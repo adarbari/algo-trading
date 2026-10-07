@@ -2,9 +2,10 @@
  * NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the
  * current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links are
  * plain anchors unless `renderLink` renders the app's router link with the given props (the
- * design system never imports the router). For switching views inside a page use Tabs.
+ * design system never imports the router). One row that scrolls sideways when the sections do
+ * not fit, the current link scrolled into view. For switching views inside a page use Tabs.
  */
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import styles from './NavTabs.module.css';
 
@@ -42,8 +43,15 @@ export function NavTabs({
   'aria-label': ariaLabel,
   renderLink = anchor,
 }: NavTabsProps) {
+  const navRef = useRef<HTMLElement>(null);
+  // Keep the current section visible in the scrolling row (jsdom has no scrollIntoView).
+  useEffect(() => {
+    const active = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- absent in jsdom
+    active?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
+  }, [activeHref]);
   return (
-    <nav aria-label={ariaLabel} className={styles.nav}>
+    <nav ref={navRef} aria-label={ariaLabel} className={styles.nav}>
       {items.map((item) => {
         const active = item.href === activeHref;
         return (

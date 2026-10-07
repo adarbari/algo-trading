@@ -260,6 +260,21 @@ describe('ScreenerResults', () => {
     expect(focus.row.symbol).toBe('KO');
   });
 
+  it('on a phone opens the chosen row in a sheet, never the first-row fallback', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    try {
+      const renderDetail = vi.fn(() => 'pick detail');
+      const { props, rerender } = setup({ renderDetail });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      rerender(<ScreenerResults {...props} focusId="EQ:KO" />);
+      expect(screen.getByRole('dialog', { name: 'KO' })).toHaveTextContent('pick detail');
+      await userEvent.keyboard('{Escape}');
+      expect(props.onFocusChange).toHaveBeenLastCalledWith(null);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('says when the screener has no run for the session', () => {
     const none = served();
     hooks.useScreenerResults.mockReturnValue(

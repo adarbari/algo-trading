@@ -3,20 +3,34 @@
  * latest session (its run for exactly that session, never an older one), with the decision,
  * rank and score its run stored and why it is not simply qualified.
  */
-import { KeyValue, Panel, Stack, Text, type KeyValueItem } from '@algotrade/ui';
+import { Button, KeyValue, Panel, Stack, Text, type KeyValueItem } from '@algotrade/ui';
 
 import { DecisionBadge, decisionLabel, useScreenerHits } from '@/entities/screen';
 
 export interface ScreenerHitsPanelProps {
   symbol: string;
+  /** Opens the screener's results page; with it each screener's name is a button. */
+  onOpenScreener?: (screenerId: string) => void;
 }
 
-export function ScreenerHitsPanel({ symbol }: ScreenerHitsPanelProps) {
+export function ScreenerHitsPanel({ symbol, onOpenScreener }: ScreenerHitsPanelProps) {
   const query = useScreenerHits(symbol);
   const data = query.data;
   const items = (data?.hits ?? []).map(({ screener, result }): KeyValueItem => ({
     id: screener.id,
-    label: screener.name,
+    label: onOpenScreener ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          onOpenScreener(screener.id);
+        }}
+      >
+        {screener.name}
+      </Button>
+    ) : (
+      screener.name
+    ),
     hint: [
       `#${String(result.rank)}`,
       result.score === null ? null : `score ${String(Math.round(result.score))}`,

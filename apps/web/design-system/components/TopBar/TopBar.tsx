@@ -1,7 +1,8 @@
 /**
  * TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the
  * workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search
- * box, "As of Fri 2 Oct", the latest-run note). Slots wrap onto new lines at phone width.
+ * box, "As of Fri 2 Oct", the latest-run note). Under 720 px (container width) the bar is two rows: brand, workspace switch and end slot, then
+ * the nav full width.
  */
 import type { ReactNode } from 'react';
 
@@ -23,7 +24,7 @@ export function TopBar({ brand, workspace, nav, end }: TopBarProps) {
     <header className={styles.topBar}>
       <span className={styles.brand}>{brand}</span>
       {workspace}
-      {nav}
+      {nav && <div className={styles.nav}>{nav}</div>}
       {end && <div className={styles.end}>{end}</div>}
     </header>
   );

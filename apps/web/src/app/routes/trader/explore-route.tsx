@@ -31,6 +31,7 @@ function ExploreRoute() {
       search={search}
       onSearchChange={onSearchChange}
       onOpenBuilder={() => void navigate({ to: '/screeners/new' })}
+      onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
     />
   );
 }

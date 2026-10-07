@@ -10,9 +10,11 @@ import { useIdeas } from '@/entities/idea';
 export interface ScreenerRankingProps {
   /** Open the screener Builder for a new screener. */
   onNewScreener: () => void;
+  /** Open one screener's results (its name in the list). */
+  onOpenScreener: (screenerId: string) => void;
 }
 
-export function ScreenerRanking({ onNewScreener }: ScreenerRankingProps) {
+export function ScreenerRanking({ onNewScreener, onOpenScreener }: ScreenerRankingProps) {
   const ideas = useIdeas();
   const screeners = ideas.data?.screeners ?? [];
   const state =
@@ -38,7 +40,7 @@ export function ScreenerRanking({ onNewScreener }: ScreenerRankingProps) {
         </Button>
       }
     >
-      <ScreenerPriorityList screeners={screeners} />
+      <ScreenerPriorityList screeners={screeners} onOpenScreener={onOpenScreener} />
     </Panel>
   );
 }

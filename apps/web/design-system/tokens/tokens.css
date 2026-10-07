@@ -43,6 +43,7 @@
   --size-icon-lg: 16px;
   --size-popover: 280px;
   --size-search: 220px;
+  --size-phone: 375px;
   --radius-none: 0;
   --radius-sm: 3px;
   --radius-md: 4px;
@@ -225,6 +226,14 @@
   --density-panel-padding-x: 20px;
   --density-panel-padding-y: 14px;
   --density-gap: 12px;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --density-control-height: 36px;
+    --density-row-height: 40px;
+    --density-cell-padding-y: 9px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

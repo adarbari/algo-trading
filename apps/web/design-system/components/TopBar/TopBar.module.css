@@ -1,5 +1,6 @@
-/* TopBar: a surface strip with a bottom border; slots wrap at narrow widths. */
+/* TopBar: a surface strip with a bottom border; under 720px the nav takes its own full-width row. */
 .topBar {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
@@ -24,4 +25,17 @@
   min-width: 0;
   margin-inline-start: auto;
   color: var(--color-muted);
+}
+
+.nav {
+  display: contents;
+}
+
+@container (width < 720px) {
+  .nav {
+    display: block;
+    flex-basis: 100%;
+    order: 1;
+    min-width: 0;
+  }
 }

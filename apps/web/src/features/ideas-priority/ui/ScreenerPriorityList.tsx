@@ -8,7 +8,13 @@ import { ScreenerRow, type ScreenerSummary } from '@/entities/idea';
 
 import { useSavePriority } from '../api/hooks';
 
-export function ScreenerPriorityList({ screeners }: { screeners: readonly ScreenerSummary[] }) {
+export interface ScreenerPriorityListProps {
+  screeners: readonly ScreenerSummary[];
+  /** Open a screener's results (its name is a button). */
+  onOpenScreener?: (screenerId: string) => void;
+}
+
+export function ScreenerPriorityList({ screeners, onOpenScreener }: ScreenerPriorityListProps) {
   const save = useSavePriority();
   return (
     <SortableList<ScreenerSummary>
@@ -16,7 +22,13 @@ export function ScreenerPriorityList({ screeners }: { screeners: readonly Screen
       items={screeners}
       getKey={(s) => s.id}
       getLabel={(s) => s.name}
-      renderItem={(screener, { index }) => <ScreenerRow screener={screener} rank={index + 1} />}
+      renderItem={(screener, { index }) => (
+        <ScreenerRow
+          screener={screener}
+          rank={index + 1}
+          {...(onOpenScreener ? { onOpen: onOpenScreener } : {})}
+        />
+      )}
       onReorder={(next) => {
         save.mutate(next.map((s) => s.id));
       }}

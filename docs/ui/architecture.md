@@ -28,6 +28,7 @@ system; everything else composes it in layers that import only downward.
 | Story / unit test | next to the component (`Name.stories.tsx`, `Name.test.tsx`) or module (`x.test.ts`) |
 | End-to-end test (mocked API) / real-app smoke / screenshot suite | `apps/web/e2e/` / `apps/web/real/` / `apps/web/visual/` |
 | Lint rule, generator, check | `apps/web/lint-rules/`, `apps/web/scripts/` |
+| A hook that measures a component's own width (tree changes below a breakpoint) | `apps/web/design-system/responsive/` (`useNarrow`); never in `src/` |
 
 Nothing fits? Add a folder for the new kind, declare it as a `[[web_dir]]` in
 `architecture/web_layout.toml` with a purpose, and never park code in a neighbour.
@@ -101,6 +102,7 @@ Every message names its rule (`[ADR 0025 rule n]`), this page and the skill with
 | 6 | Every design-system component: stories for Default / Loading / Empty / Error / Dense (or the reason not), unit test with axe, screenshots light + dark | `npm run ds:check`; `test_layout_web.py`; Playwright visual suite (screenshot diff + axe incl. contrast, every story, both themes) |
 | 7 | No grab-bag module names (`utils.ts`, `helpers.ts`, ...) | `test_layout_web.py` (`[banned_module_names]`) |
 | 8 | Accessible: keyboard and labels for interactive components | `eslint-plugin-jsx-a11y` (strict); axe in unit, visual and e2e tests |
+| 9 | One tree for phones and desktops (ADR 0052): layout by container query, a multi-column `Grid` outside the design system passes `collapse`, a list beside its detail is `MasterDetail`, touch sizing from the density tokens, nothing hover-only | ESLint `[ADR 0025 rule 9]` (`lint-rules/responsive.js`); `ds:check` (a `Narrow` story for every component with a container or coarse-pointer rule); the e2e `phone` project (`e2e/phone.spec.ts`); skill `.claude/skills/responsive-ui` |
 
 Every folder under `apps/web` is declared in `architecture/web_layout.toml` (`[[web_dir]]`, with
 `kind` = layer / slice / segment / component / screenshots); an undeclared folder fails

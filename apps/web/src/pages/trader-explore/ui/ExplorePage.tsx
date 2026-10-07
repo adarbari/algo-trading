@@ -1,11 +1,13 @@
 /**
  * Trader > Explore: one page for the universe, instruments, chains and features. Left, the
  * ticker table (the feature table over the universe: filters, catalogue columns, sorting and
- * paging on the server, selection into the compare set); right, the detail tabs for the
- * compare set and the focused ticker. Every choice lives in the URL's search params (given as
- * props by the route), so a view is a shareable link.
+ * paging on the server, selection into the compare set); right, the compare bar and the detail
+ * tabs for the compare set and the focused ticker. On a phone the table takes the width, the
+ * compare bar sits above it, and a chosen ticker's detail opens in a sheet (MasterDetail). Every
+ * choice lives in the URL's search params (given as props by the route), so a view is a
+ * shareable link.
  */
-import { Grid, Heading, Stack, Text } from '@algotrade/ui';
+import { Heading, MasterDetail, Stack, Text } from '@algotrade/ui';
 
 import { FeatureTable } from '@/widgets/feature-table';
 import { FieldGuide } from '@/widgets/field-guide';
@@ -15,6 +17,7 @@ import { TickerFilterBar, toTableFilters, type TickerFilters } from '@/features/
 import { DEFAULT_COLUMNS, formatSort, joinList, type ExploreSearch } from '../model/search';
 import { exploreState, type SearchPatch } from '../model/state';
 
+import { CompareBar } from './CompareBar';
 import { DetailTabs } from './DetailTabs';
 import { ExploreTabs } from './ExploreTabs';
 
@@ -23,9 +26,16 @@ export interface ExplorePageProps {
   onSearchChange: (patch: SearchPatch) => void;
   /** Opens the Screener Builder (the field guide's "Add to a screen"). */
   onOpenBuilder: () => void;
+  /** Opens one screener's results (a name in the Screener hits tab). */
+  onOpenScreener?: (screenerId: string) => void;
 }
 
-export function ExplorePage({ search, onSearchChange, onOpenBuilder }: ExplorePageProps) {
+export function ExplorePage({
+  search,
+  onSearchChange,
+  onOpenBuilder,
+  onOpenScreener,
+}: ExplorePageProps) {
   const state = exploreState(search);
   const filters: TickerFilters = {
     q: search.q,
@@ -79,49 +89,63 @@ export function ExplorePage({ search, onSearchChange, onOpenBuilder }: ExplorePa
           compare, click one for its chart, options, features and events.
         </Text>
       </Stack>
-      <Grid columns={2} gap={4} collapse="lg" align="start">
-        <FeatureTable
-          label="Tickers"
-          columns={state.columns}
-          onColumnsChange={(cols) => {
-            onSearchChange({ cols: joinList(cols, DEFAULT_COLUMNS) });
-          }}
-          filters={toTableFilters(filters)}
-          header={
-            <TickerFilterBar
-              filters={filters}
-              onChange={(f) => {
-                onSearchChange({
-                  q: f.q,
-                  type: f.type,
-                  sector: f.sector,
-                  liq: f.liquidity,
-                  lev: f.leveraged,
-                  opt: f.optionable,
-                });
-              }}
-            />
-          }
-          sortMode="server"
-          sort={state.sort}
-          onSortChange={(sort) => {
-            onSearchChange({ sort: formatSort(sort) });
-          }}
-          selected={state.selected}
-          onSelectedChange={(sel) => {
-            const next = nextSelection(state.selected, sel);
-            onSearchChange({ sel: next.length > 0 ? next.join(',') : undefined });
-          }}
-          maxSelected={MAX_COMPARE}
-          onRowActivate={(focus) => {
-            onSearchChange({ focus, expiry: undefined, feature: undefined });
-          }}
-          emptyMessage={
-            search.q ? `No ticker matches “${search.q}”` : 'No tickers match these filters'
-          }
-        />
-        <DetailTabs search={search} onSearchChange={onSearchChange} />
-      </Grid>
+      <MasterDetail
+        detailKey={search.focus ?? null}
+        detailTitle={search.focus ?? state.focused}
+        onDetailClose={() => {
+          onSearchChange({ focus: undefined });
+        }}
+        summary={<CompareBar search={search} onSearchChange={onSearchChange} />}
+        master={
+          <FeatureTable
+            label="Tickers"
+            columns={state.columns}
+            onColumnsChange={(cols) => {
+              onSearchChange({ cols: joinList(cols, DEFAULT_COLUMNS) });
+            }}
+            filters={toTableFilters(filters)}
+            header={
+              <TickerFilterBar
+                filters={filters}
+                onChange={(f) => {
+                  onSearchChange({
+                    q: f.q,
+                    type: f.type,
+                    sector: f.sector,
+                    liq: f.liquidity,
+                    lev: f.leveraged,
+                    opt: f.optionable,
+                  });
+                }}
+              />
+            }
+            sortMode="server"
+            sort={state.sort}
+            onSortChange={(sort) => {
+              onSearchChange({ sort: formatSort(sort) });
+            }}
+            selected={state.selected}
+            onSelectedChange={(sel) => {
+              const next = nextSelection(state.selected, sel);
+              onSearchChange({ sel: next.length > 0 ? next.join(',') : undefined });
+            }}
+            maxSelected={MAX_COMPARE}
+            onRowActivate={(focus) => {
+              onSearchChange({ focus, expiry: undefined, feature: undefined });
+            }}
+            emptyMessage={
+              search.q ? `No ticker matches “${search.q}”` : 'No tickers match these filters'
+            }
+          />
+        }
+        detail={
+          <DetailTabs
+            search={search}
+            onSearchChange={onSearchChange}
+            onOpenScreener={onOpenScreener}
+          />
+        }
+      />
     </Stack>
   );
 }

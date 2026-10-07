@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
+import { narrow } from '../../testing';
 import { NavTabs } from './NavTabs';
 
 const TRADER = [
@@ -41,10 +42,17 @@ export const Admin: Story = {
   },
 };
 
-/** Many sections wrapping at a narrow width. */
+/** Many sections in one row that scrolls sideways. */
 export const Dense: Story = {
   args: {
     activeHref: '/s5',
     items: Array.from({ length: 9 }, (_, i) => ({ href: `/s${i + 1}`, label: `Section ${i + 1}` })),
   },
+};
+
+/** A phone frame: the row scrolls and the current section (7th) is scrolled into view. */
+export const Narrow: Story = {
+  ...Dense,
+  args: { ...Dense.args, activeHref: '/s8' },
+  decorators: [narrow],
 };

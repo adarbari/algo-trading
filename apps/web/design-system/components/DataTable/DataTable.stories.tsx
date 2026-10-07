@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useMemo, useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
+import { narrow } from '../../testing';
 import { Mono } from '../../primitives/Mono';
 import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
@@ -303,6 +304,28 @@ export const Dense: Story = {
       />
     </Stack>
   ),
+};
+
+/**
+ * On a phone (a 375 px container), scrolled sideways: the checkbox and ticker columns stay pinned
+ * at the start, over the row's background, with an end border; the other columns slide under them.
+ */
+export const Narrow: Story = {
+  render: () => (
+    <TickerTable
+      rows={smallUniverse}
+      initialSelected={['AAPL']}
+      defaultHiddenColumns={[]}
+      visibleRows={6}
+    />
+  ),
+  decorators: [narrow],
+  play: async ({ canvasElement }) => {
+    const grid = within(canvasElement).getByRole('grid');
+    grid.scrollLeft = grid.scrollWidth;
+    grid.dispatchEvent(new Event('scroll'));
+    await expect(grid.querySelector('[data-pinned="first"]')).not.toBeNull();
+  },
 };
 
 /** Comfortable density: taller rows and wider cell padding from the density tokens. */

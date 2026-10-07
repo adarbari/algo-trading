@@ -9,7 +9,8 @@
  * thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page
  * Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the
  * caller's own `rowKeys` act on it); the active row can be controlled; horizontal
- * scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
+ * scrolling on narrow widths, with the checkbox column and the first column pinned at the start
+ * (the row's key stays in view; `pinFirst`). Built on TanStack Table + Virtual, which stay internal.
  */
 import {
   useTable,
@@ -95,6 +96,11 @@ export interface DataTableProps<TRow> {
   rowLines?: 1 | 2;
   /** Toolbar content before the column picker (a count, filters). */
   toolbar?: ReactNode;
+  /**
+   * Pin the checkbox column and the first column at the start while the table scrolls
+   * sideways (default true): pass false when the first column is not the row's key.
+   */
+  pinFirst?: boolean;
 }
 
 const EMPTY_IDS: readonly string[] = [];
@@ -134,9 +140,12 @@ export function DataTable<TRow extends RowData>({
   visibleRows = 12,
   rowLines = 1,
   toolbar,
+  pinFirst = true,
 }: DataTableProps<TRow>) {
   const id = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Scrolled sideways: the pinned column shows its end border over the cells sliding under it.
+  const [scrolledX, setScrolledX] = useState(false);
   const { base: baseHeight, row: rowHeight } = useRowHeight(scrollRef, rowLines);
 
   // Sort and hidden columns: controlled when the prop is given, otherwise owned here.
@@ -279,6 +288,7 @@ export function DataTable<TRow extends RowData>({
   const gridVars = {
     '--dt-columns': template,
     '--dt-min-width': minWidth,
+    '--dt-pin-offset': selectable ? 'var(--dt-w-select)' : '0',
     '--dt-visible-rows': visibleRows,
     '--dt-row-lines': rowLines,
   } as CSSProperties;
@@ -289,6 +299,19 @@ export function DataTable<TRow extends RowData>({
   const activeVisible =
     activeIndex >= 0 && virtualizer.getVirtualItems().some((item) => item.index === activeIndex);
   const colCount = visibleColumns.length + (selectable ? 1 : 0);
+  const firstColumnId = visibleColumns[0]?.id;
+  /** `data-pinned` of the checkbox cell, of a column's cells, or of a placeholder cell by index. */
+  const pinSelect = pinFirst && selectable ? ('select' as const) : undefined;
+  const pinColumn = (columnId: string) =>
+    pinFirst && columnId === firstColumnId ? ('first' as const) : undefined;
+  const pinCell = (index: number) =>
+    !pinFirst
+      ? undefined
+      : selectable && index === 0
+        ? 'select'
+        : index === (selectable ? 1 : 0)
+          ? 'first'
+          : undefined;
 
   const pickerColumns = columns.map((column) => ({
     id: column.id,
@@ -340,6 +363,11 @@ export function DataTable<TRow extends RowData>({
         aria-activedescendant={activeVisible && activeId !== null ? rowIdFor(activeId) : undefined}
         tabIndex={0}
         data-lines={rowLines}
+        data-scrolled-x={scrolledX || undefined}
+        onScroll={(event) => {
+          const next = event.currentTarget.scrollLeft > 0;
+          if (next !== scrolledX) setScrolledX(next);
+        }}
         onKeyDown={onKeyDown}
         onClick={onClick}
         onFocus={(event) => {
@@ -351,7 +379,7 @@ export function DataTable<TRow extends RowData>({
             {table.getHeaderGroups().map((group) => (
               <div key={group.id} className={styles.row} role="row" aria-rowindex={1}>
                 {selectable && (
-                  <div className={styles.selectCell} role="columnheader">
+                  <div className={styles.selectCell} role="columnheader" data-pinned={pinSelect}>
                     <Checkbox
                       label="Select all rows"
                       hideLabel
@@ -377,6 +405,7 @@ export function DataTable<TRow extends RowData>({
                       className={styles.headerCell}
                       role="columnheader"
                       data-align={align}
+                      data-pinned={pinColumn(column.id)}
                       aria-sort={
                         canSort
                           ? sorted === 'asc'
@@ -441,7 +470,12 @@ export function DataTable<TRow extends RowData>({
                   data-placeholder
                 >
                   {Array.from({ length: colCount }, (__, cell) => (
-                    <div key={cell} className={styles.cell} role="gridcell">
+                    <div
+                      key={cell}
+                      className={styles.cell}
+                      role="gridcell"
+                      data-pinned={pinCell(cell)}
+                    >
                       <span className={styles.placeholder} aria-hidden="true" />
                     </div>
                   ))}
@@ -470,7 +504,7 @@ export function DataTable<TRow extends RowData>({
                     data-row-id={row.id}
                   >
                     {selectable && (
-                      <div className={styles.selectCell} role="gridcell">
+                      <div className={styles.selectCell} role="gridcell" data-pinned={pinSelect}>
                         <Checkbox
                           label={`Select ${getRowLabel ? getRowLabel(row.original) : row.id}`}
                           hideLabel
@@ -491,6 +525,7 @@ export function DataTable<TRow extends RowData>({
                           className={styles.cell}
                           role="gridcell"
                           data-align={alignOf(column)}
+                          data-pinned={pinColumn(column.id)}
                           data-mono={column.mono || undefined}
                           data-fill={column.fill?.(row.original)}
                           data-tone={

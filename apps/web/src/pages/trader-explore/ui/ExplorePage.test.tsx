@@ -193,6 +193,35 @@ describe('ExplorePage', () => {
     expect(widgets.hits).toHaveBeenLastCalledWith({ symbol: 'NVDA' });
   });
 
+  it('on a phone opens the focused ticker in a sheet and clears the focus on close', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    const onSearchChange = vi.fn();
+    try {
+      const { rerender } = render(
+        <ExplorePage
+          search={{ sel: 'AAPL,MSFT' }}
+          onSearchChange={onSearchChange}
+          onOpenBuilder={vi.fn()}
+        />,
+      );
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Remove MSFT from compare' })).toBeInTheDocument();
+      rerender(
+        <ExplorePage
+          search={{ sel: 'AAPL,MSFT', focus: 'NVDA', tab: 'hits' }}
+          onSearchChange={onSearchChange}
+          onOpenBuilder={vi.fn()}
+        />,
+      );
+      const sheet = screen.getByRole('dialog', { name: 'NVDA' });
+      expect(sheet).toHaveTextContent('screener hits');
+      await userEvent.keyboard('{Escape}');
+      expect(onSearchChange).toHaveBeenLastCalledWith({ focus: undefined });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('opens the field guide as the last tab, over the whole page without the ticker table', async () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();

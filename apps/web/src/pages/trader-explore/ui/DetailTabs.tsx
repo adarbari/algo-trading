@@ -1,5 +1,5 @@
 /**
- * The right-hand side of Explore: the compare bar and the detail tabs (Overview, Compare,
+ * The detail side of Explore: the detail tabs (Overview, Compare,
  * Chart, Options, Features, Events, Screener hits; the Field guide takes the page, see
  * ExplorePage), each tab a widget for the compare set or
  * the focused ticker. Compare is the rebased chart over the compare set's features side by
@@ -17,7 +17,6 @@ import { OptionsPanel } from '@/widgets/options-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 import { ScreenerHitsPanel } from '@/widgets/screener-hits-panel';
-import { CompareSetBar } from '@/features/compare-set';
 
 import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch } from '../model/search';
 import { exploreState, type SearchPatch } from '../model/state';
@@ -27,6 +26,8 @@ import { ExploreTabs } from './ExploreTabs';
 export interface DetailTabsProps {
   search: ExploreSearch;
   onSearchChange: (patch: SearchPatch) => void;
+  /** Opens one screener's results (the Screener hits tab). */
+  onOpenScreener?: (screenerId: string) => void;
 }
 
 function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symbol: string }) {
@@ -105,15 +106,9 @@ function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symb
   }
 }
 
-export function DetailTabs({ search, onSearchChange }: DetailTabsProps) {
+export function DetailTabs({ search, onSearchChange, onOpenScreener }: DetailTabsProps) {
   const state = exploreState(search);
   const { selected, focused, tab } = state;
-  const setSelected = (next: readonly string[]) => {
-    onSearchChange({
-      sel: next.length > 0 ? next.join(',') : undefined,
-      focus: focused && next.includes(focused) ? search.focus : undefined,
-    });
-  };
   let content;
   if (tab === 'compare') {
     const chart = (
@@ -149,7 +144,7 @@ export function DetailTabs({ search, onSearchChange }: DetailTabsProps) {
         </Stack>
       );
   } else if (tab === 'hits' && focused) {
-    content = <ScreenerHitsPanel symbol={focused} />;
+    content = <ScreenerHitsPanel symbol={focused} onOpenScreener={onOpenScreener} />;
   } else if (!focused) {
     content = (
       <EmptyState
@@ -163,23 +158,8 @@ export function DetailTabs({ search, onSearchChange }: DetailTabsProps) {
     content = <FocusedTab search={search} onSearchChange={onSearchChange} symbol={focused} />;
   }
   return (
-    <Stack gap={3}>
-      <CompareSetBar
-        symbols={selected}
-        focused={focused}
-        onRemove={(symbol) => {
-          setSelected(selected.filter((s) => s !== symbol));
-        }}
-        onClear={() => {
-          setSelected([]);
-        }}
-        onFocus={(symbol) => {
-          onSearchChange({ focus: symbol, expiry: undefined, feature: undefined });
-        }}
-      />
-      <ExploreTabs tab={tab} selectedCount={selected.length} onSearchChange={onSearchChange}>
-        {content}
-      </ExploreTabs>
-    </Stack>
+    <ExploreTabs tab={tab} selectedCount={selected.length} onSearchChange={onSearchChange}>
+      {content}
+    </ExploreTabs>
   );
 }

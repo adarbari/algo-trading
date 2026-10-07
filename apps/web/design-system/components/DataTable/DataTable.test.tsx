@@ -244,6 +244,25 @@ describe('DataTable', () => {
     expect(bodyRows().length).toBeLessThan(40);
   });
 
+  it('pins the checkbox and first columns at the start, header and rows alike', () => {
+    render(<Selectable />);
+    const grid = screen.getByRole('grid');
+    const [header, firstRow] = within(grid).getAllByRole('row');
+    const pins = (row: HTMLElement | undefined) =>
+      Array.from(row?.children ?? []).map((cell) => cell.getAttribute('data-pinned'));
+    expect(pins(header)).toEqual(['select', 'first', null, null, null, null]);
+    expect(pins(firstRow)).toEqual(['select', 'first', null, null, null, null]);
+  });
+
+  it('pins nothing with pinFirst false, and marks the grid scrolled sideways', () => {
+    render(<Table pinFirst={false} />);
+    const grid = screen.getByRole('grid');
+    expect(grid.querySelector('[data-pinned]')).toBeNull();
+    grid.scrollLeft = 40;
+    grid.dispatchEvent(new Event('scroll'));
+    expect(grid).toHaveAttribute('data-scrolled-x');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<Selectable columnPicker />);
     await expectNoA11yViolations(container);

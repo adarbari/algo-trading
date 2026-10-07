@@ -151,6 +151,7 @@ Weights: regular 400, medium 500, semibold 600 (headings).
 | Space (`--space-n`, n x 4 px) | 0, 0.5 (2), 1 (4), 1.5 (6), 2 (8), 2.5 (10), 3 (12), 4 (16), 5 (20), 6 (24), 8 (32), 10 (40) |
 | Size | `label` 140, `sidebar` 320, `page` 1600 px (max page width); `icon-sm` / `icon-md` / `icon-lg` 12 / 14 / 16; `popover` 280 (min list width); `search` 220 (top-bar search) |
 | Breakpoints (Grid `collapse`, container width) | sm 480, md 720, lg 960 px |
+| Touch (`@media (pointer: coarse)`, every density) | control 36, row 40, cell padding y 9 px (`density.touch`): controls, rows and every small variant keep at least the control height |
 | Radius | none 0, sm 3 (bars, tracks), md 4 (controls, chips), lg 6 (panels) |
 | Border | thin 1 px (all surfaces), thick 2 px; focus ring 2 px solid accent, offset 1 px |
 | Motion | fast 100 ms, base 150 ms, `cubic-bezier(0.2, 0, 0, 1)`; 0 ms under reduced motion |
@@ -283,6 +284,7 @@ macro circle) and a letter each (E, F, M).
 | `Popover` | A panel anchored to a trigger, opened by click (column picker, filter editor) | `trigger(props)` wires ref, `aria-expanded` / `aria-controls` / `aria-haspopup`; non-modal dialog; Escape / outside click close and return focus; `trapFocus` optional; flips / shifts / fits the viewport |
 | `Dialog` | A short modal task or confirmation | Controlled; title = name, description; focus to the first control in the body, Tab trapped, focus returns to the opener; Escape / close / backdrop (unless `dismissible={false}`); scroll locked |
 | `Drawer` | Side sheet for detail in context | Same modal behaviour; `side` end / start; `size` sm / md / lg |
+| `MasterDetail` | A list beside its detail (Explore, screener results): the one way a page shows a detail for a chosen row (ADR 0052) | `master`, `detail`, `detailKey` (the chosen item; null none), `detailTitle` / `detailDescription`, `onDetailClose`, `summary` (narrow only, above the list), `columns` 2 / `main-aside`, `collapse` md / lg. Wide: a Grid of the two. Narrow (`useNarrow`): the list; the detail in a Drawer that opens when `detailKey` changes and calls `onDetailClose` on dismiss (the caller clears the choice) |
 | `Kbd` | A key or shortcut in text | `keys={['Ctrl', 'K']}` |
 
 **Why Floating UI.** Overlays are built on `@floating-ui/react` (MIT): positioning (flip,
@@ -317,6 +319,11 @@ With PR 4 the catalogue covers every v1 screen (Ideas, Screener builder, Explore
 3. **Then use it** from the app (`src/`, through the layer that owns it: architecture.md).
 4. Screens contain layout and data wiring only: no raw colours, no one-off spacing, no styled
    HTML elements.
+5. **Phones and desktops from the one component** (ADR 0052, `.claude/skills/responsive-ui`):
+   layout reacts to the container's width (`@container` at the breakpoint tokens; `useNarrow`
+   from `design-system/responsive/` when the tree must change), touch sizing comes from the
+   density tokens under a coarse pointer, nothing is hover-only, a list beside its detail is
+   `MasterDetail`, and a component with a container or coarse-pointer rule has a `Narrow` story.
 
 ## Enforcement (CI)
 
@@ -329,6 +336,7 @@ With PR 4 the catalogue covers every v1 screen (Ideas, Screener builder, Explore
 | `COMPONENTS.md` and `tokens.css` are up to date | regenerated in CI (`npm run generated:check`); fails on diff |
 | Screenshot changes are reviewed; contrast holds in light and dark | Playwright visual suite over every story (screenshot diff + axe), Linux image |
 | 1000-line file limit also covers `.ts` / `.tsx` / `.css` | `scripts/check_file_length.py` |
+| Phones: a multi-column `Grid` outside the design system passes `collapse`; a responsive component has a `Narrow` story; every section route and the master-detail / link flows work at iPhone width | ESLint `[ADR 0025 rule 9]`, `npm run ds:check`, the e2e `phone` project (`e2e/phone.spec.ts`) |
 
 ## Before any screen is built
 
