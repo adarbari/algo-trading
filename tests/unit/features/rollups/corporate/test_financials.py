@@ -1,12 +1,14 @@
-"""``financials@v1``: discrete quarters from year-to-date facts (the fourth quarter as annual
-minus nine months), four-quarter and annual TTMs, the year-ago TTM, restatements and filing
-dates (point in time), split-adjusted EPS, the statuses (OK / PARTIAL / NO_TTM / NO_FACTS /
-STALE), and the ``pe_ratio`` / ``revenue_growth_yoy`` expression features."""
+"""``financials@v2``: discrete quarters from year-to-date facts (the fourth quarter as annual
+minus nine months), four-quarter and annual TTMs, the year-ago TTMs, the latest quarter and
+the same quarter a year earlier, restatements and filing dates (point in time), split-adjusted
+EPS, the statuses (OK / PARTIAL / NO_TTM / NO_FACTS / STALE), the ``pe_ratio`` /
+``revenue_growth_yoy`` expression features, and that every v1 column is unchanged."""
 
 from calendar import monthrange
 from dataclasses import replace
 from datetime import date, timedelta
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -19,6 +21,7 @@ from algotrade.features.rollups.corporate.financials import (
     FinancialsParams,
     annual,
     discrete_quarters,
+    latest_quarter,
     months,
     split_adjusted,
     trailing,
@@ -418,13 +421,192 @@ def test_params_validate_and_catalogue_fields() -> None:
         replace(FinancialsParams(), stale_days=0)
     with pytest.raises(ValueError, match="history_days"):
         replace(FinancialsParams(), history_days=300)
-    columns = catalogue_columns()["financials@v1"]
+    columns = catalogue_columns()["financials@v2"]
     assert columns["revenue_ttm"] == "float" and columns["eps_diluted_ttm"] == "float32"
     assert columns["financials_status"] == "str" and columns["revenue_fy_end"] == "date"
-    assert field_source("rollup.financials@v1.net_income_ttm") == (
-        "rollups/instrument/financials@v1",
+    assert field_source("rollup.financials@v2.net_income_ttm") == (
+        "rollups/instrument/financials@v2",
         "net_income_ttm",
     )
+
+
+# What financials@v1 computed for the facts of ``_setup`` (recorded from the v1 module before it
+# was replaced; dates as ISO strings): every v2 column that existed in v1 stays identical.
+V1_COLUMNS = (
+    "revenue_ttm", "revenue_ttm_year_ago", "net_income_ttm", "eps_diluted_ttm", "revenue_fy",
+    "revenue_fy_end", "ttm_as_of", "ttm_filed", "ttm_basis", "eps_stale", "is_adr",
+    "financials_status",
+)  # fmt: skip
+# fmt: off
+V1_END = {
+    "EQ:A": (535.0, 445.0, 53.5, 5.349999904632568, 480.0, "2025-12-31", "2026-06-30",
+             "2026-08-04", "QUARTERS", False, False, "OK"),
+    "EQ:ADR": (535.0, 445.0, None, 5.349999904632568, 480.0, "2025-12-31", "2026-06-30",
+               "2026-08-04", "QUARTERS", False, True, "PARTIAL"),
+    "EQ:B": (1200.0, 1000.0, 120.0, 1.2000000476837158, 1200.0, "2025-12-31", "2025-12-31",
+             "2026-03-01", "ANNUAL", False, False, "OK"),
+    "EQ:C": (50.0, None, None, None, 50.0, "2025-12-31", "2025-12-31", "2026-03-01", "ANNUAL",
+             None, False, "PARTIAL"),
+    "EQ:D": (70.0, None, 7.0, 0.699999988079071, 70.0, "2024-12-31", "2024-12-31", "2025-03-01",
+             "ANNUAL", True, False, "STALE"),
+    "EQ:E": (None, None, None, None, None, None, None, None, None, None, False, "NO_TTM"),
+    "EQ:ETF": (None, None, None, None, None, None, None, None, None, None, False, "NO_FACTS"),
+    "EQ:LOSS": (None, None, -53.5, -5.349999904632568, None, None, "2026-06-30", "2026-08-04",
+                "QUARTERS", False, False, "PARTIAL"),
+    "EQ:M": (80.0, None, None, 5.349999904632568, 80.0, "2024-12-31", "2024-12-31", "2025-03-01",
+             "ANNUAL", False, False, "STALE"),
+    "EQ:S": (None, None, None, 5.349999904632568, None, None, "2026-06-30", "2026-08-04",
+             "QUARTERS", False, False, "PARTIAL"),
+}
+
+V1_JULY = {
+    "EQ:A": (510.0, 430.0, 51.0, 5.099999904632568, 480.0, "2025-12-31", "2026-03-31",
+             "2026-05-05", "QUARTERS", False, False, "OK"),
+    "EQ:B": (1200.0, 1000.0, 120.0, 1.2000000476837158, 1200.0, "2025-12-31", "2025-12-31",
+             "2026-03-01", "ANNUAL", False, False, "OK"),
+}
+
+# fmt: on
+
+
+def _recorded(rows: pd.DataFrame, columns: tuple[str, ...]) -> dict[str, tuple[object, ...]]:
+    """The rows' columns as plain values: nulls None, dates ISO strings, flags bool."""
+
+    def plain(value: object) -> object:
+        if value is None or (not isinstance(value, str | bool | date) and pd.isna(value)):
+            return None
+        if isinstance(value, date):
+            return value.isoformat()
+        return bool(value) if isinstance(value, bool | np.bool_) else value
+
+    return {iid: tuple(plain(row[c]) for c in columns) for iid, row in rows.iterrows()}
+
+
+def test_every_v1_column_is_unchanged() -> None:
+    reader, _ = _setup()
+    out = _rows(reader, [date(2026, 7, 20), END])
+    assert _recorded(out[END], V1_COLUMNS) == V1_END
+    assert _recorded(out[date(2026, 7, 20)].loc[["EQ:A", "EQ:B"]], V1_COLUMNS) == V1_JULY
+
+
+def test_latest_quarter_with_the_same_quarter_a_year_earlier() -> None:
+    facts = facts_of(company_a())
+    assert latest_quarter(facts) == ((day(date(2026, 6, 30)), 140, day(date(2026, 8, 4))), 115)
+    before_q2 = [f for f in facts if f[3] < day(date(2026, 8, 4))]  # a filing date, not a period
+    assert latest_quarter(before_q2) == ((day(date(2026, 3, 31)), 130, day(date(2026, 5, 5))), 100)
+    assert latest_quarter([]) is None
+
+
+def test_the_fourth_quarter_of_a_10k_is_the_year_minus_the_nine_months() -> None:
+    facts = facts_of(company_a())
+    through_10k = [f for f in facts if f[3] <= day(date(2026, 3, 1))]
+    last, ago = latest_quarter(through_10k) or (None, None)
+    assert last == (day(date(2025, 12, 31)), 135, day(date(2026, 2, 13)))  # 480 - 345
+    assert ago == 120  # 2024's fourth quarter: 420 - 300
+    before_10k = [f for f in facts if f[3] < day(date(2026, 2, 13))]  # Q3 is the latest public
+    last, ago = latest_quarter(before_10k) or (None, None)
+    assert (last[1], ago) == (130, 110)  # type: ignore[index]
+
+
+def test_no_fourth_quarter_without_the_nine_months_is_no_quarter() -> None:
+    """The annual figure is newer than the newest quarter and cannot be split: the quarter
+    columns are null rather than an older quarter shown as the latest."""
+    facts = facts_of(company_a())
+    no_nine_months = [f for f in facts if f[3] <= day(date(2026, 3, 1))]
+    no_nine_months = [f for f in no_nine_months if f[1] != day(date(2025, 9, 30))]
+    assert latest_quarter(no_nine_months) is None
+    annual_only = facts_of([fy("EQ:B", "revenue", 2024, 1000), fy("EQ:B", "revenue", 2025, 1200)])
+    assert latest_quarter(annual_only) is None
+
+
+def test_quarter_and_year_ago_columns_on_stored_facts() -> None:
+    reader, _ = _setup()
+    out = _rows(reader, [date(2026, 7, 20), END])
+    a = out[END].loc["EQ:A"]
+    assert (a["revenue_qtr"], a["revenue_qtr_year_ago"]) == (140, 115)
+    assert (a["eps_diluted_qtr"], a["eps_diluted_qtr_year_ago"]) == (
+        pytest.approx(1.4),
+        pytest.approx(1.15),
+    )
+    assert a["eps_diluted_ttm_year_ago"] == pytest.approx(4.45)  # 1.10 + 1.20 + 1.00 + 1.15
+    assert a["qtr_as_of"] == date(2026, 6, 30)
+    early = out[date(2026, 7, 20)].loc["EQ:A"]  # Q2 2026 is filed on 2026-08-04
+    assert (early["revenue_qtr"], early["revenue_qtr_year_ago"]) == (130, 100)
+    assert early["eps_diluted_ttm_year_ago"] == pytest.approx(4.30) and early["qtr_as_of"] == date(
+        2026, 3, 31
+    )
+    annual_filer = out[END].loc["EQ:B"]  # no quarters; EPS has one fiscal year: no year ago
+    assert pd.isna(annual_filer["qtr_as_of"]) and pd.isna(annual_filer["revenue_qtr"])
+    assert pd.isna(annual_filer["eps_diluted_ttm_year_ago"])
+    assert out[END].loc["EQ:B", "revenue_ttm_year_ago"] == 1000
+    only_q1 = out[END].loc["EQ:E"]  # a quarter without a year-ago quarter or a TTM
+    assert (only_q1["revenue_qtr"], only_q1["qtr_as_of"]) == (5, date(2026, 3, 31))
+    assert pd.isna(only_q1["revenue_qtr_year_ago"]) and only_q1["financials_status"] == "NO_TTM"
+    revenue_only = out[END].loc["EQ:C"]
+    assert pd.isna(revenue_only["qtr_as_of"]) and pd.isna(revenue_only["eps_diluted_qtr"])
+    loss = out[END].loc["EQ:LOSS"]  # losses are kept; the growth expressions null them
+    assert (loss["eps_diluted_qtr"], loss["eps_diluted_qtr_year_ago"]) == (
+        pytest.approx(-1.4),
+        pytest.approx(-1.15),
+    )
+    assert pd.isna(loss["revenue_qtr"])
+
+
+def test_quarter_eps_is_split_adjusted_by_filing_date() -> None:
+    reader, _ = _setup()
+    before = date(2026, 8, 10)  # the 2:1 split of 2026-08-20 is ahead
+    out = _rows(reader, [before, END])
+    ahead, after = out[before].loc["EQ:S"], out[END].loc["EQ:S"]
+    assert (ahead["eps_diluted_qtr"], ahead["eps_diluted_qtr_year_ago"]) == (
+        pytest.approx(2.8),
+        pytest.approx(2.3),
+    )
+    assert (after["eps_diluted_qtr"], after["eps_diluted_qtr_year_ago"]) == (
+        pytest.approx(1.4),
+        pytest.approx(1.15),
+    )
+    assert after["eps_diluted_ttm_year_ago"] == pytest.approx(4.45)  # 8.9 / 2
+    assert pd.isna(after["revenue_qtr"])  # S has no revenue facts
+
+
+def test_the_quarter_columns_describe_one_quarter() -> None:
+    """Revenue is through Q2 2026, EPS only through Q1: qtr_as_of is Q2 and the EPS columns,
+    of an older quarter, are null; and a quarter older than stale_days is null throughout
+    while the TTMs stay shown."""
+    writer, reader = store()
+    write_bars(writer, {"EQ:X": series(100, 0), "EQ:OLD": series(100, 1)})
+    q1_filed = date(2026, 5, 5)
+    eps = [r for r in company_a("EQ:X", "eps_diluted", 0.01) if r["filed"] <= q1_filed]
+    old = [r for r in company_a("EQ:OLD") if r["filed"] <= date(2025, 3, 1)]
+    rows = [*company_a("EQ:X", "revenue"), *eps, *old]
+    writer.write_table("instruments/shares", STORED, "facts", stamped(rows, STORED, "facts"))
+    x = _rows(reader, [END])[END].loc["EQ:X"]
+    assert (x["qtr_as_of"], x["revenue_qtr"]) == (date(2026, 6, 30), 140)
+    assert pd.isna(x["eps_diluted_qtr"]) and pd.isna(x["eps_diluted_qtr_year_ago"])
+    stale = _rows(reader, [END])[END].loc["EQ:OLD"]  # newest quarter: 2024-12-31
+    assert stale["revenue_ttm"] == 420 and stale["financials_status"] == "STALE"
+    assert pd.isna(stale["qtr_as_of"]) and pd.isna(stale["revenue_qtr"])
+    loose = _rows(reader, [END], FinancialsParams(stale_days=900))[END].loc["EQ:OLD"]
+    assert (loose["revenue_qtr"], loose["qtr_as_of"]) == (120, date(2024, 12, 31))
+    assert pd.isna(loose["revenue_qtr_year_ago"])  # no 2023 facts
+
+
+def test_growth_expressions_end_to_end_on_stored_facts() -> None:
+    reader, _ = _setup()
+    rows = _rows(reader, [END])[END].reset_index()
+    fs = site_features(FileConfigStore(REPO_ROOT / "config"))
+    stats = pd.DataFrame(
+        {"instrument_id": rows["instrument_id"], "session_date": END, "close": 1.0}
+    )
+    frames = {price_stats.GROUP.table: stats, GROUP.table: rows.assign(session_date=END)}
+    names = ["eps_growth_yoy", "revenue_growth_qtr_yoy", "eps_growth_qtr_yoy"]
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    assert out.loc["EQ:A", "eps_growth_yoy"] == pytest.approx(5.35 / 4.45 - 1)
+    assert out.loc["EQ:A", "revenue_growth_qtr_yoy"] == pytest.approx(140 / 115 - 1)
+    assert out.loc["EQ:A", "eps_growth_qtr_yoy"] == pytest.approx(1.4 / 1.15 - 1)
+    for loss in ("EQ:LOSS", "EQ:B", "EQ:ETF"):  # a loss base, no year-ago, no facts
+        assert pd.isna(out.loc[loss, "eps_growth_yoy"]), loss
+        assert pd.isna(out.loc[loss, "eps_growth_qtr_yoy"]), loss
 
 
 def test_no_facts_table_at_all_gives_no_facts_rows() -> None:

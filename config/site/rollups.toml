@@ -56,11 +56,11 @@ source = "ours"          # "ours" (iv30@v1.iv30) or "cboe" (iv30@v1.iv30_cboe)
 window = 252             # sessions for a FULL rank (today included)
 min_provisional = 60     # sessions with an IBKR IV before the rank is shown (PROVISIONAL)
 
-["fundamentals@v2"]
+["fundamentals@v3"]
 stale_days = 400         # shares whose period ended longer ago than this are STALE (no market cap);
                          # 10-Q filers report every ~3 months, 20-F filers once a year
 
-["financials@v1"]
+["financials@v2"]
 stale_days = 480         # the oldest TTM period ended longer ago than this: STALE (still shown, no P/E);
                          # a 10-K-only or 20-F filer is up to ~15 months behind just before its next annual report
 history_days = 1100      # facts whose period ended earlier are not read (two TTMs need ~2.3 years)

@@ -37,3 +37,66 @@ description = "Revenue growth year over year: the trailing-twelve-month revenue 
 null_meaning = "revenue_ttm or revenue_ttm_year_ago is null (fewer than two years of reported quarters or fiscal years), or the year-ago revenue is not positive"
 valid_range = [-1, inf]
 version = 1
+
+[ps_ratio]
+expr = 'if(financials.revenue_ttm > 0 and financials.financials_status != "STALE" and not financials.is_adr, market_cap / financials.revenue_ttm, null)'
+dtype = "float"
+unit = "ratio"
+description = "Price to sales: market_cap / revenue over the trailing twelve months (the company total on both sides; 2 means the market pays $2 for each dollar of yearly sales)"
+null_meaning = "market_cap is null (no count, a stale count, or no close), revenue_ttm is null (no revenue fact, or no TTM can be formed) or not positive, the revenue TTM is stale (financials_status STALE: the first TTM ended more than stale_days before the session), or the instrument is an ADR (its market cap uses the ordinary-share count)"
+valid_range = [0, inf]
+version = 1
+
+[net_margin]
+expr = 'if(financials.revenue_ttm > 0 and financials.financials_status != "STALE", financials.net_income_ttm / financials.revenue_ttm, null)'
+dtype = "float"
+unit = "decimal"
+description = "Net margin: net income over the trailing twelve months / revenue over the same window; 0.10 is 10 cents of profit on each dollar of sales, negative for a loss"
+null_meaning = "net_income_ttm or revenue_ttm is null (no fact, or no TTM can be formed), the revenue is not positive, or the TTM is stale (financials_status STALE)"
+valid_range = [-inf, inf]
+version = 1
+
+[payout_ratio]
+expr = "if(financials.eps_diluted_ttm != 0 and not financials.eps_stale and not financials.is_adr, dividends.div_ttm / financials.eps_diluted_ttm, null)"
+dtype = "float"
+unit = "decimal"
+description = "Dividend payout ratio: dividends per share over the trailing 365 days / diluted EPS over the trailing twelve months; 0.5 means half the earnings is paid out, above 1 more than the company earns. A negative value is a dividend payer with negative earnings (not a negative payout); 0 is a known non-payer"
+null_meaning = "dividends div_ttm is null (no dividend in the window and too little bar history to call it a non-payer), financials eps_diluted_ttm is null or 0, the EPS TTM is stale (eps_stale), or the instrument is an ADR (its EPS is per ordinary share, the dividend per ADR)"
+valid_range = [-inf, inf]
+version = 1
+
+[eps_growth_yoy]
+expr = "if(financials.eps_diluted_ttm_year_ago > 0 and not financials.eps_stale, financials.eps_diluted_ttm / financials.eps_diluted_ttm_year_ago - 1, null)"
+dtype = "float"
+unit = "decimal"
+description = "Diluted EPS growth year over year: the trailing-twelve-month EPS against the same TTM a year earlier; 0.25 is +25%. A negative value is a decline, below -1 means the EPS turned negative"
+null_meaning = "eps_diluted_ttm or its year-ago value is null (fewer than two years of reported quarters or fiscal years, or a gap), the year-ago EPS is 0 or negative (a growth rate from a loss or from nothing is meaningless: the field is null, not infinite or negative), or the EPS TTM is stale (eps_stale)"
+valid_range = [-inf, inf]
+version = 1
+
+[revenue_growth_qtr_yoy]
+expr = "if(financials.revenue_qtr_year_ago > 0, financials.revenue_qtr / financials.revenue_qtr_year_ago - 1, null)"
+dtype = "float"
+unit = "decimal"
+description = "Revenue growth of the latest reported quarter against the same quarter a year earlier; 0.25 is +25%"
+null_meaning = "revenue_qtr or revenue_qtr_year_ago is null (no discrete quarter can be formed, the quarter is stale, or the quarter a year earlier is not known), or the year-ago revenue is not positive"
+valid_range = [-1, inf]
+version = 1
+
+[eps_growth_qtr_yoy]
+expr = "if(financials.eps_diluted_qtr_year_ago > 0, financials.eps_diluted_qtr / financials.eps_diluted_qtr_year_ago - 1, null)"
+dtype = "float"
+unit = "decimal"
+description = "Diluted EPS growth of the latest reported quarter against the same quarter a year earlier (CAN SLIM's C); 0.25 is +25%. A negative value is a decline, below -1 means the quarter's EPS turned negative"
+null_meaning = "eps_diluted_qtr or eps_diluted_qtr_year_ago is null (no discrete quarter can be formed, the quarter is stale, or the quarter a year earlier is not known), or the year-ago EPS is 0 or negative (a growth rate from a loss or from nothing is meaningless: null, not infinite or negative)"
+valid_range = [-inf, inf]
+version = 1
+
+[shares_change_yoy]
+expr = 'if(fundamentals.shares_outstanding_year_ago > 0 and fundamentals.market_cap_status != "STALE", fundamentals.shares_outstanding / fundamentals.shares_outstanding_year_ago - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Change of the share count over a year: shares_outstanding / the count a year earlier - 1; negative is buybacks (the count shrinks), positive is dilution (issuance, options, an acquisition paid in shares); 0.02 is +2%"
+null_meaning = "shares_outstanding or shares_outstanding_year_ago is null (no count, or none whose period ended 9 to 15 months before shares_as_of under the same concept: a company that began tagging the cover page recently has no cover count a year back), or the count is stale (market_cap_status STALE: the change would be of an old year)"
+valid_range = [-1, inf]
+version = 1

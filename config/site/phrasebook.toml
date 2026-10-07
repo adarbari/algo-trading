@@ -110,6 +110,41 @@ fields = ["feature.pe_ratio", "feature.revenue_growth_yoy"]
 hint = "pe_ratio lt 15 (trailing); 'growing revenue' is revenue_growth_yoy gt 0.10 (a fraction)"
 
 [[phrase]]
+say = ["cheap on sales", "low price to sales", "low P/S"]
+fields = ["feature.ps_ratio", "feature.net_margin"]
+hint = "ps_ratio lt 2 (market cap over trailing sales), soft with tolerance 0.5; add net_margin gt 0.05 so it is not just a thin margin; '5 to 10' is the growth price, ps_ratio between 5 and 10"
+
+[[phrase]]
+say = ["high margin", "high margins", "fat margins"]
+fields = ["feature.net_margin"]
+hint = "net_margin gte 0.10 (a fraction, 0.10 is 10%) for a healthy business, soft with tolerance 0.03; gte 0.20 for a franchise; margins differ by sector, so pair with an instrument.sector gate"
+
+[[phrase]]
+say = ["safe dividend", "sustainable dividend", "covered dividend"]
+fields = ["feature.payout_ratio", "feature.div_yield"]
+hint = "payout_ratio between 0 and 0.60 (a fraction; never a bare lt 0.6: a negative payout is a payer with negative earnings) and div_yield gte 0.02 so there is a dividend; above 1.0 is unsustainable"
+
+[[phrase]]
+say = ["earnings growth", "growing earnings", "EPS growth"]
+fields = ["feature.eps_growth_qtr_yoy", "feature.eps_growth_yoy"]
+hint = "eps_growth_qtr_yoy gte 0.25 (the latest quarter against a year earlier, a fraction) and eps_growth_yoy gte 0.25 for the year, soft with tolerance 0.05; both are null from a loss, so a turnaround is not matched"
+
+[[phrase]]
+say = ["accelerating earnings", "earnings acceleration", "CAN SLIM earnings"]
+fields = ["feature.eps_growth_qtr_yoy", "feature.eps_growth_yoy", "feature.revenue_growth_qtr_yoy"]
+hint = "eps_growth_qtr_yoy gte 0.25 as the gate, eps_growth_yoy gte 0.25 and revenue_growth_qtr_yoy gte 0.25 as confirmations; accelerating means the quarterly rate is above the yearly one, which the rule grammar cannot compare, so state both thresholds"
+
+[[phrase]]
+say = ["buying back shares", "buybacks", "shrinking share count"]
+fields = ["feature.shares_change_yoy"]
+hint = "shares_change_yoy lte -0.01 (a fraction, -0.03 is a 3% smaller count), soft with tolerance 0.01; 1 to 5% a year is a steady repurchaser"
+
+[[phrase]]
+say = ["diluting", "dilution", "issuing shares"]
+fields = ["feature.shares_change_yoy"]
+hint = "shares_change_yoy gt 0.10 finds dilution above 10% a year; 'no dilution' is shares_change_yoy lte 0.10, soft with tolerance 0.03"
+
+[[phrase]]
 say = ["near support", "near resistance", "room to run"]
 fields = ["feature.dist_to_support", "feature.dist_to_resistance"]
 hint = "near support: dist_to_support lte 0.03 (fraction of price); room to run: dist_to_resistance gte 0.10"
