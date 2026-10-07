@@ -87,4 +87,5 @@ enforced_by = ["review (import.meta.env is read only in shared/config)"]
 id = "web-container-width"
 description = "Measuring a component's own width against a breakpoint token when its tree (not only its CSS) changes on a phone (useNarrow; ADR 0052)"
 owner = ["apps/web/design-system/responsive/*"]
-section = "docs/adr/0052-one-ui-for-phones-and-desktops.md"
+section = "docs/adr/0052-one-ui-for-phones-and-desktops.md#decision"
+enforced_by = ["eslint no-restricted-globals / no-restricted-syntax (apps/web/lint-rules/restrictions.js: no matchMedia / ResizeObserver in src)", "review: a tree that changes by width calls useNarrow from @algotrade/ui internals only (the hook is not exported to src)"]
