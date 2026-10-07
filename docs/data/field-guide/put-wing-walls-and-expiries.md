@@ -421,7 +421,7 @@ Sources: Site convention (features/rollups/positioning/implied_move.py)
 
 - It prices the whole period to the move expiry, not a day. With rollup.implied_move@v1.move_basis EARNINGS it includes the report; with TERM it is a month of ordinary movement. Read move_basis and rollup.implied_move@v1.move_dte before comparing two names.
 - The straddle also prices in the volatility premium, so options usually imply more than the stock then delivers. feature.implied_move_vs_hv is the comparison with recent realised movement.
-- Interpolated in strike to the closing price from stored end-of-day mids; a wide-spread chain is null (rollup.implied_move@v1.move_status), never guessed.
+- Interpolated in strike to the closing price from stored end-of-day mids; a wide-spread chain is null (rollup.implied_move@v1.move_status), never guessed. When only one of the two strikes around the price has usable quotes its straddle stands in, which is biased when the strikes are far apart relative to the move (a $20 stock with $2.50 strikes a week out).
 - Null when the status is not OK.
 
 Sources: Expected move from the at-the-money straddle (about 0.8 x sigma x sqrt(t) x S): https://www.tastylive.com/concepts-strategies/expected-move
@@ -516,7 +516,7 @@ Sources: Expected move and one standard deviation: https://www.tastylive.com/con
 
 ### `feature.implied_move_vs_hv`
 
-**How to read it.** How much more the straddle prices than recent realised movement would: rollup.implied_move@v1.implied_move over HV20 scaled to the move expiry (hv20 x sqrt(days / 365)). 1 means the options price what the last 20 sessions delivered, 1.5 half again more, 0.7 less. Above 1.2 options are rich against realised, which favours selling premium; below 0.8 they are cheap.
+**How to read it.** How much more the straddle prices than recent realised movement would: the one-standard-deviation implied move (feature.implied_move_1sd) over HV20 scaled to the move expiry (hv20 x sqrt(days / 365)), so 1 means the options price what the last 20 sessions delivered (implied volatility equal to HV20), 1.5 half again more, 0.7 less. Above 1.2 options are rich against realised, which favours selling premium; below 0.8 they are cheap.
 
 **The criterion per intent**
 

@@ -64,6 +64,7 @@ _ROW = "instrument_id"
 _OPTIONABLE = "instrument.optionable"
 _SECURITY_TYPE = "instrument.security_type"
 _SIC = "instrument.sic"  # company snapshot on or before the session (ADR 0045)
+_LEVERAGED, _INVERSE = "instrument.is_leveraged", "instrument.is_inverse"
 type Reasons = tuple[frozenset[str], tuple[StatusRule, ...]]  # FeatureSet.applicability
 # What an EXPLAINED value's detail adds after "<status> is <reason> for <id> on <day>".
 _EXPLAINED = {
@@ -98,6 +99,7 @@ def _reason_fields(reasons: Reasons) -> list[str]:
     return [
         *([_OPTIONABLE] if "optionable" in applies else []),
         *([_SECURITY_TYPE, _SIC] if "operating_company" in applies else []),
+        *([_LEVERAGED, _INVERSE] if "leveraged_fund" in applies else []),
         *(field for field, _, _, _ in statuses),
     ]
 
@@ -139,6 +141,8 @@ def _not_applicable(
         _flag(row.get(_OPTIONABLE)) if "optionable" in applies else None,
         _text(row.get(_SECURITY_TYPE)) if "operating_company" in applies else None,
         _text(row.get(_SIC)) if "operating_company" in applies else None,
+        _flag(row.get(_LEVERAGED)) if "leveraged_fund" in applies else None,
+        _flag(row.get(_INVERSE)) if "leveraged_fund" in applies else None,
     )
     if ruled_out == "optionable":
         return f"{iid} is not optionable {snapshot}"
@@ -147,6 +151,8 @@ def _not_applicable(
         if kind in OPERATING_TYPES:
             return f"{iid} is a blank-check company (SIC {BLANK_CHECK_SIC}): no earnings"
         return f"{iid} is not an operating company: {kind} {snapshot}: no earnings"
+    if ruled_out == "leveraged_fund":
+        return f"{iid} is not a leveraged or inverse fund {snapshot}: no fund reference"
     return ""
 
 

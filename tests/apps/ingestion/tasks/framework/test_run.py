@@ -16,6 +16,8 @@ from algotrade_ingestion.tasks.framework.run import (
     IngestRun,
     NoResponseError,
     recover_unpublished,
+    resumable_run,
+    retryable_items,
     run_summary,
     stamp,
 )
@@ -129,6 +131,27 @@ def test_resume_keeps_finished_items_and_retries_fetch_errors_and_stale_data() -
         second.record_item("c", "OK")
     assert second.record.status is RunStatus.COMPLETE
     assert IngestRun(ctx, "demo", DAY, resume=True).items == {}  # complete: a fresh run
+
+
+def test_a_resumed_run_cut_short_keeps_what_it_did_not_reach() -> None:
+    writer, reader, _ = store()
+    ctx = task_ctx(writer, reader)
+    with IngestRun(ctx, "demo", DAY, resume=True) as first:
+        first.record_item("a", "OK")
+        first.stage("t", "a", pd.DataFrame({"x": [1]}), "src")
+        first.fail("b", "old", kind="STALE_DATA")
+        first.fail("c", "old", kind="STALE_DATA")
+    with pytest.raises(RuntimeError), IngestRun(ctx, "demo", DAY, resume=True) as cut:
+        assert cut.items == {"a": "OK"}  # b and c are to be refetched
+        cut.record_item("b", "OK")
+        raise RuntimeError("vendor down")  # before c
+    saved = writer.load_run(first.run_id)
+    assert saved is not None and saved.status is RunStatus.FAILED
+    assert saved.items == {"a": "OK", "b": "OK", "c": "STALE_DATA: old"}  # c still counts
+    resumed = resumable_run(writer, "demo", DAY)
+    assert retryable_items(saved) == ["c"] and resumed is not None
+    assert resumed.run_id == first.run_id  # the nightly and the next resume agree on the run
+    assert IngestRun(ctx, "demo", DAY, resume=True).items == {"a": "OK", "b": "OK"}
 
 
 def test_staging_publish_and_rewrite() -> None:
