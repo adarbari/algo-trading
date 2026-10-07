@@ -96,6 +96,17 @@ def test_site_settings_and_overrides(root: Path) -> None:
     assert store.overrides("missing") == []
 
 
+def test_the_guide_files_are_site_only(root: Path) -> None:
+    (root / "site" / "guide").mkdir()
+    (root / "site" / "guide" / "sections.toml").write_text('[[section]]\nid = "fields"\n')
+    (root / "users" / "alice" / "guide").mkdir()
+    (root / "users" / "alice" / "guide" / "sections.toml").write_text("x = 1\n")
+    store = FileConfigStore(root)
+    assert store.names("site", "guide") == ["sections"]
+    assert store.load("site", "guide", "sections") == {"section": [{"id": "fields"}]}
+    assert store.load("alice", "guide", "sections") is None  # never a user's
+
+
 def test_screen_documents_are_read_through_every_store(tmp_path: Path) -> None:
     """Drafts and versions are read through the ``ConfigStore`` (the read model reads them;
     only the writer writes them): files, memory and an overlay over either."""

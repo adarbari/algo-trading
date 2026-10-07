@@ -365,6 +365,113 @@ type FundReference {
   status: String!
 }
 
+"""A reference market fall: its key and name"""
+type GuideEpisode {
+  key: String!
+  name: String!
+}
+
+"""A family of playbooks, in reading order"""
+type GuideFamily {
+  id: String!
+  title: String!
+  playbooks: [GuidePlaybook!]!
+}
+
+"""
+A field's Guide page: `info` with the field guide's entry; `related` the other catalogue fields its entry names, then its formula's inputs (first mention first); the site playbooks that use it; the situations that fool it
+"""
+type GuideField {
+  info: FeatureInfo!
+  related: [String!]!
+  playbooks: [GuidePlaybookUse!]!
+  situations: [GuideSituation!]!
+}
+
+"""
+What the Guide holds (ADR 0051): the sections in order with entry counts, the field theme groups, the intents (most fields first), the situations, the playbooks by family, the regime indicators and the reference episodes
+"""
+type GuideIndex {
+  sections: [GuideSection!]!
+  themeGroups: [GuideThemeGroup!]!
+  intents: [GuideIntent!]!
+  situations: [GuideSituationEntry!]!
+  families: [GuideFamily!]!
+  indicators: [GuideIndicator!]!
+  episodes: [GuideEpisode!]!
+}
+
+"""A regime indicator card: its key and plain-language name"""
+type GuideIndicator {
+  key: String!
+  plainName: String!
+}
+
+"""
+An intent a trader has and the number of fields with a criterion for it
+"""
+type GuideIntent {
+  intent: String!
+  fields: Int!
+}
+
+"""A playbook: a site rule-screen preset's id and name"""
+type GuidePlaybook {
+  id: String!
+  name: String!
+}
+
+"""
+A site preset that uses the field: `rules`, one per criterion on it as `op value mode tolerance`; `column`: a display column; `rank`: its tie-break
+"""
+type GuidePlaybookUse {
+  id: String!
+  name: String!
+  family: String
+  rules: [String!]!
+  column: Boolean!
+  rank: Boolean!
+}
+
+"""
+A Guide section in order: `entries`, how many entries it has (0: none yet)
+"""
+type GuideSection {
+  id: String!
+  title: String!
+  purpose: String!
+  entries: Int!
+}
+
+"""
+A situation that fools the field: how it shows, what a screen does about it and every field it fools
+"""
+type GuideSituation {
+  name: String!
+  signs: String!
+  do: String!
+  affects: [String!]!
+}
+
+"""A situation and the number of fields it fools"""
+type GuideSituationEntry {
+  name: String!
+  fields: Int!
+}
+
+"""A field-guide theme and the number of fields it guides"""
+type GuideTheme {
+  theme: String!
+  fields: Int!
+}
+
+"""Field themes grouped in the order a screen uses them"""
+type GuideThemeGroup {
+  id: String!
+  title: String!
+  themes: [GuideTheme!]!
+}
+
 """
 One intent a trader has for a field and the criterion that expresses it, as a rule screen takes it: `op`, `value` (in the field's unit), `mode`, `tolerance` (a number in the unit, or `{relative}` as a share of the threshold), `onMiss` for soft; `note` says how to combine it
 """
@@ -915,6 +1022,16 @@ type Query {
     """
     date: Date = null
   ): FeatureDistribution
+
+  """
+  What the Guide holds, in its order (ADR 0051): sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes (not session data)
+  """
+  guideIndex: GuideIndex
+
+  """
+  The Guide page of the catalogue field `name` (ADR 0051): its info and guide entry, related fields, the playbooks that use it and the situations that fool it; a name outside the caller's catalogue is an UNKNOWN_FEATURE error
+  """
+  guideField(name: FeatureName!): GuideField
 
   """
   Every strategy and screener config the user sees: site presets, then their own (`kind`: only `strategy` or `screener`)
