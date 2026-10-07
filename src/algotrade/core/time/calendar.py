@@ -17,6 +17,12 @@ Wednesday paperwork-crisis closures and a state-wide election-day closure):
 - early closes (13:00 New York): July 3 and December 24 when they are sessions, and the day
   after Thanksgiving (the close times are the current ones; no earlier era is modelled).
 
+Market-structure days by rule (the days the events-ahead read lists, ADR 0050): the monthly
+option expiry (``monthly_expiry``: the third Friday, or the session before it when the exchange
+is closed), the last session of a month (``last_session_of_month``: a quarter's end) and the
+annual Russell US index reconstitution (``russell_reconstitution``: after the close of the
+fourth Friday of June, or the session before it).
+
 ``last_closed_session(now)`` is the session a nightly run may ingest as end of day: the most
 recent one whose close (plus a settle margin) has passed in New York time. A run started
 during market hours therefore never treats today's intraday data as end of day.
@@ -188,6 +194,28 @@ def sessions_to(start: date, end: date) -> int:
     if end <= start:
         return 0
     return len(sessions_between(start + timedelta(1), end))
+
+
+def session_on_or_before(day: date) -> date:
+    """``day`` when it is a session, else the last session before it."""
+    return day if is_session(day) else previous_session(day)
+
+
+def monthly_expiry(year: int, month: int) -> date:
+    """The standard monthly equity option expiry: the third Friday, or the session before it
+    when the exchange is closed on it (Good Friday, Juneteenth)."""
+    return session_on_or_before(third_friday(year, month))
+
+
+def last_session_of_month(year: int, month: int) -> date:
+    """The month's last session (for March, June, September and December: the quarter's end)."""
+    return session_on_or_before(date(year + month // 12, month % 12 + 1, 1) - timedelta(1))
+
+
+def russell_reconstitution(year: int) -> date:
+    """The annual Russell US index reconstitution, effective after the close: the fourth
+    Friday of June (2018-06-22, 2024-06-28), or the session before it when closed."""
+    return session_on_or_before(nth_weekday(year, 6, _FRIDAY, 4))
 
 
 def exchange_date(now: datetime) -> date:

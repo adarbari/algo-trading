@@ -1,8 +1,8 @@
 """``Instrument``: who an instrument is for the session (typed identity, ADR 0038), its
 values by catalogue name (``features(names)``) and the objects of its detail pane: events,
-option chain, ETF holdings, price and feature series, the user's screeners that picked it
-(ADR 0037), each through the request's dataloader for it (a list of instruments reads each
-once, not once per instrument)."""
+what is coming (``eventStudy``, ADR 0050), option chain, ETF holdings, price and feature
+series, the user's screeners that picked it (ADR 0037), each through the request's dataloader
+for it (a list of instruments reads each once, not once per instrument)."""
 
 import datetime as dt
 from typing import TYPE_CHECKING, Annotated, Self
@@ -11,12 +11,14 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.events.instrument_events import DEFAULT_DAYS, DEFAULT_MONTHS
 from algotrade.services.read.instruments import identity
 from algotrade.services.read.instruments.prices import Adjustment
-from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.limits import MAX_DAYS, MAX_MONTHS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.scalars import FeatureName
+from algotrade_api.graphql.types.events.event import Event
+from algotrade_api.graphql.types.events.instrument_events import InstrumentEvents
 from algotrade_api.graphql.types.instruments.chain import OptionChain
-from algotrade_api.graphql.types.instruments.event import Event
 from algotrade_api.graphql.types.instruments.feature import FeatureValue
 from algotrade_api.graphql.types.instruments.holdings import Holdings
 from algotrade_api.graphql.types.instruments.series import FeatureSeries, PriceSeries
@@ -77,6 +79,19 @@ class Instrument:
     ) -> list[Event]:
         found = await self.ctx.loaders.events.load((self.instrument_id, start, end))
         return [Event.of(e) for e in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="What is coming for it as of the session (ADR 0050): the events of the "
+        "next `days` calendar days (own and a fund's reference earnings, macro releases, "
+        "market-structure days), its 8-Ks of the last `months`, the 7-90 day expiry ladder "
+        "and a leveraged fund's reference, with the parts not known for the session",
+        extensions=[MaxItems("days", MAX_DAYS), MaxItems("months", MAX_MONTHS)],
+    )
+    async def event_study(
+        self, info: Info, days: int = DEFAULT_DAYS, months: int = DEFAULT_MONTHS
+    ) -> InstrumentEvents | None:
+        found = await self.ctx.loaders.instrument_events.load((self.instrument_id, days, months))
+        return InstrumentEvents.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The option chain stored for the session (null: none stored for it)"
