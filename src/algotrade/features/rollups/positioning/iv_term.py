@@ -48,10 +48,9 @@ from algotrade.features.rollups.options.iv30 import (
 from algotrade.features.rollups.positioning.chain_inputs import (
     OPTIONS,
     UNDERLYINGS,
-    closing_spots,
-    one_row_per_contract,
+    read_chain,
 )
-from algotrade.quant.rates import DAYS_PER_YEAR, YieldCurve
+from algotrade.quant.rates import DAYS_PER_YEAR
 
 NAME = "iv_term"
 VERSION = 1
@@ -128,18 +127,7 @@ def _status(iv_next: float, iv_90d: float, spot: float, has_chain: bool) -> str:
 
 
 def compute(inputs: Inputs, session: date, p: IvTermParams) -> pd.DataFrame:
-    options, curve_rows = inputs[OPTIONS], inputs[RATES]
-    assert options is not None and curve_rows is not None  # required inputs
-    curve = YieldCurve.from_days(curve_rows["tenor_days"], curve_rows["rate_cont"])
-    underlyings = inputs.get(UNDERLYINGS)
-    spots = closing_spots(underlyings)
-    quoted = set() if underlyings is None else set(underlyings["instrument_id"].astype(str))
-    options = one_row_per_contract(options)
-    options = options.assign(
-        underlying_id=options["underlying_id"].astype(str),
-        expiry=pd.to_datetime(options["expiry"]).dt.date,
-    )
-    ids = pd.Index(sorted(quoted | set(options["underlying_id"])), name="instrument_id")
+    curve, spots, options, ids = read_chain(inputs)
     rules = p.vol_rules()
     priced = options[options["underlying_id"].isin(spots.dropna().index)]
     pairs = priced[["underlying_id", "expiry"]].drop_duplicates()
