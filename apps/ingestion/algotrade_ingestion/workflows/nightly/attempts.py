@@ -6,6 +6,8 @@ a step that SUCCEEDED or was WAIVED in an earlier attempt is not run again; its 
 is reused. A step that ran and FAILED or was WAITING is remembered, so a latest-only step
 (a source that serves only the current snapshot) whose session is no longer the latest FAILS
 as expired instead of being SKIPPED: the session stays FAILED until it is waived by hand.
+Attempts are read oldest first and the latest verdict wins: a step re-run on refetched input
+(``nightly.py``) that FAILED is not taken from the attempt that had it SUCCEEDED before.
 """
 
 from dataclasses import dataclass, field
@@ -22,6 +24,8 @@ DONE = (StepStatus.SUCCEEDED, StepStatus.WAIVED)
 @dataclass(frozen=True)
 class Attempts:
     done: dict[str, dict[str, Any]] = field(default_factory=dict)  # step -> stored result
+    # ``done[step]["run_id"]`` is the attempt that produced the result: a later attempt that
+    # reused it stores that id as ``origin``, so the citation never drifts to the carrier.
     tried: frozenset[str] = frozenset()  # steps an earlier attempt ran and saw FAIL or WAIT
 
 
@@ -45,7 +49,9 @@ def earlier_attempts(reader: StoreReader, session: date) -> Attempts:
         for name, step in steps.items():
             status = parse_status(str(step.get("status")))
             if status in DONE:
-                done[name] = {**step, "status": status.value, "run_id": record.run_id}
+                run_id = step.get("origin") or record.run_id
+                done[name] = {**step, "status": status.value, "run_id": run_id}
             elif status in (StepStatus.FAILED, StepStatus.WAITING):  # NOT_RUN was never tried
+                done.pop(name, None)  # re-run on new input and failed: the latest verdict wins
                 tried.add(name)
     return Attempts(done, frozenset(tried - set(done)))

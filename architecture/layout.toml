@@ -183,6 +183,11 @@ purpose = "feature groups from daily bars: one module per group, its documented 
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/levels"
+purpose = "feature groups of price-level structure from daily bars (swing pivots and their strength, breakouts and their retests, unfilled gaps): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/market"
 purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus tickers.py, the ticker -> id lookup and close panel they share"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
@@ -190,6 +195,11 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 [[dir]]
 path = "src/algotrade/features/rollups/options"
 purpose = "feature groups from option chains and implied volatility: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/reference"
+purpose = "feature groups from what an instrument is, its reference facts and a fund's holdings (the stock or basket a leveraged fund tracks): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus fund_names.py, the name rules for the fund's ticker and kind it shares"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
@@ -247,18 +257,18 @@ purpose = "use cases (the backend's interface for apps); shared helpers: configs
 [[dir]]
 path = "src/algotrade/services/backtests"
 purpose = "use case: run a configured backtest, record its run and results"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
 
 [[dir]]
 path = "src/algotrade/services/screening"
 purpose = "use case: run a screener over the universe, record the run, export its rows"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
 
 [[dir]]
 path = "src/algotrade/services/authoring"
 purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features; the only config writer the API calls"
 contracts = [
-    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)",
     "Config writes go only through services.authoring (ADR 0029)",
 ]
 
@@ -277,6 +287,14 @@ purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the promp
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
 
 [[dir]]
+path = "src/algotrade/services/events"
+purpose = "use case: which names the event-sensitivity study covers (ADR 0050): the tier A / B short-put names, the site scope list and the stocks the scoped leveraged funds track, each with its reason; symbols resolved through SymbolResolver of the session's reference snapshot, the unknown ones reported; read-only"
+contracts = [
+    "Event scope is read-only: no writers, no jobs, no vendors (ADR 0050)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)",
+]
+
+[[dir]]
 path = "src/algotrade/services/text_model"
 purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through; no vendor, no storage"
 
@@ -285,7 +303,7 @@ path = "src/algotrade/services/explaining"
 purpose = "use case: the market regime explained in plain words on request (ADR 0041, amended): the prompt of facts and allowed links, the answer cleaned and number-checked, the TextCache protocol and key, the per-user rate limit; the only write is the explanation cache"
 contracts = [
     "Explaining reads the regime and writes only its cache: no writers, no jobs, no vendors (ADR 0041)",
-    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)",
 ]
 
 [[dir]]

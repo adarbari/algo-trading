@@ -33,7 +33,7 @@ from algotrade_ingestion.workflows.nightly.nightly import (
 )
 from algotrade_ingestion.workflows.nightly.notify import Notice
 from algotrade_ingestion.workflows.nightly.sessions import Plan, last_done, plan_sessions
-from algotrade_ingestion.workflows.nightly.steps import StepStatus, from_record, judge
+from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus, from_record, judge
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped, universe_rows
 
@@ -45,13 +45,21 @@ TASK_STEPS = [s.name for s in (*NIGHTLY, *FINALLY) if s.name != SCREENS]
 
 class Calls:
     """Fake registry tasks: record (task, session); raise for the names in ``fail``, finish
-    PARTIAL for those in ``partial``; ``on`` limits a failure to one session."""
+    PARTIAL for those in ``partial``, SKIPPED (``stats["skipped"]``) for those in ``skip``;
+    ``on`` limits a failure to one session; ``items`` gives a task's per-item statuses (e.g.
+    the chains STALE_DATA names)."""
 
     def __init__(
-        self, fail: tuple[str, ...] = (), partial: tuple[str, ...] = (), on: date | None = None
+        self,
+        fail: tuple[str, ...] = (),
+        partial: tuple[str, ...] = (),
+        on: date | None = None,
+        items: Mapping[str, Mapping[str, str]] | None = None,
+        skip: tuple[str, ...] = (),
     ) -> None:
         self.calls: list[tuple[str, date]] = []
-        self.fail, self.partial, self.on = fail, partial, on
+        self.fail, self.partial, self.on, self.skip = fail, partial, on, skip
+        self.items: dict[str, Mapping[str, str]] = dict(items or {})
 
     def task(self, name: str) -> Callable[[TaskContext, Mapping[str, Any]], RunRecord]:
         def run(ctx: TaskContext, params: Mapping[str, Any]) -> RunRecord:
@@ -61,6 +69,9 @@ class Calls:
                 raise RuntimeError(f"{name} broke")
             with IngestRun(ctx, f"fake-{name}", session) as r:
                 r.stats["ran"] = name
+                r.items.update(self.items.get(name, {}))
+                if name in self.skip:
+                    r.stats["skipped"] = "gateway down"
                 if name in self.partial:
                     r.partial("some items failed")
             return r.record
@@ -362,6 +373,143 @@ def test_a_retry_resumes_where_the_session_stopped(fake: Callable[..., Calls]) -
     assert rerun["status"] == "SUCCEEDED" and calls.sessions("chains") == [D, D]
 
 
+# What Cboe left unrolled on 2026-10-05: 199 of 4,205 names, under the tier limits.
+STALE = {
+    "chains": {
+        **{f"EQ:OK{i}": "OK" for i in range(10)},
+        **{f"EQ:ST{i}": "STALE_DATA: chain is for 2026-10-01" for i in range(199)},
+    }
+}
+
+
+class Screens:
+    """A ``screens`` step that FAILS while ``short`` (the screener skipped the stale names)."""
+
+    def __init__(self, short: bool = True) -> None:
+        self.short, self.calls = short, 0
+
+    def __call__(self, session: date) -> Outcome:
+        self.calls += 1
+        if self.short:
+            return Outcome(StepStatus.FAILED, reason="screeners not complete: x partial")
+        return Outcome(StepStatus.SUCCEEDED, {"screens": []})
+
+
+def _chains_staging(writer: StoreWriter, session: date = D) -> str:
+    """The staging a resumed chains run resumes from (kept while retryable items remain)."""
+    run_id = writer.runs_for("fake-chains", session)[-1].run_id
+    rows = stamped(universe_rows(["AAPL"]), session, "u")
+    writer.staging.put(run_id, "chains/option_quotes", "AAPL", rows)
+    return run_id
+
+
+def test_a_retry_refetches_the_stale_chains_and_recomputes_what_needs_them(
+    fake: Callable[..., Calls],
+) -> None:
+    # 2026-10-05: chains SUCCEEDED with 199 STALE_DATA names, the screens failed on exactly
+    # those names (option_liquidity@v1 reads chains/status), and every hourly retry reused
+    # the chains and the rollups, so the screens failed identically each hour.
+    calls, screens = fake(items=STALE), Screens()
+    writer = store()
+    first = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert statuses(first)["chains"] == "SUCCEEDED" and statuses(first)["screens"] == "FAILED"
+    chains_run = writer.runs_for("fake-chains", D)[-1].run_id
+    assert steps_of(first)["chains"]["task_run"] == chains_run
+    _chains_staging(writer)
+    screens.short = False  # the refetch rolled the names over
+    second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert second["status"] == "SUCCEEDED" and last_done(writer) == D
+    assert calls.sessions("chains") == [D, D]  # re-run: the task resumes and refetches the 199
+    assert calls.sessions("rollups") == [D, D]  # needs chains: recomputed on the new data
+    assert calls.sessions("market-rollups") == [D, D]  # needs rollups
+    assert calls.sessions("bars") == [D] and calls.sessions("earnings") == [D]  # reused
+    assert "earlier attempt" not in (steps_of(second)["chains"].get("reason") or "")
+    assert steps_of(second)["chains"]["task_run"] == chains_run  # the task resumed that run
+
+
+def test_stale_chains_are_not_refetched_without_staging_or_for_an_older_session(
+    fake: Callable[..., Calls],
+) -> None:
+    calls, screens = fake(items=STALE), Screens()
+    writer = store()
+    run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)  # staging gone
+    assert calls.sessions("chains") == [D] and calls.sessions("rollups") == [D]
+    reason = steps_of(second)["chains"]["reason"]
+    assert reason.startswith("succeeded in an earlier attempt (")
+    assert reason.endswith("; 199 FETCH_ERROR/STALE_DATA names left, no staging to resume from")
+    _chains_staging(writer)
+    screens.short = False
+    later = date(2026, 10, 5)
+    plan = Plan([D, later], last_done=D1, until=later)
+    third = run_nightly(task_ctx(writer), plan, screens=screens)
+    assert calls.sessions("chains") == [D]  # D is no longer served by Cboe: reused, not refetched
+    assert statuses(third, 0)["chains"] == "SUCCEEDED"
+    assert steps_of(third, 0)["screens"]["reason"].startswith("expired:")  # waive, as before
+    assert third["catch_up"]["held"] == [later.isoformat()]
+
+
+def test_a_dependent_that_failed_on_refetched_data_is_not_taken_from_before(
+    fake: Callable[..., Calls],
+) -> None:
+    calls, screens = fake(items=STALE), Screens()
+    writer = store()
+    hourly = [AFTER_CLOSE + timedelta(hours=h) for h in (1, 2, 3)]
+    run_nightly(task_ctx(writer, clock=lambda: hourly[0]), Plan([D]), screens=screens)
+    _chains_staging(writer)
+    calls.items, calls.fail = {}, ("rollups",)  # the refetch cleared the names; rollups broke
+    second = run_nightly(task_ctx(writer, clock=lambda: hourly[1]), Plan([D]), screens=screens)
+    assert statuses(second)["rollups"] == "FAILED" and calls.sessions("rollups") == [D, D]
+    calls.fail = ()
+    third = run_nightly(task_ctx(writer, clock=lambda: hourly[2]), Plan([D]), screens=screens)
+    assert calls.sessions("rollups") == [D, D, D]  # recomputed, not the first attempt's
+    assert calls.sessions("chains") == [D, D]  # nothing left: reused
+    assert statuses(third)["rollups"] == "SUCCEEDED"
+
+
+def test_a_need_skipped_every_attempt_does_not_rerun_its_dependents(
+    fake: Callable[..., Calls],
+) -> None:
+    calls, screens = fake(skip=("ibkr-contracts",)), Screens()  # IB Gateway down all night
+    writer = store()
+    first = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert (
+        statuses(first)["ibkr-contracts"] == "SKIPPED" and statuses(first)["ibkr-iv"] == "SUCCEEDED"
+    )
+    second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert calls.sessions("ibkr-contracts") == [D, D]  # SKIPPED is never carried
+    assert calls.sessions("ibkr-iv") == [D] and statuses(second)["ibkr-iv"] == "SUCCEEDED"
+
+
+def test_a_failed_refetch_keeps_the_earlier_chains(fake: Callable[..., Calls]) -> None:
+    calls, screens = fake(items=STALE), Screens()
+    writer = store()
+    run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    _chains_staging(writer)
+    calls.fail = ("chains",)  # Cboe down during the refetch
+    second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    chains = steps_of(second)["chains"]
+    assert calls.sessions("chains") == [D, D] and chains["status"] == "SUCCEEDED"
+    assert chains["reason"].startswith("succeeded in an earlier attempt (")
+    assert chains["reason"].endswith("; refetch failed: RuntimeError: chains broke")
+    assert calls.sessions("rollups") == [D]  # nothing new to compute on
+    assert statuses(second)["screens"] == "FAILED"  # still short: the session stays FAILED
+
+
+def test_a_reused_step_cites_the_attempt_that_produced_it(fake: Callable[..., Calls]) -> None:
+    calls = fake(fail=("bars",))
+    writer = store()
+    hourly = [AFTER_CLOSE + timedelta(hours=h) for h in (1, 2, 3)]  # three attempts, three ids
+    run_nightly(task_ctx(writer, clock=lambda: hourly[0]), Plan([D]))  # chains done here
+    run_nightly(task_ctx(writer, clock=lambda: hourly[1]), Plan([D]))  # carried
+    calls.fail = ()
+    third = run_nightly(task_ctx(writer, clock=lambda: hourly[2]), Plan([D]))
+    first, second = (r.run_id for r in writer.runs_for("nightly", D)[:2])
+    chains = steps_of(third)["chains"]
+    assert chains["reason"] == f"succeeded in an earlier attempt ({first})"
+    assert chains["origin"] == first and first != second
+
+
 def test_a_snapshot_step_past_its_day_fails_until_waived(fake: Callable[..., Calls]) -> None:
     calls = fake(fail=("chains",))
     writer = store()
@@ -371,7 +519,7 @@ def test_a_snapshot_step_past_its_day_fails_until_waived(fake: Callable[..., Cal
     summary = run_nightly(task_ctx(writer), Plan([D, later], last_done=D1, until=later))
     chains = steps_of(summary, 0)["chains"]
     assert chains["status"] == "FAILED" and chains["reason"].startswith("expired:")
-    assert "--waive chains" in chains["reason"]
+    assert "--date 2026-10-02 --waive chains" in chains["reason"]  # the session filled in
     assert summary["catch_up"]["held"] == [later.isoformat()]
     assert calls.sessions("chains") == [D]  # never refetched for an older session
     waived = run_nightly(task_ctx(writer), Plan([D]), waive={"chains": "Cboe outage"})
