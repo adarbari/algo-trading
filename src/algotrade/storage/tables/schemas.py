@@ -391,10 +391,12 @@ EARNINGS_EVENTS = TableSpec(
 )
 # L1: the macro release calendar (ADR 0050), one row per release and date: ``ts`` is the release
 # moment in UTC (the date with ``time_et``, New York), ``instrument_id`` ``MACRO:<release_key>``.
-# ``status`` is ``scheduled`` (the date is after the session that stored the row) or ``released``;
-# ``known_from`` is the first session it was knowable on (the session that fetched the calendar,
-# or the release date for a past row). A rescheduled release is a new key; runs merge on it.
-RELEASE_STATUSES = frozenset({"scheduled", "released"})
+# ``status`` is ``scheduled`` (the date is after the session that stored the row), ``released``
+# or ``moved`` (a later fetch no longer lists the date: rescheduled or withdrawn); a change of
+# status is a new version of the row, with its own ``known_from``: the session it was knowable
+# on (the session that fetched the calendar, or the release date for a past row). A rescheduled
+# release is a new key; runs merge on it, the latest version known by a session wins.
+RELEASE_STATUSES = frozenset({"scheduled", "released", "moved"})
 MACRO_RELEASE_EVENTS = _fixed(
     "events/macro_release",
     "event",

@@ -7,7 +7,7 @@ sampled. Read-only: nothing is saved (naming and saving is ``services.authoring.
 from dataclasses import dataclass
 from datetime import date
 
-from algotrade.config.site.settings import FeatureDefinition
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.services.features import catalogue, read_expressions

@@ -24,7 +24,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from algotrade.config.site.settings import FeatureDefinition
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.features.expressions.checker import check_formula
 from algotrade.features.expressions.evaluator import KIND_OF
 from algotrade.features.expressions.functions import OPEN_STR, Type

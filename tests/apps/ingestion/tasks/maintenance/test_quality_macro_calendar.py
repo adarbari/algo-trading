@@ -5,6 +5,8 @@ a release the latest run skipped is not graded, nothing without FRED releases.""
 from datetime import date
 from typing import Any
 
+import pandas as pd
+
 from algotrade.config.site.events.releases import FOLDER, NAME
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.storage.backends.memory import MemoryBackend
@@ -91,3 +93,15 @@ def test_nothing_to_grade_without_configs_or_fred_releases() -> None:
     only_rules = {"release": [DOCUMENT["release"][2]]}
     assert check_macro_calendar(with_configs(store({}), only_rules), S) == []
     assert check_macro_calendar(with_configs(store({}), None), S) == []
+
+
+def test_a_moved_date_does_not_count_as_a_scheduled_one() -> None:
+    ctx = store({"CPI": [date(2026, 10, 14)], "FOMC": [date(2026, 10, 28)]})
+    rows = release_rows(CPI, [date(2026, 10, 14)], S).assign(
+        status="moved", known_from=S, session_date=S, source="fred", run_id="r9"
+    )
+    ctx.writer.write_table(
+        TABLE, S, "r9", rows.assign(knowledge_ts=rows["ts"].iloc[0] + pd.Timedelta(days=1))
+    )
+    [check] = check_macro_calendar(ctx, S)
+    assert check.status == "FAIL" and "CPI" in check.detail  # its only future date moved
