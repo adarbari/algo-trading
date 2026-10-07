@@ -175,6 +175,31 @@ def test_declared_dividends_are_read_by_knowledge_date_with_their_stored_session
     assert inputs.load_input(empty, "events/dividend_declared", [END], 0).at(END, 0) is None
 
 
+def test_declared_dividends_before_the_chunk_are_not_read() -> None:
+    """A row whose ex-date is before the chunk's first session can never be a next ex-date
+    for any session of the chunk, so the loader leaves it out (the table grows for ever)."""
+    writer, reader = store()
+    stored = END - timedelta(days=10)
+    write_dividends(
+        writer,
+        [
+            ("EQ:A", END - timedelta(days=3), 0.4, "recurring"),
+            ("EQ:A", END + timedelta(days=20), 0.5, "recurring"),
+        ],
+        stored,
+    )
+    rows = inputs.load_input(reader, "events/dividend_declared", [END], 0).at(END, 0)
+    assert rows is not None and list(rows["cash_amount"]) == [0.5]
+    earlier = inputs.load_input(
+        reader, "events/dividend_declared", [END - timedelta(days=7), END], 0
+    )
+    both = earlier.at(END, 0)
+    assert both is not None and list(both["cash_amount"]) == [
+        0.4,
+        0.5,
+    ]  # the chunk starts before it
+
+
 def test_rates_input_is_the_curve_the_session_sees() -> None:
     writer, reader = store()
     loaded = inputs.load_input(reader, "rates/treasury", [END], 0)

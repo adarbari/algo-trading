@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-373 stored features in 37 groups, in dependency order; 99 expression features.
+373 stored features in 37 groups, in dependency order; 100 expression features.
 
 ## `option_liquidity@v1`
 
@@ -692,6 +692,7 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `earnings_before_expiry` | expression | bool | flag | open |  | Whether the next earnings report (earnings.next_earnings_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option held to that expiry carries the report | the next report date or the nearest expiry is unknown (no report date on or after the session in the stored calendars, or no stored chain with an expiry on or after the session) | `earnings.next_earnings_date <= nearest_expiry.expiry_date` | virtual |
 | `ex_div_before_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the target expiry (put_wing.target_expiry, the 30-60 day expiry the put and call wings use): a short call held to it risks early assignment, and a short put misses the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED: the source lists a date only about 30 days ahead, so null is 'none known yet', not 'none'), or no target expiry (put_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= put_wing.target_expiry` | virtual |
 | `ex_div_before_nearest_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option expiring then carries the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no stored chain with an expiry on or after the session | `dividend_schedule.next_ex_date <= nearest_expiry.expiry_date` | virtual |
+| `ex_div_before_call_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date falls on or before the covered-call wing's target expiry (call_wing.target_expiry): the early-assignment risk of the short call, and the dividend the shares collect if it is not assigned | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no call target expiry (call_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= call_wing.target_expiry` | virtual |
 
 ### `fundamentals.toml`
 

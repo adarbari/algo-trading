@@ -317,6 +317,7 @@ export const SITE_FEATURES = [
   'feature.earnings_before_expiry',
   'feature.ex_div_before_expiry',
   'feature.ex_div_before_nearest_expiry',
+  'feature.ex_div_before_call_expiry',
   'feature.div_yield',
   'feature.market_cap',
   'feature.pe_ratio',
