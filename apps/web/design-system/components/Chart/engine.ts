@@ -96,6 +96,8 @@ const MARKER: Record<
   dividend: { shape: 'circle', position: 'aboveBar' },
   split: { shape: 'square', position: 'aboveBar' },
   earnings: { shape: 'arrowUp', position: 'belowBar' },
+  filing: { shape: 'arrowDown', position: 'aboveBar' },
+  macro: { shape: 'circle', position: 'belowBar' },
 };
 
 /** A point as chart data. */

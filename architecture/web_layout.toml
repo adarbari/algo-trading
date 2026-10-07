@@ -79,7 +79,7 @@ styles = true
 
 [[web_dir]]
 path = "apps/web/design-system/testing"
-purpose = "test support for design-system tests (axe assertion); never exported"
+purpose = "test and story support for design-system components (the axe assertion, sample events and calendars for the event components); never exported"
 
 [[web_dir]]
 path = "apps/web/design-system/format"

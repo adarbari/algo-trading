@@ -17,6 +17,7 @@ import type { CrosshairInfo, EngineInput } from './engine';
 import {
   aapl,
   aaplEvents,
+  eventMarkers,
   aaplVolume,
   cautionBand,
   msft,
@@ -76,6 +77,22 @@ describe('chart data', () => {
     const rows = tableRows(chart);
     expect(rows[0]?.time).toBe('2026-10-02');
     expect(rows.find((r) => r.time === '2026-08-10')?.events).toBe('Ex-dividend $0.27');
+  });
+});
+
+describe('chart event markers', () => {
+  it('counts filings and macro releases in the summary and lists them in the table', () => {
+    const chart = prepare([aapl], { range: '1Y', rebase: false, events: eventMarkers });
+    const text = describeChart('AAPL close', chart, {
+      rebase: false,
+      format: { kind: 'currency' },
+    });
+    expect(text).toContain('4 earnings, 4 filing, 4 macro release');
+    const rows = tableRows(chart);
+    expect(rows.find((r) => r.time === '2026-01-29')?.events).toBe(
+      'Earnings after close; Filing 8-K 2.02 results',
+    );
+    expect(rows.find((r) => r.time === '2026-05-12')?.events).toBe('Macro release CPI 08:30');
   });
 });
 
@@ -146,6 +163,22 @@ describe('Chart', () => {
     const key = screen.getByRole('list', { name: 'Event markers' });
     expect(key).toHaveTextContent('D Ex-dividend');
     expect(key).toHaveTextContent('E Earnings');
+  });
+
+  it('keys filing and macro markers and reads their text in the crosshair', async () => {
+    render(<Chart label="AAPL close" series={[aapl]} range="1Y" events={eventMarkers} />);
+    const key = screen.getByRole('list', { name: 'Event markers' });
+    expect(key).toHaveTextContent('E Earnings');
+    expect(key).toHaveTextContent('F Filing');
+    expect(key).toHaveTextContent('M Macro release');
+    await waitFor(() => {
+      expect(engine.crosshair).toBeDefined();
+    });
+    act(() => {
+      engine.crosshair?.({ time: '2026-07-30', x: 10, y: 20 });
+    });
+    expect(screen.getByText('F Filing · 8-K 2.02 results')).toBeInTheDocument();
+    expect(screen.getByText('E Earnings · after close')).toBeInTheDocument();
   });
 
   it('rebases every series to 100 and draws the reference line', async () => {

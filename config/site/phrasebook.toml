@@ -185,6 +185,26 @@ fields = ["rollup.trend_stats@v2.ret_z_20d", "rollup.volume@v1.volume_z_20d"]
 hint = "ret_z_20d gte 3 for an up shock, lte -3 for a down one (three times the normal daily move); confirm with volume_z_20d gte 2"
 
 [[phrase]]
+say = ["relative strength vs the market", "outperforming SPY", "beating the market", "outperforming the market", "relative strength improving"]
+fields = ["feature.rs_spy_positive", "rollup.relative_strength@v1.rs_spy_63d", "feature.rs_improving"]
+hint = "gate: rs_spy_positive eq true (the last 63 sessions beat SPY; rs_spy_63d gt 0.05 for a clear lead); add rs_improving eq true when the sentence says improving or gaining on the market; not the RSI indicator"
+
+[[phrase]]
+say = ["RS line at a new high", "relative strength at a new high", "leading the market at a high"]
+fields = ["rollup.relative_strength@v1.rs_line_high_252d"]
+hint = "rs_line_high_252d eq true (the close / SPY line is at its 252-session high); with rs_spy_63d gt 0 for current leadership"
+
+[[phrase]]
+say = ["sector leader", "strong sector", "leading sector", "in a hot sector"]
+fields = ["feature.sector_leader", "rollup.relative_strength@v1.sector_rank_63d", "rollup.relative_strength@v1.rs_sector_63d"]
+hint = "gate: sector_leader eq true (the sector ETF is in the top three of eleven over 63 sessions; sector_rank_63d lte 5 for a looser one); add rs_sector_63d gt 0 for a name that also beats its sector"
+
+[[phrase]]
+say = ["top decile momentum", "top decile", "momentum leaders", "best performers"]
+fields = ["rollup.relative_strength@v1.mom_pctile_63d", "rollup.relative_strength@v1.mom_pctile_252d"]
+hint = "mom_pctile_63d gte 0.9 (the top tenth of stocks over a quarter; mom_pctile_252d for a year); a rank, not a size: add feature.pct_vs_sma_200 gt 0"
+
+[[phrase]]
 say = ["covered call", "covered calls", "sell calls against shares", "call to write"]
 fields = ["rollup.call_wing@v1.wing_status", "rollup.call_wing@v1.best_call_yield", "feature.call_otm_pct", "feature.cc_yield_annualised"]
 hint = "the call at the 30 to 60 day expiry nearest 45 days, 15 to 30 delta (ours): wing_status eq OK, soft with tolerance 0 (the near miss is OUTSIDE_BAND); rank by best_call_yield (0.01 is 1% for the term) or cc_yield_annualised gte 0.10; call_otm_pct gte 0.04 for room before the shares are called away; add feature.ex_div_before_expiry eq false when the sentence says early assignment"

@@ -1,8 +1,8 @@
 """Feature inputs asked of ``algotrade.data`` by table name: each table's point-in-time read
 (bars, earnings snapshots, chain partitions, events by event date, the Treasury curve, share
 facts, the reference's security types, IBKR vols, the universe snapshot, the symbol -> id
-map, macro series by vintage and id) and other groups' stored rows (instrument and market
-groups), with this run's rows winning."""
+map, the company snapshot's sectors, macro series by vintage and id) and other groups' stored
+rows (instrument and market groups), with this run's rows winning."""
 
 from datetime import date, timedelta
 
@@ -113,6 +113,25 @@ def test_symbol_ids_resolve_through_the_reference_the_session_sees() -> None:
         "pre_snapshot": [False, False],
     }
     assert early is not None and list(early["pre_snapshot"]) == [True, True]
+
+
+def test_company_input_is_the_sector_snapshot_the_session_sees() -> None:
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(4)})
+    company = inputs.load_input(reader, "instruments/company", days, 0)
+    assert company.at(days[0], 0) is None  # nothing stored
+    row = {"instrument_id": "EQ:A", "symbol": "A", "cik": "1", "name": "A Inc", "sic": "3571",
+           "sector": "Technology", "industry": "Software", "fetched_on": days[2]}  # fmt: skip
+    writer.write_table("instruments/company", days[2], "c2", stamped([row], days[2], "c2"))
+    company = inputs.load_input(reader, "instruments/company", days, 0)
+    assert company.at(days[1], 0) is None  # taken later: never stands in
+    seen = company.at(days[3], 0)
+    assert seen is not None and seen.to_dict("list") == {
+        "instrument_id": ["EQ:A"],
+        "sector": ["Technology"],
+        "industry": ["Software"],
+    }
+    assert inputs.has_input("instruments/company")
 
 
 def test_event_inputs_are_by_event_date_and_never_later() -> None:

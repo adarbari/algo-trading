@@ -30,12 +30,15 @@ export interface ChartSeries {
   tone?: Series;
 }
 
-export type ChartEventKind = 'dividend' | 'split' | 'earnings';
+export type ChartEventKind = 'dividend' | 'split' | 'earnings' | 'filing' | 'macro';
 
 export interface ChartEvent {
   time: string;
   kind: ChartEventKind;
-  /** Short detail for the tooltip and table ("$0.26", "4-for-1", "after close"). */
+  /**
+   * Short text for the tooltip and table: the amount or ratio ("$0.26", "4-for-1"), the time
+   * ("after close"), or for a filing or a macro release what it is ("8-K 2.02 results", "CPI 08:30").
+   */
   detail?: string;
 }
 
@@ -96,6 +99,8 @@ export const EVENT_KINDS: Record<ChartEventKind, { label: string; letter: string
   dividend: { label: 'Ex-dividend', letter: 'D' },
   split: { label: 'Split', letter: 'S' },
   earnings: { label: 'Earnings', letter: 'E' },
+  filing: { label: 'Filing', letter: 'F' },
+  macro: { label: 'Macro release', letter: 'M' },
 };
 
 const MONTHS: Record<ChartRange, number | null> = { '3M': 3, '1Y': 12, '2Y': 24, All: null };

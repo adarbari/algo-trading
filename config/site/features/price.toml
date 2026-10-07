@@ -80,3 +80,30 @@ description = "Close / 200-session moving average - 1"
 null_meaning = "price_stats sma_200 is null (a gap among the last 200 sessions, or a shorter history), or no price_stats row"
 valid_range = [-1, inf]
 version = 1
+
+# Relative strength (relative_strength@v1, docs/data/technical.md): the flags the owner's screens
+# ask for, over the stored columns.
+[rs_spy_positive]
+expr = "relative_strength.rs_spy_63d > 0"
+dtype = "bool"
+unit = "flag"
+description = "The instrument beat SPY over the last 63 sessions: rs_spy_63d above 0 (outperforming the market over a quarter)"
+null_meaning = "rs_spy_63d is null (a gap in the 64 closes, or SPY not in the symbol map), or no relative_strength row"
+version = 1
+
+[rs_improving]
+expr = "relative_strength.rs_spy_trend_20d > 0"
+dtype = "bool"
+unit = "flag"
+description = "Relative strength against SPY is improving: rs_spy_trend_20d above 0 (the 63-session relative strength is higher than it was 20 sessions ago)"
+null_meaning = "rs_spy_trend_20d is null (a gap in either 63-session window, or SPY not in the symbol map), or no relative_strength row"
+version = 1
+
+[sector_leader]
+expr = "relative_strength.sector_rank_63d <= leader_rank"
+params = { leader_rank = 3 }  # the strongest three of the eleven sector ETFs
+dtype = "bool"
+unit = "flag"
+description = "The instrument's sector is one of the three strongest of the eleven sector ETFs over 63 sessions: sector_rank_63d at most 3 (params.leader_rank)"
+null_meaning = "sector_rank_63d is null (no sector or sector ETF, the ETF has no complete window, or fewer than min_sector_etfs ETFs do), or no relative_strength row"
+version = 1
