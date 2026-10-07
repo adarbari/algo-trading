@@ -47,6 +47,12 @@ export const TRADER: Workspace = {
       summary:
         'The market as weather: Clear, Clouds building, Storm or Severe storm, the slow and fast warning signs behind it in plain words, what changed this week and a reading list.',
     },
+    {
+      path: '/calendar',
+      label: 'Calendar',
+      summary:
+        'What is coming across names for the next 90 days: earnings, macro releases and expiry days, for the scope list or the names a screener picked.',
+    },
     { path: '/backtests', label: 'Backtests', summary: 'Run backtests and compare their results.' },
   ],
 };

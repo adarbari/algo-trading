@@ -1,0 +1,104 @@
+import { describe, expect, it } from 'vitest';
+
+import { CALENDAR_FIXTURE, STUDY_FIXTURE } from './fixtures';
+import {
+  aheadItems,
+  calendarDays,
+  eventItem,
+  filingItem,
+  gapLines,
+  ladderRows,
+  MARKET_NAME,
+  studyChartEvents,
+} from './items';
+
+const AHEAD0 = STUDY_FIXTURE.ahead[0] as (typeof STUDY_FIXTURE.ahead)[number];
+const FILING0 = STUDY_FIXTURE.filings[0] as (typeof STUDY_FIXTURE.filings)[number];
+const DAY1 = CALENDAR_FIXTURE.days[1] as (typeof CALENDAR_FIXTURE.days)[number];
+
+describe('eventItem', () => {
+  it('keeps the API text and reads a missing known-from as the session', () => {
+    expect(eventItem(AHEAD0, '2026-10-07')).toEqual({
+      date: '2026-10-14',
+      time: '08:30',
+      kind: 'macro_release',
+      label: 'CPI',
+      source: 'BLS',
+      knownFrom: '2026-10-07',
+    });
+  });
+
+  it('drops a kind with no chip', () => {
+    expect(eventItem({ ...AHEAD0, kind: 'novel' }, '2026-10-07')).toBeNull();
+    expect(aheadItems(STUDY_FIXTURE)).toHaveLength(3);
+  });
+});
+
+describe('filingItem', () => {
+  it('is a filing chip with the API label and the acceptance time', () => {
+    expect(filingItem(FILING0)).toMatchObject({
+      kind: 'filing',
+      date: '2026-07-30',
+      time: '20:31 UTC',
+      label: 'Results',
+      knownFrom: '2026-07-30',
+    });
+  });
+});
+
+describe('ladderRows', () => {
+  it('passes clear and marks the rung the API marked', () => {
+    expect(ladderRows(STUDY_FIXTURE).map((r) => [r.expiry, r.dte, r.clear, r.firstClear])).toEqual([
+      ['2026-10-16', 9, false, false],
+      ['2026-10-23', 16, true, true],
+    ]);
+    expect(ladderRows(STUDY_FIXTURE)[0]?.events.map((e) => e.label)).toEqual(['CPI']);
+  });
+});
+
+describe('gapLines', () => {
+  it('says the part, the server word and its detail', () => {
+    expect(
+      gapLines([
+        {
+          instrumentId: null,
+          part: 'macro_release',
+          unknown: { code: 'NO_PARTITION', detail: 'no macro calendar stored', reason: null },
+        },
+        {
+          instrumentId: null,
+          part: 'filings',
+          unknown: { code: 'NOT_APPLICABLE', detail: '', reason: null },
+        },
+      ]),
+    ).toEqual(['Macro releases: Unknown (no macro calendar stored)', 'Filings: n/a']);
+  });
+});
+
+describe('studyChartEvents', () => {
+  it('marks filings, macro dates and own earnings the stored events do not already mark', () => {
+    expect(studyChartEvents(STUDY_FIXTURE, new Set())).toEqual([
+      { time: '2026-07-30', kind: 'filing', detail: '8-K Results' },
+      { time: '2026-10-14', kind: 'macro', detail: 'CPI 08:30' },
+      { time: '2026-10-29', kind: 'earnings', detail: 'after the close' },
+    ]);
+    expect(
+      studyChartEvents(STUDY_FIXTURE, new Set(['2026-10-29'])).some((e) => e.kind === 'earnings'),
+    ).toBe(false);
+  });
+});
+
+describe('calendarDays', () => {
+  it('puts market-wide events in a Market column and rules the expiry days', () => {
+    const { days, names, ruledDays } = calendarDays(CALENDAR_FIXTURE);
+    expect(names.map((n) => n.symbol)).toEqual(['Market', 'AAPL', 'NVDA']);
+    expect(days[0]?.events[0]).toMatchObject({ instrumentId: MARKET_NAME.id, symbol: 'Market' });
+    expect(days[1]?.events[0]).toMatchObject({ instrumentId: 'EQ:A', symbol: 'AAPL' });
+    expect(ruledDays).toEqual(['2026-11-20']);
+  });
+
+  it('has no Market column when nothing is market-wide', () => {
+    const own = { ...CALENDAR_FIXTURE, days: [DAY1] };
+    expect(calendarDays(own).names.map((n) => n.symbol)).toEqual(['AAPL', 'NVDA']);
+  });
+});

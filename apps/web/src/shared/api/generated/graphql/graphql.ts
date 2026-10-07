@@ -72,6 +72,21 @@ export type OptionQuotesQueryVariables = Exact<{
 
 export type OptionQuotesQuery = { instrument: { instrumentId: string, chain: { quotes: Array<{ instrumentId: string, expiry: string, right: string, strike: number, bid: number | null, ask: number | null, last: number | null, volume: number | null, openInterest: number | null, iv: number | null, delta: number | null, gamma: number | null, theta: number | null, vega: number | null }> } | null } | null };
 
+export type EventCalendarQueryVariables = Exact<{
+  instrumentIds: Array<string> | string;
+  scope: boolean;
+}>;
+
+
+export type EventCalendarQuery = { eventCalendar: { session: string, end: string, missing: Array<string>, unresolved: Array<string>, names: Array<{ instrumentId: string, symbol: string }>, days: Array<{ date: string, isSession: boolean, events: Array<{ instrumentId: string | null, symbol: string | null, event: { date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null } }> }>, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, detail: string, reason: NullReason | null } }> } | null };
+
+export type InstrumentEventStudyQueryVariables = Exact<{
+  key: string;
+}>;
+
+
+export type InstrumentEventStudyQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, eventStudy: { session: string, days: number, months: number, ahead: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null }>, filings: Array<{ accepted: string, filingDate: string, form: string, items: Array<string>, label: string, knownFrom: string }>, ladder: Array<{ expiry: string, days: number, clear: boolean, marked: boolean, spans: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null }> }>, reference: { instrumentId: string | null, symbol: string | null, kind: string, source: string | null, status: string } | null, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, detail: string, reason: NullReason | null } }> } | null } | null };
+
 export type ComparePricesQueryVariables = Exact<{
   keys: Array<string> | string;
   start: string;
@@ -385,6 +400,113 @@ export const OptionQuotesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<OptionQuotesQuery, OptionQuotesQueryVariables>;
+export const EventCalendarDocument = new TypedDocumentString(`
+    query EventCalendar($instrumentIds: [String!]!, $scope: Boolean!) {
+  eventCalendar(instrumentIds: $instrumentIds, scope: $scope) {
+    session
+    end
+    names {
+      instrumentId
+      symbol
+    }
+    days {
+      date
+      isSession
+      events {
+        instrumentId
+        symbol
+        event {
+          date
+          time
+          kind
+          label
+          name
+          subjectId
+          source
+          knownFrom
+        }
+      }
+    }
+    gaps {
+      instrumentId
+      part
+      unknown {
+        code
+        detail
+        reason
+      }
+    }
+    missing
+    unresolved
+  }
+}
+    `) as unknown as TypedDocumentString<EventCalendarQuery, EventCalendarQueryVariables>;
+export const InstrumentEventStudyDocument = new TypedDocumentString(`
+    query InstrumentEventStudy($key: String!) {
+  session {
+    date
+  }
+  instrument(key: $key) {
+    instrumentId
+    symbol
+    eventStudy {
+      session
+      days
+      months
+      ahead {
+        date
+        time
+        kind
+        label
+        name
+        subjectId
+        source
+        knownFrom
+      }
+      filings {
+        accepted
+        filingDate
+        form
+        items
+        label
+        knownFrom
+      }
+      ladder {
+        expiry
+        days
+        clear
+        marked
+        spans {
+          date
+          time
+          kind
+          label
+          name
+          subjectId
+          source
+          knownFrom
+        }
+      }
+      reference {
+        instrumentId
+        symbol
+        kind
+        source
+        status
+      }
+      gaps {
+        instrumentId
+        part
+        unknown {
+          code
+          detail
+          reason
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<InstrumentEventStudyQuery, InstrumentEventStudyQueryVariables>;
 export const ComparePricesDocument = new TypedDocumentString(`
     query ComparePrices($keys: [String!]!, $start: Date!) {
   table(columns: [], keys: $keys) {

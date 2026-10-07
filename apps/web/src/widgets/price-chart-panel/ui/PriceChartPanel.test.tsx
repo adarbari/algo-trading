@@ -11,6 +11,7 @@ import { PriceChartPanel } from './PriceChartPanel';
 const hooks = vi.hoisted(() => ({
   useInstrumentPrices: vi.fn(),
   useInstrumentEvents: vi.fn(),
+  useInstrumentEventStudy: vi.fn(),
   useRegimeBands: vi.fn(),
   chart: vi.fn(),
 }));
@@ -36,6 +37,11 @@ vi.mock('@/entities/instrument', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInstrumentPrices: hooks.useInstrumentPrices,
   useInstrumentEvents: hooks.useInstrumentEvents,
+}));
+
+vi.mock('@/entities/event', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useInstrumentEventStudy: hooks.useInstrumentEventStudy,
 }));
 
 vi.mock('@/entities/regime', async (importOriginal) => ({
@@ -69,6 +75,30 @@ beforeEach(() => {
   hooks.useInstrumentEvents.mockReturnValue(
     fakeQuery([dividend('2026-08-10', 0.27), dividend('2024-08-10', 0.25)]),
   );
+  hooks.useInstrumentEventStudy.mockReturnValue(
+    fakeQuery({
+      session: '2026-08-10',
+      ahead: [
+        { date: '2026-08-10', time: '08:30', kind: 'macro_release', label: 'CPI' },
+        { date: '2026-08-12', time: 'after_hours', kind: 'own_earnings', label: 'Earnings' },
+        { date: '2026-08-12', time: 'close', kind: 'market_structure', label: 'Opex' },
+      ],
+      filings: [
+        {
+          filingDate: '2026-08-07',
+          form: '8-K',
+          label: '2.02 results',
+          accepted: '2026-08-07T20:05:00Z',
+        },
+        {
+          filingDate: '2024-08-07',
+          form: '8-K',
+          label: '5.02 management',
+          accepted: '2024-08-07T20:05:00Z',
+        },
+      ],
+    }),
+  );
 });
 
 describe('PriceChartPanel', () => {
@@ -84,7 +114,12 @@ describe('PriceChartPanel', () => {
       { time: '2026-08-10', value: 229 },
     ]);
     expect(chart.volume).toHaveLength(2);
-    expect(chart.events).toEqual([{ time: '2026-08-10', kind: 'dividend', detail: '$0.27' }]);
+    expect(chart.events).toEqual([
+      { time: '2026-08-07', kind: 'filing', detail: '8-K 2.02 results' },
+      { time: '2026-08-10', kind: 'dividend', detail: '$0.27' },
+      { time: '2026-08-10', kind: 'macro', detail: 'CPI 08:30' },
+      { time: '2026-08-12', kind: 'earnings', detail: 'after the close' },
+    ]);
     vi.useRealTimers();
     await expectNoA11yViolations(container);
     await userEvent.setup().click(screen.getByRole('radio', { name: '3M' }));

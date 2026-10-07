@@ -24,6 +24,7 @@ const PENDING = [
 // Not feature tables: their rows are not instruments x catalogue features.
 const STRUCTURE = [
   'src/widgets/events-panel/ui/EventsPanel.tsx', // an instrument's stored events
+  'src/widgets/event-study-panel/model/columns.tsx', // an instrument's events ahead and its 8-Ks
   'src/widgets/features-panel/model/rows.tsx', // one instrument's features, one row each
   'src/widgets/holdings-panel/model/columns.tsx', // an ETF's holdings (issuer-dated weights)
   'src/widgets/options-panel/model/columns.tsx', // an option chain's quotes by strike
