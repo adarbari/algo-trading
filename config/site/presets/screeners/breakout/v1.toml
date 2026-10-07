@@ -1,0 +1,107 @@
+# Breakout: the close clears the 20-session high with momentum, volume and range expansion behind
+# it (owner's screen, 2026-10-06; docs/data/technical.md "Presets"; rule grammar
+# docs/screeners/rules.md). What it finds: names breaking out today. What it does not check:
+# whether the break holds (see failed_breakout), earnings or news, gaps, the market's regime.
+# Left out: "volume above the 20-session average" (rel_volume > 1.25 already implies it).
+# Notes: "above the 50-session high or within X%" is feature.dist_to_high_50d >= -3% (it is 0 at
+# the high and never positive, so a new high passes); "not extended from the 20 EMA" is measured
+# from the SMA20 (stretch_sma20_atr).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+# Run on request or nightly like every site screener (ADR 0033); an identification layer,
+# not a trade signal.
+id = "breakout"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Breakout"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# no liquidity_class: it bundles option liquidity, and these are stock-chart screens)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the setup
+[criteria.breakout_20d]
+field = "feature.breakout_magnitude_20d"
+op = "gt"
+value = 0
+
+[criteria.near_high_50d]
+field = "feature.dist_to_high_50d"
+op = "gte"
+value = -0.03
+
+[criteria.ret_5d]
+field = "rollup.momentum@v1.ret_5d"
+op = "gt"
+value = 0
+
+[criteria.ret_20d]
+field = "rollup.price_stats@v2.ret_20d"
+op = "gt"
+value = 0
+
+[criteria.mom_accel]
+field = "rollup.trend_stats@v2.mom_accel_5d"
+op = "gt"
+value = 0
+
+[criteria.rel_volume]
+field = "rollup.momentum@v1.rel_volume"
+op = "gt"
+value = 1.25
+
+[criteria.atr_expanding]
+field = "feature.atr_ratio_5_20"
+op = "gte"
+value = 1.1
+
+[criteria.close_location]
+field = "rollup.trend_stats@v2.close_range_pos"
+op = "gt"
+value = 0.7
+
+[criteria.not_extended]
+field = "feature.stretch_sma20_atr"
+op = "lte"
+value = 3
+mode = "soft"
+tolerance = 1.0
+on_miss = "WATCH"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+breakout_magnitude_20d = "feature.breakout_magnitude_20d"
+dist_to_high_50d = "feature.dist_to_high_50d"
+stretch_sma20_atr = "feature.stretch_sma20_atr"
+close_range_pos = "rollup.trend_stats@v2.close_range_pos"
+ret_5d = "rollup.momentum@v1.ret_5d"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+mom_accel_5d = "rollup.trend_stats@v2.mom_accel_5d"
+rel_volume = "rollup.momentum@v1.rel_volume"
+atr_ratio_5_20 = "feature.atr_ratio_5_20"
+rsi_14 = "rollup.momentum@v1.rsi_14"
+rs_spy_63d = "rollup.relative_strength@v1.rs_spy_63d"
+
+[rank]
+tie_break = "feature.breakout_magnitude_20d"

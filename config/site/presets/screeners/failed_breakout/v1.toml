@@ -1,0 +1,84 @@
+# Failed breakout (short setups): a 20-session breakout that has since closed back below its
+# level, near resistance, on elevated volume with fading momentum (owner's screen, 2026-10-06;
+# docs/data/technical.md "Presets"). What it finds: bull traps. What it does not check: borrow,
+# shortability, earnings. Approximation: feature.breakout_failed is "the latest breakout of the
+# last 60 sessions has closed below its level at any time since", not strictly "yesterday above,
+# today below"; sessions_since_breakout (soft, 10 with 5 tolerance) keeps it recent.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+# Run on request or nightly like every site screener (ADR 0033); an identification layer,
+# not a trade signal.
+id = "failed_breakout"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Failed breakout"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# no liquidity_class: it bundles option liquidity, and these are stock-chart screens)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the setup
+[criteria.breakout_failed]
+field = "feature.breakout_failed"
+op = "eq"
+value = true
+
+[criteria.recent]
+field = "rollup.retest@v1.sessions_since_breakout"
+op = "lte"
+value = 10
+mode = "soft"
+tolerance = 5
+on_miss = "WATCH"
+
+[criteria.rel_volume]
+field = "rollup.momentum@v1.rel_volume"
+op = "gte"
+value = 1.2
+
+[criteria.momentum_fading]
+field = "rollup.trend_stats@v2.mom_accel_5d"
+op = "lt"
+value = 0
+
+[criteria.near_resistance]
+field = "feature.dist_to_resistance_atr"
+op = "lte"
+value = 1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+retest_state = "rollup.retest@v1.retest_state"
+sessions_since_breakout = "rollup.retest@v1.sessions_since_breakout"
+dist_to_resistance_atr = "feature.dist_to_resistance_atr"
+ret_5d = "rollup.momentum@v1.ret_5d"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+mom_accel_5d = "rollup.trend_stats@v2.mom_accel_5d"
+rel_volume = "rollup.momentum@v1.rel_volume"
+atr_ratio_5_20 = "feature.atr_ratio_5_20"
+rsi_14 = "rollup.momentum@v1.rsi_14"
+rs_spy_63d = "rollup.relative_strength@v1.rs_spy_63d"
+
+[rank]
+tie_break = "rollup.retest@v1.sessions_since_breakout"

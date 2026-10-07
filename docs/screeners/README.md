@@ -5,6 +5,14 @@
 | `short_premium_liquidity` | implemented | `rollups/instrument/option_liquidity@v1` | below |
 | VRP scanner (IV vs HV near 52-week extremes) | spec (phase 2b) | needs `iv30`, `hv20/30`, 52-week range, moving averages, earnings | [vrp-scanner.md](vrp-scanner.md) |
 | Rule screens (`impl = "rules"`, TOML / web Builder) | engine implemented; Builder later ([ADR 0029](../adr/0029-rule-screener.md)) | any catalogue fields | [rules.md](rules.md) |
+| `breakout` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `pullback` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `support_reversal` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `exhaustion` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `trend_continuation` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `range_breakout` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `failed_breakout` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `oversold_reversal` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
 
 ## Contract (all screeners)
 

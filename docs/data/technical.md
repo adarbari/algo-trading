@@ -103,11 +103,28 @@ interest and days to cover (FINRA files, free), float and insider / institutiona
 
 ## Presets
 
-Once the inputs above exist, the eight rule screens the owner described (breakout, pullback,
-support reversal, exhaustion, trend continuation, range breakout, failed breakout, oversold
-reversal) are site presets in `config/site/presets/` (`add-screener`), each criterion a
-catalogue field with its guide threshold. They are the last PR of the track; a preset that
-needs a field this table marks planned waits for that field.
+The eight rule screens the owner described (2026-10-06) are site presets
+(`config/site/presets/screeners/<id>/v1.toml`, `add-screener`; rule grammar in
+[rules.md](../screeners/rules.md)), each criterion a catalogue field with the owner's number
+or the field guide's threshold. Each opens with the site base gates (security type, ACTIVE,
+price > $5, ADV >= $50M as a soft `LIQUIDITY_RISK` near miss); `feature.liquidity_class` is
+not used, because it bundles option liquidity (a liquid stock with no options is LOW) and
+these are stock-chart screens. Every criterion is hard unless marked. Where a line has no
+field, it is left out and said so in the preset's header comment.
+
+| Preset | Setup (beyond the base gates) | Left out or approximated |
+|---|---|---|
+| `breakout` | `breakout_magnitude_20d` > 0; `dist_to_high_50d` >= -3%; `ret_5d`, `ret_20d`, `mom_accel_5d` > 0; `rel_volume` > 1.25; `atr_ratio_5_20` >= 1.1; `close_range_pos` > 0.7; `stretch_sma20_atr` <= 3 (soft) | "volume above the 20-session average" (implied by `rel_volume`); the 20 EMA stretch is measured from the SMA20 |
+| `pullback` | `ret_20d`, `ret_60d` > 0; `ema_stack` BULL; `stretch_sma20_atr` in [-0.5, 0.5] (soft); `pullback_atr_20d` <= 1.5; `sessions_since_high_20d` <= 10; `volume_ratio_5d_20d` < 1; `dist_to_support_atr` <= 1; `trend_state` UPTREND; `mom_accel_5d` >= -0.03 (soft); `rs_spy_63d` > 0 | the 50-session return is `ret_60d`; the EMA20 distance is from the SMA20; "volume below the advance" is the 5 / 20-day ratio below 1 |
+| `support_reversal` | `dist_to_support_atr` < 0.5; `support_touches` >= 2; `ret_5d` < 0; `mom_accel_5d` > 0; `ret_1d` > 0; `close_range_pos` > 0.6; `rel_volume` >= 1; `rs_spy_trend_20d` > 0; `put_support_cushion_atr` >= 1 (score, the put seller's cushion) | none |
+| `exhaustion` (reversal) | `ret_5d_pctile` >= 0.9; `stretch_sma20_atr` > 2; `rsi_14` > 70; `rel_volume` > 1.5; `atr_ratio_5_20` > 1.1; `bb_pct_b` >= 0.95; `mom_accel_5d` < 0 | the continuation case is the same screen with `mom_accel_5d` > 0 (copy it in the Builder) |
+| `trend_continuation` | `ema_stack` BULL; `ret_20d`, `ret_60d` > 0; `rs_spy_63d` > 0; `pct_vs_ema_20` > 0; `atr_ratio_5_20` >= 0.8 | the 50-session return is `ret_60d` |
+| `range_breakout` | `atr_ratio_5_20` <= 0.85; `bb_width_pctile_252d` <= 0.15; `dist_to_resistance_atr` <= 1; `rel_volume` >= 1.2; `mom_accel_5d` > 0 and `ret_5d` > 0 | none (nothing confirms the direction of the break) |
+| `failed_breakout` | `breakout_failed` true; `sessions_since_breakout` <= 10 (soft, 5 tolerance); `rel_volume` >= 1.2; `mom_accel_5d` < 0; `dist_to_resistance_atr` <= 1 | "yesterday above the 20-session high, today below" is approximated by `breakout_failed` (any close below the level since the latest breakout of the last 60 sessions) plus the recency gate |
+| `oversold_reversal` | `ret_5d_pctile` <= 0.1; `rsi_14` < 30; `dist_to_support` > 0; `pct_vs_sma_200` > 0 (soft, 5 pts) and `trend_state` != DOWNTREND (score); `mom_accel_5d` > 0; `volume_z_20d` >= 2 (`rel_volume` >= 1.5 scores); `ret_1d` > 0 | the "or" in the volume spike: one field gates, the other scores; `dist_to_support` > 0 also drops names at a one-year low (no swing low below) |
+
+A preset is an identification layer, not a trade signal: none checks earnings, news or the
+market regime.
 
 ## Where the columns live
 

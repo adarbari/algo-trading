@@ -1,0 +1,84 @@
+# Range breakout (before the move): a squeeze, a Bollinger width near its yearly low, price
+# against resistance and volume and momentum starting to turn up (owner's screen, 2026-10-06;
+# docs/data/technical.md "Presets"). What it finds: coiled names about to resolve. What it
+# does not check: the direction of the resolution (resistance proximity leans up, nothing
+# confirms it); once it breaks, the breakout preset takes over.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+# Run on request or nightly like every site screener (ADR 0033); an identification layer,
+# not a trade signal.
+id = "range_breakout"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Range breakout"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# no liquidity_class: it bundles option liquidity, and these are stock-chart screens)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the setup
+[criteria.atr_contracting]
+field = "feature.atr_ratio_5_20"
+op = "lte"
+value = 0.85
+
+[criteria.bb_width_low]
+field = "rollup.bands@v2.bb_width_pctile_252d"
+op = "lte"
+value = 0.15
+
+[criteria.near_resistance]
+field = "feature.dist_to_resistance_atr"
+op = "lte"
+value = 1
+
+[criteria.rel_volume]
+field = "rollup.momentum@v1.rel_volume"
+op = "gte"
+value = 1.2
+
+[criteria.momentum_turning]
+field = "rollup.trend_stats@v2.mom_accel_5d"
+op = "gt"
+value = 0
+
+[criteria.ret_5d]
+field = "rollup.momentum@v1.ret_5d"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+bb_width_pctile_252d = "rollup.bands@v2.bb_width_pctile_252d"
+dist_to_resistance_atr = "feature.dist_to_resistance_atr"
+ret_5d = "rollup.momentum@v1.ret_5d"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+mom_accel_5d = "rollup.trend_stats@v2.mom_accel_5d"
+rel_volume = "rollup.momentum@v1.rel_volume"
+atr_ratio_5_20 = "feature.atr_ratio_5_20"
+rsi_14 = "rollup.momentum@v1.rsi_14"
+rs_spy_63d = "rollup.relative_strength@v1.rs_spy_63d"
+
+[rank]
+tie_break = "feature.dist_to_resistance_atr"

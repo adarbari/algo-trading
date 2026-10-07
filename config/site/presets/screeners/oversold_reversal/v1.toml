@@ -1,0 +1,109 @@
+# Oversold reversal: a washed-out week (bottom decile, RSI < 30) on a volume spike that has
+# turned up, still above support (owner's screen, 2026-10-06; docs/data/technical.md
+# "Presets"). What it finds: bounce candidates. What it does not check: why it sold off.
+# Guide caveat: an oversold name in a downtrend keeps falling, so a close above the SMA200
+# is a soft gate (a miss within 5% is WATCH) and trend_state != DOWNTREND scores.
+# "Volume spike" is volume_z_20d >= 2 as the gate, rel_volume >= 1.5 as a score. Price above major
+# support is dist_to_support > 0, which also drops names at a one-year low (no swing low below).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+# Run on request or nightly like every site screener (ADR 0033); an identification layer,
+# not a trade signal.
+id = "oversold_reversal"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Oversold reversal"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# no liquidity_class: it bundles option liquidity, and these are stock-chart screens)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the setup
+[criteria.ret_5d_rank]
+field = "rollup.relative_strength@v1.ret_5d_pctile"
+op = "lte"
+value = 0.1
+
+[criteria.rsi]
+field = "rollup.momentum@v1.rsi_14"
+op = "lt"
+value = 30
+
+[criteria.above_support]
+field = "feature.dist_to_support"
+op = "gt"
+value = 0
+
+[criteria.above_sma200]
+field = "feature.pct_vs_sma_200"
+op = "gt"
+value = 0
+mode = "soft"
+tolerance = 0.05
+on_miss = "WATCH"
+
+[criteria.not_downtrend]
+field = "feature.trend_state"
+op = "ne"
+value = "DOWNTREND"
+mode = "score"
+
+[criteria.momentum_improving]
+field = "rollup.trend_stats@v2.mom_accel_5d"
+op = "gt"
+value = 0
+
+[criteria.volume_spike]
+field = "rollup.volume@v1.volume_z_20d"
+op = "gte"
+value = 2
+
+[criteria.rel_volume]
+field = "rollup.momentum@v1.rel_volume"
+op = "gte"
+value = 1.5
+mode = "score"
+tolerance = 0.5
+
+[criteria.up_close]
+field = "rollup.trend_stats@v2.ret_1d"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+ret_5d_pctile = "rollup.relative_strength@v1.ret_5d_pctile"
+dist_to_support = "feature.dist_to_support"
+pct_vs_sma_200 = "feature.pct_vs_sma_200"
+volume_z_20d = "rollup.volume@v1.volume_z_20d"
+ret_5d = "rollup.momentum@v1.ret_5d"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+mom_accel_5d = "rollup.trend_stats@v2.mom_accel_5d"
+rel_volume = "rollup.momentum@v1.rel_volume"
+atr_ratio_5_20 = "feature.atr_ratio_5_20"
+rsi_14 = "rollup.momentum@v1.rsi_14"
+rs_spy_63d = "rollup.relative_strength@v1.rs_spy_63d"
+
+[rank]
+tie_break = "rollup.relative_strength@v1.ret_5d_pctile"
