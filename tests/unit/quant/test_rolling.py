@@ -9,6 +9,7 @@ from algotrade.quant.rolling import (
     rolling_mean,
     rolling_min,
     rolling_var,
+    trailing_percentile,
     trailing_run,
 )
 
@@ -49,3 +50,15 @@ def test_trailing_run_counts_back_from_the_last_row() -> None:
     assert out[0] == 1.0 and np.isnan(out[3])
     with pytest.raises(ValueError):
         trailing_run(holds, known[:2])
+
+
+def test_trailing_percentile_ranks_the_last_row_against_the_window_before() -> None:
+    col = np.r_[np.arange(1.0, 11), 5.5][:, None]  # 10 earlier values 1..10, then 5.5
+    assert trailing_percentile(col, 10, 10)[0] == 0.5
+    col[2, 0] = np.nan  # one unknown: 9 known, 4 below
+    assert trailing_percentile(col, 10, 9)[0] == pytest.approx(4 / 9)
+    assert np.isnan(trailing_percentile(col, 10, 10)[0])
+    col[-1, 0] = np.nan
+    assert np.isnan(trailing_percentile(col, 10, 5)[0])
+    with pytest.raises(ValueError):
+        trailing_percentile(col, 10, 11)

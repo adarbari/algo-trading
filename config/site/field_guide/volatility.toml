@@ -680,12 +680,12 @@ value = "ibkr"
 mode = "soft"
 tolerance = 0
 
-# Realised-volatility bands and the squeeze (bands@v1, trend_stats@v1 and
+# Realised-volatility bands and the squeeze (bands@v2, trend_stats@v2 and
 # config/site/features/bands.toml): how dispersed the last month's closes are, where that
 # sits against the year, and the compressions that precede a move.
 
 [[field]]
-name = "rollup.bands@v1.close_std_20"
+name = "rollup.bands@v2.close_std_20"
 theme = "volatility"
 reads = "The sample standard deviation of the last 20 closes, in dollars per share: half the distance from the 20-session mean to a one-sigma Bollinger band. It scales with the price, so read it as a share of the price (feature.bb_width is four of these over the mean) or in the z-score it normalises (feature.price_z_20d): a $2 deviation is wide on a $30 stock and tight on a $300 one."
 caveats = [
@@ -704,7 +704,7 @@ note = "threshold the normalised forms instead: feature.bb_width or feature.pric
 [[field]]
 name = "feature.bb_width"
 theme = "volatility"
-reads = "The Bollinger bandwidth: the distance between the bands as a share of the 20-session mean, 0.10 meaning the bands are 10% of the price apart (four standard deviations of the last 20 closes). Low to high: under about 0.05 is tight for a large cap, 0.08 to 0.15 ordinary, above 0.25 a volatile month. The level depends on the name, so screen on its rank against the year, rollup.bands@v1.bb_width_pctile_252d, and use this to compare two names on the same day."
+reads = "The Bollinger bandwidth: the distance between the bands as a share of the 20-session mean, 0.10 meaning the bands are 10% of the price apart (four standard deviations of the last 20 closes). Low to high: under about 0.05 is tight for a large cap, 0.08 to 0.15 ordinary, above 0.25 a volatile month. The level depends on the name, so screen on its rank against the year, rollup.bands@v2.bb_width_pctile_252d, and use this to compare two names on the same day."
 caveats = [
   "A shock day widens the bands for exactly 20 sessions and then they snap shut as it leaves the window; a 'narrowest in a year' reading right then is arithmetic, not a base. Check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.",
   "Bandwidth rises in a clean trend as well as in a chop (a one-direction move spreads the closes), so a high value is not 'risky' on its own; pair with feature.trend_state.",
@@ -720,14 +720,14 @@ op = "lte"
 value = 0.10
 mode = "score"
 tolerance = 0.05
-note = "a score between names; for 'tight for this name' use rollup.bands@v1.bb_width_pctile_252d lte 0.10"
+note = "a score between names; for 'tight for this name' use rollup.bands@v2.bb_width_pctile_252d lte 0.10"
 
 [[field]]
-name = "rollup.bands@v1.bb_width_pctile_252d"
+name = "rollup.bands@v2.bb_width_pctile_252d"
 theme = "volatility"
 reads = "Where today's Bollinger bandwidth sits against the name's own last year, 0 to 1: the share of the 252 sessions before today whose bandwidth was narrower. 0.05 means the bands are tighter than on 95% of days in the year (Bollinger's Squeeze: the lowest bandwidth in six months), 0.50 an ordinary month, 0.95 one of the widest. A squeeze says a large move is likelier, not which way: it is a setup to pair with a direction (feature.trend_state, rollup.volume@v1.up_volume_share_20d), and feature.bb_squeeze is the same idea measured against the Keltner channel."
 caveats = [
-  "Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that just had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v1.tight_range_sessions.",
+  "Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that just had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.",
   "A squeeze can last weeks and the release can go either way; do not read a low percentile as a buy. Confirm the direction with feature.breakout_20d or rollup.volume@v1.up_volume_share_20d once it moves.",
   "A pending takeover pins the price, so the bands stay the tightest in the year until the deal closes. See the 'pending takeover' situation.",
   "Null when fewer than 240 of the 252 sessions before today have a bandwidth (a young listing or a name with gaps), or today's is unknown.",
@@ -754,9 +754,9 @@ note = "a filter for strategies that need a calm name; for 'wide bands today' us
 [[field]]
 name = "feature.bb_squeeze"
 theme = "volatility"
-reads = "True when both Bollinger bands sit inside the Keltner channel: the dispersion of closes has fallen below the name's own daily range, the compression Carter's TTM squeeze is built on. It is a state, not a signal: the release (the first session the bands move back outside the channel) is the event, and its direction comes from the price. It usually coincides with rollup.bands@v1.bb_width_pctile_252d under about 0.15 but needs no history, so it works on young listings."
+reads = "True when both Bollinger bands sit inside the Keltner channel: the dispersion of closes has fallen below the name's own daily range, the compression Carter's TTM squeeze is built on. It is a state, not a signal: the release (the first session the bands move back outside the channel) is the event, and its direction comes from the price. It usually coincides with rollup.bands@v2.bb_width_pctile_252d under about 0.15 but needs no history, so it works on young listings."
 caveats = [
-  "With a Keltner multiplier of 2 ATR the squeeze fires less often than Carter's 1.5; a name that is 'almost' squeezed shows in rollup.bands@v1.bb_width_pctile_252d.",
+  "With a Keltner multiplier of 2 ATR the squeeze fires less often than Carter's 1.5; a name that is 'almost' squeezed shows in rollup.bands@v2.bb_width_pctile_252d.",
   "A squeeze lasts from a few sessions to months; screening on it alone finds names going nowhere. Pair with feature.trend_state or feature.volume_dry_up to find the ones building a base.",
   "A pending takeover squeezes forever (no range, no dispersion); see the 'pending takeover' situation.",
   "Null when the bands or the channel are unknown (fewer than 20 consecutive bars) and the known side does not already say false.",
@@ -773,7 +773,7 @@ mode = "hard"
 note = "with feature.trend_state eq UPTREND (bullish) or rollup.volume@v1.up_volume_share_20d gte 0.55 for the direction"
 
 [[field]]
-name = "rollup.trend_stats@v1.ret_z_20d"
+name = "rollup.trend_stats@v2.ret_z_20d"
 theme = "volatility"
 reads = "Today's close-to-close return in units of the name's normal daily move: the return divided by the standard deviation of the 20 daily returns before it. Low to high: within -1 to +1 is an ordinary day, beyond 2 a notable one (about one day in twenty by chance), beyond 3 an event (earnings, news, an index change, a capitulation), beyond 5 almost always a gap on news. The sign is the direction; rollup.volume@v1.volume_z_20d is the same measure for volume."
 caveats = [
@@ -801,11 +801,11 @@ mode = "hard"
 note = "a filter for setups that need a quiet entry day"
 
 [[field]]
-name = "rollup.trend_stats@v1.tight_range_sessions"
+name = "rollup.trend_stats@v2.tight_range_sessions"
 theme = "volatility"
 reads = "How many consecutive sessions, ending today, the 20-session high-low range has been at most 15% of the close: the age of the current base. 0 means the range is not tight today; 5 to 10 is a young base (one or two weeks); 20 and above a month-old consolidation, the kind O'Neil's flat base and Minervini's contraction patterns describe; 60 and above a long, often dull, range. It counts sessions, so the base's start is today minus the count."
 caveats = [
-  "15% of the close is tight for a large cap and wide for a biotech or a leveraged fund: a high-volatility name never qualifies and a utility always does. For 'tight for this name' use rollup.bands@v1.bb_width_pctile_252d, which ranks against the name's own year.",
+  "15% of the close is tight for a large cap and wide for a biotech or a leveraged fund: a high-volatility name never qualifies and a utility always does. For 'tight for this name' use rollup.bands@v2.bb_width_pctile_252d, which ranks against the name's own year.",
   "A base in a downtrend is a shelf before the next leg down as often as a bottom; pair with feature.trend_state or feature.pct_vs_sma_200 for the direction it should resolve in.",
   "A pending takeover makes the tightest base there is; see the 'pending takeover' situation.",
   "Null when today's 20-session range is unknown (a gap among the last 20 sessions, or a shorter history).",
