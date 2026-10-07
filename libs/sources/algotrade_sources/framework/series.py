@@ -16,7 +16,9 @@ ingestion task sees one shape (``parsed["series"]`` of ``Normalized``, ``SERIES_
   ``date``. Point-in-time stamping (``knowledge_ts`` etc.) belongs to the task, not here.
 
 ``SeriesRequest`` is a ``FetchRequest`` plus what the registry knows about the series; the task
-builds it from the registry, so adapters hold no per-series knowledge.
+builds it from the registry, so adapters hold no per-series knowledge. ``ReleaseRequest`` asks
+the release-dates source (FRED ``release/dates``, ADR 0050) for one release, bounded in real
+time; its answer is ``parsed[RELEASE_FRAME]`` (``vendors/fred/releases.py``).
 """
 
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ from algotrade_sources.framework.base import FetchRequest
 
 SERIES_FRAME = "series"  # key of ``Normalized.parsed`` holding the normalised frame
 SERIES_COLUMNS = ("series", "obs_date", "vintage_date", "value", "code")
+RELEASE_FRAME = "release_dates"  # key of ``Normalized.parsed`` holding a release's dates (ADR 0050)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -44,6 +47,15 @@ class SeriesRequest(FetchRequest):
     value_column: str = "value"
     parser: str = "csv"
     vintages: bool = True  # FRED: every vintage (ALFRED); False: the current values only
+    start: date | None = None
+    end: date | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class ReleaseRequest(FetchRequest):
+    """One FRED release. ``key`` is the release id (digits, e.g. ``"10"`` for the CPI);
+    ``start`` / ``end`` bound the real-time period (inclusive; ``None``: unbounded)."""
+
     start: date | None = None
     end: date | None = None
 
