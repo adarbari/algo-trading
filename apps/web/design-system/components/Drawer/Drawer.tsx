@@ -17,6 +17,8 @@ export interface DrawerProps {
   onOpenChange: (open: boolean) => void;
   /** The heading and accessible name ("AAPL · Apple"). */
   title: ReactNode;
+  /** A small mono line above the title (a catalogue name, a section label). */
+  eyebrow?: ReactNode;
   /** One line under the title; also the accessible description. */
   description?: ReactNode;
   /** Actions pinned to the bottom of the sheet. */

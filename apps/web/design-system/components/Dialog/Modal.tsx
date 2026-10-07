@@ -28,6 +28,8 @@ export interface ModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
+  /** A small mono line above the title. */
+  eyebrow?: ReactNode;
   description?: ReactNode;
   footer?: ReactNode;
   /** `dialog` (centred) or `drawer` (a full-height sheet on one side). */
@@ -45,6 +47,7 @@ export function Modal({
   open,
   onOpenChange,
   title,
+  eyebrow,
   description,
   footer,
   kind,
@@ -97,6 +100,11 @@ export function Modal({
           >
             <div className={styles.header}>
               <div className={styles.titles}>
+                {eyebrow && (
+                  <Text size="xs" tone="muted" mono>
+                    {eyebrow}
+                  </Text>
+                )}
                 <Heading level={2} size="lg" id={`${id}-title`}>
                   {title}
                 </Heading>
