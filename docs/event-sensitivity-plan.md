@@ -63,7 +63,7 @@ The owner's starting list (two batches, 2026-10-06), resolved; the holdings tabl
 
 | In the list | Kind | Reference used for events |
 |---|---|---|
-| AAPU, AMZU, ASMU, AVL, AVGG, AVGU, AVGX, BRKD, BRKU, GGLL, MCDL, METU, MSFU, NVDL, TSLL, TSLQ, UBRL, UNHG | single-stock leveraged | AAPL, AMZN, ASML, AVGO (x4), BRK.B (x2), GOOGL, MCD (unverified), META, MSFT, NVDA, TSLA (x2), UBER, UNH |
+| AAPU, AMZU, ASMU, AVL, AVGG, AVGU, AVGX, BRKU, GGLL, METU, MSFU, NVDL, TSLL, TSLQ, UBRL, UNHG | single-stock leveraged | AAPL, AMZN, ASML, AVGO (x4), BRK.B, GOOGL, META, MSFT, NVDA, TSLA (x2), UBER, UNH |
 | SOXL, SOXS | semiconductor index, 3x | top 3 of the index: MU, AMD, MRVL (NVDA, AVGO close behind) |
 | TQQQ, SQQQ, QLD | Nasdaq-100, 3x / 2x | NVDA, AAPL, MSFT |
 | SSO, UPRO | S&P 500, 2x / 3x | NVDA, AAPL, MSFT |
