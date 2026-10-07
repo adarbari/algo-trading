@@ -31,7 +31,7 @@ test('the top bar links to the Guide, and "?" opens it', async ({ page }) => {
   await expect(page).toHaveURL(/\/guide$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Guide' })).toBeVisible();
   await page.goto('/explore');
-  await page.keyboard.press('Shift+/');
+  await page.keyboard.press('?');
   await expect(page).toHaveURL(/\/guide$/);
   expect(errors).toEqual([]);
 });
@@ -63,7 +63,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(use).toContainText('gte 0.4 soft tolerance 0.05');
     await expect(use.getByRole('button', { name: 'Add to Builder' })).toHaveCount(2);
 
-    await expect(page.getByText('When it lies')).toBeVisible();
+    await expect(page.locator('#lies').getByText('When it lies')).toBeVisible();
     await expect(page.getByText('Earnings gap inside the window')).toBeVisible();
     const related = page.getByRole('region', { name: 'Related fields and playbooks' });
     await expect(related.getByRole('link', { name: 'feature.iv_hv_ratio' })).toBeVisible();
@@ -98,7 +98,8 @@ test('the rail searches the fields and the index has three views', async ({ page
   await page.goto('/guide/fields');
   await page.getByRole('searchbox', { name: 'Search the guide' }).fill('realised');
   const results = page.getByRole('navigation', { name: 'Search results' });
-  await expect(results.getByRole('link')).toHaveCount(1);
+  await expect(results.getByRole('link', { name: 'rollup.price_stats@v2.hv30' })).toBeVisible();
+  await expect(results.getByRole('link', { name: IV30 })).toHaveCount(0);
   await page.getByRole('searchbox', { name: 'Search the guide' }).fill('zzzz');
   await expect(page.getByText('No field matches “zzzz”.')).toBeVisible();
   await page.getByRole('radio', { name: 'By intent' }).click();
