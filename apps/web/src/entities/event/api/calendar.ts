@@ -31,6 +31,7 @@ const EventCalendar = graphql(`
             subjectId
             source
             knownFrom
+            expiry
           }
         }
       }

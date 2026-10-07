@@ -157,9 +157,7 @@ export function calendarDays(calendar: EventCalendarResponse): {
   const marketWide = days.some((d) => d.events.some((e) => e.instrumentId === MARKET_NAME.id));
   const named = calendar.names.map((n) => ({ id: n.instrumentId, symbol: n.symbol }));
   const ruledDays = calendar.days
-    .filter((d) =>
-      d.events.some((e) => e.event.kind === 'market_structure' && /expiry/i.test(e.event.label)),
-    )
+    .filter((d) => d.events.some((e) => e.event.expiry))
     .map((d) => d.date);
   return { days, names: marketWide ? [MARKET_NAME, ...named] : named, ruledDays };
 }

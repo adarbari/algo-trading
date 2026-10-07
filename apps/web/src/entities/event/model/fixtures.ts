@@ -4,7 +4,14 @@ import type { EventStudyResponse } from '../api/study';
 
 type Study = NonNullable<NonNullable<EventStudyResponse['instrument']>['eventStudy']>;
 
-const ahead = (kind: string, date: string, label: string, time: string, source = 'Calendar') => ({
+const ahead = (
+  kind: string,
+  date: string,
+  label: string,
+  time: string,
+  source = 'Calendar',
+  expiry = false,
+) => ({
   date,
   time,
   kind,
@@ -13,6 +20,7 @@ const ahead = (kind: string, date: string, label: string, time: string, source =
   subjectId: null,
   source,
   knownFrom: null,
+  expiry,
 });
 
 export const STUDY_FIXTURE: Study = {
@@ -22,7 +30,7 @@ export const STUDY_FIXTURE: Study = {
   ahead: [
     ahead('macro_release', '2026-10-14', 'CPI', '08:30', 'BLS'),
     ahead('own_earnings', '2026-10-29', 'Earnings', 'after_hours', 'Company calendar'),
-    ahead('market_structure', '2026-11-20', 'Monthly expiry', 'close', 'Rule'),
+    ahead('market_structure', '2026-11-20', 'Monthly expiry', 'close', 'Rule', true),
   ],
   filings: [
     {
@@ -85,7 +93,7 @@ export const CALENDAR_FIXTURE: EventCalendarResponse = {
         {
           instrumentId: null,
           symbol: null,
-          event: ahead('market_structure', '2026-11-20', 'Monthly expiry', 'close', 'Rule'),
+          event: ahead('market_structure', '2026-11-20', 'Monthly expiry', 'close', 'Rule', true),
         },
       ],
     },

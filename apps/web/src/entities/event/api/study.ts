@@ -29,6 +29,7 @@ const InstrumentEventStudy = graphql(`
           subjectId
           source
           knownFrom
+          expiry
         }
         filings {
           accepted
@@ -52,6 +53,7 @@ const InstrumentEventStudy = graphql(`
             subjectId
             source
             knownFrom
+            expiry
           }
         }
         reference {

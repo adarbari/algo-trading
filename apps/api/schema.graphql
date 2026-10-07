@@ -6,7 +6,7 @@ enum Adjustment {
 }
 
 """
-A dated event ahead: `kind` own_earnings | reference_earnings | macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown for a report, the release time for a macro release (08:30 ET), close for a market-structure day; `label` short, `name` in words; `subjectId` whose event (the instrument, the fund's reference, the MACRO: release; null for a market-structure day); `knownFrom` the first session the stored row was known on (null: a catalogue value or a calendar rule)
+A dated event ahead: `kind` own_earnings | reference_earnings | macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown for a report, the release time for a macro release (08:30 ET), close for a market-structure day; `label` short, `name` in words; `subjectId` whose event (the instrument, the fund's reference, the MACRO: release; null for a market-structure day); `knownFrom` the first session the stored row was known on (null: a catalogue value or a calendar rule); `expiry` a monthly or quarterly option expiry day
 """
 type AheadEvent {
   date: Date!
@@ -17,6 +17,7 @@ type AheadEvent {
   subjectId: String
   source: String!
   knownFrom: Date
+  expiry: Boolean!
 }
 
 """

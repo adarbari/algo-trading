@@ -9,7 +9,14 @@
  */
 import type { Page, Route } from '@playwright/test';
 
-const event = (kind: string, date: string, label: string, time: string, source: string) => ({
+const event = (
+  kind: string,
+  date: string,
+  label: string,
+  time: string,
+  source: string,
+  expiry = false,
+) => ({
   date,
   time,
   kind,
@@ -18,11 +25,12 @@ const event = (kind: string, date: string, label: string, time: string, source: 
   subjectId: null,
   source,
   knownFrom: null,
+  expiry,
 });
 
 const CPI = event('macro_release', '2026-10-14', 'CPI', '08:30', 'BLS');
 const EARNINGS = event('own_earnings', '2026-10-29', 'Earnings', 'after_hours', 'Company calendar');
-const OPEX = event('market_structure', '2026-10-16', 'Monthly expiry', 'close', 'Rule');
+const OPEX = event('market_structure', '2026-10-16', 'Monthly expiry', 'close', 'Rule', true);
 
 const AAPL_STUDY = {
   session: '2026-10-07',

@@ -20,7 +20,7 @@ from algotrade_api.graphql.types.instruments.feature import Unknown
     "structure day; `label` short, `name` in words; `subjectId` whose event (the "
     "instrument, the fund's reference, the MACRO: release; null for a market-structure day); "
     "`knownFrom` the first session the stored row was known on (null: a catalogue value or "
-    "a calendar rule)"
+    "a calendar rule); `expiry` a monthly or quarterly option expiry day"
 )
 class AheadEvent:
     date: dt.date
@@ -31,6 +31,7 @@ class AheadEvent:
     subject_id: str | None
     source: str
     known_from: dt.date | None
+    expiry: bool
 
     @classmethod
     def of(cls, d: ahead.AheadEvent) -> Self:
@@ -43,6 +44,7 @@ class AheadEvent:
             subject_id=d.subject_id,
             source=d.source,
             known_from=d.known_from,
+            expiry=d.expiry,
         )
 
 

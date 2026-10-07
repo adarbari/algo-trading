@@ -97,6 +97,25 @@ describe('calendarDays', () => {
     expect(ruledDays).toEqual(['2026-11-20']);
   });
 
+  it('rules only the days the API flags as expiry, whatever the label says', () => {
+    const day = (date: string, label: string, expiry: boolean) => ({
+      date,
+      isSession: true,
+      events: [
+        {
+          instrumentId: null,
+          symbol: null,
+          event: { ...AHEAD0, date, kind: 'market_structure', label, expiry },
+        },
+      ],
+    });
+    const flagged = {
+      ...CALENDAR_FIXTURE,
+      days: [day('2026-12-18', 'Opex', true), day('2026-12-31', 'Quarterly expiry roll', false)],
+    };
+    expect(calendarDays(flagged).ruledDays).toEqual(['2026-12-18']);
+  });
+
   it('has no Market column when nothing is market-wide', () => {
     const own = { ...CALENDAR_FIXTURE, days: [DAY1] };
     expect(calendarDays(own).names.map((n) => n.symbol)).toEqual(['AAPL', 'NVDA']);

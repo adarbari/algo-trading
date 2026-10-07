@@ -16,13 +16,19 @@ def test_a_quarter_with_the_reconstitution() -> None:
         (date(2026, 7, 17), "Monthly expiry"),
     ]  # May's expiry (the 15th) is before the window
     assert found[2].name.startswith("Last session of Q2 2026")
+    assert [(d.label, d.expiry) for d in found] == [
+        ("Quarterly expiry", True),
+        ("Russell reconstitution", False),
+        ("Quarter end", False),
+        ("Monthly expiry", True),
+    ]  # only the option expiry days are flagged
 
 
 def test_the_window_is_inclusive_and_spans_years() -> None:
     found = market_days(date(2026, 12, 18), date(2027, 1, 15))
     assert found == (
-        MarketDay(date(2026, 12, 18), "Quarterly expiry", found[0].name),
-        MarketDay(date(2026, 12, 31), "Quarter end", found[1].name),
-        MarketDay(date(2027, 1, 15), "Monthly expiry", found[2].name),
+        MarketDay(date(2026, 12, 18), "Quarterly expiry", found[0].name, True),
+        MarketDay(date(2026, 12, 31), "Quarter end", found[1].name, False),
+        MarketDay(date(2027, 1, 15), "Monthly expiry", found[2].name, True),
     )
     assert market_days(date(2026, 10, 17), date(2026, 10, 31)) == ()

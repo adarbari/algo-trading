@@ -78,14 +78,14 @@ export type EventCalendarQueryVariables = Exact<{
 }>;
 
 
-export type EventCalendarQuery = { eventCalendar: { session: string, end: string, missing: Array<string>, unresolved: Array<string>, names: Array<{ instrumentId: string, symbol: string }>, days: Array<{ date: string, isSession: boolean, events: Array<{ instrumentId: string | null, symbol: string | null, event: { date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null } }> }>, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, detail: string, reason: NullReason | null } }> } | null };
+export type EventCalendarQuery = { eventCalendar: { session: string, end: string, missing: Array<string>, unresolved: Array<string>, names: Array<{ instrumentId: string, symbol: string }>, days: Array<{ date: string, isSession: boolean, events: Array<{ instrumentId: string | null, symbol: string | null, event: { date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean } }> }>, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, detail: string, reason: NullReason | null } }> } | null };
 
 export type InstrumentEventStudyQueryVariables = Exact<{
   key: string;
 }>;
 
 
-export type InstrumentEventStudyQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, eventStudy: { session: string, days: number, months: number, ahead: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null }>, filings: Array<{ accepted: string, filingDate: string, form: string, items: Array<string>, label: string, knownFrom: string }>, ladder: Array<{ expiry: string, days: number, clear: boolean, marked: boolean, spans: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null }> }>, reference: { instrumentId: string | null, symbol: string | null, kind: string, source: string | null, status: string } | null, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, detail: string, reason: NullReason | null } }> } | null } | null };
+export type InstrumentEventStudyQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, eventStudy: { session: string, days: number, months: number, ahead: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }>, filings: Array<{ accepted: string, filingDate: string, form: string, items: Array<string>, label: string, knownFrom: string }>, ladder: Array<{ expiry: string, days: number, clear: boolean, marked: boolean, spans: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }> }>, reference: { instrumentId: string | null, symbol: string | null, kind: string, source: string | null, status: string } | null, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, detail: string, reason: NullReason | null } }> } | null } | null };
 
 export type ComparePricesQueryVariables = Exact<{
   keys: Array<string> | string;
@@ -424,6 +424,7 @@ export const EventCalendarDocument = new TypedDocumentString(`
           subjectId
           source
           knownFrom
+          expiry
         }
       }
     }
@@ -462,6 +463,7 @@ export const InstrumentEventStudyDocument = new TypedDocumentString(`
         subjectId
         source
         knownFrom
+        expiry
       }
       filings {
         accepted
@@ -485,6 +487,7 @@ export const InstrumentEventStudyDocument = new TypedDocumentString(`
           subjectId
           source
           knownFrom
+          expiry
         }
       }
       reference {

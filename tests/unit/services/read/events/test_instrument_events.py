@@ -32,6 +32,14 @@ def test_a_stock_for_the_session() -> None:
         (date(2026, 11, 20), MARKET_STRUCTURE, "Monthly expiry"),
         (date(2026, 12, 18), MARKET_STRUCTURE, "Quarterly expiry"),
     ]
+    assert [e.expiry for e in found.ahead] == [
+        False,
+        True,
+        False,
+        False,
+        True,
+        True,
+    ]  # expiry days only
     cpi, _, report = found.ahead[:3]
     assert (cpi.time, cpi.name, cpi.subject_id, cpi.source, cpi.known_from) == (
         "08:30 ET", "CPI release", "MACRO:CPI", "fred", D0,
