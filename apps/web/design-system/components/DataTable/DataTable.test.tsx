@@ -324,4 +324,28 @@ describe('DataTable', () => {
     const active = container.querySelector('[data-active]');
     expect(active?.getAttribute('data-row-id')).toBe(rows[0]?.id); // controlled: the caller decides
   });
+
+  it('shows a header action beside the sort button, not inside it', async () => {
+    const onAction = vi.fn();
+    const helped = columns.map((c) =>
+      c.id === 'iv30'
+        ? {
+            ...c,
+            headerAction: (
+              <button type="button" aria-label="What is IV30?" onClick={onAction}>
+                i
+              </button>
+            ),
+          }
+        : c,
+    );
+    const { container } = render(<Table columns={helped} />);
+    const header = screen.getByRole('columnheader', { name: /IV30/ });
+    const action = within(header).getByRole('button', { name: 'What is IV30?' });
+    expect(action.closest('button[aria-describedby]')).toBeNull(); // not inside the sort button
+    await userEvent.click(action);
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(header.getAttribute('aria-sort')).toBe('none'); // the action did not sort
+    await expectNoA11yViolations(container);
+  });
 });

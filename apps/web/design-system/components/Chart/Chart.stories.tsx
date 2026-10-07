@@ -51,6 +51,16 @@ const painted = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
   );
 };
 
+/** Two animation frames: what the chart engine needs to redraw after a zoom. */
+const settled = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+
 const meta = {
   title: 'Components/Chart',
   component: Chart,
@@ -76,6 +86,8 @@ export const Zoomed: Story = {
     const zoomIn = within(context.canvasElement).getByRole('button', { name: 'Zoom in' });
     await userEvent.click(zoomIn);
     await userEvent.click(zoomIn);
+    // The engine redraws on the next animation frames; the screenshot waits for the settled one.
+    await settled();
   },
 };
 

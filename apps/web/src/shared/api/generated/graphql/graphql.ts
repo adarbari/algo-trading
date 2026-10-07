@@ -316,6 +316,13 @@ export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ViewerQuery = { viewer: { id: string, name: string, role: string, workspaces: Array<string> } };
 
+export type GuideHelpFieldQueryVariables = Exact<{
+  name: string;
+}>;
+
+
+export type GuideHelpFieldQuery = { guideField: { info: { name: string, unit: string | null, guide: { theme: string, reads: string, summary: string, caveats: Array<string>, uses: Array<{ intent: string, op: string, value: unknown, mode: string, tolerance: unknown, onMiss: string | null, note: string }> } | null } } | null };
+
 export type TableViewQueryVariables = Exact<{
   scope: string;
   name?: string | null | undefined;
@@ -1379,6 +1386,31 @@ export const ViewerDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ViewerQuery, ViewerQueryVariables>;
+export const GuideHelpFieldDocument = new TypedDocumentString(`
+    query GuideHelpField($name: FeatureName!) {
+  guideField(name: $name) {
+    info {
+      name
+      unit
+      guide {
+        theme
+        reads
+        summary
+        caveats
+        uses {
+          intent
+          op
+          value
+          mode
+          tolerance
+          onMiss
+          note
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideHelpFieldQuery, GuideHelpFieldQueryVariables>;
 export const TableViewDocument = new TypedDocumentString(`
     query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) {

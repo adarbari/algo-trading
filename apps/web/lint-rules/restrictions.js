@@ -210,6 +210,20 @@ const OVERLAY_LIBRARY = {
   ),
 };
 
+/**
+ * The help drawer is shown only through `features/guide-help`, which turns a Guide entry
+ * reference into it (ADR 0051), so no page, widget or other feature passes text to a drawer.
+ */
+const HELP_DRAWER = {
+  name: '@algotrade/ui',
+  importNames: ['HelpDrawer', 'HelpLead', 'HelpSection'],
+  message: message(
+    2,
+    'HelpDrawer, HelpLead and HelpSection are imported only by src/features/guide-help (ADR 0051): put an InfoButton from the guide-help feature beside the thing explained, passing the Guide entry { kind, id }, and write the text as a Guide entry.',
+    '.claude/skills/add-guide-content',
+  ),
+};
+
 /** Which libraries each layer may not import, beyond the shared bans. */
 const LAYER_BANS = {
   app: [],
@@ -222,7 +236,7 @@ const LAYER_BANS = {
   'shared/api': [ROUTER, REACT_DOM],
 };
 
-function restrictedImports(layer) {
+function restrictedImports(layer, helpDrawerAllowed = false) {
   const httpAllowed = layer === 'shared/api';
   return [
     'error',
@@ -240,6 +254,7 @@ function restrictedImports(layer) {
         ...LAYER_BANS[layer],
         CHART_LIBRARY,
         OVERLAY_LIBRARY,
+        ...(helpDrawerAllowed ? [] : [HELP_DRAWER]),
       ],
       patterns: [STYLE_IMPORTS, DEEP_UI],
     },
@@ -258,22 +273,35 @@ const syntaxRules = (layer, featureNames) => [
  * One config object per app layer with its complete restriction lists, and one per layer's
  * tests and stories: the same lists without WEB 5 (fixtures name features as plain strings).
  */
-export const appRestrictions = Object.keys(LAYER_BANS).flatMap((layer) => [
-  appLayer(layer, true),
+export const appRestrictions = [
+  ...Object.keys(LAYER_BANS).flatMap((layer) => [
+    appLayer(layer, true),
+    {
+      ...appLayer(layer, false),
+      name: `algotrade/restrictions/${layer}/tests`,
+      files: TEST_FILES.map((pattern) => `src/${layer}/${pattern}`),
+    },
+  ]),
+  // After the layers (a later config wins): the one feature that may import the help drawer.
   {
-    ...appLayer(layer, false),
-    name: `algotrade/restrictions/${layer}/tests`,
-    files: TEST_FILES.map((pattern) => `src/${layer}/${pattern}`),
+    ...appLayer('features', true, true),
+    name: 'algotrade/restrictions/features/guide-help',
+    files: ['src/features/guide-help/**/*.{ts,tsx}'],
   },
-]);
+  {
+    ...appLayer('features', false, true),
+    name: 'algotrade/restrictions/features/guide-help/tests',
+    files: TEST_FILES.map((pattern) => `src/features/guide-help/${pattern}`),
+  },
+];
 
-function appLayer(layer, featureNames) {
+function appLayer(layer, featureNames, helpDrawerAllowed = false) {
   return {
     name: `algotrade/restrictions/${layer}`,
     files: [`src/${layer}/**/*.{ts,tsx}`],
     rules: {
       'no-restricted-syntax': syntaxRules(layer, featureNames),
-      'no-restricted-imports': restrictedImports(layer),
+      'no-restricted-imports': restrictedImports(layer, helpDrawerAllowed),
       'no-restricted-globals': [
         'error',
         ...(layer === 'shared/api'

@@ -10,6 +10,7 @@ from algotrade.services.read.instruments.catalogue import (
     FeatureFormat,
     UnknownFeatureError,
     feature_infos,
+    first_sentence,
     format_of,
     load_catalogue,
 )
@@ -92,3 +93,10 @@ def test_the_catalogue_read_attaches_the_field_guide(ctx: ReadContext) -> None:
     # feature_infos without a guide attaches nothing (values, tables, the drafting prompt).
     infos = feature_infos(ctx.features, ["rollup.momentum@v1.rsi_14"])
     assert infos["rollup.momentum@v1.rsi_14"].guide is None
+
+
+def test_the_guide_summary_is_the_first_sentence_of_reads() -> None:
+    assert first_sentence("Close over EPS. The long-run average is 15.") == "Close over EPS."
+    assert first_sentence("A ratio, e.g. 0.5 is half. Next one.") == "A ratio, e.g. 0.5 is half."
+    assert first_sentence("Only one sentence, no stop") == "Only one sentence, no stop"
+    assert first_sentence("Is it 3.5 times? Yes.") == "Is it 3.5 times?"

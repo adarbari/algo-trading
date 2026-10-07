@@ -63,12 +63,14 @@ class GuideUse:
 
 @strawberry.type(
     description="The site field guide's entry for a field (docs/data/field-guide.md): how to "
-    "read it, the criterion per intent, when the reading lies (each caveat names the field "
-    "that exposes it), and the sources"
+    "read it (`reads`; `summary` is its first sentence, for a hover), the criterion per "
+    "intent, when the reading lies (each caveat names the field that exposes it), and the "
+    "sources"
 )
 class FieldGuide:
     theme: str
     reads: str
+    summary: str
     uses: list[GuideUse]
     caveats: list[str]
     sources: list[str]
@@ -78,6 +80,7 @@ class FieldGuide:
         return cls(
             theme=d.theme,
             reads=d.reads,
+            summary=d.summary,
             uses=[GuideUse.of(u) for u in d.uses],
             caveats=list(d.caveats),
             sources=list(d.sources),
