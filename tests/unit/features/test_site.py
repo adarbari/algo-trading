@@ -811,10 +811,24 @@ def test_ex_div_before_expiry_compares_the_next_ex_date_with_the_expiries(fs: Fe
             "expiry_date": [nearest] * 5 + [None],
         }
     )
-    frames = {DIVIDEND_SCHEDULE: schedule, PUT_WING: wing, NEAREST: chains}
-    names = ["ex_div_before_expiry", "ex_div_before_nearest_expiry"]
+    call_wing = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,  # the call wing's own expiry: a week later than the put's
+            "target_expiry": [target + pd.Timedelta(days=7)] * 4 + [None, target],
+        }
+    )
+    frames = {DIVIDEND_SCHEDULE: schedule, PUT_WING: wing, NEAREST: chains, CALL_WING: call_wing}
+    names = ["ex_div_before_expiry", "ex_div_before_nearest_expiry", "ex_div_before_call_expiry"]
     out = fs.evaluate(frames, names).set_index("instrument_id")
     target_flag, nearest_flag = out["ex_div_before_expiry"], out["ex_div_before_nearest_expiry"]
+    call_flag = out["ex_div_before_call_expiry"]
+    assert bool(call_flag["EQ:AFTER"])  # a day after the put's expiry, inside the call's
+    assert (
+        bool(call_flag["EQ:BEFORE"])
+        and pd.isna(call_flag["EQ:NODIV"])
+        and pd.isna(call_flag["EQ:NOWING"])
+    )
     assert bool(target_flag["EQ:BEFORE"]) and bool(target_flag["EQ:ON"])  # on the expiry counts
     assert not bool(target_flag["EQ:AFTER"])
     assert bool(nearest_flag["EQ:BEFORE"]) and not bool(nearest_flag["EQ:ON"])
