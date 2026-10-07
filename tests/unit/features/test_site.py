@@ -907,43 +907,88 @@ def test_volatility_ratios_volume_trend_turnover_and_value_area(fs: FeatureSet) 
     )
 
 
-RELATIVE_STRENGTH = "rollups/instrument/relative_strength@v1"
+CHAIN_FLOW = "rollups/instrument/chain_flow@v1"
+IMPLIED_MOVE = "rollups/instrument/implied_move@v1"
 
 
-def _relative_rows(**columns: list[float]) -> dict[str, pd.DataFrame | None]:
-    ids = ["EQ:A", "EQ:B", "EQ:C", "EQ:NONE"]
-    frame = pd.DataFrame({"instrument_id": ids, "session_date": END, **columns})
-    return {RELATIVE_STRENGTH: frame.astype(dict.fromkeys(columns, "float32"))}
+def test_put_call_and_volume_oi_ratios_are_put_over_call_and_null_on_zero(fs: FeatureSet) -> None:
+    flow = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:NOCALL", "EQ:DARK"],
+            "session_date": END,
+            "call_volume": [60.0, 0.0, np.nan],
+            "put_volume": [30.0, 1200.0, np.nan],
+            "call_oi": [100.0, 0.0, np.nan],
+            "put_oi": [150.0, 800.0, np.nan],
+        }
+    )
+    names = ["put_call_oi_ratio", "put_call_volume_ratio", "option_volume_oi_ratio"]
+    out = fs.evaluate({CHAIN_FLOW: flow}, names).set_index("instrument_id")
+    assert out.loc["EQ:A", "put_call_oi_ratio"] == pytest.approx(1.5)  # above 1: put-heavy
+    assert out.loc["EQ:A", "put_call_volume_ratio"] == pytest.approx(0.5)
+    assert out.loc["EQ:A", "option_volume_oi_ratio"] == pytest.approx(90 / 250)
+    nocall = out.loc["EQ:NOCALL"]  # a zero denominator is null, never infinity
+    assert pd.isna(nocall["put_call_oi_ratio"]) and pd.isna(nocall["put_call_volume_ratio"])
+    assert nocall["option_volume_oi_ratio"] == pytest.approx(1200 / 800)
+    assert out.loc["EQ:DARK", names].isna().all()  # NO_CHAIN: UNKNOWN
+    assert {fs.expressions[n].feature.licence for n in names} == {"open"}
 
 
-def test_rs_spy_positive_is_true_above_zero_and_unknown_when_null(fs: FeatureSet) -> None:
-    frames = _relative_rows(rs_spy_63d=[0.10, 0.0, -0.05, np.nan])
-    out = fs.evaluate(frames, ["rs_spy_positive"]).set_index("instrument_id")
-    assert out["rs_spy_positive"].to_dict() == {
-        "EQ:A": True,
-        "EQ:B": False,  # level with SPY is not outperforming
-        "EQ:C": False,
-        "EQ:NONE": None,
-    }
+def test_implied_move_one_sd_and_against_realised_vol(fs: FeatureSet) -> None:
+    ids = ["EQ:A", "EQ:NOHV", "EQ:FLAT", "EQ:NOMOVE"]
+    move = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "implied_move": [0.0616, 0.05, 0.05, np.nan],
+            "move_dte": [30, 30, 30, np.nan],
+        }
+    )
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "hv20": [0.40, np.nan, 0.0, 0.40],
+        }
+    )
+    out = fs.evaluate(
+        {IMPLIED_MOVE: move, PRICE_STATS: stats}, ["implied_move_1sd", "implied_move_vs_hv"]
+    ).set_index("instrument_id")
+    assert out.loc["EQ:A", "implied_move_1sd"] == pytest.approx(0.0616 * 1.2533)
+    assert out.loc["EQ:A", "implied_move_vs_hv"] == pytest.approx(
+        0.0616 * 1.2533 / (0.40 * np.sqrt(30 / 365))
+    )  # 1sd move over HV20 scaled to the move expiry: 1 is implied vol equal to HV20
+    parity = move.assign(implied_move=0.40 * np.sqrt(30 / 365) * np.sqrt(2 / np.pi))
+    same = fs.evaluate({IMPLIED_MOVE: parity, PRICE_STATS: stats}, ["implied_move_vs_hv"])
+    assert same.set_index("instrument_id").loc["EQ:A", "implied_move_vs_hv"] == pytest.approx(
+        1.0, abs=1e-4
+    )  # an expected absolute move from a 40% vol, against an HV20 of 40%: parity
+    assert pd.isna(out.loc["EQ:NOHV", "implied_move_vs_hv"])  # no HV20
+    assert out.loc["EQ:NOHV", "implied_move_1sd"] == pytest.approx(0.05 * 1.2533)
+    assert pd.isna(out.loc["EQ:FLAT", "implied_move_vs_hv"])  # HV20 0: missing, no floor
+    assert out.loc["EQ:NOMOVE", ["implied_move_1sd", "implied_move_vs_hv"]].isna().all()
 
 
-def test_rs_improving_is_true_when_the_trend_is_above_zero(fs: FeatureSet) -> None:
-    frames = _relative_rows(rs_spy_trend_20d=[0.03, 0.0, -0.02, np.nan])
-    out = fs.evaluate(frames, ["rs_improving"]).set_index("instrument_id")
-    assert out["rs_improving"].to_dict() == {
-        "EQ:A": True,
-        "EQ:B": False,
-        "EQ:C": False,
-        "EQ:NONE": None,
-    }
-
-
-def test_sector_leader_is_a_top_three_sector_and_unknown_without_a_rank(fs: FeatureSet) -> None:
-    frames = _relative_rows(sector_rank_63d=[1, 3, 4, np.nan])
-    out = fs.evaluate(frames, ["sector_leader"]).set_index("instrument_id")
-    assert out["sector_leader"].to_dict() == {
-        "EQ:A": True,
-        "EQ:B": True,  # the edge counts
-        "EQ:C": False,
-        "EQ:NONE": None,
-    }
+def test_short_put_otm_distance_breakeven_and_annualised_return(fs: FeatureSet) -> None:
+    ids = ["EQ:A", "EQ:ABOVE", "EQ:NOPUT"]
+    stats = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "close": [100.0, 100.0, 100.0]}
+    )
+    wing = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "best_put_strike": [92.0, 101.0, np.nan],
+            "best_put_mid": [1.15, 4.0, np.nan],
+            "best_put_roc": [0.0125, 0.0396, np.nan],
+            "target_dte": [45.0, 30.0, np.nan],
+        }
+    )
+    names = ["put_otm_pct", "put_breakeven", "put_roc_annualised"]
+    out = fs.evaluate({PRICE_STATS: stats, PUT_WING: wing}, names).set_index("instrument_id")
+    a = out.loc["EQ:A"]
+    assert a["put_otm_pct"] == pytest.approx(0.08)  # the strike sits 8% under the close
+    assert a["put_breakeven"] == pytest.approx(90.85)  # strike - premium
+    assert a["put_roc_annualised"] == pytest.approx(0.0125 * 365 / 45)
+    assert out.loc["EQ:ABOVE", "put_otm_pct"] == pytest.approx(-0.01)  # a strike above the close
+    assert out.loc["EQ:NOPUT", names].isna().all()  # no best put: UNKNOWN

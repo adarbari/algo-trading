@@ -250,6 +250,26 @@ fields = ["rollup.vol_stats@v1.pocket_pivot", "rollup.momentum@v1.rel_volume"]
 hint = "pocket_pivot eq true; add feature.pct_vs_ema_20 gt 0 and rollup.trend_stats@v2.tight_range_sessions gte 10 so it is inside a base"
 
 [[phrase]]
+say = ["unusual options activity", "unusual option activity", "unusual options volume", "heavy options flow", "options sweeps"]
+fields = ["rollup.chain_flow@v1.unusual_contracts", "rollup.chain_flow@v1.unusual_premium_usd", "rollup.chain_flow@v1.max_vol_oi_ratio", "rollup.flow_history@v1.option_volume_rel_20d"]
+hint = "gate: unusual_contracts gte 1 (a contract trading above its open interest and at least 500 contracts); rank by unusual_premium_usd (usd: 1000000 for $1M of premium); max_vol_oi_ratio gte 3 as a score; option_volume_rel_20d gte 2 confirms a busy day but is null for the first two weeks of history (chains stored from 2026-10-02); the fields carry no direction, say so rather than inventing a call or put filter"
+
+[[phrase]]
+say = ["put/call ratio", "put call ratio", "put-call ratio", "bearish options flow", "bullish options flow", "put heavy", "call heavy"]
+fields = ["feature.put_call_volume_ratio", "feature.put_call_oi_ratio", "rollup.flow_history@v1.pc_volume_ratio_20d", "rollup.chain_flow@v1.call_volume"]
+hint = "put_call_volume_ratio is today's flow (above 1 put-heavy, below 0.5 call-heavy), put_call_oi_ratio the standing book (above 1.2 put-heavy, below 0.6 call-heavy), pc_volume_ratio_20d the month; gate a ratio on call_volume gte 500 or a handful of contracts decides it; a high put ratio is often hedging or put selling, not a bearish view"
+
+[[phrase]]
+say = ["expected move", "implied move", "what the options price", "options imply a move"]
+fields = ["rollup.implied_move@v1.implied_move", "feature.implied_move_1sd", "rollup.implied_move@v1.move_basis", "rollup.implied_move@v1.move_status"]
+hint = "implied_move is a decimal (0.06 is 6%): gte 0.08 for a big expected move, lte 0.04 for a quiet one; 'into earnings' adds move_basis eq EARNINGS; 'one standard deviation' is implied_move_1sd; require move_status eq OK so a thin chain is not read as a number"
+
+[[phrase]]
+say = ["implied move bigger than realised", "options pricing more than the stock moves", "implied move above realised", "options rich to realised"]
+fields = ["feature.implied_move_vs_hv", "rollup.implied_move@v1.move_basis"]
+hint = "implied_move_vs_hv gte 1.2 (the straddle prices 20% more than HV20 would), soft with tolerance 0.2; add move_basis eq TERM when the report should not be what is priced; null without HV20 or a priced move"
+
+[[phrase]]
 say = ["dividend before the call expires", "ex-dividend during the covered call", "collect the dividend with a covered call"]
 fields = ["feature.ex_div_before_call_expiry", "rollup.call_wing@v1.best_call_delta"]
 hint = "ex_div_before_call_expiry eq true to collect it (with best_call_delta lte 0.3 so the call is not assigned first), eq false to avoid the assignment question; null means no date is known yet, not none"
