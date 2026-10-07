@@ -9,12 +9,11 @@ import pytest
 
 from algotrade_sources.framework.base import FetchRequest, TransientFetchError
 from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.framework.series import RELEASE_FRAME, ReleaseRequest
 from algotrade_sources.vendors.fred.observations import BASE_URL
 from algotrade_sources.vendors.fred.releases import (
     RELEASE_COLUMNS,
-    RELEASE_FRAME,
     FredReleaseDates,
-    ReleaseRequest,
     parse_release_dates,
 )
 from tests.conftest import REPO_ROOT

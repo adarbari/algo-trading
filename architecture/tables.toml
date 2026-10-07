@@ -79,6 +79,11 @@ name = "events/earnings"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py"
 
 [[table]]
+name = "events/macro_release"
+owner = "apps/ingestion/algotrade_ingestion/tasks/macro/calendar.py"
+note = "ADR 0050: the macro release calendar (FRED release dates, ISM by rule), past and scheduled; known_from = the first session it was knowable on"
+
+[[table]]
 name = "events/reference_change"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"

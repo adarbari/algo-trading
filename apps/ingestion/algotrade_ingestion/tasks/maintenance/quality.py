@@ -14,11 +14,13 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.config.site.events.releases import MacroRelease, load_macro_releases
 from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.settings import SourcesSettings, load_macro
 from algotrade.core.model.instruments import market_id
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
+from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
 from algotrade.services.features import site_features
@@ -285,6 +287,8 @@ def check_verification(reader: StoreReader, session: date, s: SourcesSettings) -
 
 
 MACRO_TASK = "macro"  # the macro task's run-record job name (tasks/macro/series.py)
+CALENDAR_TASK = "macro_calendar"  # the macro-calendar task's job name (tasks/macro/calendar.py)
+CALENDAR_TABLE = "events/macro_release"  # the table it owns
 EXAMPLES_MACRO = 6  # stale or shrunken series named in a detail
 
 
@@ -317,6 +321,47 @@ def macro_checks(
         _macro_fresh(stored, session, s.max_macro_stale_share, fetchable, skipped),
         _macro_vintages(stored, runs, enabled),
     ]
+
+
+def check_macro_calendar(ctx: TaskContext, session: date) -> list[Check]:
+    """The ``macro-calendar`` step's acceptance: every FRED release of the registry lists at
+    least ``[quality] min_calendar_future_dates`` dates after ``session`` among the rows known
+    by it (FAIL naming the releases that do not). A release the latest run skipped (FRED off,
+    no key) is not graded: named in a WARN. Nothing without a config store or FRED releases."""
+    if ctx.configs is None:
+        return []
+    fred = load_macro_releases(ctx.configs).fred
+    if not fred or not ctx.settings.vendor("fred").enabled:
+        return []
+    done = [r for r in ctx.reader.runs(CALENDAR_TASK) if r.status in PUBLISHED]
+    skipped: dict[str, Any] = {}
+    if done:
+        latest = max(done, key=lambda r: (r.started_at, r.run_id))
+        skipped = dict(latest.stats.get("skipped_releases") or {})
+    graded = [r for r in fred if r.key not in skipped]
+    if not graded:
+        return [Check("macro_calendar_future", "WARN", f"no FRED release was fetchable: {skipped}")]
+    ahead = _future_dates(ctx.reader, graded, session)
+    minimum = ctx.settings.min_calendar_future_dates
+    short = [r.key for r in graded if ahead.get(r.instrument_id, 0) < minimum]
+    note = f"; {len(skipped)} skipped, not graded ({', '.join(skipped)})" if skipped else ""
+    if short:
+        detail = f"no scheduled date after {session} for {', '.join(short)}{note}"
+        return [Check("macro_calendar_future", "FAIL", detail)]
+    detail = f"{len(graded)} FRED releases list dates after {session}{note}"
+    return [Check("macro_calendar_future", "PASS", detail)]
+
+
+def _future_dates(
+    reader: StoreReader, releases: list[MacroRelease], session: date
+) -> dict[str, int]:
+    """Release instrument id -> its stored dates after ``session``, known by it."""
+    ids = [r.instrument_id for r in releases]
+    frame = read_events(reader, CALENDAR_TABLE, *ALL_TIME, instruments=ids, through=session).frame
+    if frame.empty:
+        return {}
+    future = frame[pd.to_datetime(frame["release_date"]).dt.date > session]
+    return {str(k): int(n) for k, n in future.groupby("instrument_id").size().items()}
 
 
 def _skipped_series(runs: list[RunRecord]) -> dict[str, str]:

@@ -88,6 +88,7 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"quality": {"max_chain_stale_share": -0.1}}, "max_chain_stale_share: expected a number"),
         ({"quality": {"max_chain_stale_share_core": 2}}, "a fraction between 0 and 1"),
         ({"quality": {"min_chain_coverage": 0.95}}, r"\[quality\]: unknown keys"),
+        ({"quality": {"min_calendar_future_dates": -1}}, r"min_calendar_future_dates: expected an"),
         (
             {"cboe": {"min_interval_s": 2, "max_interval_s": 1}},
             r"\[cboe\] max_interval_s: expected >= min",
@@ -336,6 +337,12 @@ def test_etf_holdings_settings_and_the_issuer_sections() -> None:
     custom = SourcesSettings.from_document(document)
     assert (custom.etf.refresh_days, custom.etf.keep_top) == (3, 0)
     assert (custom.etf.fallback_scope, custom.etf.fallback_min_adv_usd) == ("all", 2_000_000.0)
+
+
+def test_the_macro_calendar_threshold_loads() -> None:
+    assert SourcesSettings.from_document(site("sources")).min_calendar_future_dates == 1
+    document = {"quality": {"min_calendar_future_dates": 3}}
+    assert SourcesSettings.from_document(document).min_calendar_future_dates == 3
 
 
 def test_a_legacy_spy_holdings_section_keeps_its_switch_under_the_new_name() -> None:

@@ -16,10 +16,10 @@ from algotrade_sources.fixtures.files import GoldenFiles
 from algotrade_sources.fixtures.source import GoldenCsvSource
 from algotrade_sources.framework.base import FetchRequest, Source
 from algotrade_sources.framework.http import RetryPolicy
-from algotrade_sources.framework.series import SeriesRequest
+from algotrade_sources.framework.series import ReleaseRequest, SeriesRequest
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_sources.vendors.fred.observations import FredObservations
-from algotrade_sources.vendors.fred.releases import FredReleaseDates, ReleaseRequest
+from algotrade_sources.vendors.fred.releases import FredReleaseDates
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
