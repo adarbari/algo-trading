@@ -273,3 +273,23 @@ def test_recomputing_a_session_after_later_nights_changes_nothing() -> None:
     for alone, with_later in zip(frames[:2], frames[2:], strict=True):
         assert alone is not None and with_later is not None
         pd.testing.assert_frame_equal(alone, with_later)
+
+
+def test_an_after_close_8k_reports_on_its_new_york_day_not_the_utc_day() -> None:
+    """An Item 2.02 8-K accepted at 20:30 New York time has a ``ts`` on the next UTC day; the
+    report day is the writer's ``earnings_date`` (ADR 0050 decision 3), never the UTC date."""
+    stored = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:B"],
+            "ts": [
+                pd.Timestamp("2026-10-01T00:30:00Z"),  # 2026-09-30 20:30 New York
+                pd.Timestamp("2026-09-30T00:00:00Z"),  # a Nasdaq calendar row: midnight UTC
+            ],
+            "earnings_date": [date(2026, 9, 30), None],
+            "session_date": [date(2026, 10, 1), date(2026, 10, 1)],
+            "known_from": [date(2026, 9, 30), date(2026, 10, 1)],
+            "reported": [True, False],
+        }
+    )
+    valid = earnings.valid_events(stored, date(2026, 10, 1))
+    assert sorted(valid["report"].tolist()) == [date(2026, 9, 30), date(2026, 9, 30)]

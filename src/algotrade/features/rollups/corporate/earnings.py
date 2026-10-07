@@ -97,6 +97,17 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
+def _report_days(stored: pd.DataFrame) -> pd.Series:
+    """The report day of each row, naive: ``earnings_date`` where the writer gave one (an 8-K
+    accepted after 20:00 New York time has a ``ts`` on the next UTC day; the Nasdaq calendar's
+    ``ts`` is midnight UTC of the day), else the UTC date of ``ts``."""
+    from_ts = pd.to_datetime(stored["ts"], utc=True).dt.tz_localize(None).dt.normalize()
+    if "earnings_date" not in stored.columns:
+        return from_ts
+    given = pd.to_datetime(stored["earnings_date"], errors="coerce")
+    return given.where(given.notna(), from_ts)
+
+
 def valid_events(stored: pd.DataFrame, session: date, since: date | None = None) -> pd.DataFrame:
     """The valid rows for each report date as of ``session`` (see the module doc): every
     history row, and the forecast rows of the authority snapshot; one row per (instrument,
@@ -111,9 +122,7 @@ def valid_events(stored: pd.DataFrame, session: date, since: date | None = None)
     snapshots' ranges still come from all their rows, so the rows kept are exactly those the
     full reading keeps for those dates; only the per-date work is limited to them. The work
     over every stored row is a vectorised group-by of two day columns."""
-    report_day = (
-        pd.to_datetime(stored["ts"], utc=True).dt.tz_localize(None).to_numpy(dtype="datetime64[D]")
-    )
+    report_day = _report_days(stored).to_numpy(dtype="datetime64[D]")
     snap_day = pd.to_datetime(stored["session_date"]).to_numpy(dtype="datetime64[D]")
     n = len(stored)
     history, carried, fetched_on = np.zeros(n, dtype=bool), np.zeros(n, dtype=bool), snap_day
@@ -155,7 +164,7 @@ def valid_events(stored: pd.DataFrame, session: date, since: date | None = None)
         _stored_by=stored_by[valid], _history=history[valid]
     )
     rows = rows.assign(
-        report=pd.to_datetime(rows["ts"], utc=True).dt.date,
+        report=_report_days(rows).dt.date,
         snapshot=pd.to_datetime(rows["session_date"]).dt.date,
     )
     if rows["_history"].any():
