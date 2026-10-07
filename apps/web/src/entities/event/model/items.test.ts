@@ -93,7 +93,7 @@ describe('calendarDays', () => {
     const { days, names, ruledDays } = calendarDays(CALENDAR_FIXTURE);
     expect(names.map((n) => n.symbol)).toEqual(['Market', 'AAPL', 'NVDA']);
     expect(days[0]?.events[0]).toMatchObject({ instrumentId: MARKET_NAME.id, symbol: 'Market' });
-    expect(days[1]?.events[0]).toMatchObject({ instrumentId: 'EQ:A', symbol: 'AAPL' });
+    expect(days[1]?.events[0]).toMatchObject({ instrumentId: 'FIGI-AAPL', symbol: 'AAPL' });
     expect(ruledDays).toEqual(['2026-11-20']);
   });
 
