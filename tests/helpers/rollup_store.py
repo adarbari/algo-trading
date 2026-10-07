@@ -177,6 +177,34 @@ def chain_rows(
     return rows
 
 
+def quote_row(
+    underlying: str,
+    session: date,
+    expiry: date,
+    right: str,
+    strike: float,
+    bid: float,
+    ask: float,
+    volume: float | None = 0.0,
+    oi: float | None = 0.0,
+) -> dict[str, object]:
+    """One hand-priced option quote in ``chain_rows``' shape (volume / OI ``None``: null)."""
+    return {
+        "instrument_id": f"OPT:{underlying}:{expiry}:{right}{strike}",
+        "underlying_id": underlying,
+        "ts": pd.Timestamp(session, tz="UTC") + pd.Timedelta(hours=21),
+        "expiry": expiry,
+        "right": right,
+        "strike": float(strike),
+        "bid": bid,
+        "ask": ask,
+        "volume": volume,
+        "open_interest": oi,
+        "iv": 30.0,
+        "delta": 0.5,
+    }
+
+
 def write_chains(
     writer: StoreWriter,
     session: date,
