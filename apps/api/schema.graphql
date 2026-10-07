@@ -225,7 +225,7 @@ type FailureGroup {
 }
 
 """
-A catalogue feature across instruments for `session`: `count` instruments with a row (a value or a stored null), `nulls` stored nulls; `quantiles` and 20-bin `histogram` for a number, `categories` (the most frequent values) otherwise; `unknown`: why nothing is counted (not stored for the session)
+A catalogue feature across instruments for `session`: `count` instruments with a row (a value or a stored null), `nulls` stored nulls; `quantiles` and 20-bin `histogram` for a number, `categories` (the most frequent values) otherwise; `unknown`: why nothing is counted (not stored for the session); `passing`: per guide use how many pass its criterion
 """
 type FeatureDistribution {
   name: String!
@@ -237,6 +237,7 @@ type FeatureDistribution {
   histogram: [Bin!]!
   categories: [Category!]!
   unknown: Unknown
+  passing: [UsePass!]!
 }
 
 """How a client shows a feature's value"""
@@ -1389,6 +1390,15 @@ enum UnknownCode {
   NOT_APPLICABLE
   ILLIQUID
   EXPLAINED
+}
+
+"""
+How many instruments pass one use of the field guide's entry (`intent`, in the guide's order), as the hard rule it states (a soft use's tolerance is not counted): `count` of the values counted and `bins` the passing count of each histogram bin (empty for a non-numeric feature)
+"""
+type UsePass {
+  intent: String!
+  count: Int!
+  bins: [Int!]!
 }
 
 """

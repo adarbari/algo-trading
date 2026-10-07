@@ -12,4 +12,5 @@ export {
   type ChartReferenceLine,
   type ChartSeries,
   type ChartTone,
+  type ChartValueBand,
 } from './chartData';

@@ -26,6 +26,7 @@ import { Skeleton } from '../Skeleton';
 import styles from './Chart.module.css';
 import {
   describeChart,
+  describeValueBand,
   prepare,
   snapToData,
   tableRows,
@@ -36,6 +37,7 @@ import {
   type ChartRange,
   type ChartReferenceLine,
   type ChartSeries,
+  type ChartValueBand,
   type ChartTableRow,
 } from './chartData';
 import { ChartLegend } from './ChartLegend';
@@ -70,6 +72,12 @@ export interface ChartProps {
    * `{ y, label?, tone?, dash? }` (default `neutral`, solid). Kept inside the price range.
    */
   referenceLines?: readonly ChartReferenceLine[];
+  /**
+   * Shaded spans of values across the price pane, each `{ from?, to?, tone, label }` (an absent
+   * edge is open): the passing zone of a criterion, a normal range. Their labels are keyed under
+   * the chart and listed for screen readers.
+   */
+  valueBands?: readonly ChartValueBand[];
   /**
    * Thin strips under the price pane, one row per lane: `{ id, label, segments: { start, end,
    * tone, label? }[] }`, drawn on the chart's own time scale. A segment's label is in the
@@ -117,6 +125,7 @@ export function Chart({
   events,
   bands,
   referenceLines,
+  valueBands,
   lanes,
   bandKey = true,
   volume,
@@ -139,10 +148,11 @@ export function Chart({
         ...(events ? { events } : {}),
         ...(bands ? { bands } : {}),
         ...(referenceLines ? { referenceLines } : {}),
+        ...(valueBands ? { valueBands } : {}),
         ...(lanes ? { lanes } : {}),
         ...(volume ? { volume } : {}),
       }),
-    [series, range, rebase, events, bands, referenceLines, lanes, volume],
+    [series, range, rebase, events, bands, referenceLines, valueBands, lanes, volume],
   );
   const summary = describeChart(label, chart, { rebase, format: valueFormat });
   const [view, setView] = useState<'chart' | 'table'>('chart');
@@ -199,6 +209,7 @@ export function Chart({
           events: chart.events,
           bands: chart.bands,
           referenceLines: chart.referenceLines,
+          valueBands: chart.valueBands,
           lanes: chart.lanes,
           volume: chart.volume,
           rebase,
@@ -330,6 +341,17 @@ export function Chart({
               ))}
             </ul>
           ))}
+        </VisuallyHidden>
+      )}
+      {view === 'chart' && chart.valueBands.length > 0 && (
+        <VisuallyHidden as="div">
+          <ul aria-label={`${label}: shaded value zones`}>
+            {chart.valueBands.map((b) => (
+              <li key={`${String(b.from)}-${String(b.to)}-${b.label}`}>
+                {`${b.label}: ${describeValueBand(b, (v) => formatValue(v, valueFormat).text)}`}
+              </li>
+            ))}
+          </ul>
         </VisuallyHidden>
       )}
       {view === 'chart' && chart.referenceLines.length > 0 && (

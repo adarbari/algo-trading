@@ -43,10 +43,27 @@ class Category:
 
 
 @strawberry.type(
+    description="How many instruments pass one use of the field guide's entry (`intent`, in "
+    "the guide's order), as the hard rule it states (a soft use's tolerance is not counted): "
+    "`count` of the values counted and `bins` the passing count of each histogram bin (empty "
+    "for a non-numeric feature)"
+)
+class UsePass:
+    intent: str
+    count: int
+    bins: list[int]
+
+    @classmethod
+    def of(cls, d: distribution.UsePass) -> Self:
+        return cls(intent=d.intent, count=d.count, bins=list(d.bins))
+
+
+@strawberry.type(
     description="A catalogue feature across instruments for `session`: `count` instruments "
     "with a row (a value or a stored null), `nulls` stored nulls; `quantiles` and 20-bin "
     "`histogram` for a number, `categories` (the most frequent values) otherwise; `unknown`: "
-    "why nothing is counted (not stored for the session)"
+    "why nothing is counted (not stored for the session); `passing`: per guide use how many "
+    "pass its criterion"
 )
 class FeatureDistribution:
     name: str
@@ -58,6 +75,7 @@ class FeatureDistribution:
     histogram: list[Bin]
     categories: list[Category]
     unknown: Unknown | None
+    passing: list[UsePass]
 
     @classmethod
     def of(cls, d: distribution.FeatureDistribution) -> Self:
@@ -71,4 +89,5 @@ class FeatureDistribution:
             histogram=[Bin.of(b) for b in d.histogram],
             categories=[Category.of(c) for c in d.categories],
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
+            passing=[UsePass.of(p) for p in d.passing],
         )

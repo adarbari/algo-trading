@@ -26,6 +26,7 @@ import {
 
 import type { Series } from '../../tokens';
 import { bandsPrimitive, type BandColours } from './bands';
+import { valueBandsPrimitive } from './valueBands';
 import { lanePrimitive, LANE_HEIGHT, type LaneColours } from './lanes';
 import {
   EVENT_KINDS,
@@ -37,6 +38,7 @@ import {
   type ChartLane,
   type ChartPoint,
   type ChartReferenceLine,
+  type ChartValueBand,
   type PreparedSeries,
 } from './chartData';
 
@@ -72,6 +74,8 @@ export interface EngineInput {
   lanes: readonly ChartLane[];
   /** Horizontal lines across the price pane, with an end label. */
   referenceLines: readonly ChartReferenceLine[];
+  /** Shaded spans of values across the price pane. */
+  valueBands: readonly ChartValueBand[];
   volume: readonly ChartPoint[];
   /** Draw the dashed reference line at 100. */
   rebase: boolean;
@@ -162,7 +166,13 @@ export function drawChart(
     kineticScroll: { mouse: false, touch: false },
   });
 
-  const lineYs = input.referenceLines.map((l) => l.value);
+  // Every line and every finite band edge stays inside the price range (they do not scale it).
+  const lineYs = [
+    ...input.referenceLines.map((l) => l.value),
+    ...input.valueBands.flatMap((b) =>
+      [b.from, b.to].filter((v): v is number => v !== undefined && Number.isFinite(v)),
+    ),
+  ];
   const drawn: ISeriesApi<'Line' | 'Area'>[] = [];
   const firstRuns: { line: ISeriesApi<'Line' | 'Area'>; times: Set<string> }[] = [];
   input.series.forEach((s, index) => {
@@ -240,6 +250,9 @@ export function drawChart(
       axisLabelVisible: line.label !== undefined,
       title: line.label ?? '',
     });
+  }
+  if (first && input.valueBands.length > 0) {
+    first.attachPrimitive(valueBandsPrimitive(input.valueBands, theme.bands));
   }
   if (first && input.bands.length > 0) {
     first.attachPrimitive(bandsPrimitive(input.bands, firstPoints, theme.bands, theme.tones));

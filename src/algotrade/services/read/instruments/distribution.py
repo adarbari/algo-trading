@@ -7,7 +7,12 @@ instrument of the session's reference snapshot), so a distribution and a page ag
 stored for the session (ADR 0036): an instrument with no row (``NO_ROW``) is not counted, a
 stored null (``NULL``) is counted as a null, and a table with no partition for the session
 makes the whole distribution UNKNOWN (``unknown``: ``NO_PARTITION``, nothing counted), never an
-older partition's values."""
+older partition's values.
+
+Each use of the field's guide entry (the criterion per intent) is also counted here, as the
+hard rule it states (the tolerance of a soft use is not counted): how many instruments pass it
+and how many of each histogram bin, so a page shades the passing part of the shape and says
+"N names pass" without counting rows itself (ADR 0038)."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -15,7 +20,10 @@ from datetime import date
 
 import numpy as np
 
+from algotrade.config.site.field_guide import GuideUse
+from algotrade.config.site.settings import load_field_guide
 from algotrade.core.model.fields import NUMERIC_TYPES, REFERENCE_TABLE
+from algotrade.core.model.predicates import Rule, evaluate_rule
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
@@ -46,6 +54,17 @@ class Category:
 
 
 @dataclass(frozen=True)
+class UsePass:
+    """How many instruments pass one guide use's criterion (``intent`` names the use, in the
+    guide's order): ``count`` of the values counted, and ``bins`` the passing count of each
+    histogram bin (empty for a non-numeric feature)."""
+
+    intent: str
+    count: int
+    bins: tuple[int, ...]
+
+
+@dataclass(frozen=True)
 class FeatureDistribution:
     """``name`` across instruments on ``session``. ``count``: instruments with a row (a value
     or a stored null); ``nulls``: the stored nulls; ``quantiles`` and ``histogram`` (20
@@ -61,11 +80,16 @@ class FeatureDistribution:
     histogram: tuple[Bin, ...]
     categories: tuple[Category, ...]
     unknown: Unknown | None = None
+    passing: tuple[UsePass, ...] = ()
+
+
+def _finite(values: Sequence[object]) -> np.ndarray:
+    numbers = np.array([v for v in values if isinstance(v, int | float)], dtype=float)
+    return numbers[np.isfinite(numbers)]
 
 
 def _numeric(values: Sequence[object]) -> tuple[tuple[Quantile, ...], tuple[Bin, ...]]:
-    numbers = np.array([v for v in values if isinstance(v, int | float)], dtype=float)
-    finite = numbers[np.isfinite(numbers)]
+    finite = _finite(values)
     if not len(finite):
         return (), ()
     quantiles = np.quantile(finite, QUANTILES)
@@ -80,6 +104,29 @@ def _categories(values: Sequence[object]) -> tuple[Category, ...]:
         counts[str(value)] = counts.get(str(value), 0) + 1
     ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:TOP_CATEGORIES]
     return tuple(Category(v, c) for v, c in ranked)
+
+
+def _rule(name: str, use: GuideUse) -> Rule:
+    value = use.value
+    return Rule(name, use.op, tuple(value) if isinstance(value, list) else value)
+
+
+def _passing(
+    name: str, uses: Sequence[GuideUse], rows: Sequence[FeatureValue], bins: tuple[Bin, ...]
+) -> tuple[UsePass, ...]:
+    """Per use: the values (a stored null is a missing value) that pass its rule, in total and
+    per histogram bin (the same equal-width edges, so the bin counts add up to the total)."""
+    out: list[UsePass] = []
+    for use in uses:
+        rule = _rule(name, use)
+        passed = [v.value for v in rows if evaluate_rule(rule, v.value) is True]
+        per_bin: tuple[int, ...] = ()
+        if bins:
+            edges = [bins[0].lo, *(b.hi for b in bins)]
+            counts, _ = np.histogram(_finite(passed), bins=edges)
+            per_bin = tuple(int(c) for c in counts)
+        out.append(UsePass(use.intent, len(passed), per_bin))
+    return tuple(out)
 
 
 def _absent(found: list[FeatureValue]) -> Unknown | None:
@@ -110,6 +157,8 @@ def load_distribution(ctx: ReadContext, name: str) -> FeatureDistribution:
     else:
         categories = _categories(present)
     nulls = len(rows) - len(present)
+    entry = load_field_guide(ctx.configs).entry(name)
+    passing = _passing(name, entry.uses, rows, bins) if entry is not None else ()
     return FeatureDistribution(
-        name, ctx.session.date, info, len(rows), nulls, quantiles, bins, categories
+        name, ctx.session.date, info, len(rows), nulls, quantiles, bins, categories, None, passing
     )

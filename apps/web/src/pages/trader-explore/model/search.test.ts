@@ -26,6 +26,12 @@ describe('explore search params', () => {
     expect(parseExploreSearch({ tab: 'nope', right: 'X', sel: '  ' })).toEqual({});
   });
 
+  it("keeps the field guide's theme, field and symbol", () => {
+    expect(
+      parseExploreSearch({ tab: 'guide', theme: 'Volatility', field: 'feature.x', symbol: 'aapl' }),
+    ).toEqual({ tab: 'guide', theme: 'Volatility', field: 'feature.x', symbol: 'AAPL' });
+  });
+
   it('splits and joins lists, leaving defaults out of the URL', () => {
     expect(splitList('a, b,,c')).toEqual(['a', 'b', 'c']);
     expect(splitList(undefined)).toEqual([]);

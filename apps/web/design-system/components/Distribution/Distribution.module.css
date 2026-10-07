@@ -40,6 +40,15 @@
   fill: var(--color-s1);
 }
 
+/* With a highlighted part the whole bar steps back to the track colour and the part is series 1. */
+.root[data-highlight] .bar {
+  fill: var(--color-track);
+}
+
+.lit {
+  fill: var(--color-s1);
+}
+
 .marker {
   position: absolute;
   inset-block: calc((var(--line-height-xs) + var(--space-1)) * -1) 0;

@@ -21,6 +21,8 @@ export interface DistributionBin {
   /** Upper edge (exclusive, inclusive for the last bin). */
   end: number;
   count: number;
+  /** How many of the bin's `count` are highlighted (the names passing a criterion); 0 or absent: none. */
+  highlighted?: number;
 }
 
 export interface DistributionMarker {
@@ -33,6 +35,11 @@ export interface DistributionMarker {
 
 export interface DistributionProps {
   bins: readonly DistributionBin[];
+  /**
+   * What the highlighted part of the bins is ("pass a squeeze"): bins with `highlighted` counts
+   * draw it as an accent bar over a muted one, and the accessible summary says how many.
+   */
+  highlightLabel?: string;
   /** What is distributed ("IV30 across 1,840 tickers"): starts the accessible summary. */
   label: string;
   /** How bin edges and markers read (default a number). */
@@ -64,6 +71,7 @@ export function describeDistribution(
   bins: readonly DistributionBin[],
   markers: readonly DistributionMarker[],
   format: ValueFormat,
+  highlightLabel?: string,
 ): string {
   const fmt = (v: number) => formatValue(v, format).text;
   const total = bins.reduce((sum, bin) => sum + bin.count, 0);
@@ -77,6 +85,10 @@ export function describeDistribution(
     `${label}: ${formatValue(total, { kind: 'number' }).text} values from ${fmt(first.start)} to ${fmt(last.end)}`,
     `most in ${fmt(tallest.start)} to ${fmt(tallest.end)} (${formatValue(tallest.count, { kind: 'number' }).text})`,
   ];
+  const marked = bins.reduce((sum, bin) => sum + (bin.highlighted ?? 0), 0);
+  if (highlightLabel !== undefined && marked > 0) {
+    parts.push(`${formatValue(marked, { kind: 'number' }).text} ${highlightLabel}`);
+  }
   if (markers.length > 0) parts.push(markers.map((m) => `${m.label} ${fmt(m.value)}`).join(', '));
   return `${parts.join('; ')}.`;
 }
@@ -87,6 +99,7 @@ const edgeOf = (fraction: number) =>
 export function Distribution({
   bins,
   label,
+  highlightLabel,
   format = { kind: 'number' },
   markers = [],
   height = 'md',
@@ -125,6 +138,7 @@ export function Distribution({
   const span = max - min || 1;
   const x = (v: number) => ((v - min) / span) * SCALE;
   const tallest = Math.max(...bins.map((b) => b.count));
+  const marked = bins.reduce((sum, bin) => sum + (bin.highlighted ?? 0), 0);
   const fmt = (v: number) => formatValue(v, format).text;
   const at = (v: number) => ({
     style: { insetInlineStart: `${((x(v) / SCALE) * 100).toFixed(2)}%` } as CSSProperties,
@@ -144,8 +158,9 @@ export function Distribution({
   return (
     <div
       className={styles.root}
+      data-highlight={marked > 0 ? '' : undefined}
       role="img"
-      aria-label={describeDistribution(label, bins, markers, format)}
+      aria-label={describeDistribution(label, bins, markers, format, highlightLabel)}
     >
       <div
         className={styles.plot}
@@ -163,15 +178,27 @@ export function Distribution({
           {bins.map((bin) => {
             const width = x(bin.end) - x(bin.start);
             const h = (bin.count / tallest) * 100;
+            const lit = (Math.min(bin.highlighted ?? 0, bin.count) / tallest) * 100;
+            const left = x(bin.start) + (width * GAP) / 2;
             return (
-              <rect
-                key={`${String(bin.start)}-${String(bin.end)}`}
-                className={styles.bar}
-                x={x(bin.start) + (width * GAP) / 2}
-                width={width * (1 - GAP)}
-                y={100 - h}
-                height={h}
-              />
+              <g key={`${String(bin.start)}-${String(bin.end)}`}>
+                <rect
+                  className={styles.bar}
+                  x={left}
+                  width={width * (1 - GAP)}
+                  y={100 - h}
+                  height={h}
+                />
+                {lit > 0 && (
+                  <rect
+                    className={styles.lit}
+                    x={left}
+                    width={width * (1 - GAP)}
+                    y={100 - lit}
+                    height={lit}
+                  />
+                )}
+              </g>
             );
           })}
         </svg>

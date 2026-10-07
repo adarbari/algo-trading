@@ -1,10 +1,11 @@
 /**
  * The right-hand side of Explore: the compare bar and the detail tabs (Overview, Compare,
- * Chart, Options, Features, Events, Screener hits), each tab a widget for the compare set or
+ * Chart, Options, Features, Events, Screener hits; the Field guide takes the page, see
+ * ExplorePage), each tab a widget for the compare set or
  * the focused ticker. Compare is the rebased chart over the compare set's features side by
  * side (the feature table for those tickers, sorted in the table).
  */
-import { EmptyState, Stack, Tabs, type TabItem } from '@algotrade/ui';
+import { EmptyState, Stack } from '@algotrade/ui';
 
 import { ComparePanel } from '@/widgets/compare-panel';
 import { EventsPanel } from '@/widgets/events-panel';
@@ -17,18 +18,10 @@ import { PriceChartPanel } from '@/widgets/price-chart-panel';
 import { ScreenerHitsPanel } from '@/widgets/screener-hits-panel';
 import { CompareSetBar } from '@/features/compare-set';
 
-import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch, type ExploreTab } from '../model/search';
-import { defaultTab, exploreState, type SearchPatch } from '../model/state';
+import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch } from '../model/search';
+import { exploreState, type SearchPatch } from '../model/state';
 
-const TABS: readonly (TabItem & { id: ExploreTab })[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'compare', label: 'Compare' },
-  { id: 'chart', label: 'Chart' },
-  { id: 'options', label: 'Options' },
-  { id: 'features', label: 'Features' },
-  { id: 'events', label: 'Events' },
-  { id: 'hits', label: 'Screener hits' },
-];
+import { ExploreTabs } from './ExploreTabs';
 
 export interface DetailTabsProps {
   search: ExploreSearch;
@@ -173,18 +166,9 @@ export function DetailTabs({ search, onSearchChange }: DetailTabsProps) {
           onSearchChange({ focus: symbol, expiry: undefined, feature: undefined });
         }}
       />
-      <Tabs
-        label="View"
-        items={TABS}
-        value={tab}
-        onChange={(id) => {
-          onSearchChange({
-            tab: id === defaultTab(selected.length) ? undefined : (id as ExploreTab),
-          });
-        }}
-      >
+      <ExploreTabs tab={tab} selectedCount={selected.length} onSearchChange={onSearchChange}>
         {content}
-      </Tabs>
+      </ExploreTabs>
     </Stack>
   );
 }

@@ -262,6 +262,7 @@ Source: `design-system/components/Chart`
 | `events` | `readonly ChartEvent[]` | no | Dated markers on the first series: ex-dividend, split, earnings, filing and macro release, each `{ time, kind, detail? }`: a shape and letter per kind, `detail` in the crosshair read-out and the table ("8-K 2.02 results", "CPI 08:30"). |
 | `bands` | `readonly ChartBand[]` | no | Shaded spans of days behind the series, in the price pane: a start and end day, a status tone and a label. Their labels are listed for screen readers and keyed under the chart. |
 | `referenceLines` | `readonly ChartReferenceLine[]` | no | Horizontal lines on the price pane at a value, each with its label at the right end: `{ y, label?, tone?, dash? }` (default `neutral`, solid). Kept inside the price range. |
+| `valueBands` | `readonly ChartValueBand[]` | no | Shaded spans of values across the price pane, each `{ from?, to?, tone, label }` (an absent edge is open): the passing zone of a criterion, a normal range. Their labels are keyed under the chart and listed for screen readers. |
 | `lanes` | `readonly ChartLane[]` | no | Thin strips under the price pane, one row per lane: `{ id, label, segments: { start, end, tone, label? }[] }`, drawn on the chart's own time scale. A segment's label is in the crosshair read-out, the key and a text list for screen readers. |
 | `bandKey` | `boolean` | no | Show the bands and lane segments in the key (default true; the hidden list for screen readers stays). |
 | `volume` | `readonly ChartPoint[]` | no | Daily volume in a pane under the price. |
@@ -419,6 +420,7 @@ Source: `design-system/components/Distribution`
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `bins` | `readonly DistributionBin[]` | yes |  |
+| `highlightLabel` | `string` | no | What the highlighted part of the bins is ("pass a squeeze"): bins with `highlighted` counts draw it as an accent bar over a muted one, and the accessible summary says how many. |
 | `label` | `string` | yes | What is distributed ("IV30 across 1,840 tickers"): starts the accessible summary. |
 | `format` | `ValueFormat` | no | How bin edges and markers read (default a number). |
 | `markers` | `readonly DistributionMarker[]` | no | Quantile lines and highlighted values. Quantile labels that would overlap are stacked or dropped (earlier markers win, so list the important ones first); lines and the accessible summary always keep every marker, and an accent marker's label is always shown. |
@@ -770,6 +772,23 @@ Source: `design-system/components/NumberInput`
 | `disabled` | `boolean` | no |  |
 | `readOnly` | `boolean` | no |  |
 | `name` | `string` | no |  |
+
+### OptionList
+
+OptionList: a scrolling list of choices, each a short name (optionally monospace, for field and symbol names) over a one-line description, one of them the current choice. A choice is a button; the current one carries `aria-current` and the accent tint, so colour is never the only signal (the selected row is also announced). Controlled: `value` in, `onSelect(id)` out. Taller than `maxHeight` it scrolls inside itself, so it never grows a page; loading shows placeholders, an empty list shows the empty message. For a choice made once and closed use Select; for many choices to filter use Combobox.
+
+Source: `design-system/components/OptionList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly OptionListItem[]` | yes |  |
+| `value` | `string \| null` | yes | The id of the current choice (null: none). |
+| `onSelect` | `(id: string) => void` | yes |  |
+| `label` | `string` | yes | Accessible name of the list ("Fields in Volatility"). |
+| `mono` | `boolean` | no | Titles in the monospace face (catalogue names, symbols). |
+| `maxHeight` | `'md' \| 'lg'` | no | Scroll inside the list taller than this: `md` (360 px) or `lg` (560 px); none by default. |
+| `loading` | `boolean` | no | Placeholders while the items load. |
+| `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
 
 ### Panel
 

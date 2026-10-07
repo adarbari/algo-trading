@@ -47,6 +47,18 @@ export const Skewed: Story = {
   },
 };
 
+/** The names passing a criterion (the part of each bin that passes) in the accent over the rest. */
+export const Highlighted: Story = {
+  args: {
+    bins: iv30.map((bin, i) => ({
+      ...bin,
+      highlighted: i < 3 ? bin.count : i === 3 ? Math.round(bin.count / 3) : 0,
+    })),
+    highlightLabel: 'at or below 25% IV30',
+    markers: [{ value: 0.27, label: 'median' }],
+  },
+};
+
 /** Bars only. */
 export const Plain: Story = {};
 

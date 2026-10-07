@@ -20,6 +20,7 @@ export {
   type ChartProps,
   type ChartRange,
   type ChartReferenceLine,
+  type ChartValueBand,
   type ChartSeries,
   type ChartTone,
 } from './Chart';
@@ -98,6 +99,7 @@ export {
 } from './LinkedText';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
 export { NumberInput, type NumberInputProps } from './NumberInput';
+export { OptionList, type OptionListItem, type OptionListProps } from './OptionList';
 export { Panel, type PanelProps, type PanelState } from './Panel';
 export {
   Popover,

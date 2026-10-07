@@ -6,8 +6,17 @@ import type { gqlTypes } from '@/shared/api';
 /** A feature across the universe as `Query.distribution` serves it. */
 export type FeatureDistribution = NonNullable<gqlTypes.FeatureDistributionQuery['distribution']>;
 
-export function distributionBins(distribution: FeatureDistribution): DistributionBin[] {
-  return distribution.histogram.map((bin) => ({ start: bin.lo, end: bin.hi, count: bin.count }));
+/** `passing` is one guide use's passing counts (`FeatureDistribution.passing[i]`): each bin carries how many of its names pass. */
+export function distributionBins(
+  distribution: FeatureDistribution,
+  passing?: FeatureDistribution['passing'][number],
+): DistributionBin[] {
+  return distribution.histogram.map((bin, i) => ({
+    start: bin.lo,
+    end: bin.hi,
+    count: bin.count,
+    ...(passing ? { highlighted: passing.bins[i] ?? 0 } : {}),
+  }));
 }
 
 const QUANTILES: readonly (readonly [number, string])[] = [

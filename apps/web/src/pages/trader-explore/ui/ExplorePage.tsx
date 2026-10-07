@@ -8,6 +8,7 @@
 import { Grid, Heading, Stack, Text } from '@algotrade/ui';
 
 import { FeatureTable } from '@/widgets/feature-table';
+import { FieldGuide } from '@/widgets/field-guide';
 import { MAX_COMPARE, nextSelection } from '@/features/compare-set';
 import { TickerFilterBar, toTableFilters, type TickerFilters } from '@/features/ticker-filter';
 
@@ -15,13 +16,16 @@ import { DEFAULT_COLUMNS, formatSort, joinList, type ExploreSearch } from '../mo
 import { exploreState, type SearchPatch } from '../model/state';
 
 import { DetailTabs } from './DetailTabs';
+import { ExploreTabs } from './ExploreTabs';
 
 export interface ExplorePageProps {
   search: ExploreSearch;
   onSearchChange: (patch: SearchPatch) => void;
+  /** Opens the Screener Builder (the field guide's "Add to a screen"). */
+  onOpenBuilder: () => void;
 }
 
-export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
+export function ExplorePage({ search, onSearchChange, onOpenBuilder }: ExplorePageProps) {
   const state = exploreState(search);
   const filters: TickerFilters = {
     q: search.q,
@@ -31,6 +35,41 @@ export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
     leveraged: search.lev,
     optionable: search.opt,
   };
+  if (state.tab === 'guide') {
+    return (
+      <Stack gap={3}>
+        <Stack gap={1}>
+          <Heading level={1}>Explore</Heading>
+          <Text size="sm" tone="secondary">
+            Every catalogue field: what it means, how today&apos;s names are spread over it, and the
+            criterion that reads it.
+          </Text>
+        </Stack>
+        <ExploreTabs
+          tab={state.tab}
+          selectedCount={state.selected.length}
+          onSearchChange={onSearchChange}
+        >
+          <FieldGuide
+            theme={search.theme}
+            field={search.field}
+            symbol={search.symbol}
+            defaultSymbol={state.focused}
+            onThemeChange={(theme) => {
+              onSearchChange({ theme, field: undefined });
+            }}
+            onFieldChange={({ theme, field }) => {
+              onSearchChange({ theme, field });
+            }}
+            onSymbolChange={(symbol) => {
+              onSearchChange({ symbol });
+            }}
+            onAddToScreen={onOpenBuilder}
+          />
+        </ExploreTabs>
+      </Stack>
+    );
+  }
   return (
     <Stack gap={3}>
       <Stack gap={1}>

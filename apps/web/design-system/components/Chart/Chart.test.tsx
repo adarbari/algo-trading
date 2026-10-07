@@ -24,6 +24,7 @@ import {
   sampleBands,
   sampleLanes,
   sampleReferenceLines,
+  sampleValueBands,
   stressBand,
 } from './storyData';
 
@@ -319,6 +320,48 @@ describe('Chart', () => {
     expect(screen.getByRole('img').getAttribute('aria-label')).toContain(
       'reference lines: Floor $300.00, Target $340.00',
     );
+  });
+
+  it('passes value bands to the engine, keys and lists them, and drops an empty one', async () => {
+    render(
+      <Chart
+        label="AAPL"
+        series={[aapl]}
+        range="1Y"
+        valueBands={[
+          ...sampleValueBands,
+          { from: 340, to: 330, tone: 'accent', label: 'Backwards' },
+          { tone: 'accent', label: 'No edge' },
+        ]}
+      />,
+    );
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().valueBands).toEqual(sampleValueBands);
+    const list = screen.getByRole('list', { name: 'AAPL: shaded value zones' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Below the floor: below $300.00']);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toContain(
+      'shaded value zone: Below the floor below $300.00',
+    );
+    expect(screen.getAllByText('Below the floor').length).toBeGreaterThan(0);
+  });
+
+  it('describes a closed value band by both edges', () => {
+    const chart = prepare([aapl], {
+      range: '1Y',
+      rebase: false,
+      valueBands: [{ from: 0, to: 0.1, tone: 'accent', label: 'Squeeze' }],
+    });
+    const text = describeChart('AAPL', chart, {
+      rebase: false,
+      format: { kind: 'number', digits: 2 },
+    });
+    expect(text).toContain('shaded value zone: Squeeze from 0.00 to 0.10');
   });
 
   it('drops a reference line without a finite value', async () => {
