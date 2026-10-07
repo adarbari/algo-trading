@@ -139,6 +139,7 @@ class IngestRun:
         self._partial: list[str] = []
         self._failed: list[str] = []
         self._waiting: list[str] = []
+        self._unrefetched: dict[str, str] = {}  # a resume's retryable items, until refetched
         self._resolvers: dict[date | None, SymbolResolver] = {}
         self._pacing: dict[str, PacingStats] = {}
         resumed = self._resume() if resume else None
@@ -157,16 +158,12 @@ class IngestRun:
         return self.record.items
 
     def _resume(self) -> RunRecord | None:
-        """The last unfinished run of this task for the session, minus its retryable items; none
-        when its staging is gone (a fresh run then refetches everything)."""
-        runs = self.writer.runs_for(self.task, self.session)
-        unfinished = [r for r in runs if r.status is not RunStatus.COMPLETE]
-        if not unfinished:
+        """The run ``resumable_run`` names, minus its retryable items (refetched), as RUNNING."""
+        record = resumable_run(self.writer, self.task, self.session)
+        if record is None:
             return None
-        record = unfinished[-1]
-        if not self.writer.staging.exists(record.run_id):
-            return None  # scratch gone: publishing would drop its finished items' rows
-        record.items = {k: v for k, v in record.items.items() if status_label(v) not in RETRYABLE}
+        self._unrefetched = {k: v for k, v in record.items.items() if status_label(v) in RETRYABLE}
+        record.items = {k: v for k, v in record.items.items() if k not in self._unrefetched}
         record.status, record.finished_at = RunStatus.RUNNING, None
         return record
 
@@ -197,6 +194,8 @@ class IngestRun:
         return RunStatus.PARTIAL if self.failures() or self._partial else RunStatus.COMPLETE
 
     def _finish(self, status: RunStatus) -> None:
+        for key, old in self._unrefetched.items():  # a run cut short: not reached, still left
+            self.record.items.setdefault(key, old)
         self.record.status, self.record.finished_at = status, self.clock()
         if self._resolved:
             self.stats.setdefault("unresolved", self.unresolved)
@@ -242,7 +241,7 @@ class IngestRun:
 
     def retryable(self) -> list[str]:
         """Items a resume would refetch (``RETRYABLE`` statuses), in item order."""
-        return [k for k, v in self.items.items() if status_label(v) in RETRYABLE]
+        return retryable_items(self.record)
 
     def _drop_staging(self) -> None:
         """Nothing left to resume: the scratch is spent. Failing to delete it never fails a
@@ -402,6 +401,23 @@ class IngestRun:
         frame["knowledge_ts"] = pd.Timestamp(self.clock())
         self.writer.write_table(table, self.session, self.run_id, frame, pending=True)
         return len(frame)
+
+
+def resumable_run(writer: StoreWriter, task: str, session: date) -> RunRecord | None:
+    """The run a resumed ``IngestRun`` of ``task`` for ``session`` continues: the last
+    unfinished one (not COMPLETE) whose staging still exists; none otherwise (a fresh run
+    then refetches everything: without the scratch, publishing would drop its finished
+    items' rows). The nightly asks the same question before re-running a done step."""
+    runs = writer.runs_for(task, session)
+    unfinished = [r for r in runs if r.status is not RunStatus.COMPLETE]
+    if not unfinished or not writer.staging.exists(unfinished[-1].run_id):
+        return None
+    return unfinished[-1]
+
+
+def retryable_items(record: RunRecord) -> list[str]:
+    """The items a resumed run of ``record`` refetches (``RETRYABLE`` statuses), in order."""
+    return [k for k, v in record.items.items() if status_label(v) in RETRYABLE]
 
 
 def recover_unpublished(writer: StoreWriter, now: datetime) -> dict[str, list[str]]:

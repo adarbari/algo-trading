@@ -8,7 +8,12 @@ SUCCEEDS or FAILS: its task must not fail, and its acceptance checks (``tasks/ma
 quality.py``, run right after it) must not FAIL. A failed critical step makes the session
 FAILED; an optional step's failure is a warning. A FAILED session holds every later one back:
 the run stops there, and the next run retries it from where it stopped (``attempts.py``:
-steps that SUCCEEDED or were WAIVED are not rerun). A latest-only step (universe files, SEC,
+steps that SUCCEEDED or were WAIVED are not rerun, except a resumable step (``Step.resumable``:
+chains) that SUCCEEDED with items its task would refetch (STALE_DATA names Cboe had not rolled
+over), which a retry re-runs while the session is the latest and the task's staging exists;
+the steps that need it (rollups, market-rollups) re-run on the new data, so the screens do not
+fail hourly on the same stale names. A refetch that fails keeps the earlier success). A
+latest-only step (universe files, SEC,
 Cboe chains: sources that serve only the current snapshot) runs only for the last closed
 session; one that failed and whose session is no longer the latest FAILS as expired until it
 is waived by hand (``algotrade-ingest nightly --date D --waive STEP --reason ...``).
@@ -26,7 +31,7 @@ the session SUCCEEDED, else FAILED) holding every step's result, which is how th
 knows where to resume.
 """
 
-from collections.abc import Mapping
+from collections.abc import Container, Mapping
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -36,7 +41,14 @@ from algotrade.core.time.calendar import close_time, last_closed_session, local_
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
-from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext, utc_now
+from algotrade_ingestion.tasks.framework.run import (
+    RETRYABLE,
+    IngestRun,
+    TaskContext,
+    resumable_run,
+    retryable_items,
+    utc_now,
+)
 from algotrade_ingestion.tasks.maintenance.coverage import check_coverage
 from algotrade_ingestion.tasks.maintenance.quality import (
     check_bars,
@@ -118,6 +130,7 @@ NIGHTLY: tuple[Step, ...] = (
         requires=universe_exists,
         latest_only=True,
         accept=(check_chains,),
+        resumable=True,
     ),
     # What each ETF holds (ADR 0035): issuer files, a weekly slot per fund, at most
     # [etf_holdings] per_night funds a night (new and stalest first). Optional.
@@ -193,27 +206,81 @@ def _held(step: Step, status: StepStatus, reason: str) -> StepResult:
 
 
 def _carried(
-    step: Step, ctx: TaskContext, before: Attempts, waive: Mapping[str, str]
+    step: Step,
+    ctx: TaskContext,
+    session: date,
+    before: Attempts,
+    waive: Mapping[str, str],
+    latest: bool,
+    reran: Container[str],
 ) -> StepResult | None:
-    """Done before (an earlier attempt SUCCEEDED or WAIVED it) or waived now, else ``None``."""
+    """Done before (an earlier attempt SUCCEEDED or WAIVED it) or waived now, else ``None``.
+    A done step runs again when one it needs ran in this attempt (``reran``: its input
+    changed) or when it is a refetch (``_refetch``)."""
     if step.name in before.done:
+        if any(n in reran for n in step.needs):
+            return None
         stored = before.done[step.name]
-        why = f"{stored['status'].lower()} in an earlier attempt ({stored['run_id']})"
-        return _held(step, StepStatus(stored["status"]), why)
+        left, resumable = _refetch(step, stored, ctx, session, latest)
+        if left and resumable:
+            return None
+        why = _carried_reason(stored)
+        if left:
+            why += f"; {left} {'/'.join(RETRYABLE)} names left, no staging to resume from"
+        return _carry(step, stored, why)
     if step.name in waive:
         who = f"waived by {ctx.user} at {ctx.clock().isoformat(timespec='seconds')}"
         return _held(step, StepStatus.WAIVED, f"{who}: {waive[step.name]}")
     return None
 
 
-def _not_latest(step: Step, before: Attempts) -> StepResult:
+def _carried_reason(stored: Mapping[str, Any]) -> str:
+    return f"{str(stored['status']).lower()} in an earlier attempt ({stored['run_id']})"
+
+
+def _carry(step: Step, stored: Mapping[str, Any], why: str) -> StepResult:
+    """The stored result reused, citing the attempt that produced it."""
+    result = _held(step, StepStatus(str(stored["status"])), why)
+    result.origin = str(stored["run_id"])
+    result.task_run = stored.get("task_run")
+    return result
+
+
+def _refetch(
+    step: Step, stored: Mapping[str, Any], ctx: TaskContext, session: date, latest: bool
+) -> tuple[int, bool]:
+    """(items a resumed re-run of the task would refetch, whether it can): a resumable step
+    that SUCCEEDED with retryable items left is re-run by a retry while the session is the
+    latest (the source still serves it) and the run its task would resume exists with its
+    staging (``resumable_run``, the same rule the task applies; without the staging the task
+    would refetch everything: hours, every hour)."""
+    if not step.resumable or stored.get("status") != StepStatus.SUCCEEDED.value:
+        return 0, False
+    task_run = stored.get("task_run")
+    record = ctx.writer.load_run(str(task_run)) if task_run else None
+    if record is None:
+        return 0, False
+    left = len(retryable_items(record))
+    if not left or not latest:
+        return left, False
+    return left, resumable_run(ctx.writer, record.job, session) is not None
+
+
+def _refetch_failed(step: Step, stored: Mapping[str, Any], result: StepResult) -> StepResult:
+    """A refetch that did not succeed keeps the earlier success (its rows are published and
+    still stand), noting why; the next attempt may refetch again."""
+    why = f"{_carried_reason(stored)}; refetch failed: {result.error or result.reason}"
+    return _carry(step, stored, why)
+
+
+def _not_latest(step: Step, before: Attempts, session: date) -> StepResult:
     """A latest-only step for an older session: SKIPPED, or FAILED as expired when an
     earlier attempt tried it without success (it can no longer be fetched)."""
     if step.critical and step.name in before.tried:
         why = (
             "expired: the source serves only the current snapshot and this session is no "
             "longer the latest; accept the gap with `algotrade-ingest nightly --date "
-            f"<session> --waive {step.name} --reason ...`"
+            f"{session.isoformat()} --waive {step.name} --reason ...`"
         )
         return _held(step, StepStatus.FAILED, why)
     return _held(step, StepStatus.SKIPPED, LATEST_ONLY)
@@ -222,18 +289,20 @@ def _not_latest(step: Step, before: Attempts) -> StepResult:
 def _not_run(
     step: Step,
     ctx: TaskContext,
+    session: date,
     latest: bool,
     done: Mapping[str, StepResult],
     before: Attempts,
     waive: Mapping[str, str],
+    reran: Container[str] = (),
 ) -> StepResult | None:
     """The step's result when it must not run (reused, waived, skipped, expired, held
     back), else ``None``."""
-    carried = _carried(step, ctx, before, waive)
+    carried = _carried(step, ctx, session, before, waive, latest, reran)
     if carried is not None:
         return carried
     if step.latest_only and not latest:
-        return _not_latest(step, before)
+        return _not_latest(step, before, session)
     held = unsatisfied(step.needs, done)
     if held:
         result = _held(step, StepStatus.NOT_RUN, f"needs {', '.join(held)}")
@@ -315,21 +384,31 @@ def run_session(
     settings = settings or NightlySettings()
     before = earlier_attempts(ctx.reader, session) if resume else Attempts()
     done: dict[str, StepResult] = {}
+    reran: set[str] = set()  # steps this attempt ran to success: their dependents re-run
     with IngestRun(ctx, NIGHTLY_RUN, session) as run:
         for step in NIGHTLY:
-            held = _not_run(step, ctx, latest, done, before, waive or {})
-            wait = waits(step, ctx, session, latest, settings)
-            done[step.name] = held or run_step(
-                step,
-                ctx,
-                session,
-                {"workers": workers},
-                screens,
-                wait,
-                settle_until(step, session, settings) if wait else None,
-                latest,
-            )
-            run.record_item(step.name, _item(done[step.name]))
+            held = _not_run(step, ctx, session, latest, done, before, waive or {}, reran)
+            if held is None:
+                wait = waits(step, ctx, session, latest, settings)
+                result = run_step(
+                    step,
+                    ctx,
+                    session,
+                    {"workers": workers},
+                    screens,
+                    wait,
+                    settle_until(step, session, settings) if wait else None,
+                    latest,
+                )
+                # a done step that ran although none of its needs did is a refetch
+                refetch = step.name in before.done and not any(n in reran for n in step.needs)
+                if refetch and result.status in BAD:
+                    result = _refetch_failed(step, before.done[step.name], result)
+                elif result.status is StepStatus.SUCCEEDED:  # new data for what needs it
+                    reran.add(step.name)
+                held = result
+            done[step.name] = held
+            run.record_item(step.name, _item(held))
         status = overall(done.values())
         failed = [
             f"{n}: {r.error or r.reason or r.status.value}"

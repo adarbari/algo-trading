@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-299 stored features in 28 groups, in dependency order; 78 expression features.
+303 stored features in 29 groups, in dependency order; 78 expression features.
 
 ## `option_liquidity@v1`
 
@@ -267,6 +267,17 @@ The nearest listed option expiry on or after the session, its DTE and sessions t
 | `expiry_date` | chain | date | date | open |  | The nearest listed option expiry on or after the session (0-DTE included), from the session's stored chain | every listed expiry in the session's stored chain is before the session | `chains/option_quotes.expiry` |
 | `dte` | chain | int | days | open | >= 0 | Calendar days from the session to the nearest expiry (0: expires on the session) | every listed expiry in the session's stored chain is before the session | `chains/option_quotes.expiry` |
 | `sessions_to_expiry` | chain | int | sessions | open | >= 0 | Exchange sessions after the session up to the nearest expiry (0: expires on the session) | every listed expiry in the session's stored chain is before the session | `chains/option_quotes.expiry` |
+
+## `fund_reference@v1`
+
+Which stock or basket a leveraged or inverse fund tracks, from its holdings and its name. Stored as `rollups/instrument/fund_reference@v1`; reads `instruments/reference`, `holdings/etf` (optional), `instruments/symbol_ids` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `reference_instrument_id` | label | str | text | open |  | The one stock the fund tracks (an instrument id from the reference snapshot, found through the symbol resolver): the single equity in its holdings or named by its swaps, else the ticker its name states | the fund tracks a basket (see reference_kind), no holdings are stored and its name names none (NO_REFERENCE), or the stock is not in the reference (UNLISTED); not a leveraged or inverse fund (NOT_APPLICABLE) | `holdings/etf.holding_id`, `holdings/etf.holding_name`, `instruments/reference.name` |
+| `reference_kind` | label | str | category | open | single_stock, index, sector, commodity, none | What the fund tracks: a single stock, an index, a sector, a commodity, or none (volatility funds, rates funds, funds nothing is known of) | never (none is a value) | `holdings/etf.asset_class`, `holdings/etf.sector`, `instruments/reference.name` |
+| `reference_source` | label | str | category | open | holdings, name_rule | What settled the link, or for a basket its kind: the holdings table or the name rule | reference_kind is none: nothing settled it | `holdings/etf.holding_id`, `instruments/reference.name` |
+| `reference_status` | label | str | category | open | LINKED, BASKET, UNLISTED, NO_REFERENCE | LINKED: one stock found; BASKET: an index, sector or commodity fund; UNLISTED: a stock is named that the reference does not list; NO_REFERENCE: neither holdings nor the name say what it tracks | never | `holdings/etf.holding_id` |
 
 ## `dividends@v2`
 

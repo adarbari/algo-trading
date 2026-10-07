@@ -1,7 +1,7 @@
 """``data.funds.holdings``: a fund's latest holdings, the run that stored them last, the CUSIP
 bridge."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -11,6 +11,7 @@ from algotrade.data.funds.holdings import (
     TABLE,
     cusip_of,
     etf_holdings,
+    funds_holdings,
     holdings_status,
     known_cusips,
 )
@@ -179,3 +180,19 @@ def test_a_row_is_invisible_before_the_date_it_was_filed() -> None:
 def test_status_reports_the_stored_position_count() -> None:
     reader = store((S1, "r1", holdings_rows(FUND, S1, LINES, total=250), at(S1)))
     assert int(holdings_status(reader, S3).iloc[0]["holdings_count"]) == 250
+
+
+def test_many_funds_are_read_at_once_each_from_its_own_latest_read() -> None:
+    reader = store(
+        (S1, "r1", [*holdings_rows(FUND, S1, LINES), *holdings_rows(OTHER, S1, LINES[:1])], at(S1)),
+        (S2, "r2", holdings_rows(FUND, date(2026, 9, 7), LINES[:2]), at(S2)),
+    )
+    frame = funds_holdings(reader, [OTHER, FUND, "EQ:NONE"], S3)
+    assert frame is not None and tuple(frame.columns) == COLUMNS
+    assert list(zip(frame["instrument_id"], frame["rank"], strict=True)) == [
+        (FUND, 1), (FUND, 2), (OTHER, 1),
+    ]  # fmt: skip
+    assert funds_holdings(reader, [FUND], S1 - timedelta(days=30)) is None  # nothing yet
+    assert (
+        funds_holdings(reader, [], S3) is None and funds_holdings(reader, ["EQ:NONE"], S3) is None
+    )

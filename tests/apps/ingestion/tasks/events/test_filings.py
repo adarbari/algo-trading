@@ -13,6 +13,7 @@ import pandas as pd
 
 from algotrade.data import StoreReader
 from algotrade.data.events import ALL_TIME, read_events
+from algotrade.services.events.scope import ScopedName
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
@@ -21,7 +22,6 @@ from algotrade_ingestion.tasks.events.filings import (
     EARNINGS,
     TABLE,
     TASK,
-    Name,
     ingest_filings,
     since_by_cik,
 )
@@ -306,7 +306,7 @@ def test_a_failing_cik_is_counted_and_the_others_are_stored() -> None:
 def test_the_default_since_is_the_latest_stored_acceptance_else_2018() -> None:
     writer = store()
     with IngestRun(context(writer), TASK, S1) as first:
-        ciks = {MU: [Name("MU", "EQ:MU")], ALPHA: [Name("GOOGL", "EQ:GOOGL")]}
+        ciks = {MU: [ScopedName("EQ:MU", "MU", ())], ALPHA: [ScopedName("EQ:GOOGL", "GOOGL", ())]}
         assert since_by_cik(first, ciks, None) == {MU: DEFAULT_SINCE, ALPHA: DEFAULT_SINCE}
         assert since_by_cik(first, ciks, date(2020, 5, 1)) == {
             MU: date(2020, 5, 1),
@@ -314,7 +314,7 @@ def test_the_default_since_is_the_latest_stored_acceptance_else_2018() -> None:
         }
     run(writer, Feed(), ("MU", "GOOGL"))
     with IngestRun(context(writer), TASK, S2) as second:
-        found = since_by_cik(second, {**ciks, "0000000001": [Name("X", "EQ:X")]}, None)
+        found = since_by_cik(second, {**ciks, "0000000001": [ScopedName("EQ:X", "X", ())]}, None)
     assert found == {
         MU: date(2026, 9, 30),  # 20:02 UTC: that day in New York
         ALPHA: date(2026, 10, 5),  # the 00:30 UTC acceptance of the 6th is the 5th in New York

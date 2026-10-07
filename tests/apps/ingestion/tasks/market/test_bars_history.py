@@ -1,3 +1,4 @@
+import dataclasses
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
 from itertools import count
@@ -7,8 +8,10 @@ import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
+from algotrade.services.events.scope import LIQUIDITY
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.market.bars_history import (
@@ -124,6 +127,37 @@ def test_unknown_symbols_are_reported_never_fetched(writer: StoreWriter) -> None
     assert record.stats["unknown_symbols"] == ["ZZZ"] and record.stats["symbols"] == 2
     assert record.items["sym:ZZZ"].startswith("UNKNOWN: not in the reference of 2020-01-01")
     assert record.status is RunStatus.COMPLETE
+
+
+def test_the_scope_is_the_list_and_the_requested_and_with_tiers_the_tier_names(
+    writer: StoreWriter,
+) -> None:
+    """One owner resolves it (``services.events``): the site list and ``--symbols``; the names
+    whose short puts are tier A / B on the newest stored session on or before ``--until`` only
+    with ``include_tiers`` (they need Tiingo's Power tier)."""
+    day = date(2020, 1, 2)
+    tiers = [{"instrument_id": "EQ:BBB", "short_put_ok": True},
+             {"instrument_id": "EQ:CCC", "short_put_ok": False}]  # fmt: skip
+    writer.write_table(LIQUIDITY, day, "t", stamped(tiers, day, "t"))
+    scope = {("site", "events", "scope"): {"name": [{"symbol": "AAA", "added_on": day}]}}
+    ctx = dataclasses.replace(
+        task_ctx(writer, clock=advancing_clock), configs=MemoryConfigStore(scope)
+    )
+
+    def fetch(**kwargs: bool) -> tuple[list[str], RunRecord]:
+        vendor = Vendor({s: payloads.prices(rows(10)) for s in ("AAA", "BBB", "CCC")})
+        source = TiingoDailyPrices(http_for(vendor, RetryPolicy(tries=1)))
+        record = ingest_bars_history(ctx, source, ("CCC",), SINCE, UNTIL, **kwargs)
+        return vendor.asked, record
+
+    asked, record = fetch()
+    assert asked == ["AAA", "CCC"]  # the list, then the requested: no tier names by default
+    assert record.stats["by_reason"] == {"list": 1, "requested": 1}
+    assert record.stats["tier_session"] is None
+    asked, record = fetch(include_tiers=True, force=True)
+    assert asked == ["AAA", "CCC", "BBB"]  # then the tier names
+    assert record.stats["by_reason"] == {"list": 1, "requested": 1, "tier": 1}
+    assert record.stats["tier_session"] == day and record.stats["symbols"] == 3
 
 
 def test_a_row_massive_already_holds_is_kept_and_counted(writer: StoreWriter) -> None:

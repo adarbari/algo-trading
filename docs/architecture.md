@@ -247,7 +247,16 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
   session. `--date D` runs exactly D (as the latest).
 - **Resume and expiry** (`attempts.py`): a FAILED session is retried (the hourly watchdog) from
   where it stopped: steps an earlier attempt SUCCEEDED or WAIVED are reused, not rerun
-  (records from before ADR 0039 are never reused). `--force` reruns every step. A step only
+  (records from before ADR 0039 are never reused); the reused result cites the attempt that
+  produced it (`origin`). One exception (`Step.resumable`, chains): a step that SUCCEEDED with
+  items its task would refetch (STALE_DATA / FETCH_ERROR names under the tier limits) is re-run
+  by a retry while the session is still the latest and the run its task resumes exists with
+  its staging (`tasks/framework/run.py` `resumable_run`, the task's own rule; the step stores
+  the task run id as `task_run`), so the task refetches only those names; the steps that need
+  it (rollups, market-rollups) re-run on the new data (2026-10-05: 199 stale chains failed the
+  screens hourly on the same names, with chains and rollups reused). Without the staging it is
+  reused and the reason says so; a refetch that fails keeps the earlier success and notes
+  why. `--force` reruns every step. A step only
   held back (NOT_RUN) was never tried, so a latest-only one is SKIPPED on a later day, not
   expired. A critical latest-only step that failed and whose session is no
   longer the latest FAILS as expired until waived: `algotrade-ingest nightly --date D --waive
