@@ -28,10 +28,9 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price.price_stats import Matrix, Panel, panel, traded_rows
+from algotrade.features.rollups.price.price_stats import Matrix, Panel, bars_rows
 from algotrade.quant.rolling import (
     exponential_path,
     rolling_mean,
@@ -169,10 +168,7 @@ def stats(px: Panel) -> dict[str, Matrix]:
 
 
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
-    bars = inputs[BARS]
-    assert bars is not None  # required input
-    px = panel(bars, sessions_ending(session, LOOKBACK + 1))
-    return traded_rows(px, stats(px), COLUMNS)
+    return bars_rows(inputs, session, LOOKBACK, stats, COLUMNS)
 
 
 GROUP = FeatureGroup(

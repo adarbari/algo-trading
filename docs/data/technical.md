@@ -74,6 +74,33 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | Catalyst / risk | days to earnings | `earnings.days_to_earnings`, `feature.earnings_before_expiry` |
 | | historical, worst and average earnings moves; news / catalyst flags | EV track (`own_sensitivity`: `move_multiple_median`, `down_move_worst_pct`, 8-K item flags); not duplicated here |
 
+## Survey of other systems (2026-10-06)
+
+A survey of the feature sets of TA-Lib, QuantConnect, Qlib, WorldQuant's alphas, Finviz,
+TradingView, thinkorswim, Trade Ideas, TrendSpider, Minervini / IBD, Clenow, Connors and the
+options screeners (Market Chameleon, Barchart, OptionStrat) against this catalogue (the full
+table: `out/feature-gap-survey.md` in the working tree). What it adds to the track, by cost:
+
+| Add | Where | Status |
+|---|---|---|
+| `sma_150` and `pct_vs_sma_150` (Minervini's template, Weinstein's 30-week average) | `bands@v2` | built (TA track 1b) |
+| `trend_r2_90d`, `reg_slope_90d_ann`, `clenow_momentum_90d` (Clenow's trend quality and pace) | `trend_stats@v2` | built (TA track 1b) |
+| `pocket_pivot` (Morales and Kacher) | `vol_stats@v1` | built |
+| `ps_ratio`, `net_margin`, `payout_ratio` | `fundamentals.toml` expressions over stored facts | planned |
+| quarterly EPS and revenue growth yoy (CAN SLIM C / A) | `financials@v2` | planned |
+| `shares_change_yoy` (buybacks / dilution) | `fundamentals@v3` | planned |
+| balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `balance_sheet@v1` (corporate/; the companyfacts document is already fetched whole) | planned |
+| unusual options activity at chain level (`unusual_contracts`, `max_vol_oi_ratio`, `unusual_premium_usd`) | `chain_flow@v1` (positioning.md) | planned |
+| `iv30_chg_1d`, `iv30_chg_5d` | `iv_history@v3` | planned |
+| bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | planned |
+
+Left out as window variants or covered: IBD's RS rating (the percentiles cover it), RSI(2),
+CCI / MFI / stochastics, Hurst and efficiency ratios, the other TA-Lib candles, chart-pattern
+scans (no deterministic daily-bar definition), per-name drawdown and Ulcer index, Amihud.
+Needing a new data source (a vendor decision, `add-data-source`, not a feature): short
+interest and days to cover (FINRA files, free), float and insider / institutional ownership
+(EDGAR Form 4 / 13F), analyst estimates and surprises (forward P/E, PEG, SUE), dark pool.
+
 ## Presets
 
 Once the inputs above exist, the eight rule screens the owner described (breakout, pullback,
@@ -95,8 +122,9 @@ folder per kind of thing; `architecture/layout.toml`):
 | `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | built ([swing.md](swing.md)) |
 | `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` | built ([swing.md](swing.md)) |
 | `gaps@v1` | `levels/` | `gap_open_pct`, `gap_above`, `gap_above_date`, `gap_below`, `gap_below_date` | built ([swing.md](swing.md)) |
-| `volume_profile@v1` | `levels/` | `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share`, `profile_status` | planned |
-| `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | planned |
+| `vol_stats@v1` | `activity/` | `atr_5`, `atr_20`, `hv10`, `hv60`, `hv20_pctile_252d`, `adv_shares_60d`, `volume_pctile_252d`, `pocket_pivot` | built |
+| `volume_profile@v1` | `activity/` | `profile_status`, `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share` | built |
+| `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | built |
 | `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | planned |
 | `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | planned |
 | `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` (shared search in `wing_search`): `wing_status`, `target_expiry`, `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`, `delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield` | built |
@@ -176,8 +204,57 @@ Worked examples: 60 closes rising every day give `close_streak` 59 and `sma20_st
 sessions ago gives `tight_range_sessions` 10 (the spike left the 20-session window 10
 sessions ago).
 
-## Levels (`levels/`), volume at price, relative strength, options
+## `vol_stats@v1` (activity/)
 
+Inputs: `bars/1d`, the session plus 272 earlier sessions.
+
+| Column | Definition | Null when |
+|---|---|---|
+| `atr_5`, `atr_20` | Wilder ATR over n, as `momentum.atr_14` (seeded with the first n true ranges of the consecutive run ending on the session, at most 150 sessions) | fewer than n + 1 consecutive bars |
+| `hv10`, `hv60` | close-to-close realised vol over n log returns, annualised by 252 (`quant.realized_vol`) | a gap among the last n + 1 sessions |
+| `hv20_pctile_252d` | share of the 252 sessions before the session whose hv20 was strictly below the session's | the session's hv20 unknown, or fewer than 240 of the 252 have one (one gap voids 21 windows) |
+| `adv_shares_60d` | mean share volume over the last 60 sessions | a gap among them |
+| `volume_pctile_252d` | share of the 252 sessions before the session whose volume was strictly below the session's | fewer than 240 known |
+| `pocket_pivot` | the close rose and the volume beat every down-close session's volume among the 10 before (Morales and Kacher); false on a down day or with no down day to beat | a gap among the last 12 sessions |
+
+Expression features: `atr_ratio_5_20` (expansion above 1), `hv_ratio_10_60` (`volatility.toml`);
+`volume_trend_20_60`, `turnover_20d` (adv_shares_20d / shares_outstanding; `volume.toml`).
+
+## `volume_profile@v1` (activity/)
+
+A daily-bar approximation of a volume profile. Inputs: `bars/1d`, the session plus 251 earlier
+sessions; `momentum@v1` (atr_14). Params (`rollups.toml`): `bins` 50, `value_area` 0.70,
+`hvn_factor` 1.5, `lvn_factor` 0.5, `min_bars` 240.
+
+Each bar's volume is spread evenly over the `bins` equal price bins between the window's lowest
+low and highest high that its [low, high] overlaps (a bar with no range goes to its bin). Then:
+`poc_252d` the centre of the fullest bin (ties: nearest the close); the value area grows from
+that bin one neighbour at a time towards the fuller side until it holds `value_area` of the
+volume (`value_area_low` / `value_area_high` are its outer edges); `hvn_above` / `hvn_below` the
+centre of the nearest bin strictly above / below the close's bin with at least `hvn_factor` x
+the mean bin volume, `lvn_*` with at most `lvn_factor` x; `volume_near_close_share` the share
+of volume in bins whose centre is within one atr_14 of the close. `profile_status` is OK,
+FEW_BARS (under `min_bars` bars) or NO_RANGE (one price all year); every value is null unless
+OK. Expression features: `in_value_area`, `dist_to_poc` (`swing.toml`).
+
+Worked example (10 bins over 100..110): one-bin bars of 300 at 102-103, 250 at 103-104, 200 at
+107-108, 20 at 105-106, 20 at 100-101, 10 at 109-110, close 105.5: POC 102.5; value area
+102..106 (300 + 250 = 550 of the 560 needed, then the fuller neighbour, bin 4 with 0, then bin
+5 with 20); HVN above 107.5, below 103.5; LVN above 106.5, below 104.5; within one ATR (1.0)
+of the close 20 / 800 of the volume.
+
+## `anchored_vwap@v2` (price/)
+
+v1's `avwap_earnings` and `avwap_anchor_date` plus `avwap_swing_low` and `avwap_swing_high`:
+the VWAP of the typical price from the session of `swing_levels@v1`'s swing low / high through
+the session (null without that pivot, with fewer than 2 sessions, a gap or no volume in the
+range). The bars read grow to 252 sessions so a pivot anywhere in `swing_levels`' window can
+anchor. v1 is superseded; retire it after the backfill.
+
+## Levels (`levels/`), relative strength, options
+
+Planned; the levels groups are specified in [swing.md](swing.md) by the PR that builds them;
+relative strength and the options groups land with their own sections here.
 `call_wing@v1` and `dividend_schedule@v1` are built (their sections are at the end of this page);
 `pivot_strength@v1`, `retest@v1` and `gaps@v1` are built; their definitions, null rules and
 worked examples are in [swing.md](swing.md) (with `swing_levels@v1`, which they build on). The

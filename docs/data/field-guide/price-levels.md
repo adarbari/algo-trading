@@ -711,6 +711,73 @@ Sources: docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns
 
 Sources: docs/data/swing.md; Raschke and Connors, Street Smarts (failed breakouts)
 
+### `rollup.anchored_vwap@v2.avwap_earnings`
+
+**How to read it.** The volume-weighted average price since the last earnings reaction session, in dollars per share: where the average share bought since the report is positioned. The close above it means holders since the report are in profit (the post-earnings drift has support); below it they are under water and rallies into it meet sellers. Compare with the close; rollup.anchored_vwap@v2.avwap_anchor_date says how old the anchor is.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has an earnings-anchored VWAP | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- A fresh anchor (a few sessions old) is nearly the current price and says little; the level means more after two to four weeks of trading.
+- Null without a report in the last 126 sessions, with fewer than 2 sessions since it, a gap in the range, or no volume.
+
+Sources: Anchored VWAP (Brian Shannon, Maximum Trading Gains with Anchored VWAP)
+
+### `rollup.anchored_vwap@v2.avwap_anchor_date`
+
+**How to read it.** The session avwap_earnings is anchored on: the last report date for a pre-market or unknown-time report, the next session for one after the close. Its age is how long the earnings VWAP has had to form.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has an earnings anchor | `not_null` | hard | - | rollup.earnings@v1.last_earnings_date is the report date itself |
+
+**When the reading lies**
+
+- Null without a report in the last 126 sessions.
+
+Sources: Anchored VWAP (Brian Shannon)
+
+### `rollup.anchored_vwap@v2.avwap_swing_low`
+
+**How to read it.** The volume-weighted average price since the most recent confirmed swing low below the close (the support swing_levels@v1 found), in dollars per share: the average cost of everyone who bought since the bottom. In an uptrend the close holds above it and pullbacks to it are bought; a close below it means the rally's buyers are under water, the first sign the swing is over. A rising anchored VWAP with the price above is the cleanest statement of a healthy leg up.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a swing-low VWAP | `not_null` | hard | - | compare with rollup.price_stats@v2.close: above it the leg up is intact |
+
+**When the reading lies**
+
+- Support is the most recent swing low, which can be a minor pivot a week old; then the VWAP is a few sessions long and close to the price. Check rollup.swing_levels@v1.swing_low_date.
+- Null without a confirmed swing low below the close, with fewer than 2 sessions since it, a gap in the range, or no volume.
+
+Sources: Anchored VWAP from swing lows (Brian Shannon, Maximum Trading Gains with Anchored VWAP)
+
+### `rollup.anchored_vwap@v2.avwap_swing_high`
+
+**How to read it.** The volume-weighted average price since the most recent confirmed swing high above the close (the resistance swing_levels@v1 found), in dollars per share: the average cost of everyone who bought since the top, all of whom are under water while the close stays below it. A close back above it means the sellers since the top have been absorbed, the first sign of a turn; below it, rallies into it are sold.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a swing-high VWAP | `not_null` | hard | - | compare with rollup.price_stats@v2.close: a close above it is the reclaim |
+
+**When the reading lies**
+
+- Resistance is the most recent swing high, possibly a minor one; check rollup.swing_levels@v1.swing_high_date.
+- Null without a confirmed swing high above the close, with fewer than 2 sessions since it, a gap in the range, or no volume.
+
+Sources: Anchored VWAP from swing highs (Brian Shannon)
+
 ### `rollup.bands@v2.sma_150`
 
 **How to read it.** The mean close of the last 150 sessions (30 weeks), in dollars per share: the one average off the 20 / 50 / 200 stack that two named methods threshold. Minervini's trend template requires the close above it, it above the 200-day and the 50-day above it; Weinstein's stage analysis reads a rising 30-week average with the price above as stage 2 (the only stage to buy). feature.pct_vs_sma_150 is the distance.
