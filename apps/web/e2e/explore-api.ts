@@ -294,7 +294,7 @@ function passing(name: string, histogram: { lo: number; count: number }[]): Json
 /** `GuideHelpField`: a field's info with its guide entry (null without one), `summary` its first sentence (the server's split, mocked). */
 function guideHelp(name: string): Json {
   const guide = GUIDES[name];
-  const reads = String(guide?.['reads'] ?? '');
+  const reads = typeof guide?.['reads'] === 'string' ? guide['reads'] : '';
   return {
     data: {
       guideField: {
