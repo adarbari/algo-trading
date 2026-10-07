@@ -79,7 +79,9 @@ from algotrade_ingestion.ops.schedule import (
     DEFAULT_TIME,
     DEFAULT_WATCHDOG_MINUTES,
     LABEL,
+    MONTHLY_LABEL,
     WAKE_COMMAND,
+    monthly_fill_plist,
     nightly_plist,
 )
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task
@@ -189,7 +191,9 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
             s.add_argument("--config", default="short_premium_liquidity", help="config id")
             s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
     sc = sub.add_parser(
-        "schedule", help="write a launchd agent for the nightly job (not installed)"
+        "schedule",
+        help="write the launchd agents of the nightly job and the monthly Tiingo fill "
+        "(not installed)",
     )
     sc.add_argument(
         "--time",
@@ -205,6 +209,10 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     )
     sc.add_argument("--export-dir", type=Path, default=Path("out"))
     sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
+    sc.add_argument(
+        "--monthly-out", type=Path, default=Path("var") / f"{MONTHLY_LABEL}.plist",
+        help="where to write the monthly `bars-history --fill` agent (2nd of the month, 19:00)",
+    )  # fmt: skip
     r = sub.add_parser(
         "report", help="render (and --send) the nightly summary email for a past session"
     )
@@ -248,10 +256,21 @@ def write_schedule(args: argparse.Namespace) -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     watchdog_s = args.watchdog_minutes * 60
     args.out.write_bytes(nightly_plist(repo, hour, minute, export_dir, watchdog_s))
+    args.monthly_out.parent.mkdir(parents=True, exist_ok=True)
+    args.monthly_out.write_bytes(monthly_fill_plist(repo))
     target = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
+    monthly_target = Path.home() / "Library" / "LaunchAgents" / f"{MONTHLY_LABEL}.plist"
     print_json(
         {
             "written": str(args.out),
+            "monthly_written": str(args.monthly_out),
+            "monthly_install": [
+                f"mkdir -p {repo / 'var' / 'logs'}",
+                f"launchctl unload {monthly_target} 2>/dev/null || true",
+                f"cp {args.monthly_out.resolve()} {monthly_target}",
+                f"launchctl load {monthly_target}",
+            ],
+            "monthly_uninstall": [f"launchctl unload {monthly_target}", f"rm {monthly_target}"],
             "weekdays_at": args.time,
             "run_at_load": True,
             "watchdog_minutes": args.watchdog_minutes or None,

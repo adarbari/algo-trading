@@ -313,7 +313,7 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/events"
-purpose = "use case: which names the event-sensitivity study covers (ADR 0050): the tier A / B short-put names, the site scope list and the stocks the scoped leveraged funds track, each with its reason; symbols resolved through SymbolResolver of the session's reference snapshot, the unknown ones reported; read-only"
+purpose = "use case: which names the event-sensitivity study covers (ADR 0050): the tier A / B short-put names, the site scope list and the stocks the scoped leveraged funds track, each with its reason; symbols resolved through SymbolResolver of the session's reference snapshot, the unknown ones reported; and the usefulness order of the universe for a budgeted history backfill (fill.py); read-only"
 contracts = [
     "Event scope is read-only: no writers, no jobs, no vendors (ADR 0050)",
     "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)",

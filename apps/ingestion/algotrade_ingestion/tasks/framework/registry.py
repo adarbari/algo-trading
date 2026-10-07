@@ -236,6 +236,7 @@ def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
         bool(p.get("force")),
         p.get("limit"),
         bool(p.get("include_tiers")),
+        p.get("fill"),
     )
 
 
@@ -572,6 +573,13 @@ TASKS: dict[str, Task] = {
                 Param("symbols", ("--symbols",), str, "tickers on top of the scope list"),
                 Param("limit", ("--limit",), int, "fetch at most N names this run"),
                 Param("force", ("--force",), None, "also names already fetched for the window"),
+                Param(
+                    "fill",
+                    ("--fill",),
+                    int,
+                    "also the N most useful names of the universe without history (optionable, "
+                    "then IV30, then dollar volume), within [tiingo] monthly_symbol_budget",
+                ),
                 Param(
                     "include_tiers",
                     ("--include-tiers",),

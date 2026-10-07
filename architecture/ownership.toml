@@ -863,6 +863,16 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "load_event_scope" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
 
 [[responsibility]]
+id = "history-fill-order"
+description = "The order a budgeted history backfill takes names as of a session (ADR 0050, services/events/fill.py): every ticker of the session's reference snapshot, optionable names first (an option_liquidity@v1 row), then iv_history@v2.iv30 descending, then price_stats@v2.adv_usd_20d descending, each read through rollup_as_of; tasks call fill_order and never rank the universe themselves"
+owner = ["src/algotrade/services/events/fill.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # the one caller: takes the first N names without history (--fill)
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "fill_order" }]
+
+[[responsibility]]
 id = "screen-preview"
 description = "The Builder's dry runs (ADR 0029), over the request's ReadContext: an unsaved rule-screen draft resolved for a user and evaluated by the nightly evaluate_screen on the context's session (summary, funnel, coverage, top rows; the field frame cached per session, fields, user features and visible_seq), and a formula type checked and sampled on that session; never writes; REST POSTs by design"
 owner = ["src/algotrade/services/preview/*"]
