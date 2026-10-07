@@ -644,24 +644,6 @@ mode = "hard"
 note = "compare with rollup.price_stats@v2.close in a rule"
 
 [[field]]
-<<<<<<< HEAD
-name = "rollup.bands@v2.sma_150"
-theme = "price levels"
-reads = "The mean close of the last 150 sessions (30 weeks), in dollars per share: the one average off the 20 / 50 / 200 stack that two named methods threshold. Minervini's trend template requires the close above it, it above the 200-day and the 50-day above it; Weinstein's stage analysis reads a rising 30-week average with the price above as stage 2 (the only stage to buy). feature.pct_vs_sma_150 is the distance."
-caveats = [
-  "An average over seven months lags a turn by weeks; pair with rollup.bands@v2.ema20_slope_5d or feature.ema_stack for the recent direction.",
-  "Null after any missing bar in the last 150 sessions or a shorter history.",
-]
-sources = [
-  "Minervini (2013), Trade Like a Stock Market Wizard: the trend template",
-  "Weinstein (1988), Secrets for Profiting in Bull and Bear Markets: the 30-week moving average",
-]
-[[field.use]]
-for = "has a 30-week average"
-op = "not_null"
-mode = "hard"
-note = "threshold feature.pct_vs_sma_150 gt 0, with rollup.price_stats@v2.sma_200 below it for the template"
-=======
 name = "rollup.pivot_strength@v1.resistance_touches"
 theme = "price levels"
 reads = "How many separate times the last 252 sessions tested the current resistance (rollup.swing_levels@v1.swing_high), the pivot bar counted: a bar touches when its high came within half an ATR of the level and it closed at or below it; consecutive bars count once. 1 is the pivot alone; 2 to 3 is a level the market has respected; 4 or more is a heavily tested ceiling, which breaks on strong volume more often than a lone high but is also where many stops and orders sit."
@@ -905,4 +887,20 @@ op = "eq"
 value = false
 mode = "soft"
 tolerance = 0
->>>>>>> origin/main
+
+name = "rollup.bands@v2.sma_150"
+theme = "price levels"
+reads = "The mean close of the last 150 sessions (30 weeks), in dollars per share: the one average off the 20 / 50 / 200 stack that two named methods threshold. Minervini's trend template requires the close above it, it above the 200-day and the 50-day above it; Weinstein's stage analysis reads a rising 30-week average with the price above as stage 2 (the only stage to buy). feature.pct_vs_sma_150 is the distance."
+caveats = [
+  "An average over seven months lags a turn by weeks; pair with rollup.bands@v2.ema20_slope_5d or feature.ema_stack for the recent direction.",
+  "Null after any missing bar in the last 150 sessions or a shorter history.",
+]
+sources = [
+  "Minervini (2013), Trade Like a Stock Market Wizard: the trend template",
+  "Weinstein (1988), Secrets for Profiting in Bull and Bear Markets: the 30-week moving average",
+]
+[[field.use]]
+for = "has a 30-week average"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.pct_vs_sma_150 gt 0, with rollup.price_stats@v2.sma_200 below it for the template"
