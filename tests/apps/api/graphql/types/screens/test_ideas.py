@@ -45,7 +45,8 @@ def test_ideas_rank_the_runs_of_the_session_with_every_pick(graph: Graph) -> Non
     assert "errors" not in body, body
     ideas = body["data"]["ideas"]
     assert (ideas["session"], ideas["priority"], ideas["total"]) == ("2022-11-23", [], 2)
-    [screener] = ideas["screeners"]
+    [screener] = [s for s in ideas["screeners"] if s["screener"]["id"] == "vrp_scanner"]
+    assert len(ideas["screeners"]) == 9  # the other eight site presets have no run: NOT_RUN
     assert screener["screener"] == {
         "id": "vrp_scanner", "owner": "site", "scope": "site", "name": "VRP", "version": 3,
         "latestRun": {"runId": screener["run"]["runId"]}, "notRun": None,
@@ -101,9 +102,12 @@ def test_screeners_and_a_view(graph: Graph) -> None:
         ' view(scope: "screener:vrp_scanner") { scope saved columns names }'
         ' missing: view(scope: "screener:nope") { scope } }'
     )
-    assert body["data"]["screeners"] == [
-        {"id": "vrp_scanner", "name": "VRP", "latestRun": {"picked": 2}, "notRun": None}
-    ]
+    screeners = {s["id"]: s for s in body["data"]["screeners"]}
+    assert len(screeners) == 9  # vrp_scanner and the eight technical presets (no run: NOT_RUN)
+    assert screeners["vrp_scanner"] == {
+        "id": "vrp_scanner", "name": "VRP", "latestRun": {"picked": 2}, "notRun": None
+    }  # fmt: skip
+    assert screeners["breakout"]["notRun"] == {"code": "NOT_RUN"}
     assert body["data"]["view"] == {
         "scope": "screener:vrp_scanner", "saved": False, "columns": [], "names": []
     }  # fmt: skip
