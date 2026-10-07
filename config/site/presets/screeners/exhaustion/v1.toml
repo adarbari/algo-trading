@@ -1,0 +1,91 @@
+# Exhaustion (the reversal case): a stretched, overbought run on a volume and range spike whose
+# momentum has started to fade (owner's screen, 2026-10-06; docs/data/technical.md "Presets").
+# What it finds: names a fade or a trim is worth looking at. What it does not check: a pending
+# takeover or a news-driven squeeze pins RSI high with no top behind it. The continuation case
+# is the same screen with mom_accel_5d gt 0 (copy it in the Builder and flip that row). The
+# 20 EMA distance is measured from the SMA20 (stretch_sma20_atr).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+# Run on request or nightly like every site screener (ADR 0033); an identification layer,
+# not a trade signal.
+id = "exhaustion"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Exhaustion"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# no liquidity_class: it bundles option liquidity, and these are stock-chart screens)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the setup
+[criteria.ret_5d_rank]
+field = "rollup.relative_strength@v1.ret_5d_pctile"
+op = "gte"
+value = 0.9
+
+[criteria.stretched]
+field = "feature.stretch_sma20_atr"
+op = "gt"
+value = 2
+
+[criteria.rsi]
+field = "rollup.momentum@v1.rsi_14"
+op = "gt"
+value = 70
+
+[criteria.rel_volume]
+field = "rollup.momentum@v1.rel_volume"
+op = "gt"
+value = 1.5
+
+[criteria.atr_expanding]
+field = "feature.atr_ratio_5_20"
+op = "gt"
+value = 1.1
+
+[criteria.upper_band]
+field = "feature.bb_pct_b"
+op = "gte"
+value = 0.95
+
+[criteria.momentum_fading]
+field = "rollup.trend_stats@v2.mom_accel_5d"
+op = "lt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+ret_5d_pctile = "rollup.relative_strength@v1.ret_5d_pctile"
+stretch_sma20_atr = "feature.stretch_sma20_atr"
+bb_pct_b = "feature.bb_pct_b"
+ret_5d = "rollup.momentum@v1.ret_5d"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+mom_accel_5d = "rollup.trend_stats@v2.mom_accel_5d"
+rel_volume = "rollup.momentum@v1.rel_volume"
+atr_ratio_5_20 = "feature.atr_ratio_5_20"
+rsi_14 = "rollup.momentum@v1.rsi_14"
+rs_spy_63d = "rollup.relative_strength@v1.rs_spy_63d"
+
+[rank]
+tie_break = "feature.stretch_sma20_atr"
