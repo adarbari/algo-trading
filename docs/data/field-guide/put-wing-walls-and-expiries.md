@@ -743,3 +743,201 @@ Sources: McMillan, Options as a Strategic Investment; the covered-call strike-ab
 - Null when there is no confirmed swing high above the close, no best call, or atr_14 is unknown or 0.
 
 Sources: McMillan, Options as a Strategic Investment
+
+### `rollup.implied_move@v1.move_status`
+
+**How to read it.** Whether the implied move has a value: OK, or the first failing step: NO_SPOT (no positive close or price), NO_CHAIN (no option quotes), NO_EXPIRY (no expiry to read), NO_QUOTES (no strike around the price with both legs two-sided) or WIDE_SPREADS (two-sided but every leg is wider than 35% of its mid).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a priced implied move | `eq "OK"` | hard | - | - |
+
+**When the reading lies**
+
+- WIDE_SPREADS and NO_QUOTES are thin chains: a straddle at those quotes would be noise, so the move is null rather than wrong. rollup.option_liquidity@v1.liq_status and feature.option_tier say the same of the chain.
+- The stored quotes are after the close; judge a live straddle before trading it.
+
+Sources: Site convention (features/rollups/positioning/implied_move.py)
+
+### `rollup.implied_move@v1.implied_move`
+
+**How to read it.** The expected absolute move to the move expiry that the at-the-money straddle prices, as a share of the price: 0.06 means the options price about a 6% move either way by that date. Single stocks over a month are often 0.05 to 0.12; into earnings 0.04 to 0.10; index ETFs 0.02 to 0.04. It is the average size of the move the market expects, not a range it promises: feature.implied_move_1sd is the one-standard-deviation version.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a big move priced | `gte 0.08` | soft | 0.02 | with rollup.implied_move@v1.move_basis eq EARNINGS for an event play |
+| a quiet name priced | `lte 0.04` | soft | 0.01 | - |
+
+**When the reading lies**
+
+- It prices the whole period to the move expiry, not a day. With rollup.implied_move@v1.move_basis EARNINGS it includes the report; with TERM it is a month of ordinary movement. Read move_basis and rollup.implied_move@v1.move_dte before comparing two names.
+- The straddle also prices in the volatility premium, so options usually imply more than the stock then delivers. feature.implied_move_vs_hv is the comparison with recent realised movement.
+- Interpolated in strike to the closing price from stored end-of-day mids; a wide-spread chain is null (rollup.implied_move@v1.move_status), never guessed. When only one of the two strikes around the price has usable quotes its straddle stands in, which is biased when the strikes are far apart relative to the move (a $20 stock with $2.50 strikes a week out).
+- Null when the status is not OK.
+
+Sources: Expected move from the at-the-money straddle (about 0.8 x sigma x sqrt(t) x S): https://www.tastylive.com/concepts-strategies/expected-move
+
+### `rollup.implied_move@v1.straddle_mid`
+
+**How to read it.** The call plus put mid at the closing price, in dollars per share, interpolated in strike between the two listed strikes around it (a single usable strike: its straddle). One contract costs 100 times this. It is the number rollup.implied_move@v1.implied_move divides by the price.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a straddle that costs at least a dollar | `gte 1` | soft | 0.5 | - |
+
+**When the reading lies**
+
+- A dollar amount: compare names through rollup.implied_move@v1.implied_move, not through the straddle.
+- A mid of a stored end-of-day quote, not a fill: trading the straddle costs about half its spread more.
+
+Sources: Site convention (features/rollups/positioning/implied_move.py)
+
+### `rollup.implied_move@v1.move_expiry`
+
+**How to read it.** The expiry the straddle is read at: the first one that covers the next earnings report, within 60 days (move_basis EARNINGS), else the listed expiry nearest 30 days among 7 to 60 days out (TERM). A date to show; rollup.implied_move@v1.move_dte is the days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an expiry was selected | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- It is not the put wing's target (rollup.put_wing@v1.target_expiry, nearest 45 days) nor the nearest expiry: three groups, three expiries.
+- An expiry covers a report after the close only when it is dated after the report day; the earnings date is as known on the session (rollup.earnings@v1.next_earnings_date) and can still move.
+- Null when no expiry was selected (NO_SPOT, NO_CHAIN or NO_EXPIRY).
+
+Sources: Site convention (features/rollups/positioning/implied_move.py)
+
+### `rollup.implied_move@v1.move_dte`
+
+**How to read it.** Calendar days from the session to the move expiry: 1 to 60. Small (a few days) is an earnings expiry right after the report, 25 to 35 a term read.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a month or less to the expiry read | `between [1, 35]` | soft | 5 | - |
+
+**When the reading lies**
+
+- The implied move scales with the square root of time: compare names at similar days, or use feature.implied_move_vs_hv which scales the realised movement to the same expiry.
+- Null when no expiry was selected.
+
+Sources: Site convention (features/rollups/positioning/implied_move.py)
+
+### `rollup.implied_move@v1.move_basis`
+
+**How to read it.** What the move expiry was chosen for: EARNINGS (the first expiry covering the next report, so the straddle prices the report) or TERM (the expiry nearest 30 days: no report ahead, or none covered within 60 days). 'The move into earnings' means EARNINGS; a TERM move is a month of ordinary movement.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the move the options price into earnings | `eq "EARNINGS"` | hard | - | - |
+
+**When the reading lies**
+
+- EARNINGS needs a known report date; a company that has not announced one reads TERM even when a report is near. Check rollup.earnings@v1.next_earnings_date.
+- A report today before the open is already in the close, so it reads TERM; a report tonight reads EARNINGS.
+- Null when no expiry was selected.
+
+Sources: Site convention (features/rollups/positioning/implied_move.py)
+
+### `feature.implied_move_1sd`
+
+**How to read it.** The one-standard-deviation move the straddle implies: rollup.implied_move@v1.implied_move x 1.2533 (the square root of pi over 2), as a share of the price: 0.08 means the options price a standard deviation of 8%, so about two chances in three of finishing within 8% of today. The expected absolute move is the smaller number.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a standard deviation of at least 10% | `gte 0.1` | soft | 0.02 | - |
+
+**When the reading lies**
+
+- Assumes a bell-shaped (lognormal) distribution; real returns have fatter tails and, around earnings, two humps (a gap up or down). Treat it as a scale, not a probability.
+- Same period as the straddle: read rollup.implied_move@v1.move_dte and move_basis.
+- Null when the implied move is null.
+
+Sources: Expected move and one standard deviation: https://www.tastylive.com/concepts-strategies/expected-move
+
+### `feature.implied_move_vs_hv`
+
+**How to read it.** How much more the straddle prices than recent realised movement would: the one-standard-deviation implied move (feature.implied_move_1sd) over HV20 scaled to the move expiry (hv20 x sqrt(days / 365)), so 1 means the options price what the last 20 sessions delivered (implied volatility equal to HV20), 1.5 half again more, 0.7 less. Above 1.2 options are rich against realised, which favours selling premium; below 0.8 they are cheap.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| options pricing more than realised | `gte 1.2` | soft | 0.2 | for selling premium, with rollup.implied_move@v1.move_basis eq TERM so the report is not what is priced |
+| options pricing less than realised | `lte 0.8` | soft | 0.2 | - |
+
+**When the reading lies**
+
+- An EARNINGS expiry prices the report, which the last 20 sessions usually did not contain, so a ratio above 1 into earnings is expected; compare with the name's own history, or read rollup.implied_move@v1.move_basis first.
+- HV20 after a shock (a gap, a takeover) overstates or understates what comes next. Check rollup.price_moves@v1.one_day_move.
+- Null when the implied move or HV20 is null, or HV20 is 0 (no floor).
+
+Sources: Site convention; implied against realised volatility, the volatility risk premium
+
+### `feature.put_otm_pct`
+
+**How to read it.** How far below the close the best short put's strike sits: (close - strike) / close, 0.08 means the strike is 8% under the price. 0.05 to 0.15 is the usual range for an 8 to 15 delta put; negative means the strike is above the close.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a strike well below the price | `gte 0.08` | soft | 0.03 | - |
+
+**When the reading lies**
+
+- The same percentage means different safety at different volatility: 8% is two weekly moves on a quiet name and under one on a wild one. Compare with feature.implied_move_1sd or feature.put_support_cushion_atr.
+- The close is the bar's, the strike is chosen against the chain's own price (rollup.put_wing@v1.best_put_delta); they can differ by after-hours movement.
+- Null with no best put (put_wing NO_STRIKE or worse).
+
+Sources: Cash-secured puts below support (McMillan, Options as a Strategic Investment)
+
+### `feature.put_breakeven`
+
+**How to read it.** The short put's break-even at expiry in dollars per share: the best put's strike minus the premium collected (its mid). The stock must stay above it for the trade to win; between the break-even and the strike the premium is only partly kept.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a break-even below a level | `lte 100` | soft | 0.05 x the threshold | 100 is an example level; the usual comparison is the break-even against rollup.swing_levels@v1.swing_low |
+
+**When the reading lies**
+
+- An absolute price, so it is read against a level (support: rollup.swing_levels@v1.swing_low) or the close, not against a threshold alone; feature.put_otm_pct is the relative version for the strike.
+- The mid is a stored end-of-day quote: a live fill is nearer the bid, which lowers the premium and lifts the break-even.
+- Null with no best put (put_wing NO_STRIKE or worse).
+
+Sources: Cash-secured puts below support (McMillan, Options as a Strategic Investment)
+
+### `feature.put_roc_annualised`
+
+**How to read it.** The short put's cash-secured return annualised, simple: rollup.put_wing@v1.best_put_roc x 365 / target_dte, 0.3 means 30% a year if the put expires worthless and is sold again at the same terms. Roughly 0.10 to 0.30 is usual for an 8 to 15 delta put; more is paid for more risk, not for free.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a worthwhile return on the cash | `gte 0.15` | soft | 0.05 | - |
+
+**When the reading lies**
+
+- An annualised yield is a rate, not an expectation: it assumes every put expires worthless, which the delta says happens about 85 to 92% of the time, and ignores the losses in the other cases. Read it with rollup.put_wing@v1.best_put_delta.
+- High values on a name with a wide stored spread (rollup.put_wing@v1.best_put_spread_pct) rest on a mid you will not get.
+- Null with no best put (put_wing NO_STRIKE or worse).
+
+Sources: Cash-secured puts below support (McMillan, Options as a Strategic Investment)

@@ -260,7 +260,7 @@ def _as_dates(values: pd.Series) -> pd.Series:
     return pd.to_datetime(values).dt.date
 
 
-def _by_id(underlyings: pd.DataFrame, values: pd.Series) -> pd.Series:
+def by_id(underlyings: pd.DataFrame, values: pd.Series) -> pd.Series:
     """``values`` (one per row) by instrument id (str): for an id quoted twice, the row with
     the latest ``ts`` (ties: the later row), so the result does not depend on staging order."""
     frame = pd.DataFrame(
@@ -281,7 +281,7 @@ def spot_prices(underlyings: pd.DataFrame | None) -> pd.Series:
     if underlyings is None or underlyings.empty:
         return pd.Series(dtype=float)
     price = pd.to_numeric(underlyings["price"], errors="coerce")
-    return _by_id(underlyings, price.where(price > 0).astype(float))
+    return by_id(underlyings, price.where(price > 0).astype(float))
 
 
 def positive_spots(underlyings: pd.DataFrame | None) -> pd.Series:
@@ -294,7 +294,7 @@ def _spots(underlyings: pd.DataFrame | None) -> pd.DataFrame:
     if underlyings is None or underlyings.empty:
         return pd.DataFrame({"instrument_id": [], "spot": [], "iv30_cboe": []}, dtype=float)
     spot = spot_prices(underlyings)
-    cboe = _by_id(underlyings, pd.to_numeric(underlyings["iv30"], errors="coerce") / 100.0)
+    cboe = by_id(underlyings, pd.to_numeric(underlyings["iv30"], errors="coerce") / 100.0)
     return pd.DataFrame(
         {
             "instrument_id": spot.index.to_numpy(),
