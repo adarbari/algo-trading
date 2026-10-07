@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { IconButton } from '@algotrade/ui';
+import { IconButton, Text } from '@algotrade/ui';
 
 import type { CatalogueFeature, GuideUse } from '@/entities/feature';
 import type { Criterion } from '@/entities/screen';
@@ -205,7 +205,7 @@ describe('CriterionRow', () => {
   });
 
   it('shows no help for a field without a guide', () => {
-    const renderFieldHelp = vi.fn(() => <span>help</span>);
+    const renderFieldHelp = vi.fn(() => <Text>help</Text>);
     setup(
       { ...CRITERION, field: 'instrument.sector', op: 'eq', value: 'Tech' },
       { renderFieldHelp },

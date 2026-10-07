@@ -31,7 +31,7 @@ const HINT =
 function keptFields(document: Readonly<Record<string, unknown>>): { id: string; field: string }[] {
   const criteria = document['criteria'];
   if (typeof criteria !== 'object' || criteria === null) return [];
-  return Object.entries(criteria).flatMap(([id, criterion]) => {
+  return Object.entries(criteria as Record<string, unknown>).flatMap(([id, criterion]) => {
     const field: unknown =
       typeof criterion === 'object' && criterion !== null && 'field' in criterion
         ? criterion.field
