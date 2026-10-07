@@ -52,6 +52,7 @@ from algotrade.features.rollups.positioning.chain_inputs import (
     closing_spots,
     days_to,
     expiry_days,
+    one_row_per_contract,
     relative_spread,
     two_sided_mid,
 )
@@ -180,7 +181,7 @@ def _legs(quotes: pd.DataFrame, right: str, p: ImpliedMoveParams) -> pd.DataFram
             "tight": spread <= p.max_spread_pct,
         }
     )
-    return legs.drop_duplicates(["underlying_id", "strike"], keep="last")
+    return legs
 
 
 def straddles(quotes: pd.DataFrame, spots: pd.Series, p: ImpliedMoveParams) -> pd.DataFrame:
@@ -231,6 +232,7 @@ def straddles(quotes: pd.DataFrame, spots: pd.Series, p: ImpliedMoveParams) -> p
 def compute(inputs: Inputs, session: date, p: ImpliedMoveParams) -> pd.DataFrame:
     options = inputs[OPTIONS]
     assert options is not None  # required input
+    options = one_row_per_contract(options)
     underlyings = inputs.get(UNDERLYINGS)
     spots = closing_spots(underlyings)
     quoted = set() if underlyings is None else set(underlyings["instrument_id"].astype(str))

@@ -36,6 +36,7 @@ from algotrade.features.rollups.positioning.chain_inputs import (
     UNDERLYINGS,
     days_to,
     expiry_days,
+    one_row_per_contract,
     two_sided_mid,
 )
 
@@ -69,14 +70,14 @@ FEATURES = (
     ),
     Feature(
         "call_oi", "int", "count",
-        "Total call open interest across the expiries 1 or more days out (end-of-day OCC "
-        "figure; a 0-DTE contract expired at the snapshot and is left out)",
+        "Total call open interest across the expiries 1 or more days out (OCC's count "
+        "as of the previous close; a 0-DTE contract expired at the snapshot and is left out)",
         _NO_CHAIN, "chain", valid_range=(0, None), inputs=(_OI, _RIGHT, _EXPIRY),
     ),
     Feature(
         "put_oi", "int", "count",
-        "Total put open interest across the expiries 1 or more days out (end-of-day OCC "
-        "figure; a 0-DTE contract expired at the snapshot and is left out)",
+        "Total put open interest across the expiries 1 or more days out (OCC's count "
+        "as of the previous close; a 0-DTE contract expired at the snapshot and is left out)",
         _NO_CHAIN, "chain", valid_range=(0, None), inputs=(_OI, _RIGHT, _EXPIRY),
     ),
     Feature(
@@ -126,6 +127,7 @@ class ChainFlowParams:
 
 def flow_columns(options: pd.DataFrame, session: date, p: ChainFlowParams) -> pd.DataFrame:
     """The flow columns by ``underlying_id`` for every underlying in ``options``."""
+    options = one_row_per_contract(options)
     right = options["right"].astype(str).reset_index(drop=True)
     call, put = (right == "C").to_numpy(), (right == "P").to_numpy()
     volume = pd.to_numeric(options["volume"], errors="coerce").fillna(0).to_numpy(dtype=float)

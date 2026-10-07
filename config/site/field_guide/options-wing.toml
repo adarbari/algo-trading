@@ -413,7 +413,7 @@ reads = "The expected absolute move to the move expiry that the at-the-money str
 caveats = [
   "It prices the whole period to the move expiry, not a day. With rollup.implied_move@v1.move_basis EARNINGS it includes the report; with TERM it is a month of ordinary movement. Read move_basis and rollup.implied_move@v1.move_dte before comparing two names.",
   "The straddle also prices in the volatility premium, so options usually imply more than the stock then delivers. feature.implied_move_vs_hv is the comparison with recent realised movement.",
-  "Interpolated in strike to the closing price from stored end-of-day mids; a wide-spread chain is null (rollup.implied_move@v1.move_status), never guessed.",
+  "Interpolated in strike to the closing price from stored end-of-day mids; a wide-spread chain is null (rollup.implied_move@v1.move_status), never guessed. When only one of the two strikes around the price has usable quotes its straddle stands in, which is biased when the strikes are far apart relative to the move (a $20 stock with $2.50 strikes a week out).",
   "Null when the status is not OK.",
 ]
 sources = [
@@ -516,7 +516,7 @@ tolerance = 0.02
 [[field]]
 name = "feature.implied_move_vs_hv"
 theme = "put wing, walls and expiries"
-reads = "How much more the straddle prices than recent realised movement would: rollup.implied_move@v1.implied_move over HV20 scaled to the move expiry (hv20 x sqrt(days / 365)). 1 means the options price what the last 20 sessions delivered, 1.5 half again more, 0.7 less. Above 1.2 options are rich against realised, which favours selling premium; below 0.8 they are cheap."
+reads = "How much more the straddle prices than recent realised movement would: the one-standard-deviation implied move (feature.implied_move_1sd) over HV20 scaled to the move expiry (hv20 x sqrt(days / 365)), so 1 means the options price what the last 20 sessions delivered (implied volatility equal to HV20), 1.5 half again more, 0.7 less. Above 1.2 options are rich against realised, which favours selling premium; below 0.8 they are cheap."
 caveats = [
   "An EARNINGS expiry prices the report, which the last 20 sessions usually did not contain, so a ratio above 1 into earnings is expected; compare with the name's own history, or read rollup.implied_move@v1.move_basis first.",
   "HV20 after a shock (a gap, a takeover) overstates or understates what comes next. Check rollup.price_moves@v1.one_day_move.",

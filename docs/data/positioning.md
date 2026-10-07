@@ -447,9 +447,12 @@ Spot is the shared rule (`close`, else `price`). The group reads `earnings@v1`'s
 `next_earnings_date` and `earnings_time` for the session.
 
 Expression features (`config/site/features/positioning.toml`): `implied_move_1sd` =
-`implied_move x 1.2533` (`params.sd_factor`); `implied_move_vs_hv` = `implied_move /
-(price_stats.hv20 x sqrt(move_dte / 365))`, how much more the straddle prices than recent
-realised movement would (null when either is null or `hv20` is 0); and over `put_wing@v1`, the
+`implied_move x 1.2533` (`params.sd_factor`); `implied_move_vs_hv` =
+`implied_move x sd_factor / (price_stats.hv20 x sqrt(move_dte / 365))` (`sd_factor` 1.2533, as
+`implied_move_1sd`), how much more the straddle prices than recent realised movement would: a
+like-for-like volatility ratio, 1 when implied vol equals HV20 (the brief's `implied_move /
+(hv20 x sqrt(move_dte / 365))` compares an expected absolute move with a one-standard-deviation
+vol and reads about 0.8 at parity; null when either is null or `hv20` is 0); and over `put_wing@v1`, the
 short put's `put_otm_pct` = `(close - best_put_strike) / close`, `put_breakeven` =
 `best_put_strike - best_put_mid` and `put_roc_annualised` = `best_put_roc x 365 / target_dte`.
 

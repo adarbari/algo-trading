@@ -533,7 +533,7 @@ tolerance = 5
 
 # Option flow (chain_flow@v1, flow_history@v1; docs/data/positioning.md OP2): the session's option
 # volume and open interest by right, the unusual-activity columns and their history. Volume is the
-# day's trading, open interest the end-of-day count of contracts still open; neither says who is
+# day's trading, open interest the count of contracts still open as of the previous close; neither says who is
 # long, who is short or whether a trade opened or closed a position.
 
 [[field]]

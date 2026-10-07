@@ -95,6 +95,12 @@ def test_every_status_and_its_nulls() -> None:
     assert [nulls[c] for c in COUNTS] == [0, 0, 0, 0, 0, 0, 0]  # a chain, no activity: 0
 
 
+def test_a_contract_stored_twice_counts_once() -> None:
+    stale = [{**r, "volume": 7777.0, "ts": r["ts"] - timedelta(hours=1)} for r in CHAIN_A]
+    out = run([*stale, *CHAIN_A]).loc["EQ:A"]  # the later ts wins whatever the row order
+    assert out["call_volume"] == 1950 and out["unusual_contracts"] == 2
+
+
 def test_without_underlying_quotes_and_row_order() -> None:
     inputs = {cf.OPTIONS: pd.DataFrame(CHAIN_A[::-1]), cf.UNDERLYINGS: None}
     out = cf.compute(inputs, END, P).set_index("instrument_id")

@@ -8,7 +8,7 @@
 expr = "chain_flow.put_oi / chain_flow.call_oi"
 dtype = "float"
 unit = "ratio"
-description = "Put open interest over call open interest across the expiries 1 or more days out (chain_flow): above 1 is put-heavy, below 1 call-heavy; OI is the end-of-day count of open contracts, not who is long"
+description = "Put open interest over call open interest across the expiries 1 or more days out (chain_flow): above 1 is put-heavy, below 1 call-heavy; OI is the count of open contracts as of the previous close, not who is long"
 null_meaning = "no option chain for the session (chain_flow NO_CHAIN), or no call open interest"
 valid_range = [0, inf]
 version = 1
@@ -42,12 +42,13 @@ params = { sd_factor = 1.2533 }
 version = 1
 
 [implied_move_vs_hv]
-expr = "implied_move.implied_move / (price_stats.hv20 * sqrt(implied_move.move_dte / 365))"
+expr = "implied_move.implied_move * sd_factor / (price_stats.hv20 * sqrt(implied_move.move_dte / 365))"
 dtype = "float"
 unit = "ratio"
-description = "How much more the straddle prices than recent realised movement would: implied_move over HV20 scaled to the move expiry (hv20 x sqrt(move_dte / 365)); above 1 the options price more movement than the last 20 sessions delivered (an earnings expiry prices the report too)"
+description = "How much more the straddle prices than recent realised movement would: the one-standard-deviation implied move (implied_move x 1.2533, params.sd_factor) over HV20 scaled to the move expiry (hv20 x sqrt(move_dte / 365)), a like-for-like volatility ratio: 1 is implied vol equal to HV20; above 1 the options price more movement than the last 20 sessions delivered (an earnings expiry prices the report too)"
 null_meaning = "implied_move or hv20 is null (move_status is not OK, or a gap in the last 21 sessions), or hv20 is 0"
 valid_range = [0, inf]
+params = { sd_factor = 1.2533 }
 version = 1
 
 [put_otm_pct]

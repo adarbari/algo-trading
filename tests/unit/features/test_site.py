@@ -724,8 +724,13 @@ def test_implied_move_one_sd_and_against_realised_vol(fs: FeatureSet) -> None:
     ).set_index("instrument_id")
     assert out.loc["EQ:A", "implied_move_1sd"] == pytest.approx(0.0616 * 1.2533)
     assert out.loc["EQ:A", "implied_move_vs_hv"] == pytest.approx(
-        0.0616 / (0.40 * np.sqrt(30 / 365))
-    )  # HV20 scaled to the move expiry: the straddle prices 1.1 times what HV would
+        0.0616 * 1.2533 / (0.40 * np.sqrt(30 / 365))
+    )  # 1sd move over HV20 scaled to the move expiry: 1 is implied vol equal to HV20
+    parity = move.assign(implied_move=0.40 * np.sqrt(30 / 365) * np.sqrt(2 / np.pi))
+    same = fs.evaluate({IMPLIED_MOVE: parity, PRICE_STATS: stats}, ["implied_move_vs_hv"])
+    assert same.set_index("instrument_id").loc["EQ:A", "implied_move_vs_hv"] == pytest.approx(
+        1.0, abs=1e-4
+    )  # an expected absolute move from a 40% vol, against an HV20 of 40%: parity
     assert pd.isna(out.loc["EQ:NOHV", "implied_move_vs_hv"])  # no HV20
     assert out.loc["EQ:NOHV", "implied_move_1sd"] == pytest.approx(0.05 * 1.2533)
     assert pd.isna(out.loc["EQ:FLAT", "implied_move_vs_hv"])  # HV20 0: missing, no floor

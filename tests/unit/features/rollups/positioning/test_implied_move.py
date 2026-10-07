@@ -88,6 +88,17 @@ def test_one_usable_strike_is_its_straddle() -> None:
     assert set(out["move_status"]) == {"OK"}
 
 
+def test_a_leg_stored_twice_uses_its_latest_quote() -> None:
+    stale = [
+        {**r, "bid": 0.0, "ts": r["ts"] - timedelta(hours=1)}
+        for r in worked()  # one-sided
+    ]
+    for rows in ([*stale, *worked()], [*worked(), *stale]):  # staging order does not matter
+        out = run(rows, {"EQ:A": (101.0, 101.0)}).loc["EQ:A"]
+        assert out["move_status"] == "OK"
+        assert out["straddle_mid"] == pytest.approx(6.22, rel=1e-6)
+
+
 def test_every_status_and_its_nulls() -> None:
     rows = [
         *worked("EQ:OK"),

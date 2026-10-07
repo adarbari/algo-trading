@@ -64,3 +64,19 @@ def test_two_sided_mid_and_relative_spread() -> None:
     assert mid[0] == pytest.approx(1.1) and np.isnan(mid[1:]).all()
     spread = ci.relative_spread(bid, ask, mid)
     assert spread[0] == pytest.approx(0.2 / 1.1) and np.isnan(spread[1:]).all()
+
+
+def test_a_contract_stored_twice_keeps_its_latest_row() -> None:
+    rows = pd.DataFrame(
+        {
+            "instrument_id": ["OPT:A", "OPT:B", "OPT:A"],
+            "ts": pd.to_datetime(
+                ["2026-10-02 22:00", "2026-10-02 21:00", "2026-10-02 21:00"], utc=True
+            ),
+            "volume": [10.0, 5.0, 99.0],
+        }
+    )
+    out = ci.one_row_per_contract(rows)
+    assert out.set_index("instrument_id")["volume"].to_dict() == {"OPT:A": 10.0, "OPT:B": 5.0}
+    unique = rows.iloc[:2]
+    assert ci.one_row_per_contract(unique) is unique  # nothing repeats: untouched

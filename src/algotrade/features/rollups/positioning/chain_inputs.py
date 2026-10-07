@@ -6,6 +6,8 @@
   ``close`` is the spot that goes with them); NaN when neither is positive.
 - ``expiry_days`` / ``days_to``: an expiry column as calendar days (``datetime64[D]``) and the
   days from the session to each, without building a ``date`` per quote.
+- ``one_row_per_contract``: a contract stored twice keeps its latest row (by ``ts``), so a sum
+  over the chain never counts it twice and the result does not depend on staging order.
 - ``two_sided_mid``: the mid of a quote with ``bid > 0`` and ``ask > bid``, else NaN; the
   relative spread ``(ask - bid) / mid`` of the same quote.
 
@@ -25,6 +27,7 @@ __all__ = [
     "closing_spots",
     "days_to",
     "expiry_days",
+    "one_row_per_contract",
     "relative_spread",
     "two_sided_mid",
 ]
@@ -40,6 +43,15 @@ def closing_spots(underlyings: pd.DataFrame | None) -> pd.Series:
     price = pd.to_numeric(underlyings.get("price", nothing), errors="coerce")
     spot = close.where(close > 0, price.where(price > 0))
     return by_id(underlyings, spot.astype(float))
+
+
+def one_row_per_contract(options: pd.DataFrame) -> pd.DataFrame:
+    """``options`` with one row per ``instrument_id`` (the contract): the latest ``ts``, ties
+    to the later row. Unchanged (no copy) when no contract repeats."""
+    if not options["instrument_id"].duplicated().any():
+        return options
+    ordered = options.iloc[pd.to_datetime(options["ts"]).argsort(kind="stable").to_numpy()]
+    return ordered.drop_duplicates("instrument_id", keep="last").sort_index()
 
 
 def expiry_days(expiry: pd.Series) -> np.ndarray:
