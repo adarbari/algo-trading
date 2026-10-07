@@ -352,6 +352,35 @@ def check_macro_calendar(ctx: TaskContext, session: date) -> list[Check]:
     return [Check("macro_calendar_future", "PASS", detail)]
 
 
+FILINGS_TASK = "filings"  # the filings task's job name (tasks/events/filings.py)
+
+
+def check_filings(ctx: TaskContext, session: date) -> list[Check]:
+    """The ``filings`` step's acceptance: FAIL when over ``[quality] max_filings_failed``
+    of the CIKs the session's finished run asked SEC for failed (a CIK SEC has no filings for
+    is not a failure), or when scoped names exist and none has a CIK in the company details.
+    Nothing without a config store or a finished run of the session (a task that failed fails
+    its step itself); WARN when the run found no scoped name."""
+    if ctx.configs is None:
+        return []
+    done = [
+        r
+        for r in ctx.reader.runs(FILINGS_TASK)
+        if r.status in PUBLISHED and r.session_date == session
+    ]
+    if not done:
+        return []
+    stats = max(done, key=lambda r: (r.started_at, r.run_id)).stats
+    names, ciks, failed = (int(stats.get(k) or 0) for k in ("names", "ciks", "ciks_failed"))
+    if not names:
+        return [Check("filings_fetched", "WARN", "no scoped name resolved in the reference")]
+    if not ciks:
+        return [Check("filings_fetched", "FAIL", f"none of {names} scoped names has a CIK")]
+    share, limit = failed / ciks, ctx.settings.max_filings_failed
+    detail = f"SEC failed for {failed} of {ciks} CIKs ({share:.1%}; max {limit:.0%})"
+    return [Check("filings_fetched", "FAIL" if share > limit else "PASS", detail)]
+
+
 def _future_dates(
     reader: StoreReader, releases: list[MacroRelease], session: date
 ) -> dict[str, int]:

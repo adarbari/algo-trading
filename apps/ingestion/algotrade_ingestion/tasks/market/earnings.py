@@ -38,7 +38,12 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade.storage.tables.schemas import CARRIED_FROM, COMMON, KNOWN_FROM
+from algotrade.storage.tables.schemas import (
+    CARRIED_FROM,
+    COMMON,
+    EARNINGS_8K_SOURCE,
+    KNOWN_FROM,
+)
 from algotrade_ingestion.tasks.framework.run import FAILURES, IngestRun, TaskContext, status_label
 from algotrade_sources.framework.base import FetchRequest, Source
 
@@ -60,12 +65,21 @@ def with_known_from(rows: pd.DataFrame, session: date) -> pd.DataFrame:
 
 
 class _Previous:
-    """The latest snapshot stored before the run's session, read once: what was known then."""
+    """The latest snapshot stored before the run's session, read once: what was known then.
+    Not the 8-K results rows the ``filings`` task also stores in the partition: they keep their
+    own ``source`` and are never copied (a copy would be re-stamped as the calendar's)."""
 
     def __init__(self, run: IngestRun) -> None:
-        earlier = [d for d in run.reader.dates(TABLE) if d < run.session]
-        frame = run.reader.table(TABLE, max(earlier)) if earlier else None
-        self.rows = frame if frame is not None else pd.DataFrame(columns=["instrument_id", "ts"])
+        # The newest earlier partition with calendar rows: one whose earnings step failed and
+        # was waived holds only the 8-K rows, and carrying from it would carry nothing.
+        self.rows = pd.DataFrame(columns=["instrument_id", "ts"])
+        for day in sorted((d for d in run.reader.dates(TABLE) if d < run.session), reverse=True):
+            frame = run.reader.table(TABLE, day)
+            if frame is not None and "source" in frame.columns:
+                frame = frame[frame["source"] != EARNINGS_8K_SOURCE]
+            if frame is not None and len(frame):
+                self.rows = frame
+                break
         self.days = pd.to_datetime(self.rows["ts"], utc=True).dt.date
 
     def carried(

@@ -379,6 +379,15 @@ KNOWN_FROM = "known_from"
 # A calendar row copied forward over a day the fetch failed: the session of the snapshot that
 # fetched it (null on fetched rows), so a failed fetch never cancels knowledge (ADR 0050).
 CARRIED_FROM = "carried_from"
+# ``events/earnings`` rows come from two sources (``source``): the Nasdaq calendar (``ts`` the
+# report date at midnight UTC, ``time`` ``pre_market`` / ``after_hours`` / ``unknown``) and SEC
+# 8-K Item 2.02 results releases (``sec_8k``, ADR 0050: ``ts`` the ACCEPTANCE instant, ``time``
+# also ``intraday`` for an acceptance during the session, ``reported`` true). The merge key is
+# (``instrument_id``, ``ts``): the 8-K row's ``ts`` is the acceptance instant (an acceptance at
+# exactly midnight UTC, 20:00 EDT, is written one second later), so a Nasdaq row and an 8-K row
+# of the same day never share a key, and the per-quarter precedence between them belongs
+# to the rollup that reads them (``earnings@v1`` and its ADR 0050 successors), not to a writer.
+EARNINGS_8K_SOURCE = "sec_8k"  # the ``source`` of the 8-K Item 2.02 rows (tasks/events/filings.py)
 EARNINGS_EVENTS = TableSpec(
     "events/earnings",
     "event",
@@ -410,6 +419,31 @@ MACRO_RELEASE_EVENTS = _fixed(
     "time_et string!",
     "status string!",
     runs="merge",
+)
+# L1: the 8-K and 8-K/A filings of the scoped companies (ADR 0050), one row per instrument and
+# filing (a CIK's share classes each get the row). ``ts`` is SEC's acceptance instant in UTC;
+# ``filing_date`` is the date SEC files it under (an evening acceptance is dated the next
+# business day); ``items`` is SEC's comma list ("2.02,9.01", empty when none); ``report_date``
+# the date of the earliest event reported (null when SEC gives none). ``known_from`` is the
+# session of the acceptance time in America/New_York: an acceptance after the close is public
+# that evening, so it is that day's session. Runs rewrite the filings they read again, so they
+# merge on (``instrument_id``, ``accession``): a rerun is idempotent.
+FILING_EVENTS = _fixed(
+    "events/filing",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM, "cik", "form", "accession", "filing_date", "items"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "cik string!",
+    "form string!",
+    "accession string!",
+    "filing_date date!",
+    "items string!",
+    "report_date date",
+    "primary_document string",
+    runs="merge",
+    key=("instrument_id", "accession"),
 )
 MACRO_SERIES = _fixed(
     "macro/series",
@@ -527,6 +561,7 @@ KNOWN: dict[str, TableSpec] = {
         MACRO_SERIES,
         EARNINGS_EVENTS,
         MACRO_RELEASE_EVENTS,
+        FILING_EVENTS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

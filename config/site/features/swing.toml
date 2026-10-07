@@ -128,7 +128,7 @@ valid_range = [0, 1]
 version = 1
 
 # Distances to the channels, the pullback in ATRs, the 52-week position, breakout and
-# breakdown rules over trend_stats@v1, and the short put's cushion above support (TA track,
+# breakdown rules over trend_stats@v2, and the short put's cushion above support (TA track,
 # docs/data/technical.md).
 
 [dist_to_high_20d]
