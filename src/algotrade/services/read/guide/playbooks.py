@@ -8,14 +8,14 @@ resolve as a rule screen is left out (the screener read and the nightly report i
 Also each criterion's rule as text, ``op value mode tolerance`` in the rule grammar's own
 words (``docs/screeners/rules.md``): ``gte 50000000 soft tolerance relative 0.2``."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.config.strategy.schema import RULES_IMPL
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import NO_VALUE_OPS
-from algotrade.core.model.screen_spec import Criterion, ScreenSpec
+from algotrade.core.model.screen_spec import Criterion, Mode, ScreenSpec
 from algotrade.services.configs import resolve_config
 from algotrade.services.read.context import Stores
 from algotrade.services.read.screens.screeners import SCREENER
@@ -56,8 +56,12 @@ def _playbook(ctx: Stores, preset: str, family: str | None) -> SitePlaybook | No
     return SitePlaybook(preset, name, family, resolved.screen_spec)
 
 
+DEFAULT_ON_MISS = next(f.default for f in fields(Criterion) if f.name == "on_miss")
+
+
 def rule_text(criterion: Criterion) -> str:
-    """``criterion``'s rule in the grammar's words: ``op [value] mode [tolerance [relative] n]``."""
+    """``criterion``'s rule in the grammar's words: ``op [value] mode [tolerance [relative] n]
+    [on_miss X]`` (``on_miss`` only when a soft criterion's differs from the default WATCH)."""
     rule = criterion.rule
     words = [rule.op]
     if rule.op not in NO_VALUE_OPS:
@@ -70,6 +74,8 @@ def rule_text(criterion: Criterion) -> str:
             *(["relative"] if tolerance.relative else []),
             _value(tolerance.amount),
         ]
+    if criterion.mode is Mode.SOFT and criterion.on_miss != DEFAULT_ON_MISS:
+        words += ["on_miss", criterion.on_miss]
     return " ".join(words)
 
 

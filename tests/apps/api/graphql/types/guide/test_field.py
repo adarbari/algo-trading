@@ -35,7 +35,7 @@ def test_a_field_page_with_what_the_server_derives(graph: Graph) -> None:
     assert len(set(page["related"])) == len(page["related"])
     pullback = next(p for p in page["playbooks"] if p["id"] == "pullback")
     assert (pullback["name"], pullback["family"]) == ("Pullback", "trend")
-    assert pullback["rules"] == ["gte 50000000 soft tolerance relative 0.2"]
+    assert pullback["rules"] == ["gte 50000000 soft tolerance relative 0.2 on_miss LIQUIDITY_RISK"]
     assert page["playbooks"][0]["family"] == "trend"  # Guide order
 
 

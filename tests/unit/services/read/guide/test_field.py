@@ -10,6 +10,8 @@ from algotrade.services.read.guide.field import GuidePlaybookUse, load_guide_fie
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from tests.unit.services.read.guide.conftest import ADV, CLOSE, PULLBACK, REL_VOLUME
 
+LIQUIDITY_RULE = "gte 50000000 soft tolerance relative 0.2 on_miss LIQUIDITY_RISK"
+
 
 def test_related_fields_in_first_mention_order(ctx: StoreContext) -> None:
     page = load_guide_field(ctx, ADV)
@@ -33,8 +35,7 @@ def test_a_field_without_a_guide_entry_relates_only_its_inputs(ctx: StoreContext
 
 def test_playbooks_that_use_the_field(ctx: StoreContext) -> None:
     assert load_guide_field(ctx, ADV).playbooks == (
-        GuidePlaybookUse("alpha", "Alpha", "trend", ("gte 50000000 soft tolerance relative 0.2",),
-                         column=True, rank=False),
+        GuidePlaybookUse("alpha", "Alpha", "trend", (LIQUIDITY_RULE,), column=True, rank=False),
         GuidePlaybookUse("zeta", "Zeta", None, (), column=True, rank=False),
     )  # fmt: skip
     (alpha,) = load_guide_field(ctx, PULLBACK).playbooks
@@ -42,6 +43,9 @@ def test_playbooks_that_use_the_field(ctx: StoreContext) -> None:
         ("between [-0.5, 0.5] soft tolerance 0.25",), False, True,
     )  # fmt: skip
     assert load_guide_field(ctx, "rollup.momentum@v1.rsi_14").playbooks == ()
+    assert load_guide_field(ctx, REL_VOLUME).playbooks == (
+        GuidePlaybookUse("zeta", "Zeta", None, (), column=False, rank=False, flag=True),
+    )  # a field read only by a flag
 
 
 def test_situations_that_fool_the_field(ctx: StoreContext) -> None:

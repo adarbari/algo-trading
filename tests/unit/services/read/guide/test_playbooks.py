@@ -43,6 +43,8 @@ def test_a_preset_that_does_not_parse_is_left_out() -> None:
         ({"op": "eq", "value": True, "mode": "score"}, "eq true score"),
         ({"op": "not_null"}, "not_null hard"),
         ({"op": "gt", "value": 2.0, "mode": "soft", "tolerance": 1.0}, "gt 2 soft tolerance 1"),
+        ({"op": "gte", "value": 5, "mode": "soft", "tolerance": 1, "on_miss": "LIQUIDITY_RISK"},
+         "gte 5 soft tolerance 1 on_miss LIQUIDITY_RISK"),
     ],
 )  # fmt: skip
 def test_a_rule_reads_in_the_grammars_words(raw: dict[str, Any], text: str) -> None:

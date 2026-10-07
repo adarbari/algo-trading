@@ -86,7 +86,11 @@ DOCUMENTS: dict[tuple[str, str, str], Mapping[str, Any]] = {
     ),
     ("site", "screeners", "alpha@2"): ALPHA_V2,
     ("site", "screeners", "zeta@1"): preset(
-        "zeta", "Zeta", {"close": {"field": CLOSE, "op": "gt", "value": 5}}, columns={"adv": ADV}
+        "zeta",
+        "Zeta",
+        {"close": {"field": CLOSE, "op": "gt", "value": 5}},
+        columns={"adv": ADV},
+        flags={"thin": {"any": [{"field": REL_VOLUME, "op": "lt", "value": 0.5}]}},
     ),
     ("site", "screeners", "broken@1"): {
         "id": "broken",

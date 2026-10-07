@@ -422,7 +422,7 @@ type GuidePlaybook {
 }
 
 """
-A site preset that uses the field: `rules`, one per criterion on it as `op value mode tolerance`; `column`: a display column; `rank`: its tie-break
+A site preset that uses the field: `rules`, one per criterion on it as `op value mode tolerance`; `column`: a display column; `rank`: its tie-break; `flag`: a rule of one of its flags
 """
 type GuidePlaybookUse {
   id: String!
@@ -431,6 +431,7 @@ type GuidePlaybookUse {
   rules: [String!]!
   column: Boolean!
   rank: Boolean!
+  flag: Boolean!
 }
 
 """

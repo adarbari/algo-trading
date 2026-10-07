@@ -12,7 +12,8 @@ from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 
 @strawberry.type(
     description="A site preset that uses the field: `rules`, one per criterion on it as `op "
-    "value mode tolerance`; `column`: a display column; `rank`: its tie-break"
+    "value mode tolerance`; `column`: a display column; `rank`: its tie-break; `flag`: a rule "
+    "of one of its flags"
 )
 class GuidePlaybookUse:
     id: str
@@ -21,6 +22,7 @@ class GuidePlaybookUse:
     rules: list[str]
     column: bool
     rank: bool
+    flag: bool
 
     @classmethod
     def of(cls, d: field.GuidePlaybookUse) -> Self:
@@ -31,6 +33,7 @@ class GuidePlaybookUse:
             rules=list(d.rules),
             column=d.column,
             rank=d.rank,
+            flag=d.flag,
         )
 
 

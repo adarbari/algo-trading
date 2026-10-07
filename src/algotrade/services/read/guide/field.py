@@ -32,7 +32,8 @@ _TOKEN = re.compile(r"[A-Za-z0-9_@.]+")
 @dataclass(frozen=True)
 class GuidePlaybookUse:
     """A site preset that uses the field: ``rules`` (one per criterion on the field, as
-    ``op value mode tolerance``), ``column`` (a display column), ``rank`` (its tie-break)."""
+    ``op value mode tolerance``), ``column`` (a display column), ``rank`` (its tie-break),
+    ``flag`` (a rule of one of its flags)."""
 
     id: str
     name: str
@@ -40,6 +41,7 @@ class GuidePlaybookUse:
     rules: tuple[str, ...]
     column: bool
     rank: bool
+    flag: bool = False
 
 
 @dataclass(frozen=True)
@@ -103,6 +105,7 @@ def _use(playbook: SitePlaybook, name: str) -> GuidePlaybookUse | None:
     rules = tuple(rule_text(c) for c in spec.criteria if c.field == name)
     column = any(field == name for _, field in spec.columns)
     rank = spec.tie_break == name
-    if not (rules or column or rank):
+    flag = any(r.field == name for _, group in spec.flags for r in group.rules())
+    if not (rules or column or rank or flag):
         return None
-    return GuidePlaybookUse(playbook.id, playbook.name, playbook.family, rules, column, rank)
+    return GuidePlaybookUse(playbook.id, playbook.name, playbook.family, rules, column, rank, flag)
