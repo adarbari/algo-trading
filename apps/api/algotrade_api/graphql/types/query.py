@@ -16,6 +16,8 @@ import strawberry
 from anyio import to_thread
 from strawberry.types import Info
 
+from algotrade.services.read.events import event_calendar
+from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
@@ -24,9 +26,10 @@ from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext
-from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.limits import MAX_DAYS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
+from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.instruments.distribution import FeatureDistribution
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -124,6 +127,32 @@ class Query:
             else None
         )
         return FeatureTable.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The events ahead of a set of names over the next `days` calendar days, "
+        "one entry per day (ADR 0050): the names `instrumentIds` give (a screen's results, a "
+        "list) plus, with `scope`, the site's scope list config/site/events/scope.toml only (no "
+        "tier A / B names); the names' own and reference "
+        "earnings on their rows, macro releases and market-structure days once. Null: nothing "
+        "stored",
+        extensions=[MaxItems("instrument_ids", MAX_PAGE), MaxItems("days", MAX_DAYS)],
+    )
+    async def event_calendar(
+        self,
+        info: Ctx,
+        instrument_ids: list[str],
+        scope: bool = False,
+        days: int = DEFAULT_DAYS,
+        date: Day = None,
+    ) -> EventCalendar | None:
+        ctx = info.context.read(date)
+        load = event_calendar.load_event_calendar  # off the event loop: one read per source
+        found = (
+            await to_thread.run_sync(load, ctx, instrument_ids, days, scope)
+            if ctx is not None
+            else None
+        )
+        return EventCalendar.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The tickers the user's screeners picked in the session, ranked by their "

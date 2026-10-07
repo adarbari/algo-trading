@@ -1,0 +1,72 @@
+/*
+ * EventChip: a small tinted tag per event kind. Own earnings take the accent, the reference
+ * name's earnings the info tint, a macro release the warning tint, a market-structure day the
+ * neutral tint, a filing the neutral tint on a dashed border. The glyph (shape, hollow or
+ * solid) repeats the kind so colour is never the only key.
+ */
+.chip {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1);
+  align-items: center;
+  max-width: 100%;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: var(--space-1-5);
+  border: var(--border-width-thin) solid var(--color-neutral-border);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
+}
+
+.chip[data-kind='own_earnings'] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.chip[data-kind='reference_earnings'] {
+  border-color: var(--color-info-border);
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.chip[data-kind='macro_release'] {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.chip[data-kind='filing'] {
+  border-style: dashed;
+}
+
+.chip[data-interactive] {
+  cursor: default;
+}
+
+.glyph {
+  flex: none;
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+}
+
+.glyph [data-fill='solid'] {
+  fill: currentcolor;
+}
+
+.glyph [data-fill='hollow'] {
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: var(--border-width-thin);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,98 @@
+/*
+ * CalendarGrid: a bordered table in a horizontal scroller. The first column is sticky, so a
+ * long axis scrolls under the names or days. A ruled day (an expiry Friday) carries an accent
+ * line on its leading edge across the grid: the top edge of its row (days down) or the start
+ * edge of its column (days across). Chips wrap in their cell.
+ */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  font-family: var(--font-sans);
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.pager > :first-child {
+  margin-inline-end: auto;
+}
+
+.scroller {
+  overflow: auto;
+  max-width: 100%;
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.corner {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: var(--z-sticky);
+  background: var(--color-surface);
+}
+
+.head,
+.side,
+.cell {
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+  border-block-end: var(--border-width-thin) solid var(--color-border-soft);
+  border-inline-end: var(--border-width-thin) solid var(--color-border-soft);
+  font-weight: var(--font-weight-regular);
+  text-align: start;
+  vertical-align: top;
+}
+
+.head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  background: var(--color-surface);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.side {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: var(--z-sticky);
+  min-width: calc(var(--space-10) * 2);
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+
+.head > *,
+.side > * {
+  display: block;
+}
+
+.cell {
+  min-width: calc(var(--space-10) * 3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.table[data-orientation='days-down'] [data-ruled] {
+  border-block-start: var(--space-0-5) solid var(--color-accent-border);
+}
+
+.table[data-orientation='days-across'] [data-ruled] {
+  border-inline-start: var(--space-0-5) solid var(--color-accent-border);
+}

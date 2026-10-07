@@ -156,3 +156,295 @@ for = "no funds (a company screen)"
 op = "eq"
 value = false
 mode = "hard"
+
+# Relative strength (relative_strength@v1 and the price.toml flags over it): the instrument
+# against the market (SPY), the universe's stocks and its sector ETF. Filed under this theme
+# because the "momentum and trend" page is at its length cap.
+
+[[field]]
+name = "rollup.relative_strength@v1.rs_spy_63d"
+theme = "instrument gates"
+reads = "Relative strength against SPY over a quarter (63 sessions): (1 + the name's return) / (1 + SPY's return) - 1. 0 is level with the market, 0.10 is ten points ahead of it, -0.10 ten points behind; the value is a ratio of growth factors, so it is the same whatever the market did (a name up 5% in a market down 5% reads +0.105). Above 0 for the last quarter is the usual meaning of 'outperforming SPY' (O'Neil, Mansfield: buy leaders, not laggards)."
+caveats = [
+  "A name that rose on one gap (a takeover bid, an earnings jump) reads as a leader for the whole quarter. Check rollup.price_moves@v1.one_day_move and rollup.relative_strength@v1.rs_spy_trend_20d: a leader whose trend is falling has stopped leading.",
+  "Against SPY every name in a rotating market looks strong or weak by its sector. Pair with rollup.relative_strength@v1.rs_sector_63d to separate stock strength from sector strength.",
+  "Price return only (no dividends), split-adjusted: a high-yield name trails its total return by its yield.",
+  "Null when the name or SPY has a gap in the 64 closes, or SPY is not in the symbol map; a hard criterion then rejects the name.",
+]
+sources = [
+  "O'Neil (1988), How to Make Money in Stocks: relative price strength",
+  "Levy (1967), Relative strength as a criterion for investment selection, Journal of Finance",
+  "Mansfield relative strength: https://www.investopedia.com/terms/r/relativestrength.asp",
+]
+[[field.use]]
+for = "outperforming SPY over the quarter"
+op = "gt"
+value = 0.0
+mode = "soft"
+tolerance = 0.02
+note = "feature.rs_spy_positive is the same gate as a flag; add rollup.relative_strength@v1.rs_spy_trend_20d gt 0 to want it improving"
+[[field.use]]
+for = "a clear market leader"
+op = "gte"
+value = 0.10
+mode = "soft"
+tolerance = 0.03
+note = "ten points ahead of SPY; with rollup.relative_strength@v1.mom_pctile_63d gte 0.8 so the lead is also a top-quintile return"
+
+[[field]]
+name = "rollup.relative_strength@v1.rs_spy_252d"
+theme = "instrument gates"
+reads = "Relative strength against SPY over a year (252 sessions): (1 + the name's return) / (1 + SPY's return) - 1. The long-run leadership reading: above 0 the name has beaten the market over the year, 0.30 is thirty points ahead. It moves slowly; a quarter that turned (rs_spy_63d) takes months to show here."
+caveats = [
+  "A year back is one start date: a name that fell hard 252 sessions ago and recovered reads a big positive value that says 'bounce', not 'leader'. Check rollup.trend_stats@v2.mom_12_1 (skips the last month) and rollup.relative_strength@v1.rs_spy_63d.",
+  "A recent listing or a gap in the year gives null, never a shorter window: a young name is invisible to a hard criterion on this field.",
+  "Price return only (no dividends).",
+]
+sources = [
+  "O'Neil (1988), How to Make Money in Stocks: the 12-month relative price strength rank",
+  "Jegadeesh and Titman (1993), Returns to buying winners and selling losers, Journal of Finance",
+]
+[[field.use]]
+for = "a year-long market leader"
+op = "gt"
+value = 0.0
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.relative_strength@v1.rs_spy_63d gt 0 so the leadership is current, not a year-old move"
+
+[[field]]
+name = "rollup.relative_strength@v1.rs_line_high_252d"
+theme = "instrument gates"
+reads = "True when the relative-strength line (the close divided by SPY's close) stands at its highest of the last 252 sessions, today included: the name is outperforming at a new high, even if its own price is not yet at one. A rising line into a breakout is the classic leader tell (O'Neil's 'blue dot'); False means the line peaked earlier in the year."
+caveats = [
+  "A flat line while SPY and the name rise together can still tie its own high on a day the market dips; one day proves little. Check rollup.relative_strength@v1.rs_spy_trend_20d for whether the line has been climbing.",
+  "It looks back one year only: a name that peaked relative to the market 14 months ago can print True after a long sag. Check rollup.relative_strength@v1.rs_spy_252d.",
+  "Null when the name or SPY has a gap in the last 252 sessions, or SPY is not in the symbol map.",
+]
+sources = [
+  "O'Neil (1988), How to Make Money in Stocks: the relative strength line at a new high",
+]
+[[field.use]]
+for = "the RS line at a new high"
+op = "eq"
+value = true
+mode = "hard"
+note = "a score input more than a gate: combine with feature.breakout_20d for a leader breaking out"
+
+[[field]]
+name = "rollup.relative_strength@v1.rs_spy_trend_20d"
+theme = "instrument gates"
+reads = "How relative strength against SPY changed over the last 20 sessions: rs_spy_63d today minus rs_spy_63d a month ago. Above 0 relative strength is improving (the name is gaining on the market), below 0 deteriorating; 0.03 means three points better than a month ago. It is the 'RS improving' of a screen, a change rather than a level."
+caveats = [
+  "A name that was far behind and merely stopped falling reads positive while still lagging. Pair with rollup.relative_strength@v1.rs_spy_63d gt 0 for improving and ahead.",
+  "The two 63-session windows overlap by 43 sessions, so the change comes from the 20 newest and the 20 oldest sessions: read it as a month's drift, not a day's move.",
+  "Null when either 63-session window has a gap (SPY's included): 84 closes must be whole.",
+]
+sources = [
+  "Relative-strength momentum of the line's slope, a standard charting reading: https://school.stockcharts.com/doku.php?id=technical_indicators:price_relative",
+]
+[[field.use]]
+for = "relative strength improving"
+op = "gt"
+value = 0.0
+mode = "soft"
+tolerance = 0.02
+note = "feature.rs_improving is the same gate as a flag; pair with rollup.relative_strength@v1.rs_spy_63d gt 0 to exclude laggards that merely stopped falling"
+
+[[field]]
+name = "rollup.relative_strength@v1.ret_5d_pctile"
+theme = "instrument gates"
+reads = "Where the 5-session return ranks among the universe's stocks: the share of universe members (the stocks of the snapshot the session sees) whose return is strictly below the name's, among members with a known return. 0.9 means the name beat 90% of stocks this week, 0.1 only 10%. It is a rank, so it is comparable across market regimes; the best member reads just under 1."
+caveats = [
+  "A week is noisy: a top-decile week is as often a spike that mean-reverts as a start. Pair with rollup.relative_strength@v1.mom_pctile_63d gte 0.7 for a name that is strong over the quarter too.",
+  "ETFs are ranked against stocks but never count as members, so an ETF's rank says how it would sit among stocks.",
+  "Null with no universe snapshot on or before the session, fewer than 90% of its members with a bar on the session (min_coverage), fewer than 200 members with a known return (min_members), or a gap in the name's own 6 closes.",
+]
+sources = [
+  "Cross-sectional momentum ranks: Jegadeesh and Titman (1993), Journal of Finance",
+]
+[[field.use]]
+for = "a top-quintile week"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.relative_strength@v1.mom_pctile_63d gte 0.7; alone it finds one-week spikes"
+
+[[field]]
+name = "rollup.relative_strength@v1.mom_pctile_63d"
+theme = "instrument gates"
+reads = "Where the 63-session (a quarter) return ranks among the universe's stocks: the share of universe members whose return is strictly below the name's, among members with a known return. 0.9 is the top decile of the quarter, 0.5 the median stock, 0.1 the bottom decile. 'Top decile momentum' is this at or above 0.9."
+caveats = [
+  "Ties share the lower rank, and the best member reads just under 1 (n - 1 of n are below it): gte 0.9 is a top decile, not 'above 90% of everything'.",
+  "A rank hides magnitude: in a flat market the top decile may have gained 5%. Read rollup.price_stats@v2.ret_60d for the size.",
+  "Top-decile quarterly winners are the most extended names: add feature.stretch_sma50_atr lte 4 to avoid chasing.",
+  "Null with no universe snapshot on or before the session, fewer than 90% of its members with a bar on the session (min_coverage), fewer than 200 members with a known return (min_members), or a gap in the name's own 64 closes.",
+]
+sources = [
+  "Jegadeesh and Titman (1993), Returns to buying winners and selling losers, Journal of Finance",
+  "O'Neil (1988), How to Make Money in Stocks: relative price strength rank (top 20%)",
+]
+[[field.use]]
+for = "top decile momentum"
+op = "gte"
+value = 0.9
+mode = "soft"
+tolerance = 0.05
+note = "with feature.pct_vs_sma_200 gt 0 so a bounce in a downtrend does not qualify"
+[[field.use]]
+for = "a top-quintile quarter"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+
+[[field]]
+name = "rollup.relative_strength@v1.mom_pctile_252d"
+theme = "instrument gates"
+reads = "Where the 252-session (a year) return ranks among the universe's stocks: the share of universe members whose return is strictly below the name's, among members with a known return. 0.9 is the top decile of the year, 0.5 the median. The classic momentum rank; it includes the last month, which mom_12_1 skips."
+caveats = [
+  "It includes the most recent month, where short-term reversal works against it: a name at 0.95 after a spike this month may pull back. Check rollup.trend_stats@v2.mom_12_1 and rollup.relative_strength@v1.ret_5d_pctile.",
+  "A rank over a year favours names that are already extended; add feature.pct_vs_sma_50 lte 0.2 when you do not want to chase.",
+  "Null with no universe snapshot on or before the session, fewer than 90% of its members with a bar on the session (min_coverage), fewer than 200 members with a known return (min_members), or a gap in the name's own 253 closes (a recent listing).",
+]
+sources = [
+  "Jegadeesh and Titman (1993), Returns to buying winners and selling losers, Journal of Finance",
+  "Fama and French (2012), Size, value and momentum in international stock returns",
+]
+[[field.use]]
+for = "top decile momentum over the year"
+op = "gte"
+value = 0.9
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.relative_strength@v1.mom_pctile_63d gte 0.7 so the year's leadership is still running"
+
+[[field]]
+name = "rollup.relative_strength@v1.sector_etf"
+theme = "instrument gates"
+reads = "The ticker of the sector ETF the name's sector maps to: Technology XLK, Health Care XLV, Financials XLF, Consumer Discretionary XLY, Consumer Staples XLP, Energy XLE, Industrials XLI, Materials XLB, Utilities XLU, Real Estate XLRE, Communication Services XLC. The sector is a coarse market sector derived from the SEC SIC code, not a GICS sector; it names the benchmark that sector_ret_63d, rs_sector_63d and sector_rank_63d compare against."
+caveats = [
+  "The SIC code is the company's old filing category: a name that is now a software business filed under an industrial code reads Industrials. Treat the sector as a first approximation and check instrument.name or the SEC description for a name that matters.",
+  "ETFs and funds listed as such in the universe have no sector here (null), so a sector screen drops them; gate on instrument.security_type for stocks anyway.",
+  "Null when the company snapshot on or before the session has no sector for the name, or the sector has no ETF.",
+]
+sources = [
+  "SPDR Select Sector ETFs: https://www.sectorspdrs.com",
+  "SEC SIC code list: https://www.sec.gov/search-filings/standard-industrial-classification-sic-code-list",
+]
+[[field.use]]
+for = "technology names"
+op = "eq"
+value = "XLK"
+mode = "hard"
+note = "a sector filter; with rollup.relative_strength@v1.sector_rank_63d lte 3 for names in a leading sector"
+
+[[field]]
+name = "rollup.relative_strength@v1.sector_ret_63d"
+theme = "instrument gates"
+reads = "The 63-session (a quarter) return of the name's sector ETF: how the sector has done. 0.08 is a sector up 8% in a quarter, below 0 a sector in decline. It is the benchmark for rs_sector_63d and the number the sector rank orders."
+caveats = [
+  "An ETF's price return leaves out dividends, which matter for Utilities and Real Estate: their sector return runs about a point per quarter below total return.",
+  "A sector can rise because three mega-caps carry it (XLK, XLC): a strong sector return is not breadth. Check feature.sector_leader and the name's own rollup.relative_strength@v1.rs_sector_63d.",
+  "Null when sector_etf is null, or the ETF is not in the symbol map or has a gap in its 64 closes.",
+]
+sources = [
+  "SPDR Select Sector ETFs: https://www.sectorspdrs.com",
+]
+[[field.use]]
+for = "a rising sector"
+op = "gt"
+value = 0.0
+mode = "soft"
+tolerance = 0.02
+note = "with rollup.relative_strength@v1.sector_rank_63d lte 5 so the sector is also above the middle of the eleven"
+
+[[field]]
+name = "rollup.relative_strength@v1.rs_sector_63d"
+theme = "instrument gates"
+reads = "Relative strength against the name's own sector ETF over a quarter: (1 + the name's return) / (1 + the ETF's return) - 1. Above 0 the name beat its sector, 0.10 ten points ahead; it separates stock strength from sector strength (a name up 20% in a sector up 20% reads 0)."
+caveats = [
+  "The sector benchmark is the SIC heuristic's: a name classified into the wrong sector is measured against the wrong ETF. Check rollup.relative_strength@v1.sector_etf.",
+  "A heavyweight is a large part of its own sector ETF, so its relative strength against it is damped toward 0.",
+  "Null when sector_ret_63d is null or the name's own 64 closes have a gap.",
+]
+sources = [
+  "Levy (1967), Relative strength as a criterion for investment selection, Journal of Finance",
+]
+[[field.use]]
+for = "beating its sector"
+op = "gt"
+value = 0.0
+mode = "soft"
+tolerance = 0.02
+note = "with rollup.relative_strength@v1.rs_spy_63d gt 0 for a name that leads both its sector and the market"
+
+[[field]]
+name = "rollup.relative_strength@v1.sector_rank_63d"
+theme = "instrument gates"
+reads = "The rank of the name's sector ETF among the eleven sector ETFs by 63-session return: 1 the strongest sector of the quarter, 11 the weakest, ties sharing the better rank. 1 to 3 is a leading sector, 9 to 11 a lagging one; it is the same number for every name of a sector."
+caveats = [
+  "A rank hides the gap: first and second can be a point apart, or ten. Check rollup.relative_strength@v1.sector_ret_63d for the size.",
+  "Eleven sectors hold thousands of names: the top three sectors pass many of them, so 'sector leader' is not a scarce filter. Add rollup.relative_strength@v1.mom_pctile_63d gte 0.8 for the leader within it.",
+  "Null when sector_ret_63d is null, or fewer than 6 of the 11 ETFs have a complete window (min_sector_etfs).",
+]
+sources = [
+  "Sector rotation by relative strength: https://school.stockcharts.com/doku.php?id=market_analysis:sector_rotation_analysis",
+]
+[[field.use]]
+for = "a name in a leading sector"
+op = "lte"
+value = 3
+mode = "soft"
+tolerance = 1
+note = "feature.sector_leader is the same gate as a flag; with rollup.relative_strength@v1.rs_sector_63d gt 0 for a leader within it"
+
+[[field]]
+name = "feature.rs_spy_positive"
+theme = "instrument gates"
+reads = "True when the name beat SPY over the last 63 sessions (rs_spy_63d above 0), False when it matched or lagged it. The flag form of 'outperforming SPY' for a quarter; the size of the lead is rollup.relative_strength@v1.rs_spy_63d."
+caveats = [
+  "A flag hides how far ahead: 0.1 points ahead and 30 points ahead are both True. Check rollup.relative_strength@v1.rs_spy_63d for a minimum lead.",
+  "Null when rs_spy_63d is null (a gap in the quarter, or SPY not in the symbol map); a hard criterion then rejects the name.",
+]
+sources = ["Levy (1967), Relative strength as a criterion for investment selection, Journal of Finance"]
+[[field.use]]
+for = "outperforming SPY over the quarter"
+op = "eq"
+value = true
+mode = "hard"
+note = "with feature.rs_improving eq true for relative strength that is still rising"
+
+[[field]]
+name = "feature.rs_improving"
+theme = "instrument gates"
+reads = "True when relative strength against SPY is improving: rs_spy_trend_20d above 0, i.e. the 63-session relative strength is higher than it was 20 sessions ago. The flag form of 'RS improving'; it says nothing about the level."
+caveats = [
+  "A laggard that stopped falling reads True while still behind the market. Pair with feature.rs_spy_positive eq true for improving and ahead.",
+  "Null when rs_spy_trend_20d is null (a gap in either 63-session window, or SPY not in the symbol map).",
+]
+sources = ["Relative-strength line slope: https://school.stockcharts.com/doku.php?id=technical_indicators:price_relative"]
+[[field.use]]
+for = "relative strength improving"
+op = "eq"
+value = true
+mode = "soft"
+tolerance = 0
+note = "with feature.rs_spy_positive eq true so a recovering laggard does not qualify"
+
+[[field]]
+name = "feature.sector_leader"
+theme = "instrument gates"
+reads = "True when the name's sector is one of the three strongest of the eleven sector ETFs over 63 sessions (sector_rank_63d at most 3), False for any other sector. The flag form of 'strong sector'; the rank and the return are rollup.relative_strength@v1.sector_rank_63d and rollup.relative_strength@v1.sector_ret_63d."
+caveats = [
+  "It describes the sector, not the name: a laggard in a leading sector is True. Add rollup.relative_strength@v1.rs_sector_63d gt 0 for a name that is itself leading.",
+  "Null when sector_rank_63d is null (no sector or ETF for the name, the ETF has no complete window, or fewer than 6 ETFs do).",
+]
+sources = ["Sector rotation by relative strength: https://school.stockcharts.com/doku.php?id=market_analysis:sector_rotation_analysis"]
+[[field.use]]
+for = "a name in a strong sector"
+op = "eq"
+value = true
+mode = "hard"
+note = "with rollup.relative_strength@v1.rs_sector_63d gt 0 for a leader within it"

@@ -224,7 +224,9 @@ Every import is a run, so the history of the dossier is kept and the UI shows "r
    a year".
 3. **Expiry ladder**: the listed expiries from 7 to 90 DTE (weeklies where listed, monthlies
    always) as rows, each showing the events it spans and the summed expected multiple; the
-   first expiry that clears the next own-earnings and the next high-multiple event is marked.
+   last clear expiry is marked: the longest expiry that still spans no own-earnings,
+   reference-earnings or macro event (market-structure days ignored); none is marked when no
+   expiry is clear.
    The chain data gives the listed expiries (`chains/status`, `nearest_expiry@v1`).
 
 ### 5.2 The price chart: event markers

@@ -226,9 +226,29 @@ Source: `design-system/components/Button`
 | `id` | `string` | no |  |
 | `children` | `ReactNode` | yes |  |
 
+### CalendarGrid
+
+CalendarGrid: the cross-name event calendar. Days on one axis, names (tickers) on the other, an EventChip in each cell that has events (hover or focus: label, time, source, known-from). Days run down the rows with the names as columns; when the grid's own width is under the medium breakpoint (a phone) the axes flip, days across and names down, so the grid scrolls the long axis instead of squeezing the names (`orientation` forces either). Days in `ruledDays` (the expiry Fridays) carry a rule across the grid and the rule's name in the day header. Beyond `pageSize` names (default 30) the names are paged, with Previous / Next and a "Names 1-30 of 64" line. A real table (caption = `label`, row and column headers). Loading, empty and error states.
+
+Source: `design-system/components/CalendarGrid`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What the grid shows ("Events, next 90 days: scope list"): the table caption. |
+| `days` | `readonly CalendarDay[]` | yes | The days, oldest first, each with its events. |
+| `names` | `readonly CalendarName[]` | no | The names (columns, or rows when flipped), in order; default the distinct names in the events. |
+| `ruledDays` | `readonly string[]` | no | Days that carry a rule across the grid (the expiry Fridays), ISO. |
+| `ruleLabel` | `string` | no | What a ruled day is called in its header ("Expiry"). |
+| `orientation` | `'auto' \| 'days-down' \| 'days-across'` | no | `auto` (default): days down, flipping to days across under the medium breakpoint; or force one. |
+| `pageSize` | `number` | no | Names per page (default 30). |
+| `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` or `error`. |
+| `errorMessage` | `ReactNode` | no |  |
+| `onRetry` | `() => void` | no |  |
+| `emptyMessage` | `ReactNode` | no | Shown when no day has an event. |
+
 ### Chart
 
-Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings) with a shape and letter each plus a key; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; optional horizontal reference lines (a threshold, a target) with an end label, also listed for assistive technology; optional lanes (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
+Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings, filings, macro releases) with a shape and letter each plus a key, and the marker's text in the crosshair read-out and the table; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; optional horizontal reference lines (a threshold, a target) with an end label, also listed for assistive technology; optional lanes (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
 
 Source: `design-system/components/Chart`
 
@@ -239,7 +259,7 @@ Source: `design-system/components/Chart`
 | `type` | `'line' \| 'area'` | no | `line` (default) or `area` (a single series only; flat tint, never a gradient). |
 | `range` | `ChartRange` | no | The time window, counted back from the latest point: 3M, 1Y, 2Y or All (default). |
 | `rebase` | `boolean` | no | Show each series as 100 x value / first value in the window (compare performance). |
-| `events` | `readonly ChartEvent[]` | no | Ex-dividend, split and earnings markers on the first series. |
+| `events` | `readonly ChartEvent[]` | no | Dated markers on the first series: ex-dividend, split, earnings, filing and macro release, each `{ time, kind, detail? }`: a shape and letter per kind, `detail` in the crosshair read-out and the table ("8-K 2.02 results", "CPI 08:30"). |
 | `bands` | `readonly ChartBand[]` | no | Shaded spans of days behind the series, in the price pane: a start and end day, a status tone and a label. Their labels are listed for screen readers and keyed under the chart. |
 | `referenceLines` | `readonly ChartReferenceLine[]` | no | Horizontal lines on the price pane at a value, each with its label at the right end: `{ y, label?, tone?, dash? }` (default `neutral`, solid). Kept inside the price range. |
 | `lanes` | `readonly ChartLane[]` | no | Thin strips under the price pane, one row per lane: `{ id, label, segments: { start, end, tone, label? }[] }`, drawn on the chart's own time scale. A segment's label is in the crosshair read-out, the key and a text list for screen readers. |
@@ -456,6 +476,51 @@ Source: `design-system/components/ErrorState`
 | `onRetry` | `() => void` | no | Adds a Retry button. |
 | `retrying` | `boolean` | no | The retry is in flight: the button shows a spinner and ignores clicks. |
 | `compact` | `boolean` | no | Less padding, left-aligned: inside tables and small panels. |
+
+### EventChip
+
+EventChip: an event's kind as a colour and a shape plus its short label ("Earnings", "NVDA earnings", "CPI", "FOMC", "Opex", "2.02 results"). The kind is never colour alone: each kind has its own glyph (a triangle for earnings, hollow for the reference name's; a circle for a macro release; a square for a market-structure day; a down triangle on a dashed border for a filing) and a screen-reader prefix naming it. Colours are the existing tokens (accent, info, warning, neutral). With `event` the chip is focusable and its tooltip (hover and keyboard focus) gives the label, time, source and the day the event became known; without it the chip is static text. Not a filter: that is Chip.
+
+Source: `design-system/components/EventChip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `kind` | `EventKind` | yes | What kind of event: sets the colour, the glyph and the screen-reader prefix. |
+| `label` | `string` | yes | The short text ("CPI", "Earnings", "2.02 results"). |
+| `event` | `EventItem` | no | The full event: makes the chip focusable with a details tooltip (label, time, source, known-from). |
+
+### EventTimeline
+
+EventTimeline: dated events over a window (the next 90 days; the trailing 24 months of filings). A horizontal axis with a mark per event day and a tick per month start shows where they fall; under it the days with events are listed oldest first, each with its date and one EventChip per event (hover or focus: label, time, source, known-from). `dense` collapses each day to a count whose tooltip lists the day's events, for a long window or a narrow panel. Days wrap, so it works at phone width. The list is the accessible content (an ordered list named by `label`); the axis is decoration. Loading, empty and error states.
+
+Source: `design-system/components/EventTimeline`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What the timeline shows ("NVDA events, next 90 days"): the list's accessible name. |
+| `events` | `readonly EventItem[]` | yes | The events (any order); those outside the window are not drawn. |
+| `start` | `string` | yes | First day of the window, ISO. |
+| `end` | `string` | yes | Last day of the window, ISO (inclusive). |
+| `dense` | `boolean` | no | Collapse each day to a count (its tooltip lists the events). Default false. |
+| `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` or `error`. |
+| `errorMessage` | `ReactNode` | no |  |
+| `onRetry` | `() => void` | no |  |
+| `emptyMessage` | `ReactNode` | no | Shown when no event falls in the window. |
+
+### ExpiryLadder
+
+ExpiryLadder: the listed option expiries from near to far, one row each: the expiry date, its days to expiry, and the events the expiry spans (an event on or before the expiry date, after the close included) as EventChips with their days, or a "Clear" badge when it spans none. The first clear row is marked ("First clear", an accent rule) so the first expiry that holds no event is easy to find. The rows, the flags and the mark come from the caller (the API decides what a row spans); the ladder draws them. A real table (caption = `label`), so it reads row by row with a screen reader and wraps at phone width. Loading, empty and error states.
+
+Source: `design-system/components/ExpiryLadder`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What the ladder is ("NVDA expiries, 7 to 90 days"): the table caption. |
+| `rows` | `readonly ExpiryRow[]` | yes | The expiries, nearest first. |
+| `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` or `error`. |
+| `errorMessage` | `ReactNode` | no |  |
+| `onRetry` | `() => void` | no |  |
+| `emptyMessage` | `ReactNode` | no | Shown when there are no expiries. |
 
 ### ExternalLink
 

@@ -1,7 +1,7 @@
 /**
  * The chart's key: one line swatch per series (Legend) and, when events are drawn, one marker
  * glyph per event kind with its letter and name, the same shapes the canvas draws (circle,
- * square, arrow), so neither series nor events rely on colour alone; and, with `bandKey`, one
+ * square, up and down arrows), so neither series nor events rely on colour alone; and, with `bandKey`, one
  * tinted cell per distinct shaded band (hatched ones with a hatch swatch), and one per distinct
  * lane segment label (tone and label).
  */
@@ -17,9 +17,10 @@ import styles from './Chart.module.css';
 function Glyph({ kind }: { kind: ChartEventKind }) {
   return (
     <svg className={styles.glyph} viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-      {kind === 'dividend' && <circle cx="6" cy="6" r="4" />}
+      {(kind === 'dividend' || kind === 'macro') && <circle cx="6" cy="6" r="4" />}
       {kind === 'split' && <rect x="2" y="2" width="8" height="8" />}
       {kind === 'earnings' && <path d="M6 1.5 10.5 9H1.5z" />}
+      {kind === 'filing' && <path d="M6 10.5 1.5 3h9z" />}
     </svg>
   );
 }

@@ -1,0 +1,119 @@
+/*
+ * EventTimeline: an axis (track, month ticks, one mark per event day at --at) above the days
+ * with events, which wrap so the list fits any width. Marks take the kind's colour when every
+ * event of the day shares it, else neutral; a day with several events is taller.
+ */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  font-family: var(--font-sans);
+}
+
+.axis {
+  position: relative;
+  height: var(--space-8);
+  margin-inline: var(--space-2);
+}
+
+.track {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline: 0;
+  height: var(--border-width-thin);
+  background: var(--color-control);
+}
+
+.tick {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--at);
+  width: var(--border-width-thin);
+  background: var(--color-border);
+}
+
+.tickLabel {
+  position: absolute;
+  inset-block-start: var(--space-4);
+  inset-inline-start: var(--space-1);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  white-space: nowrap;
+}
+
+.mark {
+  position: absolute;
+  inset-block-start: var(--space-0-5);
+  inset-inline-start: var(--at);
+  width: var(--space-1-5);
+  height: var(--space-3);
+  margin-inline-start: calc(var(--space-1-5) / -2);
+  border: var(--border-width-thin) solid var(--color-neutral-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral);
+}
+
+.mark[data-multiple] {
+  inset-block-start: 0;
+  height: var(--space-4);
+}
+
+.mark[data-kind='own_earnings'] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent);
+}
+
+.mark[data-kind='reference_earnings'] {
+  border-color: var(--color-info-border);
+  background: var(--color-info);
+}
+
+.mark[data-kind='macro_release'] {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning);
+}
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+  min-width: 0;
+  padding-block-start: var(--space-1);
+  border-block-start: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.days[data-dense] {
+  gap: var(--space-2);
+}
+
+.count {
+  margin: 0;
+  padding-block: 0;
+  padding-inline: var(--space-1-5);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
+  cursor: default;
+}
+
+.countLabel {
+  font-weight: var(--font-weight-regular);
+}

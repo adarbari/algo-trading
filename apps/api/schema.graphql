@@ -6,6 +6,20 @@ enum Adjustment {
 }
 
 """
+A dated event ahead: `kind` own_earnings | reference_earnings | macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown for a report, the release time for a macro release (08:30 ET), close for a market-structure day; `label` short, `name` in words; `subjectId` whose event (the instrument, the fund's reference, the MACRO: release; null for a market-structure day); `knownFrom` the first session the stored row was known on (null: a catalogue value or a calendar rule)
+"""
+type AheadEvent {
+  date: Date!
+  time: String!
+  kind: String!
+  label: String!
+  name: String!
+  subjectId: String
+  source: String!
+  knownFrom: Date
+}
+
+"""
 A saved backtest run: `status` complete, partial or failed; `start` / `end` its first and last session; `metrics` (sharpe, cagr, max drawdown, ...)
 """
 type Backtest {
@@ -38,6 +52,30 @@ type Bin {
   lo: Float!
   hi: Float!
   count: Int!
+}
+
+"""
+A day of the window (every session, and a closed day only when an event falls on it) and its events: the names' first, in name order, then the market-wide ones
+"""
+type CalendarDay {
+  date: Date!
+  isSession: Boolean!
+  events: [CalendarEvent!]!
+}
+
+"""
+An event on a day: the name whose row it is on (null: market-wide, a macro release or a market-structure day) and the event; a fund's reference earnings are on the fund's row, `event.subjectId` the stock
+"""
+type CalendarEvent {
+  instrumentId: String
+  symbol: String
+  event: AheadEvent!
+}
+
+"""A name on the calendar: its id and ticker in the session's snapshot"""
+type CalendarName {
+  instrumentId: String!
+  symbol: String!
 }
 
 """A value of a non-numeric feature and how many instruments have it"""
@@ -155,6 +193,28 @@ type Event {
 }
 
 """
+The calendar of `names` from the session through `end`: the days in order, the parts not known for the session (`gaps`), the asked ids the reference snapshot lacks (`missing`) and the scope list's symbols it does not know (`unresolved`)
+"""
+type EventCalendar {
+  session: Date!
+  end: Date!
+  names: [CalendarName!]!
+  days: [CalendarDay!]!
+  gaps: [EventGap!]!
+  missing: [String!]!
+  unresolved: [String!]!
+}
+
+"""
+A part of the events read not known for the session: `part` own_earnings, reference_earnings, macro_release, reference, filings or ladder; `instrumentId` null for a market-wide part (the macro calendar)
+"""
+type EventGap {
+  instrumentId: String
+  part: String!
+  unknown: Unknown!
+}
+
+"""
 Items not fine, grouped by a normalised `reason` (code + message without ids, URLs, dates or numbers): `examples` item keys (at most 10), `statuses` the distinct statuses as recorded (at most 10)
 """
 type FailureGroup {
@@ -269,6 +329,18 @@ type FieldGuide {
   sources: [String!]!
 }
 
+"""
+An 8-K or 8-K/A: `accepted` the SEC acceptance instant (UTC), `items` as SEC lists them, `label` the first item in words, `knownFrom` the session it was public on
+"""
+type Filing {
+  accepted: DateTime!
+  filingDate: Date!
+  form: String!
+  items: [String!]!
+  label: String!
+  knownFrom: Date!
+}
+
 """One simulated fill"""
 type Fill {
   ts: String!
@@ -278,6 +350,17 @@ type Fill {
   price: Float
   commission: Float
   multiplier: Float
+}
+
+"""
+What a leveraged or inverse fund tracks for the session (fund_reference@v1): `instrumentId` / `symbol` the one stock (null: a basket, or not listed), `kind` single_stock | index | sector | commodity | none, `source` holdings | name_rule, `status` LINKED | BASKET | UNLISTED | NO_REFERENCE
+"""
+type FundReference {
+  instrumentId: String
+  symbol: String
+  kind: String!
+  source: String
+  status: String!
 }
 
 """
@@ -452,6 +535,11 @@ type Instrument {
   """
   events(start: Date = null, end: Date = null): [Event!]!
 
+  """
+  What is coming for it as of the session (ADR 0050): the events of the next `days` calendar days (own and a fund's reference earnings, macro releases, market-structure days), its 8-Ks of the last `months`, the 7-90 day expiry ladder and a leveraged fund's reference, with the parts not known for the session
+  """
+  eventStudy(days: Int! = 90, months: Int! = 24): InstrumentEvents
+
   """The option chain stored for the session (null: none stored for it)"""
   chain: OptionChain
 
@@ -475,6 +563,21 @@ type Instrument {
 }
 
 """
+What is coming for the instrument as of the session: the events of the next `days` days (oldest first), the 8-Ks of the last `months` (newest first), the expiry ladder, a leveraged fund's reference (null: not one, or not known: see `gaps`) and the parts not known for the session. Event rows are those known on or before the session (ADR 0050); catalogue values and the chain exactly the session's (ADR 0036)
+"""
+type InstrumentEvents {
+  instrumentId: String!
+  session: Date!
+  days: Int!
+  months: Int!
+  ahead: [AheadEvent!]!
+  filings: [Filing!]!
+  ladder: [LadderRung!]!
+  reference: FundReference
+  gaps: [EventGap!]!
+}
+
+"""
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
@@ -483,6 +586,17 @@ scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads
 type LabelSize {
   label: RegimeLabel!
   multiplier: Float!
+}
+
+"""
+A listed expiry 7 to 90 days out: the events it spans (dated on or before it: an after-close report on the expiry date is inside it) and whether it is `clear` (it spans none but market-structure days); `marked` the last clear rung (the longest expiry still clear of earnings and macro events; none when no rung is clear)
+"""
+type LadderRung {
+  expiry: Date!
+  days: Int!
+  spans: [AheadEvent!]!
+  clear: Boolean!
+  marked: Boolean!
 }
 
 """
@@ -709,6 +823,20 @@ type Query {
     """
     date: Date = null
   ): FeatureTable
+
+  """
+  The events ahead of a set of names over the next `days` calendar days, one entry per day (ADR 0050): the names `instrumentIds` give (a screen's results, a list) plus, with `scope`, the site's scope list config/site/events/scope.toml only (no tier A / B names); the names' own and reference earnings on their rows, macro releases and market-structure days once. Null: nothing stored
+  """
+  eventCalendar(
+    instrumentIds: [String!]!
+    scope: Boolean! = false
+    days: Int! = 90
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): EventCalendar
 
   """
   The tickers the user's screeners picked in the session, ranked by their screener priority then score (the first `limit`); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
