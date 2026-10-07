@@ -8,7 +8,7 @@ from typing import Self
 import strawberry
 from strawberry.scalars import JSON
 
-from algotrade.services.read.instruments import events
+from algotrade.services.read.events import stored as events
 
 
 @strawberry.type(

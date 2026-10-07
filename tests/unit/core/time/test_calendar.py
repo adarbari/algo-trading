@@ -10,10 +10,14 @@ from algotrade.core.time.calendar import (
     holidays,
     is_session,
     last_closed_session,
+    last_session_of_month,
     local_deadline,
+    monthly_expiry,
     next_session,
     nth_weekday,
     previous_session,
+    russell_reconstitution,
+    session_on_or_before,
     sessions_between,
     third_friday,
 )
@@ -247,3 +251,25 @@ def test_christmas_and_independence_day_observed_on_friday_in_the_1980s() -> Non
 )
 def test_session_counts_match_nyse_history(year: int, count: int) -> None:
     assert len(sessions_between(date(year, 1, 1), date(year, 12, 31))) == count
+
+
+def test_monthly_expiry_moves_to_the_session_before_a_closed_friday() -> None:
+    assert monthly_expiry(2026, 10) == date(2026, 10, 16)
+    assert monthly_expiry(2025, 4) == date(2025, 4, 17)  # Good Friday
+    assert monthly_expiry(2026, 6) == date(2026, 6, 18)  # Juneteenth
+
+
+def test_last_session_of_month_skips_weekends_and_holidays() -> None:
+    assert last_session_of_month(2026, 3) == date(2026, 3, 31)
+    assert last_session_of_month(2023, 12) == date(2023, 12, 29)  # the 31st is a Sunday
+    assert last_session_of_month(2024, 3) == date(2024, 3, 28)  # Good Friday on the 29th
+    assert session_on_or_before(date(2026, 10, 10)) == date(2026, 10, 9)
+
+
+@pytest.mark.parametrize(
+    ("year", "day"),
+    [(2018, date(2018, 6, 22)), (2023, date(2023, 6, 23)), (2024, date(2024, 6, 28)),
+     (2025, date(2025, 6, 27))],
+)  # fmt: skip
+def test_russell_reconstitution_is_the_fourth_friday_of_june(year: int, day: date) -> None:
+    assert russell_reconstitution(year) == day
