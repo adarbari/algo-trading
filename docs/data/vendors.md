@@ -35,7 +35,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Company description (stocks, ADRs) | Massive ticker overview (`/v3/reference/tickers/{ticker}`; one request per ticker; free tier) | none free | Implemented (ADR 0034): capped per night |
 | Fund description (ETFs) | SEC prospectus investment objective (Risk/Return Summary data sets + `company_tickers_mf.json`; official, free) | issuer fund pages (per-site terms, not used) | Implemented (ADR 0034): the objective sentence, ~74% of ETFs |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
-| Revenue, net income, diluted EPS (TTM, P/E) | SEC EDGAR company facts (the same document and request as the share counts) | none planned | Implemented, `financials@v1` |
+| Revenue, net income, diluted EPS (TTM, P/E) | SEC EDGAR company facts (the same document and request as the share counts) | none planned | Implemented, `financials@v2` |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | IV history / IV rank (enrichment) | **IBKR** (ADR 0028): IB's daily 30-day IV and HV per underlying, years of history; personal-use licence | our IV30 history (from the Cboe chains), the fallback | Implemented: `ibkr_iv@v1`, `iv_rank` with `iv_rank_source` |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
@@ -392,7 +392,7 @@ document is downloaded whole either way, so the three financial ones cost no ext
 |---|---|---|
 | `dei:EntityCommonStockSharesOutstanding` (cover page, as of a date just before filing) | `dei` | each value; several values for one date are classes (companyfacts drops the class labels) and are summed, `class_values` counts them |
 | `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` | `weighted_basic` | the filing's current period: latest period end, then the shortest span (comparatives and year-to-date dropped) |
-| `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); all three tags are kept (`tag`), `financials@v1` prefers them in this order and never subtracts across tags |
+| `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); all three tags are kept (`tag`), `financials@v2` prefers them in this order and never subtracts across tags |
 | `us-gaap:NetIncomeLoss` (USD) | `net_income` | the same periods; losses are kept |
 | `us-gaap:EarningsPerShareDiluted` (USD per share) | `eps_diluted` | the same periods; negative values are kept |
 
@@ -400,7 +400,7 @@ document is downloaded whole either way, so the three financial ones cost no ext
 `period_start` and `period_end` (a year-to-date and a quarterly fact share an end date), and
 the amount is in `value` with `unit` (`usd`, `usd_per_share`). Only periodic filings count
 (10-K, 10-Q, 20-F, 40-F and their amendments; proxy statements and 8-Ks are dropped) and only
-spans of about 3, 6, 9 or 12 months: the year-to-date facts are how `financials@v1` derives the
+spans of about 3, 6, 9 or 12 months: the year-to-date facts are how `financials@v2` derives the
 fourth quarter (annual minus nine months). A period is repeated as a comparative in every
 later filing, so we keep the filing that first reported it plus any later filing whose value
 differs (a restatement), per tag. A point-in-time read then sees exactly what was public on each date,
@@ -417,7 +417,7 @@ stores new facts in `instruments/shares` (docs/data/layers.md). The CIK comes fr
 class-specific counts, so every instrument of a CIK (GOOGL and GOOG) gets the company total.
 Most multi-class issuers no longer tag the cover count, so they fall back to the weighted
 average; Berkshire's last facts are from 2015 (class A equivalents), so BRK.A / BRK.B are
-`STALE` in `fundamentals@v2`, not wrong.
+`STALE` in `fundamentals@v3`, not wrong.
 
 Checked live 2026-10-05 (financials, sessions up to 2026-10-02, scratch copy of the store): AAPL
 TTM revenue $466.8B (four quarters to 2026-06-27, filed 2026-07-31), net income $128.9B, diluted
@@ -432,13 +432,13 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 
 **Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
 download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
-`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v2`.
+`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v3`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks.
 
 **Adding the financials to a store that already has share counts:** a CIK is refetched only
 on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not
 stored yet are written), then `algotrade-ingest rollups --from <first session> --to <last
-session> --only financials@v1` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
+session> --only financials@v2` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
 that has not been refetched yet shows `NO_FACTS` financials.
 
 ### Refreshes spread over the window

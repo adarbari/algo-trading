@@ -149,7 +149,7 @@ def test_market_cap_and_the_materialised_dividend_yield(fs: FeatureSet) -> None:
                               "div_ttm": [2.0, 1.0]})  # fmt: skip
     frames = {
         PRICE_STATS: stats,
-        "rollups/instrument/fundamentals@v2": fundamentals,
+        "rollups/instrument/fundamentals@v3": fundamentals,
         "rollups/instrument/dividends@v2": dividends,
     }
     out = fs.evaluate(frames, ["market_cap", "div_yield"], compute=["div_yield"])
@@ -191,7 +191,7 @@ def test_moved_features_reproduce_v1_on_golden_data(
     """Labels exactly, numbers within float32 tolerance, nulls in the same places."""
     sessions = golden_reader.dates("bars/1d")[-25:]
     v2 = [
-        fs.groups[k] for k in ("price_stats@v2", "dividends@v2", "fundamentals@v2", "div_yield@v1")
+        fs.groups[k] for k in ("price_stats@v2", "dividends@v2", "fundamentals@v3", "div_yield@v1")
     ]
     stored = _computed(compute_in_memory(golden_reader, v2, sessions), v2)
     v1 = [_float64(g) for g in v2[:3]]
@@ -841,7 +841,7 @@ def test_ex_div_before_expiry_compares_the_next_ex_date_with_the_expiries(fs: Fe
 
 VOL_STATS = "rollups/instrument/vol_stats@v1"
 PROFILE = "rollups/instrument/volume_profile@v1"
-FUNDAMENTALS = "rollups/instrument/fundamentals@v2"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v3"
 
 
 def test_volatility_ratios_volume_trend_turnover_and_value_area(fs: FeatureSet) -> None:

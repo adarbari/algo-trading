@@ -142,11 +142,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the next known ex-dividend date; reads events/dividend by knowledge date (events/dividend_declared)"
 
 [[table]]
-name = "rollups/instrument/fundamentals@v2"
+name = "rollups/instrument/fundamentals@v3"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
-name = "rollups/instrument/financials@v1"
+name = "rollups/instrument/financials@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
@@ -317,8 +317,8 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/verification/verify.py"
 name = "catalog/golden_datasets"
 owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
 
-# Superseded group tables (price_stats@v1, dividends@v1, fundamentals@v1, iv_history@v1,
-# liquidity_class@v1; ADR 0023 step 3) have no producer: they stay readable until
+# Superseded group tables (price_stats@v1, dividends@v1, fundamentals@v1, fundamentals@v2,
+# financials@v1, iv_history@v1, liquidity_class@v1; ADR 0023 step 3) have no producer: they stay readable until
 # `algotrade-ingest retire-features` (tasks/maintenance/retire_features.py) deletes them.
 # Every table may additionally be rewritten by the one-off id migration (ADR 0018):
 # apps/ingestion/algotrade_ingestion/tasks/maintenance/migrate_ids.py (an admin command, not a producer).

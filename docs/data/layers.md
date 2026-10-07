@@ -337,8 +337,8 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `div_yield@v1` | `div_yield` (the materialised expression feature) | `dividends@v2`, `price_stats@v2` | built |
 | `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL) | `iv30@v1` over 252 sessions | built |
-| `fundamentals@v2` | `shares_outstanding`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
-| `financials@v1` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
+| `fundamentals@v3` | `shares_outstanding`, `shares_outstanding_year_ago`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
+| `financials@v2` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of`, `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `call_wing@v1` | the covered-call mirror of `put_wing@v1`, by the same search: `wing_status`, `target_expiry` + `target_dte`, `n_unpriced`; band totals of the calls with OUR delta in 0.15..0.30 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best call among 0.05..0.50 delta, nearest the band then by premium yield mid / spot, then OI, then the higher strike (`delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `price_moves@v1` | `one_day_move`: the largest \|close-to-close return\| over the last 20 sessions | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
@@ -355,7 +355,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `oi_walls@v1` | `wall_status` (OK / PARTIAL / NO_OI / NO_SPOT / NO_CHAIN / NO_EXPIRY), `call_wall` + `call_wall_oi` (most call OI at or above spot), `put_wall` + `put_wall_oi` (most put OI at or below spot); OI summed across expiries 1..60 days out, ties nearer spot | the session's `chains/option_quotes`, `chains/underlying_quotes` | built |
 | `nearest_expiry@v1` | `expiry_date` (the nearest listed expiry on or after the session; 0-DTE counts), `dte` (calendar days to it), `sessions_to_expiry` (exchange sessions after the session up to it); a row per underlying with a chain, null when every listed expiry is past. `feature.earnings_before_expiry` (`config/site/features/earnings.toml`) compares it with `earnings@v1.next_earnings_date` | the session's `chains/option_quotes` | built |
 
-**`fundamentals@v2` rules.** Among facts FILED on or before the session: the latest cover
+**`fundamentals@v3` rules.** Among facts FILED on or before the session: the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
 still tags it (its latest `dei` filing is no older than its latest weighted average), else the
 latest filing's weighted average basic. Splits after the count multiply it (after
@@ -365,11 +365,17 @@ null, not an error), `STALE` (period end more than `stale_days`, 400, before the
 the count is still shown) and `NO_PRICE` have a null market cap. Counts are company totals,
 so a class's market cap is the total times its own close (fine for GOOGL / GOOG, wrong for
 classes at very different prices, such as BRK.A / BRK.B). One row per instrument with a
-`price_stats@v2` row or a share count.
+`price_stats@v2` row or a share count. `shares_outstanding_year_ago` is the count of the same
+concept (a cover count against a cover count, a weighted average against a weighted average)
+among the facts filed by the session whose period ended 9 to 15 months before `shares_as_of`,
+the one closest to a year (a later filing of that period, an amendment, wins a tie); split-adjusted
+by the same rule as the current count, so a split in between is not dilution; null when none.
+The expression `shares_change_yoy = shares_outstanding / shares_outstanding_year_ago - 1` is
+negative for buybacks and positive for dilution, null for a stale count.
 
-**`financials@v1` rules.** Among facts FILED on or before the session (a filing counts for
+**`financials@v2` rules.** Among facts FILED on or before the session (a filing counts for
 the session of its filing date, even one made in the evening: the same few-hours look-ahead as
-`fundamentals@v2`), each (concept, tag, period) takes its latest known value (a restatement
+`fundamentals@v3`), each (concept, tag, period) takes its latest known value (a restatement
 counts from its filing date). Per concept a TTM is: (1) `QUARTERS`: the sum of the last four
 consecutive discrete quarters, when the newest quarter ends on or after the newest fiscal year;
 a discrete quarter is a reported three-month fact (the best revenue tag first), else the
@@ -395,7 +401,20 @@ non-USD issuers; every value null, never an error), `NO_TTM` (facts but no TTM c
 ended more than `stale_days`, 480, before the session; values still shown), else `OK`.
 `ttm_as_of`, `ttm_filed` and `ttm_basis` describe that same first TTM (revenue's, normally).
 `eps_stale` says the EPS TTM itself is stale, and `is_adr` that the instrument is an ADR
-(`instruments/reference` security type). The expression feature
+(`instruments/reference` security type). `eps_diluted_ttm_year_ago` is the EPS TTM a year
+earlier (by the same assembly: four quarters ending 340 to 380 days before the EPS TTM, or the
+previous fiscal year). The latest quarter (`revenue_qtr`, `eps_diluted_qtr`) is the newest
+discrete quarter: a 10-Q's three-month figure as filed, or at a 10-K the fourth quarter as the
+annual figure minus the nine months of the same tag (the subtraction above, with its 150-day
+restatement guard; for revenue and net income the same as the annual minus the three quarters);
+null when the annual figure is newer than the newest quarter (a Q4 that cannot be derived),
+when the newest quarter ended more than `stale_days` before the session, or, per concept, when
+that concept's newest quarter is older than the other's (`qtr_as_of` is the one quarter every
+non-null quarter column describes). `revenue_qtr_year_ago` / `eps_diluted_qtr_year_ago` are the
+discrete quarter ending 340 to 380 days before it. The expression features `eps_growth_yoy`
+(EPS TTM against its year-ago, null when the year-ago EPS is 0 or negative or the EPS is stale),
+`revenue_growth_qtr_yoy` and `eps_growth_qtr_yoy` (null when the year-ago quarter is 0 or, for
+EPS, not positive) read them. The expression feature
 `pe_ratio = close / eps_diluted_ttm` is null when `eps_diluted_ttm` is missing or not positive
 (a negative P/E is not shown), when the close is not positive, when `eps_stale`, and for an ADR:
 an ADR's EPS is per ordinary share and the ADR ratio is not stored. Every instrument of a CIK

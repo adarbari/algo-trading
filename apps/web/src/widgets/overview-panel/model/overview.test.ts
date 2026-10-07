@@ -64,7 +64,7 @@ const stock = () =>
     known('rollup.price_stats@v2.close', 333.69, 'CURRENCY'),
     known('feature.market_cap', 4.87e12, 'COMPACT', 'usd'),
     unknown('feature.pe_ratio', 'NULL'),
-    unknown('rollup.financials@v1.revenue_ttm', 'NO_PARTITION', 'COMPACT'),
+    unknown('rollup.financials@v2.revenue_ttm', 'NO_PARTITION', 'COMPACT'),
     known('feature.div_yield', 0.0032, 'PERCENT'),
     known('feature.pct_from_high_52w', -0.04, 'PERCENT'),
     known(NEXT, '2026-10-29', 'DATE'),

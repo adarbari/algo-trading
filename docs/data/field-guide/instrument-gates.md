@@ -33,7 +33,7 @@ Sources: Site convention (docs/data/instruments.md)
 
 **When the reading lies**
 
-- An ADR passes a 'stocks' gate but feature.pe_ratio is null for it (the ADR ratio is not stored) and its filings are foreign; add rollup.financials@v1.is_adr eq false when the screen reads earnings.
+- An ADR passes a 'stocks' gate but feature.pe_ratio is null for it (the ADR ratio is not stored) and its filings are foreign; add rollup.financials@v2.is_adr eq false when the screen reads earnings.
 - ETFs include leveraged and inverse funds; a fund screen that wants plain index exposure adds instrument.is_leveraged eq false and instrument.is_inverse eq false.
 
 Sources: Site convention (docs/data/instruments.md; the vendor's type wins over the name rules)

@@ -1,6 +1,6 @@
 """Share counts and basic financials from SEC company facts as an L1 table
 (``instruments/shares``, phase 2b.4; revenue, net income and diluted EPS added for
-``financials@v1``).
+``financials@v2``).
 
 - CIK per instrument: the latest ``instruments/company`` snapshot on or before the session
   (the reference's CIK or the SEC ticker map, chosen by ``company_details``), else the

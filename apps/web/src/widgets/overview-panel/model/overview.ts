@@ -80,7 +80,7 @@ const HEADLINE: readonly FactSpec[] = [
   { id: 'close', label: 'Last close', name: feature('rollup.price_stats@v2.close') },
   { id: 'market-cap', label: 'Market cap', name: feature('feature.market_cap') },
   { id: 'pe', label: 'P/E ratio', name: feature('feature.pe_ratio') },
-  { id: 'revenue', label: 'Revenue (TTM)', name: feature('rollup.financials@v1.revenue_ttm') },
+  { id: 'revenue', label: 'Revenue (TTM)', name: feature('rollup.financials@v2.revenue_ttm') },
 ];
 
 const GROUPS: readonly { id: string; title: string; facts: readonly FactSpec[] }[] = [
@@ -91,7 +91,7 @@ const GROUPS: readonly { id: string; title: string; facts: readonly FactSpec[] }
       {
         id: 'shares',
         label: 'Shares outstanding',
-        name: feature('rollup.fundamentals@v2.shares_outstanding'),
+        name: feature('rollup.fundamentals@v3.shares_outstanding'),
       },
       {
         id: 'growth',
@@ -102,12 +102,12 @@ const GROUPS: readonly { id: string; title: string; facts: readonly FactSpec[] }
       {
         id: 'income',
         label: 'Net income (TTM)',
-        name: feature('rollup.financials@v1.net_income_ttm'),
+        name: feature('rollup.financials@v2.net_income_ttm'),
       },
       {
         id: 'eps',
         label: 'Diluted EPS (TTM)',
-        name: feature('rollup.financials@v1.eps_diluted_ttm'),
+        name: feature('rollup.financials@v2.eps_diluted_ttm'),
       },
       {
         id: 'adv',

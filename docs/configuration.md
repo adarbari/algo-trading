@@ -87,7 +87,7 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 | Field | Source table | Example |
 |---|---|---|
 | `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
-| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v2.hv30`, `rollup.price_stats@v2.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v2.market_cap_status` |
+| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v2.hv30`, `rollup.price_stats@v2.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v3.market_cap_status` |
 | `feature.<name>` | an expression feature (`config/site/features/*.toml`, [below](#expression-features)), computed on read from the stored features it names | `feature.liquidity_class`, `feature.near_52w`, `feature.market_cap`, `feature.iv_hv_spread` |
 
 Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules;
@@ -102,8 +102,8 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `dividend_schedule@v1` | `dividend_status` (str: SCHEDULED / NOT_ANNOUNCED); `next_ex_date`, `next_pay_date` (date); `next_div_amount` (float32); `days_to_ex_date` (int) |
 | `iv30@v1` | `iv30`, `iv30_cboe`, `atm_strike_near`, `spot`, `rate`, `div_yield` (float); `iv30_status` (str); `near_expiry`, `far_expiry` (date); `n_quotes_used` (int) |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d` (float32); `history_days` (int); `rank_status` (str: UNKNOWN / PROVISIONAL / FULL) |
-| `fundamentals@v2` | `shares_outstanding` (float32); `shares_as_of`, `shares_filed` (date); `shares_source`, `market_cap_status` (str) |
-| `financials@v1` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `revenue_fy` (float); `eps_diluted_ttm` (float32); `revenue_fy_end`, `ttm_as_of`, `ttm_filed` (date); `eps_stale`, `is_adr` (bool); `ttm_basis`, `financials_status` (str) |
+| `fundamentals@v3` | `shares_outstanding`, `shares_outstanding_year_ago` (float32); `shares_as_of`, `shares_filed` (date); `shares_source`, `market_cap_status` (str) |
+| `financials@v2` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `revenue_fy`, `revenue_qtr`, `revenue_qtr_year_ago` (float); `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago` (float32); `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `qtr_as_of` (date); `eps_stale`, `is_adr` (bool); `ttm_basis`, `financials_status` (str) |
 | `put_wing@v1` | `wing_status` (str); `target_expiry` (date); `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `best_put_oi`, `best_put_volume` (int); `wing_spread_pct`, `delta_band_distance`, `best_put_strike`, `best_put_delta`, `best_put_iv`, `best_put_mid`, `best_put_spread_pct`, `best_put_roc` (float32) |
 | `call_wing@v1` | `wing_status` (str); `target_expiry` (date); `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `best_call_oi`, `best_call_volume` (int); `wing_spread_pct`, `delta_band_distance`, `best_call_strike`, `best_call_delta`, `best_call_iv`, `best_call_mid`, `best_call_spread_pct`, `best_call_yield` (float32) |
 | `price_moves@v1` | `one_day_move` (float32) |

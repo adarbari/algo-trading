@@ -299,7 +299,7 @@ name = "feature.turnover_20d"
 theme = "volume"
 reads = "Daily turnover: the 20-session average share volume as a share of the shares outstanding, 0.01 meaning 1% of the company changes hands each day (the whole float roughly every five months). Low to high: under 0.002 is a closely held or dull name; 0.005 to 0.015 is typical for an S&P 500 stock; above 0.03 is a heavily traded name (a meme stock, a fresh IPO, a takeover target). Turnover is comparable across names of every size, where share volume is not."
 caveats = [
-  "Shares outstanding are the company's last filed count (every quarter for a 10-Q filer, once a year for a 20-F filer), so turnover is stale by up to a year after a buyback or an offering; rollup.fundamentals@v2.market_cap_status says STALE when too old.",
+  "Shares outstanding are the company's last filed count (every quarter for a 10-Q filer, once a year for a 20-F filer), so turnover is stale by up to a year after a buyback or an offering; rollup.fundamentals@v3.market_cap_status says STALE when too old.",
   "ETFs and ADRs have no filed share count here, so turnover is null for them; use rollup.price_stats@v2.adv_usd_20d.",
   "Null when the 20-session average is unknown or no share count is filed.",
 ]
