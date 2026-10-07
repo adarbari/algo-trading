@@ -225,3 +225,22 @@ Sources: Site convention (ADR 0050)
 - Only BASKET with rollup.fund_reference@v1.reference_kind none is a settled 'tracks nothing' (a volatility fund); NO_REFERENCE is a gap to close by reading the fund's holdings.
 
 Sources: Site convention (ADR 0050)
+
+### `feature.ex_div_before_call_expiry`
+
+**How to read it.** True when the next known ex-dividend date falls on or before the covered-call wing's target expiry (rollup.call_wing@v1.target_expiry). It is feature.ex_div_before_expiry read against the call side's own expiry, so it answers the covered-call writer's question directly: will the shares go ex-dividend while the call is open? If so, a call near the money is the one assigned early (the holder exercises to capture the dividend), and an out-of-the-money one leaves the dividend with the shares. False is the clean case; null means the date or the expiry is unknown, not that there is none.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| no ex-dividend date before the covered call's expiry | `eq false` | hard | - | for a covered call; with rollup.call_wing@v1.best_call_delta lte 0.3 the dividend is usually kept even when true |
+| a dividend to collect while the call is open | `eq true` | hard | - | a covered-call writer who wants the dividend: pair with rollup.call_wing@v1.best_call_delta lte 0.3 so the call is not assigned first |
+
+**When the reading lies**
+
+- Null when no ex-date is known yet (the source lists dates about 30 days ahead; a quarterly payer whose last ex-date, rollup.dividends@v2.last_ex_date, was about three months ago is due even when unlisted) or when the call wing has no target expiry.
+- Early assignment needs the call in the money with a dividend above its remaining time value; check rollup.call_wing@v1.best_call_delta (above about 0.6 is at risk, 0.25 rarely).
+- The two wings usually share the expiry; when they differ (one right has no quotes at the monthly), this flag and feature.ex_div_before_expiry can disagree, and this one is the covered-call answer.
+
+Sources: Hull, Options, Futures and Other Derivatives: early exercise of American calls before an ex-dividend date
