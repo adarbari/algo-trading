@@ -442,6 +442,7 @@ Source: `design-system/components/Drawer`
 | `onOpenChange` | `(open: boolean) => void` | yes | Called with `false` on Escape, the close button or a backdrop click. |
 | `title` | `ReactNode` | yes | The heading and accessible name ("AAPL · Apple"). |
 | `eyebrow` | `ReactNode` | no | A small mono line above the title (a catalogue name, a section label). |
+| `titleSize` | `'md' \| 'lg'` | no | Title size: `md` (default) or `lg` for a reading panel (HelpDrawer). |
 | `description` | `ReactNode` | no | One line under the title; also the accessible description. |
 | `footer` | `ReactNode` | no | Actions pinned to the bottom of the sheet. |
 | `side` | `'start' \| 'end'` | no | The side it slides in from: `end` (default) or `start`. |

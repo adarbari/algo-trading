@@ -19,6 +19,8 @@ export interface DrawerProps {
   title: ReactNode;
   /** A small mono line above the title (a catalogue name, a section label). */
   eyebrow?: ReactNode;
+  /** Title size: `md` (default) or `lg` for a reading panel (HelpDrawer). */
+  titleSize?: 'md' | 'lg';
   /** One line under the title; also the accessible description. */
   description?: ReactNode;
   /** Actions pinned to the bottom of the sheet. */

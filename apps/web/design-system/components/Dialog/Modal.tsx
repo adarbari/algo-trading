@@ -30,6 +30,8 @@ export interface ModalProps {
   title: ReactNode;
   /** A small mono line above the title. */
   eyebrow?: ReactNode;
+  /** Title size: `md` (default) or `lg` (a reading panel such as HelpDrawer). */
+  titleSize?: 'md' | 'lg';
   description?: ReactNode;
   footer?: ReactNode;
   /** `dialog` (centred) or `drawer` (a full-height sheet on one side). */
@@ -48,6 +50,7 @@ export function Modal({
   onOpenChange,
   title,
   eyebrow,
+  titleSize = 'md',
   description,
   footer,
   kind,
@@ -105,7 +108,7 @@ export function Modal({
                     {eyebrow}
                   </Text>
                 )}
-                <Heading level={2} size="lg" id={`${id}-title`}>
+                <Heading level={2} size={titleSize === 'lg' ? '2xl' : 'lg'} id={`${id}-title`}>
                   {title}
                 </Heading>
                 {description && (

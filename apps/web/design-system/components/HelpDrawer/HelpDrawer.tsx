@@ -46,6 +46,7 @@ export function HelpDrawer({
       open={open}
       onOpenChange={onOpenChange}
       eyebrow={eyebrow}
+      titleSize="lg"
       title={title}
       description={meta}
       footer={
