@@ -61,6 +61,7 @@ from algotrade.features.rollups.price import (
     trend_stats,
     volume,
 )
+from algotrade.features.rollups.reference import fund_reference
 
 GROUPS: dict[str, FeatureGroup] = {
     g.key: g
@@ -96,6 +97,7 @@ GROUPS: dict[str, FeatureGroup] = {
             macro.GROUP,
             indicators.GROUP,
             regime.GROUP,
+            fund_reference.GROUP,
         ),
         # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
         stored_ok=True,
@@ -111,6 +113,9 @@ SUPERSEDED: dict[str, Superseded] = {
     "fundamentals@v1": Superseded("fundamentals@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
     "anchored_vwap@v1": Superseded("anchored_vwap@v2"),
+    # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)
+    "bands@v1": Superseded("bands@v2"),
+    "trend_stats@v1": Superseded("trend_stats@v2"),
     # Its rows were price_stats rows; the class and option tier are expression features now.
     "liquidity_class@v1": Superseded(
         "price_stats@v2", {"chain_oi": "feature.option_chain_oi", "rule_hash": ""}

@@ -41,6 +41,8 @@ from algotrade_ingestion.tasks.market.tiers import CORE, REST, load_tiers
 TIERS = (CORE, REST)
 STORED_EXAMPLES = 10  # missing names kept per cell in the check's data (the email shows fewer)
 ETF = "ETF"
+# The reference snapshot's facts ``applies_to`` decides on (``features.framework.feature``).
+_FACTS = ("symbol", "security_type", "optionable", "is_leveraged", "is_inverse")
 # Explained absences that still count as a gap for a core name (ADR 0046): a large stock with
 # no bar is far likelier a dropped bar than a day without a trade.
 GAP_IN_CORE = frozenset({NullReason.NO_TRADE.value})
@@ -77,7 +79,7 @@ def _population(reader: StoreReader, session: date) -> pd.DataFrame | None:
         ids[["instrument_id"]]
         .drop_duplicates()
         .merge(
-            facts[["instrument_id", "symbol", "security_type", "optionable"]],
+            facts.reindex(columns=["instrument_id", *_FACTS]),
             on="instrument_id",
             how="left",
         )
@@ -90,7 +92,8 @@ def _population(reader: StoreReader, session: date) -> pd.DataFrame | None:
     pop["sic"] = [sic.get(str(i)) for i in pop["instrument_id"]]
     for fact in ("security_type", "sic"):  # "" is null (not_applicable never rules it out)
         pop[fact] = pop[fact].map(lambda v: "" if v is None or pd.isna(v) else str(v))
-    pop["optionable"] = pop["optionable"].map(lambda v: None if pd.isna(v) else bool(v))
+    for flag in ("optionable", "is_leveraged", "is_inverse"):  # a null flag is unknown, not "no"
+        pop[flag] = pop[flag].map(lambda v: None if pd.isna(v) else bool(v))
     return pop
 
 
@@ -197,9 +200,14 @@ def cells(
             reader, reader.table(table, day), column, feat, rule, day
         )
         applies = [
-            not not_applicable([feat.applies_to], opt, kind, sic)
-            for opt, kind, sic in zip(
-                pop["optionable"], pop["security_type"], pop["sic"], strict=True
+            not not_applicable([feat.applies_to], opt, kind, sic, lev, inv)
+            for opt, kind, sic, lev, inv in zip(
+                pop["optionable"],
+                pop["security_type"],
+                pop["sic"],
+                pop["is_leveraged"],
+                pop["is_inverse"],
+                strict=True,
             )
         ]
         for tier in TIERS:

@@ -306,13 +306,13 @@ value = 3
 mode = "soft"
 tolerance = 1
 
-# Bands and channels as levels (bands@v1 and config/site/features/bands.toml): the Bollinger
+# Bands and channels as levels (bands@v2 and config/site/features/bands.toml): the Bollinger
 # bands and the Keltner channel in dollars per share. Compared with the close, not
 # thresholded; the positions (feature.bb_pct_b, feature.kc_position) and the squeeze carry
 # the screening thresholds (momentum and trend, volatility).
 
 [[field]]
-name = "rollup.bands@v1.ema_20"
+name = "rollup.bands@v2.ema_20"
 theme = "price levels"
 reads = "The 20-session exponential moving average of the close, in dollars per share: the midline of the Keltner channel and the fastest of the common averages (it weights the latest close 2 / 21, so it turns a few sessions before rollup.price_stats@v2.sma_20). Compare with the close: above it the short-term trend is up, below it down; the gap between the two in percent or ATRs is what to threshold (feature.pct_vs_sma_20 and feature.stretch_sma20_atr do that for the SMA, which sits within a fraction of a percent of the EMA on all but the fastest moves)."
 caveats = [
@@ -332,7 +332,7 @@ note = "threshold the distance instead: feature.kc_position or feature.pct_vs_sm
 [[field]]
 name = "feature.bb_upper"
 theme = "price levels"
-reads = "The upper Bollinger band: the 20-session mean close plus two standard deviations of those closes, in dollars per share. Price touches it on about 5% of sessions in a random walk; in a trend it rides along it (the band walk, rollup.bands@v1.band_walk). Compare with the close through feature.bb_pct_b (1 is on the band, above 1 is outside it) rather than the level itself."
+reads = "The upper Bollinger band: the 20-session mean close plus two standard deviations of those closes, in dollars per share. Price touches it on about 5% of sessions in a random walk; in a trend it rides along it (the band walk, rollup.bands@v2.band_walk). Compare with the close through feature.bb_pct_b (1 is on the band, above 1 is outside it) rather than the level itself."
 caveats = [
   "A band is a statement about the last 20 closes, not resistance: in a strong uptrend the close lives on or above the upper band for weeks. Pair a 'too far above' reading with feature.trend_state and rollup.momentum@v1.rsi_14 before reading it as a top.",
   "After a one-day shock (earnings, a takeover) both bands jump apart for 20 sessions and the price sits 'inside' them; the squeeze that follows is the shock leaving the window, not a new base. Check rollup.price_moves@v1.one_day_move.",
@@ -403,16 +403,16 @@ op = "not_null"
 mode = "hard"
 note = "threshold the position instead: feature.kc_position"
 
-# The EMA stack, the longer channels and the prior extremes (bands@v1, trend_stats@v1): levels
+# The EMA stack, the longer channels and the prior extremes (bands@v2, trend_stats@v2): levels
 # in dollars per share. Compared with the close; the distances (feature.pct_vs_ema_*,
 # feature.dist_to_high_*, feature.breakout_magnitude_20d) carry the thresholds.
 
 [[field]]
-name = "rollup.bands@v1.ema_10"
+name = "rollup.bands@v2.ema_10"
 theme = "price levels"
 reads = "The 10-session exponential moving average of the close, in dollars per share: the fastest trend line in the catalogue, about two trading weeks, which day traders and short-term swing systems use as the trailing reference. The close above it is a short-term uptrend in force; a close below it after a run is the first warning. Threshold the distance, not the level."
 caveats = [
-  "It hugs the price: a 10-day average crosses the close every few sessions in a range, so a cross alone is noise. Pair with rollup.bands@v1.ema_20 or feature.ema_stack for the direction.",
+  "It hugs the price: a 10-day average crosses the close every few sessions in a range, so a cross alone is noise. Pair with rollup.bands@v2.ema_20 or feature.ema_stack for the direction.",
   "Null with fewer than 10 consecutive bars ending on the session.",
 ]
 sources = ["Moving average (exponential), Wikipedia: https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average"]
@@ -423,7 +423,7 @@ mode = "hard"
 note = "compare with rollup.price_stats@v2.close in a rule; threshold feature.pct_vs_ema_20 for distance"
 
 [[field]]
-name = "rollup.bands@v1.ema_50"
+name = "rollup.bands@v2.ema_50"
 theme = "price levels"
 reads = "The 50-session exponential moving average of the close, in dollars per share: the intermediate trend line (about a quarter). Above it with the 20-session EMA above it too is the alignment the pullback and continuation screens require (feature.ema_stack BULL); a pullback that holds it is the classic swing entry. feature.pct_vs_ema_50 is the distance."
 caveats = [
@@ -438,7 +438,7 @@ mode = "hard"
 note = "threshold feature.pct_vs_ema_50 or use feature.ema_stack for alignment"
 
 [[field]]
-name = "rollup.bands@v1.ema_200"
+name = "rollup.bands@v2.ema_200"
 theme = "price levels"
 reads = "The 200-session exponential moving average of the close, in dollars per share: the long-term trend line (about ten months). The close above it is the bull-market condition most trend-following systems gate on (Faber's rule uses the 10-month SMA, within a percent of this). feature.pct_vs_ema_200 is the distance, feature.ema_stack the alignment with the 20 and the 50."
 caveats = [
@@ -453,7 +453,7 @@ mode = "hard"
 note = "threshold feature.pct_vs_ema_200 or feature.pct_vs_sma_200"
 
 [[field]]
-name = "rollup.trend_stats@v1.high_100d"
+name = "rollup.trend_stats@v2.high_100d"
 theme = "price levels"
 reads = "The highest daily high of the last 100 sessions (about five months), in dollars per share, today's high included. With the 20 and 50-session highs it dates the current advance: the close at all three is a fresh leg, at the 20 but not the 100 a rally inside a longer range. Compare with the close as a share: rollup.price_stats@v2.close / high_100d - 1."
 caveats = [
@@ -468,7 +468,7 @@ mode = "hard"
 note = "compare with rollup.price_stats@v2.close in a rule"
 
 [[field]]
-name = "rollup.trend_stats@v1.low_100d"
+name = "rollup.trend_stats@v2.low_100d"
 theme = "price levels"
 reads = "The lowest daily low of the last 100 sessions, in dollars per share, today's low included: the floor of the five-month range. The close at it is a five-month low; the distance above it (close / low_100d - 1) is how much of the range the name has recovered."
 caveats = [
@@ -483,7 +483,7 @@ mode = "hard"
 note = "compare with rollup.price_stats@v2.close in a rule"
 
 [[field]]
-name = "rollup.trend_stats@v1.high_200d"
+name = "rollup.trend_stats@v2.high_200d"
 theme = "price levels"
 reads = "The highest daily high of the last 200 sessions, in dollars per share, today's high included: close to the 52-week high (rollup.price_stats@v2.high_52w covers 252 sessions and needs 240 bars), so use it on names too young or gappy for the 52-week figure."
 caveats = [
@@ -497,7 +497,7 @@ mode = "hard"
 note = "prefer feature.pct_from_high_52w for the 52-week distance"
 
 [[field]]
-name = "rollup.trend_stats@v1.low_200d"
+name = "rollup.trend_stats@v2.low_200d"
 theme = "price levels"
 reads = "The lowest daily low of the last 200 sessions, in dollars per share, today's low included: the ten-month floor, close to rollup.price_stats@v2.low_52w."
 caveats = [
@@ -511,7 +511,7 @@ mode = "hard"
 note = "prefer feature.pct_from_low_52w for the 52-week distance"
 
 [[field]]
-name = "rollup.trend_stats@v1.prior_high_50d"
+name = "rollup.trend_stats@v2.prior_high_50d"
 theme = "price levels"
 reads = "The highest daily high of the 50 sessions before today (today excluded), in dollars per share: the level a 50-session breakout close has to clear. feature.breakout_50d is the rule (close above it on 1.5x volume); rollup.momentum@v1.prior_high_20d is the 20-session version."
 caveats = [
@@ -526,7 +526,7 @@ mode = "hard"
 note = "the rule is feature.breakout_50d"
 
 [[field]]
-name = "rollup.trend_stats@v1.prior_low_20d"
+name = "rollup.trend_stats@v2.prior_low_20d"
 theme = "price levels"
 reads = "The lowest daily low of the 20 sessions before today (today excluded), in dollars per share: the level a 20-session breakdown close has to break. feature.breakdown_20d is the rule (close below it on 1.5x volume); for a long it is the stop most swing systems place just under."
 caveats = [
@@ -540,7 +540,7 @@ mode = "hard"
 note = "the rule is feature.breakdown_20d; the distance above it is rollup.price_stats@v2.close / prior_low_20d - 1"
 
 [[field]]
-name = "rollup.trend_stats@v1.prior_low_50d"
+name = "rollup.trend_stats@v2.prior_low_50d"
 theme = "price levels"
 reads = "The lowest daily low of the 50 sessions before today (today excluded), in dollars per share: the intermediate breakdown level, and the stop a position-trade places under."
 caveats = [
@@ -558,7 +558,7 @@ note = "compare with rollup.price_stats@v2.close in a rule"
 
 [[field]]
 name = "rollup.volume_profile@v1.profile_status"
-theme = "price levels"
+theme = "volume"
 reads = "Whether the volume profile is computed: OK; FEW_BARS when fewer than 240 of the last 252 sessions have a bar (a young listing or a gappy name: every profile value is null); NO_RANGE when the name traded at one price all year (a halted or pinned name)."
 caveats = [
   "OK says the profile exists, not that it is sharp: each day's volume is spread over its whole range, so the bins are a day's range wide in effect. Read the levels as zones.",
@@ -573,7 +573,7 @@ note = "the gate for every profile level; the levels themselves are compared wit
 
 [[field]]
 name = "rollup.volume_profile@v1.poc_252d"
-theme = "price levels"
+theme = "volume"
 reads = "The point of control: the price bin (one fiftieth of the year's range) where the most volume traded over the last 252 sessions, in dollars per share. It is the year's 'fair price' by participation: the level price returns to and lingers at, support when the close is above it and resistance when below. feature.dist_to_poc is the distance as a fraction."
 caveats = [
   "A daily-bar estimate: each day's volume is spread evenly over its range, so the point of control is a zone a bin or two wide, and a tie goes to the bin nearest the close.",
@@ -589,7 +589,7 @@ note = "threshold feature.dist_to_poc"
 
 [[field]]
 name = "rollup.volume_profile@v1.value_area_high"
-theme = "price levels"
+theme = "volume"
 reads = "The top of the value area: the smallest band of price bins around the point of control that held 70% of the last year's volume, in dollars per share. Above it the price is at a level the market has traded little (an extreme by volume, where a trend either continues into thin air or returns to value); feature.in_value_area is the flag."
 caveats = [
   "The band is built from daily ranges, not intraday prints: a zone, not a price.",
@@ -604,7 +604,7 @@ note = "use feature.in_value_area for the close's position"
 
 [[field]]
 name = "rollup.volume_profile@v1.value_area_low"
-theme = "price levels"
+theme = "volume"
 reads = "The bottom of the value area (the band around the point of control holding 70% of the year's volume), in dollars per share: below it the price is at a volume extreme on the downside, a cheap level by participation that either holds or breaks into thin air."
 caveats = [
   "A zone, not a price (daily-bar profile).",
@@ -619,7 +619,7 @@ note = "use feature.in_value_area for the close's position"
 
 [[field]]
 name = "rollup.volume_profile@v1.hvn_above"
-theme = "price levels"
+theme = "volume"
 reads = "The nearest high-volume node above the close: the centre of the closest price bin above the close's bin whose volume over the year was at least 1.5 times the average bin, in dollars per share. A level where the name has traded heavily, so price tends to slow and pause there: resistance by volume, and a target for a move up."
 caveats = [
   "A zone a bin or two wide (daily-bar profile), not a price.",
@@ -634,7 +634,7 @@ note = "compare with rollup.price_stats@v2.close in a rule; the pivot version is
 
 [[field]]
 name = "rollup.volume_profile@v1.hvn_below"
-theme = "price levels"
+theme = "volume"
 reads = "The nearest high-volume node below the close (a bin with at least 1.5 times the average bin volume), in dollars per share: support by volume, where buyers have shown up before, and the level a pullback tends to stop at."
 caveats = [
   "A zone, not a price (daily-bar profile).",
@@ -649,7 +649,7 @@ note = "compare with rollup.price_stats@v2.close in a rule; the pivot version is
 
 [[field]]
 name = "rollup.volume_profile@v1.lvn_above"
-theme = "price levels"
+theme = "volume"
 reads = "The nearest low-volume node above the close: the closest bin above with at most half the average bin volume, in dollars per share. A price the market rejected quickly, so a move into it tends to continue through it (thin air): the breakout screens like a close just under a low-volume node with a high-volume node further up as the target."
 caveats = [
   "A zone, not a price (daily-bar profile).",
@@ -664,7 +664,7 @@ note = "compare with rollup.price_stats@v2.close in a rule"
 
 [[field]]
 name = "rollup.volume_profile@v1.lvn_below"
-theme = "price levels"
+theme = "volume"
 reads = "The nearest low-volume node below the close (a bin with at most half the average bin volume), in dollars per share: thin air on the downside, where a breakdown accelerates until the next high-volume node."
 caveats = [
   "A zone, not a price (daily-bar profile).",
@@ -738,7 +738,7 @@ note = "compare with rollup.price_stats@v2.close: a close above it is the reclai
 
 [[field]]
 name = "feature.in_value_area"
-theme = "price levels"
+theme = "volume"
 reads = "True when the close sits inside the last year's value area, the price band that held 70% of the volume: fair value by participation, where price tends to rotate. False means the close is at a volume extreme: above the value area a trend is being accepted at new prices (or will return to value), below it the name is cheap by the year's participation (or breaking down). Dalton's rule of thumb: an open outside value that fails to hold returns to the point of control."
 caveats = [
   "The value area is built from daily ranges (no intraday data) and is a year wide, so a trending name leaves it for months; pair with feature.trend_state before reading 'outside value' as a reversal.",
@@ -754,7 +754,7 @@ note = "with feature.dist_to_poc gt 0 for above value, lt 0 for below"
 
 [[field]]
 name = "feature.dist_to_poc"
-theme = "price levels"
+theme = "volume"
 reads = "Close over the year's point of control minus one: 0.05 means the price sits 5% above the most-traded level of the year, -0.10 ten percent below it. Near 0 the name is at its volume magnet (expect rotation); far above after a strong year the point of control is the support a deep pullback would find; far below it is the overhead supply."
 caveats = [
   "A daily-bar estimate of the level, a bin or two wide.",
@@ -768,3 +768,20 @@ value = [-0.03, 0.03]
 mode = "soft"
 tolerance = 0.02
 note = "with feature.in_value_area eq true; a mean-reversion zone"
+[[field]]
+name = "rollup.bands@v2.sma_150"
+theme = "price levels"
+reads = "The mean close of the last 150 sessions (30 weeks), in dollars per share: the one average off the 20 / 50 / 200 stack that two named methods threshold. Minervini's trend template requires the close above it, it above the 200-day and the 50-day above it; Weinstein's stage analysis reads a rising 30-week average with the price above as stage 2 (the only stage to buy). feature.pct_vs_sma_150 is the distance."
+caveats = [
+  "An average over seven months lags a turn by weeks; pair with rollup.bands@v2.ema20_slope_5d or feature.ema_stack for the recent direction.",
+  "Null after any missing bar in the last 150 sessions or a shorter history.",
+]
+sources = [
+  "Minervini (2013), Trade Like a Stock Market Wizard: the trend template",
+  "Weinstein (1988), Secrets for Profiting in Bull and Bear Markets: the 30-week moving average",
+]
+[[field.use]]
+for = "has a 30-week average"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.pct_vs_sma_150 gt 0, with rollup.price_stats@v2.sma_200 below it for the template"

@@ -129,7 +129,7 @@ w_runup = 50.0
 credit_boom_above = 0.10     # bank credit up more than 10% on the year
 runup_above = 0.30           # SPY up more than 30% on the year
 
-["trend_stats@v1"]        # streaks and the base length (docs/data/technical.md)
+["trend_stats@v2"]        # streaks and the base length (docs/data/technical.md)
 tight_range_pct = 0.15   # a 20-session high-low range at most this share of the close is tight
 
 ["volume_profile@v1"]     # volume at price from daily bars (docs/data/technical.md)

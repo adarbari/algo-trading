@@ -318,6 +318,22 @@ forbidden_modules = [
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
+name = "Event scope is read-only: no writers, no jobs, no vendors (ADR 0050)"
+type = "forbidden"
+source_modules = ["algotrade.services.events"]
+forbidden_modules = [
+    "algotrade.storage.tables.writers",
+    "algotrade.storage.tables.result_writer",
+    "algotrade.storage.configs.writer",
+    "algotrade.services.jobs",
+    "algotrade.services.authoring",
+    "algotrade.services.ondemand",
+    "algotrade.services.screening",
+    "algotrade_sources",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
 name = "Explaining reads the regime and writes only its cache: no writers, no jobs, no vendors (ADR 0041)"
 type = "forbidden"
 source_modules = ["algotrade.services.explaining"]
@@ -623,9 +639,9 @@ source_modules = ["algotrade.config.site"]
 forbidden_modules = ["algotrade.config.strategy"]
 
 [[tool.importlinter.contracts]]
-name = "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)"
+name = "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"
 type = "independence"
-modules = ["algotrade.services.backtests", "algotrade.services.screening", "algotrade.services.authoring", "algotrade.services.drafting", "algotrade.services.explaining"]
+modules = ["algotrade.services.backtests", "algotrade.services.screening", "algotrade.services.authoring", "algotrade.services.drafting", "algotrade.services.explaining", "algotrade.services.events"]
 
 # ---- ADR 0029: user configs are written only through services.authoring (the API calls it).
 [[tool.importlinter.contracts]]

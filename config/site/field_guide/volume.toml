@@ -268,7 +268,7 @@ op = "gte"
 value = 0.95
 mode = "soft"
 tolerance = 0.03
-note = "with rollup.trend_stats@v1.close_range_pos gte 0.7 for a strong close on it; rollup.volume@v1.volume_z_20d is the sigma version"
+note = "with rollup.trend_stats@v2.close_range_pos gte 0.7 for a strong close on it; rollup.volume@v1.volume_z_20d is the sigma version"
 [[field.use]]
 for = "a quiet day (volume drying up)"
 op = "lte"
@@ -340,7 +340,7 @@ note = "a breakout through a thin zone runs fast: pair with feature.breakout_mag
 [[field]]
 name = "rollup.vol_stats@v1.pocket_pivot"
 theme = "volume"
-reads = "True on a pocket pivot: the close rose and the session's volume exceeded the volume of every down-close session among the ten before it. Morales and Kacher's buy point inside a base: institutions are accumulating before the breakout, visible as an up day on more volume than any recent selling day. It fires on a few percent of sessions; the classic version also wants the close above the 10-day average and a constructive base (rollup.trend_stats@v1.tight_range_sessions, feature.pct_vs_ema_20 gt 0)."
+reads = "True on a pocket pivot: the close rose and the session's volume exceeded the volume of every down-close session among the ten before it. Morales and Kacher's buy point inside a base: institutions are accumulating before the breakout, visible as an up day on more volume than any recent selling day. It fires on a few percent of sessions; the classic version also wants the close above the 10-day average and a constructive base (rollup.trend_stats@v2.tight_range_sessions, feature.pct_vs_ema_20 gt 0)."
 caveats = [
   "An earnings day or an index event is a pocket pivot by arithmetic; check rollup.earnings@v1.last_earnings_date and rollup.momentum@v1.rel_volume (a genuine one is usually 1.2 to 2 times average, not 5).",
   "False when the ten sessions before had no down close at all (nothing to beat), which is rare and not a signal either way.",
@@ -352,4 +352,4 @@ for = "a pocket pivot buy point"
 op = "eq"
 value = true
 mode = "hard"
-note = "with feature.pct_vs_ema_20 gt 0 and rollup.trend_stats@v1.tight_range_sessions gte 10 for the base; feature.stretch_sma20_atr lte 2 against an extended one"
+note = "with feature.pct_vs_ema_20 gt 0 and rollup.trend_stats@v2.tight_range_sessions gte 10 for the base; feature.stretch_sma20_atr lte 2 against an extended one"

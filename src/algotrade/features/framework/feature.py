@@ -37,8 +37,9 @@ type and, later, UI and email labels (ADR 0023).
 - ``applies_to``  which instruments the feature is defined for: ``any``, ``optionable``
                   (option-chain features: a non-optionable instrument has none) or
                   ``operating_company`` (earnings: only a common stock or ADR that is not a
-                  blank-check company, SEC SIC 6770; ADR 0045). A group's value is inherited by its
-                  features.
+                  blank-check company, SEC SIC 6770; ADR 0045) or ``leveraged_fund`` (a
+                  leveraged or inverse fund: ``is_leveraged`` or ``is_inverse``; ADR 0050). A
+                  group's value is inherited by its features.
                   Where it does not apply the read says NOT_APPLICABLE, not UNKNOWN (ADR 0042)
 - ``null_status`` the status column saying why this one is null: a sibling column of the same
                   group (``iv30_status``) or another group's (``iv30.iv30_status@v1``, for a
@@ -66,7 +67,7 @@ type Entity = Literal["instrument", "market"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
 type Licence = Literal["open", "personal"]
-type AppliesTo = Literal["any", "optionable", "operating_company"]
+type AppliesTo = Literal["any", "optionable", "operating_company", "leveraged_fund"]
 # A status field, the values of it that read ILLIQUID and those that read EXPLAINED, and the
 # stored table of the feature declaring it (an EXPLAINED status covers a missing row there only).
 type StatusRule = tuple[str, frozenset[str], frozenset[str], str]
@@ -74,7 +75,7 @@ type StatusRule = tuple[str, frozenset[str], frozenset[str], str]
 ENTITIES = frozenset({"instrument", "market"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
 LICENCES = ("open", "personal")  # least to most restrictive
-APPLIES_TO = ("any", "optionable", "operating_company")
+APPLIES_TO = ("any", "optionable", "operating_company", "leveraged_fund")
 UNITS = frozenset(
     {
         "decimal",  # a fraction: 0.25 is 25% (returns, vols, yields, rates, relative spreads)
@@ -247,10 +248,13 @@ def not_applicable(
     optionable: bool | None,
     security_type: str | None,
     sic: str | None = None,
+    leveraged: bool | None = None,
+    inverse: bool | None = None,
 ) -> str:
     """The ``applies_to`` value that rules a feature out for an instrument with these
-    reference and company facts, or ``""`` when it applies (ADR 0042, ADR 0045). A null fact
-    never rules out: a null ``optionable``, ``security_type`` or ``sic`` is unknown, not "no".
+    reference and company facts, or ``""`` when it applies (ADR 0042, ADR 0045, ADR 0050). A
+    null fact never rules out: a null ``optionable``, ``security_type``, ``sic``, or a
+    leverage flag that is not "no" on both counts is unknown, not "no".
     The one decision: the read layer (NOT_APPLICABLE) and the nightly coverage check share it."""
     wanted = set(applies)
     if "optionable" in wanted and optionable is False:
@@ -260,6 +264,8 @@ def not_applicable(
             return "operating_company"
         if (sic or "").strip() == BLANK_CHECK_SIC:
             return "operating_company"
+    if "leveraged_fund" in wanted and leveraged is False and inverse is False:
+        return "leveraged_fund"
     return ""
 
 

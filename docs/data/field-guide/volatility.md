@@ -266,7 +266,7 @@ Sources: Carr and Wu (2009) on the realised side of the premium; Yang and Zhang 
 
 Sources: Yang and Zhang (2000); https://flashalpha.com/articles/yang-zhang-vs-close-to-close-realized-volatility
 
-### `rollup.bands@v1.close_std_20`
+### `rollup.bands@v2.close_std_20`
 
 **How to read it.** The sample standard deviation of the last 20 closes, in dollars per share: half the distance from the 20-session mean to a one-sigma Bollinger band. It scales with the price, so read it as a share of the price (feature.bb_width is four of these over the mean) or in the z-score it normalises (feature.price_z_20d): a $2 deviation is wide on a $30 stock and tight on a $300 one.
 
@@ -285,13 +285,13 @@ Sources: Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Ban
 
 ### `feature.bb_width`
 
-**How to read it.** The Bollinger bandwidth: the distance between the bands as a share of the 20-session mean, 0.10 meaning the bands are 10% of the price apart (four standard deviations of the last 20 closes). Low to high: under about 0.05 is tight for a large cap, 0.08 to 0.15 ordinary, above 0.25 a volatile month. The level depends on the name, so screen on its rank against the year, rollup.bands@v1.bb_width_pctile_252d, and use this to compare two names on the same day.
+**How to read it.** The Bollinger bandwidth: the distance between the bands as a share of the 20-session mean, 0.10 meaning the bands are 10% of the price apart (four standard deviations of the last 20 closes). Low to high: under about 0.05 is tight for a large cap, 0.08 to 0.15 ordinary, above 0.25 a volatile month. The level depends on the name, so screen on its rank against the year, rollup.bands@v2.bb_width_pctile_252d, and use this to compare two names on the same day.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| comparing two names' volatility today | `lte 0.1` | score | 0.05 | a score between names; for 'tight for this name' use rollup.bands@v1.bb_width_pctile_252d lte 0.10 |
+| comparing two names' volatility today | `lte 0.1` | score | 0.05 | a score between names; for 'tight for this name' use rollup.bands@v2.bb_width_pctile_252d lte 0.10 |
 
 **When the reading lies**
 
@@ -301,7 +301,7 @@ Sources: Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Ban
 
 Sources: Bollinger (2001), Bollinger on Bollinger Bands: BandWidth and the Squeeze; Bollinger BandWidth, StockCharts: https://school.stockcharts.com/doku.php?id=technical_indicators:bollinger_band_width
 
-### `rollup.bands@v1.bb_width_pctile_252d`
+### `rollup.bands@v2.bb_width_pctile_252d`
 
 **How to read it.** Where today's Bollinger bandwidth sits against the name's own last year, 0 to 1: the share of the 252 sessions before today whose bandwidth was narrower. 0.05 means the bands are tighter than on 95% of days in the year (Bollinger's Squeeze: the lowest bandwidth in six months), 0.50 an ordinary month, 0.95 one of the widest. A squeeze says a large move is likelier, not which way: it is a setup to pair with a direction (feature.trend_state, rollup.volume@v1.up_volume_share_20d), and feature.bb_squeeze is the same idea measured against the Keltner channel.
 
@@ -314,7 +314,7 @@ Sources: Bollinger (2001), Bollinger on Bollinger Bands: BandWidth and the Squee
 
 **When the reading lies**
 
-- Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that just had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v1.tight_range_sessions.
+- Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that just had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.
 - A squeeze can last weeks and the release can go either way; do not read a low percentile as a buy. Confirm the direction with feature.breakout_20d or rollup.volume@v1.up_volume_share_20d once it moves.
 - A pending takeover pins the price, so the bands stay the tightest in the year until the deal closes. See the 'pending takeover' situation.
 - Null when fewer than 240 of the 252 sessions before today have a bandwidth (a young listing or a name with gaps), or today's is unknown.
@@ -323,7 +323,7 @@ Sources: Bollinger (2001), Bollinger on Bollinger Bands: 'The Squeeze' (BandWidt
 
 ### `feature.bb_squeeze`
 
-**How to read it.** True when both Bollinger bands sit inside the Keltner channel: the dispersion of closes has fallen below the name's own daily range, the compression Carter's TTM squeeze is built on. It is a state, not a signal: the release (the first session the bands move back outside the channel) is the event, and its direction comes from the price. It usually coincides with rollup.bands@v1.bb_width_pctile_252d under about 0.15 but needs no history, so it works on young listings.
+**How to read it.** True when both Bollinger bands sit inside the Keltner channel: the dispersion of closes has fallen below the name's own daily range, the compression Carter's TTM squeeze is built on. It is a state, not a signal: the release (the first session the bands move back outside the channel) is the event, and its direction comes from the price. It usually coincides with rollup.bands@v2.bb_width_pctile_252d under about 0.15 but needs no history, so it works on young listings.
 
 **The criterion per intent**
 
@@ -333,14 +333,14 @@ Sources: Bollinger (2001), Bollinger on Bollinger Bands: 'The Squeeze' (BandWidt
 
 **When the reading lies**
 
-- With a Keltner multiplier of 2 ATR the squeeze fires less often than Carter's 1.5; a name that is 'almost' squeezed shows in rollup.bands@v1.bb_width_pctile_252d.
+- With a Keltner multiplier of 2 ATR the squeeze fires less often than Carter's 1.5; a name that is 'almost' squeezed shows in rollup.bands@v2.bb_width_pctile_252d.
 - A squeeze lasts from a few sessions to months; screening on it alone finds names going nowhere. Pair with feature.trend_state or feature.volume_dry_up to find the ones building a base.
 - A pending takeover squeezes forever (no range, no dispersion); see the 'pending takeover' situation.
 - Null when the bands or the channel are unknown (fewer than 20 consecutive bars) and the known side does not already say false.
 
 Sources: Carter (2005), Mastering the Trade: the TTM squeeze; TTM Squeeze, StockCharts: https://school.stockcharts.com/doku.php?id=technical_indicators:ttm_squeeze
 
-### `rollup.trend_stats@v1.ret_z_20d`
+### `rollup.trend_stats@v2.ret_z_20d`
 
 **How to read it.** Today's close-to-close return in units of the name's normal daily move: the return divided by the standard deviation of the 20 daily returns before it. Low to high: within -1 to +1 is an ordinary day, beyond 2 a notable one (about one day in twenty by chance), beyond 3 an event (earnings, news, an index change, a capitulation), beyond 5 almost always a gap on news. The sign is the direction; rollup.volume@v1.volume_z_20d is the same measure for volume.
 
@@ -360,7 +360,7 @@ Sources: Carter (2005), Mastering the Trade: the TTM squeeze; TTM Squeeze, Stock
 
 Sources: Standard score, Wikipedia: https://en.wikipedia.org/wiki/Standard_score; Event-day detection by standardised returns (de Bondt and Thaler style event studies): https://en.wikipedia.org/wiki/Event_study
 
-### `rollup.trend_stats@v1.tight_range_sessions`
+### `rollup.trend_stats@v2.tight_range_sessions`
 
 **How to read it.** How many consecutive sessions, ending today, the 20-session high-low range has been at most 15% of the close: the age of the current base. 0 means the range is not tight today; 5 to 10 is a young base (one or two weeks); 20 and above a month-old consolidation, the kind O'Neil's flat base and Minervini's contraction patterns describe; 60 and above a long, often dull, range. It counts sessions, so the base's start is today minus the count.
 
@@ -373,7 +373,7 @@ Sources: Standard score, Wikipedia: https://en.wikipedia.org/wiki/Standard_score
 
 **When the reading lies**
 
-- 15% of the close is tight for a large cap and wide for a biotech or a leveraged fund: a high-volatility name never qualifies and a utility always does. For 'tight for this name' use rollup.bands@v1.bb_width_pctile_252d, which ranks against the name's own year.
+- 15% of the close is tight for a large cap and wide for a biotech or a leveraged fund: a high-volatility name never qualifies and a utility always does. For 'tight for this name' use rollup.bands@v2.bb_width_pctile_252d, which ranks against the name's own year.
 - A base in a downtrend is a shelf before the next leg down as often as a bottom; pair with feature.trend_state or feature.pct_vs_sma_200 for the direction it should resolve in.
 - A pending takeover makes the tightest base there is; see the 'pending takeover' situation.
 - Null when today's 20-session range is unknown (a gap among the last 20 sessions, or a shorter history).
@@ -425,7 +425,7 @@ Sources: Wilder (1978), New Concepts in Technical Trading Systems: ATR
 
 **When the reading lies**
 
-- Ten returns: one 5% day alone gives an hv10 near 0.25. Check rollup.trend_stats@v1.ret_z_20d for the day behind the number.
+- Ten returns: one 5% day alone gives an hv10 near 0.25. Check rollup.trend_stats@v2.ret_z_20d for the day behind the number.
 - Null after a gap in the last 11 sessions or a shorter history.
 
 Sources: Realised volatility estimators: ADR 0021; Sinclair (2013), Volatility Trading
@@ -455,7 +455,7 @@ Sources: Realised volatility estimators: ADR 0021
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| realised volatility contraction | `lte 0.15` | soft | 0.05 | with feature.bb_squeeze eq true or rollup.bands@v1.bb_width_pctile_252d lte 0.10; a pre-move state, no direction |
+| realised volatility contraction | `lte 0.15` | soft | 0.05 | with feature.bb_squeeze eq true or rollup.bands@v2.bb_width_pctile_252d lte 0.10; a pre-move state, no direction |
 | realised volatility already elevated | `gte 0.85` | soft | 0.05 | a filter for strategies that want a calm entry; for premium selling check feature.iv_percentile is higher still |
 
 **When the reading lies**
@@ -475,11 +475,11 @@ Sources: Bollinger (2001), Bollinger on Bollinger Bands: volatility cycles; Sinc
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
 | range expanding (breakout confirmation) | `gte 1.2` | soft | 0.1 | with feature.breakout_20d or feature.breakout_magnitude_20d gt 0 |
-| range contracting (before the move) | `lte 0.8` | soft | 0.1 | with rollup.bands@v1.bb_width_pctile_252d lte 0.15 for the squeeze |
+| range contracting (before the move) | `lte 0.8` | soft | 0.1 | with rollup.bands@v2.bb_width_pctile_252d lte 0.15 for the squeeze |
 
 **When the reading lies**
 
-- One gap day lifts ATR(5) by a fifth of the gap and the ratio with it for a week; an 'expansion' that is one day old is a gap, not a trend. Check rollup.trend_stats@v1.ret_z_20d.
+- One gap day lifts ATR(5) by a fifth of the gap and the ratio with it for a week; an 'expansion' that is one day old is a gap, not a trend. Check rollup.trend_stats@v2.ret_z_20d.
 - A pending takeover collapses both ATRs; the ratio then swings on cents. See the 'pending takeover' situation.
 - Null with fewer than 21 consecutive bars, or ATR(20) of 0.
 
