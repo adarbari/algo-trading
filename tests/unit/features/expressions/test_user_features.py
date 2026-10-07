@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 
-from algotrade.config.site.settings import FeatureDefinition, feature_definitions
+from algotrade.config.site.features.definitions import FeatureDefinition, feature_definitions
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.expressions.nodes import ExpressionError

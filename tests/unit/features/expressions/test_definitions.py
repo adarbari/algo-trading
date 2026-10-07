@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import pytest
 
-from algotrade.config.site.settings import FeatureDefinition
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.features.expressions.definitions import build_expressions, formula_type
 from algotrade.features.expressions.nodes import ExpressionError
 from algotrade.features.registry import GROUPS

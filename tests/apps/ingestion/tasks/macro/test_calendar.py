@@ -4,6 +4,7 @@ session for a scheduled date, the release date for a past one), the ISM rules ar
 starts and holidays, a rerun that writes nothing, and a release that turns ``released``
 keeping its ``known_from``."""
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 from itertools import count
 from typing import Any
@@ -20,6 +21,7 @@ from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro.calendar import (
     TABLE,
     ingest_macro_calendar,
+    moved_rows,
     release_moment,
     release_rows,
     rows_to_write,
@@ -156,7 +158,7 @@ def test_rows_say_status_by_the_session_and_known_from_the_earlier_date() -> Non
     assert rows["ts"].iloc[2] == pd.Timestamp("2026-10-14 12:30", tz="UTC")
 
 
-def test_rows_to_write_keeps_the_stored_known_from_and_never_downgrades() -> None:
+def test_rows_to_write_versions_a_turned_date_by_its_own_known_from_and_never_downgrades() -> None:
     held = release_rows(CPI, [date(2026, 10, 14), date(2026, 11, 10)], S1)
     held.loc[1, "status"] = "released"  # stored as released already
     target = release_rows(CPI, [date(2026, 10, 14), date(2026, 11, 10), date(2026, 12, 10)], S2)
@@ -164,7 +166,31 @@ def test_rows_to_write_keeps_the_stored_known_from_and_never_downgrades() -> Non
     out = rows_to_write(target, held)
     assert list(out["release_date"]) == [date(2026, 10, 14), date(2026, 12, 10)]
     assert list(out["status"]) == ["released", "scheduled"]
-    assert list(out["known_from"]) == [S1, S2]  # the flipped row keeps its first session
+    assert list(out["known_from"]) == [date(2026, 10, 14), S2]  # released from its own date
+
+
+def test_a_changed_name_keeps_the_stored_known_from() -> None:
+    held = release_rows(CPI, [date(2026, 11, 10)], S1)
+    target = release_rows(CPI, [date(2026, 11, 10)], S2).assign(release_name="CPI (renamed)")
+    out = rows_to_write(target, held)
+    assert list(out["release_name"]) == ["CPI (renamed)"] and list(out["known_from"]) == [S1]
+
+
+def test_a_moved_date_listed_again_is_written_again() -> None:
+    held = release_rows(CPI, [date(2026, 11, 10)], S1).assign(status="moved")
+    out = rows_to_write(release_rows(CPI, [date(2026, 11, 10)], S2), held)
+    assert list(out["status"]) == ["scheduled"] and list(out["known_from"]) == [S2]
+
+
+def test_moved_rows_cover_only_stored_scheduled_dates_inside_the_window() -> None:
+    window = (date(2026, 1, 1), date(2026, 12, 31))
+    held = release_rows(CPI, [date(2025, 12, 10), date(2026, 11, 10), date(2026, 12, 10)], S1)
+    held.loc[2, "status"] = "released"  # (a released date is final)
+    out = moved_rows(held, [date(2026, 11, 12)], window, S2)
+    assert list(out["release_date"]) == [date(2026, 11, 10)]  # 2025-12-10 is outside the window
+    assert list(out["status"]) == ["moved"] and list(out["known_from"]) == [S2]
+    assert moved_rows(held, [date(2026, 11, 10)], window, S2).empty
+    assert moved_rows(held.iloc[0:0], [S1], window, S2).empty
 
 
 def test_nothing_new_writes_nothing() -> None:
@@ -232,31 +258,68 @@ def test_a_rerun_on_an_unchanged_calendar_writes_nothing() -> None:
     assert set(again.items.values()) == {"UNCHANGED"} and again.stats["rows"] == 0
 
 
-def test_a_later_run_turns_a_date_released_and_keeps_its_known_from() -> None:
+def test_a_later_run_turns_a_date_released_as_a_version_known_from_its_date() -> None:
     ctx = context(Feed())
     ingest_macro_calendar(ctx, REGISTRY, S1)
     later = ingest_macro_calendar(ctx, REGISTRY, S2, only=["CPI"])
     assert later.items == {
         "CPI": "OK: 1 rows"
     }  # the 2026-10-14 date; the window moved nothing else
+    release = date(2026, 10, 14)
     cpi = stored(ctx, "CPI").set_index("release_date")
-    flipped = cpi.loc[date(2026, 10, 14)]
-    assert flipped["status"] == "released" and flipped["known_from"] == S1
-    assert cpi.loc[date(2026, 11, 10), "status"] == "scheduled"
-    assert len(cpi) == 15
+    assert cpi.loc[release, "status"] == "released" and cpi.loc[release, "known_from"] == release
+    assert cpi.loc[date(2026, 11, 10), "status"] == "scheduled" and len(cpi) == 15
+    # a session before the release date still reads it scheduled; from the date on, released
+    for session, status in ((S1, "scheduled"), (date(2026, 10, 13), "scheduled"),
+                            (release, "released"), (S2, "released")):  # fmt: skip
+        known = stored(ctx, "CPI", through=session).set_index("release_date")
+        assert known.loc[release, "status"] == status, session
 
 
-def test_a_date_fred_moves_is_a_new_row_and_the_old_one_stays() -> None:
+def test_a_date_fred_moves_is_a_new_row_and_the_old_one_is_marked_moved() -> None:
     feed = Feed({"10": PAYLOAD, "101": PAYLOAD})
     ctx = context(feed)
     ingest_macro_calendar(ctx, REGISTRY, S1, only=["CPI"])
-    moved = PAYLOAD.replace(b"2026-11-10", b"2026-11-12")
-    feed.bodies["10"] = moved
-    record = ingest_macro_calendar(ctx, REGISTRY, date(2026, 10, 7), only=["CPI"])
-    assert record.items["CPI"] == "OK: 1 rows"
-    cpi = stored(ctx, "CPI")
-    assert {date(2026, 11, 10), date(2026, 11, 12)} <= set(cpi["release_date"])
-    assert stored(ctx, "CPI", through=S1)["release_date"].tolist().count(date(2026, 11, 12)) == 0
+    feed.bodies["10"] = PAYLOAD.replace(b"2026-11-10", b"2026-11-12")
+    later = date(2026, 10, 7)
+    record = ingest_macro_calendar(ctx, REGISTRY, later, only=["CPI"])
+    assert record.items["CPI"] == "OK: 2 rows"  # the new date and the old one's moved version
+    before = stored(ctx, "CPI", through=S1).set_index("release_date")
+    assert (
+        date(2026, 11, 12) not in before.index
+        and before.loc[date(2026, 11, 10), "status"] == "scheduled"
+    )
+    after = stored(ctx, "CPI", through=later).set_index("release_date")
+    assert after.loc[date(2026, 11, 10), "status"] == "moved"
+    assert after.loc[date(2026, 11, 12), "status"] == "scheduled"
+    assert after.loc[date(2026, 11, 10), "known_from"] == later
+    again = ingest_macro_calendar(ctx, REGISTRY, later, only=["CPI"])
+    assert again.items["CPI"] == "UNCHANGED"  # the moved version is not rewritten
+
+
+def test_a_fetch_that_returns_nothing_marks_nothing_moved() -> None:
+    feed = Feed()
+    ctx = context(feed)
+    ingest_macro_calendar(ctx, REGISTRY, S1, only=["CPI"])
+    feed.bodies["10"] = EMPTY
+    record = ingest_macro_calendar(ctx, REGISTRY, S2, only=["CPI"])
+    assert record.items["CPI"] == "NO_DATA"
+    assert "moved" not in set(stored(ctx, "CPI")["status"])
+
+
+def test_a_registry_exception_replaces_the_rule_date_and_a_later_run_moves_the_old_one() -> None:
+    window = (date(2025, 1, 1), date(2025, 3, 31))
+    assert rule_dates(MFG, *window)[0] == date(2025, 1, 2)
+    shifted = replace(MFG, exceptions={"2025-01": date(2025, 1, 3)})
+    assert rule_dates(shifted, *window) == [date(2025, 1, 3), date(2025, 2, 3), date(2025, 3, 3)]
+    ctx = context(Feed())
+    ingest_macro_calendar(ctx, REGISTRY, date(2024, 12, 30), only=["ISM_MFG"])
+    registry = MacroReleases((CPI, FOMC, shifted, SERVICES))
+    record = ingest_macro_calendar(ctx, registry, date(2025, 1, 6), only=["ISM_MFG"])
+    assert record.items["ISM_MFG"].startswith("OK:")
+    jan = stored(ctx, "ISM_MFG").set_index("release_date")
+    assert jan.loc[date(2025, 1, 2), "status"] == "moved"
+    assert jan.loc[date(2025, 1, 3), "status"] == "released"
 
 
 def test_without_fred_the_rules_still_run_and_the_fred_releases_are_skipped() -> None:
