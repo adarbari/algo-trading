@@ -1,4 +1,4 @@
-/** The rule 9 check (lint-rules/responsive.js): which `<Grid>` usages it reports. */
+/** The rule 10 check (lint-rules/responsive.js): which `<Grid>` usages it reports. */
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
 import { describe, expect, it } from 'vitest';
@@ -44,7 +44,7 @@ describe('algotrade/grid-collapses', () => {
   ])('reports %s', (jsx) => {
     const found = lint(`const x = ${jsx};`);
     expect(found).toHaveLength(1);
-    expect(found[0]).toContain('[ADR 0025 rule 9]');
+    expect(found[0]).toContain('[ADR 0025 rule 10]');
     expect(found[0]).toContain('.claude/skills/responsive-ui');
   });
 });

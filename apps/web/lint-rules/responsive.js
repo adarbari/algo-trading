@@ -35,7 +35,7 @@ function isNoCollapse(attr) {
 export const gridCollapses = {
   meta: {
     type: 'problem',
-    docs: { description: 'rule 9: a multi-column Grid collapses on narrow screens' },
+    docs: { description: 'rule 10: a multi-column Grid collapses on narrow screens' },
     schema: [],
     messages: { collapse: MESSAGE },
   },

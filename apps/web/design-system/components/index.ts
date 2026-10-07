@@ -77,8 +77,17 @@ export {
   type HeatGridRow,
   type HeatStatus,
 } from './HeatGrid';
+export {
+  HelpDrawer,
+  HelpLead,
+  HelpSection,
+  type HelpDrawerProps,
+  type HelpLeadProps,
+  type HelpSectionProps,
+} from './HelpDrawer';
 export { Icon, ICON_NAMES, type IconName, type IconProps, type IconTone } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { InfoButton, type InfoButtonProps } from './InfoButton';
 export {
   IndicatorRow,
   type IndicatorChange,

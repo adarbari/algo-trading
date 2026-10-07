@@ -9,7 +9,10 @@
   story, test, index and screenshots; ``screenshots`` hold only ``.png``;
 - stylesheets only where ``styles = true`` (the design system);
 - no fact the server owns is derived in ``src/``
-  (``architecture/web_forbidden_derivations.toml``, ADR 0038).
+  (``architecture/web_forbidden_derivations.toml``, ADR 0038);
+- no explanatory prose is added to ``src/``: explanations are Guide content shown through the
+  help drawer, the older prose is a shrink-only baseline (``architecture/web_prose.toml``,
+  ADR 0051).
 
 Import rules between these folders are ESLint's (``apps/web/lint-rules/``); the per-story
 completeness of design-system components is ``npm run ds:check``.
@@ -252,3 +255,101 @@ def test_forbidden_derivations_respect_allowed_paths(tmp_path: Path) -> None:
     (src / "widgets" / "w.test.tsx").write_text("const t = new Date();\n")
     patterns = [{"regex": r"new Date\(\)", "reason": "ask", "allowed": ["src/shared/lib/"]}]
     assert forbidden_derivations(src, patterns) == ["src/widgets/w.tsx:2: ask"]
+
+
+PROSE_FILE = "architecture/web_prose.toml"
+PROSE_HINT = (
+    "an explanation is a Guide entry shown through the help drawer (ADR 0051; "
+    ".claude/skills/add-guide-content); microcopy is one sentence under 25 words"
+)
+_COMMENT = re.compile(r"/\*.*?\*/|(?<![:\"'])//[^\n]*", re.S)
+_JSX_TEXT = re.compile(r">([^<>{}]+)<")
+_STRING = re.compile(r"'((?:[^'\\\n]|\\.)*)'|\"((?:[^\"\\\n]|\\.)*)\"|`((?:[^`\\]|\\.)*)`")
+_CODE = re.compile(r"=|&&|\|\||\n|\b(?:const|return|function)\b")
+_WORD = re.compile(r"[A-Za-z][A-Za-z\u2019'-]*")
+_SENTENCE_END = re.compile(r"[.!?](?=\s+[A-Z(]|\s*$)")
+_EXPLAINER = re.compile(
+    r"<Disclosure\b[^>]*?label=[\"'{`]+[^\"'}`]*?(?:how to read|why it matters|learn more|what is)",
+    re.I | re.S,
+)
+
+
+def _is_prose(text: str, settings: dict[str, Any]) -> bool:
+    words = len(_WORD.findall(text))
+    sentences = len(_SENTENCE_END.findall(text))
+    return words >= settings["min_words"] and (
+        sentences >= 2 or words >= settings["max_sentence_words"]
+    )
+
+
+def prose_findings(text: str, settings: dict[str, Any]) -> list[str]:
+    """The explanatory prose and explainer Disclosures in one TS / TSX source (comments,
+    code between tags and multi-line template literals such as GraphQL documents left out)."""
+    text = _COMMENT.sub("", text)
+    found = []
+    for match in _JSX_TEXT.finditer(text):
+        jsx = " ".join(match.group(1).split())
+        if not _CODE.search(jsx) and _is_prose(jsx, settings):
+            found.append(jsx)
+    for match in _STRING.finditer(text):
+        literal = next(group for group in match.groups() if group is not None)
+        if not _CODE.search(literal) and _is_prose(re.sub(r"\$\{[^}]*\}", "X", literal), settings):
+            found.append(literal)
+    found += [match.group(0) for match in _EXPLAINER.finditer(text)]
+    return found
+
+
+def prose_counts(src: Path, settings: dict[str, Any]) -> dict[str, int]:
+    """Findings per file of ``src/**/*.{ts,tsx}`` (tests, stories, generated left out), keyed
+    by the path relative to ``src``'s parent (``apps/web``)."""
+    counts = {}
+    for path in sorted(src.rglob("*.ts*")):
+        rel = path.relative_to(src.parent).as_posix()
+        if path.suffix not in (".ts", ".tsx") or "/generated/" in rel:
+            continue
+        if any(fnmatch.fnmatchcase(path.name, skip) for skip in DERIVED_SKIP):
+            continue
+        if found := prose_findings(path.read_text(), settings):
+            counts[rel] = len(found)
+    return counts
+
+
+def test_web_prose_matches_the_baseline() -> None:
+    """ADR 0051: explanations live in the Guide; the baseline of older prose only shrinks."""
+    settings = tomllib.loads((REPO_ROOT / PROSE_FILE).read_text())
+    baseline: dict[str, int] = settings["baseline"]
+    counts = prose_counts(REPO_ROOT / WEB["root"] / "src", settings)
+    over = [
+        f"{rel}: {n} (baseline {baseline.get(rel, 0)})"
+        for rel, n in counts.items()
+        if n > baseline.get(rel, 0)
+    ]
+    assert not over, f"explanatory prose in the web code; {PROSE_HINT}:\n" + "\n".join(over)
+    under = [
+        f"{rel}: {counts.get(rel, 0)} (baseline {n})"
+        for rel, n in baseline.items()
+        if counts.get(rel, 0) < n
+    ]
+    assert not under, f"prose removed: lower or delete these lines of {PROSE_FILE}:\n" + "\n".join(
+        under
+    )
+
+
+def test_prose_findings_tell_explanations_from_microcopy() -> None:
+    settings = {"min_words": 12, "max_sentence_words": 25}
+    source = """
+    // A comment of many words that explains a lot of things to the reader of the code.
+    const q = `
+      query Long { one two three four five six seven eight nine ten eleven twelve }`;
+    <Text>No screener yet.</Text>
+    <Text>Ranked by your screener priority, then score. Reorder the screeners to change it.</Text>
+    <Text>{a > b ? 'x' : 'y'} and some words that read like code const x = 1 here then</Text>
+    const hint = "Plain English: the rows are a draft. Review each one before you save it here.";
+    <Disclosure label="How to read it">
+    <Disclosure label="Missing data">
+    """
+    assert prose_findings(source, settings) == [
+        "Ranked by your screener priority, then score. Reorder the screeners to change it.",
+        "Plain English: the rows are a draft. Review each one before you save it here.",
+        '<Disclosure label="How to read',
+    ]

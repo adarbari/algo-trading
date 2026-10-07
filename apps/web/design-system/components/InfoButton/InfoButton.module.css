@@ -1,0 +1,28 @@
+/* InfoButton: the icon's own size plus a hairline of padding, so it sits inline in a header row. */
+.infoButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: var(--space-0-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  vertical-align: middle;
+  transition-duration: var(--duration-fast);
+  transition-property: background-color, color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.infoButton:hover {
+  background: var(--color-row);
+  color: var(--color-text);
+}
+
+.infoButton[data-expanded] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}

@@ -1,6 +1,6 @@
 /**
  * The app on a phone (iPhone 13: touch, 390 px wide; the `phone` project of playwright.config.ts,
- * ADR 0025 rule 9), against the production build with the API mocked: every top-bar route fits
+ * ADR 0025 rule 10), against the production build with the API mocked: every top-bar route fits
  * the screen (no horizontal page scroll, a top bar that does not eat it), logs no errors and is
  * accessible; a ticker opens its detail as a sheet; a screener name opens its results; the chart
  * has zoom buttons for fingers.

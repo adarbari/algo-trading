@@ -6,7 +6,7 @@ description: Make or keep a web screen, widget or design-system component usable
 # Responsive UI: one tree for phones and desktops
 
 Read first: ADR 0052 (`docs/adr/0052-one-ui-for-phones-and-desktops.md`), `docs/ui/architecture.md`
-rule 9. Components: `.claude/skills/add-ui-component`; pages: `.claude/skills/add-web-page`.
+rule 10. Components: `.claude/skills/add-ui-component`; pages: `.claude/skills/add-web-page`.
 Never a mobile page, route, widget or component variant: adapt the one component.
 
 ## Checklist for every UI change
@@ -18,7 +18,7 @@ Never a mobile page, route, widget or component variant: adapt the one component
    `useNarrow(breakpoint)` from `design-system/responsive/`. App code never measures or reads
    `matchMedia`: what differs by width is a prop on a design-system component.
 2. **Multi-column layout collapses.** Every `Grid` with more than one column outside the design
-   system passes `collapse="md"` or `"lg"` (ESLint, ADR 0025 rule 9). Fixed tracks
+   system passes `collapse="md"` or `"lg"` (ESLint, ADR 0025 rule 10). Fixed tracks
    (`sidebar-*`, `label-value`, `main-aside`) collapse like the rest.
 3. **A list beside its detail is `MasterDetail`** (`master`, `detail`, `detailKey`,
    `detailTitle`, `onDetailClose`, optional `summary` shown above the list on narrow). Choosing
@@ -42,7 +42,7 @@ Never a mobile page, route, widget or component variant: adapt the one component
 - `npm run ds:check`: a component whose CSS has `@container` or `pointer: coarse` exports a
   `Narrow` story (the `narrow` decorator in `design-system/testing`: a 375 px container); the
   visual suite screenshots it light and dark and runs axe.
-- ESLint `[ADR 0025 rule 9]`: a multi-column `Grid` outside the design system has `collapse`.
+- ESLint `[ADR 0025 rule 10]`: a multi-column `Grid` outside the design system has `collapse`.
 - `npx playwright test --project=phone` (`e2e/phone.spec.ts`, iPhone 13 emulation): every
   section route without horizontal overflow, the top bar under 30 % of the viewport, no console
   errors, axe; Explore row tap opens the detail sheet; Ideas screener name opens its results;

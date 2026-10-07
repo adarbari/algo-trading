@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-10-07; owner decision: the UI must serve phones as well as desktops,
 without a second code base). Extends [0011](0011-design-system-first-ui.md) and
-[0025](0025-frontend-architecture.md) (rule 9 below). Skill: `.claude/skills/responsive-ui`.
+[0025](0025-frontend-architecture.md) (rule 10 below). Skill: `.claude/skills/responsive-ui`.
 
 ## Context
 The web app was built against desktop mockups: a top bar that wraps into three rows on a phone,

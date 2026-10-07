@@ -5,7 +5,7 @@
  *   - stories for the canonical states (Default, Loading, Empty, Error, Dense), or the state
  *     named in `parameters.states.notApplicable` with the reason;
  *   - a `Narrow` story when its CSS has an `@container` or `(pointer: coarse)` rule, or the
- *     reason it has none in `parameters.states.notApplicable` (ADR 0025 rule 9);
+ *     reason it has none in `parameters.states.notApplicable` (ADR 0025 rule 10);
  *   - an axe accessibility assertion in its unit test;
  *   - committed screenshots for every story in light and dark (__screenshots__/, made by
  *     `npm run visual:update`; compared in CI).
@@ -17,7 +17,7 @@ import { componentFolders, storyFileStem, THEMES, type ComponentFolder } from '.
 
 const STATES = ['Default', 'Loading', 'Empty', 'Error', 'Dense'] as const;
 const RESPONSIVE_GUIDE =
-  'see .claude/skills/responsive-ui and docs/ui/architecture.md (ADR 0025 rule 9)';
+  'see .claude/skills/responsive-ui and docs/ui/architecture.md (ADR 0025 rule 10)';
 const GUIDE = 'see .claude/skills/add-ui-component and docs/ui/architecture.md (ADR 0025 rule 6)';
 
 /** Story export names in a CSF file, in file order. */

@@ -1,0 +1,44 @@
+# Explanations are written once, as Guide content, and shown in place through the help drawer
+# (ADR 0051; docs/ui/guide.md; .claude/skills/add-guide-content). The web code holds no
+# explanatory prose of its own: a page keeps at most a one-sentence introduction, and microcopy
+# (an empty state, a confirmation, an action hint) is one sentence under 25 words.
+#
+# Checked by tests/architecture/test_layout_web.py::test_web_prose_matches_the_baseline over
+# apps/web/src/**/*.{ts,tsx} (tests, stories and generated files excluded). A finding is
+#   - a JSX text or string literal of at least `min_words` words that has two or more sentences
+#     or at least `max_sentence_words` words, or
+#   - a Disclosure whose label is an explainer ("how to read", "why it matters", "learn more",
+#     "what is"): that is the drawer's job (an InfoButton on the thing it explains).
+#
+# [baseline] is the number of findings per file today: a shrink-only ratchet. A file over its
+# count fails (move the text into a Guide entry); a file under it fails too, so the PR that
+# migrates a surface lowers or deletes its line in the same change. Never raise a count or add
+# a file: an explanation goes into the Guide (add-guide-content), a sentence of microcopy is
+# shortened.
+
+min_words = 12
+max_sentence_words = 25
+
+[baseline]
+"src/app/workspaces/workspaces.ts" = 3
+"src/entities/feature/model/columns.tsx" = 1
+"src/entities/regime/ui/RegimeHeadline.tsx" = 1
+"src/features/indicator-history/ui/IndicatorHistory.tsx" = 1
+"src/features/screener-builder/ui/FieldGuideHelp.tsx" = 1
+"src/features/screener-delete/ui/DeleteScreenerDialog.tsx" = 1
+"src/features/screener-describe/ui/DescribeForm.tsx" = 1
+"src/features/screener-finalise/ui/RebaseBanner.tsx" = 1
+"src/features/table-view/ui/SaveViewDialog.tsx" = 1
+"src/pages/screener-results/ui/ScreenerResultsPage.tsx" = 1
+"src/pages/trader-calendar/ui/CalendarPage.tsx" = 1
+"src/pages/trader-ideas/ui/IdeasPage.tsx" = 1
+"src/pages/trader-regime/ui/RegimePage.tsx" = 1
+"src/widgets/completeness-panel/ui/CompletenessPanel.tsx" = 1
+"src/widgets/draft-bar/ui/DraftBar.tsx" = 1
+"src/widgets/feature-table/ui/ScreenerResults.tsx" = 1
+"src/widgets/options-panel/ui/OptionsPanel.tsx" = 1
+"src/widgets/paused-ideas/ui/PausedIdeas.tsx" = 1
+"src/widgets/regime-indicators/ui/IndicatorCard.tsx" = 1
+"src/widgets/regime-legend/ui/RegimeLegend.tsx" = 1
+"src/widgets/screener-list/ui/ScreenerList.tsx" = 1
+"src/widgets/screener-ranking/ui/ScreenerRanking.tsx" = 1

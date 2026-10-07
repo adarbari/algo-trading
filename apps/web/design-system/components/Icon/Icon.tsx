@@ -47,6 +47,12 @@ const PATHS = {
       <path d="M6.17 3v10M9.83 3v10" />
     </>
   ),
+  book: (
+    <>
+      <path d="M2 3h3.5A2.5 2.5 0 0 1 8 5.5V13a1.75 1.75 0 0 0-1.75-1.75H2z" />
+      <path d="M14 3h-3.5A2.5 2.5 0 0 0 8 5.5V13a1.75 1.75 0 0 1 1.75-1.75H14z" />
+    </>
+  ),
   'zoom-in': (
     <>
       <circle cx="7" cy="7" r="4.25" />
@@ -77,7 +83,7 @@ export type IconTone =
   'inherit' | 'muted' | 'secondary' | 'accent' | 'positive' | 'warning' | 'negative' | 'info';
 
 export interface IconProps {
-  /** Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, zoom-in, zoom-out, fit, spinner. */
+  /** Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. */
   name: IconName;
   /** sm 12, md 14 (default), lg 16 px. */
   size?: 'sm' | 'md' | 'lg';
