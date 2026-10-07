@@ -52,8 +52,8 @@ export const CALENDAR_FIXTURE: EventCalendarResponse = {
   session: '2026-10-07',
   end: '2027-01-05',
   names: [
-    { instrumentId: 'EQ:A', symbol: 'AAPL' },
-    { instrumentId: 'EQ:N', symbol: 'NVDA' },
+    { instrumentId: 'FIGI-AAPL', symbol: 'AAPL' },
+    { instrumentId: 'FIGI-NVDA', symbol: 'NVDA' },
   ],
   days: [
     {
@@ -72,7 +72,7 @@ export const CALENDAR_FIXTURE: EventCalendarResponse = {
       isSession: true,
       events: [
         {
-          instrumentId: 'EQ:A',
+          instrumentId: 'FIGI-AAPL',
           symbol: 'AAPL',
           event: ahead('own_earnings', '2026-10-29', 'Earnings', 'after_hours'),
         },
