@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.site.events.releases import FOLDER, NAME
+from algotrade.config.site.events.releases import FOLDER, NAME, MacroReleases
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -18,7 +18,6 @@ from algotrade_ingestion.tasks.maintenance.quality import check_macro_calendar
 from tests.apps.ingestion.tasks.macro.test_calendar import (
     CPI,
     FOMC,
-    REGISTRY,
     Feed,
     context,
     entry,
@@ -28,7 +27,11 @@ from tests.helpers.ingest_fakes import task_ctx
 
 S = date(2026, 10, 6)
 DOCUMENT: dict[str, Any] = {
-    "release": [entry("CPI"), entry("FOMC", release_id=101, time_et="14:00"), rule("ISM_MFG", 1)]
+    "release": [
+        entry("CPI"),
+        entry("FOMC", release_id=101, time_et="14:00"),
+        rule("ISM_MFG", 1),
+    ]
 }
 
 
@@ -82,8 +85,9 @@ def test_a_date_stored_after_the_session_is_not_known_by_it() -> None:
 
 
 def test_releases_the_latest_run_skipped_are_not_graded() -> None:
-    ctx = with_configs(context(Feed(), fred=False))
-    ingest_macro_calendar(ctx, REGISTRY, S)  # every FRED release skipped (no key)
+    registry = {"release": [entry("CPI"), entry("FOMC", release_id=101), rule("ISM_MFG", 1)]}
+    ctx = with_configs(context(Feed(), fred=False), registry)
+    ingest_macro_calendar(ctx, MacroReleases.from_document(registry), S)  # no key: all skipped
     [check] = check_macro_calendar(ctx, S)
     assert check.status == "WARN" and "no FRED release was fetchable" in check.detail
 

@@ -29,6 +29,16 @@ ISM: dict[str, Any] = {
 }
 
 
+FOMC: dict[str, Any] = {
+    "key": "FOMC",
+    "name": "FOMC Press Release",
+    "source": "dates",
+    "dates": [date(2026, 1, 28), date(2026, 3, 18)],
+    "time_et": "14:00",
+    "terms": "the Fed calendar",
+}
+
+
 def load(*releases: dict[str, Any]) -> MacroReleases:
     return MacroReleases.from_document({"release": list(releases)})
 
@@ -39,13 +49,13 @@ def test_the_shipped_registry_loads_the_nine_releases() -> None:
         "CPI", "EMPLOYMENT", "PCE", "GDP", "PPI", "RETAIL_SALES", "ISM_MFG", "ISM_SERVICES", "FOMC",
     )  # fmt: skip
     ids = {r.key: r.release_id for r in found.fred}
-    assert ids == {
-        "CPI": 10, "EMPLOYMENT": 50, "PCE": 54, "GDP": 53, "PPI": 46,
-        "RETAIL_SALES": 9, "FOMC": 101,
-    }  # fmt: skip
+    assert ids == {"CPI": 10, "EMPLOYMENT": 50, "PCE": 54, "GDP": 53, "PPI": 46, "RETAIL_SALES": 9}
+    fomc = found.releases[-1]
+    assert fomc.source == "dates" and fomc.release_id is None and len(fomc.dates) == 32
+    assert fomc.dates[0] == date(2024, 1, 31) and fomc.dates[-1] == date(2027, 12, 8)
     rules = {r.key: (r.nth_business_day, r.time_et) for r in found.releases if r.source == "rule"}
     assert rules == {"ISM_MFG": (1, "10:00"), "ISM_SERVICES": (3, "10:00")}
-    assert {r.key: r.time_et for r in found.fred}["FOMC"] == "14:00"
+    assert fomc.time_et == "14:00"
     assert all(r.terms and r.name for r in found.releases)
     assert [r.instrument_id for r in found.releases][:2] == ["MACRO:CPI", "MACRO:EMPLOYMENT"]
 
@@ -89,7 +99,7 @@ def without(base: dict[str, Any], key: str) -> dict[str, Any]:
         ({"release": [without(CPI, "terms")]}, r"terms: required"),
         (
             {"release": [changed(CPI, source="web")]},
-            r"CPI source: expected one of \['fred', 'rule'\]",
+            r"CPI source: expected one of \['fred', 'rule', 'dates'\]",
         ),
         ({"release": [changed(CPI, time_et="8:30")]}, r"CPI time_et: expected HH:MM.*'8:30'"),
         ({"release": [changed(CPI, time_et="24:00")]}, r"CPI time_et: expected HH:MM"),
@@ -103,6 +113,19 @@ def without(base: dict[str, Any], key: str) -> dict[str, Any]:
             {"release": [CPI, changed(CPI, name="again")]},
             r"keys declared more than once: \['CPI'\]",
         ),
+        ({"release": [changed(FOMC, dates=[])]}, r"FOMC dates: required, a non-empty list"),
+        ({"release": [without(FOMC, "dates")]}, r"FOMC dates: required"),
+        (
+            {"release": [changed(FOMC, dates=[date(2026, 3, 18), date(2026, 1, 28)])]},
+            r"FOMC dates: not sorted",
+        ),
+        (
+            {"release": [changed(FOMC, dates=[date(2026, 1, 28), date(2026, 1, 28)])]},
+            r"FOMC dates: repeated \[datetime.date\(2026, 1, 28\)\]",
+        ),
+        ({"release": [changed(FOMC, dates=["2026-01-28"])]}, r"FOMC dates: expected dates"),
+        ({"release": [changed(FOMC, release_id=101)]}, r"FOMC release_id: not used by"),
+        ({"release": [changed(CPI, dates=[date(2026, 1, 28)])]}, r"CPI dates: not used by"),
         ({"release": [changed(CPI, api_key="x")]}, r"looks like a secret"),
     ],
 )

@@ -39,9 +39,13 @@ EMPTY = b'{"count":0,"offset":0,"limit":10000,"release_dates":[]}'
 S1, S2 = date(2026, 10, 6), date(2026, 10, 15)
 
 
+LISTED = [date(2026, 1, 28), date(2026, 3, 18), date(2026, 9, 16), date(2026, 10, 28)]
+
+
 def entry(key: str, **kw: Any) -> dict[str, Any]:
     base = {"key": key, "name": key.title(), "source": "fred", "release_id": 10}
-    return {**base, "time_et": "08:30", "terms": "t", **kw}
+    doc = {**base, "time_et": "08:30", "terms": "t", **kw}
+    return {k: v for k, v in doc.items() if not (k == "release_id" and doc["source"] == "dates")}
 
 
 def rule(key: str, nth: int) -> dict[str, Any]:
@@ -53,7 +57,7 @@ REGISTRY = MacroReleases.from_document(
     {
         "release": [
             entry("CPI"),
-            entry("FOMC", release_id=101, time_et="14:00"),
+            {**entry("FOMC", source="dates", time_et="14:00"), "dates": LISTED},
             rule("ISM_MFG", 1),
             rule("ISM_SERVICES", 3),
         ]
@@ -207,11 +211,11 @@ def test_the_task_stores_fred_dates_and_computed_ism_rows() -> None:
     ctx = context(feed)
     record = ingest_macro_calendar(ctx, REGISTRY, S1)
     assert record.status is RunStatus.COMPLETE
-    assert record.items["CPI"] == "OK: 15 rows" and record.items["FOMC"] == "OK: 15 rows"
+    assert record.items["CPI"] == "OK: 15 rows" and record.items["FOMC"] == "OK: 4 rows"
     assert record.items["ISM_MFG"].startswith("OK:") and record.items["ISM_SERVICES"].startswith(
         "OK:"
     )
-    assert len(feed.urls) == 2  # one request per fred release; the rules fetch nothing
+    assert len(feed.urls) == 1  # one request per fred release; rules and dates fetch nothing
     assert "release_id=10&" in feed.urls[0] and "realtime_start=2025-09-01" in feed.urls[0]
     assert "realtime_end=2027-11-10" in feed.urls[0]  # 400 days ahead
     cpi = stored(ctx, "CPI")
@@ -328,7 +332,7 @@ def test_without_fred_the_rules_still_run_and_the_fred_releases_are_skipped() ->
     assert record.status is RunStatus.COMPLETE
     assert record.items["CPI"].startswith("SKIPPED: ALGOTRADE_FRED_API_KEY")
     assert record.items["ISM_MFG"].startswith("OK:")
-    assert set(record.stats["skipped_releases"]) == {"CPI", "FOMC"}
+    assert set(record.stats["skipped_releases"]) == {"CPI"}  # FOMC lists its dates: no fetch
     assert stored(ctx, "CPI").empty and not stored(ctx, "ISM_MFG").empty
 
 
@@ -347,3 +351,36 @@ def test_a_failed_request_fails_that_release_only() -> None:
 def test_an_unknown_release_key_is_refused() -> None:
     with pytest.raises(KeyError, match="NOPE"):
         ingest_macro_calendar(context(Feed()), REGISTRY, S1, only=["NOPE"])
+
+
+def test_a_dates_release_writes_exactly_the_listed_rows_without_a_fetch() -> None:
+    feed = Feed()
+    ctx = context(feed)
+    record = ingest_macro_calendar(ctx, REGISTRY, S1, only=["FOMC"])
+    assert record.items["FOMC"] == "OK: 4 rows" and feed.urls == []
+    fomc = stored(ctx, "FOMC")
+    assert list(fomc["release_date"]) == LISTED and set(fomc["source"]) == {"registry"}
+    assert list(fomc["status"]) == ["released"] * 3 + ["scheduled"]
+    assert list(fomc["ts"].dt.strftime("%H:%M")) == ["19:00", "18:00", "18:00", "18:00"]
+    again = ingest_macro_calendar(ctx, REGISTRY, S1, only=["FOMC"])
+    assert again.items["FOMC"] == "UNCHANGED"
+
+
+def test_a_stored_fomc_row_not_in_the_list_is_retired_as_moved_from_the_run_session() -> None:
+    ctx = context(Feed())
+    old = replace(FOMC, source="fred", release_id=101, dates=())
+    ingest_macro_calendar(ctx, MacroReleases((CPI, old, MFG, SERVICES)), S1, only=["FOMC"])
+    daily = stored(ctx, "FOMC")
+    assert len(daily) == 15 and set(daily["status"]) == {"released", "scheduled"}
+    record = ingest_macro_calendar(ctx, REGISTRY, S2, only=["FOMC"])
+    assert record.items["FOMC"].startswith("OK:")
+    now = stored(ctx, "FOMC")
+    by_date = now.set_index("release_date")
+    stray = by_date[~by_date.index.isin(LISTED)]
+    assert len(stray) > 0 and set(stray["status"]) == {"moved"}
+    assert set(stray["known_from"]) == {S2}
+    assert set(by_date.loc[by_date.index.isin(LISTED), "status"]) <= {"released", "scheduled"}
+    before = stored(ctx, "FOMC", through=S1)  # a session before the fix still reads the rows
+    assert "moved" not in set(before["status"])
+    assert set(daily["release_date"]) <= set(before["release_date"])
+    assert ingest_macro_calendar(ctx, REGISTRY, S2, only=["FOMC"]).items["FOMC"] == "UNCHANGED"
