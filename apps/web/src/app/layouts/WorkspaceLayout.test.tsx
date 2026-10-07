@@ -1,6 +1,6 @@
 /**
  * The top bar of a workspace layout for each kind of viewer: the regime chip opens the Regime
- * page, the switch lists only the
+ * page, the Guide link (and the "?" key) opens the Guide for everyone, the switch lists only the
  * workspaces the registry role allows, the name shows, sign-out appears only with a Supabase
  * session, and a viewer that turns null goes back to the login page.
  */
@@ -16,7 +16,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Text, UiProvider } from '@algotrade/ui';
+import { SearchInput, Text, UiProvider } from '@algotrade/ui';
 
 import { currentSession, gql, signOutSession, subscribeSession } from '@/shared/api';
 
@@ -44,11 +44,20 @@ beforeEach(() => {
 
 function setup() {
   const root = createRootRoute({ component: () => <WorkspaceLayout workspace={TRADER} /> });
-  const ideas = createRoute({ getParentRoute: () => root, path: '/ideas', component: () => null });
+  const ideas = createRoute({
+    getParentRoute: () => root,
+    path: '/ideas',
+    component: () => <SearchInput aria-label="Test field" />,
+  });
   const regime = createRoute({
     getParentRoute: () => root,
     path: '/regime',
     component: () => <Text>regime page</Text>,
+  });
+  const guide = createRoute({
+    getParentRoute: () => root,
+    path: '/guide',
+    component: () => <Text>guide page</Text>,
   });
   const login = createRoute({
     getParentRoute: () => root,
@@ -56,7 +65,7 @@ function setup() {
     component: () => <Text>login page</Text>,
   });
   const router = createRouter({
-    routeTree: root.addChildren([ideas, regime, login]),
+    routeTree: root.addChildren([ideas, regime, guide, login]),
     history: createMemoryHistory({ initialEntries: ['/ideas'] }),
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -85,6 +94,31 @@ describe('WorkspaceLayout top bar', () => {
     setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Regime: not computed' }));
     expect(await screen.findByText('regime page')).toBeVisible();
+  });
+
+  it('shows the Guide link to every viewer, before the name, and opens the Guide', async () => {
+    vi.mocked(gql).mockResolvedValue({ viewer: TRADER_VIEWER });
+    setup();
+    const link = await screen.findByRole('link', { name: /Guide/ });
+    expect(link).toHaveAttribute('href', '/guide');
+    expect(link.compareDocumentPosition(screen.getByText('Ann'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    await userEvent.click(link);
+    expect(await screen.findByText('guide page')).toBeVisible();
+  });
+
+  it('opens the Guide on "?" unless the focus is in a text field', async () => {
+    vi.mocked(gql).mockResolvedValue({ viewer: ADMIN_VIEWER });
+    const { router } = setup();
+    await screen.findByText('Bo');
+    await userEvent.click(screen.getByRole('searchbox', { name: 'Test field' }));
+    await userEvent.keyboard('?');
+    expect(router.state.location.pathname).toBe('/ideas');
+    expect(screen.getByRole('searchbox', { name: 'Test field' })).toHaveValue('?');
+    await userEvent.click(document.body);
+    await userEvent.keyboard('?');
+    expect(await screen.findByText('guide page')).toBeVisible();
   });
 
   it('hides the admin workspace from a trader', async () => {

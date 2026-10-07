@@ -1,7 +1,8 @@
 /**
  * TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the
  * workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search
- * box, "As of Fri 2 Oct", the latest-run note). Slots wrap onto new lines at phone width.
+ * box, "As of Fri 2 Oct", the latest-run note), and a utility slot just before it for links that
+ * belong to no workspace (the Guide). Slots wrap onto new lines at phone width.
  */
 import type { ReactNode } from 'react';
 
@@ -14,16 +15,19 @@ export interface TopBarProps {
   workspace?: ReactNode;
   /** The workspace's section links (NavTabs). */
   nav?: ReactNode;
+  /** A utility link on the far side, before `end` (a TextLink to the Guide), in every workspace. */
+  utility?: ReactNode;
   /** Content at the far end: a SearchInput, an as-of date, a status note. */
   end?: ReactNode;
 }
 
-export function TopBar({ brand, workspace, nav, end }: TopBarProps) {
+export function TopBar({ brand, workspace, nav, utility, end }: TopBarProps) {
   return (
     <header className={styles.topBar}>
       <span className={styles.brand}>{brand}</span>
       {workspace}
       {nav}
+      {utility && <div className={styles.utility}>{utility}</div>}
       {end && <div className={styles.end}>{end}</div>}
     </header>
   );

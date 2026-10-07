@@ -321,11 +321,12 @@ type FeatureValue {
 }
 
 """
-The site field guide's entry for a field (docs/data/field-guide.md): how to read it, the criterion per intent, when the reading lies (each caveat names the field that exposes it), and the sources
+The site field guide's entry for a field (docs/data/field-guide.md): how to read it (`reads`; `summary` is its first sentence, for a hover), the criterion per intent, when the reading lies (each caveat names the field that exposes it), and the sources
 """
 type FieldGuide {
   theme: String!
   reads: String!
+  summary: String!
   uses: [GuideUse!]!
   caveats: [String!]!
   sources: [String!]!

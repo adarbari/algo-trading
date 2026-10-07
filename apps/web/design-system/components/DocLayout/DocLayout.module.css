@@ -1,0 +1,36 @@
+/* DocLayout: rail | article | aside as a wrapping flex row; the article takes the room left. */
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6) var(--space-8);
+  align-items: flex-start;
+}
+
+.rail {
+  flex: 0 1 var(--size-search);
+  min-width: var(--size-label);
+}
+
+.article {
+  display: flex;
+  flex: 999 1 calc(var(--size-page) / 3);
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  max-width: calc(var(--size-page) / 2);
+}
+
+.article[data-wide] {
+  max-width: calc(var(--size-page) * 0.65);
+}
+
+.aside {
+  position: sticky;
+  top: var(--space-4);
+  flex: 0 1 var(--size-label);
+  min-width: var(--size-label);
+}
+
+.section {
+  scroll-margin-top: calc(var(--space-8) * 2);
+}

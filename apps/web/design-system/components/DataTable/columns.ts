@@ -34,6 +34,8 @@ export interface DataTableColumn<TRow> {
   id: string;
   /** Header text (also the column picker label). */
   header: string;
+  /** Slot beside the header text (an InfoButton): its own control, not part of the sort button; adds no height. */
+  headerAction?: ReactNode;
   /** What the column means: shown in the column picker and announced with the header. */
   description?: string;
   /** Reads the cell value from a row (also the sort key). */

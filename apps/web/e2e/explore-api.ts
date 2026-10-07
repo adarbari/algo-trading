@@ -213,11 +213,11 @@ function featureHistory(names: readonly string[]): Json {
 
 /**
  * The recorded catalogue predates the field guide: three fields get a synthetic entry (the
- * Field guide tab's themes, how to read it, criteria and caveats).
+ * Guide's themes, how to read it, criteria and caveats).
  */
 const GUIDES: Record<string, Json> = {
   'rollup.iv30@v1.iv30': {
-    theme: 'Implied volatility',
+    theme: 'implied volatility',
     reads:
       'Our 30-day at-the-money implied volatility, annualised: 0.25 means the options price a one-standard-deviation move of about 7% over the next month. Compare it with the name’s own history, not across sectors.',
     caveats: [
@@ -246,14 +246,14 @@ const GUIDES: Record<string, Json> = {
     ],
   },
   'feature.iv_hv_ratio': {
-    theme: 'Implied volatility',
+    theme: 'implied volatility',
     reads: 'IV30 over HV30: above 1 the options price more movement than the stock has delivered.',
     caveats: [],
     sources: [],
     uses: [],
   },
   'rollup.price_stats@v2.hv30': {
-    theme: 'Volatility',
+    theme: 'volatility',
     reads: 'Realised volatility of the last 30 sessions, annualised.',
     caveats: ['A single gap day dominates a 30-session window.'],
     sources: [],
@@ -291,6 +291,23 @@ function passing(name: string, histogram: { lo: number; count: number }[]): Json
   });
 }
 
+/** `GuideHelpField`: a field's info with its guide entry (null without one), `summary` its first sentence (the server's split, mocked). */
+function guideHelp(name: string): Json {
+  const guide = GUIDES[name];
+  const reads = typeof guide?.['reads'] === 'string' ? guide['reads'] : '';
+  return {
+    data: {
+      guideField: {
+        info: {
+          name,
+          unit: CATALOGUE.get(name)?.['unit'] ?? null,
+          guide: guide ? { ...guide, summary: reads.split(/(?<=[.!?])\s+(?=[A-Z0-9])/)[0] } : null,
+        },
+      },
+    },
+  };
+}
+
 /** A feature's distribution: the recorded one for its name, else IV30's renamed. */
 function distribution(name: string): Json {
   const answer = fixture(DISTRIBUTIONS[name] ?? 'dist-iv30.json') as {
@@ -302,6 +319,69 @@ function distribution(name: string): Json {
   };
 }
 
+/** `Query.guideIndex` for the three guided fields: the sections, theme groups and intents. */
+function guideIndex(): Json {
+  const intents = Object.values(GUIDES).flatMap((g) =>
+    (g['uses'] as GuideUse[]).map((u) => u.intent),
+  );
+  return {
+    data: {
+      guideIndex: {
+        sections: [
+          { id: 'start', title: 'Start here', purpose: 'How the app thinks.', entries: 4 },
+          { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 3 },
+        ],
+        themeGroups: [
+          {
+            id: 'chart',
+            title: 'The chart',
+            themes: [{ theme: 'volatility', fields: 1 }],
+          },
+          {
+            id: 'options',
+            title: 'Options',
+            themes: [{ theme: 'implied volatility', fields: 2 }],
+          },
+        ],
+        intents: intents.map((intent) => ({ intent, fields: 1 })),
+      },
+    },
+  };
+}
+
+/** `Query.guideField`: the server-derived parts of a field's page (a mock of the related reads). */
+function guideField(name: string): Json {
+  const known = name in GUIDES;
+  if (!known)
+    return { errors: [{ message: `unknown feature ${name}` }], data: { guideField: null } };
+  return {
+    data: {
+      guideField: {
+        related: name === 'rollup.iv30@v1.iv30' ? ['feature.iv_hv_ratio'] : [],
+        playbooks: [
+          {
+            id: 'vrp_scanner',
+            name: 'VRP scanner',
+            family: 'income',
+            rules: ['gte 0.4 soft tolerance 0.05'],
+            column: false,
+            rank: false,
+            flag: false,
+          },
+        ],
+        situations: [
+          {
+            name: 'Earnings gap inside the window',
+            signs: 'A report in the next 30 days lifts the reading.',
+            do: 'Screens flag it.',
+            affects: [name],
+          },
+        ],
+      },
+    },
+  };
+}
+
 /**
  * A GraphQL operation's recorded answer (`{ data }`): the catalogue (`FeatureCatalogue`), a
  * feature's distribution (`FeatureDistribution`) and AAPL's detail pane.
@@ -309,7 +389,10 @@ function distribution(name: string): Json {
 function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
   if (name === 'FeatureCatalogue') return catalogue();
+  if (name === 'GuideIndex') return guideIndex();
+  if (name === 'GuideField') return guideField(String(operation.variables?.['name']));
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
+  if (name === 'GuideHelpField') return guideHelp(String(operation.variables?.['name']));
   if (name === 'FeatureTable') return featureTable(operation.variables ?? {});
   if (name === 'ComparePrices') return comparePrices(operation.variables ?? {});
   if (operation.variables?.['key'] !== 'AAPL') return null;

@@ -1,7 +1,7 @@
 /**
  * Explore's tab row (Overview, Compare, Chart, Options, Features, Events, Screener hits, and the
- * Field guide), shared by the ticker detail and the field guide, which takes the whole page.
- * Choosing the default tab for the compare set removes `tab` from the URL.
+ * Field guide, which the route redirects to the Guide for one release). Choosing the default tab
+ * for the compare set removes `tab` from the URL.
  */
 import { Tabs, type TabItem } from '@algotrade/ui';
 import type { ReactNode } from 'react';

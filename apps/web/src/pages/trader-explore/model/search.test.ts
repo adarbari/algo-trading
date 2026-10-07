@@ -26,10 +26,10 @@ describe('explore search params', () => {
     expect(parseExploreSearch({ tab: 'nope', right: 'X', sel: '  ' })).toEqual({});
   });
 
-  it("keeps the field guide's theme, field and symbol", () => {
+  it("keeps a retired Field guide link's tab, theme and field (the route redirects) and drops its symbol", () => {
     expect(
-      parseExploreSearch({ tab: 'guide', theme: 'Volatility', field: 'feature.x', symbol: 'aapl' }),
-    ).toEqual({ tab: 'guide', theme: 'Volatility', field: 'feature.x', symbol: 'AAPL' });
+      parseExploreSearch({ tab: 'guide', theme: 'volatility', field: 'feature.x', symbol: 'aapl' }),
+    ).toEqual({ tab: 'guide', theme: 'volatility', field: 'feature.x' });
   });
 
   it('splits and joins lists, leaving defaults out of the URL', () => {

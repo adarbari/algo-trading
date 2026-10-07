@@ -4,6 +4,7 @@ import { Mono } from '../../primitives/Mono';
 import { Text } from '../../primitives/Text';
 import { NavTabs } from '../NavTabs';
 import { SearchInput } from '../SearchInput';
+import { TextLink } from '../TextLink';
 import { WorkspaceSwitch } from '../WorkspaceSwitch';
 import { TopBar } from './TopBar';
 
@@ -65,6 +66,18 @@ export const AdminWithNote: Story = {
       />
     ),
     end: <Text tone="muted">Latest session ingested: Fri 2 Oct</Text>,
+  },
+};
+
+/** The Guide link in the utility slot, before the end slot (both workspaces show it). */
+export const WithUtilityLink: Story = {
+  args: {
+    utility: (
+      <TextLink href="/guide" icon="book" keys={['?']} current>
+        Guide
+      </TextLink>
+    ),
+    end: <Text tone="muted">Session 2026-10-06</Text>,
   },
 };
 

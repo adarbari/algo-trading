@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
 import { NavTabs } from '../NavTabs';
+import { TextLink } from '../TextLink';
 import { TopBar } from './TopBar';
 
 describe('TopBar', () => {
@@ -18,6 +19,23 @@ describe('TopBar', () => {
     const banner = screen.getByRole('banner');
     expect(banner).toHaveTextContent(/^algotradeswitchAAs of Fri 2 Oct$/);
     expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
+  });
+
+  it('puts the utility slot after the nav and before the end slot', () => {
+    render(
+      <TopBar
+        brand="algotrade"
+        nav={<NavTabs items={[{ href: '/a', label: 'A' }]} aria-label="Sections" />}
+        utility={
+          <TextLink href="/guide" icon="book">
+            Guide
+          </TextLink>
+        }
+        end="Session"
+      />,
+    );
+    expect(screen.getByRole('banner')).toHaveTextContent(/^algotradeAGuideSession$/);
+    expect(screen.getByRole('link', { name: 'Guide' })).toHaveAttribute('href', '/guide');
   });
 
   it('renders the brand alone', () => {

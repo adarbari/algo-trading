@@ -150,7 +150,7 @@ Inventory of 2026-10-07. Each row moves in the phase named; the PR that moves it
 
 | Today | Becomes | Phase |
 |---|---|---|
-| Explore "Field guide" tab and its panels (`widgets/field-guide`, `pages/trader-explore`) | `/guide/fields`, `/guide/fields/<name>`; the tab redirects for one release | 1 |
+| Explore "Field guide" tab and its panels (`widgets/field-guide`, `pages/trader-explore`) | `/guide/fields`, `/guide/fields/<name>`; the tab redirects for one release | 1 (done in GD3b: the panels live in `widgets/guide-field`, the route redirects `tab=guide`; remove the redirect and the tab one release later) |
 | Feature table column headers (`widgets/feature-table`, column factories in `entities/feature`), Ideas columns | `InfoButton` in every field header, opening the field's drawer | 1 |
 | Builder "How to read it" Disclosure (`features/screener-builder/ui/FieldGuideHelp.tsx`) | `InfoButton` beside the criterion's field; the drawer's "Use this" fills the row | 2 |
 | Preset descriptions in TOML comments; Screeners list rows, the Builder header of a preset | playbook pages; a "Playbook" link on every preset | 2 |
@@ -175,6 +175,11 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
 - **Coverage**: fitness tests that every Guide reference in the web code and in config resolves,
   that every site preset has a playbook, every regime card and episode a page, and (existing)
   every phrased or site-screened field a field-guide entry.
+- **Sources**: Guide-only sources live under `config/site/guide/`: `sections.toml` now (the
+  section order, the theme groups, the playbook families), and from GD4 one
+  `config/site/guide/playbooks/<id>.toml` per site preset (the playbook prose above).
+  Field, situation and regime entries stay where they are (`config/site/field_guide/`,
+  `config/site/regime/`).
 - **Process**: `.claude/skills/add-guide-content` (where each kind lives, its owner, how to put
   the button on a page); CLAUDE.md names it in the workflow table.
 

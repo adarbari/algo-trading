@@ -11,6 +11,7 @@ feature groups in registry order, then expression features. A market's catalogue
 (``entity="market"``, ADR 0047) is its groups' ``market.<group>@v<N>.<column>`` fields and
 the expression features over them."""
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -95,6 +96,20 @@ class GuideUse:
         return cls(u.intent, u.op, u.value, u.mode, tolerance, u.on_miss or None, u.note)
 
 
+_SENTENCE_END = re.compile(r"[.!?](?=\s+[A-Z0-9])")
+_ABBREVIATIONS = ("e.g.", "i.e.", "vs.", "etc.", "approx.", "ca.")
+
+
+def first_sentence(text: str) -> str:
+    """The text up to its first sentence end (a full stop, ``!`` or ``?`` followed by a capital
+    or digit, not an abbreviation such as ``e.g.``); all of it when it has one sentence."""
+    for end in _SENTENCE_END.finditer(text):
+        head = text[: end.end()]
+        if not head.lower().endswith(_ABBREVIATIONS):
+            return head
+    return text
+
+
 @dataclass(frozen=True)
 class FieldGuide:
     """The site field guide's entry for a field (``docs/data/field-guide.md``): how to read
@@ -103,6 +118,7 @@ class FieldGuide:
 
     theme: str
     reads: str
+    summary: str  # the first sentence of ``reads``: the hover text of a field's help button
     uses: tuple[GuideUse, ...]
     caveats: tuple[str, ...]
     sources: tuple[str, ...]
@@ -110,7 +126,12 @@ class FieldGuide:
     @classmethod
     def from_entry(cls, e: FieldGuideEntry) -> "FieldGuide":
         return cls(
-            e.theme, e.reads, tuple(GuideUse.from_entry(u) for u in e.uses), e.caveats, e.sources
+            e.theme,
+            e.reads,
+            first_sentence(e.reads),
+            tuple(GuideUse.from_entry(u) for u in e.uses),
+            e.caveats,
+            e.sources,
         )
 
 

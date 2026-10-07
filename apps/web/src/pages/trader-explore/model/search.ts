@@ -1,7 +1,6 @@
 /**
  * Explore's state in the URL's search params, so a view is a shareable link: the compare set,
- * the focused ticker, the tab, the table's columns, filters and sort, and each tab's choices
- * (the field guide's theme, field and symbol).
+ * the focused ticker, the tab, the table's columns, filters and sort, and each tab's choices.
  * Lists are comma-separated; absent keys take the defaults below.
  */
 import type { ChartRange, DataTableSort } from '@algotrade/ui';
@@ -46,12 +45,10 @@ export interface ExploreSearch {
   strikes?: 'all';
   /** The feature whose distribution the Features tab shows. */
   feature?: string;
-  /** The field guide's theme (default: the chosen field's, else the first). */
+  /** Retired with the Field guide tab (it moved to /guide/fields): kept so an old link redirects. */
   theme?: string;
-  /** The catalogue field the field guide shows (default: the theme's first). */
+  /** Retired with the Field guide tab: the field an old link asked for. */
   field?: string;
-  /** The symbol the field guide draws the field for (default: the focused ticker). */
-  symbol?: string;
 }
 
 /** The mockup's columns: close, our IV30, IV / HV, distance from the 52-week high, earnings. */
@@ -119,7 +116,6 @@ export function parseExploreSearch(raw: Record<string, unknown>): ExploreSearch 
   set('feature', text(raw['feature']));
   set('theme', text(raw['theme']));
   set('field', text(raw['field']));
-  set('symbol', text(raw['symbol'])?.toUpperCase());
   return out;
 }
 
