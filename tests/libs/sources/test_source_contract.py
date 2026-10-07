@@ -5,6 +5,7 @@ apply to it automatically.
 """
 
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -16,7 +17,12 @@ from algotrade_sources.fixtures.files import GoldenFiles
 from algotrade_sources.fixtures.source import GoldenCsvSource
 from algotrade_sources.framework.base import FetchRequest, Source
 from algotrade_sources.framework.http import RetryPolicy
-from algotrade_sources.framework.series import FilingsRequest, ReleaseRequest, SeriesRequest
+from algotrade_sources.framework.series import (
+    DailyIndexRequest,
+    FilingsRequest,
+    ReleaseRequest,
+    SeriesRequest,
+)
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_sources.vendors.fred.observations import FredObservations
 from algotrade_sources.vendors.fred.releases import FredReleaseDates
@@ -32,6 +38,7 @@ from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
 from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
+from algotrade_sources.vendors.sec.daily_index import SecDailyIndex
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
 from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundObjectives,
@@ -217,6 +224,12 @@ def sec_filings() -> Adapter:
     return SecFilings(http_for(lambda url: payload)), FilingsRequest("723125")
 
 
+def sec_daily_index() -> Adapter:
+    payload = (FIXTURES / "sec" / "daily_index_form_20260930_trimmed.idx").read_bytes()
+    request = DailyIndexRequest(key="2026-09-30", day=date(2026, 9, 30))
+    return SecDailyIndex(http_for(lambda url: payload)), request
+
+
 def published() -> Adapter:
     request = SeriesRequest(
         "SPX", url="https://stooq.com/q/d/l/?s=^spx&i=d", date_column="Date", value_column="Close"
@@ -228,6 +241,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "fred": fred,
     "fred_release_dates": fred_release_dates,
     "sec_filings": sec_filings,
+    "sec_daily_index": sec_daily_index,
     "published": published,
     "treasury": treasury,
     "massive_tickers": massive_tickers,

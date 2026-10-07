@@ -301,7 +301,7 @@ forecast); intraday; any trade recommendation or order; news ingestion in v1.
 | Listed expiries per name | `chains/status`, `nearest_expiry@v1` (chains stored from 2026-10-02) | none for the ladder; weekly listing is read from the chain |
 | IV around earnings | `ibkr_iv@v1`, about 500 sessions | none (the crush statistic covers two years, not 2018) |
 | The scope list, editable | nothing | a site-level config written by the API: the API writes only user configs today (ADR 0029), so an admin-owned site list is an ADR amendment with the same `services/authoring` seam |
-| 8-K filings with item codes | SEC EDGAR source (company details, facts) | a filing-index reader (daily index or per-CIK submissions JSON, free) into `events/filing` |
+| 8-K filings with item codes | SEC EDGAR source (company details, facts) | done (EV1c): per-CIK submissions JSON for the whole universe as the one-time backfill, EDGAR's daily form index (`sec_daily_index`) as the nightly that picks the CIKs to ask, into `events/filing` |
 | Headlines | the Massive vendor (bars, descriptions) | its news endpoint, capped per night to the names with a big move; the text model classifies (`config/site/llm.toml` on) |
 | Dossiers (factors, reviewed attributions, dated occurrences) | nothing | the deep-dive skill writes TOML; `dossier-import` writes `instruments/factors`, `events/factor_occurrence`, `events/attribution` |
 

@@ -1,0 +1,21 @@
+Description:           Daily Index of EDGAR Dissemination Feed by Form Type
+Last Data Received:    Sep 30, 2026
+Comments:              webmaster@sec.gov
+Anonymous FTP:         ftp://ftp.sec.gov/edgar/
+
+
+
+
+Form Type   Company Name                                                  CIK
+      Date Filed  File Name
+---------------------------------------------------------------------------------------------------------------------------------------------
+10-K             Bowen Acquisition Corp                                        1973056     20260930    edgar/data/1973056/0001493152-26-044953.txt
+4                5E Advanced Materials, Inc.                                   1888654     20260930    edgar/data/1888654/0001168534-26-000009.txt
+424B2            BANK OF AMERICA CORP /DE/                                     70858       20260930    edgar/data/70858/0001918704-26-029619.txt
+8-K              374Water Inc.                                                 933972      20260930    edgar/data/933972/0001654954-26-008681.txt
+8-K              MICRON TECHNOLOGY INC                                         723125      20260930    edgar/data/723125/0000723125-26-000018.txt
+8-K              ALAMO GROUP INC                                               897077      20260930    edgar/data/897077/0000897077-26-000102.txt
+8-K/A            BBCMS Mortgage Trust 2026-M1                                  2152423     20260930    edgar/data/2152423/0001539497-26-002614.txt
+8-K/A            Beacon Financial Corp                                         1108134     20260930    edgar/data/1108134/0001171843-26-006308.txt
+D                1World Online, Inc.                                           1595734     20260930    edgar/data/1595734/0001595734-26-000005.txt
+S-1              BHAV Acquisition Corp II                                      2142627     20260930    edgar/data/2142627/0001213900-26-104979.txt
