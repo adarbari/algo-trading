@@ -7,22 +7,26 @@ Roadmap: SW0 to SW4 in [roadmap.md](../roadmap.md); every column's generated ent
 
 ## Where the columns live
 
-`features/rollups/` was at its 10-module cap, so it is split by kind (`price/`, `options/`,
-`corporate/`) rather than re-versioning `price_stats@v2` (a `v3` would cascade to
+`features/rollups/` was at its 10-module cap, so it is split by kind (`price/`, `levels/`,
+`options/`, `corporate/`) rather than re-versioning `price_stats@v2` (a `v3` would cascade to
 `dividends@v2`, `fundamentals@v2` and `div_yield@v1` for no change in their values). New
 groups:
 
 | Group | Folder | Columns |
 |---|---|---|
 | `momentum@v1` | `price/` | `atr_14`, `rsi_14`, `ret_5d`, `rel_volume`, `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` |
-| `swing_levels@v1` | `price/` | `swing_high`, `swing_high_date`, `swing_low`, `swing_low_date` |
+| `swing_levels@v1` | `levels/` | `swing_high`, `swing_high_date`, `swing_low`, `swing_low_date` |
+| `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` |
+| `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` |
+| `gaps@v1` | `levels/` | `gap_open_pct`, `gap_above`, `gap_above_date`, `gap_below`, `gap_below_date` |
 | `anchored_vwap@v1` | `price/` | `avwap_earnings`, `avwap_anchor_date` |
 | `oi_walls@v1` | `options/` | `wall_status`, `call_wall`, `call_wall_oi`, `put_wall`, `put_wall_oi` |
 
 A formula over stored columns is an expression feature in `config/site/features/swing.toml`
 (computed on read): `atr_pct`, `range_20d_pct`, `trend_state`, `dist_to_resistance`,
 `dist_to_support`, `dist_to_resistance_atr`, `dist_to_support_atr`, `breakout_20d`,
-`pullback_to_sma20`. Reused, not repeated: `price_stats` `close`, `sma_20/50/200`,
+`pullback_to_sma20`, `breakout_retest_held`, `breakout_failed`, `dist_to_gap_above`,
+`dist_to_gap_below`. Reused, not repeated: `price_stats` `close`, `sma_20/50/200`,
 `high_52w`, `low_52w`, `ret_20d/60d`, `hv20/30`.
 
 ## Shared rules
@@ -131,6 +135,89 @@ to 60 days out), NO_OI (no positive OI on either side), PARTIAL (one wall), OK (
 missing OI counts as 0 in the sums. Example: spot 100, call OI 500 at 100, 800 at 105, 800
 at 110 gives a call wall at 105 (tie, nearer spot); put OI 700 at 95, 300 at 90 gives a put
 wall at 95.
+
+## Levels: pivot strength, retests and gaps
+
+`pivot_strength@v1`, `retest@v1` and `gaps@v1` (folder `levels/`, with `swing_levels@v1`)
+read the same split-adjusted daily bars; the first two also read other groups' stored rows
+for the session (`swing_levels@v1` and `momentum@v1`; `retest@v1` only `momentum@v1`), so
+they run after them. Parameters are in `config/site/rollups.toml`. A price comparison with a
+tolerance uses `atr_14`, so a null `atr_14` makes it unknown, never zero.
+
+**`resistance_touches`, `support_touches`** (count, at least 1). Distinct touches of
+`swing_high` (`swing_low`) over the 252 sessions read, the pivot bar included. A bar touches
+the resistance when its high is within `touch_atr x atr_14` of the level (`|high - level| <=
+tol`, the edge included; `touch_atr = 0.5`) and its close is at or below the level; for the
+support, its low is within the tolerance and its close at or above. Consecutive touching bars
+count once; a missing bar ends a run. Prices are compared as stored (float32), so the pivot
+bar always touches its own level. Null when the level or `atr_14` is null. Example: level
+110, ATR 2.00 (tolerance 1.00); highs 110 and 109.5 on consecutive sessions (one touch), 109
+(a second: exactly 1.00 away), 108.9 (too far), 110.8 with a close of 110.5 (no: the close is
+above the level) give 2 touches.
+
+**`resistance_age`, `support_age`** (sessions, 5 to 246). Exchange sessions from
+`swing_high_date` (`swing_low_date`) to the session. Null when the level is null.
+
+**`pivot_structure`** (label HH_HL / LH_LL / MIXED). From the last two confirmed swing highs
+and the last two confirmed swing lows of the window (every pivot of `swing_levels`, not only
+those beyond the close). HH_HL when the later swing high is above the earlier and the later
+swing low above the earlier; LH_LL when both are lower; else MIXED (an equal pair is neither
+higher nor lower). Null with fewer than two swing highs or two swing lows. Example: swing
+highs 105 then 108 and swing lows 95 then 96 are HH_HL; highs 105 then 108 with lows 96 then
+95 are MIXED.
+
+**Breakout session** (`retest`). Session b is a breakout when its close is above the highest
+high of the 20 sessions before b (every one of them with a bar): the level is
+`prior_high_20d` as of b. The breakout is the close alone, without `breakout_20d`'s volume
+condition.
+
+**`breakout_date`, `breakout_level`, `sessions_since_breakout`** (date, usd per share,
+sessions). The most recent breakout session among the last `search_sessions = 60` (today
+included), its level and the sessions since it (0: today). Null when there is none
+(`retest_state` NONE).
+
+**`retest_state`** (label FAILED / NONE / RETESTING / HELD / FRESH / NO_ATR, never null).
+The first that matches: NONE (no breakout in the window); FAILED (a close after b, through
+today, below the level); NO_ATR (`atr_14` is null: the tolerance is unknown); RETESTING
+(today is after b, today's low is at or below `level + retest_atr x atr_14` (`retest_atr =
+0.5`, the edge included) and today's close is at or above the level); HELD (an earlier
+session after b, before today, had such a low); FRESH (none came within the tolerance). The
+breakout session itself is never a retest: a breakout today is FRESH. Example: level 101, ATR
+2.00 (tolerance 1.00): a low of 102 today with a close of 103 is RETESTING; 102.1 is FRESH;
+a low of 101.5 five sessions ago and no close below 101 since is HELD; one close of 100.5
+since the breakout is FAILED, whatever else.
+
+**`failed_breakouts_252d`** (count, at least 0). Over the last 252 sessions, the first
+session of each run of consecutive breakout sessions whose close fell below its level within
+the next `fail_sessions = 20` sessions. A breakout that has not run its 20 sessions and has
+not failed is pending and not counted (one that has already failed is). Null unless all 292
+bars read have a bar (a gap, or a shorter history). Example: a breakout, then a close below
+its level on the 20th session after it, counts; the same on the 21st does not. Three
+consecutive breakout sessions that then fall back count once.
+
+**`gap_open_pct`** (decimal, at least -1) = today's open / the previous session's close - 1;
+null without a bar on the previous session. Example: close 100, next open 103.5 gives 0.035.
+
+**Gaps** (`gaps`). An up gap on session t: `low_t > high_{t-1}`, the zone `[high_{t-1},
+low_t]` was never traded; it is filled when a later session (through today) has `low <=
+high_{t-1}`. A down gap: `high_t < low_{t-1}`, the zone `[high_t, low_{t-1}]`, filled when a
+later session has `high >= low_{t-1}`. Both bars must exist; a missing later bar fills
+nothing. An unfilled gap lies on the far side of every close since it: an unfilled up gap is
+below the close (support), an unfilled down gap above it (resistance).
+
+**`gap_above`, `gap_above_date`** (usd per share, date). The lower edge (`high_t`, where
+price rising would enter the zone) of the nearest unfilled down gap lying wholly above the
+close, and its session; nearest is the smallest such edge (a tie: the more recent gap). Null
+when there is none in the 253 bars read (all filled, or the close is inside the zone: a
+partly filled gap). **`gap_below`, `gap_below_date`**: the upper edge (`low_t`) of the nearest
+unfilled up gap wholly below the close, the largest such edge. Example: down gaps with zones
+[97, 99] (session 8) and [92, 94] (session 15), close 91, neither filled: `gap_above` is 92.
+Up gaps with zones [101, 103] and [106, 108], close 109: `gap_below` is 108.
+`dist_to_gap_above` = `(gap_above - close) / close` and `dist_to_gap_below` = `(close -
+gap_below) / close` (decimals) are expression features.
+
+**`breakout_retest_held`** (flag) = `retest_state == "HELD"`; **`breakout_failed`** (flag) =
+`retest_state == "FAILED"`. Null only without a `retest@v1` row.
 
 ## Changes from the proposal
 
