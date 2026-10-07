@@ -462,6 +462,8 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
     "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
+    "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ string = "events/filing" }, { string = "sec_8k" }]
