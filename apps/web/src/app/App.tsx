@@ -2,6 +2,8 @@
 import { RouterProvider } from '@tanstack/react-router';
 import { useState } from 'react';
 
+import { GuideHelpProvider } from '@/features/guide-help';
+
 import { AppProviders, createQueryClient } from './providers';
 import { router } from './router';
 
@@ -10,7 +12,13 @@ export function App() {
   const [queryClient] = useState(createQueryClient);
   return (
     <AppProviders queryClient={queryClient}>
-      <RouterProvider router={router} context={{ queryClient }} />
+      <GuideHelpProvider
+        navigate={(path) => {
+          router.history.push(path);
+        }}
+      >
+        <RouterProvider router={router} context={{ queryClient }} />
+      </GuideHelpProvider>
     </AppProviders>
   );
 }

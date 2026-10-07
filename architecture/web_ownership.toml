@@ -82,3 +82,10 @@ description = "Build-time configuration (Vite env, VITE_*)"
 owner = ["apps/web/src/shared/config/*"]
 section = "docs/adr/0025-frontend-architecture.md#layers-and-folders"
 enforced_by = ["review (import.meta.env is read only in shared/config)"]
+
+[[web_responsibility]]
+id = "guide-help-drawer"
+description = "Showing a Guide entry in place: the InfoButton and HelpDrawer for an entry reference { kind, id }, and the field help button in table headers; no page passes text to a drawer (ADR 0051)"
+owner = ["apps/web/src/features/guide-help/**"]
+section = "docs/adr/0051-guide-explain-once-show-in-place.md#decision"
+enforced_by = ["eslint no-restricted-imports: HelpDrawer, HelpLead, HelpSection only in src/features/guide-help (apps/web/lint-rules/restrictions.js)"]

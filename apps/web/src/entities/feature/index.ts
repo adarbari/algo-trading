@@ -22,7 +22,9 @@ export {
   TICKER_COLUMN,
   tickerColumn,
   withCompanions,
+  type ColumnHelp,
   type ColumnPlan,
+  type PlanColumn,
   type CriterionInfo,
   type ScreenColumnInfo,
 } from './model/columns';

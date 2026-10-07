@@ -24,8 +24,23 @@ import { featureLabel, featureMarks, unitLabel } from './catalogue';
 import type { ColumnInfo, TableRow } from './table';
 import { codeReason, shownValue, unknownLabel, valueFormat } from './value';
 
+/**
+ * What a field column's help button opens: the field's Guide entry. The widget that renders the
+ * table turns it into the button (`features/guide-help`); an entity cannot import a feature.
+ */
+export interface ColumnHelp {
+  kind: 'field';
+  /** The catalogue name. */
+  id: string;
+}
+
+/** A column from a factory: a field's carries the Guide entry its header button opens. */
+export type PlanColumn = DataTableColumn<TableRow> & { help?: ColumnHelp };
+
 /** A table's columns, in order: each one a factory call. */
-export type ColumnPlan = readonly DataTableColumn<TableRow>[];
+export type ColumnPlan = readonly PlanColumn[];
+
+const fieldHelp = (name: string): { help: ColumnHelp } => ({ help: { kind: 'field', id: name } });
 
 /** The ticker column's id (and the server's sort key for it). */
 export const TICKER_COLUMN = 'symbol';
@@ -67,7 +82,7 @@ function describe(info: ColumnInfo): string {
 export function featureColumn(
   info: ColumnInfo,
   titleOf?: (row: TableRow) => string | undefined,
-): DataTableColumn<TableRow> {
+): PlanColumn {
   const format = valueFormat(info);
   const numeric = isNumericFormat(format);
   const label = featureLabel(info.name);
@@ -78,6 +93,7 @@ export function featureColumn(
     value: (row) => shownValue(row.cells[info.name]?.value ?? null),
     format,
     hideable: false,
+    ...fieldHelp(info.name),
     cell: ({ row, formatted }) => {
       const cell = row.cells[info.name];
       if (!cell || cell.value === null || cell.value === undefined) {
@@ -123,7 +139,7 @@ export function withCompanions(columns: readonly string[]): string[] {
  * feature column whose hover reads "High over N sessions" from the row's stored
  * `range_sessions` (display only).
  */
-export function fromHighColumn(info: ColumnInfo): DataTableColumn<TableRow> {
+export function fromHighColumn(info: ColumnInfo): PlanColumn {
   return featureColumn(info, (row) => {
     const sessions = row.cells[RANGE_SESSIONS]?.value;
     return typeof sessions === 'number' ? `High over ${sessions} sessions` : undefined;
@@ -131,7 +147,7 @@ export function fromHighColumn(info: ColumnInfo): DataTableColumn<TableRow> {
 }
 
 /** The column for a catalogue feature: its own factory where it has one, else `featureColumn`. */
-export function catalogueColumn(info: ColumnInfo): DataTableColumn<TableRow> {
+export function catalogueColumn(info: ColumnInfo): PlanColumn {
   return info.name === FROM_HIGH ? fromHighColumn(info) : featureColumn(info);
 }
 
@@ -220,12 +236,10 @@ export interface ScreenColumnInfo {
  * A screen's display column, headed and formatted as its feature (`info`, when the catalogue
  * has it), else by its own name as a number.
  */
-export function screenColumn(
-  column: ScreenColumnInfo,
-  info?: ColumnInfo,
-): DataTableColumn<TableRow> {
+export function screenColumn(column: ScreenColumnInfo, info?: ColumnInfo): PlanColumn {
   return {
     id: `column:${column.name}`,
+    ...(info ? fieldHelp(info.name) : {}),
     header: info ? featureLabel(info.name) : decisionLabel(column.name),
     description: `${info?.description ?? column.field} (the screen's column ${column.name})`,
     value: (row) => shownValue(row.columns?.[column.name] ?? null),
@@ -257,13 +271,11 @@ export interface CriterionInfo {
  * One criterion: its value, formatted as its feature (`info`, when the catalogue has it), the
  * cell tinted by the outcome (a near miss or a miss); the value still says what it is.
  */
-export function criterionColumn(
-  criterion: CriterionInfo,
-  info?: ColumnInfo,
-): DataTableColumn<TableRow> {
+export function criterionColumn(criterion: CriterionInfo, info?: ColumnInfo): PlanColumn {
   const of = (row: TableRow) => row.criteria?.[criterion.id];
   return {
     id: `criterion:${criterion.id}`,
+    ...(info ? fieldHelp(info.name) : {}),
     header: info ? featureLabel(info.name) : decisionLabel(criterion.id),
     description: `${info?.description ?? criterion.field} (criterion ${criterion.id}, ${criterion.mode}). A tint marks a near miss or a miss.`,
     value: (row) => shownValue(of(row)?.value ?? null),

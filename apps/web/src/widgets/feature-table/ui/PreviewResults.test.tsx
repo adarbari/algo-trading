@@ -8,6 +8,7 @@ import { PreviewResults } from './PreviewResults';
 
 const state = vi.hoisted(() => ({ preview: {} }));
 
+vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null })); // the header help button: TableFrame.test.tsx
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreenerBuilder: () => ({ preview: state.preview }),

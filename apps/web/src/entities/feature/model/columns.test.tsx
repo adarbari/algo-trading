@@ -200,6 +200,21 @@ describe('column factories', () => {
     expect(withCompanions([high.name, sessions])).toEqual([high.name, sessions]);
   });
 
+  it('name the Guide entry of every field column, and of no other', () => {
+    const entry = { kind: 'field', id: CLOSE.name };
+    expect(featureColumn(CLOSE).help).toEqual(entry);
+    expect(fromHighColumn(CLOSE).help).toEqual(entry);
+    expect(screenColumn({ name: 'close', field: CLOSE.name }, CLOSE).help).toEqual(entry);
+    expect(criterionColumn({ id: 'c1', field: CLOSE.name, mode: 'hard' }, CLOSE).help).toEqual(
+      entry,
+    );
+    // No catalogue entry (a screen's own column), or not a field at all: nothing to explain.
+    expect(screenColumn({ name: 'close', field: CLOSE.name }).help).toBeUndefined();
+    expect(criterionColumn({ id: 'c1', field: CLOSE.name, mode: 'hard' }).help).toBeUndefined();
+    const others: ColumnPlan = [tickerColumn(), rankColumn(), decisionColumn(), scoreColumn()];
+    for (const column of others) expect(column.help).toBeUndefined();
+  });
+
   it('mark personal-licence features and describe a column from its catalogue entry', () => {
     const column = featureColumn(IV);
     expect(column.header).toBe('Iv30 (P)');

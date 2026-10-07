@@ -415,6 +415,9 @@ export function DataTable<TRow extends RowData>({
                       ) : (
                         <span className={styles.headerText}>{column.header}</span>
                       )}
+                      {column.headerAction && (
+                        <span className={styles.headerAction}>{column.headerAction}</span>
+                      )}
                       {descriptionId && (
                         <span id={descriptionId} className={styles.hidden}>
                           {column.description}
