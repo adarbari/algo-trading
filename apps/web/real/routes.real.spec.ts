@@ -12,7 +12,13 @@ import { WORKSPACES } from '../src/app/workspaces/workspaces';
  * Routes with a parameter or no top-bar section, opened with a plausible id; `/explore?sel=BULL`
  * opens one ticker's Overview, read over GraphQL (`POST /graphql`) from the real API.
  */
-const EXTRA_ROUTES = ['/screeners/new', '/screeners/vrp_scanner/edit', '/explore?sel=BULL'];
+const EXTRA_ROUTES = [
+  '/screeners/new',
+  '/screeners/vrp_scanner/edit',
+  '/explore?sel=BULL',
+  '/guide',
+  '/guide/fields',
+];
 const ROUTES = [...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)), ...EXTRA_ROUTES];
 
 const SETTLE_MS = 10_000;

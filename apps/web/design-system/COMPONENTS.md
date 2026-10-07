@@ -431,6 +431,18 @@ Source: `design-system/components/Distribution`
 | `onRetry` | `() => void` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no values. |
 
+### DocLayout
+
+DocLayout: the frame of a reference page (the Guide): a narrow `rail` to find things, the `children` as the article (a reading width, the content is the hero) and an optional `aside` on the end (a page's "On this page" list). The columns wrap under each other when the page is narrow. `DocSection` is the anchor of one part of the article, the target of an "On this page" link (the content brings its own heading and landmark); it clears the top bar when scrolled to.
+
+Source: `design-system/components/DocLayout`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rail` | `ReactNode` | no | The side rail: a search and a NavList. |
+| `aside` | `ReactNode` | no | The list on the end: a NavList of this page's anchors. |
+| `children` | `ReactNode` | yes | The article: DocSections and other blocks, one column. |
+
 ### Drawer
 
 Drawer: a side sheet over the page for detail that keeps the screen behind it in context (a ticker's detail from a table row, a run's log, filters on a phone). Modal like Dialog: focus moves in, stays inside, and returns to the opener; Escape, the close button and a backdrop click close it; page scroll is locked. Full height on the `end` (default) or `start` side; `sm` / `md` / `lg` widths, never wider than the screen.
@@ -786,6 +798,18 @@ Source: `design-system/components/MasterDetail`
 | `gap` | `Space` | no | Space between the columns, and between the summary and its neighbour (default 4). |
 | `collapse` | `'md' \| 'lg'` | no | The breakpoint under which the detail moves into a sheet: `md` (720) or `lg` (960, default). |
 
+### NavList
+
+NavList: a compact vertical list of links, optionally nested one level (a section and its themes, a theme and its fields), each with an optional count; the current one carries `aria-current="page"` and the accent tint. Used as the Guide's side rail and, with anchors, as a page's "On this page" list. Links go through the app's router link (`LinkProvider`).
+
+Source: `design-system/components/NavList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `'aria-label'` | `string` | yes | The navigation landmark's name ("Guide", "On this page"). |
+| `items` | `readonly NavListItem[]` | yes |  |
+| `size` | `'sm' \| 'base'` | no | `sm` for a page's own anchors; `base` (default) for a rail. |
+
 ### NavTabs
 
 NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links are plain anchors unless `renderLink` renders the app's router link with the given props (the design system never imports the router). One row that scrolls sideways when the sections do not fit, the current link scrolled into view. For switching views inside a page use Tabs.
@@ -1099,6 +1123,23 @@ Source: `design-system/components/Tabs`
 | `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
 | `size` | `'sm' \| 'md'` | no | Text size: `md` (default) or `sm` (dense toolbars). |
 
+### TextLink
+
+TextLink: a link inside the app (a field's page, a section of this page, Explore): accent text, an optional leading icon and a trailing key hint; `current` marks the page the link points at. In-app paths go through the app's router link (`LinkProvider`); anchors ("#reads") and URLs are plain anchors. A link to another site is an ExternalLink.
+
+Source: `design-system/components/TextLink`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `href` | `string` | yes | Where it goes: an in-app path ("/guide/fields/rel_volume"), an anchor ("#reads") or a URL. |
+| `children` | `string` | yes | What is there ("Relative volume"): the visible text. |
+| `icon` | `IconName` | no | An icon before the text (`book` for the Guide). |
+| `keys` | `readonly string[]` | no | The key that opens it, shown after the text (`['?']`). |
+| `mono` | `boolean` | no | Mono face, for a catalogue name. |
+| `size` | `'sm' \| 'base' \| 'inherit'` | no | `sm` for dense lists, `base` (default), or `inherit` inside a sentence. |
+| `tone` | `'default' \| 'secondary'` | no | Quiet colour, for a link in a list of links (`default` is the accent). |
+| `current` | `boolean` | no | The page the link points at is the one shown: marks it with the accent tint. |
+
 ### TickerTag
 
 TickerTag: a ticker symbol in mono, keyed to its chart series (s1-s6: border and swatch in the series colour) so a compare list, a chart legend and a side-by-side table read as one. The symbol itself stays in the text colour: series colours meet 3:1 for graphics, not 4.5:1 for text. Optionally removable ("Remove AAPL from compare").
@@ -1143,7 +1184,7 @@ Source: `design-system/components/Tooltip`
 
 ### TopBar
 
-TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search box, "As of Fri 2 Oct", the latest-run note). Under 720 px (container width) the bar is two rows: brand, workspace switch and end slot, then the nav full width.
+TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search box, "As of Fri 2 Oct", the latest-run note), and a utility slot just before it for links that belong to no workspace (the Guide). Under 720 px (container width) the bar is two rows: brand, workspace switch, utility and end slots, then the nav full width.
 
 Source: `design-system/components/TopBar`
 
@@ -1152,6 +1193,7 @@ Source: `design-system/components/TopBar`
 | `brand` | `ReactNode` | yes | The product mark (e.g. `<Mono weight="medium">algotrade</Mono>`). |
 | `workspace` | `ReactNode` | no | The workspace switch (WorkspaceSwitch). |
 | `nav` | `ReactNode` | no | The workspace's section links (NavTabs). |
+| `utility` | `ReactNode` | no | A utility link on the far side, before `end` (a TextLink to the Guide), in every workspace. |
 | `end` | `ReactNode` | no | Content at the far end: a SearchInput, an as-of date, a status note. |
 
 ### WorkspaceSwitch

@@ -1,7 +1,6 @@
 /**
- * The detail side of Explore: the detail tabs (Overview, Compare,
- * Chart, Options, Features, Events, Screener hits; the Field guide takes the page, see
- * ExplorePage), each tab a widget for the compare set or
+ * The detail side of Explore (the compare bar is CompareBar): the detail tabs (Overview, Compare,
+ * Chart, Options, Features, Events, Screener hits), each tab a widget for the compare set or
  * the focused ticker. Compare is the rebased chart over the compare set's features side by
  * side (the feature table for those tickers, sorted in the table).
  */

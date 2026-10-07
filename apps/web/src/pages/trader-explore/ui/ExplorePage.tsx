@@ -1,16 +1,15 @@
 /**
  * Trader > Explore: one page for the universe, instruments, chains and features. Left, the
  * ticker table (the feature table over the universe: filters, catalogue columns, sorting and
- * paging on the server, selection into the compare set); right, the compare bar and the detail
- * tabs for the compare set and the focused ticker. On a phone the table takes the width, the
- * compare bar sits above it, and a chosen ticker's detail opens in a sheet (MasterDetail). Every
- * choice lives in the URL's search params (given as props by the route), so a view is a
- * shareable link.
+ * paging on the server, selection into the compare set); right, the detail tabs for the
+ * compare bar and the detail tabs for the compare set and the focused ticker. On a phone the table
+ * takes the width, the compare bar sits above it, and a chosen ticker's detail opens in a sheet
+ * (MasterDetail). Every choice lives in the URL's search params (given as props by the route), so
+ * a view is a shareable link.
  */
 import { Heading, MasterDetail, Stack, Text } from '@algotrade/ui';
 
 import { FeatureTable } from '@/widgets/feature-table';
-import { FieldGuide } from '@/widgets/field-guide';
 import { MAX_COMPARE, nextSelection } from '@/features/compare-set';
 import { TickerFilterBar, toTableFilters, type TickerFilters } from '@/features/ticker-filter';
 
@@ -19,23 +18,15 @@ import { exploreState, type SearchPatch } from '../model/state';
 
 import { CompareBar } from './CompareBar';
 import { DetailTabs } from './DetailTabs';
-import { ExploreTabs } from './ExploreTabs';
 
 export interface ExplorePageProps {
   search: ExploreSearch;
   onSearchChange: (patch: SearchPatch) => void;
-  /** Opens the Screener Builder (the field guide's "Add to a screen"). */
-  onOpenBuilder: () => void;
   /** Opens one screener's results (a name in the Screener hits tab). */
   onOpenScreener: (screenerId: string) => void;
 }
 
-export function ExplorePage({
-  search,
-  onSearchChange,
-  onOpenBuilder,
-  onOpenScreener,
-}: ExplorePageProps) {
+export function ExplorePage({ search, onSearchChange, onOpenScreener }: ExplorePageProps) {
   const state = exploreState(search);
   const filters: TickerFilters = {
     q: search.q,
@@ -45,41 +36,6 @@ export function ExplorePage({
     leveraged: search.lev,
     optionable: search.opt,
   };
-  if (state.tab === 'guide') {
-    return (
-      <Stack gap={3}>
-        <Stack gap={1}>
-          <Heading level={1}>Explore</Heading>
-          <Text size="sm" tone="secondary">
-            Every catalogue field: what it means, how today&apos;s names are spread over it, and the
-            criterion that reads it.
-          </Text>
-        </Stack>
-        <ExploreTabs
-          tab={state.tab}
-          selectedCount={state.selected.length}
-          onSearchChange={onSearchChange}
-        >
-          <FieldGuide
-            theme={search.theme}
-            field={search.field}
-            symbol={search.symbol}
-            defaultSymbol={state.focused}
-            onThemeChange={(theme) => {
-              onSearchChange({ theme, field: undefined });
-            }}
-            onFieldChange={({ theme, field }) => {
-              onSearchChange({ theme, field });
-            }}
-            onSymbolChange={(symbol) => {
-              onSearchChange({ symbol });
-            }}
-            onAddToScreen={onOpenBuilder}
-          />
-        </ExploreTabs>
-      </Stack>
-    );
-  }
   return (
     <Stack gap={3}>
       <Stack gap={1}>
@@ -91,7 +47,7 @@ export function ExplorePage({
       </Stack>
       <MasterDetail
         detailKey={search.focus ?? null}
-        detailTitle={search.focus ?? state.focused}
+        detailTitle={search.focus ?? ''}
         onDetailClose={() => {
           onSearchChange({ focus: undefined });
         }}

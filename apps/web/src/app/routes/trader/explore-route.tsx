@@ -1,9 +1,12 @@
 /**
  * Trader > Explore: the route validates the search params (Explore's whole state, so views
- * are shareable links) and hands them to the page with a setter that replaces the URL.
+ * are shareable links) and hands them to the page with a setter that replaces the URL. The
+ * retired Field guide tab (`tab=guide`) redirects to the Guide for one release: to the field's
+ * page when the link named one, else to the field index (narrowed to the theme it named).
  */
-import { createRoute, useNavigate } from '@tanstack/react-router';
+import { createRoute, redirect, useNavigate } from '@tanstack/react-router';
 
+import { fieldPath, GUIDE_FIELDS_PATH } from '@/entities/guide';
 import {
   ExplorePage,
   parseExploreSearch,
@@ -30,7 +33,6 @@ function ExploreRoute() {
     <ExplorePage
       search={search}
       onSearchChange={onSearchChange}
-      onOpenBuilder={() => void navigate({ to: '/screeners/new' })}
       onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
     />
   );
@@ -40,5 +42,14 @@ export const exploreRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'explore',
   validateSearch: parseExploreSearch,
+  beforeLoad: ({ search }) => {
+    if (search.tab !== 'guide') return;
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect(
+      search.field
+        ? { to: fieldPath(search.field) }
+        : { to: GUIDE_FIELDS_PATH, search: search.theme ? { theme: search.theme } : {} },
+    );
+  },
   component: ExploreRoute,
 });

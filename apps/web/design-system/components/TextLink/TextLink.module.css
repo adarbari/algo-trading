@@ -1,0 +1,48 @@
+/* TextLink: accent text, underline on hover, the accent tint when it is the current page. */
+.link {
+  display: inline-flex;
+  min-width: 0;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.content {
+  display: inline-flex;
+  gap: var(--space-1-5);
+  align-items: center;
+  color: var(--color-accent-strong);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.content[data-size='sm'] {
+  font-size: var(--font-size-sm);
+}
+
+.content[data-size='inherit'] {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.content[data-mono] {
+  font-family: var(--font-mono);
+}
+
+.content[data-tone='secondary'] {
+  color: var(--color-text-2);
+}
+
+.link:hover .content {
+  text-decoration: underline;
+}
+
+.link[aria-current='page'] {
+  padding-inline: var(--space-2);
+  background: var(--color-accent-soft);
+}
+
+.link[aria-current='page'] .content {
+  color: var(--color-accent-strong);
+  font-weight: var(--font-weight-medium);
+}
