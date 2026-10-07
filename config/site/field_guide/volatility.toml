@@ -827,3 +827,137 @@ op = "eq"
 value = 0
 mode = "hard"
 note = "a filter for momentum entries that want the move under way"
+
+# ATR and realised-vol windows beside the 14 / 20 / 30 (vol_stats@v1, volatility.toml
+# expressions): the expansion and contraction of the daily range, and where realised vol sits
+# against the name's own year.
+
+[[field]]
+name = "rollup.vol_stats@v1.atr_5"
+theme = "volatility"
+reads = "Wilder's average true range over 5 sessions, in dollars per share: this week's typical daily range, reacting to a change in volatility within days where atr_14 takes two weeks. Read it against atr_20 (feature.atr_ratio_5_20): above the longer average the range is expanding, below it contracting. On its own it scales with the price; feature.atr_pct is the 14-session range as a share of the close."
+caveats = [
+  "Five true ranges is a small sample: one gap day lifts it by a fifth of the gap for a week. Check rollup.price_moves@v1.one_day_move.",
+  "Null with fewer than 6 consecutive bars ending on the session.",
+]
+sources = ["Wilder (1978), New Concepts in Technical Trading Systems: ATR"]
+[[field.use]]
+for = "has a short ATR"
+op = "not_null"
+mode = "hard"
+note = "threshold the ratio instead: feature.atr_ratio_5_20"
+
+[[field]]
+name = "rollup.vol_stats@v1.atr_20"
+theme = "volatility"
+reads = "Wilder's average true range over 20 sessions, in dollars per share: the month's typical daily range, the slow reference the 5-session ATR is compared with (feature.atr_ratio_5_20). Position sizing by ATR usually uses 14 or 20; the two differ by a few percent on most names."
+caveats = [
+  "Null with fewer than 21 consecutive bars ending on the session.",
+]
+sources = ["Wilder (1978), New Concepts in Technical Trading Systems: ATR"]
+[[field.use]]
+for = "has a monthly ATR"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.atr_pct for the range as a share of the price"
+
+[[field]]
+name = "rollup.vol_stats@v1.hv10"
+theme = "volatility"
+reads = "Close-to-close realised volatility over the last 10 sessions, annualised: 0.30 means the last two weeks' daily moves, scaled to a year, were 30%. It is the fastest realised-vol window in the catalogue and the noisiest; compare it with hv60 (feature.hv_ratio_10_60) to see whether the last two weeks were calmer or wilder than the quarter, and with rollup.iv30@v1.iv30 for what options price for the month ahead."
+caveats = [
+  "Ten returns: one 5% day alone gives an hv10 near 0.25. Check rollup.trend_stats@v2.ret_z_20d for the day behind the number.",
+  "Null after a gap in the last 11 sessions or a shorter history.",
+]
+sources = ["Realised volatility estimators: ADR 0021; Sinclair (2013), Volatility Trading"]
+[[field.use]]
+for = "a calm fortnight (realised vol low)"
+op = "lte"
+value = 0.20
+mode = "soft"
+tolerance = 0.05
+note = "the level depends on the name: use feature.hv_ratio_10_60 or rollup.vol_stats@v1.hv20_pctile_252d for 'calm for this name'"
+
+[[field]]
+name = "rollup.vol_stats@v1.hv60"
+theme = "volatility"
+reads = "Close-to-close realised volatility over the last 60 sessions (a quarter), annualised: the name's recent normal, slower and steadier than hv20 and hv30. A large cap sits around 0.15 to 0.30, a growth name 0.40 to 0.60, a biotech or a leveraged fund above 0.70. It is the base feature.hv_ratio_10_60 compares the last two weeks with, and a fair comparison for a 60-day option's implied vol."
+caveats = [
+  "An earnings day inside the quarter lifts it for 60 sessions; check rollup.earnings@v1.last_earnings_date.",
+  "Null after a gap in the last 61 sessions or a shorter history.",
+]
+sources = ["Realised volatility estimators: ADR 0021"]
+[[field.use]]
+for = "a volatile name (quarterly realised vol)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+note = "for premium selling, pair with feature.iv_hv_spread or the vrp features so the implied side pays for it"
+
+[[field]]
+name = "rollup.vol_stats@v1.hv20_pctile_252d"
+theme = "volatility"
+reads = "Where today's 20-session realised volatility sits against the name's own last year, 0 to 1: the share of the 252 sessions before today whose hv20 was lower. 0.10 means the last month was among the calmest tenth of the year (the realised side of a volatility contraction, the setup the squeeze screens look for); 0.90 among the wildest. It is the realised twin of feature.iv_percentile: both high means a known storm, implied high and realised low means the market expects one."
+caveats = [
+  "After a shock day hv20 stays high for 20 sessions and then drops in one step; a percentile that collapses with no news is the shock leaving the window. Check rollup.price_moves@v1.one_day_move.",
+  "One missing bar voids every hv20 window containing it (21 of them), so a name with two or three gaps in the year has no percentile. Check rollup.price_stats@v2.history_days.",
+  "Null when today's hv20 is unknown or fewer than 240 of the 252 sessions before have one.",
+]
+sources = ["Bollinger (2001), Bollinger on Bollinger Bands: volatility cycles; Sinclair (2013), Volatility Trading"]
+[[field.use]]
+for = "realised volatility contraction"
+op = "lte"
+value = 0.15
+mode = "soft"
+tolerance = 0.05
+note = "with feature.bb_squeeze eq true or rollup.bands@v2.bb_width_pctile_252d lte 0.10; a pre-move state, no direction"
+[[field.use]]
+for = "realised volatility already elevated"
+op = "gte"
+value = 0.85
+mode = "soft"
+tolerance = 0.05
+note = "a filter for strategies that want a calm entry; for premium selling check feature.iv_percentile is higher still"
+
+[[field]]
+name = "feature.atr_ratio_5_20"
+theme = "volatility"
+reads = "ATR(5) / ATR(20): the daily range this week against the month. 1 is unchanged; above about 1.3 the range is expanding (a breakout under way, or a shock), below about 0.7 it is contracting (the quiet before a move, or a dull name). The breakout screens want it above 1 on the breakout day; the range-breakout screen wants it below 1 before the move."
+caveats = [
+  "One gap day lifts ATR(5) by a fifth of the gap and the ratio with it for a week; an 'expansion' that is one day old is a gap, not a trend. Check rollup.trend_stats@v2.ret_z_20d.",
+  "A pending takeover collapses both ATRs; the ratio then swings on cents. See the 'pending takeover' situation.",
+  "Null with fewer than 21 consecutive bars, or ATR(20) of 0.",
+]
+sources = ["Volatility breakout systems (Kaufman, Trading Systems and Methods: range expansion)"]
+[[field.use]]
+for = "range expanding (breakout confirmation)"
+op = "gte"
+value = 1.2
+mode = "soft"
+tolerance = 0.1
+note = "with feature.breakout_20d or feature.breakout_magnitude_20d gt 0"
+[[field.use]]
+for = "range contracting (before the move)"
+op = "lte"
+value = 0.8
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.bands@v2.bb_width_pctile_252d lte 0.15 for the squeeze"
+
+[[field]]
+name = "feature.hv_ratio_10_60"
+theme = "volatility"
+reads = "Realised vol over the last 10 sessions / over the last 60: above 1 the last two weeks were more volatile than the quarter, below 1 calmer. 0.5 is a markedly quiet fortnight (a base), 2 a fortnight that held an event. The same reading as feature.atr_ratio_5_20 from close-to-close returns instead of ranges, so a gap-heavy name reads higher here."
+caveats = [
+  "An earnings day in the last 10 sessions is the whole numerator; check rollup.earnings@v1.last_earnings_date.",
+  "Null after a gap in the last 61 sessions, a shorter history, or hv60 of 0.",
+]
+sources = ["Sinclair (2013), Volatility Trading: volatility cones and term comparison"]
+[[field.use]]
+for = "a quiet fortnight against the quarter"
+op = "lte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.vol_stats@v1.hv20_pctile_252d lte 0.2 for a contraction against the year as well"

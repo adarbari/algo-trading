@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
+from algotrade.features.rollups.activity import vol_stats, volume_profile
 from algotrade.features.rollups.corporate import (
     dividends,
     earnings,
@@ -83,6 +84,8 @@ GROUPS: dict[str, FeatureGroup] = {
             volume.GROUP,
             bands.GROUP,
             trend_stats.GROUP,
+            vol_stats.GROUP,
+            volume_profile.GROUP,
             swing_levels.GROUP,
             pivot_strength.GROUP,
             retest.GROUP,
@@ -112,6 +115,7 @@ SUPERSEDED: dict[str, Superseded] = {
     "dividends@v1": Superseded("dividends@v2"),
     "fundamentals@v1": Superseded("fundamentals@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
+    "anchored_vwap@v1": Superseded("anchored_vwap@v2"),
     # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)
     "bands@v1": Superseded("bands@v2"),
     "trend_stats@v1": Superseded("trend_stats@v2"),

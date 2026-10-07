@@ -16,7 +16,15 @@ from algotrade.features.registry import GROUPS
 from algotrade.features.rollups.corporate.earnings import valid_events
 from algotrade.features.rollups.price import anchored_vwap as av
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.rollup_store import END, series, store, write_bars, write_earnings, write_split
+from tests.helpers.rollup_store import (
+    END,
+    series,
+    store,
+    write_bars,
+    write_earnings,
+    write_rows,
+    write_split,
+)
 
 DAYS = sessions_ending(END, 40)  # END is a Friday: DAYS[-3] Wednesday, DAYS[-2] Thursday
 
@@ -166,8 +174,58 @@ def test_point_in_time_reports_and_bars_after_the_session_never_count() -> None:
 
 
 def test_registered() -> None:
-    assert GROUPS["anchored_vwap@v1"].table == "rollups/instrument/anchored_vwap@v1"
-    assert [i.table for i in av.GROUP.inputs] == ["events/earnings", "bars/1d"]
+    assert GROUPS["anchored_vwap@v2"].table == "rollups/instrument/anchored_vwap@v2"
+    assert [i.table for i in av.GROUP.inputs] == [
+        "events/earnings",
+        "bars/1d",
+        "rollups/instrument/swing_levels@v1",
+    ]
+    assert av.GROUP.inputs[1].sessions_back(None) == av.SWING_SESSIONS == 251
+
+
+def test_swing_anchors_use_the_stored_pivot_dates() -> None:
+    writer, reader = store()
+    flat_bars(writer, ["EQ:A", "EQ:B", "EQ:GAP"], skip={"EQ:GAP": [37]})
+    write_earnings(writer, DAYS[-30], [("EQ:Z", DAYS[-25], "pre_market")])  # no report for these
+    write_rows(
+        writer,
+        "rollups/instrument/swing_levels@v1",
+        END,
+        [
+            # EQ:A: support pivot on Thursday (two sessions: Thursday 10 x 100, Friday 12 x 300)
+            {
+                "instrument_id": "EQ:A",
+                "swing_high": 20.0,
+                "swing_high_date": DAYS[-10],
+                "swing_low": 8.0,
+                "swing_low_date": DAYS[-2],
+            },
+            # EQ:B: a pivot on the session itself (one session: unknown), no resistance
+            {
+                "instrument_id": "EQ:B",
+                "swing_high": None,
+                "swing_high_date": None,
+                "swing_low": 8.0,
+                "swing_low_date": DAYS[-1],
+            },
+            # EQ:GAP: a gap inside the range from the pivot
+            {
+                "instrument_id": "EQ:GAP",
+                "swing_high": 20.0,
+                "swing_high_date": DAYS[-5],
+                "swing_low": None,
+                "swing_low_date": None,
+            },
+        ],
+    )
+    out = rows(reader)
+    assert out["EQ:A"]["avwap_swing_low"] == pytest.approx((10 * 100 + 12 * 300) / 400, rel=1e-6)
+    assert out["EQ:A"]["avwap_swing_high"] == pytest.approx(
+        (10 * 100 * 9 + 12 * 300) / 1200, rel=1e-6
+    )
+    assert np.isnan(out["EQ:B"]["avwap_swing_low"]) and np.isnan(out["EQ:B"]["avwap_swing_high"])
+    assert np.isnan(out["EQ:GAP"]["avwap_swing_high"])
+    assert np.isnan(out["EQ:A"]["avwap_earnings"])  # no report: the earnings anchor is separate
 
 
 def test_reading_only_reports_that_can_anchor_changes_nothing(

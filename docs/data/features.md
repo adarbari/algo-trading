@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-321 stored features in 32 groups, in dependency order; 84 expression features.
+340 stored features in 34 groups, in dependency order; 90 expression features.
 
 ## `option_liquidity@v1`
 
@@ -214,6 +214,21 @@ Short and long returns, the 12-1 momentum and its acceleration, the return z-sco
 | `sma20_streak` | window | int | sessions | open | -252 .. 252 | Signed count of consecutive sessions, ending on the session, with the close above its 20-session mean (positive) or below it (negative); 0 when equal; the count stops at the first session whose mean is unknown | the session's 20-session mean is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.close` |
 | `tight_range_sessions` | window | int | sessions | open | >= 0 | Consecutive sessions, ending on the session, on which the 20-session high-low range / close was at most tight_range_pct (0.15): the length of the base (0: the session itself is not tight) | the session's 20-session range is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
 
+## `vol_stats@v1`
+
+Wilder ATR over 5 / 20, realised vol over 10 / 60, the hv20 and volume percentiles over 252 sessions, the 60-session volume average and the pocket pivot. Stored as `rollups/instrument/vol_stats@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `atr_5` | window | float32 | usd_per_share | open | >= 0 | Wilder average true range (5): seeded with the mean of the first 5 true ranges, then (4 x ATR + TR) / 5, over the consecutive bars ending on the session (at most the last 150 sessions) | fewer than 6 consecutive bars ending on the session (a gap among the last 6 sessions, or a shorter history) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `atr_20` | window | float32 | usd_per_share | open | >= 0 | Wilder average true range (20): seeded with the mean of the first 20 true ranges, then (19 x ATR + TR) / 20, over the consecutive bars ending on the session (at most the last 150 sessions) | fewer than 21 consecutive bars ending on the session (a gap among the last 21 sessions, or a shorter history) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `hv10` | window | float32 | decimal | open | 0 .. 5 | Close-to-close realised volatility: sample stdev of the last 10 log returns x sqrt(252) | a session among the last 11 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `hv60` | window | float32 | decimal | open | 0 .. 5 | Close-to-close realised volatility: sample stdev of the last 60 log returns x sqrt(252) | a session among the last 61 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `hv20_pctile_252d` | window | float32 | decimal | open | 0 .. 1 | Share of the 252 sessions before the session whose 20-session realised volatility was strictly below the session's: 0.10 means realised vol is in the calmest tenth of the name's year, 0.90 in the wildest | the session's hv20 is unknown, or fewer than 240 of the 252 sessions before it have one | `bars/1d.close` |
+| `adv_shares_60d` | window | float32 | shares | open | >= 0 | Mean share volume over the last 60 sessions, the session included | a session among the last 60 has no bar (a gap), or the history is shorter | `bars/1d.volume` |
+| `volume_pctile_252d` | window | float32 | decimal | open | 0 .. 1 | Share of the 252 sessions before the session whose share volume was strictly below the session's: 0.98 means only 2% of the year's sessions traded more | the session's volume is unknown, or fewer than 240 of the 252 sessions before it have one | `bars/1d.volume` |
+| `pocket_pivot` | window | bool | flag | open |  | The pocket pivot: the close is above the previous close and the session's volume is above the volume of every down-close session among the 10 sessions before it (Morales and Kacher); false on a down day, or when the last 10 sessions had no down close to beat | a session among the last 12 has no bar (a gap), or the history is shorter | `bars/1d.close`, `bars/1d.volume` |
+
 ## `swing_levels@v1`
 
 Resistance and support: the most recent confirmed swing high above and swing low below the close (5 bars each side, pivots 5 to 246 sessions back). Stored as `rollups/instrument/swing_levels@v1`; reads `bars/1d`.
@@ -236,15 +251,6 @@ Today's opening gap and the nearest unfilled down gap above and up gap below the
 | `gap_above_date` | window | date | date | open |  | The session of that down gap | no unfilled down gap above the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
 | `gap_below` | window | float32 | usd_per_share | open | >= 0 | Support gap: the upper edge (the low of the gap session, where price falling would enter the zone) of the nearest unfilled up gap below the close (an up gap: low > the previous high; filled when a later low reaches that previous high) | no unfilled up gap below the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
 | `gap_below_date` | window | date | date | open |  | The session of that up gap | no unfilled up gap below the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
-
-## `anchored_vwap@v1`
-
-VWAP anchored to the last earnings report (from the reaction session through the session). Stored as `rollups/instrument/anchored_vwap@v1`; reads `events/earnings`, `bars/1d`.
-
-| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
-|---|---|---|---|---|---|---|---|---|
-| `avwap_earnings` | window | float32 | usd_per_share | open | >= 0 | Volume-weighted average of the typical price (high + low + close) / 3 from the last earnings anchor session through the session (the anchor: the report date, or the next session for a report after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older); or fewer than 2 sessions from the anchor through the session, a session in that range without a bar, or no volume in it | `events/earnings.ts`, `events/earnings.time`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
-| `avwap_anchor_date` | window | date | date | open |  | The session avwap_earnings is anchored on: the last report date (pre-market or unknown time) or the session after it (after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older) | `events/earnings.ts`, `events/earnings.time` |
 
 ## `episode_behaviour@v1`
 
@@ -335,6 +341,22 @@ Trailing-twelve-month revenue, net income and diluted EPS and the last fiscal ye
 | `is_adr` | window | bool | flag | open |  | The instrument is an ADR: its per-share figures are per ordinary share and the ADR ratio is not stored, so pe_ratio is null | never (false without an instruments/reference snapshot) | `instruments/reference.security_type` |
 | `financials_status` | label | str | category | open | OK, PARTIAL, NO_TTM, NO_FACTS, STALE | OK (all three TTMs); PARTIAL (some); NO_TTM (facts, but no TTM can be formed); NO_FACTS (none filed); STALE (the first TTM present ended more than stale_days, 480, before the session; the values are still shown) | never | `instruments/shares.concept` |
 
+## `volume_profile@v1`
+
+Volume at price over the last 252 sessions from daily bars: point of control, value area, the nearest high- and low-volume nodes above and below the close, and the share of volume within an ATR of the close. Stored as `rollups/instrument/volume_profile@v1`; reads `bars/1d`, `rollups/instrument/momentum@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `profile_status` | label | str | category | open | OK, FEW_BARS, NO_RANGE | OK: the profile is computed; FEW_BARS: fewer than min_bars (240) bars among the last 252 sessions; NO_RANGE: every bar in the window at one price | never | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `poc_252d` | window | float32 | usd_per_share | open | >= 0 | Point of control: the centre of the price bin with the most volume over the last 252 sessions (each bar's volume spread evenly over the bins its range covers; ties: the bin nearest the close) | profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `value_area_high` | window | float32 | usd_per_share | open | >= 0 | The top edge of the value area: the smallest run of bins around the point of control holding value_area (70%) of the window's volume, grown one bin at a time towards the neighbour with more volume | profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `value_area_low` | window | float32 | usd_per_share | open | >= 0 | The bottom edge of the value area | profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `hvn_above` | window | float32 | usd_per_share | open | >= 0 | The centre of the nearest price bin above the close's bin whose volume over the last 252 sessions is at least hvn_factor (1.5) x the mean bin volume: the nearest high-volume node above the price | no such bin above the close in the window's range, or profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `hvn_below` | window | float32 | usd_per_share | open | >= 0 | The centre of the nearest price bin below the close's bin whose volume over the last 252 sessions is at least hvn_factor (1.5) x the mean bin volume: the nearest high-volume node below the price | no such bin below the close in the window's range, or profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `lvn_above` | window | float32 | usd_per_share | open | >= 0 | The centre of the nearest price bin above the close's bin whose volume over the last 252 sessions is at most lvn_factor (0.5) x the mean bin volume: the nearest low-volume node above the price | no such bin above the close in the window's range, or profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `lvn_below` | window | float32 | usd_per_share | open | >= 0 | The centre of the nearest price bin below the close's bin whose volume over the last 252 sessions is at most lvn_factor (0.5) x the mean bin volume: the nearest low-volume node below the price | no such bin below the close in the window's range, or profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `volume_near_close_share` | window | float32 | decimal | open | 0 .. 1 | Share of the last 252 sessions' volume in bins whose centre is within one atr_14 of the close: 0.30 means the name has traded nearly a third of its year within a day's range of here (a heavily traded level) | atr_14 is null (no momentum row, or fewer than 15 consecutive bars), or profile_status is not OK (fewer than min_bars bars in the window, or no price range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume`, `momentum.atr_14@v1` |
+
 ## `pivot_strength@v1`
 
 How often the swing high and low were tested (touches within 0.5 ATR), their age in sessions and whether the pivots step up (HH_HL), down (LH_LL) or mix. Stored as `rollups/instrument/pivot_strength@v1`; reads `bars/1d`, `rollups/instrument/swing_levels@v1`, `rollups/instrument/momentum@v1`.
@@ -358,6 +380,17 @@ The latest 20-session breakout of the last 60 sessions, its level, whether it wa
 | `sessions_since_breakout` | window | int | sessions | open | 0 .. 291 | Exchange sessions from that breakout to the session (0: the breakout is today) | no breakout session among the last search_sessions (60) sessions (retest_state NONE) | `bars/1d.high`, `bars/1d.close` |
 | `retest_state` | label | str | category | open | FAILED, NONE, RETESTING, HELD, FRESH, NO_ATR | FAILED (a close after the breakout, through the session, is below its level), NONE (no breakout in the last 60 sessions), NO_ATR (atr_14 unknown), RETESTING (the session's low is at or below the level + 0.5 x atr_14 and its close at or above the level), HELD (an earlier session after the breakout had such a low), FRESH (price has not come back to the level); the breakout session itself is never a retest | never | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `momentum.atr_14@v1` |
 | `failed_breakouts_252d` | window | int | count | open | 0 .. 252 | Breakouts of the last 252 sessions (the first session of each run of consecutive breakout sessions) whose close fell below their level within the next 20 sessions; one that has not failed and is under 20 sessions old is pending and not counted | a session among the last 292 has no bar (a gap), or the history is shorter | `bars/1d.high`, `bars/1d.close` |
+
+## `anchored_vwap@v2`
+
+VWAP anchored to the last earnings report (from the reaction session through the session) and to the swing low and swing high swing_levels@v1 found. Stored as `rollups/instrument/anchored_vwap@v2`; reads `events/earnings`, `bars/1d`, `rollups/instrument/swing_levels@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `avwap_earnings` | window | float32 | usd_per_share | open | >= 0 | Volume-weighted average of the typical price (high + low + close) / 3 from the last earnings anchor session through the session (the anchor: the report date, or the next session for a report after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older); or fewer than 2 sessions from the anchor through the session, a session in that range without a bar, or no volume in it | `events/earnings.ts`, `events/earnings.time`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `avwap_anchor_date` | window | date | date | open |  | The session avwap_earnings is anchored on: the last report date (pre-market or unknown time) or the session after it (after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older) | `events/earnings.ts`, `events/earnings.time` |
+| `avwap_swing_low` | window | float32 | usd_per_share | open | >= 0 | Volume-weighted average of the typical price (high + low + close) / 3 from the session of swing_levels@v1's swing_low (support) through the session: where the average participant since that pivot is positioned | no swing_low on the session (no swing_levels row, or no confirmed pivot below the close); or fewer than 2 sessions from the pivot through the session, a session in that range without a bar, or no volume in it | `swing_levels.swing_low_date@v1`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `avwap_swing_high` | window | float32 | usd_per_share | open | >= 0 | Volume-weighted average of the typical price (high + low + close) / 3 from the session of swing_levels@v1's swing_high (resistance) through the session: where the average participant since that pivot is positioned | no swing_high on the session (no swing_levels row, or no confirmed pivot above the close); or fewer than 2 sessions from the pivot through the session, a session in that range without a bar, or no volume in it | `swing_levels.swing_high_date@v1`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
 
 ## `iv30@v1`
 
@@ -681,6 +714,8 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `breakdown_20d` | expression | bool | flag | open |  | A 20-session breakdown on volume: close below the lowest low of the 20 sessions before today (prior_low_20d) and rel_volume above 1.5 (params.min_rel_volume) | neither condition is false and one is unknown (prior_low_20d or rel_volume null) | `price_stats.close < trend_stats.prior_low_20d and momentum.rel_volume > min_rel_volume` (min_rel_volume = 1.5) | virtual |
 | `put_support_cushion` | expression | float | decimal | open | -1 .. 1 | The short put's cushion: (support - the best put's strike) / close, 0.05 means the strike sits 5% of the price below the most recent swing low (negative: the strike is above support) | no confirmed swing low below the close, no best put (put_wing NO_STRIKE or worse), or no price_stats row | `(swing_levels.swing_low - put_wing.best_put_strike) / price_stats.close` | virtual |
 | `put_support_cushion_atr` | expression | float | ratio | open |  | The short put's cushion in ATRs: (support - the best put's strike) / atr_14, how many average days' range of technical room sit between support and the strike | no confirmed swing low below the close, no best put, atr_14 null (fewer than 15 consecutive bars) or 0 | `(swing_levels.swing_low - put_wing.best_put_strike) / momentum.atr_14` | virtual |
+| `in_value_area` | expression | bool | flag | open |  | The close sits inside the year's value area (the price band that held 70% of the volume): fair value by volume; outside it the price is at an extreme the market has traded little | the value area is null (profile_status not OK) and the known side does not already say false | `price_stats.close >= volume_profile.value_area_low and price_stats.close <= volume_profile.value_area_high` | virtual |
+| `dist_to_poc` | expression | float | decimal | open | >= -1 | Close / the point of control - 1: how far the price sits from the year's most-traded level, 0.05 is 5% above it (the level acts as a magnet and as support when above, resistance when below) | poc_252d is null (profile_status not OK), or no price_stats row | `price_stats.close / volume_profile.poc_252d - 1` | virtual |
 
 ### `volatility.toml`
 
@@ -691,6 +726,8 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `iv_rank` | expression | float | decimal | personal | 0 .. 1 | IV rank over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which | neither has a rank: both rank statuses are UNKNOWN (under 60 sessions of IV), there is no IV today, or every IV in the window is equal | `coalesce(ibkr_iv.iv_rank_252d_ibkr, iv_history.iv_rank_252d)` | virtual |
 | `iv_percentile` | expression | float | decimal | personal | 0 .. 1 | IV percentile over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which | neither has a percentile: both rank statuses are UNKNOWN, there is no IV today, or no earlier IV | `coalesce(ibkr_iv.iv_percentile_252d_ibkr, iv_history.iv_percentile_252d)` | virtual |
 | `iv_rank_source` | label | str | category | personal | ibkr, ours | Where iv_rank and iv_percentile came from: ibkr (IBKR's IV history) or ours (iv_history, from Cboe chains) | iv_rank is null (neither source has a rank) | `if(not is_null(ibkr_iv.iv_rank_252d_ibkr), "ibkr", if(not is_null(iv_history.iv_rank_252d), "ours", null))` | virtual |
+| `atr_ratio_5_20` | expression | float | ratio | open | >= 0 | ATR(5) / ATR(20): above 1 the daily range is expanding (this week wider than the month), below 1 contracting; 1.3 is a clear expansion, 0.7 a tight week | atr_5 or atr_20 is null (fewer than 21 consecutive bars), or atr_20 is 0 | `vol_stats.atr_5 / vol_stats.atr_20` | virtual |
+| `hv_ratio_10_60` | expression | float | ratio | open | >= 0 | Realised vol over 10 sessions / over 60: above 1 the last two weeks were more volatile than the quarter, below 1 calmer | hv10 or hv60 is null (a gap among the last 61 sessions, or a shorter history), or hv60 is 0 | `vol_stats.hv10 / vol_stats.hv60` | virtual |
 
 ### `volume.toml`
 
@@ -699,6 +736,8 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `volume_dry_up` | expression | bool | flag | open |  | The last 5 sessions traded under 60% (params.max_ratio) of the 20-session average volume: the contraction that often precedes a breakout | volume_ratio_5d_20d is null (a gap among the last 20 sessions, a shorter history, or no volume at all over the 20) | `volume.volume_ratio_5d_20d < max_ratio` (max_ratio = 0.6) | virtual |
 | `volume_climax` | expression | bool | flag | open |  | The session's volume is 3 (params.min_z) or more standard deviations above the 20 sessions before it: an event-sized day (earnings, news, an index event or a capitulation) | volume_z_20d is null (a gap among the last 21 sessions, a shorter history, or the 20 sessions before all had the same volume) | `volume.volume_z_20d >= min_z` (min_z = 3.0) | virtual |
 | `volume_bias` | label | str | category | open | ACCUMULATION, DISTRIBUTION, NEUTRAL | ACCUMULATION when 60% (params.accumulation_at) or more of the last 20 sessions' volume traded on up days, DISTRIBUTION at 40% (params.distribution_at) or less, else NEUTRAL | up_volume_share_20d is null (a gap among the last 21 sessions, a shorter history, or no volume at all over the 20) | `if(is_null(volume.up_volume_share_20d), null, if(volume.up_volume_share_20d >= accumulation_at, "ACCUMULATION", if(volume.up_volume_share_20d <= distribution_at, "DISTRIBUTION", "NEUTRAL")))` (accumulation_at = 0.6, distribution_at = 0.4) | virtual |
+| `volume_trend_20_60` | expression | float | ratio | open | >= 0 | The 20-session average volume / the 60-session average: above 1 activity is building over the quarter, below 1 fading; 1.3 is a clear pick-up | adv_shares_20d or adv_shares_60d is null (a gap among the last 60 sessions, or a shorter history), or the 60-session average is 0 | `volume.adv_shares_20d / vol_stats.adv_shares_60d` | virtual |
+| `turnover_20d` | expression | float | decimal | open | >= 0 | Daily turnover: the 20-session average share volume / shares outstanding, 0.01 means 1% of the company changes hands a day (about a 100-session holding period) | adv_shares_20d is null (a gap among the last 20 sessions), or shares_outstanding is null (no share count filed, or STALE: fundamentals market_cap_status) | `volume.adv_shares_20d / fundamentals.shares_outstanding` | virtual |
 
 ### `vrp.toml`
 
@@ -719,6 +758,7 @@ Readable until retired (`algotrade-ingest retire-features --group <key>`); their
 | `dividends@v1` | `dividends@v2` + expression features |
 | `fundamentals@v1` | `fundamentals@v2` + expression features |
 | `iv_history@v1` | `iv_history@v2` + expression features |
+| `anchored_vwap@v1` | `anchored_vwap@v2` + expression features |
 | `bands@v1` | `bands@v2` + expression features |
 | `trend_stats@v1` | `trend_stats@v2` + expression features |
 | `liquidity_class@v1` | `price_stats@v2` + expression features; `chain_oi` -> `feature.option_chain_oi`, `rule_hash` retired |

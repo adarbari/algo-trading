@@ -420,84 +420,6 @@ mode = "hard"
 note = "threshold the distance instead: feature.kc_position or feature.pct_vs_sma_20"
 
 [[field]]
-name = "feature.bb_upper"
-theme = "volatility"
-reads = "The upper Bollinger band: the 20-session mean close plus two standard deviations of those closes, in dollars per share. Price touches it on about 5% of sessions in a random walk; in a trend it rides along it (the band walk, rollup.bands@v2.band_walk). Compare with the close through feature.bb_pct_b (1 is on the band, above 1 is outside it) rather than the level itself."
-caveats = [
-  "A band is a statement about the last 20 closes, not resistance: in a strong uptrend the close lives on or above the upper band for weeks. Pair a 'too far above' reading with feature.trend_state and rollup.momentum@v1.rsi_14 before reading it as a top.",
-  "After a one-day shock (earnings, a takeover) both bands jump apart for 20 sessions and the price sits 'inside' them; the squeeze that follows is the shock leaving the window, not a new base. Check rollup.price_moves@v1.one_day_move.",
-  "Null after a gap in the last 20 sessions or a shorter history.",
-]
-sources = [
-  "Bollinger (2001), Bollinger on Bollinger Bands: the 20 / 2 defaults",
-  "Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Bands",
-]
-[[field.use]]
-for = "has Bollinger bands"
-op = "not_null"
-mode = "hard"
-note = "threshold the position instead: feature.bb_pct_b"
-
-[[field]]
-name = "feature.bb_lower"
-theme = "volatility"
-reads = "The lower Bollinger band: the 20-session mean close minus two standard deviations of those closes, in dollars per share. A close at or under it (feature.bb_pct_b at or below 0) is a two-sigma dip against the last month; in an uptrend that is the classic mean-reversion entry, in a downtrend it is where the price lives."
-caveats = [
-  "A close below the band in a downtrend keeps falling: a dip is a dip only with feature.trend_state UPTREND or feature.pct_vs_sma_200 above 0.",
-  "The band widens after a shock and narrows as the shock leaves the window, so a touch 20 sessions after an earnings gap means less than one in a quiet month. Check rollup.earnings@v1.last_earnings_date.",
-  "Null after a gap in the last 20 sessions or a shorter history.",
-]
-sources = [
-  "Bollinger (2001), Bollinger on Bollinger Bands",
-  "Mean reversion with bands (Connors and Alvarez, Short Term Trading Strategies That Work)",
-]
-[[field.use]]
-for = "has Bollinger bands"
-op = "not_null"
-mode = "hard"
-note = "threshold the position instead: feature.bb_pct_b"
-
-[[field]]
-name = "feature.kc_upper"
-theme = "volatility"
-reads = "The upper Keltner channel: the 20-session EMA plus two Wilder ATR(14), in dollars per share. Unlike a Bollinger band it is built from the daily range, so it moves with how much the name trades each day rather than with the dispersion of closes; price closes above it on a strong day, and a Bollinger band inside it is the squeeze (feature.bb_squeeze). Compare with the close through feature.kc_position."
-caveats = [
-  "The channel uses ATR(14) where the classic uses ATR(10); the width is the same within a few percent on most names and the reading is unchanged. For the exact TTM construction see the sources.",
-  "A takeover pins the price with an ATR near zero, so the channel collapses onto the EMA and every close is 'outside' it. Check feature.atr_pct and the 'pending takeover' situation.",
-  "Null with fewer than 20 consecutive bars ending on the session.",
-]
-sources = [
-  "Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel",
-  "Carter (2005), Mastering the Trade: the TTM squeeze (Bollinger 20/2 inside Keltner 20/1.5 ATR)",
-]
-[[field.use]]
-for = "has a Keltner channel"
-op = "not_null"
-mode = "hard"
-note = "threshold the position instead: feature.kc_position"
-
-[[field]]
-name = "feature.kc_lower"
-theme = "volatility"
-reads = "The lower Keltner channel: the 20-session EMA minus two Wilder ATR(14), in dollars per share. A close below it is a strong down day against the name's own daily range; a Bollinger band inside it is part of the squeeze. Compare with the close through feature.kc_position."
-caveats = [
-  "A gap down on news puts the close far below the channel for one day and the ATR catches up over the next two weeks; the channel widens after the move, not before. Check rollup.price_moves@v1.one_day_move.",
-  "Null with fewer than 20 consecutive bars ending on the session.",
-]
-sources = [
-  "Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel",
-]
-[[field.use]]
-for = "has a Keltner channel"
-op = "not_null"
-mode = "hard"
-note = "threshold the position instead: feature.kc_position"
-
-# The EMA stack, the longer channels and the prior extremes (bands@v2, trend_stats@v2): levels
-# in dollars per share. Compared with the close; the distances (feature.pct_vs_ema_*,
-# feature.dist_to_high_*, feature.breakout_magnitude_20d) carry the thresholds.
-
-[[field]]
 name = "rollup.bands@v2.ema_10"
 theme = "price levels"
 reads = "The 10-session exponential moving average of the close, in dollars per share: the fastest trend line in the catalogue, about two trading weeks, which day traders and short-term swing systems use as the trailing reference. The close above it is a short-term uptrend in force; a close below it after a run is the first warning. Threshold the distance, not the level."
@@ -541,107 +463,6 @@ for = "has a 200-session EMA (ten months of history)"
 op = "not_null"
 mode = "hard"
 note = "threshold feature.pct_vs_ema_200 or feature.pct_vs_sma_200"
-
-[[field]]
-name = "rollup.trend_stats@v2.high_100d"
-theme = "momentum and trend"
-reads = "The highest daily high of the last 100 sessions (about five months), in dollars per share, today's high included. With the 20 and 50-session highs it dates the current advance: the close at all three is a fresh leg, at the 20 but not the 100 a rally inside a longer range. Compare with the close as a share: rollup.price_stats@v2.close / high_100d - 1."
-caveats = [
-  "A single spike high (an earnings gap that reversed) sets the level for 100 sessions; feature.dist_to_resistance uses the confirmed swing pivot instead.",
-  "Null after a gap in the last 100 sessions or a shorter history.",
-]
-sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
-[[field.use]]
-for = "has a 100-session channel"
-op = "not_null"
-mode = "hard"
-note = "compare with rollup.price_stats@v2.close in a rule"
-
-[[field]]
-name = "rollup.trend_stats@v2.low_100d"
-theme = "momentum and trend"
-reads = "The lowest daily low of the last 100 sessions, in dollars per share, today's low included: the floor of the five-month range. The close at it is a five-month low; the distance above it (close / low_100d - 1) is how much of the range the name has recovered."
-caveats = [
-  "One capitulation wick sets the level for 100 sessions; rollup.swing_levels@v1.swing_low is the confirmed support instead.",
-  "Null after a gap in the last 100 sessions or a shorter history.",
-]
-sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
-[[field.use]]
-for = "has a 100-session channel"
-op = "not_null"
-mode = "hard"
-note = "compare with rollup.price_stats@v2.close in a rule"
-
-[[field]]
-name = "rollup.trend_stats@v2.high_200d"
-theme = "momentum and trend"
-reads = "The highest daily high of the last 200 sessions, in dollars per share, today's high included: close to the 52-week high (rollup.price_stats@v2.high_52w covers 252 sessions and needs 240 bars), so use it on names too young or gappy for the 52-week figure."
-caveats = [
-  "Null after a gap in the last 200 sessions or a shorter history; the 52-week high tolerates 12 missing bars, this does not.",
-]
-sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
-[[field.use]]
-for = "has a 200-session channel"
-op = "not_null"
-mode = "hard"
-note = "prefer feature.pct_from_high_52w for the 52-week distance"
-
-[[field]]
-name = "rollup.trend_stats@v2.low_200d"
-theme = "momentum and trend"
-reads = "The lowest daily low of the last 200 sessions, in dollars per share, today's low included: the ten-month floor, close to rollup.price_stats@v2.low_52w."
-caveats = [
-  "Null after a gap in the last 200 sessions or a shorter history.",
-]
-sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
-[[field.use]]
-for = "has a 200-session channel"
-op = "not_null"
-mode = "hard"
-note = "prefer feature.pct_from_low_52w for the 52-week distance"
-
-[[field]]
-name = "rollup.trend_stats@v2.prior_high_50d"
-theme = "momentum and trend"
-reads = "The highest daily high of the 50 sessions before today (today excluded), in dollars per share: the level a 50-session breakout close has to clear. feature.breakout_50d is the rule (close above it on 1.5x volume); rollup.momentum@v1.prior_high_20d is the 20-session version."
-caveats = [
-  "It excludes today on purpose: today's high is always at or above today's close, so a channel that included it could never be broken by the close.",
-  "Null after a gap in the 50 sessions before today or a shorter history.",
-]
-sources = ["Faith (2007), Way of the Turtle: the 55-day breakout (System 2)"]
-[[field.use]]
-for = "has a 50-session breakout level"
-op = "not_null"
-mode = "hard"
-note = "the rule is feature.breakout_50d"
-
-[[field]]
-name = "rollup.trend_stats@v2.prior_low_20d"
-theme = "momentum and trend"
-reads = "The lowest daily low of the 20 sessions before today (today excluded), in dollars per share: the level a 20-session breakdown close has to break. feature.breakdown_20d is the rule (close below it on 1.5x volume); for a long it is the stop most swing systems place just under."
-caveats = [
-  "Null after a gap in the 20 sessions before today or a shorter history.",
-]
-sources = ["Faith (2007), Way of the Turtle: the 20-day channel exit"]
-[[field.use]]
-for = "has a 20-session breakdown level"
-op = "not_null"
-mode = "hard"
-note = "the rule is feature.breakdown_20d; the distance above it is rollup.price_stats@v2.close / prior_low_20d - 1"
-
-[[field]]
-name = "rollup.trend_stats@v2.prior_low_50d"
-theme = "momentum and trend"
-reads = "The lowest daily low of the 50 sessions before today (today excluded), in dollars per share: the intermediate breakdown level, and the stop a position-trade places under."
-caveats = [
-  "Null after a gap in the 50 sessions before today or a shorter history.",
-]
-sources = ["Faith (2007), Way of the Turtle"]
-[[field.use]]
-for = "has a 50-session breakdown level"
-op = "not_null"
-mode = "hard"
-note = "compare with rollup.price_stats@v2.close in a rule"
 
 [[field]]
 name = "rollup.pivot_strength@v1.resistance_touches"
@@ -888,6 +709,68 @@ value = false
 mode = "soft"
 tolerance = 0
 
+# Volume at price (volume_profile@v1, a daily-bar approximation) and the swing-anchored VWAPs
+# (anchored_vwap@v2): levels in dollars per share, compared with the close.
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_earnings"
+theme = "price levels"
+reads = "The volume-weighted average price since the last earnings reaction session, in dollars per share: where the average share bought since the report is positioned. The close above it means holders since the report are in profit (the post-earnings drift has support); below it they are under water and rallies into it meet sellers. Compare with the close; rollup.anchored_vwap@v2.avwap_anchor_date says how old the anchor is."
+caveats = [
+  "A fresh anchor (a few sessions old) is nearly the current price and says little; the level means more after two to four weeks of trading.",
+  "Null without a report in the last 126 sessions, with fewer than 2 sessions since it, a gap in the range, or no volume.",
+]
+sources = ["Anchored VWAP (Brian Shannon, Maximum Trading Gains with Anchored VWAP)"]
+[[field.use]]
+for = "has an earnings-anchored VWAP"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_anchor_date"
+theme = "price levels"
+reads = "The session avwap_earnings is anchored on: the last report date for a pre-market or unknown-time report, the next session for one after the close. Its age is how long the earnings VWAP has had to form."
+caveats = [
+  "Null without a report in the last 126 sessions.",
+]
+sources = ["Anchored VWAP (Brian Shannon)"]
+[[field.use]]
+for = "has an earnings anchor"
+op = "not_null"
+mode = "hard"
+note = "rollup.earnings@v1.last_earnings_date is the report date itself"
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_swing_low"
+theme = "price levels"
+reads = "The volume-weighted average price since the most recent confirmed swing low below the close (the support swing_levels@v1 found), in dollars per share: the average cost of everyone who bought since the bottom. In an uptrend the close holds above it and pullbacks to it are bought; a close below it means the rally's buyers are under water, the first sign the swing is over. A rising anchored VWAP with the price above is the cleanest statement of a healthy leg up."
+caveats = [
+  "Support is the most recent swing low, which can be a minor pivot a week old; then the VWAP is a few sessions long and close to the price. Check rollup.swing_levels@v1.swing_low_date.",
+  "Null without a confirmed swing low below the close, with fewer than 2 sessions since it, a gap in the range, or no volume.",
+]
+sources = ["Anchored VWAP from swing lows (Brian Shannon, Maximum Trading Gains with Anchored VWAP)"]
+[[field.use]]
+for = "has a swing-low VWAP"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close: above it the leg up is intact"
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_swing_high"
+theme = "price levels"
+reads = "The volume-weighted average price since the most recent confirmed swing high above the close (the resistance swing_levels@v1 found), in dollars per share: the average cost of everyone who bought since the top, all of whom are under water while the close stays below it. A close back above it means the sellers since the top have been absorbed, the first sign of a turn; below it, rallies into it are sold."
+caveats = [
+  "Resistance is the most recent swing high, possibly a minor one; check rollup.swing_levels@v1.swing_high_date.",
+  "Null without a confirmed swing high above the close, with fewer than 2 sessions since it, a gap in the range, or no volume.",
+]
+sources = ["Anchored VWAP from swing highs (Brian Shannon)"]
+[[field.use]]
+for = "has a swing-high VWAP"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close: a close above it is the reclaim"
+
 [[field]]
 name = "rollup.bands@v2.sma_150"
 theme = "price levels"
@@ -905,3 +788,81 @@ for = "has a 30-week average"
 op = "not_null"
 mode = "hard"
 note = "threshold feature.pct_vs_sma_150 gt 0, with rollup.price_stats@v2.sma_200 below it for the template"
+
+[[field]]
+name = "feature.bb_upper"
+theme = "volatility"
+reads = "The upper Bollinger band: the 20-session mean close plus two standard deviations of those closes, in dollars per share. Price touches it on about 5% of sessions in a random walk; in a trend it rides along it (the band walk, rollup.bands@v2.band_walk). Compare with the close through feature.bb_pct_b (1 is on the band, above 1 is outside it) rather than the level itself."
+caveats = [
+  "A band is a statement about the last 20 closes, not resistance: in a strong uptrend the close lives on or above the upper band for weeks. Pair a 'too far above' reading with feature.trend_state and rollup.momentum@v1.rsi_14 before reading it as a top.",
+  "After a one-day shock (earnings, a takeover) both bands jump apart for 20 sessions and the price sits 'inside' them; the squeeze that follows is the shock leaving the window, not a new base. Check rollup.price_moves@v1.one_day_move.",
+  "Null after a gap in the last 20 sessions or a shorter history.",
+]
+sources = [
+  "Bollinger (2001), Bollinger on Bollinger Bands: the 20 / 2 defaults",
+  "Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Bands",
+]
+[[field.use]]
+for = "has Bollinger bands"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.bb_pct_b"
+
+[[field]]
+name = "feature.bb_lower"
+theme = "volatility"
+reads = "The lower Bollinger band: the 20-session mean close minus two standard deviations of those closes, in dollars per share. A close at or under it (feature.bb_pct_b at or below 0) is a two-sigma dip against the last month; in an uptrend that is the classic mean-reversion entry, in a downtrend it is where the price lives."
+caveats = [
+  "A close below the band in a downtrend keeps falling: a dip is a dip only with feature.trend_state UPTREND or feature.pct_vs_sma_200 above 0.",
+  "The band widens after a shock and narrows as the shock leaves the window, so a touch 20 sessions after an earnings gap means less than one in a quiet month. Check rollup.earnings@v1.last_earnings_date.",
+  "Null after a gap in the last 20 sessions or a shorter history.",
+]
+sources = [
+  "Bollinger (2001), Bollinger on Bollinger Bands",
+  "Mean reversion with bands (Connors and Alvarez, Short Term Trading Strategies That Work)",
+]
+[[field.use]]
+for = "has Bollinger bands"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.bb_pct_b"
+
+[[field]]
+name = "feature.kc_upper"
+theme = "volatility"
+reads = "The upper Keltner channel: the 20-session EMA plus two Wilder ATR(14), in dollars per share. Unlike a Bollinger band it is built from the daily range, so it moves with how much the name trades each day rather than with the dispersion of closes; price closes above it on a strong day, and a Bollinger band inside it is the squeeze (feature.bb_squeeze). Compare with the close through feature.kc_position."
+caveats = [
+  "The channel uses ATR(14) where the classic uses ATR(10); the width is the same within a few percent on most names and the reading is unchanged. For the exact TTM construction see the sources.",
+  "A takeover pins the price with an ATR near zero, so the channel collapses onto the EMA and every close is 'outside' it. Check feature.atr_pct and the 'pending takeover' situation.",
+  "Null with fewer than 20 consecutive bars ending on the session.",
+]
+sources = [
+  "Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel",
+  "Carter (2005), Mastering the Trade: the TTM squeeze (Bollinger 20/2 inside Keltner 20/1.5 ATR)",
+]
+[[field.use]]
+for = "has a Keltner channel"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.kc_position"
+
+[[field]]
+name = "feature.kc_lower"
+theme = "volatility"
+reads = "The lower Keltner channel: the 20-session EMA minus two Wilder ATR(14), in dollars per share. A close below it is a strong down day against the name's own daily range; a Bollinger band inside it is part of the squeeze. Compare with the close through feature.kc_position."
+caveats = [
+  "A gap down on news puts the close far below the channel for one day and the ATR catches up over the next two weeks; the channel widens after the move, not before. Check rollup.price_moves@v1.one_day_move.",
+  "Null with fewer than 20 consecutive bars ending on the session.",
+]
+sources = [
+  "Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel",
+]
+[[field.use]]
+for = "has a Keltner channel"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.kc_position"
+
+# The EMA stack, the longer channels and the prior extremes (bands@v2, trend_stats@v2): levels
+# in dollars per share. Compared with the close; the distances (feature.pct_vs_ema_*,
+# feature.dist_to_high_*, feature.breakout_magnitude_20d) carry the thresholds.
