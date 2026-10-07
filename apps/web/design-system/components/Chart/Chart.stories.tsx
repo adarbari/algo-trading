@@ -10,6 +10,7 @@ import {
   aaplEvents,
   aaplVolume,
   aaplWithGap,
+  eventMarkers,
   hatchedBand,
   msft,
   nvda,
@@ -61,6 +62,13 @@ type Story = StoryObj<typeof meta>;
 
 /** One price series with its ex-dividend, split and earnings markers. Sample data. */
 export const Default: Story = { args: { events: aaplEvents } };
+
+/**
+ * Event markers of the event-sensitivity price chart: earnings (up arrow, E), filings (down
+ * arrow, F) and macro releases (circle, M), keyed under the chart, with the marker's text in the
+ * hover read-out. Sample data.
+ */
+export const WithEventMarkers: Story = { args: { events: eventMarkers } };
 
 /** The Explore compare chart: three tickers rebased to 100 over the window. */
 export const Compare: Story = {

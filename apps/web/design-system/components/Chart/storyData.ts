@@ -85,6 +85,22 @@ export const aaplEvents: ChartEvent[] = [
   { time: '2026-08-10', kind: 'dividend', detail: '$0.27' },
 ];
 
+/** Earnings, the 8-K that reports them, and macro releases: the markers of the event-sensitivity price chart. */
+export const eventMarkers: ChartEvent[] = [
+  { time: '2025-10-30', kind: 'earnings', detail: 'after close' },
+  { time: '2025-10-30', kind: 'filing', detail: '8-K 2.02 results' },
+  { time: '2025-12-10', kind: 'macro', detail: 'FOMC 14:00' },
+  { time: '2026-01-29', kind: 'earnings', detail: 'after close' },
+  { time: '2026-01-29', kind: 'filing', detail: '8-K 2.02 results' },
+  { time: '2026-03-18', kind: 'macro', detail: 'FOMC 14:00' },
+  { time: '2026-04-30', kind: 'earnings', detail: 'after close' },
+  { time: '2026-05-12', kind: 'macro', detail: 'CPI 08:30' },
+  { time: '2026-06-10', kind: 'macro', detail: 'CPI 08:30' },
+  { time: '2026-07-30', kind: 'earnings', detail: 'after close' },
+  { time: '2026-07-30', kind: 'filing', detail: '8-K 2.02 results' },
+  { time: '2026-09-16', kind: 'filing', detail: '8-K 5.02 management' },
+];
+
 export const aaplVolume: ChartPoint[] = (() => {
   const next = random(5);
   return DAYS.map((time) => ({ time, value: Math.round(38e6 + next() * 52e6) }));
