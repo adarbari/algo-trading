@@ -1,6 +1,6 @@
 # ADR 0042: Not applicable and illiquid values
 
-**Status:** accepted (2026-10-05; owner decision); amended 2026-10-06 by [0045](0045-security-type-precedence-and-operating-company.md): `applies_to` `not_etf` becomes `operating_company`; extended by [0046](0046-explained-absences.md) (`EXPLAINED` with a `NullReason`, `explained_statuses`). Amends [0023](0023-feature-store.md) (the
+**Status:** accepted (2026-10-05; owner decision); amended 2026-10-06 by [0045](0045-security-type-precedence-and-operating-company.md): `applies_to` `not_etf` becomes `operating_company`; extended by [0046](0046-explained-absences.md) (`EXPLAINED` with a `NullReason`, `explained_statuses`) and by [0050](0050-event-sensitivity.md) (`applies_to` gains `leveraged_fund`: `is_leveraged` or `is_inverse`, a null flag never rules out). Amends [0023](0023-feature-store.md) (the
 `Feature` / `FeatureGroup` declaration gains two fields) and
 [0036](0036-session-strictness-for-reads.md) (the `UnknownCode` vocabulary gains two codes).
 Builds on [0038](0038-catalogue-named-values.md) (the browser derives nothing from raw rows).
