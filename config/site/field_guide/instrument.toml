@@ -24,7 +24,7 @@ name = "instrument.security_type"
 theme = "instrument gates"
 reads = "What kind of listing it is: COMMON_STOCK, ADR (a foreign company's US receipt) or ETF, among others. 'Stocks' is COMMON_STOCK and ADR; 'ETFs' is ETF. A company screen (P/E, revenue growth, market cap) wants stocks only: funds have no financials and ADRs have no P/E here."
 caveats = [
-  "An ADR passes a 'stocks' gate but feature.pe_ratio is null for it (the ADR ratio is not stored) and its filings are foreign; add rollup.financials@v1.is_adr eq false when the screen reads earnings.",
+  "An ADR passes a 'stocks' gate but feature.pe_ratio is null for it (the ADR ratio is not stored) and its filings are foreign; add rollup.financials@v2.is_adr eq false when the screen reads earnings.",
   "ETFs include leveraged and inverse funds; a fund screen that wants plain index exposure adds instrument.is_leveraged eq false and instrument.is_inverse eq false.",
 ]
 sources = ["Site convention (docs/data/instruments.md; the vendor's type wins over the name rules)"]

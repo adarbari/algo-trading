@@ -253,7 +253,7 @@ Sources: O'Neil (2009), How to Make Money in Stocks: volume building before a br
 
 **When the reading lies**
 
-- Shares outstanding are the company's last filed count (every quarter for a 10-Q filer, once a year for a 20-F filer), so turnover is stale by up to a year after a buyback or an offering; rollup.fundamentals@v2.market_cap_status says STALE when too old.
+- Shares outstanding are the company's last filed count (every quarter for a 10-Q filer, once a year for a 20-F filer), so turnover is stale by up to a year after a buyback or an offering; rollup.fundamentals@v3.market_cap_status says STALE when too old.
 - ETFs and ADRs have no filed share count here, so turnover is null for them; use rollup.price_stats@v2.adv_usd_20d.
 - Null when the 20-session average is unknown or no share count is filed.
 

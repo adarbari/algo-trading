@@ -450,6 +450,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the calendar (macro_calendar_future)
     "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
@@ -464,6 +465,7 @@ allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the table
     "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
     "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
+    "src/algotrade/services/read/events/filings.py",  # the filings read of InstrumentEvents (known_from <= session), a display read
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ string = "events/filing" }, { string = "sec_8k" }]
@@ -568,7 +570,7 @@ detect = [
 
 [[responsibility]]
 id = "session-calendar"
-description = "Which day is a trading session, in exchange time (weekends, holidays, early closes); the last closed session"
+description = "Which day is a trading session, in exchange time (weekends, holidays, early closes); the last closed session; the market-structure days by rule (the monthly option expiry, a month's last session, the Russell reconstitution), moved to the session before a closed day"
 owner = ["src/algotrade/core/time/calendar.py"]
 allowed = ["src/algotrade/core/time/clock.py"]  # business_days: a plain weekday grid for synthetic golden data (no holidays by design)
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
@@ -752,7 +754,7 @@ detect = [
 
 [[responsibility]]
 id = "domain-read-model"
-description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards, label bands, reference episodes and NBER recessions, services/read/regime/) and the market entity (services/read/market/: its values by catalogue name and the bucketed history of its stored fields), read from the market-entity feature groups by catalogue name. A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
+description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards, label bands, reference episodes and NBER recessions, services/read/regime/) and the market entity (services/read/market/: its values by catalogue name and the bucketed history of its stored fields), read from the market-entity feature groups by catalogue name. The event reads (ADR 0050, services/read/events/): InstrumentEvents (the events ahead: own and a fund's reference earnings by catalogue name, the macro releases known by the session, the market-structure days from the exchange calendar; the 8-K filings; the expiry ladder over the session's chain with its spans and clear state; the fund reference by catalogue name) and the cross-name EventCalendar (its scope list through services.events). A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
 owner = ["src/algotrade/services/read/*"]
 allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)

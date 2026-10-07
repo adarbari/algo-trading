@@ -96,7 +96,7 @@ Sources: Jegadeesh (1990) and Lehmann (1990): one-week to one-month contrarian p
 
 - A pending takeover puts the close at its high and keeps it there; the anchoring story does not apply. See the 'pending takeover' situation.
 - Null for a name with fewer than 240 bars in the last 252 sessions (a listing under a year old, a long halt): a hard criterion rejects it. Check instrument.listed_on.
-- A name 50% below its high is 'cheap' only in price; nothing here says why it fell. Pair a deep-discount rule with feature.trend_state or rollup.financials@v1.financials_status.
+- A name 50% below its high is 'cheap' only in price; nothing here says why it fell. Pair a deep-discount rule with feature.trend_state or rollup.financials@v2.financials_status.
 
 Sources: George and Hwang (2004), The 52-week high and momentum investing, Journal of Finance: https://alphaarchitect.com/the-secret-to-momentum-is-the-52-week-high/; Quantpedia, 52-weeks high effect in stocks: https://quantpedia.com/strategies/52-weeks-high-effect-in-stocks
 
@@ -113,7 +113,7 @@ Sources: George and Hwang (2004), The 52-week high and momentum investing, Journ
 **When the reading lies**
 
 - At the low with feature.trend_state DOWNTREND the trend is down; a bounce rule needs a turn (rollup.price_stats@v2.ret_20d gt 0, feature.pct_vs_sma_20 gt 0) or it buys the decline.
-- A dividend cut, a failed deal or a going-concern notice puts a name at its low; check rollup.financials@v1.financials_status and instrument.financial_status.
+- A dividend cut, a failed deal or a going-concern notice puts a name at its low; check rollup.financials@v2.financials_status and instrument.financial_status.
 - Null under 240 bars in the last 252 sessions (recent listings).
 
 Sources: George and Hwang (2004): the low has less predictive power than the high

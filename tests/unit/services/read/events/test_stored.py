@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from algotrade.services.read.instruments.events import event_tables, load_events
+from algotrade.services.read.events.stored import event_tables, load_events
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_dividends, write_split
 from tests.helpers.stored_frames import T0, stamped
@@ -94,7 +94,7 @@ def test_a_backfilled_report_is_known_from_its_report_date() -> None:
     assert found[0].values["known_from"] == D0.isoformat()  # disclosed with the row (JSON)
 
 
-def test_no_event_tables_is_no_events(ctx: object) -> None:
+def test_no_event_tables_is_no_events() -> None:
     empty = context(store_with())
     assert event_tables(empty) == ()
     assert load_events(empty, ["EQ:AAA"], None, None) == {"EQ:AAA": ()}

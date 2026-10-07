@@ -1,4 +1,4 @@
-"""``fundamentals@v2``: shares outstanding and the market-cap status.
+"""``fundamentals@v3``: shares outstanding, the count a year earlier and the market-cap status.
 
 Inputs: ``instruments/shares`` (SEC company facts; every fact FILED on or before the session,
 point in time by filing date), the session's ``price_stats@v2`` close, and ``events/split``
@@ -22,11 +22,21 @@ count (the count is as of that date); after ``filed`` for a weighted average (fi
 it for splits before they file).
 
     shares_outstanding  the count, split-adjusted to the session
+    shares_outstanding_year_ago
+                        the count of the same kind a year earlier, split-adjusted likewise
     shares_as_of        its period end (the cover date, or the end of the averaged period)
     shares_filed        the filing date that made it public
     shares_source       dei / weighted_basic
     market_cap_status   OK / NO_SHARES (no fact: ETFs, funds, no CIK) / STALE (period end more
                         than ``stale_days`` before the session) / NO_PRICE (no close)
+
+``shares_outstanding_year_ago`` is the count of the same concept as the chosen one (a cover
+count against a cover count, a weighted average against a weighted average: the two differ by
+definition) among the facts filed on or before the session, whose period ended 9 to 15 months
+before ``shares_as_of``, the one closest to a year before it (a later filing of the same period,
+an amendment, wins a tie); null when there is none. It is split-adjusted by the same rule as
+the current count, to the session's share terms, so a split in between does not read as
+dilution. The expression ``shares_change_yoy`` is the ratio minus one.
 
 v2 (ADR 0023 step 3) stores ``shares_outstanding`` as a 32-bit float and drops
 ``market_cap``: it is the expression feature ``market_cap`` (``shares_outstanding x close``
@@ -44,11 +54,13 @@ from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 
 NAME = "fundamentals"
-VERSION = 2
+VERSION = 3
 SHARES = "instruments/shares"
 PRICE_STATS = "rollups/instrument/price_stats@v2"
 SPLITS = "events/split"
 DEI, WEIGHTED = "dei", "weighted_basic"
+YEAR = 365  # days before shares_as_of the year-ago count's period ideally ended
+YEAR_AGO = (274, 456)  # days before shares_as_of that period may end: 9 to 15 months
 
 _NO_SHARES = "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
 _FACTS = (f"{SHARES}.shares", f"{SHARES}.concept", f"{SHARES}.filed", f"{SHARES}.period_end")
@@ -60,6 +72,16 @@ FEATURES = (
         "the latest cover-page count (dei) while the company tags it, else the latest "
         "weighted average basic",
         _NO_SHARES, valid_range=(0, None), inputs=(*_FACTS, f"{SPLITS}.ratio"),
+    ),
+    Feature(
+        "shares_outstanding_year_ago", "float32", "shares",
+        "Shares outstanding a year earlier: the count of the same kind (cover or weighted "
+        "average) whose period ended 9 to 15 months before shares_as_of, the one closest to a "
+        "year, split-adjusted to the session: the base of shares_change_yoy",
+        _NO_SHARES + "; or no count of that kind with a period ending 9 to 15 months before "
+        "shares_as_of is filed by the session (a newer filer, or a company that began tagging "
+        "the cover page less than a year ago)",
+        valid_range=(0, None), inputs=(*_FACTS, f"{SPLITS}.ratio"),
     ),
     Feature(
         "shares_as_of", "date", "date",
@@ -80,7 +102,7 @@ FEATURES = (
         "OK; NO_SHARES (no count); STALE (period end more than stale_days, 400, before the "
         "session; the count is still shown); NO_PRICE (no close)",
         "never", "label", categories=("OK", "NO_SHARES", "STALE", "NO_PRICE"),
-        inputs=("fundamentals.shares_outstanding@v2", "price_stats.close@v2"),
+        inputs=("fundamentals.shares_outstanding@v3", "price_stats.close@v2"),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
@@ -96,8 +118,9 @@ class FundamentalsParams:
 
 
 def split_lookback(p: FundamentalsParams) -> int:
-    """Sessions of splits loaded: more than ``stale_days`` calendar days."""
-    return int(p.stale_days * 252 / 365) + 10
+    """Sessions of splits loaded: more than ``stale_days`` plus the year-ago window (the
+    oldest count ``year_ago`` reads) in calendar days."""
+    return int((p.stale_days + YEAR_AGO[1]) * 252 / 365) + 10
 
 
 def _latest(facts: pd.DataFrame, concept: str) -> pd.DataFrame:
@@ -121,6 +144,28 @@ def choose(facts: pd.DataFrame | None) -> pd.DataFrame:
     return chosen.reset_index()[columns].sort_values("instrument_id").reset_index(drop=True)
 
 
+def year_ago(facts: pd.DataFrame | None, chosen: pd.DataFrame) -> pd.DataFrame:
+    """Per chosen count: the count of the same concept a year earlier among ``facts`` (already
+    filed on or before the session): the fact whose period ended ``YEAR_AGO`` days before the
+    chosen count's, the one closest to ``YEAR``, the latest filed on a tie. Columns as
+    ``choose``; instruments with no such count are absent."""
+    columns = ["instrument_id", "shares", "period_end", "filed", "concept"]
+    if facts is None or facts.empty or chosen.empty:
+        return pd.DataFrame(columns=columns)
+    now = chosen[["instrument_id", "concept", "period_end"]].rename(columns={"period_end": "now"})
+    now = now.assign(now=pd.to_datetime(now["now"]))
+    past = facts[facts["concept"].isin([DEI, WEIGHTED])]
+    past = past[past["shares"].notna() & past["period_end"].notna()][columns]
+    both = now.merge(past, on=["instrument_id", "concept"])
+    age = (both["now"] - pd.to_datetime(both["period_end"])).dt.days
+    both = both.assign(miss=(age - YEAR).abs())[age.between(*YEAR_AGO)]
+    both = both.sort_values(
+        ["instrument_id", "miss", "filed"], ascending=[True, True, False], kind="stable"
+    )
+    best = both.drop_duplicates("instrument_id", keep="first")
+    return best[columns].sort_values("instrument_id").reset_index(drop=True)
+
+
 def split_factor(chosen: pd.DataFrame, splits: pd.DataFrame | None, session: date) -> np.ndarray:
     """Per chosen count: the product of split ratios after its count date, up to the session."""
     factor = np.ones(len(chosen))
@@ -141,13 +186,17 @@ def compute(inputs: Inputs, session: date, p: FundamentalsParams) -> pd.DataFram
     stats = inputs[PRICE_STATS]
     assert stats is not None  # required input
     today = stats[stats["session_date"] == session][["instrument_id", "close"]]
+    splits = inputs.get(SPLITS)
     chosen = choose(inputs.get(SHARES))
-    chosen["shares"] = chosen["shares"].astype(float) * split_factor(
-        chosen, inputs.get(SPLITS), session
-    )
+    before = year_ago(inputs.get(SHARES), chosen)
+    chosen["shares"] = chosen["shares"].astype(float) * split_factor(chosen, splits, session)
+    before["shares"] = before["shares"].astype(float) * split_factor(before, splits, session)
+    before = before[["instrument_id", "shares"]].rename(columns={"shares": "ago"})
     out = today.merge(chosen, on="instrument_id", how="outer").sort_values("instrument_id")
+    out = out.merge(before, on="instrument_id", how="left")
     close = pd.to_numeric(out["close"], errors="coerce").to_numpy(dtype=float)
     shares = pd.to_numeric(out["shares"], errors="coerce").to_numpy(dtype=float)
+    ago = pd.to_numeric(out["ago"], errors="coerce").to_numpy(dtype=float)
     oldest = session - timedelta(days=p.stale_days)
     stale = np.array([d is not None and not pd.isna(d) and d < oldest for d in out["period_end"]])
     status = np.select(
@@ -157,6 +206,7 @@ def compute(inputs: Inputs, session: date, p: FundamentalsParams) -> pd.DataFram
         {
             "instrument_id": out["instrument_id"].astype(str).to_numpy(),
             "shares_outstanding": shares,
+            "shares_outstanding_year_ago": ago,
             "shares_as_of": out["period_end"].to_numpy(),
             "shares_filed": out["filed"].to_numpy(),
             "shares_source": out["concept"].to_numpy(),
@@ -168,7 +218,8 @@ def compute(inputs: Inputs, session: date, p: FundamentalsParams) -> pd.DataFram
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    "Shares outstanding (SEC company facts, point in time by filing date) and its status",
+    "Shares outstanding and the count a year earlier (SEC company facts, point in time by "
+    "filing date) and its status",
     (
         Input(PRICE_STATS),
         Input(SHARES, required=False),

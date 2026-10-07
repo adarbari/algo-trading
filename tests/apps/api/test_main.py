@@ -305,7 +305,7 @@ OVERVIEW_NAMES = [
     "instrument.sector", "instrument.industry", "instrument.website", "instrument.in_sp500",
     "instrument.optionable", "instrument.is_leveraged", "instrument.is_inverse",
     "instrument.leverage", "instrument.tracks", "rollup.price_stats@v2.close",
-    "feature.market_cap", "feature.pe_ratio", "rollup.financials@v1.revenue_ttm",
+    "feature.market_cap", "feature.pe_ratio", "rollup.financials@v2.revenue_ttm",
     "rollup.price_stats@v2.high_52w", "rollup.price_stats@v2.low_52w",
     "feature.pct_from_high_52w", "rollup.price_stats@v2.hv30", "rollup.iv30@v1.iv30",
     "feature.iv_rank", "feature.div_yield", "rollup.earnings@v1.next_earnings_date",

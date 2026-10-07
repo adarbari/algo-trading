@@ -16,13 +16,17 @@ from anyio import to_thread
 from strawberry.dataloader import DataLoader
 
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.events.instrument_events import (
+    InstrumentEvents,
+    load_instrument_events,
+)
+from algotrade.services.read.events.stored import Event, load_events
 from algotrade.services.read.instruments.chains import (
     OptionChain,
     OptionQuote,
     load_chains,
     load_quotes,
 )
-from algotrade.services.read.instruments.events import Event, load_events
 from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
 from algotrade.services.read.instruments.holdings import Holdings, load_holdings
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -33,6 +37,7 @@ from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_
 
 FeatureKey = tuple[str, tuple[str, ...]]  # (instrument_id, catalogue names in the order asked)
 EventKey = tuple[str, date | None, date | None]  # (instrument_id, start, end)
+EventStudyKey = tuple[str, int, int]  # (instrument_id, days, months)
 QuoteKey = tuple[str, date]  # (underlying_id, expiry)
 HoldingsKey = tuple[str, int]  # (fund_id, top)
 PriceKey = tuple[str, date, date | None, Adjustment]  # (instrument_id, start, end, adjustment)
@@ -94,6 +99,9 @@ class Loaders:
         )
         self.instruments: DataLoader[tuple[str], Instrument | None] = _loader(load_instruments, ctx)
         self.events: DataLoader[EventKey, tuple[Event, ...]] = _loader(load_events, ctx)
+        self.instrument_events: DataLoader[EventStudyKey, InstrumentEvents | None] = _loader(
+            load_instrument_events, ctx
+        )
         self.chains: DataLoader[tuple[str], OptionChain | None] = _loader(load_chains, ctx)
         self.quotes: DataLoader[QuoteKey, tuple[OptionQuote, ...]] = _loader(load_quotes, ctx)
         self.holdings: DataLoader[HoldingsKey, Holdings | None] = _loader(load_holdings, ctx)
