@@ -16,7 +16,7 @@ from algotrade_sources.fixtures.files import GoldenFiles
 from algotrade_sources.fixtures.source import GoldenCsvSource
 from algotrade_sources.framework.base import FetchRequest, Source
 from algotrade_sources.framework.http import RetryPolicy
-from algotrade_sources.framework.series import ReleaseRequest, SeriesRequest
+from algotrade_sources.framework.series import FilingsRequest, ReleaseRequest, SeriesRequest
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_sources.vendors.fred.observations import FredObservations
 from algotrade_sources.vendors.fred.releases import FredReleaseDates
@@ -39,7 +39,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundTickerMap,
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
-from algotrade_sources.vendors.sec.submissions import FilingsRequest, SecFilings
+from algotrade_sources.vendors.sec.submissions import SecFilings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices

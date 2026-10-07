@@ -115,6 +115,26 @@ def test_macro_release_rows_round_trip_and_reject_a_null_known_from(backend: Bac
         )
 
 
+def test_filing_rows_round_trip_and_merge_on_the_accession(backend: Backend) -> None:
+    row = {
+        "instrument_id": "EQ:MU", "ts": T0, "known_from": pd.Timestamp(2026, 10, 1),
+        "cik": "0000723125", "form": "8-K", "accession": "0000723125-26-000018",
+        "filing_date": pd.Timestamp(2026, 10, 2), "items": "2.02,9.01", "report_date": None,
+        "primary_document": "mu.htm",
+    }  # fmt: skip
+    backend.tables.write("events/filing", D1, "r1", stamped([row], D1, "r1"))
+    again = {**row, "items": "2.02", "ts": T0 + pd.Timedelta(seconds=1)}
+    backend.tables.write("events/filing", D1, "r2", stamped([again], D1, "r2"))
+    out = backend.tables.read("events/filing", D1)
+    assert out is not None and len(out) == 1  # the latest run's row of the same accession wins
+    assert out["items"].iloc[0] == "2.02" and out["filing_date"].iloc[0] == date(2026, 10, 2)
+    assert out["known_from"].iloc[0] == date(2026, 10, 1)
+    with pytest.raises(DataValidationError, match="known_from: nulls"):
+        backend.tables.write(
+            "events/filing", D2, "r3", stamped([{**row, "known_from": None}], D2, "r3")
+        )
+
+
 def test_every_fixed_table_declares_its_required_columns() -> None:
     for name in ("universe", "chains/option_quotes", "instruments/reference", "bars/1d"):
         spec = spec_for(name)
