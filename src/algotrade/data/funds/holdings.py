@@ -79,6 +79,21 @@ def etf_holdings(
     return out.sort_values("rank", kind="stable").reset_index(drop=True)
 
 
+def funds_holdings(
+    reader: StoreReader, instrument_ids: Collection[str], on: date, as_of: datetime | None = None
+) -> pd.DataFrame | None:
+    """Each of ``instrument_ids``' latest stored holdings on or before ``on`` as one frame
+    (``COLUMNS``, by fund then rank): what ``etf_holdings`` returns for one fund, read once for
+    many (a feature group reads every leveraged fund's). ``None`` when none has any stored."""
+    if not instrument_ids:
+        return None
+    frame = _stored(reader, on, as_of, sorted(instrument_ids))
+    if frame is None or frame.empty:
+        return None
+    out = _latest_per_fund(frame).reindex(columns=list(COLUMNS))
+    return out.sort_values(["instrument_id", "rank"], kind="stable").reset_index(drop=True)
+
+
 def holdings_status(reader: StoreReader, through: date) -> pd.DataFrame:
     """One row per fund with stored holdings: ``instrument_id``, ``as_of``, ``holdings_count``
     and ``source`` (the issuer adapter) of its latest stored read, and ``fetched_on`` (the

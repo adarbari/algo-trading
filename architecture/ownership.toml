@@ -192,7 +192,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "feature-input-loading"
-description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows (rollups/instrument/ and rollups/market/) with this run's rows winning, the session's universe snapshot (the population; none before the first) and the symbol -> id map of its reference snapshot (instruments/symbol_ids, a lookup only; ADR 0047), bars narrowed to the ids of a group's tickers (Input.symbols); features never read storage or a domain reader"
+description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows (rollups/instrument/ and rollups/market/) with this run's rows winning, the session's universe snapshot (the population; none before the first) and the symbol -> id map of its reference snapshot (instruments/symbol_ids, a lookup only; ADR 0047), the leveraged and inverse funds' latest holdings (holdings/etf, ADR 0050), bars narrowed to the ids of a group's tickers (Input.symbols); features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]
 allowed = [
     # ADR 0024 / 0037: the API shows stored group rows (a feature's series in the read
@@ -425,6 +425,7 @@ owner = [
 allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "src/algotrade/features/rollups/reference/fund_reference.py",  # names its input; read through data.feature_inputs (ADR 0050)
 ]
 section = "docs/adr/0035-etf-holdings.md#decision"
 detect = [{ string = "holdings/etf" }]
@@ -821,6 +822,19 @@ allowed = [
 ]
 section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-06-the-text-model-seam"
 detect = [{ call = "explain_regime" }, { call = "LocalTextCache" }, { call = "MemoryTextCache" }]
+
+[[responsibility]]
+id = "event-scope"
+description = "Which names the event-sensitivity study covers (ADR 0050 decision 2) as of a session: the tier A / B short-put names (option_liquidity@v1.short_put_ok), the site list config/site/events/scope.toml and the stocks the scoped leveraged funds track (fund_reference@v1), each with its reason; list symbols become ids only through SymbolResolver of the session's reference snapshot and the unknown ones are returned, never dropped or built; tasks call scoped_instruments and never load the scope list themselves"
+owner = ["src/algotrade/services/events/*"]
+allowed = [
+    "src/algotrade/config/site/events/scope.py",  # the typed loader of the list's file (ADR 0050); the owner is its one caller
+    "src/algotrade/features/rollups/options/option_liquidity.py",  # declares short_put_ok
+    "src/algotrade/strategies/screeners/short_premium_liquidity.py",  # a screener's own read of the flag per row
+    "src/algotrade/services/screening/exports.py",  # the export's column of the flag
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "load_event_scope" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
 
 [[responsibility]]
 id = "screen-preview"
