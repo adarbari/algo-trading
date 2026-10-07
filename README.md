@@ -36,7 +36,7 @@ algotrade-ingest retire-features --group price_stats@v1 [--dry-run]   # delete a
 algotrade-ingest nightly --export-dir out/      # catch up missed sessions (a quiet no-op when up to date; --force re-runs); universe -> company details -> shares -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> macro -> market-rollups -> screen jobs -> descriptions -> quality -> purge
 algotrade-ingest report --date D [--out r.html] [--send]   # the nightly summary email for a past session (read-only)
 algotrade-ingest quality                        # data-quality checks for a session
-algotrade-ingest schedule                       # writes a launchd agent (weekdays 15:00, at login, hourly); prints install commands
+algotrade-ingest schedule                       # writes the launchd agents (nightly: weekdays 15:00, at login, hourly; monthly Tiingo fill); prints install commands
 algotrade-ingest purge-raw [--keep-days 90]     # raw per source (SEC 7 days) + unfinished-run scratch older than 14 days (defaults: sources.toml)
 algotrade-ingest migrate-ids [--dry-run]        # symbol ids -> FIGI ids per instruments/id_map (new runs, ADR 0018)
 algotrade-ingest run <task> [--date D | --from D --to D]   # any registry task (tasks/framework/registry.py), same flags
@@ -228,6 +228,23 @@ nohup sh -c '.venv/bin/algotrade-ingest run bars-history --since 2018-01-01 --un
   > var/logs/bars-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/bars-history.status' >/dev/null 2>&1 &
 cat var/logs/bars-history.status   # appears when the run ends; tail var/logs/bars-history.log meanwhile
 ```
+
+**Monthly Tiingo fill.** `bars-history --fill N` picks the N most useful names of the universe
+that have no Tiingo history for the window (optionable names first, then `iv_history@v2.iv30`, then
+`price_stats@v2.adv_usd_20d`, as of `--until`'s session; the references of leveraged / inverse funds
+come along) and fetches them within `[tiingo] monthly_symbol_budget` (450 of the free tier's 500
+distinct symbols a calendar month), counted from the task's own earlier run records. A launchd agent
+(`algotrade-ingest schedule` writes it; hosting.md installs it) runs `bars-history --fill 450 --wait`
+on the 2nd of each month at 09:00 until the optionable universe is covered. Check a run:
+
+```bash
+tail var/logs/bars-history-monthly.log   # the run record: month_budget, month_used, month_remaining, filled, pending
+make status                              # recent runs and jobs
+```
+
+A run that ends with `month_remaining = 0` hit the budget; a run with `filled = 0` and nothing
+`pending` means every name is covered. Run it by hand the same way, detached, with
+`run bars-history --fill 450 --until <last session>`; a month already used up fetches nothing.
 
 The `macro` task (economic series and index levels with their vintages, ADR 0048) refetches
 each series whole, so its first run is the history: run it detached, the published files first

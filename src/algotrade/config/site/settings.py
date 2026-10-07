@@ -140,7 +140,7 @@ VENDOR_EXTRAS = {
     "sec_edgar": ("refresh_days", "facts_refresh_days", "fund_quarters"),
     "treasury": ("lookback_days",),
     "fred": ("base_url",),
-    "tiingo": ("licence",),
+    "tiingo": ("licence", "monthly_symbol_budget"),
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
     "ibkr": (
@@ -212,6 +212,9 @@ class SourcesSettings:
     treasury_lookback_days: int = 10
     fred_base_url: str = "https://api.stlouisfed.org/fred"  # [fred] base_url (ADR 0048)
     tiingo_licence: str = "personal"  # [tiingo] licence: what its bars are licensed for (ADR 0028)
+    tiingo_monthly_symbol_budget: int = (
+        450  # [tiingo] monthly_symbol_budget: distinct tickers a month
+    )
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -328,6 +331,9 @@ class SourcesSettings:
             ),
             fred_base_url=_extra(vendors, "fred").text("base_url", d.fred_base_url),
             tiingo_licence=_extra(vendors, "tiingo").choice("licence", d.tiingo_licence, LICENCES),
+            tiingo_monthly_symbol_budget=_extra(vendors, "tiingo").integer(
+                "monthly_symbol_budget", d.tiingo_monthly_symbol_budget, 0
+            ),
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),
             limits_dir=http.text("limits_dir", d.limits_dir),

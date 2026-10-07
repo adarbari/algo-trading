@@ -11,6 +11,17 @@ stored unadjusted, as Massive's are (ADR 0016). The source paces one request eve
 names take ~3 hours: run it detached (README "Long runs"); ``stats["pending"]`` and ``eta_h``
 say how many are left.
 
+- **Monthly fill** (``--fill N``): instead of only the scope list, picks up to N names of the
+  whole universe that no earlier run fetched for the window, most useful first
+  (``services.events.fill.fill_order``: optionable, then ``iv30``, then dollar volume, as of
+  ``--until``'s session); the references of leveraged / inverse funds among them come along as
+  before. A launchd agent runs it monthly (``ops/schedule.py``) until the optionable universe is
+  covered.
+- **Monthly budget**: Tiingo's free tier allows 500 distinct symbols a calendar month, so a run
+  fetches at most ``[tiingo] monthly_symbol_budget`` minus the distinct names (items ``hist:`` that
+  are ``OK`` / ``NO_DATA``) the finished runs started this UTC month and this run already
+  fetched; ``stats`` carry ``month_budget``, ``month_used`` and ``month_remaining`` (all after
+  the run), and ``filled`` (the ``--fill`` picks fetched this run). A new month resets it.
 - **Scope** is resolved once, by the owner, as of ``--until``'s session (ADR 0018): ids come
   from that session's reference snapshot. A symbol it does not know is NEVER fetched under a
   made-up id: it is an item ``sym:<SYMBOL>`` (``UNKNOWN``) and listed in
@@ -40,12 +51,14 @@ import math
 from collections import Counter
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from functools import partial
+from itertools import islice
 
 import pandas as pd
 
 from algotrade.data.events import read_events
+from algotrade.services.events.fill import FillCandidate, fill_order
 from algotrade.services.events.scope import (
     LIST,
     REFERENCE,
@@ -110,6 +123,20 @@ def history_done(runs: Sequence[RunRecord], since: date, until: date) -> set[str
             ):
                 done.add(key.removeprefix("hist:"))
     return done
+
+
+def month_symbols(runs: Sequence[RunRecord], items: dict[str, str], now: datetime) -> set[str]:
+    """Instrument ids fetched from Tiingo in the calendar month of ``now`` (UTC): by the finished
+    ``runs`` that started in it and by the current run (``items``)."""
+    month = (now.year, now.month)
+    used: set[str] = set()
+    for statuses in [r.items for r in runs if (r.started_at.year, r.started_at.month) == month] + [
+        items
+    ]:
+        for key, status in statuses.items():
+            if key.startswith("hist:") and status_label(status) in DONE:
+                used.add(key.removeprefix("hist:"))
+    return used
 
 
 def split_findings(
@@ -238,6 +265,16 @@ def _fetch_pending(
             return
 
 
+def _fill_picks(
+    run: IngestRun, until: date, done: Collection[str], fill: int
+) -> list[FillCandidate]:
+    """The first ``fill`` names of the universe, most useful first, that no earlier run fetched.
+    Names this (resumed) run already asked for stay in the count, so a restart fetches no more
+    than N in all."""
+    waiting = (c for c in fill_order(run.reader, until) if c.instrument_id not in done)
+    return list(islice(waiting, fill))
+
+
 def ingest_bars_history(
     ctx: TaskContext,
     source: Source,
@@ -247,19 +284,24 @@ def ingest_bars_history(
     force: bool = False,
     limit: int | None = None,
     include_tiers: bool = False,
+    fill: int | None = None,
 ) -> RunRecord:
     """Daily bars of the scope list, its funds' references and ``requested`` symbols (plus the
     tier A / B names with ``include_tiers``) from ``since`` to ``until`` (``limit``: fetch at
     most that many names this run; ``force``: also the names an earlier run fetched for the
-    window)."""
+    window; ``fill``: also the first ``fill`` names of the universe without history, most useful
+    first). Never more than the month's remaining symbol budget."""
     if until < since:
         raise ValueError(f"--until {until} is before --since {since}")
     with IngestRun(ctx, TASK, until, resume=True) as run:
+        runs = finished_runs(run.writer, TASK)
+        done: Collection[str] = set() if force else history_done(runs, since, until)
+        picks = _fill_picks(run, until, done, max(0, fill)) if fill is not None else []
         scope = scoped_instruments(
             run.reader,
             ctx.configs,
             until,
-            requested,
+            [*requested, *(p.symbol for p in picks)],
             DEFAULT_REASONS + ((TIER,) if include_tiers else ()),
         )
         names, unknown = names_of(scope), scope.unresolved
@@ -267,20 +309,22 @@ def ingest_bars_history(
             run.record_item(
                 f"sym:{symbol}", f"{UNKNOWN}: not in the reference of {scope.reference_snapshot}"
             )
-        done: Collection[str] = (
-            set() if force else history_done(finished_runs(run.writer, TASK), since, until)
-        )
         pending = [
             n
             for n in names
             if n.instrument_id not in done and f"hist:{n.instrument_id}" not in run.items
         ]
-        todo = pending if limit is None else pending[: max(0, limit)]
+        budget = ctx.settings.tiingo_monthly_symbol_budget
+        remaining = max(0, budget - len(month_symbols(runs, run.items, run.clock())))
+        todo = pending[: remaining if limit is None else min(remaining, max(0, limit))]
         _fetch_pending(run, source, todo, since, until)
         run.stats.update(_publish(run, source.name))
         mismatches, shown = _mismatches(run.items)
         statuses = [status_label(run.items.get(f"hist:{n.instrument_id}", "")) for n in todo]
         left = len(pending) - sum(1 for s in statuses if s in DONE)
+        picked = {p.instrument_id for p in picks}
+        fetched = {n.instrument_id for n, s in zip(todo, statuses, strict=True) if s in DONE}
+        used = len(month_symbols(runs, run.items, run.clock()))
         pace = ctx.settings.vendor("tiingo").min_interval_s or HOURLY_FREE_PACE_S
         run.stats.update(
             window=_window(since, until),
@@ -291,6 +335,10 @@ def ingest_bars_history(
             unknown_symbols=list(unknown),
             skipped_done=len(names) - len(pending),
             fetched=len(todo),
+            filled=len(picked & fetched),
+            month_budget=budget,
+            month_used=used,
+            month_remaining=max(0, budget - used),
             pending=left,
             eta_h=round(left * pace / 3600, 1),
             split_mismatches=mismatches,

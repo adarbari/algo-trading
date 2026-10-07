@@ -56,6 +56,26 @@ curl -s http://127.0.0.1:8000/health
 The agent binds `127.0.0.1` only; Funnel is the one way in from outside. Without the agent,
 `.venv/bin/algotrade-api` in a terminal serves the same.
 
+### The monthly Tiingo history fill (launchd)
+
+The third agent runs `algotrade-ingest bars-history --fill 450 --wait` on the 2nd of each month
+at 09:00 local time: the next names without 2018 daily bars (optionable first, by IV30 then dollar
+volume), within Tiingo's free limit of 500 distinct tickers a month (`[tiingo]
+monthly_symbol_budget = 450` in `config/site/sources.toml`), until the optionable universe is
+covered. `algotrade-ingest schedule` writes it next to the nightly's; it is written, never
+installed by code. Install it (and replace an installed copy) with:
+
+```bash
+.venv/bin/algotrade-ingest schedule   # also writes var/com.algotrade.bars-history-monthly.plist
+mkdir -p var/logs
+cp var/com.algotrade.bars-history-monthly.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.algotrade.bars-history-monthly.plist
+```
+
+Logs are `var/logs/bars-history-monthly.log` and `.err.log`. `--wait` queues it behind a running
+ingest; a month the Mac is off at that time is skipped (the next run covers the same names).
+README "Long runs" says how to check a run.
+
 ## 4. Tailscale and Funnel
 
 Commands from Tailscale's docs ([Funnel](https://tailscale.com/kb/1223/funnel),

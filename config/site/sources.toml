@@ -134,6 +134,10 @@ min_interval_s = 72              # free tier: 50 requests an hour (3600 / 50), 1
                                  # take ~3 hours; the whole tier A / B set needs the Power tier ($10 a month: no
                                  # symbol cap, 5,000 requests an hour), then lower this to 1 or less.
 licence = "personal"             # Tiingo's terms: personal use; features derived from its bars inherit it
+monthly_symbol_budget = 450      # distinct tickers `bars-history` fetches in a calendar month (its run records
+                                 # count them). The free tier allows 500; 450 leaves a buffer for the names a
+                                 # failed run asked for, a ticker fetched outside this task and a month-boundary
+                                 # skew. 0: fetch none. The monthly launchd agent runs `bars-history --fill 450`.
 
 [published]                      # published series files (Stooq, Fed EBP, OFR FSI, Shiller): one request per file
 enabled = true

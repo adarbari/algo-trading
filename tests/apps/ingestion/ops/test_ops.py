@@ -11,7 +11,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.ops.schedule import LABEL, nightly_plist
+from algotrade_ingestion.ops.schedule import LABEL, MONTHLY_LABEL, monthly_fill_plist, nightly_plist
 from algotrade_ingestion.tasks.maintenance.quality import check_chains, run_quality
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped, universe_rows
@@ -31,6 +31,7 @@ def test_sources_settings_defaults_and_overrides() -> None:
         "massive": {"min_interval_s": 0.5, "corporate_actions_window": [-3, 10]},
         "quality": {"max_universe_change": 0.2},
         "sec_edgar": {"enabled": False, "min_interval_s": 0.5, "refresh_days": 7},
+        "tiingo": {"monthly_symbol_budget": 300},
     }
     s = load_sources(MemoryConfigStore({("site", "settings", "sources"): doc}))
     earnings = s.vendor("nasdaq_earnings")
@@ -48,6 +49,10 @@ def test_sources_settings_defaults_and_overrides() -> None:
     sec = s.vendor("sec_edgar")
     assert (sec.enabled, sec.min_interval_s, s.sec_refresh_days) == (False, 0.5, 7)
     assert s.staging_retention_days == 3
+    assert (s.tiingo_monthly_symbol_budget, SourcesSettings().tiingo_monthly_symbol_budget) == (
+        300,
+        450,
+    )
     assert s.vendor("nasdaq_trader").enabled  # a malformed section falls back to defaults
     assert s.vendor("cboe").min_interval_s is None  # unset: the registry's default applies
     assert (s.http_max_retry_s, s.http_breaker_failures) == (300.0, 10)
@@ -282,3 +287,23 @@ def test_nightly_plist() -> None:
         nightly_plist(Path("/repo"), 25, 0)
     with pytest.raises(ValueError, match="invalid watchdog"):
         nightly_plist(Path("/repo"), 15, 0, watchdog_s=-1)
+
+
+def test_monthly_fill_plist() -> None:
+    plist = plistlib.loads(monthly_fill_plist(Path("/repo")))
+    assert plist["Label"] == MONTHLY_LABEL
+    assert plist["ProgramArguments"] == [
+        "/repo/.venv/bin/algotrade-ingest",
+        "bars-history",
+        "--fill",
+        "450",
+        "--wait",
+    ]
+    assert plist["StartCalendarInterval"] == {"Day": 2, "Hour": 9, "Minute": 0}
+    assert "RunAtLoad" not in plist and "StartInterval" not in plist  # monthly only
+    assert plist["WorkingDirectory"] == "/repo"
+    assert plist["StandardOutPath"] == "/repo/var/logs/bars-history-monthly.log"
+    assert plist["StandardErrorPath"] == "/repo/var/logs/bars-history-monthly.err.log"
+    for bad in ({"fill": 0}, {"day": 29}, {"hour": 24}):
+        with pytest.raises(ValueError, match="invalid"):
+            monthly_fill_plist(Path("/repo"), **bad)
