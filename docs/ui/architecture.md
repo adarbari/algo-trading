@@ -72,7 +72,7 @@ request; a 401 ends the session):
 
 | Workspace | Sections (routes) |
 |---|---|
-| TRADER (default, `/` opens Ideas) | Ideas `/ideas`, Screeners `/screeners` (list), `/screeners/new`, `/screeners/$id/edit` (Builder), Explore `/explore`, Regime `/regime` (the market as weather: `entities/regime`, widgets `regime-header`, `regime-indicators`, `reading-list`; the top-bar chip and the Ideas `regime-strip` read the same query), Backtests `/backtests` |
+| TRADER (default, `/` opens Ideas) | Ideas `/ideas`, Screeners `/screeners` (list), `/screeners/new`, `/screeners/$id/edit` (Builder), Explore `/explore`, Regime `/regime` (the market as weather: `entities/regime`, widgets `regime-header`, `regime-indicators`, `reading-list`; the top-bar chip and the Ideas `regime-strip` read the same query), Calendar `/calendar` (events ahead across names: `entities/event`, `widgets/event-calendar-panel`, `features/calendar-source`), Backtests `/backtests` |
 | ADMIN | Ingestion `/admin/ingestion`, Screener runs & sharing `/admin/screener-runs`, Users & configs `/admin/users` |
 
 Explore is one page (ticker table with feature-catalogue columns, multi-select compare, detail

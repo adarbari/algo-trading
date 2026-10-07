@@ -1,11 +1,13 @@
 /**
  * Chart: the focused ticker's split-adjusted daily closes over the chosen window, with
- * ex-dividend, split and earnings markers, a volume pane and the sessions the market regime
- * called Storm or Severe storm shaded behind the line.
+ * ex-dividend, split and earnings markers, the 8-K filings and the macro release dates of the
+ * event study, a volume pane and the sessions the market regime called Storm or Severe storm
+ * shaded behind the line.
  */
 import { Chart, Panel, type ChartRange } from '@algotrade/ui';
 import { useMemo } from 'react';
 
+import { studyChartEvents, useInstrumentEventStudy } from '@/entities/event';
 import {
   RangeControl,
   rangeFrom,
@@ -25,6 +27,7 @@ export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPane
   const from = rangeFrom(range);
   const bars = useInstrumentPrices(symbol, from);
   const events = useInstrumentEvents(symbol);
+  const study = useInstrumentEventStudy(symbol);
   const items = useMemo(() => bars.data ?? [], [bars.data]);
   // Storm and Severe-storm sessions shade the window, up to the last stored bar.
   const regimeBands = useRegimeBands(from, items.at(-1)?.session);
@@ -40,14 +43,18 @@ export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPane
     [items, symbol],
   );
   const volume = useMemo(() => items.map((b) => ({ time: b.session, value: b.volume })), [items]);
-  const markers = useMemo(
-    () => toChartEvents(events.data ?? []).filter((e) => e.time >= from),
-    [events.data, from],
-  );
+  const markers = useMemo(() => {
+    const stored = toChartEvents(events.data ?? []);
+    const earnings = new Set(stored.filter((e) => e.kind === 'earnings').map((e) => e.time));
+    const studied = study.data ? studyChartEvents(study.data, earnings) : [];
+    return [...stored, ...studied]
+      .filter((e) => e.time >= from)
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }, [events.data, study.data, from]);
   return (
     <Panel
       title={`${symbol} · price`}
-      description="Split-adjusted closes; dividends, splits and earnings marked"
+      description="Split-adjusted closes; dividends, splits, earnings, filings and macro releases marked"
     >
       <Chart
         label={`${symbol} close`}

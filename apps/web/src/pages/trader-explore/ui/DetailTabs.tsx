@@ -7,6 +7,7 @@
 import { EmptyState, Stack, Tabs, type TabItem } from '@algotrade/ui';
 
 import { ComparePanel } from '@/widgets/compare-panel';
+import { EventStudyPanel } from '@/widgets/event-study-panel';
 import { EventsPanel } from '@/widgets/events-panel';
 import { FeatureTable } from '@/widgets/feature-table';
 import { FeaturesPanel } from '@/widgets/features-panel';
@@ -95,7 +96,17 @@ function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symb
         />
       );
     case 'events':
-      return <EventsPanel symbol={symbol} />;
+      return (
+        <Stack gap={4}>
+          <EventStudyPanel
+            symbol={symbol}
+            onSelectSymbol={(focus) => {
+              onSearchChange({ focus, expiry: undefined, feature: undefined });
+            }}
+          />
+          <EventsPanel symbol={symbol} />
+        </Stack>
+      );
     default:
       return null;
   }

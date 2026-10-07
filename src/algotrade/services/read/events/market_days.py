@@ -20,11 +20,13 @@ RECONSTITUTION_MONTH = 6
 
 @dataclass(frozen=True)
 class MarketDay:
-    """A market-structure day: its date, a short label and what happens (all at the close)."""
+    """A market-structure day: its date, a short label and what happens (all at the close);
+    ``expiry``: the monthly or quarterly option expiry (what the calendar rules)."""
 
     date: date
     label: str
     name: str
+    expiry: bool = False
 
 
 def _months(start: date, end: date) -> list[tuple[int, int]]:
@@ -41,6 +43,7 @@ def _month_days(year: int, month: int) -> list[MarketDay]:
             "Stock and index options and index futures expire (quarterly expiry)"
             if quarter
             else "Monthly options expire (the third Friday)",
+            expiry=True,
         )
     ]
     if quarter:

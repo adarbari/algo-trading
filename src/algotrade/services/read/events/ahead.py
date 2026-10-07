@@ -60,7 +60,8 @@ class AheadEvent:
     instrument, the fund's reference, the ``MACRO:`` release; None for a market-structure day);
     ``source``: the catalogue field, the stored row's source or the calendar rule;
     ``known_from``: the first session the stored row was known on (None: a catalogue value, which
-    is what the session knew, or a rule)."""
+    is what the session knew, or a rule); ``expiry``: a monthly or quarterly option expiry day
+    (a market-structure day the calendar rules)."""
 
     date: dt.date
     time: str
@@ -70,6 +71,7 @@ class AheadEvent:
     subject_id: str | None
     source: str
     known_from: dt.date | None
+    expiry: bool = False
 
 
 @dataclass(frozen=True)
@@ -167,7 +169,9 @@ def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown
 
 
 def _market(day: MarketDay) -> AheadEvent:
-    return AheadEvent(day.date, CLOSE, MARKET_STRUCTURE, day.label, day.name, None, RULE, None)
+    return AheadEvent(
+        day.date, CLOSE, MARKET_STRUCTURE, day.label, day.name, None, RULE, None, day.expiry
+    )
 
 
 def load_ahead(ctx: ReadContext, instrument_ids: Sequence[str], end: date) -> Ahead:
