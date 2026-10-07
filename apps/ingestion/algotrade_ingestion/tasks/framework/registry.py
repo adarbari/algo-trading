@@ -241,10 +241,16 @@ def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _filings(ctx: TaskContext, p: Params) -> RunRecord:
-    # The event-study scope (the list, the tier names, fund references: services.events) is
-    # resolved by the task; --symbols only adds to it.
+    # The names are the session's universe without funds, resolved by the task; --symbols
+    # narrows them.
     return filings.ingest_filings(
-        ctx, ctx.sources["sec_filings"], session_of(p), _symbols(p), p.get("since"), p.get("limit")
+        ctx,
+        ctx.sources["sec_filings"],
+        session_of(p),
+        _symbols(p),
+        p.get("since"),
+        p.get("limit"),
+        ctx.sources["sec_daily_index"],
     )
 
 
@@ -584,24 +590,26 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "filings",
-            "SEC 8-K filings of the event-study names (events/filing) and their Item 2.02 results "
-            "releases as earnings rows (sec_8k); --since backfills, the default reads each CIK "
-            "from its latest stored filing",
+            "SEC 8-K filings of every operating company in the universe (events/filing) and "
+            "their Item 2.02 results releases as earnings rows (sec_8k); --since backfills per "
+            "CIK (resumable, --limit), the default reads the days since the latest stored "
+            "filing from EDGAR's daily form index",
             filings,
             (filings.TABLE, filings.EARNINGS),
             _filings,
-            sources=("sec_filings",),
-            settings="sources.toml [sec_edgar] [quality]; events/scope.toml",
+            sources=("sec_filings", "sec_daily_index"),
+            settings="sources.toml [sec_edgar] [quality]",
             params=(
                 SESSION,
                 Param(
                     "since",
                     ("--since",),
                     date.fromisoformat,
-                    "first filing date for every CIK (default: its latest stored, else 2018)",
+                    "backfill: every CIK from this date (one already covered is skipped); "
+                    "default: the days since the latest stored filing, else 2018",
                 ),
-                Param("symbols", ("--symbols",), str, "tickers on top of the scope list"),
-                Param("limit", ("--limit",), int, "fetch at most N CIKs this run"),
+                Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
+                Param("limit", ("--limit",), int, "per-CIK reads: fetch at most N CIKs this run"),
             ),
         ),
         Task(

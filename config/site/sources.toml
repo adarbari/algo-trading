@@ -195,7 +195,8 @@ max_macro_stale_share = 0.20     # macro (ADR 0048): FAIL if over 20% of the ena
                                  # than their cadence + release lag + 2 days (3 for a daily series), or any series lost stored vintages
 min_calendar_future_dates = 1    # macro release calendar (ADR 0050): FAIL if a FRED release lists fewer scheduled dates
                                  # after the session than this (FRED serves the next ones for every release it has)
-max_filings_failed = 0.05  # 8-K filings (ADR 0050): FAIL if over 5% of the scoped CIKs' SEC requests failed
+max_filings_failed = 0.05  # 8-K filings (ADR 0050): FAIL if over 5% of the SEC requests (CIKs, index days) failed
+filings_backfill_per_night = 50  # 8-K filings: CIKs new to the universe (or never read) read in full a night, nightly mode
 
 # Coverage (ADR 0043): per key feature, the share of the instruments it applies to (applies_to) that
 # have a value for the session, by tier (core: S&P 500, priority symbols, HIGH liquidity). core_min /

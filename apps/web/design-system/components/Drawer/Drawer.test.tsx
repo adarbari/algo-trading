@@ -46,6 +46,13 @@ describe('Drawer', () => {
     expect(screen.getByRole('dialog')).toHaveAttribute('data-side', 'start');
   });
 
+  it('shows an eyebrow above the title without making it part of the name', async () => {
+    render(<Example eyebrow="rollup.momentum@v1.rel_volume" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Details' }));
+    const drawer = screen.getByRole('dialog', { name: 'AAPL · Apple' });
+    expect(drawer).toHaveTextContent('rollup.momentum@v1.rel_volume');
+  });
+
   it('has no accessibility violations (open)', async () => {
     render(<Example />);
     await userEvent.click(screen.getByRole('button', { name: 'Details' }));

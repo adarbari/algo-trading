@@ -1,0 +1,9 @@
+/* HelpDrawer: the lead keeps a reading measure; the footer's link slot sits at the start. */
+.lead {
+  max-width: 68ch;
+}
+
+.fullPage {
+  display: inline-flex;
+  min-width: 0;
+}
