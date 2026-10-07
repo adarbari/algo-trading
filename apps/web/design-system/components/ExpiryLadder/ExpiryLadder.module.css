@@ -1,0 +1,71 @@
+/*
+ * ExpiryLadder: a bordered table of expiries, soft rules between rows, the first clear row set
+ * apart by an accent rule on its start edge and the accent tint (the badge says it in words).
+ * Header cells in the muted caption style; the events cell wraps, so a phone shows the same table.
+ */
+.table {
+  width: 100%;
+  border: var(--border-width-thin) solid var(--color-border);
+  border-collapse: separate;
+  border-radius: var(--radius-lg);
+  border-spacing: 0;
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+}
+
+.head {
+  padding-block: var(--space-1-5);
+  padding-inline: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--color-border-soft);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-xs);
+  text-align: start;
+}
+
+.expiry,
+.cell {
+  padding-block: var(--space-1-5);
+  padding-inline: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--color-border-soft);
+  font-weight: var(--font-weight-regular);
+  text-align: start;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.head[data-numeric],
+.cell[data-numeric] {
+  text-align: end;
+}
+
+.cell:not([data-numeric]) {
+  width: 100%;
+  white-space: normal;
+}
+
+.row:last-child > * {
+  border-block-end: 0;
+}
+
+.row[data-first-clear] > * {
+  background: var(--color-accent-soft);
+}
+
+.row[data-first-clear] > :first-child {
+  border-inline-start: var(--space-0-5) solid var(--color-accent);
+}
+
+.events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+}
+
+.event {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+}

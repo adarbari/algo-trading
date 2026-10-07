@@ -23,6 +23,13 @@ export {
   type ChartSeries,
   type ChartTone,
 } from './Chart';
+export {
+  CalendarGrid,
+  type CalendarDay,
+  type CalendarEvent,
+  type CalendarGridProps,
+  type CalendarName,
+} from './CalendarGrid';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Chip, type ChipProps } from './Chip';
 export { Combobox, type ComboboxOption, type ComboboxProps } from './Combobox';
@@ -45,6 +52,18 @@ export {
 } from './Distribution';
 export { Drawer, type DrawerProps } from './Drawer';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
+export {
+  EventChip,
+  EventDetail,
+  EVENT_KINDS,
+  EVENT_KIND_NAMES,
+  timeText,
+  type EventChipProps,
+  type EventItem,
+  type EventKind,
+} from './EventChip';
+export { EventTimeline, type EventTimelineProps } from './EventTimeline';
+export { ExpiryLadder, type ExpiryLadderProps, type ExpiryRow } from './ExpiryLadder';
 export { ExternalLink, type ExternalLinkProps } from './ExternalLink';
 export { ErrorState, type ErrorStateProps } from './ErrorState';
 export { Field, type FieldProps } from './Field';

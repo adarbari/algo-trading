@@ -2,7 +2,8 @@
  * Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one
  * wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the
  * series colours s1-s6, optionally rebased to 100 at the start of the window; event markers
- * (ex-dividend, split, earnings) with a shape and letter each plus a key; optional shaded bands
+ * (ex-dividend, split, earnings, filings, macro releases) with a shape and letter each plus a key, and
+ * the marker's text in the crosshair read-out and the table; optional shaded bands
  * (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a
  * key and in a text list for assistive technology; optional horizontal reference lines (a
  * threshold, a target) with an end label, also listed for assistive technology; optional lanes
@@ -53,7 +54,11 @@ export interface ChartProps {
   range?: ChartRange;
   /** Show each series as 100 x value / first value in the window (compare performance). */
   rebase?: boolean;
-  /** Ex-dividend, split and earnings markers on the first series. */
+  /**
+   * Dated markers on the first series: ex-dividend, split, earnings, filing and macro release,
+   * each `{ time, kind, detail? }`: a shape and letter per kind, `detail` in the crosshair
+   * read-out and the table ("8-K 2.02 results", "CPI 08:30").
+   */
   events?: readonly ChartEvent[];
   /**
    * Shaded spans of days behind the series, in the price pane: a start and end day, a status

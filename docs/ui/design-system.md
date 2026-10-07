@@ -225,7 +225,7 @@ screens never format numbers themselves.
 
 | Component | What it is | Notes |
 |---|---|---|
-| `Chart` | THE time-series chart: price history, rebased comparisons, a feature over time | One wrapper around **lightweight-charts** (TradingView, Apache-2.0; canvas, small, built for financial time series). `series` (id, label, points `{time: ISO day, value}`, tone `s1`-`s6` by position), `type` `line` / `area` (one series, flat tint: never a gradient), `range` `3M` / `1Y` / `2Y` / `All` (the caller's `SegmentedControl`, passed as `toolbar`; `CHART_RANGES`), `rebase` (100 x value / first value in the window, dashed 100 line), `events` (ex-dividend circle **D**, split square **S**, earnings arrow **E** on the first series, plus a key: shape and letter, never colour alone), `volume` (a second pane), `format` (axis, read-out and table through `formatValue`), `height` sm / md / lg, `status` loading / error (+ `onRetry`), `emptyMessage` |
+| `Chart` | THE time-series chart: price history, rebased comparisons, a feature over time | One wrapper around **lightweight-charts** (TradingView, Apache-2.0; canvas, small, built for financial time series). `series` (id, label, points `{time: ISO day, value}`, tone `s1`-`s6` by position), `type` `line` / `area` (one series, flat tint: never a gradient), `range` `3M` / `1Y` / `2Y` / `All` (the caller's `SegmentedControl`, passed as `toolbar`; `CHART_RANGES`), `rebase` (100 x value / first value in the window, dashed 100 line), `events` (dated markers on the first series: ex-dividend circle **D**, split square **S**, earnings up arrow **E**, filing down arrow **F**, macro release circle **M**, each `{ time, kind, detail? }`, plus a key: shape and letter, never colour alone; `detail` is the hover text in the read-out and the table), `volume` (a second pane), `format` (axis, read-out and table through `formatValue`), `height` sm / md / lg, `status` loading / error (+ `onRetry`), `emptyMessage` |
 | `Sparkline` | Tiny inline line for a table cell or stat | Plain SVG, no library. Tone `auto` (up / down by first-to-last), `muted` or `s1`-`s6`; dashed `baseline`; `showLast`; gaps break the line; summary as its accessible name |
 | `Distribution` | Histogram of one feature across the universe (feature catalogue) | Plain SVG bars on a value axis (unequal bins allowed); `markers` (quantiles dashed, a highlighted value solid accent, each labelled in text); summary as its accessible name; loading / empty / error |
 
@@ -243,6 +243,27 @@ Screenshot stories use seeded data and wait for the canvas to paint (`data-ready
 it only `engine.ts` does (ESLint `no-restricted-imports` everywhere else; ownership entry
 `web-charting`). The library's attribution logo stays on (its licence asks for a link to
 TradingView; turning it off needs an attribution page instead).
+
+## Event components (EV7a-B)
+
+For the event-sensitivity screens (ADR 0050, `docs/event-sensitivity-plan.md`). The props
+mirror the read model's event item in plain TypeScript (`EventItem`: `date`, `time`, `kind`,
+`label`, `source`, `knownFrom`), so the design system imports no API types; the label and the
+"clear" and "first clear" flags come from the API, nothing is derived in the browser.
+
+| Component | What it is | Notes |
+|---|---|---|
+| `EventChip` | An event's kind as a colour, a glyph and its short label ("Earnings", "CPI", "2.02 results") | With `event` it is focusable and its tooltip (hover and focus) gives label, time, source and known-from (`EventDetail`); the kind is also a screen-reader prefix |
+| `EventTimeline` | Dated events over a window: an axis (month ticks, a mark per event day) above the days with events, each day a group of chips | `dense` collapses a day to a count whose tooltip lists the events; days wrap (phone width); an ordered list named by `label` |
+| `ExpiryLadder` | Listed expiries as a table: expiry, DTE, the events it spans (chip + day) or a "Clear" badge | The row with `firstClear` carries the "First clear" badge and an accent rule |
+| `CalendarGrid` | Days x names table, chips in the cells; `ruledDays` (expiry Fridays) are ruled and named in the header | Days down; flips to days across under the medium breakpoint (or `orientation`); names paged beyond `pageSize` (30) with Previous / Next names |
+
+**Kind colours: no new tokens.** The existing roles fit, and the glyph and the text carry the
+kind where colour cannot: own earnings = `accent` tint with a solid triangle; the reference
+name's earnings = `info` tint with a hollow triangle; macro release = `warning` tint with a
+circle; market structure = `neutral` tint with a square; filing = `neutral` tint, dashed
+border, down triangle. `Chart` markers use the same shapes (earnings up arrow, filing down arrow,
+macro circle) and a letter each (E, F, M).
 
 ## Feedback (design system PR 4)
 
