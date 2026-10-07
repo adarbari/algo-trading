@@ -362,6 +362,57 @@ def test_swing_distances_to_resistance_and_support(fs: FeatureSet) -> None:
     assert out.loc["EQ:NOATR", "dist_to_resistance"] == pytest.approx(0.05)
 
 
+RETEST = "rollups/instrument/retest@v1"
+GAPS = "rollups/instrument/gaps@v1"
+
+
+def test_swing_breakout_retest_flags(fs: FeatureSet) -> None:
+    states = ["HELD", "RETESTING", "FRESH", "FAILED", "NONE", "NO_ATR"]
+    ids = [f"EQ:{s}" for s in states]
+    frames = {
+        RETEST: pd.DataFrame({"instrument_id": ids, "session_date": END, "retest_state": states})
+    }
+    out = fs.evaluate(frames, ["breakout_retest_held", "breakout_failed"]).set_index(
+        "instrument_id"
+    )
+    assert out["breakout_retest_held"].to_dict() == {
+        "EQ:HELD": True,
+        "EQ:RETESTING": False,  # today is the retest: not yet held
+        "EQ:FRESH": False,
+        "EQ:FAILED": False,
+        "EQ:NONE": False,
+        "EQ:NO_ATR": False,
+    }
+    assert out["breakout_failed"].to_dict() == {i: i == "EQ:FAILED" for i in ids}
+    stats = pd.DataFrame({"instrument_id": [*ids, "EQ:NEW"], "session_date": END, "close": 100.0})
+    stats = stats.astype({"close": "float32"})
+    names = ["breakout_failed", "dist_to_gap_above"]
+    both = fs.evaluate({PRICE_STATS: stats, **frames}, names).set_index("instrument_id")
+    assert pd.isna(both.loc["EQ:NEW", "breakout_failed"])  # no retest row: unknown, not false
+
+
+def test_swing_distances_to_gaps(fs: FeatureSet) -> None:
+    ids = ["EQ:A", "EQ:UPONLY", "EQ:NONE"]
+    stats = pd.DataFrame({"instrument_id": ids, "session_date": END, "close": [100.0, 50.0, 20.0]})
+    gaps = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "gap_above": [103.0, np.nan, np.nan],  # a down gap begins 3 above the close
+            "gap_below": [96.0, 45.0, np.nan],  # an up gap's top is 4 below
+        }
+    )
+    frames = {PRICE_STATS: stats.astype({"close": "float32"}), GAPS: gaps}
+    out = fs.evaluate(frames, ["dist_to_gap_above", "dist_to_gap_below"]).set_index("instrument_id")
+    assert out.loc["EQ:A", "dist_to_gap_above"] == pytest.approx(0.03)
+    assert out.loc["EQ:A", "dist_to_gap_below"] == pytest.approx(0.04)
+    assert pd.isna(out.loc["EQ:UPONLY", "dist_to_gap_above"])  # no zone above: unknown, not 0
+    assert out.loc["EQ:UPONLY", "dist_to_gap_below"] == pytest.approx(0.1)
+    assert pd.isna(out.loc["EQ:NONE", "dist_to_gap_above"]) and pd.isna(
+        out.loc["EQ:NONE", "dist_to_gap_below"]
+    )
+
+
 def test_swing_breakout_and_pullback_rules(fs: FeatureSet) -> None:
     ids = [
         "EQ:BREAK",

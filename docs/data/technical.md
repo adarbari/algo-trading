@@ -89,10 +89,10 @@ folder per kind of thing; `architecture/layout.toml`):
 |---|---|---|---|
 | `bands@v2` | `price/` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
 | `trend_stats@v2` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
-| `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | planned |
-| `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | planned |
-| `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state` | planned |
-| `gaps@v1` | `levels/` | `gap_open_pct`, `gap_above`, `gap_above_date`, `gap_below`, `gap_below_date` | planned |
+| `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | built |
+| `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | built ([swing.md](swing.md)) |
+| `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` | built ([swing.md](swing.md)) |
+| `gaps@v1` | `levels/` | `gap_open_pct`, `gap_above`, `gap_above_date`, `gap_below`, `gap_below_date` | built ([swing.md](swing.md)) |
 | `volume_profile@v1` | `levels/` | `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share`, `profile_status` | planned |
 | `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | planned |
 | `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | planned |
@@ -173,5 +173,7 @@ sessions ago).
 
 ## Levels (`levels/`), volume at price, relative strength, options
 
-Planned; each lands with its own section here (definitions, null rules, a worked example) in
-the PR that builds it.
+`pivot_strength@v1`, `retest@v1` and `gaps@v1` are built; their definitions, null rules and
+worked examples are in [swing.md](swing.md) (with `swing_levels@v1`, which they build on). The
+rest is planned; each lands with its own section here (definitions, null rules, a worked
+example) in the PR that builds it.

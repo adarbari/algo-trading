@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-306 stored features in 29 groups, in dependency order; 80 expression features.
+318 stored features in 32 groups, in dependency order; 82 expression features.
 
 ## `option_liquidity@v1`
 
@@ -167,9 +167,9 @@ Session volume and dollar volume, 20-session average volume, the 5 / 20 volume r
 | `up_volume_share_20d` | window | float32 | decimal | open | 0 .. 1 | Volume traded on sessions closing above the previous close / total volume, over the last 20 sessions: 0.5 is balanced, above is accumulation, below distribution; a session closing unchanged counts in the total only | a session among the last 21 has no bar (a gap), or the history is shorter (the first session needs the close before it); or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.volume` |
 | `cmf_20d` | window | float32 | decimal | open | -1 .. 1 | Chaikin money flow over the last 20 sessions: sum(mfm x volume) / sum(volume), mfm = ((close - low) - (high - close)) / (high - low), 0 when high equals low: above 0 closes sat in the upper half of the day's range on volume | a session among the last 20 has no bar (a gap), or the history is shorter; or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.high`, `bars/1d.low`, `bars/1d.volume` |
 
-## `bands@v2`
+## `bands@v1`
 
-The EMA stack (10, 20, 50, 200) with slopes, the 150-session SMA, the 20-close standard deviation, the bandwidth percentile over 252 sessions (the squeeze) and the band walk. Stored as `rollups/instrument/bands@v2`; reads `bars/1d`.
+The EMA stack (10, 20, 50, 200) with slopes, the 20-close standard deviation, the bandwidth percentile over 252 sessions (the squeeze) and the band walk. Stored as `rollups/instrument/bands@v1`; reads `bars/1d`.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -177,7 +177,6 @@ The EMA stack (10, 20, 50, 200) with slopes, the 150-session SMA, the 20-close s
 | `ema_20` | window | float32 | usd_per_share | open | >= 0 | Exponential moving average of the close, alpha 2 / 21, over the consecutive bars ending on the session (at most the last 400 sessions), seeded with the mean of the run's first 20 closes: the Keltner channel's midline | fewer than 20 consecutive bars ending on the session (a gap among the last 20 sessions, or a shorter history) | `bars/1d.close` |
 | `ema_50` | window | float32 | usd_per_share | open | >= 0 | Exponential moving average of the close, alpha 2 / 51, over the consecutive bars ending on the session (at most the last 400 sessions), seeded with the mean of the run's first 50 closes | fewer than 50 consecutive bars ending on the session (a gap among the last 50 sessions, or a shorter history) | `bars/1d.close` |
 | `ema_200` | window | float32 | usd_per_share | open | >= 0 | Exponential moving average of the close, alpha 2 / 201, over the consecutive bars ending on the session (at most the last 400 sessions), seeded with the mean of the run's first 200 closes | fewer than 200 consecutive bars ending on the session (a gap among the last 200 sessions, or a shorter history) | `bars/1d.close` |
-| `sma_150` | window | float32 | usd_per_share | open | >= 0 | Mean close over the last 150 sessions (the 30-week average of Minervini's trend template and Weinstein's stage analysis; price_stats has the 20 / 50 / 200) | a session among the last 150 has no bar (a gap), or the history is shorter | `bars/1d.close` |
 | `ema20_slope_5d` | window | float32 | decimal | open | >= -1 | ema_20 / ema_20 5 sessions earlier - 1: the average's slope over 5 sessions, positive when it is rising (0.02 is 2% higher than it was) | fewer than 25 consecutive bars ending on the session (a gap among the last 25 sessions, or a shorter history) | `bars/1d.close` |
 | `ema50_slope_10d` | window | float32 | decimal | open | >= -1 | ema_50 / ema_50 10 sessions earlier - 1: the average's slope over 10 sessions, positive when it is rising (0.02 is 2% higher than it was) | fewer than 60 consecutive bars ending on the session (a gap among the last 60 sessions, or a shorter history) | `bars/1d.close` |
 | `sma200_slope_20d` | window | float32 | decimal | open | >= -1 | sma_200 / sma_200 20 sessions earlier - 1: the average's slope over 20 sessions, positive when it is rising (0.02 is 2% higher than it was) | a session among the last 220 has no bar (a gap), or the history is shorter | `bars/1d.close` |
@@ -185,9 +184,9 @@ The EMA stack (10, 20, 50, 200) with slopes, the 150-session SMA, the 20-close s
 | `bb_width_pctile_252d` | window | float32 | decimal | open | 0 .. 1 | Share of the 252 sessions before the session whose Bollinger bandwidth (2 x 2 x close_std_20 / sma_20) was strictly below the session's: 0.05 is a squeeze (narrower than 95% of the year), 0.95 an expansion | the session's bandwidth is unknown (a session among the last 20 has no bar (a gap), or the history is shorter), or fewer than 240 of the 252 sessions before it have one | `bars/1d.close` |
 | `band_walk` | window | int | sessions | open | -399 .. 399 | Signed count of consecutive sessions, ending on the session, with the close above the upper Bollinger band (sma_20 + 2 x close_std_20; positive) or below the lower band (negative); 0 when the close is inside the bands; the count stops at the first session whose bands are unknown | the session's bands are unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.close` |
 
-## `trend_stats@v2`
+## `trend_stats@v1`
 
-Short and long returns, the 12-1 momentum and its acceleration, the return z-score, the 100 / 200-session channels, the prior 20 / 50-session extremes, the pullback's age, the close's place in the day's range, the 90-session regression trend quality and pace, and the close, SMA20 and tight-range streaks. Stored as `rollups/instrument/trend_stats@v2`; reads `bars/1d`.
+Short and long returns, the 12-1 momentum and its acceleration, the return z-score, the 100 / 200-session channels, the prior 20 / 50-session extremes, the pullback's age, the close's place in the day's range and the close, SMA20 and tight-range streaks. Stored as `rollups/instrument/trend_stats@v1`; reads `bars/1d`.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -208,8 +207,6 @@ Short and long returns, the 12-1 momentum and its acceleration, the return z-sco
 | `prior_low_50d` | window | float32 | usd_per_share | open | >= 0 | Lowest daily low over the 50 sessions before the session (the session excluded): the level a breakdown close must clear | a session among the 50 before the session has no bar (a gap), or the history is shorter | `bars/1d.low` |
 | `sessions_since_high_20d` | window | int | sessions | open | 0 .. 19 | Sessions since the highest high of the last 20 sessions (0: today's high is the highest; 19: the pullback has lasted the whole window): the age of the current pullback | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.high` |
 | `close_range_pos` | window | float32 | ratio | open | 0 .. 1 | Where the close sits in the session's own high-low range: (close - low) / (high - low), 1 at the high of the day, 0 at the low; above 0.7 the session closed strong | never null for a traded session, except a bar whose high equals its low (no range) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
-| `trend_r2_90d` | window | float32 | ratio | open | 0 .. 1 | R-squared of the least-squares line through the log close over the last 90 sessions: how much of the price path a straight trend explains, 1 a perfectly smooth trend, 0 no trend at all (Clenow's trend quality) | a session among the last 90 has no bar (a gap), or the history is shorter; or the close never moved over the window | `bars/1d.close` |
-| `reg_slope_90d_ann` | window | float32 | decimal | open | >= -1 | The slope of that line, annualised: exp(slope x 252) - 1, the yearly return the last {REG_WINDOW} sessions' trend implies (0.40 is a trend pace of 40% a year) | a session among the last 90 has no bar (a gap), or the history is shorter | `bars/1d.close` |
 | `close_streak` | window | int | sessions | open | -252 .. 252 | Signed count of consecutive sessions, ending on the session, with the close above the previous close (positive) or below it (negative); 0 when the close is unchanged; the count stops at the first session without a bar before it | no bar on the session before (a gap) | `bars/1d.close` |
 | `sma20_streak` | window | int | sessions | open | -252 .. 252 | Signed count of consecutive sessions, ending on the session, with the close above its 20-session mean (positive) or below it (negative); 0 when equal; the count stops at the first session whose mean is unknown | the session's 20-session mean is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.close` |
 | `tight_range_sessions` | window | int | sessions | open | >= 0 | Consecutive sessions, ending on the session, on which the 20-session high-low range / close was at most tight_range_pct (0.15): the length of the base (0: the session itself is not tight) | the session's 20-session range is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
@@ -224,6 +221,18 @@ Resistance and support: the most recent confirmed swing high above and swing low
 | `swing_high_date` | window | date | date | open |  | The session of that swing high | no confirmed swing high above the close dated 5 to 246 sessions before the session (e.g. the close is at a 252-session high), or fewer than 11 bars in a row | `bars/1d.high`, `bars/1d.close` |
 | `swing_low` | window | float32 | usd_per_share | open | >= 0 | Support: the low of the most recent swing low below the close (a bar whose low is strictly below the 5 lows before it and at most the 5 after it, confirmed 5 sessions later) | no confirmed swing low below the close dated 5 to 246 sessions before the session (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
 | `swing_low_date` | window | date | date | open |  | The session of that swing low | no confirmed swing low below the close dated 5 to 246 sessions before the session (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
+
+## `gaps@v1`
+
+Today's opening gap and the nearest unfilled down gap above and up gap below the close (over the last 253 sessions). Stored as `rollups/instrument/gaps@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `gap_open_pct` | window | float32 | decimal | open | >= -1 | Today's open / the previous session's close - 1: the opening gap, up positive | the previous session has no bar | `bars/1d.open`, `bars/1d.close` |
+| `gap_above` | window | float32 | usd_per_share | open | >= 0 | Resistance gap: the lower edge (the high of the gap session, where price rising would enter the zone) of the nearest unfilled down gap above the close (a down gap: high < the previous low; filled when a later high reaches that previous low) | no unfilled down gap above the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `gap_above_date` | window | date | date | open |  | The session of that down gap | no unfilled down gap above the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `gap_below` | window | float32 | usd_per_share | open | >= 0 | Support gap: the upper edge (the low of the gap session, where price falling would enter the zone) of the nearest unfilled up gap below the close (an up gap: low > the previous high; filled when a later low reaches that previous high) | no unfilled up gap below the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `gap_below_date` | window | date | date | open |  | The session of that up gap | no unfilled up gap below the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
 
 ## `anchored_vwap@v1`
 
@@ -322,6 +331,30 @@ Trailing-twelve-month revenue, net income and diluted EPS and the last fiscal ye
 | `eps_stale` | window | bool | flag | open |  | The EPS TTM's own period ended more than stale_days (480) before the session: the value is shown but pe_ratio is null | there is no EPS TTM (see eps_diluted_ttm) | `instruments/shares.period_end` |
 | `is_adr` | window | bool | flag | open |  | The instrument is an ADR: its per-share figures are per ordinary share and the ADR ratio is not stored, so pe_ratio is null | never (false without an instruments/reference snapshot) | `instruments/reference.security_type` |
 | `financials_status` | label | str | category | open | OK, PARTIAL, NO_TTM, NO_FACTS, STALE | OK (all three TTMs); PARTIAL (some); NO_TTM (facts, but no TTM can be formed); NO_FACTS (none filed); STALE (the first TTM present ended more than stale_days, 480, before the session; the values are still shown) | never | `instruments/shares.concept` |
+
+## `pivot_strength@v1`
+
+How often the swing high and low were tested (touches within 0.5 ATR), their age in sessions and whether the pivots step up (HH_HL), down (LH_LL) or mix. Stored as `rollups/instrument/pivot_strength@v1`; reads `bars/1d`, `rollups/instrument/swing_levels@v1`, `rollups/instrument/momentum@v1`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `resistance_touches` | window | int | count | open | 1 .. 252 | Distinct touches of swing_high over the 252 sessions read, the pivot bar included: a bar touches when its high is within touch_atr (0.5) x atr_14 of the level and its close is at or below it; consecutive touching bars count once | swing_high is null (no swing_levels row or no swing high above the close), or atr_14 is null (fewer than 15 consecutive bars) | `bars/1d.high`, `bars/1d.close`, `swing_levels.swing_high@v1`, `momentum.atr_14@v1` |
+| `support_touches` | window | int | count | open | 1 .. 252 | Distinct touches of swing_low over the 252 sessions read, the pivot bar included: a bar touches when its low is within touch_atr (0.5) x atr_14 of the level and its close is at or above it; consecutive touching bars count once | swing_low is null (no swing_levels row or no swing low below the close), or atr_14 is null (fewer than 15 consecutive bars) | `bars/1d.low`, `bars/1d.close`, `swing_levels.swing_low@v1`, `momentum.atr_14@v1` |
+| `resistance_age` | window | int | sessions | open | 5 .. 246 | Exchange sessions from the swing high's date to the session (at least 5: a pivot is confirmed 5 sessions later) | swing_high is null (no swing_levels row or no swing high above the close) | `swing_levels.swing_high_date@v1` |
+| `support_age` | window | int | sessions | open | 5 .. 246 | Exchange sessions from the swing low's date to the session (at least 5: a pivot is confirmed 5 sessions later) | swing_low is null (no swing_levels row or no swing low below the close) | `swing_levels.swing_low_date@v1` |
+| `pivot_structure` | label | str | category | open | HH_HL, LH_LL, MIXED | HH_HL when the last two confirmed swing highs and the last two confirmed swing lows of the window both step up (the later above the earlier), LH_LL when both step down, else MIXED (an equal pair is MIXED); every confirmed pivot counts, not only those beyond the close | fewer than two confirmed swing highs or two swing lows in the 252 sessions read (or a missing bar around them) | `bars/1d.high`, `bars/1d.low` |
+
+## `retest@v1`
+
+The latest 20-session breakout of the last 60 sessions, its level, whether it was retested (within 0.5 ATR) and held or failed, and the failed breakouts of the last year. Stored as `rollups/instrument/retest@v1`; reads `bars/1d`, `rollups/instrument/momentum@v1`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `breakout_date` | window | date | date | open |  | The session of the most recent breakout among the last 60: a close above the highest high of the 20 sessions before it | no breakout session among the last search_sessions (60) sessions (retest_state NONE) | `bars/1d.high`, `bars/1d.close` |
+| `breakout_level` | window | float32 | usd_per_share | open | >= 0 | The highest high of the 20 sessions before that breakout (what its close cleared) | no breakout session among the last search_sessions (60) sessions (retest_state NONE) | `bars/1d.high`, `bars/1d.close` |
+| `sessions_since_breakout` | window | int | sessions | open | 0 .. 291 | Exchange sessions from that breakout to the session (0: the breakout is today) | no breakout session among the last search_sessions (60) sessions (retest_state NONE) | `bars/1d.high`, `bars/1d.close` |
+| `retest_state` | label | str | category | open | FAILED, NONE, RETESTING, HELD, FRESH, NO_ATR | FAILED (a close after the breakout, through the session, is below its level), NONE (no breakout in the last 60 sessions), NO_ATR (atr_14 unknown), RETESTING (the session's low is at or below the level + 0.5 x atr_14 and its close at or above the level), HELD (an earlier session after the breakout had such a low), FRESH (price has not come back to the level); the breakout session itself is never a retest | never | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `momentum.atr_14@v1` |
+| `failed_breakouts_252d` | window | int | count | open | 0 .. 252 | Breakouts of the last 252 sessions (the first session of each run of consecutive breakout sessions) whose close fell below their level within the next 20 sessions; one that has not failed and is under 20 sessions old is pending and not counted | a session among the last 292 has no bar (a gap), or the history is shorter | `bars/1d.high`, `bars/1d.close` |
 
 ## `iv30@v1`
 
@@ -559,8 +592,6 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `pct_vs_ema_50` | expression | float | decimal | open | >= -1 | Close / 50-session EMA - 1 | ema_50 is null (fewer than 50 consecutive bars), or no price_stats row | `price_stats.close / bands.ema_50 - 1` | virtual |
 | `pct_vs_ema_200` | expression | float | decimal | open | >= -1 | Close / 200-session EMA - 1 | ema_200 is null (fewer than 200 consecutive bars), or no price_stats row | `price_stats.close / bands.ema_200 - 1` | virtual |
 | `ema_stack` | label | str | category | open | BULL, BEAR, MIXED | EMA alignment: BULL when EMA20 > EMA50 > EMA200, BEAR when EMA20 < EMA50 < EMA200, else MIXED (an equality is MIXED); trend_state is the same test on the close and the SMAs | an EMA is null (fewer than 200 consecutive bars ending on the session) | `if(is_null(bands.ema_20) or is_null(bands.ema_50) or is_null(bands.ema_200), null, if(bands.ema_20 > bands.ema_50 and bands.ema_50 > bands.ema_200, "BULL", if(bands.ema_20 < bands.ema_50 and bands.ema_50 < bands.ema_200, "BEAR", "MIXED")))` | virtual |
-| `pct_vs_sma_150` | expression | float | decimal | open | >= -1 | Close / 150-session (30-week) moving average - 1: Minervini's template wants it above 0 with sma_150 above sma_200 | sma_150 is null (a gap among the last 150 sessions, or a shorter history), or no price_stats row | `price_stats.close / bands.sma_150 - 1` | virtual |
-| `clenow_momentum_90d` | expression | float | decimal | open | >= -1 | Clenow's momentum score: the annualised regression slope over 90 sessions x its R-squared, rewarding trends that are both fast and smooth (0.30 is a smooth 30%-a-year pace; a volatile name with the same slope scores lower) | trend_r2_90d or reg_slope_90d_ann is null (a gap among the last 90 sessions, a shorter history, or a close that never moved) | `trend_stats.reg_slope_90d_ann * trend_stats.trend_r2_90d` | virtual |
 
 ### `earnings.toml`
 
@@ -630,6 +661,10 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `dist_to_support_atr` | expression | float | ratio | open | >= 0 | Distance to support in ATRs: (close - swing_low) / atr_14 | dist_to_support is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0 | `(price_stats.close - swing_levels.swing_low) / momentum.atr_14` | virtual |
 | `breakout_20d` | expression | bool | flag | open |  | A 20-session breakout on volume: close above the highest high of the 20 sessions before today (prior_high_20d) and rel_volume above 1.5 (params.min_rel_volume) | neither condition is false and one is unknown (prior_high_20d or rel_volume null: a gap among the last 21 sessions, or a shorter history) | `price_stats.close > momentum.prior_high_20d and momentum.rel_volume > min_rel_volume` (min_rel_volume = 1.5) | virtual |
 | `pullback_to_sma20` | expression | bool | flag | open |  | A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included) | neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null) | `trend_state == "UPTREND" and abs(price_stats.close - price_stats.sma_20) <= atr_multiple * momentum.atr_14` (atr_multiple = 1.0) | virtual |
+| `breakout_retest_held` | expression | bool | flag | open |  | The latest 20-session breakout came back to within 0.5 ATR of its level on an earlier session and has not closed below it since (retest_state HELD); not true while today is the retest (RETESTING) | no retest row (no bar on the session) | `retest.retest_state == "HELD"` | virtual |
+| `breakout_failed` | expression | bool | flag | open |  | The latest 20-session breakout (of the last 60 sessions) has since closed below its level (retest_state FAILED) | no retest row (no bar on the session) | `retest.retest_state == "FAILED"` | virtual |
+| `dist_to_gap_above` | expression | float | decimal | open | >= 0 | How far the nearest unfilled down gap above the close begins: (gap_above - close) / close, 0.03 is 3% above | no unfilled down gap wholly above the close in the last 253 sessions, or no gaps or price_stats row | `(gaps.gap_above - price_stats.close) / price_stats.close` | virtual |
+| `dist_to_gap_below` | expression | float | decimal | open | 0 .. 1 | How far the nearest unfilled up gap below the close begins: (close - gap_below) / close, 0.03 is 3% below | no unfilled up gap wholly below the close in the last 253 sessions, or no gaps or price_stats row | `(price_stats.close - gaps.gap_below) / price_stats.close` | virtual |
 | `dist_to_high_20d` | expression | float | decimal | open | -1 .. 0 | Close / the 20-session high - 1 (at or below 0): the pullback from the channel high, -0.05 is 5% below it | high_20d is null (a gap among the last 20 sessions, or a shorter history) | `price_stats.close / momentum.high_20d - 1` | virtual |
 | `dist_to_high_50d` | expression | float | decimal | open | -1 .. 0 | Close / the 50-session high - 1 (at or below 0) | high_50d is null (a gap among the last 50 sessions, or a shorter history) | `price_stats.close / momentum.high_50d - 1` | virtual |
 | `dist_to_low_20d` | expression | float | decimal | open | >= 0 | Close / the 20-session low - 1 (at or above 0): how far the close sits above the channel low | low_20d is null (a gap among the last 20 sessions, or a shorter history) | `price_stats.close / momentum.low_20d - 1` | virtual |
@@ -679,6 +714,4 @@ Readable until retired (`algotrade-ingest retire-features --group <key>`); their
 | `dividends@v1` | `dividends@v2` + expression features |
 | `fundamentals@v1` | `fundamentals@v2` + expression features |
 | `iv_history@v1` | `iv_history@v2` + expression features |
-| `bands@v2` | `bands@v2` + expression features |
-| `trend_stats@v2` | `trend_stats@v2` + expression features |
 | `liquidity_class@v1` | `price_stats@v2` + expression features; `chain_oi` -> `feature.option_chain_oi`, `rule_hash` retired |
