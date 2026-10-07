@@ -1,6 +1,6 @@
 # Swing levels and momentum (the SW track; definitions and worked examples in
 # docs/data/swing.md). Formulas over price_stats@v2, momentum@v1, swing_levels@v1, retest@v1,
-# gaps@v1, put_wing@v1 and call_wing@v1, computed on read. The language and the keys: docs/configuration.md "Expression features". Changing a
+# gaps@v1, put_wing@v1, call_wing@v1, candle@v1 and trend_stats@v2, computed on read. The language and the keys: docs/configuration.md "Expression features". Changing a
 # formula or a param: bump its version.
 
 [atr_pct]
@@ -254,4 +254,21 @@ unit = "decimal"
 description = "Close / the point of control - 1: how far the price sits from the year's most-traded level, 0.05 is 5% above it (the level acts as a magnet and as support when above, resistance when below)"
 null_meaning = "poc_252d is null (profile_status not OK), or no price_stats row"
 valid_range = [-1, inf]
+version = 1
+
+[inside_day_breakout]
+expr = 'trend_stats.ret_1d > 0 and candle.prev_bar_relation == "INSIDE"'
+dtype = "bool"
+unit = "flag"
+description = "The session closed above the previous close and the previous session was an inside day (its high-low range within the day before's): the day after the squeeze resolved up"
+null_meaning = "neither condition is false and one is unknown (ret_1d null: a gap in the last 2 sessions; prev_bar_relation null: the previous session or the one before it has no bar), or no trend_stats or candle row"
+version = 1
+
+[strong_close]
+expr = "trend_stats.close_range_pos >= min_close_pos and candle.body_share >= min_body"
+params = { min_close_pos = 0.7, min_body = 0.5 }  # closed in the top 30% of the range, with a body of half the range
+dtype = "bool"
+unit = "flag"
+description = "The session closed strong with conviction: the close in the top 30% of the day's range (close_range_pos at least 0.7) and a body of at least half the range (body_share at least 0.5), so not a doji or a long-wick spike"
+null_meaning = "neither condition is false and one is unknown (the bar has no range), or no trend_stats or candle row"
 version = 1
