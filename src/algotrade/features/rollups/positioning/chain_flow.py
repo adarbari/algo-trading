@@ -126,15 +126,15 @@ class ChainFlowParams:
 
 def flow_columns(options: pd.DataFrame, session: date, p: ChainFlowParams) -> pd.DataFrame:
     """The flow columns by ``underlying_id`` for every underlying in ``options``."""
-    right = options["right"].astype(str).to_numpy()
-    call, put = right == "C", right == "P"
+    right = options["right"].astype(str).reset_index(drop=True)
+    call, put = (right == "C").to_numpy(), (right == "P").to_numpy()
     volume = pd.to_numeric(options["volume"], errors="coerce").fillna(0).to_numpy(dtype=float)
     oi = pd.to_numeric(options["open_interest"], errors="coerce").fillna(0).to_numpy(dtype=float)
     dte = days_to(expiry_days(options["expiry"]), session)
     ahead = dte >= 1
-    uid = options["underlying_id"].astype(str).to_numpy()
+    uid = options["underlying_id"].astype(str).reset_index(drop=True)  # not .to_numpy(): slow
     next_dte = pd.Series(np.where(ahead, dte, np.iinfo("int64").max)).groupby(uid).min()
-    at_next = ahead & (dte == pd.Series(uid).map(next_dte).to_numpy())
+    at_next = ahead & (dte == uid.map(next_dte).to_numpy())
     big = ahead & (volume >= p.min_unusual_volume)
     unusual = big & (volume > oi)
     mid = two_sided_mid(options["bid"], options["ask"])

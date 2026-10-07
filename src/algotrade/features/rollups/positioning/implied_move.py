@@ -169,12 +169,12 @@ def choose_expiries(
 def _legs(quotes: pd.DataFrame, right: str, p: ImpliedMoveParams) -> pd.DataFrame:
     """One right's quotes by (underlying, strike): ``mid`` (NaN unless two-sided) and
     ``tight`` (two-sided with a spread within ``max_spread_pct``)."""
-    side = quotes[quotes["right"].astype(str) == right]
+    side = quotes[quotes["right"] == right].reset_index(drop=True)
     mid = two_sided_mid(side["bid"], side["ask"])
     spread = relative_spread(side["bid"], side["ask"], mid)
     legs = pd.DataFrame(
         {
-            "underlying_id": side["underlying_id"].to_numpy(),
+            "underlying_id": side["underlying_id"],
             "strike": side["strike"].to_numpy(dtype=float),
             "mid": mid,
             "tight": spread <= p.max_spread_pct,
@@ -187,20 +187,19 @@ def straddles(quotes: pd.DataFrame, spots: pd.Series, p: ImpliedMoveParams) -> p
     """``straddle_mid`` and ``status`` (OK, NO_QUOTES, WIDE_SPREADS) by ``underlying_id``.
 
     ``quotes``: the contracts at each underlying's move expiry (``underlying_id``, ``right``,
-    ``strike``, ``bid``, ``ask``); ``spots``: ``S0`` by underlying id. The two strikes are
-    the highest listed at or below ``S0`` and the lowest above it; with none on one side
-    (``S0`` outside the listed strikes) there is no pair around ``S0`` and no usable strike."""
-    uid = quotes["underlying_id"].astype(str)
-    strike = quotes["strike"].to_numpy(dtype=float)
-    spot = spots.reindex(uid).to_numpy(dtype=float)
-    ids = pd.Index(sorted(set(uid)))
-    k_lo = pd.Series(strike[strike <= spot]).groupby(uid[strike <= spot].to_numpy()).max()
-    k_hi = pd.Series(strike[strike > spot]).groupby(uid[strike > spot].to_numpy()).min()
+    ``strike``, ``bid``, ``ask``; string columns, a default index); ``spots``: ``S0`` by
+    underlying id. The two strikes are the highest listed at or below ``S0`` and the lowest
+    above it; with none on one side (``S0`` outside the listed strikes) there is no pair
+    around ``S0`` and no usable strike."""
+    spot = spots.reindex(quotes["underlying_id"]).to_numpy(dtype=float)
+    strikes = quotes.assign(spot=spot)
+    ids = pd.Index(sorted(set(strikes["underlying_id"].unique())))
+    k_lo = strikes[strikes["strike"] <= strikes["spot"]].groupby("underlying_id")["strike"].max()
+    k_hi = strikes[strikes["strike"] > strikes["spot"]].groupby("underlying_id")["strike"].min()
     around = pd.DataFrame({"k_lo": k_lo, "k_hi": k_hi}).reindex(ids)
     around["spot"] = spots.reindex(ids).to_numpy(dtype=float)
     paired = around["k_lo"].notna() & (around["k_hi"].notna() | (around["k_lo"] == around["spot"]))
     around = around[paired]
-    quotes = quotes.assign(underlying_id=uid.to_numpy())
     calls, puts = _legs(quotes, "C", p), _legs(quotes, "P", p)
     both = calls.merge(puts, on=["underlying_id", "strike"], suffixes=("_c", "_p"))
     both = both.join(around, on="underlying_id", how="inner")
@@ -237,16 +236,16 @@ def compute(inputs: Inputs, session: date, p: ImpliedMoveParams) -> pd.DataFrame
     quoted = set() if underlyings is None else set(underlyings["instrument_id"].astype(str))
     chain = pd.DataFrame(
         {
-            "underlying_id": options["underlying_id"].astype(str).to_numpy(),
+            "underlying_id": options["underlying_id"].astype(str).reset_index(drop=True),
             "expiry": expiry_days(options["expiry"]),
-            "right": options["right"].astype(str).to_numpy(),
+            "right": options["right"].astype(str).reset_index(drop=True),
             "strike": options["strike"].to_numpy(dtype=float),
             "bid": options["bid"].to_numpy(),
             "ask": options["ask"].to_numpy(),
         }
     )
     chain["dte"] = days_to(chain["expiry"].to_numpy(), session)
-    ids = pd.Index(sorted(quoted | set(chain["underlying_id"])), name="instrument_id")
+    ids = pd.Index(sorted(quoted | set(chain["underlying_id"].unique())), name="instrument_id")
     priced = chain[chain["underlying_id"].isin(spots.dropna().index)]
     listed = priced[priced["dte"] >= 1].drop_duplicates(["underlying_id", "expiry"])
     chosen = choose_expiries(listed, _reports(inputs.get(EARNINGS), session), session, p)
@@ -262,7 +261,7 @@ def compute(inputs: Inputs, session: date, p: ImpliedMoveParams) -> pd.DataFrame
     quote_status = found.get("status", pd.Series(dtype=object)).reindex(ids)
     status = quote_status.fillna("NO_QUOTES").to_numpy(dtype=object)
     status = np.where(out["move_expiry"].isna().to_numpy(), "NO_EXPIRY", status)
-    status = np.where(ids.isin(set(chain["underlying_id"])), status, "NO_CHAIN")
+    status = np.where(ids.isin(set(chain["underlying_id"].unique())), status, "NO_CHAIN")
     out["move_status"] = np.where(spots.reindex(ids).isna().to_numpy(), "NO_SPOT", status)
     return out.reset_index().reindex(columns=["instrument_id", *COLUMNS])
 
