@@ -1,8 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CatalogueFeature } from '@/entities/feature';
+import { IconButton } from '@algotrade/ui';
+
+import type { CatalogueFeature, GuideUse } from '@/entities/feature';
 import type { Criterion } from '@/entities/screen';
 import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
@@ -54,6 +57,16 @@ const CATALOGUE = [
   },
 ] as unknown as CatalogueFeature[];
 
+const USE: GuideUse = {
+  intent: 'high IV',
+  op: 'gte',
+  value: 0.4,
+  mode: 'soft',
+  tolerance: 0.05,
+  onMiss: null,
+  note: '',
+};
+
 const CRITERION: Criterion = {
   id: 'iv30',
   field: 'rollup.iv30@v1.iv30',
@@ -64,7 +77,7 @@ const CRITERION: Criterion = {
 
 function setup(
   criterion: Criterion = CRITERION,
-  extra: { error?: string | null; disabled?: boolean } = {},
+  extra: Partial<ComponentProps<typeof CriterionRow>> = {},
 ) {
   const onChange = vi.fn();
   const onRemove = vi.fn();
@@ -166,12 +179,20 @@ describe('CriterionRow', () => {
     ).toBeInTheDocument();
   });
 
-  it('applies a guided intent to the row', async () => {
-    const { onChange } = setup();
-    await userEvent.click(screen.getByRole('button', { name: 'How to read it' }));
-    expect(screen.getByText(/Our 30-day ATM implied volatility/)).toBeInTheDocument();
-    expect(screen.getByText('≥ 40.0%')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Use: high IV' }));
+  it('puts the help slot beside the field, and its "Use this" sets the row to the intent', async () => {
+    const renderFieldHelp = vi.fn((field: string, onUse: (use: GuideUse) => void) => (
+      <IconButton
+        icon="info"
+        label={`What is ${field}?`}
+        size="sm"
+        onClick={() => {
+          onUse(USE);
+        }}
+      />
+    ));
+    const { onChange, container } = setup(CRITERION, { renderFieldHelp });
+    expect(renderFieldHelp).toHaveBeenCalledWith('rollup.iv30@v1.iv30', expect.any(Function));
+    await userEvent.click(screen.getByRole('button', { name: /^What is rollup\.iv30/ }));
     expect(onChange).toHaveBeenCalledWith({
       ...CRITERION,
       op: 'gte',
@@ -180,6 +201,16 @@ describe('CriterionRow', () => {
       tolerance: 0.05,
       on_miss: undefined,
     });
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows no help for a field without a guide', () => {
+    const renderFieldHelp = vi.fn(() => <span>help</span>);
+    setup(
+      { ...CRITERION, field: 'instrument.sector', op: 'eq', value: 'Tech' },
+      { renderFieldHelp },
+    );
+    expect(renderFieldHelp).not.toHaveBeenCalled();
   });
 
   it('is read-only for a preset not yet copied', () => {

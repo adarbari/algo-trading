@@ -27,6 +27,16 @@ const CATALOGUE = [
 ] as CatalogueFeature[];
 
 describe('featureOptions', () => {
+  it("describes a field by its guide's one-line summary when it has one", () => {
+    const guided = {
+      ...CATALOGUE[0],
+      guide: { summary: 'The 30-day at-the-money implied volatility.' },
+    } as CatalogueFeature;
+    expect(featureOptions([guided])[0]?.description).toBe(
+      'The 30-day at-the-money implied volatility. · fraction (shown as %) · personal licence',
+    );
+  });
+
   it('describes each feature with its unit and licence, and badges formulas', () => {
     const [iv, own] = featureOptions(CATALOGUE);
     expect(iv).toMatchObject({ value: 'rollup.iv30@v1.iv30', group: 'iv30@v1' });

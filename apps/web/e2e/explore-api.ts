@@ -261,6 +261,13 @@ const GUIDES: Record<string, Json> = {
   },
 };
 
+/** A guide entry with its `summary`, the first sentence of `reads` (the server's split, mocked). */
+function withSummary(guide: Json | undefined): Json | null {
+  if (!guide) return null;
+  const reads = typeof guide['reads'] === 'string' ? guide['reads'] : '';
+  return { ...guide, summary: reads.split(/(?<=[.!?])\s+(?=[A-Z0-9])/)[0] };
+}
+
 /** The recorded catalogue with the synthetic guide entries. */
 function catalogue(): Json {
   const recorded = fixture('catalogue.json') as { data: { catalogue: Row[] } };
@@ -268,7 +275,7 @@ function catalogue(): Json {
     data: {
       catalogue: recorded.data.catalogue.map((f) => ({
         ...f,
-        guide: GUIDES[String(f['name'])] ?? null,
+        guide: withSummary(GUIDES[String(f['name'])]),
       })),
     },
   };
@@ -293,15 +300,14 @@ function passing(name: string, histogram: { lo: number; count: number }[]): Json
 
 /** `GuideHelpField`: a field's info with its guide entry (null without one), `summary` its first sentence (the server's split, mocked). */
 function guideHelp(name: string): Json {
-  const guide = GUIDES[name];
-  const reads = typeof guide?.['reads'] === 'string' ? guide['reads'] : '';
+  const guide = withSummary(GUIDES[name]);
   return {
     data: {
       guideField: {
         info: {
           name,
           unit: CATALOGUE.get(name)?.['unit'] ?? null,
-          guide: guide ? { ...guide, summary: reads.split(/(?<=[.!?])\s+(?=[A-Z0-9])/)[0] } : null,
+          guide,
         },
       },
     },

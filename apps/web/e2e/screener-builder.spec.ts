@@ -146,6 +146,33 @@ test('changing a mode saves a tolerance with it', async ({ page }) => {
   expect(criteria['iv30']).toMatchObject({ mode: 'soft', tolerance: 0 });
 });
 
+test("a criterion's help button opens the field's drawer and Use this fills that row", async ({
+  page,
+}) => {
+  const mock = await mockBuilderApi(page);
+  await page.goto('/screeners/my-vrp/edit');
+  const row = page.getByRole('combobox', { name: 'Feature or formula' }).first();
+  await expect(row).toHaveValue('IV30');
+  await page
+    .getByRole('button', { name: /^What is IV30/ })
+    .first()
+    .click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toContainText('Rich premium to sell');
+  await expectAccessible(page);
+  await drawer.getByRole('button', { name: 'Use this: Cheap options to buy' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Operator' }).first()).toHaveText(/≤/);
+  await expect(page.getByRole('spinbutton', { name: 'Threshold' }).first()).toHaveValue('20.0');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect.poll(() => mock.drafts.length).toBe(1);
+  const criteria = mock.drafts[0]?.document['criteria'] as Record<
+    string,
+    { op: string; value: number }
+  >;
+  expect(criteria['iv30']).toMatchObject({ op: 'lte', value: 0.2 });
+});
+
 test('discarding the draft goes back to the saved version', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/my-vrp/edit');

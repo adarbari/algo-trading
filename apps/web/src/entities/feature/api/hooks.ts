@@ -34,6 +34,7 @@ const FeatureCatalogue = graphql(`
       guide {
         theme
         reads
+        summary
         caveats
         sources
         uses {
