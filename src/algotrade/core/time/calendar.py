@@ -215,6 +215,7 @@ def last_session_of_month(year: int, month: int) -> date:
 def russell_reconstitution(year: int) -> date:
     """The annual Russell US index reconstitution, effective after the close: the fourth
     Friday of June (2018-06-22, 2024-06-28), or the session before it when closed."""
+    # TODO(EV follow-up): FTSE Russell adds a December reconstitution from 2026; not modelled.
     return session_on_or_before(nth_weekday(year, 6, _FRIDAY, 4))
 
 

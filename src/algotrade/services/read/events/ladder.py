@@ -6,7 +6,8 @@ The spanning rule: an expiry spans every event dated on or before it, so an earn
 after the close on the expiry date is inside it (a short option held to that expiry carries
 it through the report session's close: the conservative reading). An expiry is ``clear`` when
 it spans no event but market-structure days (the expiries and quarter ends themselves, which
-every rung past them would otherwise span)."""
+every rung past them would otherwise span). The ``marked`` rung is the last clear one: the
+longest expiry that still spans no earnings or macro event (none when no rung is clear)."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -22,12 +23,13 @@ LADDER_DAYS = (7, 90)  # the expiries listed: calendar days from the session, in
 class LadderRung:
     """One listed expiry: ``days`` calendar days from the session, the events it spans (on or
     before it, oldest first) and whether it is ``clear`` (spans none but market-structure
-    days)."""
+    days) and whether it is the ``marked`` one (the last clear rung)."""
 
     expiry: date
     days: int
     spans: tuple[AheadEvent, ...]
     clear: bool
+    marked: bool
 
 
 def ladder(
@@ -35,11 +37,15 @@ def ladder(
 ) -> tuple[LadderRung, ...]:
     """The rungs of ``expiries`` within ``LADDER_DAYS``, each spanning ``events`` (sorted)."""
     low, high = LADDER_DAYS
-    rungs = []
+    rungs: list[tuple[OptionExpiry, tuple[AheadEvent, ...], bool]] = []
     for expiry in sorted(expiries, key=lambda e: e.date):
         if not low <= expiry.days <= high:
             continue
         spans = tuple(e for e in events if e.date <= expiry.date)
         clear = all(e.kind == MARKET_STRUCTURE for e in spans)
-        rungs.append(LadderRung(expiry.date, expiry.days, spans, clear))
-    return tuple(rungs)
+        rungs.append((expiry, spans, clear))
+    last = max((i for i, (_, _, clear) in enumerate(rungs) if clear), default=None)
+    return tuple(
+        LadderRung(e.date, e.days, spans, clear, i == last)
+        for i, (e, spans, clear) in enumerate(rungs)
+    )

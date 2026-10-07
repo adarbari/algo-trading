@@ -88,13 +88,15 @@ class Filing:
 @strawberry.type(
     description="A listed expiry 7 to 90 days out: the events it spans (dated on or before "
     "it: an after-close report on the expiry date is inside it) and whether it is `clear` "
-    "(it spans none but market-structure days)"
+    "(it spans none but market-structure days); `marked` the last clear rung (the longest "
+    "expiry still clear of earnings and macro events; none when no rung is clear)"
 )
 class LadderRung:
     expiry: dt.date
     days: int
     spans: list[AheadEvent]
     clear: bool
+    marked: bool
 
     @classmethod
     def of(cls, d: ladder.LadderRung) -> Self:
@@ -103,6 +105,7 @@ class LadderRung:
             days=d.days,
             spans=[AheadEvent.of(e) for e in d.spans],
             clear=d.clear,
+            marked=d.marked,
         )
 
 

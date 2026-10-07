@@ -131,7 +131,8 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The events ahead of a set of names over the next `days` calendar days, "
         "one entry per day (ADR 0050): the names `instrumentIds` give (a screen's results, a "
-        "list) plus, with `scope`, the site's event-study list; the names' own and reference "
+        "list) plus, with `scope`, the site's scope list config/site/events/scope.toml only (no "
+        "tier A / B names); the names' own and reference "
         "earnings on their rows, macro releases and market-structure days once. Null: nothing "
         "stored",
         extensions=[MaxItems("instrument_ids", MAX_PAGE), MaxItems("days", MAX_DAYS)],

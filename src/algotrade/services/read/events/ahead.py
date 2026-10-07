@@ -135,17 +135,21 @@ def _earnings(
 
 def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown | None]:
     """The scheduled macro releases of ``session..end`` known by the session; UNKNOWN when
-    the calendar has nothing known by the session at all."""
+    the calendar has nothing known by the session at all (NO_PARTITION), or no scheduled
+    release dated on or after the session (NO_ROW: the calendar is not current)."""
     day = ctx.session.date
-    frame = read_events(ctx.reader, MACRO_TABLE, day, end, through=day).frame
-    if frame.empty:
-        anything = read_events(ctx.reader, MACRO_TABLE, *ALL_TIME, through=day).frame
-        if anything.empty:
-            detail = f"{MACRO_TABLE} has no release dates known by {day.isoformat()}"
-            return (), Unknown(UnknownCode.NO_PARTITION, detail)
+    frame = read_events(ctx.reader, MACRO_TABLE, day, ALL_TIME[1], through=day).frame
     frame = frame[frame["status"] == SCHEDULED] if not frame.empty else frame
     if frame.empty:
-        return (), None
+        anything = read_events(ctx.reader, MACRO_TABLE, *ALL_TIME, through=day).frame
+        code, detail = (
+            (UnknownCode.NO_PARTITION, "no release dates known by")
+            if anything.empty
+            else (UnknownCode.NO_ROW, "no future release dates known by")
+        )
+        return (), Unknown(code, f"{MACRO_TABLE} has {detail} the session {day.isoformat()}")
+    days = pd.to_datetime(frame["release_date"]).dt.date
+    frame = frame[days <= end]
     events = tuple(
         AheadEvent(
             date=pd.Timestamp(row["release_date"]).date(),

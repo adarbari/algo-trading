@@ -27,6 +27,12 @@ def test_the_spanning_rule_and_the_clear_state() -> None:
     ]  # fmt: skip
     assert [r.spans for r in rungs] == [(), (expiry_day,), (expiry_day, report)]
     assert [r.clear for r in rungs] == [True, True, False]  # the report after the close counts
+    assert [r.marked for r in rungs] == [False, True, False]  # the last clear rung
+
+
+def test_no_clear_rung_none_marked() -> None:
+    rungs = ladder([OptionExpiry(REPORT, 22)], [_event(REPORT, OWN_EARNINGS)])
+    assert [(r.clear, r.marked) for r in rungs] == [(False, False)]
 
 
 def test_no_expiries_no_rungs() -> None:

@@ -9,7 +9,7 @@ STUDY = """query($key: String!, $days: Int) {
     instrumentId session days months
     ahead { date time kind label name subjectId source knownFrom }
     filings { accepted form items label }
-    ladder { expiry days clear spans { date kind label } }
+    ladder { expiry days clear marked spans { date kind label } }
     reference { instrumentId symbol kind source status }
     gaps { instrumentId part unknown { code detail } }
   } }
@@ -31,8 +31,8 @@ def test_what_is_coming_for_a_stock(graph: Graph) -> None:
         ("2023-02-17", "market_structure", "Monthly expiry"),
     ]
     assert study["ahead"][0]["time"] == "pre_market" and study["ahead"][0]["knownFrom"] is None
-    assert [(r["expiry"], r["days"], r["clear"]) for r in study["ladder"]] == [
-        ("2022-12-23", 30, False), ("2023-01-22", 60, False),
+    assert [(r["expiry"], r["days"], r["clear"], r["marked"]) for r in study["ladder"]] == [
+        ("2022-12-23", 30, False, False), ("2023-01-22", 60, False, False),
     ]  # fmt: skip
     assert [s["label"] for s in study["ladder"][0]["spans"]] == ["Earnings", "Quarterly expiry"]
     assert study["reference"] is None and study["filings"] == []
