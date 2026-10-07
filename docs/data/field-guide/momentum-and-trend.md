@@ -951,3 +951,24 @@ Sources: Faith (2007), Way of the Turtle: System 2 (55-day breakout)
 - Null when the prior low or the volume ratio is unknown and the known side does not already say false.
 
 Sources: Faith (2007), Way of the Turtle: the 20-day channel exit
+
+### `rollup.retest@v1.retest_state`
+
+**How to read it.** What the latest 20-session breakout of the last 60 sessions did since. RETESTING: today's low came back to within half an ATR above the breakout level and the close held it (the entry traders wait for). HELD: an earlier session did that and no close since went below the level. FRESH: price has not come back to the level. FAILED: some close since the breakout is below its level. NONE: no breakout in the window. NO_ATR: the ATR is unknown, so the retest tolerance is too.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a breakout that came back and held | `in ["RETESTING", "HELD"]` | hard | - | feature.breakout_retest_held is the HELD half |
+| buying the retest today | `eq "RETESTING"` | hard | - | with feature.trend_state eq UPTREND |
+| a breakout that has not failed | `ne "FAILED"` | soft | 0 | - |
+
+**When the reading lies**
+
+- FAILED includes a single close below the level on any day since the breakout, even if price recovered the next day; rollup.retest@v1.failed_breakouts_252d is how often the name's breakouts failed within 20 sessions.
+- RETESTING is today's bar only: a low in the band with a weak close at or above the level is still RETESTING, so check the close against feature.dist_to_support_atr or the session's range.
+- The breakout is the close above the prior 20-session high, with no volume condition; a thin-volume breakout fails more often (rollup.momentum@v1.rel_volume).
+- NONE and NO_ATR are not failures: a hard 'eq HELD' rejects them, which is usually intended.
+
+Sources: docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns (pullbacks and throwbacks to a breakout); Edwards and Magee, Technical Analysis of Stock Trends

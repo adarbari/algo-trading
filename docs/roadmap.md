@@ -53,7 +53,7 @@ In order. WF1-WF3 shipped in one PR (resume and waivers are what make hold-back 
 | WF1 | Step model: `needs`, `critical`, acceptance checks (thresholds in `sources.toml [quality]`), SUCCEEDED / FAILED / NOT_RUN / SKIPPED / WAIVED; `quality` checks run per step; rollups fail on a gap in a lookback window; NYSE special closures | **done** |
 | WF2 | Resume (steps done in an earlier attempt are reused; `--force` reruns all); sessions in order, stopping at a FAILED one (later ones held), none dropped (old PARTIAL records count as done) | **done** |
 | WF3 | `nightly --date D --waive STEP --reason ...` (stored in the run record, kept on later attempts); expired latest-only steps name the unblock command; notifier names failing critical steps and held sessions, alerts on every failed retry | **done** |
-| WF3b | Chains retry refetches only STALE_DATA / FETCH_ERROR names (today a FAILED chains step refetches all ~4,200, 2-4 h); consider starting the nightly later than close + 30 min (2026-10-05: ~50% STALE_DATA at 13:40 PT) | next |
+| WF3b | Chains retry refetches only STALE_DATA / FETCH_ERROR names (today a FAILED chains step refetches all ~4,200, 2-4 h); consider starting the nightly later than close + 30 min (2026-10-05: ~50% STALE_DATA at 13:40 PT) | **done** for a SUCCEEDED chains step with names left (`Step.refetch`: re-run on retry while latest, when its staging exists). **Open:** the 2026-10-05 second fetch made 4,208 requests, so the first run's staging was gone by then (not purge, not recovery: both leave it); find what removes it. The later start is still open |
 | WF4 | Split into `market-daily` / `reference` (weekly) / `enrichment`: CLI commands, three launchd agents from `ops/schedule.py`, `ibkr-iv` session snapshot vs history backfill | |
 | WF5 | Reads default to the latest SUCCEEDED `market-daily` session (`services/read/session.py`); architecture docs rewritten | |
 
@@ -234,6 +234,7 @@ the close, not real time) is the likely source.
 | SEC EDGAR contact | A contact email in the user agent (SEC policy) | **done** (`ALGOTRADE_SEC_CONTACT` in `.env`) |
 | FIGI-based `instrument_id` | Keep symbol ids, or migrate to FIGI ids | **decided: FIGI ids** (ADR 0018); owner runs `migrate-ids` on the local store |
 | Cboe terms | Confirm acceptable use of the delayed feed | owner to confirm |
+| Stale-chain limit vs screener coverage | `max_chain_stale_share` 20% (rest tier, ADR 0043) lets `chains` SUCCEED while `short_premium_liquidity` (`min_coverage` 98%) fails on the same names (2026-10-05: 199 of 4,205). Options: rest tier 2% (`1 - min_coverage`, with a fitness test tying the two), or keep 20% and accept the waive when the retry refetch does not clear them | owner to decide (amends ADR 0043) |
 | User identity scheme | Labels now; auth provider in phase 4 | **decided: site registry + Supabase Auth** (ADR 0040; roadmap ID1-ID4) |
 | Production job queue | Redis/RQ, Postgres-backed, cloud queue | local runner until hosting |
 | Hosting target | VM + docker-compose, a container platform | local only |

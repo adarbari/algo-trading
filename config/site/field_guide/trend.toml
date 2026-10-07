@@ -731,3 +731,35 @@ op = "eq"
 value = true
 mode = "hard"
 note = "with feature.ema_stack eq BEAR for a trend short; with feature.trend_state eq UPTREND it is a stop-out list"
+
+# Levels PR (levels/ folder): the retest state and its flags (the level fields are in levels.toml).
+
+[[field]]
+name = "rollup.retest@v1.retest_state"
+theme = "momentum and trend"
+reads = "What the latest 20-session breakout of the last 60 sessions did since. RETESTING: today's low came back to within half an ATR above the breakout level and the close held it (the entry traders wait for). HELD: an earlier session did that and no close since went below the level. FRESH: price has not come back to the level. FAILED: some close since the breakout is below its level. NONE: no breakout in the window. NO_ATR: the ATR is unknown, so the retest tolerance is too."
+caveats = [
+  "FAILED includes a single close below the level on any day since the breakout, even if price recovered the next day; rollup.retest@v1.failed_breakouts_252d is how often the name's breakouts failed within 20 sessions.",
+  "RETESTING is today's bar only: a low in the band with a weak close at or above the level is still RETESTING, so check the close against feature.dist_to_support_atr or the session's range.",
+  "The breakout is the close above the prior 20-session high, with no volume condition; a thin-volume breakout fails more often (rollup.momentum@v1.rel_volume).",
+  "NONE and NO_ATR are not failures: a hard 'eq HELD' rejects them, which is usually intended.",
+]
+sources = ["docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns (pullbacks and throwbacks to a breakout); Edwards and Magee, Technical Analysis of Stock Trends"]
+[[field.use]]
+for = "a breakout that came back and held"
+op = "in"
+value = ["RETESTING", "HELD"]
+mode = "hard"
+note = "feature.breakout_retest_held is the HELD half"
+[[field.use]]
+for = "buying the retest today"
+op = "eq"
+value = "RETESTING"
+mode = "hard"
+note = "with feature.trend_state eq UPTREND"
+[[field.use]]
+for = "a breakout that has not failed"
+op = "ne"
+value = "FAILED"
+mode = "soft"
+tolerance = 0
