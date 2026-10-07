@@ -3,7 +3,8 @@
 Every release of the registry (``config/site/events/releases.toml``) gets one row per release
 date from 400 days before the session to 400 days after it. A ``fred`` release is one request
 to the registered ``fred_release_dates`` source (FRED lists the scheduled future dates too); a
-``rule`` release (ISM: the n-th exchange session of the month) is computed, no fetch. A row's
+``rule`` release (ISM: the n-th exchange session of the month) is computed and a ``dates``
+release (FOMC) lists its dates in the registry: neither fetches. A row's
 ``ts`` is the release date at ``time_et`` (New York) in UTC.
 
 - ``status``: ``released`` when the release date is on or before the run's session, else
@@ -15,6 +16,10 @@ to the registered ``fred_release_dates`` source (FRED lists the scheduled future
   turns ``released``: the same ``min``, so a session before the release date, which reads the
   latest version known by it, still sees ``scheduled`` and the release date on sees
   ``released``. A ``moved`` version: the run's session.
+- A ``dates`` release is the whole truth: every stored row of it (``scheduled`` or ``released``,
+  any date) that the list does not hold gets a ``moved`` version known from the run's session,
+  which retires rows an earlier source wrongly stored (FRED's daily FOMC rows) without deleting
+  anything; a session before it still reads them (point in time).
 
 Only the rows the table lacks and the changed versions are written: a rerun on an unchanged
 calendar writes nothing. A date FRED moves is a new ``ts``; the old row gets its ``moved``
@@ -43,6 +48,7 @@ TASK = "macro_calendar"
 TABLE = "events/macro_release"  # the table this task owns (architecture/tables.toml)
 WINDOW_DAYS = 400  # dates from this many days before the session to this many after
 RULE_SOURCE = "rule"  # the ``source`` stamped on computed rows
+DATES_SOURCE = "registry"  # and on rows listed in the registry
 SCHEDULED, RELEASED, MOVED = "scheduled", "released", "moved"
 KEY = ["instrument_id", "ts"]
 COLUMNS = [
@@ -125,16 +131,20 @@ def rows_to_write(target: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
 
 
 def moved_rows(
-    held: pd.DataFrame, days: Sequence[date], window: tuple[date, date], session: date
+    held: pd.DataFrame,
+    days: Sequence[date],
+    window: tuple[date, date],
+    session: date,
+    statuses: tuple[str, ...] = (SCHEDULED,),
 ) -> pd.DataFrame:
-    """A ``moved`` version of every stored ``scheduled`` date inside ``window`` that a fetch
+    """A ``moved`` version of every stored date of ``statuses`` inside ``window`` that a fetch
     which returned ``days`` no longer lists (the date was rescheduled or withdrawn), known
     from ``session``: ``COLUMNS`` rows, none when nothing went missing."""
     if held.empty:
         return held.reindex(columns=COLUMNS)
     dates = pd.to_datetime(held["release_date"]).dt.date
     gone = (
-        (held["status"] == SCHEDULED)
+        held["status"].isin(statuses)
         & (dates >= window[0])
         & (dates <= window[1])
         & ~dates.isin(set(days))
@@ -166,7 +176,14 @@ def _one_release(
     window: tuple[date, date],
 ) -> str:
     """Fetch or compute one release, stage what the table lacks -> the item status."""
-    if spec.source == "fred":
+    retire: tuple[str, ...] = (SCHEDULED,)
+    span = window
+    listed: list[date] = []
+    if spec.source == "dates":
+        listed = list(spec.dates)
+        days, stamp = [d for d in spec.dates if window[0] <= d <= window[1]], DATES_SOURCE
+        retire, span = (SCHEDULED, RELEASED), (date.min, date.max)
+    elif spec.source == "fred":
         assert source is not None
         try:
             days = _fetch_dates(run, spec, source, *window)
@@ -177,10 +194,11 @@ def _one_release(
         days, stamp = rule_dates(spec, *window), RULE_SOURCE
     if not days:
         return "NO_DATA"
+    listed = listed or days
     new = pd.concat(
         [
             rows_to_write(release_rows(spec, days, run.session), held),
-            moved_rows(held, days, window, run.session),
+            moved_rows(held, listed, span, run.session, retire),
         ],
         ignore_index=True,
     )
