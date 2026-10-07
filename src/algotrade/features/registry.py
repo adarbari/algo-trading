@@ -124,7 +124,12 @@ _BY_FIELD: dict[str, Feature] = {f.field: f for f in FEATURES.values()}
 SUPERSEDED: dict[str, Superseded] = {
     "price_stats@v1": Superseded("price_stats@v2"),
     "dividends@v1": Superseded("dividends@v2"),
-    "fundamentals@v1": Superseded("fundamentals@v2"),
+    "fundamentals@v1": Superseded("fundamentals@v3"),
+    # v3 adds shares_outstanding_year_ago; every v2 column is unchanged
+    "fundamentals@v2": Superseded("fundamentals@v3"),
+    # v2 adds the year-ago EPS TTM and the latest quarter's revenue and EPS (with the quarter a
+    # year earlier); every v1 column is unchanged
+    "financials@v1": Superseded("financials@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
     "anchored_vwap@v1": Superseded("anchored_vwap@v2"),
     # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)

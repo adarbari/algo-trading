@@ -14,10 +14,10 @@ counts:
   Alphabet). Each filing reports several periods (quarter, year to date, prior-year
   comparatives); we keep its current period: the latest ``end``, then the shortest span.
 
-and three flows (``FLOWS``), the inputs of ``financials@v1``:
+and three flows (``FLOWS``), the inputs of ``financials@v2``:
 
 - ``revenue`` (``us-gaap:Revenues``, ``RevenueFromContractWithCustomerExcludingAssessedTax``
-  and ``SalesRevenueNet``; every tag is kept in ``tag``, ``financials@v1`` ranks them in that
+  and ``SalesRevenueNet``; every tag is kept in ``tag``, ``financials@v2`` ranks them in that
   order and never subtracts across tags), ``net_income`` (``NetIncomeLoss``) in USD, and
   ``eps_diluted`` (``EarningsPerShareDiluted``) in USD per share, in ``value`` with ``unit``;
 - only periodic filings (10-K, 10-Q, 20-F, 40-F and their amendments) and only periods of a

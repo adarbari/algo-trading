@@ -66,7 +66,7 @@ const stock = {
     value('rollup.price_stats@v2.close', 74.1, 'CURRENCY'),
     value('feature.market_cap', 3.2e11, 'COMPACT', 'usd'),
     value('feature.pe_ratio', 24.3, 'NUMBER', 'ratio'),
-    value('rollup.financials@v1.revenue_ttm', 4.7e10, 'COMPACT', 'usd'),
+    value('rollup.financials@v2.revenue_ttm', 4.7e10, 'COMPACT', 'usd'),
     value('rollup.dividends@v2.last_ex_date', '2026-09-12', 'DATE'),
     {
       name: 'rollup.earnings@v1.next_earnings_date',

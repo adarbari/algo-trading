@@ -1,6 +1,8 @@
-"""``fundamentals@v2``: point in time by filing date, cover count vs weighted fallback,
-amendments, splits after the count, statuses (OK / NO_SHARES / STALE / NO_PRICE), and the
-selectable catalogue fields."""
+"""``fundamentals@v3``: point in time by filing date, cover count vs weighted fallback,
+amendments, splits after the count, statuses (OK / NO_SHARES / STALE / NO_PRICE), the count a
+year earlier (``shares_outstanding_year_ago``: the 9 to 15 month window, the same concept, point
+in time by filing date, split-adjusted), ``shares_change_yoy``, that every v2 column is
+unchanged, and the selectable catalogue fields."""
 
 from dataclasses import replace
 from datetime import date, timedelta
@@ -11,7 +13,12 @@ import pytest
 from algotrade.core.model.fields import field_source
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import catalogue_columns
-from algotrade.features.rollups.corporate.fundamentals import GROUP, FundamentalsParams, choose
+from algotrade.features.rollups.corporate.fundamentals import (
+    GROUP,
+    FundamentalsParams,
+    choose,
+    year_ago,
+)
 from algotrade.features.rollups.price import price_stats
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
@@ -143,13 +150,152 @@ def test_choose_prefers_the_cover_count_while_it_is_still_filed() -> None:
     assert choose(None).empty
 
 
+# What fundamentals@v2 computed for the facts of ``_setup`` (recorded from the v2 module before it
+# was replaced; dates as ISO strings): every v3 column that existed in v2 stays identical.
+V2_COLUMNS = (
+    "shares_outstanding", "shares_as_of", "shares_filed", "shares_source", "market_cap_status",
+)  # fmt: skip
+# fmt: off
+V2_END = {
+    "EQ:A": (2200.0, "2026-09-20", "2026-09-22", "dei", "OK"),
+    "EQ:ETF": (None, None, None, None, "NO_SHARES"),
+    "EQ:GONE": (9.0, "2026-09-02", "2026-09-07", "dei", "NO_PRICE"),
+    "EQ:OLD": (7.0, "2025-05-20", "2025-05-25", "dei", "STALE"),
+    "EQ:W": (70.0, "2026-08-23", "2026-09-12", "weighted_basic", "OK"),
+}
+
+V2_EARLY = {
+    "EQ:A": (1001.0, "2026-07-14", "2026-08-03", "dei", "OK"),
+    "EQ:ETF": (None, None, None, None, "NO_SHARES"),
+    "EQ:OLD": (7.0, "2025-05-20", "2025-05-25", "dei", "STALE"),
+    "EQ:W": (50.0, "2024-04-15", "2024-04-25", "dei", "STALE"),
+}
+
+# fmt: on
+
+
+def _recorded(rows: pd.DataFrame) -> dict[str, tuple[object, ...]]:
+    def plain(value: object) -> object:
+        if value is None or (not isinstance(value, str | date) and pd.isna(value)):
+            return None
+        return value.isoformat() if isinstance(value, date) else value
+
+    return {iid: tuple(plain(row[c]) for c in V2_COLUMNS) for iid, row in rows.iterrows()}
+
+
+def test_every_v2_column_is_unchanged() -> None:
+    reader, days = _setup()
+    earlier = days[-20]
+    out = _rows(reader, [earlier, END])
+    assert _recorded(out[END]) == V2_END
+    assert _recorded(out[earlier]) == V2_EARLY
+    assert out[END]["shares_outstanding_year_ago"].isna().all()  # no count a year back in _setup
+
+
+def _year_ago_store() -> tuple[object, list[date]]:
+    """Counts as of ``AS_OF`` (END - 90 days) with older ones at known distances before it."""
+    writer, reader = store()
+    names = ["EQ:Y", "EQ:W", "EQ:SPL", "EQ:PIT", "EQ:NEW", "EQ:OUT"]
+    days = write_bars(writer, {n: series(60, i) for i, n in enumerate(names)})
+    ago = lambda n: AS_OF - timedelta(days=n)  # noqa: E731
+    filed = lambda end: end + timedelta(days=5)  # noqa: E731
+    # The current cover counts are amended last (``choose`` takes the latest filing), after the
+    # amendments of the older counts below.
+    rows = [
+        *(fact(n, "dei", 1000.0, AS_OF, FILED) for n in ("EQ:Y", "EQ:NEW")),
+        *(
+            fact(n, "dei", 1000.0, AS_OF, END - timedelta(days=20), "10-Q/A")
+            for n in ("EQ:Y", "EQ:PIT")
+        ),
+        # Y: 700 is older than 15 months, 800 is 400 days back, 900 is 360 (closest to a year,
+        # amended to 905 later), 950 is under 9 months back
+        fact("EQ:Y", "dei", 700.0, ago(500), filed(ago(500))),
+        fact("EQ:Y", "dei", 800.0, ago(400), filed(ago(400))),
+        fact("EQ:Y", "dei", 900.0, ago(360), filed(ago(360))),
+        fact("EQ:Y", "dei", 905.0, ago(360), END - timedelta(days=30), "10-Q/A"),
+        fact("EQ:Y", "dei", 950.0, ago(200), filed(ago(200))),
+        fact("EQ:Y", "weighted_basic", 111.0, ago(365), filed(ago(365))),  # another concept
+        # W: only the weighted average is current; the cover count a year back is not used
+        fact("EQ:W", "weighted_basic", 70.0, AS_OF, FILED),
+        fact("EQ:W", "weighted_basic", 60.0, ago(366), filed(ago(366))),
+        fact("EQ:W", "dei", 999.0, ago(365), filed(ago(365))),
+        # SPL: 500 shares 440 days back, a 2:1 split 430 days back (before the 1100 count)
+        fact("EQ:SPL", "dei", 1100.0, AS_OF, FILED),
+        fact("EQ:SPL", "dei", 500.0, ago(440), filed(ago(440))),
+        # PIT: 800 is amended to 810 after the earlier session
+        fact("EQ:PIT", "dei", 1000.0, AS_OF, FILED),
+        fact("EQ:PIT", "dei", 800.0, ago(365), AS_OF - timedelta(days=360)),
+        fact("EQ:PIT", "dei", 810.0, ago(365), END - timedelta(days=30), "10-Q/A"),
+        # NEW: a recent filer; OUT: its only older count is 20 months back
+        fact("EQ:OUT", "dei", 1000.0, AS_OF, FILED),
+        fact("EQ:OUT", "dei", 600.0, ago(600), filed(ago(600))),
+    ]
+    write_facts(writer, rows)
+    write_split(writer, "EQ:SPL", ago(430), 2.0, END)
+    return reader, days
+
+
+AS_OF = END - timedelta(days=90)
+FILED = AS_OF + timedelta(days=5)
+
+
+def test_the_count_a_year_earlier_is_the_closest_one_of_the_same_kind() -> None:
+    reader, _ = _year_ago_store()
+    rows = _rows(reader, [END])[END]
+    assert rows.loc["EQ:Y", "shares_outstanding_year_ago"] == 905.0  # not 700, 800, 950, 111
+    assert rows.loc["EQ:W", "shares_outstanding_year_ago"] == 60.0  # the weighted one
+    assert rows.loc["EQ:W", "shares_source"] == "weighted_basic"
+    assert pd.isna(rows.loc["EQ:NEW", "shares_outstanding_year_ago"])  # no count a year back
+    assert pd.isna(rows.loc["EQ:OUT", "shares_outstanding_year_ago"])  # 20 months is too old
+    assert rows.loc["EQ:Y", "shares_outstanding"] == 1000.0  # the current count is unchanged
+
+
+def test_the_year_ago_count_is_split_adjusted_to_the_session() -> None:
+    """A 2:1 split between the two counts: 500 then is 1000 now, so 1100 is +10%, not +120%."""
+    reader, _ = _year_ago_store()
+    spl = _rows(reader, [END])[END].loc["EQ:SPL"]
+    assert (spl["shares_outstanding"], spl["shares_outstanding_year_ago"]) == (1100.0, 1000.0)
+
+
+def test_the_year_ago_count_is_point_in_time_by_filing_date() -> None:
+    reader, days = _year_ago_store()
+    earlier = max(d for d in days if d <= END - timedelta(days=40))  # the amendment is ahead
+    out = _rows(reader, [earlier, END])
+    assert out[earlier].loc["EQ:PIT", "shares_outstanding_year_ago"] == 800.0
+    assert out[END].loc["EQ:PIT", "shares_outstanding_year_ago"] == 810.0  # the amendment counts
+
+
+def test_year_ago_is_empty_without_facts_or_counts() -> None:
+    chosen = choose(pd.DataFrame([fact("EQ:X", "dei", 10.0, END, END)]))
+    assert year_ago(None, chosen).empty and year_ago(pd.DataFrame(), chosen).empty
+    assert year_ago(pd.DataFrame([fact("EQ:X", "dei", 10.0, END, END)]), chosen).empty
+
+
+def test_shares_change_yoy_end_to_end_on_stored_counts() -> None:
+    reader, _ = _year_ago_store()
+    out = compute_in_memory(reader, [price_stats.GROUP, GROUP], [END])
+    frames = {
+        g.table: out[g.key][0].frame.assign(session_date=END)  # type: ignore[union-attr]
+        for g in (price_stats.GROUP, GROUP)
+    }
+    fs = site_features(FileConfigStore(REPO_ROOT / "config"))
+    change = fs.evaluate(frames, ["shares_change_yoy"]).set_index("instrument_id")
+    change = change["shares_change_yoy"]
+    assert change["EQ:Y"] == pytest.approx(1000 / 905 - 1)  # dilution
+    assert change["EQ:SPL"] == pytest.approx(0.1)
+    assert change["EQ:PIT"] == pytest.approx(1000 / 810 - 1)
+    assert change["EQ:W"] == pytest.approx(70 / 60 - 1)
+    assert change[["EQ:NEW", "EQ:OUT"]].isna().all()
+
+
 def test_params_validate_and_catalogue_fields() -> None:
     with pytest.raises(ValueError, match="stale_days"):
         replace(FundamentalsParams(), stale_days=0)
-    columns = catalogue_columns()["fundamentals@v2"]
+    columns = catalogue_columns()["fundamentals@v3"]
     assert columns["shares_outstanding"] == "float32" and columns["market_cap_status"] == "str"
+    assert columns["shares_outstanding_year_ago"] == "float32"
     assert "market_cap" not in columns  # an expression feature since v2
-    assert field_source("rollup.fundamentals@v2.market_cap_status") == (
-        "rollups/instrument/fundamentals@v2",
+    assert field_source("rollup.fundamentals@v3.market_cap_status") == (
+        "rollups/instrument/fundamentals@v3",
         "market_cap_status",
     )

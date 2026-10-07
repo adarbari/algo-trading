@@ -83,7 +83,7 @@ def test_a_failed_rollup_blocks_its_dependents(monkeypatch: pytest.MonkeyPatch) 
     record = compute_rollups(task_ctx(writer, reader), END)  # type: ignore[arg-type]
     assert record.status is RunStatus.PARTIAL
     assert record.items["price_stats@v2"] == "FETCH_ERROR: boom"
-    for key in ("dividends@v2", "fundamentals@v2", "div_yield@v1", "iv30@v1", "iv_history@v2"):
+    for key in ("dividends@v2", "fundamentals@v3", "div_yield@v1", "iv30@v1", "iv_history@v2"):
         assert record.items[key] == "FAILED: not computed: price_stats@v2 failed", key
     assert record.items["earnings@v1"] == "NO_INPUT"
 
