@@ -255,9 +255,9 @@ class FeatureSet:
 
         for name in todo:
             values[name] = evaluate_formula(self.expressions[name].node, lookup, len(keys))
-        typed = pd.DataFrame({"instrument_id": keys["instrument_id"].astype(str).to_numpy()})
-        for name in names:
-            typed[name] = from_column(*lookup(name)).to_numpy()
+        built = {"instrument_id": keys["instrument_id"].astype(str).to_numpy()}
+        built.update({name: from_column(*lookup(name)).to_numpy() for name in names})
+        typed = pd.DataFrame(built)  # one build: column-by-column insertion fragments the frame
         dtypes = {n: self.expressions[n].feature.dtype for n in names}
         out = conform("expressions", typed, dtypes)
         out.insert(0, "session_date", keys["session_date"].to_numpy())
