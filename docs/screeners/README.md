@@ -7,7 +7,7 @@
 | Rule screens (`impl = "rules"`, TOML / web Builder) | engine implemented; Builder later ([ADR 0029](../adr/0029-rule-screener.md)) | any catalogue fields | [rules.md](rules.md) |
 | `breakout` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
 | `pullback` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
-| `support_reversal` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
+| `support_reversal` | implemented (rule screen, site preset v2: v1 plus option-liquidity gates, option volume soft and option tier A or B hard, for put selling) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
 | `exhaustion` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
 | `trend_continuation` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |
 | `range_breakout` | implemented (rule screen, site preset v1) | price, momentum, trend, level and relative-strength rollups | [technical.md](../data/technical.md#presets) |

@@ -12,6 +12,7 @@
 "breakout/v1.toml" = "c346fada2a8fd12a20fc27a9634be4f67c5f6d0c407efdcd9ba59d344b45517a"
 "pullback/v1.toml" = "891e587b51bb18591cbeb216cccf495debf35f6a126fd3cdc5457cda28f7c67a"
 "support_reversal/v1.toml" = "61dbbc85b7f9647ff12f43025e37ac7054ee9e1c70247efd94bd26ddb3740ca2"
+"support_reversal/v2.toml" = "59a3d43b1ea31906a7686b57585ce38742aedf43e60f24dde67cec1fafc8caba"
 "exhaustion/v1.toml" = "91365e403772d089ddcd72c25691d9a9f4ba24745c1e2a9b0e04f45a7451b83a"
 "trend_continuation/v1.toml" = "437c003641a5415bb581079cd7d6e13ae3b6a94da58d017668dca1af24c12b6b"
 "range_breakout/v1.toml" = "b05c7f9f533dec59476599d85bb202ff50b8211bc57f7fb8c2639c3bc96ccfe2"
