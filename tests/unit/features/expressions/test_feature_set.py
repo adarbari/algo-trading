@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from algotrade.config.site.settings import FeatureDefinition
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.expressions.frame import join
