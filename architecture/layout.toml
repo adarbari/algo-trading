@@ -178,6 +178,11 @@ purpose = "feature groups (rollups), one folder per kind of input (no modules of
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/activity"
+purpose = "feature groups of volatility and trading activity from daily bars (ATR and realised-vol windows and percentiles, volume averages and rank, volume at price): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/price"
 purpose = "feature groups from daily bars: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
@@ -544,6 +549,11 @@ kind = "task-domain"
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/macro"
 purpose = "macro-series tasks: the macro task (FRED / ALFRED and published economic series and index levels into macro/series, with vintages) and the rows it adds to what is stored"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/events"
+purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows)"
 kind = "task-domain"
 
 [[dir]]

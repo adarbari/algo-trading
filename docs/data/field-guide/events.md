@@ -38,6 +38,127 @@ Sources: IV ramp and crush around earnings: https://flashalpha.com/articles/iv-c
 
 Sources: Site convention over the earnings calendar and the stored chains
 
+### `rollup.dividend_schedule@v1.dividend_status`
+
+**How to read it.** Whether a next ex-dividend date is known: SCHEDULED (the source has listed an ex-dividend date after the session) or NOT_ANNOUNCED (none yet: a payer between declarations, or a name that pays nothing). The source lists a date only about 30 days ahead, so NOT_ANNOUNCED on a quarterly payer is normal for most of the quarter.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a dividend date is known | `eq "SCHEDULED"` | soft | 0 | a hard filter drops every payer between declarations; pair a known date with rollup.dividend_schedule@v1.days_to_ex_date |
+
+**When the reading lies**
+
+- NOT_ANNOUNCED is not 'no dividend soon': a payer's next ex-date is unlisted until about a month before it. For a 30 to 60 day option the dividend can fall inside the term and still be unannounced; rollup.dividends@v2.last_ex_date and div_ttm say whether the name pays at all, and the interval between last_ex_date values says when the next is due.
+- A date a later listing moved is read from the latest listing; a date withdrawn without another listed stays until it passes (an empty fetch stores nothing to say so).
+
+Sources: Site convention (the corporate-actions window, config/site/sources.toml)
+
+### `rollup.dividend_schedule@v1.next_ex_date`
+
+**How to read it.** The next ex-dividend date after the session, as the stored corporate-actions listings knew it on the session: a share bought on or after that day does not receive the dividend. A date to show next to an expiry: a short call held through it risks early assignment, a short put misses the dividend.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a known ex-dividend date | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null (NOT_ANNOUNCED) means none is listed yet, not none coming; the source lists dates about 30 days ahead only. See rollup.dividend_schedule@v1.dividend_status.
+- A declared date can move; the listing the session saw is the one shown, and the next night's can differ.
+- Special dividends count: the date can be a one-off, not the regular payment (rollup.dividends@v2.div_count_ttm says how often the name usually pays).
+
+Sources: Site convention (Massive dividends, ex_dividend_date)
+
+### `rollup.dividend_schedule@v1.next_div_amount`
+
+**How to read it.** The next dividend's cash amount per share, in today's share terms (a split since the listing divides it). $0.25 on a $100 stock is a 0.25% dividend for the period: against the call premium it is the amount an in-the-money short call is assigned early to capture. Compare with rollup.call_wing@v1.best_call_mid: a dividend larger than the call's remaining time value is the early-assignment case.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a dividend worth watching against a short call | `gte 0.25` | soft | 0.1 | - |
+
+**When the reading lies**
+
+- Per share, not a yield: divide by rollup.price_stats@v2.close, or read feature.div_yield for the trailing annual yield.
+- A declared amount can be revised before the ex-date; an irregular payer's special dividend can be many times the usual.
+- Null when no ex-date after the session is known (NOT_ANNOUNCED).
+
+Sources: Site convention; the early-exercise rule (Hull, Options, Futures and Other Derivatives: a call is exercised early just before an ex-dividend date when the dividend exceeds the time value)
+
+### `rollup.dividend_schedule@v1.days_to_ex_date`
+
+**How to read it.** Calendar days from the session to the next ex-dividend date, 1 or more (an ex-date today is not the next one). A known date is at most about 30 days out, because that is as far ahead as the source lists. 1 to 3 is the early-assignment window for a short in-the-money call; 10 to 30 is a dividend inside the term of a monthly option.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an ex-dividend date within a week (early-assignment risk for a short call) | `lte 7` | soft | 3, EVENT_RISK | - |
+
+**When the reading lies**
+
+- Calendar days, not sessions: rollup.earnings@v1.days_to_earnings counts sessions. Compare with rollup.call_wing@v1.target_dte or rollup.nearest_expiry@v1.dte, which are calendar days.
+- Null when no date is known (NOT_ANNOUNCED): a hard 'lte 5' rejects every name without a listed date; use soft with EVENT_RISK.
+
+Sources: Site convention
+
+### `rollup.dividend_schedule@v1.next_pay_date`
+
+**How to read it.** The payment date of the next dividend, which follows its ex-date by a week or two. Shown with the ex-date; it matters to a holder of the shares, not to an option holder (assignment and the dividend capture turn on the ex-date).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a payment date | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null when no ex-date is known (NOT_ANNOUNCED) and also when the source gives no payment date for a listed one: a null here with a known ex-date is a gap in the listing, not a missing dividend.
+
+Sources: Site convention
+
+### `feature.ex_div_before_expiry`
+
+**How to read it.** True when the next known ex-dividend date falls on or before the target expiry (rollup.put_wing@v1.target_expiry, the 30 to 60 day expiry both option wings use). For a short call that is the early-assignment risk: a call near the money goes through the ex-date with the dividend as the incentive to exercise first. For a short put it is a dividend the stock drops by and the seller does not collect; for a covered call the shares collect it. False is the clean case; null is not.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| no ex-dividend date before the wing's expiry | `eq false` | soft | 0, EVENT_RISK | - |
+
+**When the reading lies**
+
+- Null when no ex-date is known (the source lists dates about 30 days ahead, so for a 45 day expiry a dividend 35 days out is not listed yet) or no target expiry: an 'eq false' criterion never passes a null, so a payer whose date is unlisted is unknown, not clean. Pair with rollup.dividends@v2.last_ex_date: a quarterly payer last paid about three months ago is due.
+- Early assignment needs an in-the-money call and a dividend above its time value: an out-of-the-money covered call at 0.25 delta is rarely assigned early. rollup.call_wing@v1.best_call_delta says how near the money it is.
+- The target expiry is the put wing's: the same expiry as rollup.call_wing@v1.target_expiry unless one right has no quotes at it.
+
+Sources: Hull, Options, Futures and Other Derivatives: early exercise of American calls just before an ex-dividend date
+
+### `feature.ex_div_before_nearest_expiry`
+
+**How to read it.** True when the next known ex-dividend date falls on or before the nearest listed expiry (rollup.nearest_expiry@v1.expiry_date): a short option expiring then carries the dividend, a weekly short call most of all. The nearest-expiry counterpart of feature.ex_div_before_expiry.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| no dividend before the nearest expiry | `eq false` | soft | 0, EVENT_RISK | - |
+
+**When the reading lies**
+
+- Null when no ex-date is known or no chain is stored; the nearest expiry is often within a week, inside the 30-day window, so a payer's date is usually listed when it matters here.
+- The nearest expiry can be a weekly a few days out; for a 30 to 60 day short option read feature.ex_div_before_expiry.
+
+Sources: Site convention
+
 ### `rollup.fund_reference@v1.reference_instrument_id`
 
 **How to read it.** For a leveraged or inverse fund, the one stock it tracks (TSLL: Tesla), as an instrument id. The fund has no events of its own: its earnings, ex-dividends and big moves are its reference's, scaled by its leverage (instrument.leverage, negative for an inverse fund). Null for a fund that tracks a basket, and for every instrument that is not a leveraged or inverse fund.

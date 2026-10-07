@@ -88,6 +88,17 @@ search_lo = 0.05         # candidates for the best put: search_lo <= |our delta|
 search_hi = 0.35
 prefer_monthly = true    # standard monthlies in the window first (where OI concentrates), else any
 
+["call_wing@v1"]         # the covered-call mirror of put_wing@v1 (docs/data/technical.md);
+                         # the DTE window and delta bands are part of v1: changing them is v2
+dte_target = 45          # target expiry: the one closest to this many calendar days ...
+dte_min = 30             # ... among those dte_min..dte_max days out (ties: the earlier)
+dte_max = 60
+delta_lo = 0.15          # target band: delta_lo <= our delta <= delta_hi (edges included)
+delta_hi = 0.30          # the covered-call convention
+search_lo = 0.05         # candidates for the best call: search_lo <= our delta <= search_hi
+search_hi = 0.50
+prefer_monthly = true    # standard monthlies in the window first (where OI concentrates), else any
+
 ["market_breadth@v1"]      # the universe's breadth (ADR 0047)
 min_coverage = 0.9         # share of member stocks with a bar on the session, else every breadth column is null
 
@@ -149,5 +160,12 @@ w_runup = 50.0
 credit_boom_above = 0.10     # bank credit up more than 10% on the year
 runup_above = 0.30           # SPY up more than 30% on the year
 
-["trend_stats@v1"]        # streaks and the base length (docs/data/technical.md)
+["trend_stats@v2"]        # streaks and the base length (docs/data/technical.md)
 tight_range_pct = 0.15   # a 20-session high-low range at most this share of the close is tight
+
+["volume_profile@v1"]     # volume at price from daily bars (docs/data/technical.md)
+bins = 50                # price bins between the window's lowest low and highest high
+value_area = 0.70        # share of the volume the value area holds
+hvn_factor = 1.5         # a bin at or above this x the mean bin volume is a high-volume node
+lvn_factor = 0.5         # ... at or below this x the mean is a low-volume node
+min_bars = 240           # bars needed among the 252 sessions (else FEW_BARS)

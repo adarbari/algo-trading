@@ -32,7 +32,7 @@ computed from other columns: ``pct_from_high_52w`` / ``pct_from_low_52w`` are ex
 features (``config/site/features/price.toml``), computed on read.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -200,6 +200,22 @@ def traded_rows(
     for column in columns:
         frame[column] = values[column][traded]
     return frame
+
+
+def bars_rows(
+    inputs: Inputs,
+    session: date,
+    lookback: int,
+    stats: Callable[[Panel], Mapping[str, Matrix]],
+    columns: Iterable[str],
+) -> pd.DataFrame:
+    """The compute of a group that reads daily bars only: the panel of the session and
+    ``lookback`` earlier sessions, ``stats`` over it, one row per instrument traded on the
+    session (``traded_rows``)."""
+    bars = inputs[BARS]
+    assert bars is not None  # required input
+    px = panel(bars, sessions_ending(session, lookback + 1))
+    return traded_rows(px, stats(px), columns)
 
 
 def _complete(window: Matrix) -> npt.NDArray[np.bool_]:

@@ -26,7 +26,6 @@ instrument id belong to the task.
 """
 
 import re
-from dataclasses import dataclass
 from datetime import date
 from typing import Any, NoReturn
 
@@ -40,24 +39,14 @@ from algotrade_sources.framework.base import (
 )
 from algotrade_sources.framework.http import Http
 from algotrade_sources.framework.pages import json_documents
+from algotrade_sources.framework.series import FILING_COLUMNS, FILINGS_FRAME, FilingsRequest
 
 SOURCE = "sec_edgar"
 DATASET = "filings"
-FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding the normalised frame
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 PAGES_URL = "https://data.sec.gov/submissions/{name}"
 PAGE_NAME = re.compile(r"CIK\d{10}-submissions-\d+\.json")  # a page stays under submissions/
 FORMS = ("8-K", "8-K/A")
-FILING_COLUMNS = (
-    "cik",
-    "form",
-    "accession",
-    "filing_date",
-    "acceptance_ts",
-    "report_date",
-    "items",
-    "primary_document",
-)
 _ARRAYS = {  # our column -> the submissions array
     "form": "form",
     "accession": "accessionNumber",
@@ -67,14 +56,6 @@ _ARRAYS = {  # our column -> the submissions array
     "items": "items",
     "primary_document": "primaryDocument",
 }
-
-
-@dataclass(frozen=True, kw_only=True)
-class FilingsRequest(FetchRequest):
-    """One company's filings. ``key`` is the CIK (digits); ``since``: the earliest filing date
-    wanted (``None``: the recent block only)."""
-
-    since: date | None = None
 
 
 def filings_request(request: FetchRequest) -> FilingsRequest:

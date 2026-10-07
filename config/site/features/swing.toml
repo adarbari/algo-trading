@@ -1,6 +1,6 @@
 # Swing levels and momentum (the SW track; definitions and worked examples in
-# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1, swing_levels@v1, retest@v1 and
-# gaps@v1, computed on read. The language and the keys: docs/configuration.md "Expression features". Changing a
+# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1, swing_levels@v1, retest@v1,
+# gaps@v1, put_wing@v1 and call_wing@v1, computed on read. The language and the keys: docs/configuration.md "Expression features". Changing a
 # formula or a param: bump its version.
 
 [atr_pct]
@@ -128,7 +128,7 @@ valid_range = [0, 1]
 version = 1
 
 # Distances to the channels, the pullback in ATRs, the 52-week position, breakout and
-# breakdown rules over trend_stats@v1, and the short put's cushion above support (TA track,
+# breakdown rules over trend_stats@v2, and the short put's cushion above support (TA track,
 # docs/data/technical.md).
 
 [dist_to_high_20d]
@@ -227,4 +227,31 @@ dtype = "float"
 unit = "ratio"
 description = "The short put's cushion in ATRs: (support - the best put's strike) / atr_14, how many average days' range of technical room sit between support and the strike"
 null_meaning = "no confirmed swing low below the close, no best put, atr_14 null (fewer than 15 consecutive bars) or 0"
+version = 1
+
+[cc_resistance_cushion_atr]
+expr = "(call_wing.best_call_strike - swing_levels.swing_high) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "The covered call's cushion above resistance in ATRs: (the best call's strike - resistance) / atr_14, how many average days' range sit between the swing high and the strike (negative: the strike is below resistance)"
+null_meaning = "no confirmed swing high above the close, no best call, atr_14 null (fewer than 15 consecutive bars) or 0"
+version = 1
+
+# Volume at price (volume_profile@v1): the close against the value area and the point of control.
+
+[in_value_area]
+expr = "price_stats.close >= volume_profile.value_area_low and price_stats.close <= volume_profile.value_area_high"
+dtype = "bool"
+unit = "flag"
+description = "The close sits inside the year's value area (the price band that held 70% of the volume): fair value by volume; outside it the price is at an extreme the market has traded little"
+null_meaning = "the value area is null (profile_status not OK) and the known side does not already say false"
+version = 1
+
+[dist_to_poc]
+expr = "price_stats.close / volume_profile.poc_252d - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / the point of control - 1: how far the price sits from the year's most-traded level, 0.05 is 5% above it (the level acts as a magnet and as support when above, resistance when below)"
+null_meaning = "poc_252d is null (profile_status not OK), or no price_stats row"
+valid_range = [-1, inf]
 version = 1

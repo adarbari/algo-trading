@@ -187,3 +187,281 @@ Sources: Selling climax and buying climax (Wyckoff method): https://chartschool.
 - It counts up and down closes, not how far they moved; confirm with rollup.volume@v1.cmf_20d and rollup.price_stats@v2.ret_20d.
 
 Sources: Accumulation / distribution, StockCharts ChartSchool: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/accumulation-distribution-line
+
+### `rollup.vol_stats@v1.adv_shares_60d`
+
+**How to read it.** The average shares traded per session over the last 60 sessions (a quarter), the session included: the slow base rollup.volume@v1.adv_shares_20d is compared with (feature.volume_trend_20_60). Read it as the other averages: under 100,000 shares a day is thin, 1 to 10 million typical for an S&P 500 stock; for dollars use rollup.price_stats@v2.adv_usd_20d.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a quarterly volume average | `not_null` | hard | - | threshold feature.volume_trend_20_60 for the trend, rollup.price_stats@v2.adv_usd_20d for liquidity |
+
+**When the reading lies**
+
+- An earnings day or an index event inside the quarter lifts it for 60 sessions.
+- Null after a gap in the last 60 sessions or a shorter history.
+
+Sources: Average daily trading volume, Investopedia: https://www.investopedia.com/terms/a/averagedailytradingvolume.asp
+
+### `rollup.vol_stats@v1.volume_pctile_252d`
+
+**How to read it.** Where today's share volume sits against the name's own last year, 0 to 1: the share of the 252 sessions before today that traded less. 0.98 means only about five sessions in the year traded more (an event day); 0.50 an ordinary day; below 0.10 one of the quietest days of the year. It is rollup.momentum@v1.rel_volume ranked against the whole year instead of divided by the last month, so a busy month does not hide a busy day.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a top-of-the-year volume day | `gte 0.95` | soft | 0.03 | with rollup.trend_stats@v2.close_range_pos gte 0.7 for a strong close on it; rollup.volume@v1.volume_z_20d is the sigma version |
+| a quiet day (volume drying up) | `lte 0.15` | soft | 0.05 | for the week use rollup.volume@v1.volume_ratio_5d_20d or feature.volume_dry_up |
+
+**When the reading lies**
+
+- Quarterly expiry Fridays, index rebalances and earnings days are the top of every name's year; check rollup.earnings@v1.last_earnings_date before reading 0.98 as news.
+- The day after a split the share count doubles; the stored volume is adjusted as of the session, so the rank is right, but a threshold a user set in shares is not.
+- Null when fewer than 240 of the 252 sessions before today have a bar.
+
+Sources: Volume (finance), Wikipedia: https://en.wikipedia.org/wiki/Volume_(finance)
+
+### `feature.volume_trend_20_60`
+
+**How to read it.** The 20-session average volume over the 60-session average: above 1 activity has been building over the quarter, below 1 fading. 1.3 and above is a clear pick-up (a story is spreading, or a base is ending); 0.7 and below a name going quiet. Where rollup.volume@v1.volume_ratio_5d_20d reads the week against the month, this reads the month against the quarter.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| volume building | `gte 1.2` | soft | 0.1 | with feature.volume_bias eq ACCUMULATION for the direction of the volume |
+
+**When the reading lies**
+
+- An earnings day in the last 20 sessions lifts the numerator by a few percent for a month; check rollup.earnings@v1.last_earnings_date.
+- Null after a gap in the last 60 sessions or a shorter history, or a 60-session average of 0.
+
+Sources: O'Neil (2009), How to Make Money in Stocks: volume building before a breakout
+
+### `feature.turnover_20d`
+
+**How to read it.** Daily turnover: the 20-session average share volume as a share of the shares outstanding, 0.01 meaning 1% of the company changes hands each day (the whole float roughly every five months). Low to high: under 0.002 is a closely held or dull name; 0.005 to 0.015 is typical for an S&P 500 stock; above 0.03 is a heavily traded name (a meme stock, a fresh IPO, a takeover target). Turnover is comparable across names of every size, where share volume is not.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| actively traded relative to its float | `gte 0.01` | soft | 0.003 | a liquidity score comparable across sizes; the dollar gate is rollup.price_stats@v2.adv_usd_20d |
+
+**When the reading lies**
+
+- Shares outstanding are the company's last filed count (every quarter for a 10-Q filer, once a year for a 20-F filer), so turnover is stale by up to a year after a buyback or an offering; rollup.fundamentals@v2.market_cap_status says STALE when too old.
+- ETFs and ADRs have no filed share count here, so turnover is null for them; use rollup.price_stats@v2.adv_usd_20d.
+- Null when the 20-session average is unknown or no share count is filed.
+
+Sources: Turnover ratio (share turnover), Investopedia: https://www.investopedia.com/terms/s/shareturnover.asp
+
+### `rollup.volume_profile@v1.volume_near_close_share`
+
+**How to read it.** The share of the last year's volume that traded in price bins within one ATR of today's close: how much the market has already transacted around here. 0.05 is a thinly traded level (price moves through it easily); 0.15 to 0.25 is a well-traded zone where the name has spent weeks (a level that holds); above 0.30 the close sits in the year's main value area. It is the daily-bar profile's answer to 'is this price a level or a gap'.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| at a well-traded level (support or resistance by volume) | `gte 0.15` | soft | 0.05 | with feature.dist_to_support or feature.dist_to_resistance for the pivot the volume agrees with |
+| in thin air (little volume at this price) | `lte 0.05` | soft | 0.02 | a breakout through a thin zone runs fast: pair with feature.breakout_magnitude_20d gt 0 |
+
+**When the reading lies**
+
+- The profile spreads each day's volume evenly over its range (no intraday data), so a bin's volume is an estimate within a day's range; read the share as a zone, not a price.
+- A collapsed ATR (a pending takeover) makes the band a few cents wide and the share tiny; see the 'pending takeover' situation.
+- Null when atr_14 is unknown or the profile is not OK (fewer than 240 bars in the year, or no range).
+
+Sources: Market Profile and volume profile: Steidlmayer and Hawkins (2003), Steidlmayer on Markets; Dalton (2007), Markets in Profile
+
+### `rollup.vol_stats@v1.pocket_pivot`
+
+**How to read it.** True on a pocket pivot: the close rose and the session's volume exceeded the volume of every down-close session among the ten before it. Morales and Kacher's buy point inside a base: institutions are accumulating before the breakout, visible as an up day on more volume than any recent selling day. It fires on a few percent of sessions; the classic version also wants the close above the 10-day average and a constructive base (rollup.trend_stats@v2.tight_range_sessions, feature.pct_vs_ema_20 gt 0).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a pocket pivot buy point | `eq true` | hard | - | with feature.pct_vs_ema_20 gt 0 and rollup.trend_stats@v2.tight_range_sessions gte 10 for the base; feature.stretch_sma20_atr lte 2 against an extended one |
+
+**When the reading lies**
+
+- An earnings day or an index event is a pocket pivot by arithmetic; check rollup.earnings@v1.last_earnings_date and rollup.momentum@v1.rel_volume (a genuine one is usually 1.2 to 2 times average, not 5).
+- False when the ten sessions before had no down close at all (nothing to beat), which is rare and not a signal either way.
+- Null after a gap in the last 12 sessions.
+
+Sources: Morales and Kacher (2010), Trade Like an O'Neil Disciple: the pocket pivot
+
+### `rollup.volume_profile@v1.profile_status`
+
+**How to read it.** Whether the volume profile is computed: OK; FEW_BARS when fewer than 240 of the last 252 sessions have a bar (a young listing or a gappy name: every profile value is null); NO_RANGE when the name traded at one price all year (a halted or pinned name).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a volume profile | `eq "OK"` | hard | - | the gate for every profile level; the levels themselves are compared with rollup.price_stats@v2.close |
+
+**When the reading lies**
+
+- OK says the profile exists, not that it is sharp: each day's volume is spread over its whole range, so the bins are a day's range wide in effect. Read the levels as zones.
+
+Sources: Steidlmayer and Hawkins (2003), Steidlmayer on Markets
+
+### `rollup.volume_profile@v1.poc_252d`
+
+**How to read it.** The point of control: the price bin (one fiftieth of the year's range) where the most volume traded over the last 252 sessions, in dollars per share. It is the year's 'fair price' by participation: the level price returns to and lingers at, support when the close is above it and resistance when below. feature.dist_to_poc is the distance as a fraction.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a point of control | `not_null` | hard | - | threshold feature.dist_to_poc |
+
+**When the reading lies**
+
+- A daily-bar estimate: each day's volume is spread evenly over its range, so the point of control is a zone a bin or two wide, and a tie goes to the bin nearest the close.
+- A trending name has its point of control far behind the price (where it spent the most time): a 20% distance is normal after a strong year. Read with feature.in_value_area.
+- Null unless profile_status is OK.
+
+Sources: Steidlmayer and Hawkins (2003), Steidlmayer on Markets; Dalton (2007), Markets in Profile
+
+### `rollup.volume_profile@v1.value_area_high`
+
+**How to read it.** The top of the value area: the smallest band of price bins around the point of control that held 70% of the last year's volume, in dollars per share. Above it the price is at a level the market has traded little (an extreme by volume, where a trend either continues into thin air or returns to value); feature.in_value_area is the flag.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a value area | `not_null` | hard | - | use feature.in_value_area for the close's position |
+
+**When the reading lies**
+
+- The band is built from daily ranges, not intraday prints: a zone, not a price.
+- Null unless profile_status is OK.
+
+Sources: Dalton (2007), Markets in Profile: the value area
+
+### `rollup.volume_profile@v1.value_area_low`
+
+**How to read it.** The bottom of the value area (the band around the point of control holding 70% of the year's volume), in dollars per share: below it the price is at a volume extreme on the downside, a cheap level by participation that either holds or breaks into thin air.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a value area | `not_null` | hard | - | use feature.in_value_area for the close's position |
+
+**When the reading lies**
+
+- A zone, not a price (daily-bar profile).
+- Null unless profile_status is OK.
+
+Sources: Dalton (2007), Markets in Profile: the value area
+
+### `rollup.volume_profile@v1.hvn_above`
+
+**How to read it.** The nearest high-volume node above the close: the centre of the closest price bin above the close's bin whose volume over the year was at least 1.5 times the average bin, in dollars per share. A level where the name has traded heavily, so price tends to slow and pause there: resistance by volume, and a target for a move up.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a volume node above | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule; the pivot version is feature.dist_to_resistance |
+
+**When the reading lies**
+
+- A zone a bin or two wide (daily-bar profile), not a price.
+- Null when no such bin lies between the close and the year's high (the close is near the top of the profile), or unless profile_status is OK.
+
+Sources: Dalton (2007), Markets in Profile: high-volume nodes
+
+### `rollup.volume_profile@v1.hvn_below`
+
+**How to read it.** The nearest high-volume node below the close (a bin with at least 1.5 times the average bin volume), in dollars per share: support by volume, where buyers have shown up before, and the level a pullback tends to stop at.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a volume node below | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule; the pivot version is feature.dist_to_support |
+
+**When the reading lies**
+
+- A zone, not a price (daily-bar profile).
+- Null when no such bin lies between the close and the year's low, or unless profile_status is OK.
+
+Sources: Dalton (2007), Markets in Profile: high-volume nodes
+
+### `rollup.volume_profile@v1.lvn_above`
+
+**How to read it.** The nearest low-volume node above the close: the closest bin above with at most half the average bin volume, in dollars per share. A price the market rejected quickly, so a move into it tends to continue through it (thin air): the breakout screens like a close just under a low-volume node with a high-volume node further up as the target.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a low-volume node above | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- A zone, not a price (daily-bar profile).
+- Null when no such bin lies between the close and the year's high, or unless profile_status is OK.
+
+Sources: Dalton (2007), Markets in Profile: low-volume nodes
+
+### `rollup.volume_profile@v1.lvn_below`
+
+**How to read it.** The nearest low-volume node below the close (a bin with at most half the average bin volume), in dollars per share: thin air on the downside, where a breakdown accelerates until the next high-volume node.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a low-volume node below | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- A zone, not a price (daily-bar profile).
+- Null when no such bin lies between the close and the year's low, or unless profile_status is OK.
+
+Sources: Dalton (2007), Markets in Profile: low-volume nodes
+
+### `feature.in_value_area`
+
+**How to read it.** True when the close sits inside the last year's value area, the price band that held 70% of the volume: fair value by participation, where price tends to rotate. False means the close is at a volume extreme: above the value area a trend is being accepted at new prices (or will return to value), below it the name is cheap by the year's participation (or breaking down). Dalton's rule of thumb: an open outside value that fails to hold returns to the point of control.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| trading at a volume extreme (outside value) | `eq false` | hard | - | with feature.dist_to_poc gt 0 for above value, lt 0 for below |
+
+**When the reading lies**
+
+- The value area is built from daily ranges (no intraday data) and is a year wide, so a trending name leaves it for months; pair with feature.trend_state before reading 'outside value' as a reversal.
+- Null when the value area is unknown (profile_status not OK) and the known side does not already say false.
+
+Sources: Dalton (2007), Markets in Profile
+
+### `feature.dist_to_poc`
+
+**How to read it.** Close over the year's point of control minus one: 0.05 means the price sits 5% above the most-traded level of the year, -0.10 ten percent below it. Near 0 the name is at its volume magnet (expect rotation); far above after a strong year the point of control is the support a deep pullback would find; far below it is the overhead supply.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| near the point of control | `between [-0.03, 0.03]` | soft | 0.02 | with feature.in_value_area eq true; a mean-reversion zone |
+
+**When the reading lies**
+
+- A daily-bar estimate of the level, a bin or two wide.
+- Null unless profile_status is OK.
+
+Sources: Dalton (2007), Markets in Profile

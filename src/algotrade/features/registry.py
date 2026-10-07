@@ -24,7 +24,9 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
+from algotrade.features.rollups.activity import vol_stats, volume_profile
 from algotrade.features.rollups.corporate import (
+    dividend_schedule,
     dividends,
     earnings,
     earnings_schedule,
@@ -41,6 +43,7 @@ from algotrade.features.rollups.market import (
     trend,
 )
 from algotrade.features.rollups.options import (
+    call_wing,
     ibkr_iv,
     iv30,
     iv_history,
@@ -73,17 +76,21 @@ GROUPS: dict[str, FeatureGroup] = {
             earnings.GROUP,
             earnings_schedule.GROUP,
             dividends.GROUP,
+            dividend_schedule.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
             fundamentals.GROUP,
             financials.GROUP,
             put_wing.GROUP,
+            call_wing.GROUP,
             price_moves.GROUP,
             momentum.GROUP,
             volume.GROUP,
             bands.GROUP,
             trend_stats.GROUP,
+            vol_stats.GROUP,
+            volume_profile.GROUP,
             swing_levels.GROUP,
             pivot_strength.GROUP,
             retest.GROUP,
@@ -103,7 +110,8 @@ GROUPS: dict[str, FeatureGroup] = {
             regime.GROUP,
             fund_reference.GROUP,
         ),
-        # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
+        # iv30@v1, put_wing@v1 and call_wing@v1 read the materialised div_yield@v1 (FeatureSet
+        # orders it)
         stored_ok=True,
     )
 }
@@ -116,6 +124,10 @@ SUPERSEDED: dict[str, Superseded] = {
     "dividends@v1": Superseded("dividends@v2"),
     "fundamentals@v1": Superseded("fundamentals@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
+    "anchored_vwap@v1": Superseded("anchored_vwap@v2"),
+    # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)
+    "bands@v1": Superseded("bands@v2"),
+    "trend_stats@v1": Superseded("trend_stats@v2"),
     # Its rows were price_stats rows; the class and option tier are expression features now.
     "liquidity_class@v1": Superseded(
         "price_stats@v2", {"chain_oi": "feature.option_chain_oi", "rule_hash": ""}
