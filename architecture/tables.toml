@@ -152,6 +152,18 @@ name = "rollups/instrument/put_wing@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/chain_flow@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/flow_history@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/implied_move@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/price_moves@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 

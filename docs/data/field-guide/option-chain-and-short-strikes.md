@@ -541,3 +541,287 @@ Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
 - A high count with a low rollup.option_liquidity@v1.call_zone_oi can be a feed gap rather than an empty zone.
 
 Sources: Site convention
+
+### `rollup.chain_flow@v1.flow_status`
+
+**How to read it.** Whether the session has option quotes for the name: OK (the flow columns have values) or NO_CHAIN (the name was quoted but no standard-series option quote was stored, e.g. a fetch failure or only adjusted series). Every flow column is null on NO_CHAIN.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a chain was stored for the session | `eq "OK"` | hard | - | - |
+
+**When the reading lies**
+
+- NO_CHAIN is about the stored session, not the name: the same name is usually OK the next session. rollup.option_liquidity@v1.liq_status says why the chain is missing.
+- Chains are stored nightly from 2026-10-02 only: a session before that has no row at all, which is not NO_CHAIN.
+
+Sources: Site convention (features/rollups/positioning/chain_flow.py)
+
+### `rollup.chain_flow@v1.call_volume`
+
+**How to read it.** Call contracts traded on the session across every stored expiry, including the one expiring that day. Hundreds is a quiet name, thousands is active, hundreds of thousands is a mega-cap or an index ETF. One contract is 100 shares.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| calls that trade every day | `gte 500` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- One day: an earnings week, an expiry Friday or one block trade multiplies it. Compare with the name's own history (rollup.flow_history@v1.option_volume_rel_20d), not another name's.
+- Volume does not say direction or intent: a call bought to open and a call sold to close both add to it. rollup.chain_flow@v1.unusual_contracts is the better 'something happened' signal.
+- Same-day-expiry volume is included (it traded); rollup.chain_flow@v1.next_exp_call_volume is the first expiry that is still alive.
+
+Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
+
+### `rollup.chain_flow@v1.put_volume`
+
+**How to read it.** Put contracts traded on the session across every stored expiry, including the one expiring that day. The put-side twin of rollup.chain_flow@v1.call_volume; the pair is the numerator and denominator of feature.put_call_volume_ratio.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| puts that trade every day | `gte 500` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- Puts are bought for protection and sold for income, so heavy put volume is not bearish by itself: a name where holders hedge or premium sellers write puts prints both. Read it with rollup.chain_flow@v1.unusual_contracts and the price trend (feature.trend_state).
+- Same-day-expiry volume is included; rollup.chain_flow@v1.next_exp_put_volume is the first expiry still alive.
+
+Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
+
+### `rollup.chain_flow@v1.call_oi`
+
+**How to read it.** Call open interest across the expiries one or more days out: how many call contracts are standing at the close, as OCC counts them (the figure is as of the previous close). Thousands is a normal listed name, hundreds of thousands a heavily traded one. Contracts expiring on the session are left out: they are gone.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a call book with depth | `gte 5000` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- Open interest says how many contracts exist, not who holds them: a covered-call overwrite and a speculative call buy look the same. Do not read it as bullish.
+- LEAPS and far-dated strikes inflate it for large caps; for the strikes you trade use rollup.put_wing@v1.wing_oi or rollup.oi_walls@v1.call_wall_oi.
+- It differs from rollup.option_liquidity@v1.chain_oi, which counts both rights and the contracts expiring today.
+
+Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
+
+### `rollup.chain_flow@v1.put_oi`
+
+**How to read it.** Put open interest across the expiries one or more days out: the standing put contracts at the close (OCC figure, as of the previous close). The put-side twin of rollup.chain_flow@v1.call_oi; their quotient is feature.put_call_oi_ratio.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a put book with depth | `gte 5000` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- Protective puts, put writing and spreads all count the same; it is not a bearish bet by itself. A put wall (rollup.oi_walls@v1.put_wall) shows where the puts concentrate.
+- Index and ETF names carry large put open interest for portfolio hedges that has nothing to do with the name's outlook.
+
+Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
+
+### `rollup.chain_flow@v1.next_exp_call_volume`
+
+**How to read it.** Call contracts traded on the session at the next expiry: the first listed expiry one or more days out, weeklies included, so on most liquid names it is this week's or tomorrow's series. It shows what traders do in the series about to expire.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the front series trades | `gte 200` | soft | 0.5 x the threshold | - |
+
+**When the reading lies**
+
+- The next expiry is days away for names with weeklies and weeks away for names with monthlies only, so the same number means different things; check rollup.nearest_expiry@v1.dte.
+- Short-dated volume spikes into events (earnings) and on expiry weeks; read it against rollup.flow_history@v1.option_volume_rel_20d.
+- Null when no expiry is one or more days out, or on NO_CHAIN.
+
+Sources: Site convention (features/rollups/positioning/chain_flow.py)
+
+### `rollup.chain_flow@v1.next_exp_put_volume`
+
+**How to read it.** Put contracts traded on the session at the next expiry (the first listed expiry one or more days out). The put-side twin of rollup.chain_flow@v1.next_exp_call_volume.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the front series trades | `gte 200` | soft | 0.5 x the threshold | - |
+
+**When the reading lies**
+
+- Short-dated puts are bought into events and sold by premium collectors; the volume alone does not say which. Read it with rollup.chain_flow@v1.unusual_contracts.
+- Null when no expiry is one or more days out, or on NO_CHAIN.
+
+Sources: Site convention (features/rollups/positioning/chain_flow.py)
+
+### `rollup.chain_flow@v1.unusual_contracts`
+
+**How to read it.** How many contracts (one or more days out) traded more than their open interest AND at least 500 contracts on the session: 0 is an ordinary day, 1 or 2 means a strike saw fresh positions far beyond what stood before, many means a broad event. It is the first screen for 'unusual options activity'.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| unusual options activity today | `gte 1` | hard | - | rank the survivors by rollup.chain_flow@v1.unusual_premium_usd; direction is not in this field |
+
+**When the reading lies**
+
+- Volume above open interest can be one fund opening a position, a spread leg, a roll between expiries or a hedge, not a view; the count says where to look, not what it means. Read the strikes on a live chain.
+- A newly listed series has open interest near 0, so its first busy day always qualifies; rollup.chain_flow@v1.max_vol_oi_ratio then reads very high on small open interest, so pair it with rollup.chain_flow@v1.unusual_premium_usd for size.
+- Contracts that expire on the session are left out (their open interest is at the snapshot, not an opening position).
+- Direction is not in the count: calls and puts both count. feature.put_call_volume_ratio is a first look at the skew of the day's trading.
+
+Sources: Barchart unusual options activity (volume to open interest above 1): https://www.barchart.com/options/unusual-activity/stocks
+
+### `rollup.chain_flow@v1.max_vol_oi_ratio`
+
+**How to read it.** The largest volume over open interest among contracts (one or more days out) with open interest of at least 1 and volume of at least 500: 1 means the day's volume equals what stood before, 3 or more is heavy fresh trading in one contract, 10 or more is extreme.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a contract trading several times its open interest | `gte 3` | soft | 1 | with rollup.chain_flow@v1.unusual_premium_usd gte 100000 so it is not a handful of cheap contracts |
+
+**When the reading lies**
+
+- Small open interest makes the ratio huge for no reason (50 contracts open, 600 traded is 12): read the size in rollup.chain_flow@v1.unusual_premium_usd.
+- A roll or a spread leg raises the ratio without a view. It is about one contract, not the whole chain (rollup.chain_flow@v1.unusual_contracts counts them).
+- Null when no contract has open interest of at least 1 and volume of at least 500, which is most names on most days: a hard criterion drops them, which is usually what a screen for unusual activity wants.
+
+Sources: Barchart unusual options activity (volume to open interest above 1): https://www.barchart.com/options/unusual-activity/stocks
+
+### `rollup.chain_flow@v1.unusual_premium_usd`
+
+**How to read it.** The premium paid across the unusual contracts, in dollars: volume x mid x 100 summed over those that traded above their open interest and at least 500 contracts, on the stored two-sided quote. A few thousand is small, hundreds of thousands is a notable trade, millions is large.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a trade worth looking at | `gte 1000000` | score | 0.5 x the threshold | ranks the larger days; the gate is rollup.chain_flow@v1.unusual_contracts gte 1 |
+
+**When the reading lies**
+
+- The mid is the end-of-day quote, not the prices the trades printed at: a trade filled at the ask is understated, one at the bid overstated; a deep out-of-the-money contract at 0.05 adds little however many trade. Read it as size, not as cost.
+- Contracts without a two-sided quote add nothing, so a chain with only one-sided unusual contracts is null while rollup.chain_flow@v1.unusual_contracts is above 0.
+- Premium does not say who paid it: a call sold to open is premium received. Direction is not in this field.
+
+Sources: Site convention (features/rollups/positioning/chain_flow.py)
+
+### `rollup.flow_history@v1.option_volume_rel_20d`
+
+**How to read it.** Today's call plus put volume divided by the mean daily volume of the earlier sessions among the last 20 that have chain flow: 1 is a usual day, 2 is twice the usual option volume, 0.5 half. The option-market version of relative volume.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| option volume well above its usual | `gte 2` | soft | 0.5 | with rollup.flow_history@v1.flow_history_days gte 10 stated, so a young history is not silently dropped |
+
+**When the reading lies**
+
+- Null until 10 of the last 20 sessions have chain flow: chains are stored nightly from 2026-10-02 only, so most names read null until mid-October 2026 and a hard criterion rejects everything before that.
+- Expiry weeks and earnings weeks are busier than a plain 20-session mean: a 1.5 in an earnings week is ordinary. Check rollup.earnings@v1.next_earnings_date and rollup.nearest_expiry@v1.dte.
+- A window with gaps (missed nights) averages fewer sessions; rollup.flow_history@v1.flow_history_days says how many.
+
+Sources: Site convention (features/rollups/positioning/flow_history.py)
+
+### `rollup.flow_history@v1.pc_volume_ratio_20d`
+
+**How to read it.** Put volume over call volume summed across the last 20 sessions that have chain flow, today included: above 1 the month's trading was put-heavy, below 0.5 call-heavy. Single stocks usually sit between 0.3 and 0.8, ETFs and indices above 1; compare a name with its own history.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a put-heavy month | `gte 1` | soft | 0.2 | - |
+
+**When the reading lies**
+
+- Null until 10 of the last 20 sessions have chain flow (chains are stored nightly from 2026-10-02 only), or when the window has no call volume.
+- A put-heavy month on an ETF is hedging, not bearishness; on a single name puts are also sold for income. It describes trading, not positions: feature.put_call_oi_ratio is the standing book.
+
+Sources: Site convention (features/rollups/positioning/flow_history.py)
+
+### `rollup.flow_history@v1.flow_history_days`
+
+**How to read it.** How many of the last 20 sessions have chain flow volume, today included, 0 to 20. The two flow_history ratios need 10; 20 is a full window. Chains are stored nightly from 2026-10-02 only, so every name starts at 1 and the ratios appear about two weeks later.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| enough history for the flow ratios | `gte 10` | hard | - | - |
+
+**When the reading lies**
+
+- A name that fell out of the chain store for a few nights counts fewer sessions without being new; the ratios then rest on a thinner window.
+
+Sources: Site convention (features/rollups/positioning/flow_history.py)
+
+### `feature.put_call_oi_ratio`
+
+**How to read it.** Put open interest over call open interest across the expiries one or more days out: 1 is balance, above 1 the standing book is put-heavy, below 1 call-heavy. Single stocks usually sit between 0.4 and 1.0 (more calls than puts); ETFs and indices run above 1.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a put-heavy book | `gte 1.2` | soft | 0.2 | a context filter, not a signal; with feature.trend_state to know whether the puts are hedges |
+| a call-heavy book | `lte 0.6` | soft | 0.1 | - |
+
+**When the reading lies**
+
+- It counts contracts, not who is long: puts are held for protection and written for income, calls are overwritten by holders. A high ratio on a stock owned by funds is often hedging, not a bearish bet. Read it with the trend (feature.trend_state).
+- Null when there are no calls (a zero denominator is null, never infinity) or no chain. Compare with the name's own range, not another's.
+- It is the stock of positions; feature.put_call_volume_ratio is the day's flow.
+
+Sources: Cboe put/call ratio, a contrarian sentiment gauge: https://www.cboe.com/us/options/market_statistics/
+
+### `feature.put_call_volume_ratio`
+
+**How to read it.** Put volume over call volume on the session, every expiry: 1 is balance, above 1 the day's trading was put-heavy, below 1 call-heavy. Single stocks usually print 0.3 to 0.8; a day above 1 stands out. A put/call ratio of tiny counts is noise: a floor on rollup.chain_flow@v1.call_volume goes with it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| put-heavy trading today | `gte 1` | soft | 0.2 | with rollup.chain_flow@v1.call_volume gte 500 so it is not a ratio of a few contracts |
+| call-heavy trading today | `lte 0.5` | soft | 0.1 | - |
+
+**When the reading lies**
+
+- One day's ratio is noisy; rollup.flow_history@v1.pc_volume_ratio_20d is the 20-session version. A single large trade flips a thin name.
+- Puts and calls trade for hedging, income and speculation alike; the ratio does not say who benefits. Extreme readings are used as a contrarian gauge, which is a trader's convention, not a rule.
+- Null when there is no call volume (never infinity) or no chain; a name with 1,200 puts and no calls is null, not 'infinitely bearish'.
+
+Sources: Cboe put/call ratio, a contrarian sentiment gauge: https://www.cboe.com/us/options/market_statistics/
+
+### `feature.option_volume_oi_ratio`
+
+**How to read it.** Option volume traded on the session over the open interest across the expiries one or more days out: how much of the standing positions turned over, 0.1 is 10%. A usual day is under 0.2; above 0.5 is heavy trading relative to what stands; above 1 is rare and usually an expiry week or an event.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| heavy option trading against what stands | `gte 0.5` | soft | 0.1 | - |
+
+**When the reading lies**
+
+- Same-day-expiry volume is in the numerator but its open interest is not in the denominator, so a name with heavy 0-DTE trading (SPY, QQQ, mega-caps) reads high every day; compare a name with itself.
+- It is a turnover ratio over the whole chain; one contract far above its open interest is rollup.chain_flow@v1.max_vol_oi_ratio.
+- Null on NO_CHAIN or when there is no open interest.
+
+Sources: Site convention

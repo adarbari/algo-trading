@@ -57,6 +57,18 @@ stale_days = 480         # the oldest TTM period ended longer ago than this: STA
                          # a 10-K-only or 20-F filer is up to ~15 months behind just before its next annual report
 history_days = 1100      # facts whose period ended earlier are not read (two TTMs need ~2.3 years)
 
+["chain_flow@v1"]         # option flow and unusual activity (docs/data/positioning.md OP2)
+min_unusual_volume = 500 # a contract is unusual when its volume is above its open interest and at least this
+
+["flow_history@v1"]       # option volume against chain_flow@v1's last sessions (the column names carry 20)
+window = 20              # sessions, today included
+min_sessions = 10        # sessions with chain flow before the ratios are shown
+
+["implied_move@v1"]       # the straddle's implied move (docs/data/positioning.md OP4)
+max_dte = 60             # the furthest expiry read, calendar days
+target_dte = 30          # the term expiry: the listed one nearest this many days out
+max_spread_pct = 0.35    # a straddle leg's (ask - bid) / mid must be within this
+
 ["put_wing@v1"]          # the VRP scanner's short-put wing (docs/screeners/vrp-scanner.md);
                          # the DTE window and delta bands are part of v1: changing them is v2
 dte_target = 45          # target expiry: the one closest to this many calendar days ...

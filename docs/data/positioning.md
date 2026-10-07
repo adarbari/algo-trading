@@ -6,10 +6,14 @@ skew and the implied move, all computed nightly from the stored Cboe chains. Dec
 [ADR 0023](../adr/0023-feature-store.md), [features.md](features.md); pricing conventions:
 [ADR 0021](../adr/0021-option-pricing-conventions.md).
 
-**Status: parked (2026-10-04); the roadmap schedules the smaller SW track instead.** Draft, kept for later. Every choice marked **Proposed** is a
-recommendation the owner confirms or changes before OP1 code starts. Once confirmed, the
-Proposed markers go and this page becomes the spec the group docstrings point to; the
-generated catalogue (`features.md`) then carries the per-feature text.
+**Status: partly built (2026-10-06, owner request).** OP2 (`chain_flow@v1`, `flow_history@v1`)
+and OP4 (`implied_move@v1`) are built, in `src/algotrade/features/rollups/positioning/`; the
+owner's request for the options-strategy parameters settled every **Proposed** item they use
+(marked **Decided**; each deviation from the text is listed under the group). OP3 is next. OP1
+(GEX / DEX) stays parked on the P1 dealer-sign decision. What is still marked **Proposed**
+(per-contract IV, the dealer sign, dollar scaling, OP1 and OP3 details, `prev_close`) is a
+recommendation the owner confirms or changes before that code starts. The generated catalogue
+(`features.md`) carries the per-feature text of what is built.
 
 ## What these numbers are, and are not
 
@@ -79,7 +83,7 @@ as `iv30@v1` and `put_wing@v1` read them today. One row per underlying with a ch
 underlying quote on the session. Licence `open` for every feature here (computed by us from the
 Cboe feed and bars).
 
-**Spot (Proposed).** `S0 = chains/underlying_quotes.close` when positive, else `.price`, else
+**Spot (Decided 2026-10-06; built in `positioning/chain_inputs.py`).** `S0 = chains/underlying_quotes.close` when positive, else `.price`, else
 NO_SPOT. Alternative: `.price`, as `iv30` and `put_wing` use. Reason: on 2026-10-02 the feed's
 `price` matched the session's bar close for only 71% of names (it carries after-hours trades),
 `close` matched for 97%, and option quotes are closing quotes. Mixing an after-hours spot with
@@ -93,7 +97,7 @@ trace). Cash-settled index options (SPX, NDX, RUT) are outside the universe (ADR
 their PM-settled weekly roots (SPXW) would be non-standard anyway: index positioning shows
 through the ETFs (SPY, QQQ, IWM). ETFs are treated exactly like stocks.
 
-**Expiries (Proposed).** Every stored expiry with `dte >= 1`, where `dte = expiry - session`
+**Expiries (Decided 2026-10-06 for OP2 and OP4).** Every stored expiry with `dte >= 1`, where `dte = expiry - session`
 in calendar days. `dte = 0` contracts expired at the snapshot (the feed still lists them:
 71k of 1.52M rows on 2026-10-02) and are excluded from exposures and OI, but their volume
 counts (it traded that day). Alternative: the roadmap's 0..60 days. Reason: on 2026-10-02 only
@@ -101,7 +105,7 @@ counts (it traded that day). Alternative: the roadmap's 0..60 days. Reason: on 2
 on names with large LEAPS open interest. The cap stays a parameter (`max_dte`, unset) so a
 later version can apply one.
 
-**Next expiry (Proposed).** The first listed expiry with `dte >= 1`, weeklies and dailies
+**Next expiry (Decided 2026-10-06; OP2).** The first listed expiry with `dte >= 1`, weeklies and dailies
 included. Alternative: the first standard monthly. Reason: on names with weeklies the nearest
 weekly holds most of the short-dated gamma, and that is what "next expiry" means on a panel.
 For a name with monthlies only, both rules agree.
@@ -276,9 +280,10 @@ own "Options Impact" is proprietary; this is our documented proxy, not a replica
   10,979,387 vs 30d 42,398,994, `top_delta_expiry` = 30d.
 - With `adv_usd_20d = 500,000,000`: `options_impact = 8,440,304 / 5e8 = 0.0169`.
 
-## OP2: `chain_flow@v1` (kind `chain`) and the ratios
+## OP2: `chain_flow@v1` (kind `chain`) and the ratios (built)
 
-Inputs: the session's `chains/option_quotes` only (no spot, no pricing). Volume counts every
+Inputs: the session's `chains/option_quotes` (no spot, no pricing) and, optionally,
+`chains/underlying_quotes`, only so that a name quoted without a chain reads NO_CHAIN. Volume counts every
 stored contract including `dte = 0`; OI counts `dte >= 1` (see [Shared rules](#shared-rules-every-op-group)).
 "Next expiry" is the same rule as `gex.next_expiry`.
 
@@ -296,21 +301,50 @@ stored contract including `dte = 0`; OI counts `dte >= 1` (see [Shared rules](#s
 for the liquidity tiers, with `dte = 0` OI included); these columns split by right and follow
 the positioning rules.
 
-**Ratios (Proposed), expression features** in `config/site/features/positioning.toml`, all
-**put over call** in absolute terms (above 1 = put-heavy), unit `ratio`, range `>= 0`, null
-when the denominator is 0 or either side is null (never 0, never infinity):
+**Unusual activity (built, added by the owner's survey of other screeners).** Three more
+columns of `chain_flow@v1`, over contracts with `dte >= 1` (they compare volume with open
+interest, so they follow the open-interest rule; a 0-DTE contract is left out). `min_unusual_volume`
+(500) is a param.
+
+| Feature | Kind | Type | Unit | Valid | Formula | Null when |
+|---|---|---|---|---|---|---|
+| `unusual_contracts` | chain | int | count | >= 0 | contracts with `volume > open_interest` and `volume >= min_unusual_volume` | NO_CHAIN (0 when none) |
+| `max_vol_oi_ratio` | chain | float32 | ratio | >= 0 | the largest `volume / open_interest` among contracts with `open_interest >= 1` and `volume >= min_unusual_volume` | NO_CHAIN, or no such contract |
+| `unusual_premium_usd` | chain | float32 | usd | >= 0 | sum over the unusual contracts of `volume x mid x 100`, two-sided quotes only | NO_CHAIN, or no unusual contract has a two-sided quote |
+
+**Ratios (Decided), expression features** in `config/site/features/positioning.toml`, all
+**put over call**, unit `ratio`, range `>= 0`, null when the denominator is 0 or either side is
+null (never 0, never infinity; division by zero is null in the expression language):
 
 | Feature | Expression |
 |---|---|
-| `put_call_oi_ratio` | `if(chain_flow.call_oi > 0, chain_flow.put_oi / chain_flow.call_oi, null)` |
-| `volume_ratio` | `if(chain_flow.call_volume > 0, chain_flow.put_volume / chain_flow.call_volume, null)` |
-| `gamma_ratio` | `if(gex.gex_call > 0, abs(gex.gex_put) / gex.gex_call, null)` |
-| `delta_ratio` | `if(gex.dex_call > 0, abs(gex.dex_put) / gex.dex_call, null)` |
+| `put_call_oi_ratio` | `chain_flow.put_oi / chain_flow.call_oi` (above 1 = put-heavy) |
+| `put_call_volume_ratio` (the "Volume Ratio") | `chain_flow.put_volume / chain_flow.call_volume` |
+| `option_volume_oi_ratio` | `(call_volume + put_volume) / (call_oi + put_oi)`: option volume traded over the open interest (0-DTE volume is in the numerator only) |
+| `gamma_ratio` | `if(gex.gex_call > 0, abs(gex.gex_put) / gex.gex_call, null)` (OP1, not built) |
+| `delta_ratio` | `if(gex.dex_call > 0, abs(gex.dex_put) / gex.dex_call, null)` (OP1, not built) |
 
-Alternative for `volume_ratio`: total option volume / stock volume ([Q4](#open-questions-for-the-owner)).
+`volume_ratio` is named `put_call_volume_ratio`. The alternative (total option volume over
+stock volume, [Q4](#open-questions-for-the-owner)) is not built.
 Worked example (OP1 numbers): `gamma_ratio = 4,277,562 / 4,162,742 = 1.028`,
 `delta_ratio = 24,927,372 / 28,451,009 = 0.876`. A name with 1,200 put and 0 call volume has a
-null `volume_ratio`, not infinity.
+null `put_call_volume_ratio`, not infinity.
+
+**`flow_history@v1` (kind `window`, built).** A window over `chain_flow@v1` rows (the
+`iv_history@v2` pattern): lookback 20 sessions (`window`), `min_sessions` 10, both in
+`rollups.toml`. A session counts when its `chain_flow@v1` row has volume (`flow_status` OK).
+
+| Feature | Type | Unit | Valid | Formula | Null when |
+|---|---|---|---|---|---|
+| `option_volume_rel_20d` | float32 | ratio | >= 0 | today's call + put volume / the mean total volume of the window's earlier sessions with a row | no row with volume today, fewer than `min_sessions` sessions with a row (today included), or that mean is 0 |
+| `pc_volume_ratio_20d` | float32 | ratio | >= 0 | put volume / call volume summed over the window's sessions with a row, today included | the same, or no call volume |
+| `flow_history_days` | int | sessions | 0 .. 20 | sessions of the window with a row, today included | never |
+
+Chains are stored nightly from 2026-10-02 only, so most names read null until mid-October 2026.
+
+**Deviations (OP2).** (1) `underlying_quotes` is an optional second input (NO_CHAIN would
+otherwise be unreachable). (2) The unusual columns leave out `dte = 0` contracts. (3) A
+`chain_flow@v1` row without volume (NO_CHAIN) is not a session "with a row" for `flow_history@v1`.
 
 ## OP3: `skew@v1` (kind `chain`) and `skew_history@v1` (kind `window`)
 
@@ -378,12 +412,12 @@ skew, min 0.10, max 0.30, today 0.25: rank 0.75, PROVISIONAL. "Backfill" means r
 UNKNOWN until about the end of 2026 and FULL around October 2027. No outside source has
 per-name skew history for free.
 
-## OP4: `implied_move@v1` (kind `chain`)
+## OP4: `implied_move@v1` (kind `chain`) (built)
 
 Inputs: the shared chain inputs plus `earnings@v1` for the session. Params: `max_dte` (60),
 `target_dte` (30), `max_spread_pct` (0.35).
 
-**Expiry (Proposed).** If `next_earnings_date` is known and the first expiry covering it is
+**Expiry (Decided 2026-10-06).** If `next_earnings_date` is known and the first expiry covering it is
 within `max_dte`: that expiry (`move_basis = EARNINGS`). An expiry covers a report on date D
 if it is after D, or on D when `earnings_time = pre`; `post` or `unknown` needs an expiry
 after D. Otherwise the listed expiry nearest `target_dte` among 7..`max_dte` days (ties: the
@@ -391,7 +425,7 @@ earlier; `move_basis = TERM`). Alternative: always the next expiry. Reason: the 
 is read as "what the market prices into the next event", and the earnings straddle is the
 standard way to read that.
 
-**Formula (Proposed).** At that expiry, the straddle mid `C(K) + P(K)` at the two listed
+**Formula (Decided 2026-10-06).** At that expiry, the straddle mid `C(K) + P(K)` at the two listed
 strikes bracketing `S0` (both legs two-sided with spread <= `max_spread_pct`), interpolated
 linearly in strike to `S0` (one usable strike: its straddle). Then
 `implied_move = straddle / S0`. No 0.85 factor. Reason: the ATM straddle already prices the
@@ -408,6 +442,24 @@ fixed basis. A one-standard-deviation move, if wanted, is the expression
 | `move_expiry` | chain | date | date | | NO_SPOT, NO_CHAIN, NO_EXPIRY |
 | `move_dte` | chain | int | days | >= 1 | same |
 | `move_basis` | label | str | category | EARNINGS, TERM | same |
+
+Spot is the shared rule (`close`, else `price`). The group reads `earnings@v1`'s
+`next_earnings_date` and `earnings_time` for the session.
+
+Expression features (`config/site/features/positioning.toml`): `implied_move_1sd` =
+`implied_move x 1.2533` (`params.sd_factor`); `implied_move_vs_hv` = `implied_move /
+(price_stats.hv20 x sqrt(move_dte / 365))`, how much more the straddle prices than recent
+realised movement would (null when either is null or `hv20` is 0); and over `put_wing@v1`, the
+short put's `put_otm_pct` = `(close - best_put_strike) / close`, `put_breakeven` =
+`best_put_strike - best_put_mid` and `put_roc_annualised` = `best_put_roc x 365 / target_dte`.
+
+**Deviations (OP4).** (1) A report dated the session itself with time `pre` is already in the
+session's close, so it is not ahead: the term expiry is used (a `post` or `unknown` report on the
+session is ahead, covered by an expiry after it). (2) A listed strike on only one side of `S0`
+(`S0` outside the listed strikes) is not a bracket: NO_QUOTES, not a deep in- or out-of-the-money
+straddle read as at the money. (3) The term expiry's 7-day floor is a constant of the definition
+(`MIN_TERM_DTE`), not a param. (4) "WIDE_SPREADS" and "NO_QUOTES" are decided per strike pair
+exactly like `iv30`: WIDE_SPREADS when some strike has both legs two-sided but none is tight.
 
 Worked example: `S0 = 101`; strike 100: call 3.60 + put 2.50 = 6.10; strike 105: 1.40 + 5.30
 = 6.70; at 101: `6.10 + (6.70 - 6.10) x 1/5 = 6.22`; `implied_move = 6.22 / 101 = 0.0616`
@@ -448,8 +500,9 @@ and Parquet size per new table, and the backfill time per stored chain session.
 
 ## Implementation notes (for OP1 to OP4, not decisions)
 
-- `src/algotrade/features/rollups/` is split by kind (`price/`, `options/`, `corporate/`); OP
-  groups go in `options/`, which has room under the 10-module cap.
+- `src/algotrade/features/rollups/` is split by kind (`price/`, `options/`, `corporate/`,
+  `positioning/`); the OP groups live in `positioning/` (`options/` is near its module cap),
+  with the chain readings they share in `positioning/chain_inputs.py`.
 - The per-contract IV fill and Greeks (Shared rules) are one new responsibility used by `gex`,
   `skew` and later `put_wing`'s `our_deltas`: one owner module, an `ownership.toml` entry, no
   copies (`make dupes`). The pdf-only gamma belongs in `quant/` (architect review).

@@ -188,6 +188,11 @@ purpose = "feature groups from option chains and implied volatility: one module 
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/positioning"
+purpose = "options positioning and chain-shape feature groups (ADR 0031): flow, implied move, skew and term structure, from the same chain inputs options/ reads; one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus chain_inputs.py, the chain readings they share"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/corporate"
 purpose = "feature groups from corporate events and filings (earnings, dividends, share counts, financials): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]

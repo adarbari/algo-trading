@@ -1,0 +1,78 @@
+# Options positioning and the short put's reads (the OP and TA tracks; definitions and worked
+# examples in docs/data/positioning.md, ADR 0031). Formulas over chain_flow@v1,
+# implied_move@v1, price_stats@v2 and put_wing@v1, computed on read. The language and the
+# keys: docs/configuration.md "Expression features". Changing a formula or a param: bump its
+# version. A ratio with a zero denominator is null (division by zero), never 0 or infinity.
+
+[put_call_oi_ratio]
+expr = "chain_flow.put_oi / chain_flow.call_oi"
+dtype = "float"
+unit = "ratio"
+description = "Put open interest over call open interest across the expiries 1 or more days out (chain_flow): above 1 is put-heavy, below 1 call-heavy; OI is the end-of-day count of open contracts, not who is long"
+null_meaning = "no option chain for the session (chain_flow NO_CHAIN), or no call open interest"
+valid_range = [0, inf]
+version = 1
+
+[put_call_volume_ratio]
+expr = "chain_flow.put_volume / chain_flow.call_volume"
+dtype = "float"
+unit = "ratio"
+description = "Put volume over call volume on the session across every expiry (chain_flow): above 1 is put-heavy trading, below 1 call-heavy; one session's flow, not a position"
+null_meaning = "no option chain for the session (chain_flow NO_CHAIN), or no call volume (never infinity)"
+valid_range = [0, inf]
+version = 1
+
+[option_volume_oi_ratio]
+expr = "(chain_flow.call_volume + chain_flow.put_volume) / (chain_flow.call_oi + chain_flow.put_oi)"
+dtype = "float"
+unit = "ratio"
+description = "Option volume traded on the session over the open interest across the expiries 1 or more days out (chain_flow): how much of the open positions turned over, 0.1 is 10%; 0-DTE volume is in the numerator only"
+null_meaning = "no option chain for the session (chain_flow NO_CHAIN), or no open interest"
+valid_range = [0, inf]
+version = 1
+
+[implied_move_1sd]
+expr = "implied_move.implied_move * sd_factor"
+dtype = "float"
+unit = "decimal"
+description = "The one-standard-deviation move the straddle implies: implied_move x 1.2533 (sqrt(pi / 2), params.sd_factor), 0.08 is 8%; implied_move is the expected absolute move, a smaller number"
+null_meaning = "implied_move is null (move_status is not OK)"
+valid_range = [0, 3]
+params = { sd_factor = 1.2533 }
+version = 1
+
+[implied_move_vs_hv]
+expr = "implied_move.implied_move / (price_stats.hv20 * sqrt(implied_move.move_dte / 365))"
+dtype = "float"
+unit = "ratio"
+description = "How much more the straddle prices than recent realised movement would: implied_move over HV20 scaled to the move expiry (hv20 x sqrt(move_dte / 365)); above 1 the options price more movement than the last 20 sessions delivered (an earnings expiry prices the report too)"
+null_meaning = "implied_move or hv20 is null (move_status is not OK, or a gap in the last 21 sessions), or hv20 is 0"
+valid_range = [0, inf]
+version = 1
+
+[put_otm_pct]
+expr = "(price_stats.close - put_wing.best_put_strike) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "How far below the close the best short put's strike is: (close - strike) / close, 0.08 means the strike sits 8% under the price (negative: the strike is above the close)"
+null_meaning = "no best put (put_wing NO_STRIKE or worse), or no price_stats row"
+valid_range = [-1, 1]
+version = 1
+
+[put_breakeven]
+expr = "put_wing.best_put_strike - put_wing.best_put_mid"
+dtype = "float"
+unit = "usd_per_share"
+description = "The short put's break-even at expiry: the best put's strike minus the premium it collects (its mid), per share; the stock must stay above it for the trade to win"
+null_meaning = "no best put (put_wing NO_STRIKE or worse)"
+valid_range = [0, inf]
+version = 1
+
+[put_roc_annualised]
+expr = "put_wing.best_put_roc * 365 / put_wing.target_dte"
+dtype = "float"
+unit = "decimal"
+description = "The short put's cash-secured return annualised, simple (no compounding): best_put_roc x 365 / target_dte, 0.3 is 30% a year if the put expires worthless and is sold again at the same terms"
+null_meaning = "no best put (put_wing NO_STRIKE or worse), or no target expiry"
+valid_range = [0, inf]
+version = 1
