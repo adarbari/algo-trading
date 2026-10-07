@@ -77,6 +77,24 @@ max_dte = 60             # the furthest expiry read, calendar days
 target_dte = 30          # the term expiry: the listed one nearest this many days out
 max_spread_pct = 0.35    # a straddle leg's (ask - bid) / mid must be within this
 
+["skew@v1"]               # the 25-delta skew at 30 days (docs/data/positioning.md OP3)
+target_days = 30         # the constant maturity of skew, iv_25p, iv_25c and iv_atm
+min_days = 7             # the term expiries are min_days..max_days out (as iv30@v1)
+max_days = 90
+max_spread_pct = 0.35    # a smile quote's (ask - bid) / mid must be within this
+
+["skew_history@v1"]       # skew rank over skew@v1's sessions (the column names carry 252)
+window = 252             # sessions for FULL, today included
+min_provisional = 60     # sessions with a skew before the rank is shown (PROVISIONAL)
+
+["iv_term@v1"]            # the ATM vol at the next expiry and at a constant 90 days
+target_days = 90         # the constant maturity of iv_90d
+min_days = 30            # its expiries are min_days..max_days out
+max_days = 180
+max_spread_pct = 0.35    # (ask - bid) / mid, as iv30@v1
+min_open_interest = 10   # a quote passes with this open interest ...
+min_volume = 1           # ... or this volume
+
 ["put_wing@v1"]          # the VRP scanner's short-put wing (docs/screeners/vrp-scanner.md);
                          # the DTE window and delta bands are part of v1: changing them is v2
 dte_target = 45          # target expiry: the one closest to this many calendar days ...

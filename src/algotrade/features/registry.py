@@ -52,7 +52,14 @@ from algotrade.features.rollups.options import (
     option_liquidity,
     put_wing,
 )
-from algotrade.features.rollups.positioning import chain_flow, flow_history, implied_move
+from algotrade.features.rollups.positioning import (
+    chain_flow,
+    flow_history,
+    implied_move,
+    iv_term,
+    skew,
+    skew_history,
+)
 from algotrade.features.rollups.price import (
     anchored_vwap,
     bands,
@@ -102,6 +109,9 @@ GROUPS: dict[str, FeatureGroup] = {
             chain_flow.GROUP,
             flow_history.GROUP,
             implied_move.GROUP,
+            skew.GROUP,
+            skew_history.GROUP,
+            iv_term.GROUP,
             nearest_expiry.GROUP,
             trend.GROUP,
             breadth.GROUP,

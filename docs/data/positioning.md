@@ -6,10 +6,10 @@ skew and the implied move, all computed nightly from the stored Cboe chains. Dec
 [ADR 0023](../adr/0023-feature-store.md), [features.md](features.md); pricing conventions:
 [ADR 0021](../adr/0021-option-pricing-conventions.md).
 
-**Status: partly built (2026-10-06, owner request).** OP2 (`chain_flow@v1`, `flow_history@v1`)
-and OP4 (`implied_move@v1`) are built, in `src/algotrade/features/rollups/positioning/`; the
+**Status: partly built (2026-10-07).** OP2 (`chain_flow@v1`, `flow_history@v1`), OP3
+(`skew@v1`, `skew_history@v1`), the term group (`iv_term@v1`) and OP4 (`implied_move@v1`) are built, in `src/algotrade/features/rollups/positioning/`; the
 owner's request for the options-strategy parameters settled every **Proposed** item they use
-(marked **Decided**; each deviation from the text is listed under the group). OP3 is next. OP1
+(marked **Decided**; each deviation from the text is listed under the group). OP1
 (GEX / DEX) stays parked on the P1 dealer-sign decision. What is still marked **Proposed**
 (per-contract IV, the dealer sign, dollar scaling, OP1 and OP3 details, `prev_close`) is a
 recommendation the owner confirms or changes before that code starts. The generated catalogue
@@ -346,9 +346,9 @@ Chains are stored nightly from 2026-10-02 only, so most names read null until mi
 otherwise be unreachable). (2) The unusual columns leave out `dte = 0` contracts. (3) A
 `chain_flow@v1` row without volume (NO_CHAIN) is not a session "with a row" for `flow_history@v1`.
 
-## OP3: `skew@v1` (kind `chain`) and `skew_history@v1` (kind `window`)
+## OP3: `skew@v1` (kind `chain`) and `skew_history@v1` (kind `window`) (built)
 
-**Definition (Proposed).** Normalised 25-delta risk reversal:
+**Definition (Decided 2026-10-07).** Normalised 25-delta risk reversal:
 `skew = (iv_25p - iv_25c) / iv_atm`, at a constant 30-day maturity. Positive = puts richer
 than calls. Alternative: the raw difference `iv_25p - iv_25c` in vol (decimal). Reason:
 normalising by ATM vol makes a 5-point skew on a 20-vol name and on an 80-vol name
@@ -411,6 +411,56 @@ skew, min 0.10, max 0.30, today 0.25: rank 0.75, PROVISIONAL. "Backfill" means r
 `skew@v1` for every stored chain session; with chains stored from 2026-10-02 the rank is
 UNKNOWN until about the end of 2026 and FULL around October 2027. No outside source has
 per-name skew history for free.
+
+**Deviations (OP3).** (1) Per-contract IV is the smile quote's own inversion, as the bullets
+above say: the shared "Per-contract IV" steps 2 to 4 (an out-of-the-money smile, interpolated
+IVs for the other contracts, unpriced counts) are not used here, so a contract without a tight
+two-sided quote simply has no point on the curve. (2) `iv_atm` needs both a call bracketing
++0.50 and a put bracketing -0.50; with only one side the expiry has no ATM vol (NO_ATM). (3)
+An expiry is usable when it has all three vols; of a bracketing pair with one usable, the
+usable one is read unchanged (SINGLE_EXPIRY), and an expiry exactly on 30 days is OK. (4) The
+expiry choice, the spread cut and the term step are `iv30@v1`'s functions (`choose_expiries`,
+`term_vol`); its open-interest / volume floors do not apply (smile quotes are the two-sided,
+tight ones). (5) `ne_dte` is read from the stored chain whatever the spot says (a NO_SPOT name
+still has a next expiry); `ne_skew` is null without a spot. (6) Spot is the shared rule (the
+close), where `iv30@v1` reads the price. (7) The wing deltas (0.25) and the ATM deltas (0.50)
+are constants of the definition, not params.
+
+Expression feature (`config/site/features/positioning.toml`): `skew_rr25` = `skew.iv_25p -
+skew.iv_25c`, the raw risk reversal in vol (decimal).
+
+The rank is UNKNOWN for every name until 60 sessions with a skew exist: chains are stored from
+2026-10-02, so that is about the end of 2026, and FULL around October 2027. The guide and the
+phrasebook say so (a screen on `skew_rank_252d` returns nothing before then).
+
+## `iv_term@v1` (kind `chain`) (built)
+
+Two more points on the at-the-money term structure beside `iv30@v1`, from the same chain inputs
+(`chains/option_quotes`, `rates/treasury`, `chains/underlying_quotes`, `div_yield@v1`) and
+`iv30@v1`'s functions (`selected_expiries`, `expiry_vols`, `term_vol`): the two strikes around
+the forward, the quality filters, call and put vols averaged. Params (`rollups.toml`):
+`target_days` 90, `min_days` 30, `max_days` 180, `max_spread_pct` 0.35, `min_open_interest` 10,
+`min_volume` 1 (`iv30@v1`'s keys).
+
+| Feature | Kind | Type | Unit | Valid | Null when |
+|---|---|---|---|---|---|
+| `iv_term_status` | label | str | category | OK, NO_SPOT, NO_CHAIN, NO_NEXT, NO_90D | never |
+| `iv_next` | chain | float32 | decimal | 0 .. 5 | no spot, no chain, no expiry with `dte >= 1`, or no ATM vol there (NO_NEXT) |
+| `iv_90d` | chain | float32 | decimal | 0 .. 5 | no spot, no chain, or no bracketing pair of expiries 30 to 180 days out with ATM vols |
+
+`iv_next` is the ATM vol at the next expiry (the first listed with `dte >= 1`, weeklies
+included; the `gex` / `chain_flow` rule), no interpolation. `iv_90d`: `choose_expiries` around
+90 days among 30..180 (standard monthlies first when they bracket), interpolated in total
+variance to 90 days. Statuses, first failing step: NO_SPOT, NO_CHAIN, NO_NEXT (`iv_next` null;
+`iv_90d` may exist), NO_90D (`iv_next` exists, `iv_90d` does not). **Deviations from `iv30@v1`:**
+a single usable expiry is not a 90-day vol, so it is null (NO_90D) rather than SINGLE_EXPIRY;
+spot is the shared rule (the close), where `iv30@v1` reads the price.
+
+Expression features (`positioning.toml`): `term_ratio_30_90` = `iv30.iv30 / iv_term.iv_90d`
+(above 1 backwardation: the front richer than the back, an event or stress; below 1 contango,
+the normal shape; above 1.1 or below 0.9 is clear) and `term_ratio_next_30` = `iv_term.iv_next
+/ iv30.iv30` (the front-expiry premium: above 1.2 an event is priced into the nearest expiry;
+read `skew.ne_dte`, a few days out is noisy).
 
 ## OP4: `implied_move@v1` (kind `chain`) (built)
 

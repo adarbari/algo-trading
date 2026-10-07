@@ -119,18 +119,27 @@ def history(ivs: np.ndarray, p: IvHistoryParams) -> dict[str, np.ndarray]:
     }
 
 
-def compute(inputs: Inputs, session: date, p: IvHistoryParams) -> pd.DataFrame:
-    rows = inputs[IV30]
-    assert rows is not None  # required input
-    column = SOURCES[p.source]
+def window_matrix(
+    rows: pd.DataFrame, column: str, session: date, window: int
+) -> tuple[list[str], np.ndarray]:
+    """The instruments with a row on ``session`` (sorted ids) and their ``column`` as a
+    sessions x instruments matrix over the ``window`` exchange sessions ending on it (NaN: no
+    row or no value; the LAST row is the session). Shared by the rank groups over a stored
+    group (``iv_history@v2``, ``skew_history@v1``)."""
     ids = sorted(rows.loc[rows["session_date"] == session, "instrument_id"].astype(str).unique())
-    days = sessions_ending(session, p.window)
     matrix = (
         rows.assign(instrument_id=rows["instrument_id"].astype(str), v=rows[column].astype(float))
         .pivot_table(index="session_date", columns="instrument_id", values="v", dropna=False)
-        .reindex(index=days, columns=ids)
+        .reindex(index=sessions_ending(session, window), columns=ids)
         .to_numpy(dtype=float)
     )
+    return ids, matrix
+
+
+def compute(inputs: Inputs, session: date, p: IvHistoryParams) -> pd.DataFrame:
+    rows = inputs[IV30]
+    assert rows is not None  # required input
+    ids, matrix = window_matrix(rows, SOURCES[p.source], session, p.window)
     return pd.DataFrame({"instrument_id": ids, **history(matrix, p)})
 
 
