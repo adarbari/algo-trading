@@ -291,6 +291,23 @@ function passing(name: string, histogram: { lo: number; count: number }[]): Json
   });
 }
 
+/** `GuideHelpField`: a field's info with its guide entry (null without one), `summary` its first sentence (the server's split, mocked). */
+function guideHelp(name: string): Json {
+  const guide = GUIDES[name];
+  const reads = typeof guide?.['reads'] === 'string' ? guide['reads'] : '';
+  return {
+    data: {
+      guideField: {
+        info: {
+          name,
+          unit: CATALOGUE.get(name)?.['unit'] ?? null,
+          guide: guide ? { ...guide, summary: reads.split(/(?<=[.!?])\s+(?=[A-Z0-9])/)[0] } : null,
+        },
+      },
+    },
+  };
+}
+
 /** A feature's distribution: the recorded one for its name, else IV30's renamed. */
 function distribution(name: string): Json {
   const answer = fixture(DISTRIBUTIONS[name] ?? 'dist-iv30.json') as {
@@ -310,6 +327,7 @@ function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
   if (name === 'FeatureCatalogue') return catalogue();
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
+  if (name === 'GuideHelpField') return guideHelp(String(operation.variables?.['name']));
   if (name === 'FeatureTable') return featureTable(operation.variables ?? {});
   if (name === 'ComparePrices') return comparePrices(operation.variables ?? {});
   if (operation.variables?.['key'] !== 'AAPL') return null;

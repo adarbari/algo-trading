@@ -137,6 +137,12 @@
   line-height: var(--line-height-xs);
 }
 
+.headerAction {
+  flex: none;
+  display: inline-flex;
+  margin-inline-start: var(--space-1);
+}
+
 .sortButton {
   display: inline-flex;
   align-items: center;

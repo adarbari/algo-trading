@@ -5,6 +5,7 @@ import { expect, userEvent, within } from 'storybook/test';
 import { Mono } from '../../primitives/Mono';
 import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
+import { InfoButton } from '../InfoButton';
 import { StatusBadge } from '../StatusBadge';
 import type { DataTableColumn } from './columns';
 import { DataTable, type DataTableProps } from './DataTable';
@@ -272,6 +273,31 @@ export const Performance: Story = {
       rows={fullUniverse}
       visibleRows={12}
       defaultSort={{ columnId: 'adv', direction: 'desc' }}
+    />
+  ),
+};
+
+/** The preview's columns with an InfoButton beside the header of two of them. */
+const helpedColumns: DataTableColumn<ScreenRow>[] = screenColumns.map((column) =>
+  column.id === 'ratio' || column.id === 'spread'
+    ? {
+        ...column,
+        headerAction: (
+          <InfoButton label={`What is ${column.header}?`} summary="A one-sentence hint." />
+        ),
+      }
+    : column,
+);
+
+/** `headerAction`: an InfoButton beside the header text of the columns that explain themselves; the header height does not change. */
+export const HeaderHelp: Story = {
+  render: () => (
+    <DataTable
+      columns={helpedColumns}
+      rows={screenRows}
+      getRowId={(r) => r.symbol}
+      label="Preview results"
+      defaultSort={{ columnId: 'score', direction: 'desc' }}
     />
   ),
 };

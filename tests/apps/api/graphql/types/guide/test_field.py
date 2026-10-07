@@ -12,7 +12,7 @@ from tests.apps.api.graphql.conftest import Graph
 
 FIELD = """query F($name: FeatureName!) {
   guideField(name: $name) {
-    info { name format guide { theme reads uses { intent op } } }
+    info { name format guide { theme reads summary uses { intent op } } }
     related
     playbooks { id name family rules column rank }
     situations { name signs do affects }
@@ -31,6 +31,8 @@ def _field(graph: Graph, name: str) -> dict[str, Any]:
 def test_a_field_page_with_what_the_server_derives(graph: Graph) -> None:
     page = _field(graph, ADV)
     assert page["info"]["name"] == ADV and page["info"]["guide"]["theme"] == "liquidity"
+    guide = page["info"]["guide"]
+    assert guide["reads"].startswith(guide["summary"]) and guide["summary"].endswith(".")
     assert page["related"] and ADV not in page["related"]
     assert len(set(page["related"])) == len(page["related"])
     pullback = next(p for p in page["playbooks"] if p["id"] == "pullback")

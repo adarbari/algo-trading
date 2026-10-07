@@ -3,7 +3,8 @@
  * notes (a stale session, nightly tables missing for it, a universe snapshot from after it),
  * the caller's header (filters), and the design system's `DataTable` over `TableRow`s with a
  * toolbar: the summary, the pager (server paging) and the caller's controls (column picker,
- * views). The columns are a `ColumnPlan` from the factories (ADR 0038).
+ * views). The columns are a `ColumnPlan` from the factories (ADR 0038); a field column's
+ * header gets its help button (`features/guide-help`, ADR 0051).
  */
 import {
   Banner,
@@ -19,7 +20,8 @@ import {
 import type { ReactNode } from 'react';
 
 import { isStale } from '@/entities/explore';
-import type { TableRow } from '@/entities/feature';
+import type { ColumnPlan, PlanColumn, TableRow } from '@/entities/feature';
+import { GuideHelp } from '@/features/guide-help';
 
 import { missingTables } from '../model/plan';
 
@@ -46,8 +48,16 @@ export interface TableFrameProps {
   pager?: Pager | null | undefined;
   /** Toolbar controls after the pager (the column picker, the view controls). */
   controls?: ReactNode;
-  grid: Omit<DataTableProps<TableRow>, 'toolbar' | 'getRowId' | 'getRowLabel' | 'rowLines'> &
-    Partial<Pick<DataTableProps<TableRow>, 'getRowId'>>;
+  grid: Omit<
+    DataTableProps<TableRow>,
+    'toolbar' | 'getRowId' | 'getRowLabel' | 'rowLines' | 'columns'
+  > &
+    Partial<Pick<DataTableProps<TableRow>, 'getRowId'>> & { columns: ColumnPlan };
+}
+
+/** The column with its help button beside the header, where its factory named a Guide entry. */
+function helped({ help, ...column }: PlanColumn): PlanColumn {
+  return help ? { ...column, headerAction: <GuideHelp entry={help} /> } : column;
 }
 
 const count = (n: number) => n.toLocaleString('en-US');
@@ -100,6 +110,7 @@ export function TableFrame({
         <DataTable<TableRow>
           getRowId={(row) => row.symbol}
           {...grid}
+          columns={grid.columns.map(helped)}
           getRowLabel={(row) => row.symbol}
           rowLines={2}
           toolbar={

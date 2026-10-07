@@ -12,6 +12,7 @@ const hooks = vi.hoisted(() => ({
   useFeatureCatalogue: vi.fn(),
 }));
 
+vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null })); // the header help button: TableFrame.test.tsx
 vi.mock('@/entities/feature', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useFeatureTable: hooks.useFeatureTable,
