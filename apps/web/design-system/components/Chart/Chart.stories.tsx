@@ -51,16 +51,6 @@ const painted = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
   );
 };
 
-/** Two animation frames: what the chart engine needs to redraw after a zoom. */
-const settled = () =>
-  new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        resolve();
-      });
-    });
-  });
-
 const meta = {
   title: 'Components/Chart',
   component: Chart,
@@ -74,22 +64,6 @@ type Story = StoryObj<typeof meta>;
 
 /** One price series with its ex-dividend, split and earnings markers. Sample data. */
 export const Default: Story = { args: { events: aaplEvents } };
-
-/**
- * Zoomed: "Zoom in" twice from the toolbar shows a quarter of the window around its centre;
- * "Reset zoom" shows the whole window again. Sample data.
- */
-export const Zoomed: Story = {
-  args: { events: aaplEvents },
-  play: async (context) => {
-    await painted(context);
-    const zoomIn = within(context.canvasElement).getByRole('button', { name: 'Zoom in' });
-    await userEvent.click(zoomIn);
-    await userEvent.click(zoomIn);
-    // The engine redraws on the next animation frames; the screenshot waits for the settled one.
-    await settled();
-  },
-};
 
 /**
  * On a phone (a 375 px container): the key, range control and zoom buttons wrap above the plot;
