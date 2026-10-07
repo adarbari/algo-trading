@@ -12,9 +12,9 @@ Two ways to read SEC, one row shape (``_one_cik`` is the only writer of rows):
 - **Per CIK** (the backfill): one request per CIK to the registered ``sec_filings`` source (the
   recent block, plus the older pages when ``since`` precedes it; pacing and ``User-Agent`` are
   the ``sec_edgar`` source's). Used with ``--since`` (every CIK from that date; one whose stored
-  filings already reach it is skipped, so a run can be repeated, and ``--limit`` caps the CIKs
-  a run asks), and when nothing is stored yet (each CIK from ``DEFAULT_SINCE``). Never-stored
-  CIKs come first.
+  filings already reach it, or an earlier run read OK / NO_DATA from a date on or before it, is
+  skipped, so a run can be repeated, and ``--limit`` caps the CIKs a run asks), and when nothing
+  is stored yet (each CIK from ``DEFAULT_SINCE``). Never-stored CIKs come first.
 - **Daily index** (the nightly, once filings are stored and without ``--since``): for each
   weekday from the latest stored ``filing_date`` (inclusive: a rerun changes nothing) through
   the session, the ``sec_daily_index`` source reads that day's form index; the universe CIKs
@@ -23,7 +23,13 @@ Two ways to read SEC, one row shape (``_one_cik`` is the only writer of rows):
   later day is published, else "not published yet": the next run reads it again, because the
   start stays the latest stored day); one older than ``STALE_DAYS`` business days with nothing
   published after it is ``FETCH_ERROR``. A day that fails stops the walk, and rows are kept only
-  up to the last day read, so the stored history never skips a day. ``--limit`` does not apply.
+  up to the last day read, so the stored history never skips a day. The start is the last
+  clean walk's ``walked_to`` (a run record with no failed day or index-asked CIK), never the
+  stored filing dates (a per-CIK run or a failed CIK moves those past unread days); only with no
+  such record, the latest stored filing day. Each night also reads in full, from
+  ``DEFAULT_SINCE``, up to ``[quality] filings_backfill_per_night`` CIKs no earlier run read
+  (new to the universe, a new share class, a backfill that failed or was cut by ``--limit``).
+  ``--limit`` and ``--symbols`` do not make a walk.
 
 - **Since** (per CIK): ``--since`` for every CIK, else each CIK's latest stored acceptance (its
   New York date, so the day's later filings are read again), else 2018-01-01. Every filing read
@@ -64,6 +70,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import EARNINGS_8K_SOURCE
 from algotrade_ingestion.tasks.framework.run import (
     FAILURES,
+    PUBLISHED,
     IngestRun,
     NoResponseError,
     TaskContext,
@@ -267,24 +274,82 @@ def since_by_cik(
     }
 
 
+def previous_runs(run: IngestRun) -> list[RunRecord]:
+    """The finished (published) runs of this task before ``run``."""
+    return [r for r in run.reader.runs(TASK) if r.status in PUBLISHED and r.run_id != run.run_id]
+
+
+def asked_since(run: IngestRun) -> dict[str, date]:
+    """CIK -> the earliest date an earlier run read it from (item ``OK`` or ``NO_DATA``): a
+    per-CIK run covers every CIK it asked from its ``covers_since``, a nightly only the CIKs it
+    read in full (``backfilled``, from ``DEFAULT_SINCE``)."""
+    out: dict[str, date] = {}
+    for record in previous_runs(run):
+        stats = record.stats
+        if stats.get("covers_since"):
+            start, ciks = date.fromisoformat(stats["covers_since"]), list(record.items)
+        else:
+            start, ciks = DEFAULT_SINCE, list(stats.get("backfilled") or [])
+        for cik in ciks:
+            if status_label(record.items.get(cik, "")) in ("OK", "NO_DATA"):
+                out[cik] = min(start, out.get(cik, start))
+    return out
+
+
+def last_walked(run: IngestRun) -> date | None:
+    """The last index day an earlier nightly read cleanly (no failed day or index-asked CIK):
+    where the next walk starts. Stored filing dates do not say: a per-CIK run (``--symbols``,
+    ``--limit``) or a failed CIK moves them past days never read."""
+    walked = [
+        date.fromisoformat(r.stats["walked_to"])
+        for r in previous_runs(run)
+        if r.stats.get("walked_to")
+    ]
+    return max(walked, default=None)
+
+
 def order_and_skip(
-    ciks: dict[str, list[Listed]], stored: pd.DataFrame, explicit: date | None
+    ciks: dict[str, list[Listed]],
+    stored: pd.DataFrame,
+    explicit: date | None,
+    asked: dict[str, date],
 ) -> tuple[dict[str, list[Listed]], int]:
     """The CIKs to ask, never-stored ones first, and how many were skipped: with an explicit
-    ``since``, a CIK whose every name already has a stored filing on or before it is covered."""
+    ``since``, a CIK is covered when every name already has a stored filing on or before it,
+    or an earlier run read the CIK (``OK`` / ``NO_DATA``) from a date on or before it."""
     first = stored.groupby("instrument_id")["filing_date"].min().to_dict() if len(stored) else {}
 
-    def covered(names: list[Listed]) -> bool:
-        return explicit is not None and all(
-            first.get(n.instrument_id, date.max) <= explicit for n in names
-        )
+    def covered(cik: str, names: list[Listed]) -> bool:
+        if explicit is None:
+            return False
+        if cik in asked and asked[cik] <= explicit:
+            return True
+        return all(first.get(n.instrument_id, date.max) <= explicit for n in names)
 
     def untouched(names: list[Listed]) -> bool:
         return not any(n.instrument_id in first for n in names)
 
-    todo = {cik: names for cik, names in ciks.items() if not covered(names)}
+    todo = {cik: names for cik, names in ciks.items() if not covered(cik, names)}
     ordered = sorted(todo, key=lambda cik: not untouched(todo[cik]))  # stable: False first
     return {cik: todo[cik] for cik in ordered}, len(ciks) - len(todo)
+
+
+def unread(
+    ciks: dict[str, list[Listed]], stored: pd.DataFrame, asked: dict[str, date], cap: int
+) -> dict[str, list[Listed]]:
+    """Up to ``cap`` CIKs the nightly must read in full: a name with no stored filing, whose CIK
+    no earlier run read from ``DEFAULT_SINCE`` (new to the universe, or its backfill failed or
+    was cut by ``--limit``), or whose CIK has a stored sibling (a new share class)."""
+    have = set(stored["instrument_id"]) if len(stored) else set()
+    out: dict[str, list[Listed]] = {}
+    for cik, names in ciks.items() if cap > 0 else ():
+        missing = [n for n in names if n.instrument_id not in have]
+        read = cik in asked and asked[cik] <= DEFAULT_SINCE
+        if missing and (not read or len(missing) < len(names)):
+            out[cik] = names
+        if len(out) >= cap:
+            break
+    return out
 
 
 def filing_days(first: date, last: date) -> list[date]:
@@ -404,21 +469,33 @@ def ingest_filings(
         have = {n.instrument_id for group in ciks.values() for n in group}
         without = [n.symbol for n in names if n.instrument_id not in have]
         stored = stored_filings(run)
-        latest = max(stored["filing_date"]) if len(stored) else None
-        daily = index is not None and since is None and latest is not None
-        skipped, days_asked, first_day, last_day = 0, 0, None, None
+        walked = last_walked(run)
+        # Where the walk starts: the last clean day an earlier nightly read; only without such a
+        # run (the first nightly after a backfill) the latest stored filing day. A narrowed run
+        # (--symbols) is no walk: it would record days it did not read for every other CIK.
+        start = walked or (max(stored["filing_date"]) if len(stored) else None)
+        daily = index is not None and since is None and not requested and start is not None
+        skipped, days_asked, first_day, last_day, clean = 0, 0, None, None, False
+        asked, backfilled = asked_since(run), []
         if daily:
-            assert index is not None and latest is not None
-            filers, days_asked = read_index_days(run, index, filing_days(latest, session))
+            assert index is not None and start is not None
+            filers, days_asked = read_index_days(run, index, filing_days(start, session))
             first_day, last_day = (min(filers), max(filers)) if filers else (None, None)
-            asked = set().union(*filers.values()) & set(ciks)
-            ciks = {cik: ciks[cik] for cik in ciks if cik in asked}
-            starts = dict.fromkeys(ciks, first_day) if first_day else {}
-            _ask(run, source, ciks, starts, last_day)
+            full = unread(ciks, stored, asked, ctx.settings.filings_backfill_per_night)
+            backfilled = list(full)
+            filed = set().union(*filers.values()) & set(ciks) - set(full)
+            todo = {cik: ciks[cik] for cik in ciks if cik in filed}
+            _ask(run, source, todo, dict.fromkeys(todo, first_day) if first_day else {}, last_day)
+            clean = not _failed(run, days=True) and not any(
+                status_label(run.items.get(cik, "")) in FAILURES for cik in todo
+            )
+            ciks = {**todo, **full}
+            _ask(run, source, full, since_by_cik(full, stored, None))
         else:
-            ciks, skipped = order_and_skip(ciks, stored, since)
+            ciks, skipped = order_and_skip(ciks, stored, since, asked)
             ciks = dict(list(ciks.items())[:limit]) if limit else ciks
             _ask(run, source, ciks, since_by_cik(ciks, stored, since))
+        covers = since or (None if daily or len(stored) else DEFAULT_SINCE)
         written = run.publish(TABLE)
         results = run.publish(EARNINGS, sort_by="ts")
         run.stats.update(
@@ -435,6 +512,9 @@ def ingest_filings(
             unknown_symbols=covered.unknown,
             since=since.isoformat() if since else (first_day.isoformat() if first_day else None),
             until=last_day.isoformat() if last_day else None,
+            walked_to=last_day.isoformat() if last_day and clean else None,
+            backfilled=backfilled,
+            covers_since=covers.isoformat() if covers else None,
             filings=written,
             results=results,
             items=run.counts(),

@@ -15,6 +15,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.events import ALL_TIME, read_events
@@ -149,8 +150,8 @@ def clock() -> datetime:
     return FIXED + timedelta(minutes=next(TICKS))
 
 
-def context(writer: StoreWriter) -> TaskContext:
-    return task_ctx(writer, clock=clock)
+def context(writer: StoreWriter, **settings: Any) -> TaskContext:
+    return task_ctx(writer, clock=clock, settings=SourcesSettings(**settings))
 
 
 def run(
@@ -189,11 +190,15 @@ def index_text(day: date, filers: list[tuple[str, str, str]]) -> bytes:
     return header + "".join(lines).encode()
 
 
-def nightly(writer: StoreWriter, feed: Feed, index: IndexFeed, session: date, **kw: Any) -> Any:
-    """The task as the nightly runs it: both sources, no ``--since``."""
+def nightly(
+    writer: StoreWriter, feed: Feed, index: IndexFeed, session: date, backfill: int = 0, **kw: Any
+) -> Any:
+    """The task as the nightly runs it: both sources, no ``--since``; ``backfill`` is
+    ``[quality] filings_backfill_per_night`` (0: the days alone)."""
     source = SecFilings(http_for(feed, RetryPolicy(tries=1)))
     daily = SecDailyIndex(http_for(index, RetryPolicy(tries=1, not_found=missing_index)))
-    return ingest_filings(context(writer), source, session, (), index=daily, **kw)
+    ctx = context(writer, filings_backfill_per_night=backfill)
+    return ingest_filings(ctx, source, session, (), index=daily, **kw)
 
 
 def read(writer: StoreWriter, table: str, ids: list[str]) -> pd.DataFrame:
@@ -443,19 +448,31 @@ def test_a_backfill_skips_ciks_it_already_reaches_and_asks_never_stored_ones_fir
     run(writer, Feed(), ("GOOGL",), since=date(2026, 1, 15))  # one Alphabet class, back to 01-15
     second = Feed()
     record = run(writer, second, (), since=date(2026, 1, 15))
-    # GOOG was never stored, so the Alphabet CIK is asked again, after the CIKs never stored.
-    assert record.stats["skipped_covered"] == 0
+    assert record.stats["skipped_covered"] == 1  # the Alphabet CIK was read from 01-15 already
     assert [u.rsplit("/", 1)[1] for u in second.urls] == [
-        "CIK0000723125.json", "CIK0000000999.json", "CIK0000000888.json", "CIK0001652044.json"
+        "CIK0000723125.json", "CIK0000000999.json", "CIK0000000888.json"
     ]  # fmt: skip
-    third = Feed()
-    record = run(writer, third, (), since=date(2026, 1, 15))
-    assert record.stats["skipped_covered"] == 1  # both Alphabet classes now reach 01-15
-    # Micron's first stored filing is later than that start: a company listed later is asked
-    # again, after the CIKs never stored.
-    assert [u.rsplit("/", 1)[1] for u in third.urls] == [
-        "CIK0000000999.json", "CIK0000000888.json", "CIK0000723125.json"
-    ]  # fmt: skip
+
+
+def test_a_cik_with_no_filings_since_the_start_is_not_asked_again() -> None:
+    """Micron's first filing in the fixture is after 2026-01-15, and SEC has none for GONE:
+    neither is stored back to the start, but both were read OK / NO_DATA from it."""
+    writer = store()
+    run(writer, Feed(), (), since=date(2026, 1, 15))
+    again = Feed()
+    record = run(writer, again, (), since=date(2026, 1, 15))
+    assert again.urls == [] and record.stats["skipped_covered"] == 4
+    earlier = Feed()
+    run(writer, earlier, (), since=date(2025, 1, 1))  # an earlier start reads them again
+    assert len(earlier.urls) == 4
+
+
+def test_a_cik_that_failed_is_not_covered() -> None:
+    writer = store()
+    run(writer, Feed(broken=("888",)), (), since=date(2026, 1, 15))
+    again = Feed()
+    run(writer, again, (), since=date(2026, 1, 15))
+    assert [u.rsplit("/", 1)[1] for u in again.urls] == ["CIK0000000888.json"]
 
 
 def test_the_limit_caps_the_ciks_of_a_run() -> None:
@@ -585,3 +602,59 @@ def test_both_paths_store_the_same_rows_for_a_recorded_day() -> None:
         got = read(through_index, table, ["EQ:MU"])
         assert len(want) >= 1
         pd.testing.assert_frame_equal(want[[*columns, "source"]], got[[*columns, "source"]])
+
+
+# ----------------------------------------------------------------------------- nightly start
+
+
+def walked(writer: StoreWriter, feed: Feed, published: dict[date, bytes], session: date) -> Any:
+    return nightly(writer, feed, IndexFeed(published), session)
+
+
+def test_the_walk_restarts_from_the_last_clean_walk_not_the_latest_stored_filing() -> None:
+    """A per-CIK run (here --symbols) stores filings up to today; the nightly must still read
+    the days between its last walk and then."""
+    writer = seeded()  # latest stored filing day: 2026-10-06
+    first = walked(writer, Feed(), {date(2026, 10, 6): index_text(date(2026, 10, 6), [])}, S2)
+    assert first.stats["walked_to"] == "2026-10-06"
+    feed = Feed(alpha=[*ALPHA_FILINGS, EXTRA])
+    run(writer, feed, ("GOOGL",), session=date(2026, 10, 13))
+    assert "A10" in set(read(writer, TABLE, ["EQ:GOOGL"])["accession"])  # stored out of the walk
+    index = IndexFeed({date(2026, 10, 7): index_text(date(2026, 10, 7), [("8-K", "723125", "M1")])})
+    record = nightly(writer, Feed(), index, date(2026, 10, 14))
+    assert index.asked[0] == date(2026, 10, 6)  # not 2026-10-07, the latest stored filing day
+    assert record.items["0000723125"].startswith("OK") and record.stats["walked_to"] == "2026-10-07"
+
+
+def test_a_walk_with_a_failed_cik_or_day_is_read_again() -> None:
+    writer = seeded()
+    day7 = index_text(date(2026, 10, 7), [("8-K", "1652044", "A10")])
+    bad = nightly(writer, Feed(broken=("1652044",)), IndexFeed({date(2026, 10, 7): day7}), S2)
+    assert bad.items["0001652044"].startswith("FETCH_ERROR") and bad.stats["walked_to"] is None
+    index = IndexFeed({date(2026, 10, 7): day7})
+    nightly(writer, Feed(alpha=[*ALPHA_FILINGS, EXTRA]), index, date(2026, 10, 13))
+    assert index.asked[0] == date(2026, 10, 6)  # still from the stored latest: no clean walk
+    cut = nightly(writer, Feed(), IndexFeed({date(2026, 10, 7): day7}, broken=(date(2026, 10, 8),)),
+                  date(2026, 10, 14))  # fmt: skip
+    assert cut.stats["walked_to"] is None
+
+
+def test_the_nightly_reads_in_full_the_ciks_it_never_read_up_to_the_cap() -> None:
+    writer = seeded()  # only Alphabet's GOOGL class is stored
+    feed = Feed()
+    first = nightly(writer, feed, IndexFeed({}), S2, backfill=2)
+    # MU and GONE are the first two unread CIKs, in universe order; Alphabet has a stored
+    # GOOGL and a new GOOG class, so it is unread too, but past the cap.
+    assert [u.rsplit("/", 1)[1] for u in feed.urls] == ["CIK0000723125.json", "CIK0001652044.json"]
+    assert first.stats["backfilled"] == [MU, ALPHA] and first.stats["mode"] == "daily_index"
+    again = Feed()
+    second = nightly(writer, again, IndexFeed({}), date(2026, 10, 13), backfill=2)
+    # Read and stored (MU, Alphabet) or read with nothing to show (never): GONE and BAD are next.
+    assert [u.rsplit("/", 1)[1] for u in again.urls] == ["CIK0000000999.json", "CIK0000000888.json"]
+    third = Feed()
+    nightly(writer, third, IndexFeed({}), date(2026, 10, 14), backfill=2)
+    assert third.urls == [] and second.stats["backfilled"] == ["0000000999", "0000000888"]
+    assert (
+        set(read(writer, TABLE, ["EQ:MU"])["accession"])
+        and len(read(writer, TABLE, ["EQ:GOOG"])) == 9
+    )

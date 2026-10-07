@@ -351,6 +351,12 @@ def test_the_filings_threshold_loads() -> None:
     assert SourcesSettings.from_document(document).max_filings_failed == 0.2
 
 
+def test_the_filings_backfill_cap_loads() -> None:
+    assert SourcesSettings.from_document(site("sources")).filings_backfill_per_night == 50
+    document = {"quality": {"filings_backfill_per_night": 0}}
+    assert SourcesSettings.from_document(document).filings_backfill_per_night == 0
+
+
 def test_a_legacy_spy_holdings_section_keeps_its_switch_under_the_new_name() -> None:
     """Files from before ``[ssga]`` had ``[spy_holdings]``: ``enabled = false`` must still turn
     State Street off, but its pacing (0 s, one request a day) is not inherited by the fund files."""

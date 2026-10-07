@@ -43,10 +43,10 @@ def test_the_threshold_is_the_setting() -> None:
 
 def test_index_days_count_with_the_ciks() -> None:
     stats = {"names": 50, "with_cik": 50, "ciks": 18, "ciks_failed": 0, "days": 2, "days_failed": 1}
-    [ok] = check_filings(ctx_with(stats), S)  # 1 of 20 requests: 5.0% is the limit, not over
-    assert ok.status == "PASS" and "1 of 2 index days" in ok.detail
-    stats["days_failed"], stats["days"] = 2, 2
-    assert check_filings(ctx_with(stats), S)[0].status == "FAIL"
+    [one] = check_filings(ctx_with(stats), S)  # 1 of 20 requests is under the limit, but a
+    assert one.status == "FAIL" and "1 of 2 index days" in one.detail  # failed day stops the walk
+    stats["days_failed"] = 0
+    assert check_filings(ctx_with(stats), S)[0].status == "PASS"
 
 
 def test_names_without_any_cik_fail_and_no_names_warn() -> None:

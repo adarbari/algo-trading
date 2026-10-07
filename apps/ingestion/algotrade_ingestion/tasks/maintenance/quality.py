@@ -357,7 +357,8 @@ FILINGS_TASK = "filings"  # the filings task's job name (tasks/events/filings.py
 
 def check_filings(ctx: TaskContext, session: date) -> list[Check]:
     """The ``filings`` step's acceptance: FAIL when over ``[quality] max_filings_failed`` of the
-    SEC requests the session's finished run made failed (the CIKs' submissions and, in the
+    SEC requests the session's finished run made failed, or when any daily index day failed (it
+    stops the walk; the CIKs' submissions and, in the
     nightly mode, the daily index days; a CIK SEC has no filings for and an index not published
     yet are not failures), or when universe names exist and none has a CIK in the company
     details. Nothing without a finished run of the session (a task that failed fails its step
@@ -384,7 +385,8 @@ def check_filings(ctx: TaskContext, session: date) -> list[Check]:
         f"SEC failed for {failed} of {ciks} CIKs and {days_failed} of {days} index days "
         f"({share:.1%}; max {limit:.0%})"
     )
-    return [Check("filings_fetched", "FAIL" if share > limit else "PASS", detail)]
+    stopped = days_failed > 0  # a failed day stops the walk: unread days follow, so never a PASS
+    return [Check("filings_fetched", "FAIL" if share > limit or stopped else "PASS", detail)]
 
 
 def _future_dates(
