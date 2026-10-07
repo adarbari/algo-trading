@@ -353,3 +353,157 @@ op = "eq"
 value = true
 mode = "hard"
 note = "with feature.pct_vs_ema_20 gt 0 and rollup.trend_stats@v2.tight_range_sessions gte 10 for the base; feature.stretch_sma20_atr lte 2 against an extended one"
+
+[[field]]
+name = "rollup.volume_profile@v1.profile_status"
+theme = "volume"
+reads = "Whether the volume profile is computed: OK; FEW_BARS when fewer than 240 of the last 252 sessions have a bar (a young listing or a gappy name: every profile value is null); NO_RANGE when the name traded at one price all year (a halted or pinned name)."
+caveats = [
+  "OK says the profile exists, not that it is sharp: each day's volume is spread over its whole range, so the bins are a day's range wide in effect. Read the levels as zones.",
+]
+sources = ["Steidlmayer and Hawkins (2003), Steidlmayer on Markets"]
+[[field.use]]
+for = "has a volume profile"
+op = "eq"
+value = "OK"
+mode = "hard"
+note = "the gate for every profile level; the levels themselves are compared with rollup.price_stats@v2.close"
+
+[[field]]
+name = "rollup.volume_profile@v1.poc_252d"
+theme = "volume"
+reads = "The point of control: the price bin (one fiftieth of the year's range) where the most volume traded over the last 252 sessions, in dollars per share. It is the year's 'fair price' by participation: the level price returns to and lingers at, support when the close is above it and resistance when below. feature.dist_to_poc is the distance as a fraction."
+caveats = [
+  "A daily-bar estimate: each day's volume is spread evenly over its range, so the point of control is a zone a bin or two wide, and a tie goes to the bin nearest the close.",
+  "A trending name has its point of control far behind the price (where it spent the most time): a 20% distance is normal after a strong year. Read with feature.in_value_area.",
+  "Null unless profile_status is OK.",
+]
+sources = ["Steidlmayer and Hawkins (2003), Steidlmayer on Markets; Dalton (2007), Markets in Profile"]
+[[field.use]]
+for = "has a point of control"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.dist_to_poc"
+
+[[field]]
+name = "rollup.volume_profile@v1.value_area_high"
+theme = "volume"
+reads = "The top of the value area: the smallest band of price bins around the point of control that held 70% of the last year's volume, in dollars per share. Above it the price is at a level the market has traded little (an extreme by volume, where a trend either continues into thin air or returns to value); feature.in_value_area is the flag."
+caveats = [
+  "The band is built from daily ranges, not intraday prints: a zone, not a price.",
+  "Null unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile: the value area"]
+[[field.use]]
+for = "has a value area"
+op = "not_null"
+mode = "hard"
+note = "use feature.in_value_area for the close's position"
+
+[[field]]
+name = "rollup.volume_profile@v1.value_area_low"
+theme = "volume"
+reads = "The bottom of the value area (the band around the point of control holding 70% of the year's volume), in dollars per share: below it the price is at a volume extreme on the downside, a cheap level by participation that either holds or breaks into thin air."
+caveats = [
+  "A zone, not a price (daily-bar profile).",
+  "Null unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile: the value area"]
+[[field.use]]
+for = "has a value area"
+op = "not_null"
+mode = "hard"
+note = "use feature.in_value_area for the close's position"
+
+[[field]]
+name = "rollup.volume_profile@v1.hvn_above"
+theme = "volume"
+reads = "The nearest high-volume node above the close: the centre of the closest price bin above the close's bin whose volume over the year was at least 1.5 times the average bin, in dollars per share. A level where the name has traded heavily, so price tends to slow and pause there: resistance by volume, and a target for a move up."
+caveats = [
+  "A zone a bin or two wide (daily-bar profile), not a price.",
+  "Null when no such bin lies between the close and the year's high (the close is near the top of the profile), or unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile: high-volume nodes"]
+[[field.use]]
+for = "has a volume node above"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule; the pivot version is feature.dist_to_resistance"
+
+[[field]]
+name = "rollup.volume_profile@v1.hvn_below"
+theme = "volume"
+reads = "The nearest high-volume node below the close (a bin with at least 1.5 times the average bin volume), in dollars per share: support by volume, where buyers have shown up before, and the level a pullback tends to stop at."
+caveats = [
+  "A zone, not a price (daily-bar profile).",
+  "Null when no such bin lies between the close and the year's low, or unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile: high-volume nodes"]
+[[field.use]]
+for = "has a volume node below"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule; the pivot version is feature.dist_to_support"
+
+[[field]]
+name = "rollup.volume_profile@v1.lvn_above"
+theme = "volume"
+reads = "The nearest low-volume node above the close: the closest bin above with at most half the average bin volume, in dollars per share. A price the market rejected quickly, so a move into it tends to continue through it (thin air): the breakout screens like a close just under a low-volume node with a high-volume node further up as the target."
+caveats = [
+  "A zone, not a price (daily-bar profile).",
+  "Null when no such bin lies between the close and the year's high, or unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile: low-volume nodes"]
+[[field.use]]
+for = "has a low-volume node above"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "rollup.volume_profile@v1.lvn_below"
+theme = "volume"
+reads = "The nearest low-volume node below the close (a bin with at most half the average bin volume), in dollars per share: thin air on the downside, where a breakdown accelerates until the next high-volume node."
+caveats = [
+  "A zone, not a price (daily-bar profile).",
+  "Null when no such bin lies between the close and the year's low, or unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile: low-volume nodes"]
+[[field.use]]
+for = "has a low-volume node below"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "feature.in_value_area"
+theme = "volume"
+reads = "True when the close sits inside the last year's value area, the price band that held 70% of the volume: fair value by participation, where price tends to rotate. False means the close is at a volume extreme: above the value area a trend is being accepted at new prices (or will return to value), below it the name is cheap by the year's participation (or breaking down). Dalton's rule of thumb: an open outside value that fails to hold returns to the point of control."
+caveats = [
+  "The value area is built from daily ranges (no intraday data) and is a year wide, so a trending name leaves it for months; pair with feature.trend_state before reading 'outside value' as a reversal.",
+  "Null when the value area is unknown (profile_status not OK) and the known side does not already say false.",
+]
+sources = ["Dalton (2007), Markets in Profile"]
+[[field.use]]
+for = "trading at a volume extreme (outside value)"
+op = "eq"
+value = false
+mode = "hard"
+note = "with feature.dist_to_poc gt 0 for above value, lt 0 for below"
+
+[[field]]
+name = "feature.dist_to_poc"
+theme = "volume"
+reads = "Close over the year's point of control minus one: 0.05 means the price sits 5% above the most-traded level of the year, -0.10 ten percent below it. Near 0 the name is at its volume magnet (expect rotation); far above after a strong year the point of control is the support a deep pullback would find; far below it is the overhead supply."
+caveats = [
+  "A daily-bar estimate of the level, a bin or two wide.",
+  "Null unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile"]
+[[field.use]]
+for = "near the point of control"
+op = "between"
+value = [-0.03, 0.03]
+mode = "soft"
+tolerance = 0.02
+note = "with feature.in_value_area eq true; a mean-reversion zone"

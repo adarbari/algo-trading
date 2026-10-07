@@ -32,6 +32,7 @@ from algotrade.features.rollups.corporate import (
     financials,
     fundamentals,
 )
+from algotrade.features.rollups.levels import gaps, pivot_strength, retest, swing_levels
 from algotrade.features.rollups.market import (
     breadth,
     cross_asset,
@@ -57,7 +58,6 @@ from algotrade.features.rollups.price import (
     price_history,
     price_moves,
     price_stats,
-    swing_levels,
     trend_stats,
     volume,
 )
@@ -87,6 +87,9 @@ GROUPS: dict[str, FeatureGroup] = {
             vol_stats.GROUP,
             volume_profile.GROUP,
             swing_levels.GROUP,
+            pivot_strength.GROUP,
+            retest.GROUP,
+            gaps.GROUP,
             anchored_vwap.GROUP,
             episodes.GROUP,
             oi_walls.GROUP,

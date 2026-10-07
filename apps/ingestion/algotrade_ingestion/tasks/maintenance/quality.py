@@ -360,7 +360,9 @@ def _future_dates(
     frame = read_events(reader, CALENDAR_TABLE, *ALL_TIME, instruments=ids, through=session).frame
     if frame.empty:
         return {}
-    future = frame[pd.to_datetime(frame["release_date"]).dt.date > session]
+    future = frame[
+        (pd.to_datetime(frame["release_date"]).dt.date > session) & (frame["status"] == "scheduled")
+    ]
     return {str(k): int(n) for k, n in future.groupby("instrument_id").size().items()}
 
 

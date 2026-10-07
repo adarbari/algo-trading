@@ -780,6 +780,27 @@ Sources: Faber (2007), A Quantitative Approach to Tactical Asset Allocation
 
 Sources: Moving average ribbons and alignment (Guppy, Trend Trading)
 
+### `rollup.retest@v1.retest_state`
+
+**How to read it.** What the latest 20-session breakout of the last 60 sessions did since. RETESTING: today's low came back to within half an ATR above the breakout level and the close held it (the entry traders wait for). HELD: an earlier session did that and no close since went below the level. FRESH: price has not come back to the level. FAILED: some close since the breakout is below its level. NONE: no breakout in the window. NO_ATR: the ATR is unknown, so the retest tolerance is too.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a breakout that came back and held | `in ["RETESTING", "HELD"]` | hard | - | feature.breakout_retest_held is the HELD half |
+| buying the retest today | `eq "RETESTING"` | hard | - | with feature.trend_state eq UPTREND |
+| a breakout that has not failed | `ne "FAILED"` | soft | 0 | - |
+
+**When the reading lies**
+
+- FAILED includes a single close below the level on any day since the breakout, even if price recovered the next day; rollup.retest@v1.failed_breakouts_252d is how often the name's breakouts failed within 20 sessions.
+- RETESTING is today's bar only: a low in the band with a weak close at or above the level is still RETESTING, so check the close against feature.dist_to_support_atr or the session's range.
+- The breakout is the close above the prior 20-session high, with no volume condition; a thin-volume breakout fails more often (rollup.momentum@v1.rel_volume).
+- NONE and NO_ATR are not failures: a hard 'eq HELD' rejects them, which is usually intended.
+
+Sources: docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns (pullbacks and throwbacks to a breakout); Edwards and Magee, Technical Analysis of Stock Trends
+
 ### `feature.pct_vs_sma_150`
 
 **How to read it.** Close over the 150-session (30-week) average minus one: 0.08 is 8% above it. Above 0 is the first line of Minervini's trend template (close above the 150 and 200-day averages, the 150 above the 200, the 50 above both) and Weinstein's stage-2 condition; well above it (0.25 and more) the name is extended from its seven-month base.
@@ -848,3 +869,118 @@ Sources: Clenow (2015), Stocks on the Move
 - Null when either input is unknown (a gap among the last 90 sessions, or a flat close).
 
 Sources: Clenow (2015), Stocks on the Move: the ranking formula and the 90-day window
+
+### `rollup.trend_stats@v2.high_100d`
+
+**How to read it.** The highest daily high of the last 100 sessions (about five months), in dollars per share, today's high included. With the 20 and 50-session highs it dates the current advance: the close at all three is a fresh leg, at the 20 but not the 100 a rally inside a longer range. Compare with the close as a share: rollup.price_stats@v2.close / high_100d - 1.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 100-session channel | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- A single spike high (an earnings gap that reversed) sets the level for 100 sessions; feature.dist_to_resistance uses the confirmed swing pivot instead.
+- Null after a gap in the last 100 sessions or a shorter history.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v2.low_100d`
+
+**How to read it.** The lowest daily low of the last 100 sessions, in dollars per share, today's low included: the floor of the five-month range. The close at it is a five-month low; the distance above it (close / low_100d - 1) is how much of the range the name has recovered.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 100-session channel | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- One capitulation wick sets the level for 100 sessions; rollup.swing_levels@v1.swing_low is the confirmed support instead.
+- Null after a gap in the last 100 sessions or a shorter history.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v2.high_200d`
+
+**How to read it.** The highest daily high of the last 200 sessions, in dollars per share, today's high included: close to the 52-week high (rollup.price_stats@v2.high_52w covers 252 sessions and needs 240 bars), so use it on names too young or gappy for the 52-week figure.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 200-session channel | `not_null` | hard | - | prefer feature.pct_from_high_52w for the 52-week distance |
+
+**When the reading lies**
+
+- Null after a gap in the last 200 sessions or a shorter history; the 52-week high tolerates 12 missing bars, this does not.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v2.low_200d`
+
+**How to read it.** The lowest daily low of the last 200 sessions, in dollars per share, today's low included: the ten-month floor, close to rollup.price_stats@v2.low_52w.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 200-session channel | `not_null` | hard | - | prefer feature.pct_from_low_52w for the 52-week distance |
+
+**When the reading lies**
+
+- Null after a gap in the last 200 sessions or a shorter history.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v2.prior_high_50d`
+
+**How to read it.** The highest daily high of the 50 sessions before today (today excluded), in dollars per share: the level a 50-session breakout close has to clear. feature.breakout_50d is the rule (close above it on 1.5x volume); rollup.momentum@v1.prior_high_20d is the 20-session version.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 50-session breakout level | `not_null` | hard | - | the rule is feature.breakout_50d |
+
+**When the reading lies**
+
+- It excludes today on purpose: today's high is always at or above today's close, so a channel that included it could never be broken by the close.
+- Null after a gap in the 50 sessions before today or a shorter history.
+
+Sources: Faith (2007), Way of the Turtle: the 55-day breakout (System 2)
+
+### `rollup.trend_stats@v2.prior_low_20d`
+
+**How to read it.** The lowest daily low of the 20 sessions before today (today excluded), in dollars per share: the level a 20-session breakdown close has to break. feature.breakdown_20d is the rule (close below it on 1.5x volume); for a long it is the stop most swing systems place just under.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 20-session breakdown level | `not_null` | hard | - | the rule is feature.breakdown_20d; the distance above it is rollup.price_stats@v2.close / prior_low_20d - 1 |
+
+**When the reading lies**
+
+- Null after a gap in the 20 sessions before today or a shorter history.
+
+Sources: Faith (2007), Way of the Turtle: the 20-day channel exit
+
+### `rollup.trend_stats@v2.prior_low_50d`
+
+**How to read it.** The lowest daily low of the 50 sessions before today (today excluded), in dollars per share: the intermediate breakdown level, and the stop a position-trade places under.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 50-session breakdown level | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- Null after a gap in the 50 sessions before today or a shorter history.
+
+Sources: Faith (2007), Way of the Turtle

@@ -11,7 +11,7 @@ import pandas as pd
 from algotrade.data import StoreReader
 from algotrade.features.framework.runner import compute_one, compute_sessions
 from algotrade.features.registry import GROUPS
-from algotrade.features.rollups.price import swing_levels as sl
+from algotrade.features.rollups.levels import swing_levels as sl
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import END, series, store, write_bars
 

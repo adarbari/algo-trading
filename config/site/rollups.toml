@@ -16,6 +16,14 @@ pick_hi = 0.40
 zone_lo = 0.15        # zone open interest / volume: zone_lo <= |delta| <= zone_hi
 zone_hi = 0.40
 
+["pivot_strength@v1"]    # swing-level tests and structure (docs/data/swing.md); the 0.5 ATR is part of v1
+touch_atr = 0.5          # a bar touches a level when its high / low is within touch_atr x atr_14
+
+["retest@v1"]            # the latest 20-session breakout and its retest (docs/data/swing.md)
+search_sessions = 60     # sessions searched for the latest breakout, today included
+retest_atr = 0.5         # a low within retest_atr x atr_14 above the level retests it
+fail_sessions = 20       # a close below the level within this many sessions fails the breakout
+
 ["price_stats@v2"]
 year_sessions = 252      # the 52-week window, in exchange sessions
 min_year_sessions = 240  # bars needed in that window for high_52w / low_52w (else null)

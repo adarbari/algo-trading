@@ -7,15 +7,18 @@ to the registered ``fred_release_dates`` source (FRED lists the scheduled future
 ``ts`` is the release date at ``time_et`` (New York) in UTC.
 
 - ``status``: ``released`` when the release date is on or before the run's session, else
-  ``scheduled``; a later run flips a row to ``released`` (and never back).
-- ``known_from`` (ADR 0050 decision 3): the first session the date was knowable on, the run's
-  session or, for a past date, the release date (``min``). A row already stored keeps its own
-  when its status flips, so a rewrite never moves a fact later (the table merges runs on
-  ``instrument_id`` + ``ts``, the latest wins).
+  ``scheduled``; ``moved`` when a later fetch no longer lists a stored scheduled date inside
+  the window (FRED rescheduled or withdrew it). A status change is a new version of the same
+  row (``instrument_id`` + ``ts``; the table merges runs on it and the latest wins).
+- ``known_from`` (ADR 0050 decision 3), of each version: the session it was knowable on. A
+  new row: the run's session or, for a past date, the release date (``min``). A version that
+  turns ``released``: the same ``min``, so a session before the release date, which reads the
+  latest version known by it, still sees ``scheduled`` and the release date on sees
+  ``released``. A ``moved`` version: the run's session.
 
-Only the rows the table lacks, or whose status moved forward, are written: a rerun on an
-unchanged calendar writes nothing. A date FRED moves is a new ``ts``; the old row stays (merge
-never deletes), as a date that was believed on the sessions it was stored for.
+Only the rows the table lacks and the changed versions are written: a rerun on an unchanged
+calendar writes nothing. A date FRED moves is a new ``ts``; the old row gets its ``moved``
+version.
 
 Per release, an item of the run: ``OK`` (rows written), ``UNCHANGED``, ``NO_DATA`` (FRED has no
 dates for it), ``SKIPPED`` with the reason (the source is off, or ``ALGOTRADE_FRED_API_KEY`` is
@@ -40,7 +43,7 @@ TASK = "macro_calendar"
 TABLE = "events/macro_release"  # the table this task owns (architecture/tables.toml)
 WINDOW_DAYS = 400  # dates from this many days before the session to this many after
 RULE_SOURCE = "rule"  # the ``source`` stamped on computed rows
-SCHEDULED, RELEASED = "scheduled", "released"
+SCHEDULED, RELEASED, MOVED = "scheduled", "released", "moved"
 KEY = ["instrument_id", "ts"]
 COLUMNS = [
     *KEY,
@@ -60,15 +63,18 @@ def release_moment(day: date, clock: time) -> datetime:
 
 
 def rule_dates(spec: MacroRelease, start: date, end: date) -> list[date]:
-    """The n-th exchange session of every month in ``[start, end]`` (``nth_business_day``),
-    in order; a month with fewer sessions than that has no release."""
+    """The n-th exchange session of every month in ``[start, end]`` (``nth_business_day``), or
+    the month's ``exceptions`` date where the registry names one, in order; a month with fewer
+    sessions than that has no release."""
     assert spec.nth_business_day is not None, f"{spec.key}: not a rule release"
     found: list[date] = []
     year, month = start.year, start.month
     while (year, month) <= (end.year, end.month):
         following = date(year + month // 12, month % 12 + 1, 1)
         sessions = sessions_between(date(year, month, 1), following - timedelta(1))
-        if len(sessions) >= spec.nth_business_day:
+        if f"{year}-{month:02d}" in spec.exceptions:
+            found.append(spec.exceptions[f"{year}-{month:02d}"])
+        elif len(sessions) >= spec.nth_business_day:
             found.append(sessions[spec.nth_business_day - 1])
         year, month = following.year, following.month
     return [d for d in found if start <= d <= end]
@@ -97,28 +103,46 @@ def release_rows(spec: MacroRelease, days: Sequence[date], session: date) -> pd.
 
 def rows_to_write(target: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
     """The rows of ``target`` the table needs given ``held`` (its stored rows, latest version
-    per key): the ones it lacks, and those whose status moved from ``scheduled`` to
-    ``released`` (or whose name or time changed), keeping the stored ``known_from``. A
-    ``released`` row is final."""
+    per key): the ones it lacks, those that turn ``released`` (a version of its own, with the
+    ``known_from`` of ``target``: a session before the release date still reads ``scheduled``),
+    a ``moved`` date FRED lists again, and a changed name (keeping the stored ``known_from``).
+    A ``released`` row is final."""
     if target.empty:
         return target
     kept = held.reindex(columns=[*KEY, *HELD])
     kept["ts"] = pd.to_datetime(kept["ts"], utc=True)
     merged = target.merge(kept, on=KEY, how="left", suffixes=("", "_held"))
     new = merged["status_held"].isna()
-    moved = ~new & (merged["status_held"] == SCHEDULED) & (merged["status"] == RELEASED)
-    edited = (
-        ~new
-        & (merged["status_held"] == merged["status"])
-        & (
-            (merged["release_name_held"] != merged["release_name"])
-            | (merged["time_et_held"] != merged["time_et"])
-        )
+    turned = (merged["status_held"] == SCHEDULED) & (merged["status"] == RELEASED)
+    back = merged["status_held"] == MOVED
+    renamed = (merged["status_held"] == merged["status"]) & (
+        merged["release_name_held"] != merged["release_name"]
     )
-    out = merged[new | moved | edited].copy()
-    keep_known = ~new[out.index]
+    out = merged[new | turned | back | renamed].copy()
+    keep_known = renamed[out.index]
     out.loc[keep_known, "known_from"] = out.loc[keep_known, "known_from_held"]
     return out[COLUMNS].reset_index(drop=True)
+
+
+def moved_rows(
+    held: pd.DataFrame, days: Sequence[date], window: tuple[date, date], session: date
+) -> pd.DataFrame:
+    """A ``moved`` version of every stored ``scheduled`` date inside ``window`` that a fetch
+    which returned ``days`` no longer lists (the date was rescheduled or withdrawn), known
+    from ``session``: ``COLUMNS`` rows, none when nothing went missing."""
+    if held.empty:
+        return held.reindex(columns=COLUMNS)
+    dates = pd.to_datetime(held["release_date"]).dt.date
+    gone = (
+        (held["status"] == SCHEDULED)
+        & (dates >= window[0])
+        & (dates <= window[1])
+        & ~dates.isin(set(days))
+    )
+    out = held[gone].reindex(columns=COLUMNS).copy()
+    out["status"], out["known_from"] = MOVED, session
+    out["ts"] = pd.to_datetime(out["ts"], utc=True)
+    return out.reset_index(drop=True)
 
 
 def _fetch_dates(
@@ -153,7 +177,13 @@ def _one_release(
         days, stamp = rule_dates(spec, *window), RULE_SOURCE
     if not days:
         return "NO_DATA"
-    new = rows_to_write(release_rows(spec, days, run.session), held)
+    new = pd.concat(
+        [
+            rows_to_write(release_rows(spec, days, run.session), held),
+            moved_rows(held, days, window, run.session),
+        ],
+        ignore_index=True,
+    )
     if new.empty:
         return "UNCHANGED"
     run.stage(TABLE, spec.key, new, stamp)

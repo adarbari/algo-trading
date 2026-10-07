@@ -28,7 +28,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from algotrade.config.site.settings import FeatureDefinition
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import rollup_table
 from algotrade.features.expressions.definitions import Expression, build_expressions, formula_type

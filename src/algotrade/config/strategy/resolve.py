@@ -15,13 +15,9 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.config.site.fields import reject_secrets
-from algotrade.config.site.settings import (
-    BacktestSettings,
-    FeatureDefinition,
-    ScreeningSettings,
-    site_defaults,
-)
+from algotrade.config.site.settings import BacktestSettings, ScreeningSettings, site_defaults
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.regime import RegimeSettings
 from algotrade.config.strategy.schema import (

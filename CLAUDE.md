@@ -115,7 +115,10 @@ the skill with the fix.
 3. **Every module starts with a docstring** stating its single responsibility.
 4. **Tests mirror src**: `src/algotrade/<path>/x.py` → `tests/unit/<path>/` (apps:
    `tests/apps/<app>/<path>/`; enforced by the layout tests). Coverage gate is
-   90%. Storage backends must pass `tests/contract/storage/`. Vendor adapters are tested
+   90%. **A fix for a reported issue adds the test that would have caught it** at
+   implementation time (a fitness test over config, a contract test, or a unit test; a
+   regression test only when nothing structural fits) and names it first in the PR
+   (owner rule 2026-10-06; `capture-learning`). Storage backends must pass `tests/contract/storage/`. Vendor adapters are tested
    against recorded responses; CI never calls the network: a root autouse fixture
    (`tests/conftest.py`) refuses real sockets; a test that needs a localhost server is marked
    `@pytest.mark.allow_localhost`.

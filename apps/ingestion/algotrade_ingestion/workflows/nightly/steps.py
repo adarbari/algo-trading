@@ -77,6 +77,10 @@ class Step:
     accept_with: tuple[ConfiguredAcceptance, ...] = ()  # the same, given the task context
     task_complete: bool = False  # the task must finish COMPLETE (a PARTIAL item fails it)
     params: Mapping[str, Any] = field(default_factory=dict, compare=False)  # extra task params
+    # The task resumes (``IngestRun(resume=True)``: it refetches only its RETRYABLE items). A
+    # step that SUCCEEDED with such items left is re-run, not reused, by a retry while its
+    # session is the latest and the task run's staging exists; its dependents re-run too.
+    resumable: bool = False
 
 
 @dataclass
@@ -94,6 +98,8 @@ class StepResult:
     held_by_wait: bool = False  # NOT_RUN only because a need is WAITING (transitively)
     observed: dict[str, Any] | None = None  # what the attempt saw of the source (timing.observe)
     arrival: dict[str, Any] | None = None  # ``observed`` + minutes_after_close, latest session
+    task_run: str | None = None  # the registry task's run id (its staging, for a resume)
+    origin: str | None = None  # the nightly attempt that produced a reused result
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -101,7 +107,7 @@ class StepResult:
             "critical": self.critical,
             "duration_s": self.duration_s,
         }
-        for key in ("result", "reason", "error"):
+        for key in ("result", "reason", "error", "task_run", "origin"):
             if getattr(self, key) is not None:
                 out[key] = getattr(self, key)
         if self.checks:
@@ -122,6 +128,7 @@ class Outcome:
     reason: str | None = None
     checks: list[dict[str, Any]] = field(default_factory=list)
     observed: dict[str, Any] | None = None
+    task_run: str | None = None
 
 
 def judge(checks: Iterable[Check], result: Any = None, wait: bool = False) -> Outcome:
@@ -157,6 +164,18 @@ def from_record(
     """A registry task's run record as a step outcome, after the step's acceptance checks.
     A task that could not run for a reason outside our data (``stats["skipped"]``, e.g. its
     gateway is down) is SKIPPED."""
+    outcome = _judged(record, step, ctx, session, wait)
+    outcome.task_run = record.run_id
+    return outcome
+
+
+def _judged(
+    record: RunRecord,
+    step: Step | None,
+    ctx: TaskContext | None,
+    session: date | None,
+    wait: bool,
+) -> Outcome:
     skipped = record.stats.get("skipped")
     if skipped:
         return Outcome(StepStatus.SKIPPED, record.stats, reason=f"skipped: {skipped}")
@@ -207,6 +226,7 @@ def run_isolated(
             reason=outcome.reason,
             checks=outcome.checks,
             observed=outcome.observed,
+            task_run=outcome.task_run,
         )
     result.duration_s = round((clock() - started).total_seconds(), 3)
     return result

@@ -98,6 +98,11 @@ purpose = "L3 event-sensitivity settings: the names in the event-study scope and
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
+path = "src/algotrade/config/site/features"
+purpose = "L3 expression-feature definitions: the typed FeatureDefinition of each feature in config/site/features/*.toml or a user's features file, and its loader (ADR 0023 step 3; split from config/site, at its module cap)"
+contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
+
+[[dir]]
 path = "src/algotrade/config/site/regime"
 purpose = "L3 regime settings: the plain-language indicator cards and the reference crash episodes and NBER recessions (config/site/regime/*.toml, ADR 0047), typed and validated (split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
@@ -180,6 +185,11 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 [[dir]]
 path = "src/algotrade/features/rollups/price"
 purpose = "feature groups from daily bars: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/levels"
+purpose = "feature groups of price-level structure from daily bars (swing pivots and their strength, breakouts and their retests, unfilled gaps): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

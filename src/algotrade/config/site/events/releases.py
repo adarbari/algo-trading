@@ -11,8 +11,8 @@ dates, and the UTC instant of ``time_et``, are the ``macro-calendar`` task's.
 import re
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import time
+from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from typing import Any, Protocol
 
 from algotrade.config.site.fields import Table, reject_secrets
@@ -22,10 +22,20 @@ from algotrade.core.model.instruments import macro_id
 FOLDER = "events"
 NAME = "releases"
 SOURCES = ("fred", "rule")
-KEYS = ("key", "name", "source", "release_id", "nth_business_day", "time_et", "terms")
+KEYS = (
+    "key",
+    "name",
+    "source",
+    "release_id",
+    "nth_business_day",
+    "exceptions",
+    "time_et",
+    "terms",
+)
 MAX_BUSINESS_DAY = 23  # a month has at least 20 sessions; 23 is the most it can hold
 _KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
 class Documents(Protocol):
@@ -37,7 +47,9 @@ class Documents(Protocol):
 @dataclass(frozen=True)
 class MacroRelease:
     """One ``[[release]]``. ``release_id`` is set for ``source = "fred"``, ``nth_business_day``
-    for ``source = "rule"``; ``time_et`` is ``"HH:MM"`` in America/New_York."""
+    for ``source = "rule"``; ``time_et`` is ``"HH:MM"`` in America/New_York. ``exceptions``
+    (a rule release only): ``"YYYY-MM"`` -> the date the rule misses that month (the actual
+    release date, in that month)."""
 
     key: str
     name: str
@@ -46,6 +58,7 @@ class MacroRelease:
     terms: str
     release_id: int | None = None
     nth_business_day: int | None = None
+    exceptions: Mapping[str, date] = field(default_factory=dict)
 
     @property
     def instrument_id(self) -> str:
@@ -122,6 +135,7 @@ def _release(doc: Mapping[str, Any], file: str, index: int) -> MacroRelease:
         terms=" ".join(t.text("terms", "").split()),
         release_id=release_id,
         nth_business_day=nth,
+        exceptions=_exceptions(t, source),
     )
 
 
@@ -141,3 +155,22 @@ def _source_keys(t: Table, source: str) -> tuple[int | None, int | None]:
             f"{t.where} nth_business_day: expected 1 to {MAX_BUSINESS_DAY}, got {value}"
         )
     return (value, None) if source == "fred" else (None, value)
+
+
+def _exceptions(t: Table, source: str) -> dict[str, date]:
+    """``exceptions``: ``"YYYY-MM" = <date in that month>``, for a rule release only."""
+    raw = t.raw("exceptions")
+    if raw is None:
+        return {}
+    if source != "rule":
+        raise ConfigurationError(f"{t.where} exceptions: not used by source = {source!r}")
+    if not isinstance(raw, Mapping):
+        raise ConfigurationError(f'{t.where} exceptions: expected a table ("YYYY-MM" = date)')
+    for month, day in raw.items():
+        if not isinstance(month, str) or not _MONTH.match(month):
+            raise ConfigurationError(f"{t.where} exceptions: expected YYYY-MM keys, got {month!r}")
+        if not isinstance(day, date) or isinstance(day, datetime):
+            raise ConfigurationError(f"{t.where} exceptions {month}: expected a date, got {day!r}")
+        if day.strftime("%Y-%m") != month:
+            raise ConfigurationError(f"{t.where} exceptions {month}: {day} is not in that month")
+    return dict(sorted(raw.items()))
