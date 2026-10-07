@@ -356,13 +356,13 @@ FILINGS_TASK = "filings"  # the filings task's job name (tasks/events/filings.py
 
 
 def check_filings(ctx: TaskContext, session: date) -> list[Check]:
-    """The ``filings`` step's acceptance: FAIL when over ``[quality] max_filings_failed``
-    of the CIKs the session's finished run asked SEC for failed (a CIK SEC has no filings for
-    is not a failure), or when scoped names exist and none has a CIK in the company details.
-    Nothing without a config store or a finished run of the session (a task that failed fails
-    its step itself); WARN when the run found no scoped name."""
-    if ctx.configs is None:
-        return []
+    """The ``filings`` step's acceptance: FAIL when over ``[quality] max_filings_failed`` of the
+    SEC requests the session's finished run made failed, or when any daily index day failed (it
+    stops the walk; the CIKs' submissions and, in the
+    nightly mode, the daily index days; a CIK SEC has no filings for and an index not published
+    yet are not failures), or when universe names exist and none has a CIK in the company
+    details. Nothing without a finished run of the session (a task that failed fails its step
+    itself); WARN when the run found no name."""
     done = [
         r
         for r in ctx.reader.runs(FILINGS_TASK)
@@ -371,14 +371,22 @@ def check_filings(ctx: TaskContext, session: date) -> list[Check]:
     if not done:
         return []
     stats = max(done, key=lambda r: (r.started_at, r.run_id)).stats
-    names, ciks, failed = (int(stats.get(k) or 0) for k in ("names", "ciks", "ciks_failed"))
+    keys = ("names", "with_cik", "ciks", "ciks_failed", "days", "days_failed")
+    names, with_cik, ciks, failed, days, days_failed = (int(stats.get(k) or 0) for k in keys)
     if not names:
-        return [Check("filings_fetched", "WARN", "no scoped name resolved in the reference")]
-    if not ciks:
-        return [Check("filings_fetched", "FAIL", f"none of {names} scoped names has a CIK")]
-    share, limit = failed / ciks, ctx.settings.max_filings_failed
-    detail = f"SEC failed for {failed} of {ciks} CIKs ({share:.1%}; max {limit:.0%})"
-    return [Check("filings_fetched", "FAIL" if share > limit else "PASS", detail)]
+        return [Check("filings_fetched", "WARN", "no name resolved in the universe")]
+    if not with_cik:
+        return [Check("filings_fetched", "FAIL", f"none of {names} names has a CIK")]
+    asked, bad = ciks + days, failed + days_failed
+    if not asked:
+        return [Check("filings_fetched", "PASS", "no SEC request was needed")]
+    share, limit = bad / asked, ctx.settings.max_filings_failed
+    detail = (
+        f"SEC failed for {failed} of {ciks} CIKs and {days_failed} of {days} index days "
+        f"({share:.1%}; max {limit:.0%})"
+    )
+    stopped = days_failed > 0  # a failed day stops the walk: unread days follow, so never a PASS
+    return [Check("filings_fetched", "FAIL" if share > limit or stopped else "PASS", detail)]
 
 
 def _future_dates(

@@ -441,6 +441,8 @@ Source: `design-system/components/Drawer`
 | `open` | `boolean` | yes | Shown (controlled). |
 | `onOpenChange` | `(open: boolean) => void` | yes | Called with `false` on Escape, the close button or a backdrop click. |
 | `title` | `ReactNode` | yes | The heading and accessible name ("AAPL · Apple"). |
+| `eyebrow` | `ReactNode` | no | A small mono line above the title (a catalogue name, a section label). |
+| `titleSize` | `'md' \| 'lg'` | no | Title size: `md` (default) or `lg` for a reading panel (HelpDrawer). |
 | `description` | `ReactNode` | no | One line under the title; also the accessible description. |
 | `footer` | `ReactNode` | no | Actions pinned to the bottom of the sheet. |
 | `side` | `'start' \| 'end'` | no | The side it slides in from: `end` (default) or `start`. |
@@ -575,6 +577,22 @@ Source: `design-system/components/HeatGrid`
 | `error` | `ReactNode` | no | Replaces the grid with this message. |
 | `emptyMessage` | `ReactNode` | no |  |
 
+### HelpDrawer
+
+HelpDrawer: a right-hand Drawer for one explanation (a field, a regime indicator, a glossary term), opened from an InfoButton beside the thing it explains. Header: an optional mono `eyebrow` (the catalogue name), the `title`, one muted `meta` line. Body: `HelpLead` (the reading paragraph at a larger size) then titled `HelpSection`s, or a Skeleton / ErrorState while it loads or fails. Footer: the `fullPage` slot (the app passes its router link; the design system does not route) and an "Esc to close" hint. Modal like Drawer: Escape closes, focus returns to the InfoButton.
+
+Source: `design-system/components/HelpDrawer`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Shown (controlled). |
+| `onOpenChange` | `(open: boolean) => void` | yes | Called with `false` on Escape, the close button or a backdrop click. |
+| `eyebrow` | `ReactNode` | no | A mono line above the title: the catalogue name ("rollup.momentum@v1.rel_volume") or a section label. |
+| `title` | `ReactNode` | yes | The heading and accessible name ("Relative volume"). |
+| `meta` | `ReactNode` | no | One muted line under the title: theme, unit, cadence. |
+| `children` | `ReactNode` | no | `HelpLead` and `HelpSection`s, or a loading / error state. |
+| `fullPage` | `ReactNode` | no | The "Open full page" link, passed by the app (its router link). |
+
 ### Icon
 
 Icon: the design system's small stroke icon set (16 px grid, 1.5 px stroke, round caps), drawn in `currentColor` so it takes the colour of the text around it. Decorative by default (hidden from screen readers); give `label` when the icon alone carries meaning. No emoji, no icon fonts. `spinner` with `spin` is the loading indicator.
@@ -583,7 +601,7 @@ Source: `design-system/components/Icon`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, spinner. |
+| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, book, spinner. |
 | `size` | `'sm' \| 'md' \| 'lg'` | no | sm 12, md 14 (default), lg 16 px. |
 | `tone` | `IconTone` | no | Colour role; `inherit` (default) follows the surrounding text. |
 | `label` | `string` | no | Accessible name when the icon alone carries meaning; omit for decorative icons. |
@@ -630,6 +648,20 @@ Source: `design-system/components/IndicatorRow`
 | `defaultOpen` | `boolean` | no | Initial open state when uncontrolled. |
 | `onOpenChange` | `(open: boolean) => void` | no |  |
 | `loading` | `boolean` | no | Placeholder while the row loads. |
+
+### InfoButton
+
+InfoButton: a small "what is this?" button placed beside the thing it explains (a column header, a card title, a criterion's field). It opens the explanation (the app wires `onClick` to a HelpDrawer); `summary` adds a one-sentence Tooltip on hover and focus, and `expanded` marks the button pressed while that explanation is open. Compact: it adds no height to a table header row. `label` is the accessible name.
+
+Source: `design-system/components/InfoButton`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The accessible name, naming the thing explained ("What is rel_volume?"). |
+| `summary` | `string` | no | One sentence shown in a tooltip on hover and keyboard focus. |
+| `expanded` | `boolean \| undefined` | no | The explanation is open: sets `aria-expanded` and the pressed style. Omit when it never expands. |
+| `onClick` | `MouseEventHandler<HTMLButtonElement>` | no |  |
+| `ref` | `Ref<HTMLButtonElement>` | no |  |
 
 ### Input
 

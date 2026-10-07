@@ -62,5 +62,8 @@ type Story = StoryObj<typeof meta>;
 /** From the end side. */
 export const Default: Story = {};
 
+/** A larger title, for reading panels (the HelpDrawer uses it). */
+export const LargeTitle: Story = { args: { titleSize: 'lg' } };
+
 /** From the start side, without a footer. */
 export const Start: Story = { args: { side: 'start', footer: undefined } };
