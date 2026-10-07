@@ -1,7 +1,8 @@
 """How much one request may ask for (ADR 0037): the document limits (depth 8, 10 aliases,
 5000 tokens; Strawberry's validation extensions, in ``EXTENSIONS``) and the list caps
 (``MaxItems``): at most ``MAX_NAMES`` feature names per ``features(names)`` and ``MAX_PAGE``
-rows per ``first`` / ``size``. A request over a limit fails with ``BAD_REQUEST``."""
+rows per ``first`` / ``size``, ``MAX_DAYS`` days ahead and ``MAX_MONTHS`` months of filings
+for the event reads. A request over a limit fails with ``BAD_REQUEST``."""
 
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -17,6 +18,8 @@ MAX_ALIASES = 10
 MAX_TOKENS = 5000
 MAX_NAMES = 60  # features(names)
 MAX_PAGE = 1000  # first / size
+MAX_DAYS = 366  # eventStudy(days), eventCalendar(days): calendar days ahead
+MAX_MONTHS = 120  # eventStudy(months): months of filings
 
 # Factories: Strawberry builds a fresh extension per request.
 EXTENSIONS: tuple[Callable[[], SchemaExtension], ...] = (
