@@ -1,6 +1,7 @@
-"""``bands@v1``: the 20-close standard deviation and EMA with hand-computed values, the
-bandwidth percentile against the year before, the band walk; gaps and short history are null;
-point in time (a session's row computed on bars up to it equals the backfilled row)."""
+"""``bands@v1``: the EMA stack and slopes with hand-computed values, the 20-close standard
+deviation, the bandwidth percentile against the year before, the band walk; gaps and short
+history are null; point in time (a session's row computed on bars up to it equals the
+backfilled row)."""
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.runner import compute_one, compute_sessions
 from algotrade.features.registry import GROUPS
 from algotrade.features.rollups.price import bands as bd
+from algotrade.quant.rolling import exponential_path
 from tests.helpers.rollup_store import END, series, store, write_bars
 from tests.unit.features.rollups.price.test_momentum import rows, truncated
 
@@ -18,6 +20,13 @@ F32 = 2e-7
 
 def column(values: list[float]) -> np.ndarray:
     return np.asarray(values, dtype=float)[:, None]
+
+
+def reference_ema(values: np.ndarray, n: int) -> float:
+    avg = values[:n].mean()
+    for x in values[n:]:
+        avg += 2 / (n + 1) * (x - avg)
+    return float(avg)
 
 
 def test_band_edges_by_hand() -> None:
@@ -29,14 +38,25 @@ def test_band_edges_by_hand() -> None:
     assert np.isnan(sma[-2, 0])  # 19 closes: no band yet
 
 
-def test_ema_seeds_with_the_first_twenty_then_smooths() -> None:
-    flat = column([100.0] * 20)
-    assert bd.ema(flat)[0] == 100.0
-    assert bd.ema(column([*[100.0] * 20, 121.0]))[0] == pytest.approx(100 + 2 / 21 * 21)  # 102
-    assert np.isnan(bd.ema(column([100.0] * 19))[0])
+def test_ema_path_seeds_with_the_first_n_then_smooths() -> None:
+    assert exponential_path(column([100.0] * 20), 20)[-1, 0] == 100.0
+    path = exponential_path(column([*[100.0] * 20, 121.0]), 20)
+    assert path[-1, 0] == pytest.approx(100 + 2 / 21 * 21)  # 102
+    assert np.isnan(path[18, 0]) and path[19, 0] == 100.0
+    assert np.isnan(exponential_path(column([100.0] * 19), 20)[-1, 0])
     gap = column([*[50.0] * 30, np.nan, *[100.0] * 20])  # the run after the gap: 20 bars
-    assert bd.ema(gap)[0] == 100.0
-    assert np.isnan(bd.ema(column([*[50.0] * 30, np.nan, *[100.0] * 19]))[0])
+    assert exponential_path(gap, 20)[-1, 0] == 100.0 and np.isnan(exponential_path(gap, 20)[20, 0])
+    assert np.isnan(exponential_path(column([*[50.0] * 30, np.nan, *[100.0] * 19]), 20)[-1, 0])
+    wilder = exponential_path(column([1.0] * 14 + [15.0]), 14, alpha=1 / 14)
+    assert wilder[-1, 0] == pytest.approx((13 + 15) / 14)
+
+
+def test_slopes_by_hand() -> None:
+    close = column([100.0] * 60 + [110.0] * 5)  # the EMA rises for 5 sessions
+    path = exponential_path(close, 20)
+    assert bd.slope(path, 5)[0] == pytest.approx(path[-1, 0] / path[-6, 0] - 1)
+    assert bd.slope(path, 5)[0] > 0
+    assert np.isnan(bd.slope(exponential_path(column([100.0] * 23), 20), 5)[0])  # 3 EMAs only
 
 
 def test_width_percentile_ranks_the_session_against_the_year_before() -> None:
@@ -76,30 +96,37 @@ def test_compute_from_stored_bars_and_nulls() -> None:
     c = series(bd.LOOKBACK + 1, seed=4)
     write_bars(
         writer,
-        {"EQ:A": c, "EQ:SHORT": c[-19:], "EQ:GAP": c[-60:]},
+        {"EQ:A": c, "EQ:SHORT": c[-19:], "EQ:GAP": c[-60:], "EQ:YOUNG": c[-150:]},
         skip={"EQ:GAP": [bd.LOOKBACK - 10]},  # no bar 10 sessions before the end
     )
     out = rows(compute_one(reader, bd.GROUP, END).frame)
     a = out["EQ:A"]
     assert a["close_std_20"] == pytest.approx(np.std(c[-20:], ddof=1), rel=F32)
-    ema = c[-150:-130].mean()
-    for x in c[-130:]:
-        ema += 2 / 21 * (x - ema)
-    assert a["ema_20"] == pytest.approx(ema, rel=F32)
-    widths = [np.std(c[i - 20 : i], ddof=1) / c[i - 20 : i].mean() for i in range(20, len(c) + 1)]
-    assert a["bb_width_pctile_252d"] == pytest.approx(
-        np.mean(np.array(widths[:-1]) < widths[-1]), abs=1e-6
+    for n in bd.EMA_WINDOWS:
+        assert a[f"ema_{n}"] == pytest.approx(reference_ema(c, n), rel=F32), n
+    assert a["ema20_slope_5d"] == pytest.approx(
+        reference_ema(c, 20) / reference_ema(c[:-5], 20) - 1, rel=1e-5
     )
-    assert a["band_walk"] in (-1, 0, 1) or abs(a["band_walk"]) > 1
-    for name in bd.COLUMNS:
-        assert pd.isna(out["EQ:SHORT"][name]) and pd.isna(out["EQ:GAP"][name]), name
+    assert a["sma200_slope_20d"] == pytest.approx(
+        c[-200:].mean() / c[-220:-20].mean() - 1, rel=1e-5
+    )
+    widths = [np.std(c[i - 20 : i], ddof=1) / c[i - 20 : i].mean() for i in range(20, len(c) + 1)]
+    expected = np.mean(np.array(widths[-253:-1]) < widths[-1])
+    assert a["bb_width_pctile_252d"] == pytest.approx(expected, abs=1e-6)
+    assert abs(a["band_walk"]) >= 0
+    for name in bd.COLUMNS:  # 19 bars, or a run of 10: only the 10-session EMA is known
+        assert (name == "ema_10") != pd.isna(out["EQ:SHORT"][name]), name
+        assert (name == "ema_10") != pd.isna(out["EQ:GAP"][name]), name
+    young = out["EQ:YOUNG"]  # 150 bars: every EMA but the 200 and the 200-slope
+    assert not pd.isna(young["ema_50"]) and pd.isna(young["ema_200"])
+    assert pd.isna(young["sma200_slope_20d"]) and pd.isna(young["bb_width_pctile_252d"])
 
 
 def test_point_in_time_a_session_never_sees_later_bars() -> None:
-    full = {"EQ:A": series(300, seed=11), "EQ:B": series(290, seed=12, start=50.0)}
+    full = {"EQ:A": series(420, seed=11), "EQ:B": series(405, seed=12, start=50.0)}
     writer, reader = store()
     days = write_bars(writer, full)
-    picks = [days[i] for i in (280, 299)]
+    picks = [days[i] for i in (405, 419)]
     backfilled = {r.session: r.frame for r in compute_sessions(reader, bd.GROUP, picks)}
     for day in picks:
         alone = compute_one(truncated(full, days, days.index(day)), bd.GROUP, day).frame
@@ -108,5 +135,5 @@ def test_point_in_time_a_session_never_sees_later_bars() -> None:
 
 def test_registered_with_the_declared_lookback() -> None:
     assert GROUPS["bands@v1"].table == "rollups/instrument/bands@v1"
-    assert bd.GROUP.inputs[0].sessions_back(None) == bd.LOOKBACK == 271
-    assert len(sessions_ending(END, bd.LOOKBACK + 1)) == 272
+    assert bd.GROUP.inputs[0].sessions_back(None) == bd.LOOKBACK == 399
+    assert len(sessions_ending(END, bd.LOOKBACK + 1)) == 400

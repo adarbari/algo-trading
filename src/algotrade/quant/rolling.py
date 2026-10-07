@@ -65,3 +65,26 @@ def trailing_run(holds: Mask, known: Mask) -> npt.NDArray[np.float64]:
     alive = (holds & known)[::-1].astype(np.int64)
     run = np.cumprod(alive, axis=0).sum(axis=0).astype(np.float64)
     return np.where(known[-1], run, np.nan)
+
+
+def exponential_path(values: Array, period: int, alpha: float | None = None) -> Array:
+    """Per column, the exponential moving average at every row over the column's consecutive
+    run of non-NaN rows ending at the last row (rows before the run are NaN): seeded with the
+    mean of the run's first ``period`` values (NaN until then), then
+    ``avg + alpha x (x - avg)`` with ``alpha = 2 / (period + 1)`` (the classic EMA) unless
+    given (``1 / period`` is Wilder's smoothing)."""
+    _check_window(period, 1)
+    weight = 2.0 / (period + 1) if alpha is None else alpha
+    n, width = values.shape
+    rows = np.arange(n)[:, None]
+    first = (np.where(np.isnan(values), rows, -1).max(axis=0) + 1).astype(np.int64)
+    out = np.full(values.shape, np.nan)
+    total = np.zeros(width)
+    avg = np.full(width, np.nan)
+    for i, row in enumerate(values):
+        k = i - first + 1  # values seen so far in the run, row i included
+        total = np.where((k >= 1) & (k <= period), total + np.nan_to_num(row), total)
+        avg = np.where(k == period, total / period, avg)
+        avg = np.where(k > period, avg + weight * (row - avg), avg)
+        out[i] = np.where(k >= period, avg, np.nan)
+    return out

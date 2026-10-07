@@ -108,3 +108,44 @@ description = "Where the close sits in the 20-session high-low channel: 0 at the
 null_meaning = "high_20d or low_20d is null (a gap among the last 20 sessions, or a shorter history), or the channel has no width"
 valid_range = [0, 1]
 version = 1
+
+[pct_vs_ema_20]
+expr = "price_stats.close / bands.ema_20 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 20-session EMA - 1: 0.03 is 3% above the fast average"
+null_meaning = "ema_20 is null (fewer than 20 consecutive bars), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[pct_vs_ema_50]
+expr = "price_stats.close / bands.ema_50 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 50-session EMA - 1"
+null_meaning = "ema_50 is null (fewer than 50 consecutive bars), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[pct_vs_ema_200]
+expr = "price_stats.close / bands.ema_200 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 200-session EMA - 1"
+null_meaning = "ema_200 is null (fewer than 200 consecutive bars), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[ema_stack]
+kind = "label"
+expr = '''
+if(is_null(bands.ema_20) or is_null(bands.ema_50) or is_null(bands.ema_200), null,
+   if(bands.ema_20 > bands.ema_50 and bands.ema_50 > bands.ema_200, "BULL",
+      if(bands.ema_20 < bands.ema_50 and bands.ema_50 < bands.ema_200, "BEAR", "MIXED")))
+'''
+dtype = "str"
+unit = "category"
+categories = ["BULL", "BEAR", "MIXED"]
+description = "EMA alignment: BULL when EMA20 > EMA50 > EMA200, BEAR when EMA20 < EMA50 < EMA200, else MIXED (an equality is MIXED); trend_state is the same test on the close and the SMAs"
+null_meaning = "an EMA is null (fewer than 200 consecutive bars ending on the session)"
+version = 1

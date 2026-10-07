@@ -23,6 +23,63 @@ already expresses it. Left out on purpose, with the column that covers the need:
 | An intraday volume profile | needs intraday bars (roadmap phase 6); the daily-bar profile below says it is an approximation |
 | Breakdown-and-retest (the short side) | mirror of the long side; added when a screen asks |
 
+## The owner's list, mapped (2026-10-06)
+
+Every requested feature and where it lives: an existing field, a column of this track, or
+left out with the field that covers it. Screener presets come last (section "Presets").
+
+| Area | Requested | Where |
+|---|---|---|
+| Trend | SMA 20 / 50 / 200 | `price_stats` `sma_20/50/200` |
+| | EMA 10 / 20 / 50 / 200 | `bands` `ema_10/20/50/200` (EMA 5 and SMA 5 / 10 / 100 left out: one short and one long average each is enough to state alignment; SMA 10 is `ema_10`'s twin) |
+| | slopes | `bands` `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d` |
+| | EMA alignment | `feature.ema_stack` (BULL / BEAR / MIXED over EMA 20 / 50 / 200; `trend_state` is the SMA version) |
+| | distance from moving averages | `feature.pct_vs_sma_20/50/200`, `feature.pct_vs_ema_20/50/200`, `feature.stretch_sma20_atr`, `feature.stretch_sma50_atr` |
+| Momentum | returns 1 / 3 / 5 / 10 / 20 / 60 / 120 / 252 | `trend_stats` `ret_1d`, `ret_3d`, `ret_10d`; `momentum.ret_5d`; `price_stats.ret_20d/60d`; `trend_stats` `ret_120d`, `ret_252d`, `mom_12_1` |
+| | momentum acceleration | `trend_stats` `mom_accel_5d` (ret_5d today minus ret_5d five sessions earlier; negative = deteriorating) |
+| | relative strength vs SPY / sector, percentile ranks | `relative_strength@v1` (planned): `rs_spy_63d`, `rs_sector_63d`, `rs_spy_trend_20d` (improving / deteriorating), `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d` |
+| Price structure | 20 / 50 / 100 / 200-session highs and lows | `momentum.high_20d/low_20d/high_50d/low_50d`; `trend_stats` `high_100d`, `low_100d`, `high_200d`, `low_200d` |
+| | 52-week high / low | `price_stats.high_52w/low_52w`; `feature.pct_52w_range` (where the close sits in the range) |
+| | swing highs / lows, support / resistance | `swing_levels` |
+| | number of touches | `pivot_strength@v1` (planned) |
+| | breakout / breakdown distance | `feature.dist_to_high_20d/50d`, `feature.dist_to_low_20d/50d`; `feature.breakout_magnitude_20d`; `feature.breakdown_20d`, `feature.breakout_50d` (over `trend_stats` `prior_high_50d`, `prior_low_20d`, `prior_low_50d`) |
+| Volatility | ATR 5 / 14 / 20 | `momentum.atr_14`; `vol_stats@v1` (planned) `atr_5`, `atr_20`; `feature.atr_ratio_5_20` (expansion above 1, contraction below). ATR 10 and 50 left out: 5 / 14 / 20 state expansion and the norm |
+| | ATR % | `feature.atr_pct` |
+| | HV 10 / 20 / 30 / 60 | `price_stats.hv20/hv30`; `vol_stats` `hv10`, `hv60`; `feature.hv_ratio_10_60` |
+| | volatility percentile | `vol_stats` `hv20_pctile_252d`; `iv_percentile` on the implied side |
+| | Bollinger width, expansion / contraction | `feature.bb_width`, `bands.bb_width_pctile_252d`, `feature.bb_squeeze`, `feature.atr_ratio_5_20` |
+| Price location | distance to support / resistance | `feature.dist_to_support(_atr)`, `feature.dist_to_resistance(_atr)` |
+| | distance to EMA 20 / 50 / 200, to 20 / 50-session high / low | `feature.pct_vs_ema_*`, `feature.dist_to_high_*`, `feature.dist_to_low_*` |
+| | Bollinger position, ATR-channel position, 52-week percentile | `feature.bb_pct_b`, `feature.kc_position`, `feature.pct_52w_range` |
+| | close location in the day's range | `trend_stats` `close_range_pos` ((close - low) / (high - low) of the session) |
+| Pullback quality | magnitude, pullback / ATR | `feature.dist_to_high_20d`, `feature.pullback_atr_20d` ((high_20d - close) / atr_14) |
+| | duration | `trend_stats` `sessions_since_high_20d` |
+| | retracement % | `feature.donchian_pos_20d` (1 - retracement of the 20-session range) |
+| | volume contraction | `volume.volume_ratio_5d_20d`, `feature.volume_dry_up` |
+| | higher-low formation | `pivot_strength.pivot_structure` (planned) |
+| | momentum deterioration / recovery | `trend_stats.mom_accel_5d`; `relative_strength.rs_spy_trend_20d` (planned) |
+| Breakout quality | above the 20 / 50-session high, magnitude, volume | `feature.breakout_20d`, `feature.breakout_50d`, `feature.breakout_magnitude_20d`, `momentum.rel_volume`, `trend_stats.close_range_pos` |
+| | ATR expansion | `feature.atr_ratio_5_20` |
+| | follow-through, failed-breakout history | `retest@v1` (planned): `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` |
+| Volume / liquidity | dollar volume, relative volume | `volume.dollar_volume`, `price_stats.adv_usd_20d`, `momentum.rel_volume`, `volume.volume_z_20d` |
+| | volume trend / acceleration / percentile, turnover | `vol_stats` (planned) `adv_shares_60d`, `volume_pctile_252d`; `feature.volume_trend_20_60`; `feature.turnover_20d` (adv_shares_20d / shares_outstanding) |
+| Market / sector regime | SPY / QQQ trend, market volatility, breadth | `market_trend@v2`, `market_breadth@v1`, `regime@v3` (`market.*`); IWM through `cross_asset.iwm_vs_spy` |
+| | sector momentum, sector relative strength | `relative_strength@v1` (planned): `sector_etf`, `sector_ret_63d`, `sector_rank_63d`, `rs_sector_63d` |
+| Options | IV, IV rank, IV percentile, IV / HV, IV - HV spread | `iv30`, `iv_rank`, `iv_percentile`, `iv_hv_ratio`, `iv_hv_spread`, the `vrp_*` set |
+| | OI, option volume, spread, delta, DTE | `option_liquidity`, `put_wing`, `oi_walls`, `nearest_expiry` |
+| | skew, expected move | `skew@v1`, `implied_move@v1` (planned, positioning.md) |
+| | strike distance from support, / ATR | `feature.put_support_cushion` ((best put strike... see swing.toml: (swing_low - best_put_strike) / close) and `feature.put_support_cushion_atr` (/ atr_14) |
+| Catalyst / risk | days to earnings | `earnings.days_to_earnings`, `feature.earnings_before_expiry` |
+| | historical, worst and average earnings moves; news / catalyst flags | EV track (`own_sensitivity`: `move_multiple_median`, `down_move_worst_pct`, 8-K item flags); not duplicated here |
+
+## Presets
+
+Once the inputs above exist, the eight rule screens the owner described (breakout, pullback,
+support reversal, exhaustion, trend continuation, range breakout, failed breakout, oversold
+reversal) are site presets in `config/site/presets/` (`add-screener`), each criterion a
+catalogue field with its guide threshold. They are the last PR of the track; a preset that
+needs a field this table marks planned waits for that field.
+
 ## Where the columns live
 
 `features/rollups/price/` is at its module cap, so the new kinds get their own folders (one
@@ -30,8 +87,8 @@ folder per kind of thing; `architecture/layout.toml`):
 
 | Group | Folder | Columns | Status |
 |---|---|---|---|
-| `bands@v1` | `price/` | `close_std_20`, `ema_20`, `bb_width_pctile_252d`, `band_walk` | built |
-| `trend_stats@v1` | `price/` | `ret_120d`, `ret_252d`, `mom_12_1`, `ret_z_20d`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
+| `bands@v1` | `price/` | `ema_10/20/50/200`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
+| `trend_stats@v1` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
 | `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | planned |
 | `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | planned |
 | `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state` | planned |
@@ -45,7 +102,8 @@ folder per kind of thing; `architecture/layout.toml`):
 
 Formulas over stored columns are expression features (computed on read):
 `config/site/features/bands.toml` (bands, channels, z-scores, stretches),
-`swing.toml` (level distances and setups), `price.toml` (relative strength),
+`swing.toml` (level distances, the pullback in ATRs, the 52-week position, the 50-session breakout and
+20-session breakdown, the short put's cushion above support), `price.toml` (relative strength),
 `positioning.toml` (flow ratios, skew, term structure, implied move, wing yields).
 
 ## Shared rules
@@ -61,13 +119,14 @@ Formulas over stored columns are expression features (computed on read):
 
 ## `bands@v1` (price/)
 
-Inputs: `bars/1d`, the session plus 270 earlier sessions (252 bandwidths of 20 closes each,
-and the EMA warm-up).
+Inputs: `bars/1d`, the session plus 399 earlier sessions (the EMA run, and 252 bandwidths of
+20 closes each).
 
 | Column | Definition | Null when |
 |---|---|---|
 | `close_std_20` | sample standard deviation (ddof 1) of the last 20 closes, the session included | a gap among the last 20 sessions, or a shorter history |
-| `ema_20` | exponential moving average of the close, alpha 2 / 21, seeded with the mean of the first 20 closes of the consecutive run of bars ending on the session (at most the last 150 sessions; the seed's weight after 130 more bars is under 1e-5) | fewer than 20 consecutive bars ending on the session |
+| `ema_10`, `ema_20`, `ema_50`, `ema_200` | exponential moving average of the close, alpha 2 / (n + 1), seeded with the mean of the first n closes of the consecutive run of bars ending on the session (at most the last 400 sessions; every charting package seeds the same way and uses all its history, so the 200 differs from theirs by the seed's remaining weight, (199/201)^k after k more bars) | fewer than n consecutive bars ending on the session |
+| `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d` | the average today / the average h sessions earlier - 1 | the average is unknown on either session |
 | `bb_width_pctile_252d` | share of the 252 sessions before the session whose Bollinger bandwidth (4 x close_std_20 / sma_20) was strictly below the session's: 0.05 is a squeeze (narrower than 95% of the year), 0.95 an expansion | the session's bandwidth is unknown, or fewer than 240 of the 252 sessions before have one |
 | `band_walk` | signed count of consecutive sessions, ending on the session, with the close above the upper Bollinger band (positive) or below the lower (negative); 0 inside the bands | the session's bands are unknown (the count stops at the first session without bands) |
 
@@ -76,7 +135,8 @@ Expression features (`bands.toml`), with `k = 2` (Bollinger) and `m = 2` (Keltne
 `bb_upper`, `bb_lower`, `bb_width`, `bb_pct_b`, `kc_upper`, `kc_lower`, `kc_position`,
 `bb_squeeze` (both Bollinger bands inside the Keltner channel: the TTM squeeze), `price_z_20d`
 ((close - sma_20) / close_std_20), `stretch_sma20_atr`, `stretch_sma50_atr` ((close - SMA) /
-atr_14), `donchian_pos_20d` ((close - low_20d) / (high_20d - low_20d)).
+atr_14), `donchian_pos_20d` ((close - low_20d) / (high_20d - low_20d)), `pct_vs_ema_20/50/200`
+and `ema_stack` (BULL / BEAR / MIXED).
 
 Worked example: closes 100, 101, ..., 119 (20 bars): sma_20 109.5, close_std_20 5.916;
 bb_upper 121.33, bb_lower 97.67, bb_width 0.2161, bb_pct_b (119 - 97.67) / 23.66 = 0.9014,
@@ -88,7 +148,12 @@ Inputs: `bars/1d`, the session plus 252 earlier sessions. Param `tight_range_pct
 
 | Column | Definition | Null when |
 |---|---|---|
-| `ret_120d`, `ret_252d` | close / close n sessions earlier - 1 | a gap among the last n + 1 sessions, or a shorter history |
+| `ret_1d`, `ret_3d`, `ret_10d`, `ret_120d`, `ret_252d` | close / close n sessions earlier - 1 | a gap among the last n + 1 sessions, or a shorter history |
+| `mom_accel_5d` | ret_5d today - ret_5d five sessions earlier | a gap among the last 11 sessions |
+| `high_100d`, `low_100d`, `high_200d`, `low_200d` | the extreme over the last n sessions, the session included | a gap among the last n sessions |
+| `prior_high_50d`, `prior_low_20d`, `prior_low_50d` | the extreme over the n sessions before the session (the session excluded): the level a breakout or breakdown close must clear | a gap among those n sessions |
+| `sessions_since_high_20d` | sessions since the highest high of the last 20 (the latest of equal highs; 0: today) | a gap among the last 20 sessions |
+| `close_range_pos` | (close - low) / (high - low) of the session's bar | the bar has no range |
 | `mom_12_1` | close 21 sessions earlier / close 252 sessions earlier - 1: the 12-month return with the last month skipped (Jegadeesh-Titman) | a gap among the last 253 sessions, or a shorter history |
 | `ret_z_20d` | the session's one-session return / the sample standard deviation of the 20 one-session returns before it | a gap among the last 22 sessions, a shorter history, or those 20 returns were all equal |
 | `close_streak` | signed consecutive sessions, ending on the session, with the close above the previous close (positive) or below it (negative); 0 when unchanged | no bar on the previous session |

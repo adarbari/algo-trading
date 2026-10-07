@@ -1,21 +1,29 @@
-"""``trend_stats@v1``: longer returns, the 12-1 momentum, the return z-score and the streaks
-(closes, sessions above the 20-session mean, tight-range sessions), from daily bars
+"""``trend_stats@v1``: short and long returns, momentum acceleration, the return z-score,
+the 100 / 200-session channels and the prior levels a breakout or breakdown must clear, the
+pullback's age, the close's place in the day's range and the streaks, from daily bars
 (``docs/data/technical.md``).
 
 Input: ``bars/1d`` split-adjusted AS OF the session, the session plus ``LOOKBACK`` (252)
 earlier sessions. One row per instrument with a bar on the session.
 
-    ret_120d, ret_252d    close / close n sessions earlier - 1
-    mom_12_1              close 21 sessions earlier / close 252 sessions earlier - 1: the
-                          12-month return with the last month skipped (Jegadeesh-Titman)
-    ret_z_20d             the session's one-session return / the sample stdev of the 20
-                          one-session returns before it
-    close_streak          signed consecutive sessions with the close above (+) / below (-)
-                          the previous close; 0 when unchanged
-    sma20_streak          signed consecutive sessions with the close above (+) / below (-)
-                          its 20-session mean; 0 when equal
-    tight_range_sessions  consecutive sessions on which the 20-session high-low range / close
-                          was at most ``tight_range_pct`` (0.15): the length of the base
+    ret_1d/3d/10d/120d/252d  close / close n sessions earlier - 1
+    mom_12_1                 close 21 sessions earlier / close 252 sessions earlier - 1
+    mom_accel_5d             ret_5d today - ret_5d five sessions earlier (momentum
+                             accelerating above 0, deteriorating below)
+    ret_z_20d                the session's one-session return / the sample stdev of the 20
+                             one-session returns before it
+    high_100d, low_100d,     highest high / lowest low over the last n sessions
+    high_200d, low_200d
+    prior_high_50d,          the extreme over the n sessions BEFORE the session (the level a
+    prior_low_20d/50d        breakout or breakdown close must clear; momentum@v1 has
+                             prior_high_20d)
+    sessions_since_high_20d  sessions since the highest high of the last 20 (0: today)
+    close_range_pos          (close - low) / (high - low) of the session's bar
+    close_streak             signed consecutive sessions with the close above (+) / below (-)
+                             the previous close; 0 when unchanged
+    sma20_streak             signed consecutive sessions above (+) / below (-) the 20-mean
+    tight_range_sessions     consecutive sessions on which the 20-session range / close was at
+                             most ``tight_range_pct`` (0.15): the length of the base
 
 A streak counts only while every session in it has a bar (and a known mean or range); it is
 capped by the sessions read. Parameters: ``TrendStatsParams`` (``config/site/rollups.toml``
@@ -37,10 +45,13 @@ from algotrade.quant.rolling import rolling_max, rolling_mean, rolling_min, trai
 NAME = "trend_stats"
 VERSION = 1
 BARS = "bars/1d"
-RETURN_WINDOWS = (120, 252)
+RETURN_WINDOWS = (1, 3, 10, 120, 252)
 SKIP, LONG = 21, 252  # the 12-1 momentum: skip the last month, measure the year before it
+ACCEL = 5  # momentum acceleration: the 5-session return against the one before it
 Z_WINDOW = 20  # one-session returns the return z-score is measured against
-MEAN_WINDOW = 20  # sma20_streak's mean, tight_range_sessions' range
+CHANNELS = (100, 200)
+PRIOR = (("high", 50), ("low", 20), ("low", 50))  # the extremes over the sessions before
+MEAN_WINDOW = 20  # sma20_streak's mean, tight_range_sessions' range, the pullback's age
 LOOKBACK = LONG  # earlier sessions read: a return over 252 sessions needs the close before
 ZERO_STD = 1e-9  # a return stdev under this is rounding noise over equal returns: unknown z
 CLOSE, HIGH, LOW = (f"{BARS}.{c}" for c in ("close", "high", "low"))
@@ -54,7 +65,7 @@ FEATURES = (
     *(
         Feature(
             f"ret_{n}d", "float32", "decimal",
-            f"Close / close {n} sessions earlier - 1",
+            f"Close / close {n} session{'s' if n > 1 else ''} earlier - 1",
             _gap(n + 1), valid_range=(-1, None), inputs=(CLOSE,),
         )
         for n in RETURN_WINDOWS
@@ -67,6 +78,13 @@ FEATURES = (
         _gap(LONG + 1), valid_range=(-1, None), inputs=(CLOSE,),
     ),
     Feature(
+        f"mom_accel_{ACCEL}d", "float32", "decimal",
+        f"The {ACCEL}-session return today minus the {ACCEL}-session return {ACCEL} sessions "
+        "earlier: above 0 momentum is accelerating (this week beat last week), below 0 "
+        "deteriorating; -0.04 means this week's return was 4 points below last week's",
+        _gap(2 * ACCEL + 1), valid_range=(-5, 5), inputs=(CLOSE,),
+    ),
+    Feature(
         f"ret_z_{Z_WINDOW}d", "float32", "ratio",
         "The session's one-session return (close / previous close - 1) / the sample standard "
         f"deviation (ddof 1) of the {Z_WINDOW} one-session returns before it: the day's "
@@ -74,6 +92,47 @@ FEATURES = (
         f"{_gap(Z_WINDOW + 2)}; or those {Z_WINDOW} returns were all equal (zero standard "
         "deviation)",
         inputs=(CLOSE,),
+    ),
+    *(
+        f
+        for n in CHANNELS
+        for f in (
+            Feature(
+                f"high_{n}d", "float32", "usd_per_share",
+                f"Highest daily high over the last {n} sessions, the session included",
+                _gap(n), valid_range=(0, None), inputs=(HIGH,),
+            ),
+            Feature(
+                f"low_{n}d", "float32", "usd_per_share",
+                f"Lowest daily low over the last {n} sessions, the session included",
+                _gap(n), valid_range=(0, None), inputs=(LOW,),
+            ),
+        )
+    ),
+    *(
+        Feature(
+            f"prior_{side}_{n}d", "float32", "usd_per_share",
+            f"{'Highest daily high' if side == 'high' else 'Lowest daily low'} over the {n} "
+            f"sessions before the session (the session excluded): the level a "
+            f"{'breakout' if side == 'high' else 'breakdown'} close must clear",
+            f"a session among the {n} before the session has no bar (a gap), or the history is "
+            "shorter", valid_range=(0, None), inputs=(HIGH if side == "high" else LOW,),
+        )
+        for side, n in PRIOR
+    ),
+    Feature(
+        f"sessions_since_high_{MEAN_WINDOW}d", "int", "sessions",
+        f"Sessions since the highest high of the last {MEAN_WINDOW} sessions (0: today's high "
+        "is the highest; 19: the pullback has lasted the whole window): the age of the "
+        "current pullback",
+        _gap(MEAN_WINDOW), valid_range=(0, MEAN_WINDOW - 1), inputs=(HIGH,),
+    ),
+    Feature(
+        "close_range_pos", "float32", "ratio",
+        "Where the close sits in the session's own high-low range: (close - low) / (high - "
+        "low), 1 at the high of the day, 0 at the low; above 0.7 the session closed strong",
+        "never null for a traded session, except a bar whose high equals its low (no range)",
+        valid_range=(0, 1), inputs=(HIGH, LOW, CLOSE),
     ),
     Feature(
         "close_streak", "int", "sessions",
@@ -122,6 +181,9 @@ def returns(close: Matrix) -> dict[str, Matrix]:
         for n in RETURN_WINDOWS
     }
     out["mom_12_1"] = _if_complete(close[-SKIP - 1] / close[-LONG - 1] - 1.0, close[-LONG - 1 :])
+    this = close[-1] / close[-ACCEL - 1] - 1.0
+    last = close[-ACCEL - 1] / close[-2 * ACCEL - 1] - 1.0
+    out[f"mom_accel_{ACCEL}d"] = _if_complete(this - last, close[-2 * ACCEL - 1 :])
     return out
 
 
@@ -137,6 +199,24 @@ def return_z(close: Matrix) -> Matrix:
     return _if_complete(z, close[-Z_WINDOW - 2 :])
 
 
+def levels(px: Panel) -> dict[str, Matrix]:
+    """The channels, the prior extremes, the pullback's age and the close's range position."""
+    out: dict[str, Matrix] = {}
+    for n in CHANNELS:
+        out[f"high_{n}d"] = px.high[-n:].max(axis=0)
+        out[f"low_{n}d"] = px.low[-n:].min(axis=0)
+    for side, n in PRIOR:
+        prices = (px.high if side == "high" else px.low)[-n - 1 : -1]
+        out[f"prior_{side}_{n}d"] = prices.max(axis=0) if side == "high" else prices.min(axis=0)
+    recent = px.high[-MEAN_WINDOW:]
+    age = np.argmax(recent[::-1] == recent.max(axis=0), axis=0)  # the latest of equal highs
+    out[f"sessions_since_high_{MEAN_WINDOW}d"] = _if_complete(age.astype(float), recent)
+    span = px.high[-1] - px.low[-1]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        out["close_range_pos"] = np.where(span > 0, (px.close[-1] - px.low[-1]) / span, np.nan)
+    return out
+
+
 def signed_run(diff: Matrix, known: np.ndarray) -> Matrix:
     """The signed trailing run of ``diff``'s sign: rows above 0 count up, below 0 down."""
     up = trailing_run(diff > 0, known)
@@ -147,14 +227,12 @@ def signed_run(diff: Matrix, known: np.ndarray) -> Matrix:
 def streaks(px: Panel, p: TrendStatsParams) -> dict[str, Matrix]:
     close = px.close
     change = np.diff(close, axis=0)
-    known = ~np.isnan(change)
     mean = rolling_mean(close, MEAN_WINDOW)
     width = (rolling_max(px.high, MEAN_WINDOW) - rolling_min(px.low, MEAN_WINDOW)) / close
-    tight = width <= p.tight_range_pct
     return {
-        "close_streak": signed_run(change, known),
+        "close_streak": signed_run(change, ~np.isnan(change)),
         f"sma{MEAN_WINDOW}_streak": signed_run(close - mean, ~np.isnan(mean)),
-        "tight_range_sessions": trailing_run(tight, ~np.isnan(width)),
+        "tight_range_sessions": trailing_run(width <= p.tight_range_pct, ~np.isnan(width)),
     }
 
 
@@ -162,16 +240,21 @@ def compute(inputs: Inputs, session: date, p: TrendStatsParams) -> pd.DataFrame:
     bars = inputs[BARS]
     assert bars is not None  # required input
     px = panel(bars, sessions_ending(session, LOOKBACK + 1))
-    values = {**returns(px.close), f"ret_z_{Z_WINDOW}d": return_z(px.close), **streaks(px, p)}
+    values = {
+        **returns(px.close),
+        f"ret_z_{Z_WINDOW}d": return_z(px.close),
+        **levels(px),
+        **streaks(px, p),
+    }
     return traded_rows(px, values, COLUMNS)
 
 
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    f"{RETURN_WINDOWS[0]} / {RETURN_WINDOWS[1]}-session returns, the 12-1 momentum, the "
-    f"return z-score over {Z_WINDOW} sessions and the close, SMA{MEAN_WINDOW} and "
-    "tight-range streaks",
+    "Short and long returns, the 12-1 momentum and its acceleration, the return z-score, the "
+    "100 / 200-session channels, the prior 20 / 50-session extremes, the pullback's age, the "
+    "close's place in the day's range and the close, SMA20 and tight-range streaks",
     (Input(BARS, lookback=LOOKBACK),),
     FEATURES,
     compute,
