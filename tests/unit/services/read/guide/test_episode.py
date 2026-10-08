@@ -16,13 +16,13 @@ from tests.unit.services.read.guide.conftest import ADV, SHIPPED
 def test_the_episode_page(regime: StoreContext) -> None:
     page = load_guide_episode(regime, "gfc")
     assert page is not None
-    assert (page.slug, page.name, page.kind, page.recession) == (
+    assert (page.slug, page.episode.name, page.episode.kind, page.episode.recession) == (
         "gfc", "Financial crisis", "recession", True,
     )  # fmt: skip
-    assert (page.peak, page.trough, page.recovered) == (
+    assert (page.episode.peak, page.episode.trough, page.episode.recovered) == (
         date(2007, 10, 9), date(2009, 3, 9), date(2013, 3, 28),
     )  # fmt: skip
-    assert (page.nber_start, page.nber_end) == (date(2007, 12, 1), date(2009, 6, 1))
+    assert (page.episode.nber_start, page.episode.nber_end) == (date(2007, 12, 1), date(2009, 6, 1))
     assert page.cause.fields == (ADV,) and page.notes.text == "Curve."
     ((indicator),) = page.indicators
     assert (indicator.key, indicator.label, indicator.line.text) == (
@@ -35,7 +35,11 @@ def test_a_shock_has_no_recession_and_a_shared_year_names_no_indicator(
 ) -> None:
     page = load_guide_episode(regime, "eu")
     assert page is not None
-    assert (page.recovered, page.nber_start, page.nber_end) == (None, None, None)
+    assert (page.episode.recovered, page.episode.nber_start, page.episode.nber_end) == (
+        None,
+        None,
+        None,
+    )
     assert page.indicators == ()  # "2011" is held by two episodes: it means neither
 
 
@@ -58,7 +62,7 @@ def test_every_shipped_episode_has_a_page_under_a_unique_slug(site: StoreContext
     assert episodes and len(set(slugs)) == len(slugs)
     for e in episodes:
         page = load_guide_episode(site, e.key)
-        assert page is not None and page.slug == e.key and page.name == e.name
+        assert page is not None and page.slug == e.key and page.episode.name == e.name
 
 
 def test_every_shipped_before_label_means_exactly_one_episode() -> None:

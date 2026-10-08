@@ -12,7 +12,6 @@ it)."""
 
 from collections.abc import Container
 from dataclasses import dataclass
-from datetime import date
 
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import Episode, load_episodes
@@ -33,26 +32,18 @@ class GuideEpisodeIndicator:
 
 @dataclass(frozen=True)
 class GuideEpisodeDetail:
-    """An episode as the config holds it: ``spx_drawdown`` / ``nasdaq_drawdown`` peak-to-trough
-    fractions (zero or negative); ``nber_start`` / ``nber_end`` the recession's first and last
-    months (``None``: no recession); ``recovered`` ``None`` while the S&P 500 has not regained
-    its peak."""
+    """An episode as the config holds it (``episode``: dates, drawdowns, recession months,
+    ``known_from``; the config's own type, never copied field by field), with ``cause`` and
+    ``notes`` linked and the indicators whose ``before`` line is about it."""
 
-    slug: str
-    name: str
-    kind: str
-    peak: date
-    trough: date
-    recovered: date | None
-    spx_drawdown: float
-    nasdaq_drawdown: float
-    recession: bool
-    nber_start: date | None
-    nber_end: date | None
-    known_from: date
+    episode: Episode
     cause: LinkedProse
     notes: LinkedProse
     indicators: tuple[GuideEpisodeIndicator, ...]
+
+    @property
+    def slug(self) -> str:
+        return self.episode.key
 
 
 def before_episode(label: str, episodes: tuple[Episode, ...]) -> Episode | None:
@@ -72,18 +63,7 @@ def load_guide_episode(ctx: Stores, slug: str) -> GuideEpisodeDetail | None:
         return None
     fields = catalog_of(ctx.features).fields
     return GuideEpisodeDetail(
-        slug=e.key,
-        name=e.name,
-        kind=e.kind,
-        peak=e.peak,
-        trough=e.trough,
-        recovered=e.recovered,
-        spx_drawdown=e.spx_drawdown,
-        nasdaq_drawdown=e.nasdaq_drawdown,
-        recession=e.recession,
-        nber_start=e.nber_start,
-        nber_end=e.nber_end,
-        known_from=e.known_from,
+        episode=e,
         cause=link_prose(e.cause, fields),
         notes=link_prose(e.notes, fields),
         indicators=_indicators(ctx, e, episodes, fields),
