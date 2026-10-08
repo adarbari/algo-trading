@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-420 stored features in 44 groups, in dependency order; 120 expression features.
+423 stored features in 45 groups, in dependency order; 120 expression features.
 
 ## `option_liquidity@v1`
 
@@ -115,6 +115,16 @@ Whether the next earnings date is announced (scheduled) on the session. Stored a
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
 | `next_status` | label | str | category | open | SCHEDULED, NOT_ANNOUNCED | SCHEDULED: a next report date on or after the session is in the calendars stored by then; NOT_ANNOUNCED: none, only a last report date | never | `events/earnings.ts` |
+
+## `earnings_expected@v1`
+
+The earnings date a session can expect: the next known date, else last year's plus 364 days. Stored as `rollups/instrument/earnings_expected@v1`; reads `events/earnings`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `expected_report_date` | window | date | date | open |  | The report date the session can expect: the next known one (SCHEDULED) or the year-ago report plus 364 days (PRIOR_YEAR) | UNKNOWN: no report date on or after the session is known, and no report in the 364 days before it | `events/earnings.ts` |
+| `expected_basis` | label | str | category | open | SCHEDULED, PRIOR_YEAR, UNKNOWN | How the date is known: SCHEDULED (a report date known by the session), PRIOR_YEAR (the year-ago report plus 364 days), UNKNOWN (neither: not 'no earnings') | never | `events/earnings.ts` |
+| `sessions_to_expected_report` | window | int | sessions | open | >= 0 | Exchange sessions after the session up to the expected report date (0: today) | UNKNOWN: no report date on or after the session is known, and no report in the 364 days before it | `events/earnings.ts` |
 
 ## `ibkr_iv@v1`
 
