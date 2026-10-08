@@ -22,6 +22,7 @@ vi.mock('@/widgets/regime-gate', async () => {
     ),
   };
 });
+vi.mock('@/widgets/preview-diff', () => ({ PreviewDiff: () => <Text>preview diff</Text> }));
 vi.mock('@/widgets/describe-screen', () => ({ DescribeScreen: () => <Text>describe</Text> }));
 vi.mock('@/widgets/criteria-table', () => ({ CriteriaTable: () => <Text>criteria</Text> }));
 vi.mock('@/widgets/screen-summary', () => ({ ScreenSummary: () => <Text>summary</Text> }));
@@ -54,7 +55,7 @@ describe('ScreenerBuilderPage', () => {
       />,
     );
     expect(probe.id).toBe('my-vrp');
-    for (const text of ['draft bar', 'describe', 'criteria', 'summary', 'funnel'])
+    for (const text of ['draft bar', 'preview diff', 'describe', 'criteria', 'summary', 'funnel'])
       expect(screen.getByText(text)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'open ticker' }));
     expect(onOpenTicker).toHaveBeenCalledWith('AAPL');
