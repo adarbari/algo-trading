@@ -53,7 +53,7 @@ after copying it there). The agent starts the API at login and restarts it whene
 it reads this checkout's `.env` as the nightly does; logs are `var/logs/api.log` and
 `var/logs/api.err.log`. After a change to `.env`, `config/site/users.toml` or an
 `identity.toml` (read at startup), or after pulling API code, restart it. After a change to the code, `scripts/ops/deploy.sh`
-does it all (main checkout on `main` and clean: `git pull --ff-only`, `make web-build`,
+(or the auto-deploy agent below) does it all (main checkout on `main` and clean: `git pull --ff-only`, `make web-build`,
 restart, health; `--dry-run` prints the plan). After only a config change:
 
 ```bash
@@ -83,6 +83,39 @@ This machine's own site values (the LLM provider, `enabled = true`) live in the 
 
 The agent binds `127.0.0.1` only; Funnel is the one way in from outside. Without the agent,
 `.venv/bin/algotrade-api` in a terminal serves the same.
+
+### Auto-deploy (launchd, ADR 0057)
+
+The fourth agent, `com.algotrade.deploy`, runs `scripts/ops/deploy.sh --auto` at load and every
+5 minutes: it fetches `origin/main` and, when it moved, deploys only what the changed files need
+(dependencies: `uv sync` + restart; `apps/web`, Makefile: web build; `schema.graphql`: both;
+`apps/api`, `src`, `libs`, `config/site`: restart; ingestion, docs, tests: merge only). Nothing
+moved: it exits at once and logs nothing. Install it (written, never installed by code; it
+needs `uv`, `npm`, `node`, `git` on the PATH it is written with):
+
+```bash
+.venv/bin/algotrade-api schedule --agent deploy   # writes var/com.algotrade.deploy.plist; prints the commands
+mkdir -p var/logs
+cp var/com.algotrade.deploy.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.algotrade.deploy.plist
+```
+
+- **Log:** `var/logs/deploy.log`, one line per acting cycle (`deployed <sha> (restart web)`,
+  `skipped: ingest/deploy running`, `BLOCKED: <reason>`). State: `var/deploy/` (`last_sha`, the
+  web build in `web.next` / `web.prev`).
+- **Blocked:** a failed sync, web build, restart or health check, a main checkout that is dirty,
+  off `main` or diverged from `origin/main`, a missing tool, or 12 failed fetches in a row write
+  `var/deploy/blocked`, show one macOS notification and stop. Nothing is rolled back; the site
+  stays as the failure left it. Fix the cause, then `scripts/ops/deploy.sh --clear` (prints the
+  reason and lets the agent run again); a manual `scripts/ops/deploy.sh` that succeeds clears it too.
+- **Ingest:** a deploy takes the `deploy` lock and the ingest run lock without waiting, so it
+  never runs over an ingest (the cycle logs "skipped" and retries in 5 minutes). While it holds
+  them, a nightly that finds the lock busy is rerun by its watchdog, and a manual
+  `algotrade-ingest` exits busy like any second run.
+- **Plists:** when a launchd plist writer changed, the cycle regenerates the agents into
+  `var/deploy/plists/`, compares them with `~/Library/LaunchAgents/` and notifies
+  "reinstall"; it never installs or blocks. Reinstall with the commands each `schedule` prints.
+- The manual `scripts/ops/deploy.sh` (and `--dry-run`) still does everything: sync, web, restart.
 
 ### The monthly Tiingo history fill (launchd)
 

@@ -585,6 +585,17 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pbo_cscv" }, { string = "results/edge_eval" }]
 
 [[responsibility]]
+id = "edge-scorer-fit"
+description = "Fit a learned scorer for an edge (ADR 0053 amendment, ED7): the training frame (the edge's eligible names at each decision session D with the features its document declares under [scorer] read at D only, and the edge's hit at the entry session S as the label, only windows closing before frozen_from less one horizon: purged and embargoed, never the frozen period), the probit of the hit on the standardised features (quant/probit.py is the model), and the coefficients written as the TOML expression feature edge_score_<edge> in config/site/features/edge_scores.toml with fitted_through; run by algotrade-backtest fit-edge-scorer through the edge-score-fit job; nightly scoring is the expression engine's ncdf over the file, with no label at score time"
+owner = ["src/algotrade/services/evaluation/training/*"]
+allowed = [
+    "src/algotrade/services/jobs/handlers.py",  # the edge-score-fit job kind (ADR 0010)
+    "apps/backtest/algotrade_backtest/commands.py",  # fit-edge-scorer writes the features file
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-08-ed7a-the-first-learned-scorer-a-probit-in-site-config"
+detect = [{ call = "fit_scorer" }, { call = "training_frame" }, { call = "render_scorer" }, { call = "merge_scorers" }]
+
+[[responsibility]]
 id = "forward-outcomes"
 description = "Compute and store forward outcomes (ADR 0053 decision 3): for each window a session closes (S = T - h exchange sessions, horizons and benchmarks from the open edge documents plus the 20-session SPY default), every name in the universe at S with a bar at S measured from S's close to T's on bars split-adjusted as of T (return, excess over the benchmark, max favourable and adverse excursion, realised volatility; DELISTED by the reference snapshot's delisting date, else a reason), one run per window end into outcomes/instrument/forward_returns@v1, and its acceptance check; read back only through algotrade.data.outcomes, importable only from services/evaluation"
 owner = [
@@ -594,7 +605,8 @@ owner = [
 ]
 allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the outcomes tables' one schema
-    "src/algotrade/services/evaluation/cross_section/harness.py",  # the one reader of outcomes (ADR 0053)
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the reader of outcomes (ADR 0053)
+    "src/algotrade/services/evaluation/training/frame.py",  # the other: the labels of a fit (ED7)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, { call = "read_outcomes" }]
@@ -751,6 +763,16 @@ detect = [
 ]
 
 [[responsibility]]
+id = "deploy-cycle"
+description = "Decide what a deploy of origin/main must do: map the changed paths to actions (sync, web, restart, plists), hold the deploy and ingest locks around it (the ingestion app's `algotrade-ingest deploy-hold`), poll the running API until it serves the deployed commit; scripts/ops/deploy.sh orchestrates (git, build, swap, notify, log) and calls this through `algotrade-api deploy-plan|deploy-verify` and `algotrade-ingest deploy-hold` (ADR 0057)"
+owner = [
+    "apps/api/algotrade_api/ops/deploy.py",
+    "apps/ingestion/algotrade_ingestion/ops/hold.py",
+]
+section = "docs/adr/0057-auto-deploy-from-origin-main.md#decision"
+detect = [{ call = "fnmatchcase" }]
+
+[[responsibility]]
 id = "http-api"
 description = "Serve HTTP: FastAPI routers (one per area: writes, job polling, health, live quotes, preview POSTs), response schemas, CORS, error mapping and the ASGI server; routes call one library function each (page reads are GraphQL: graphql-schema)"
 owner = ["apps/api/algotrade_api/*"]
@@ -759,7 +781,7 @@ detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn"
 
 [[responsibility]]
 id = "launchd-agents"
-description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py) and the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044)"
+description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py), the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044) and the auto-deploy poll (the same api module, ADR 0057)"
 owner = [
     "apps/ingestion/algotrade_ingestion/ops/schedule.py",
     "apps/api/algotrade_api/ops/schedule.py",
@@ -803,7 +825,7 @@ detect = [{ call = "explain" }, { call = "unavailable_tables" }]
 
 [[responsibility]]
 id = "domain-read-model"
-description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards, label bands, reference episodes and NBER recessions, services/read/regime/) and the market entity (services/read/market/: its values by catalogue name and the bucketed history of its stored fields), read from the market-entity feature groups by catalogue name. The event reads (ADR 0050, services/read/events/): InstrumentEvents (the events ahead: own and a fund's reference earnings by catalogue name, the macro releases known by the session, the market-structure days from the exchange calendar; the 8-K filings; the expiry ladder over the session's chain with its spans and clear state; the fund reference by catalogue name) and the cross-name EventCalendar (its scope list through services.events). A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
+description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards, label bands, reference episodes and NBER recessions, services/read/regime/) and the market entity (services/read/market/: its values by catalogue name and the bucketed history of its stored fields), read from the market-entity feature groups by catalogue name. The edge evaluation reads (ADR 0053, services/read/evaluation/): Edge (the documents with their status), EdgeRun / EdgeRow (committed runs of results/edge_eval read BY RUN, never by session: the run's own partition, runId, range, split, knowledgeTs and asOf disclosed; the canonical run is the latest site run at the edge's frozen_from) and a screener's TrackRecord (the canonical run's frozen slice only, never an exploratory run). The event reads (ADR 0050, services/read/events/): InstrumentEvents (the events ahead: own and a fund's reference earnings by catalogue name, the macro releases known by the session, the market-structure days from the exchange calendar; the 8-K filings; the expiry ladder over the session's chain with its spans and clear state; the fund reference by catalogue name) and the cross-name EventCalendar (its scope list through services.events). A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
 owner = ["src/algotrade/services/read/*"]
 allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)

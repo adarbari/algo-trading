@@ -242,3 +242,36 @@ corrected it on point-in-time grounds.
    2026-10-02 are the evidence set going forward. Massive's free Options Basic tier (EOD
    aggregates of expired contracts, 2 years, 5 calls a minute, no bid/ask or IV) is the
    candidate backfill when real premiums are needed (a later item).
+
+## Amendment 2026-10-08: ED7a, the first learned scorer (a probit in site config)
+
+Decided on the owner's behalf (architect review of the diff). ED7a ships the machinery for
+learned scorers; the model is the regime probit (`quant/probit.py`, the expression engine's
+`ncdf`), not a new dependency. A logistic would need a new `exp` built-in in the engine, and the
+probit is the same model class with the precedent already in place. LightGBM (ADR amendment above:
+`apps/ingestion`) comes only if the probit loses to the rule screener in the frozen period (ED7d).
+
+1. **The training boundary.** Labels reach a fit only through
+   `services/evaluation/training/frame.py` `training_frame`. With `cross_section/harness.py` it is
+   the only importer of `algotrade.data.outcomes` (a fitness test checks both; the import contract
+   still allows `services.evaluation`). Rows are (instrument, decision session D) of the edge's
+   schedule; the features are the document's `[scorer] features`, read at D only; the label is the
+   edge's hit for the window starting at S. A row with a missing feature is dropped, never filled.
+2. **The fit never sees the frozen period.** A window is kept only when it closes (`window_end`)
+   before the session one horizon before `frozen_from` (purged: no label overlaps the frozen
+   period; embargoed: one horizon between the last training window and the first frozen one).
+   `window_end` is read, not `knowledge_ts`, which is the write time (a backfill writes old windows
+   today). `fitted_through` is the latest kept `window_end`.
+3. **Coefficients are a TOML expression feature.** `algotrade-backtest fit-edge-scorer --edge ID`
+   (through the `edge-score-fit` job) writes `[edge_score_<edge>]` in
+   `config/site/features/edge_scores.toml`: `ncdf(b0 + sum w_i * (x_i - m_i) / s_i)` with every
+   coefficient a param, and the fit (`fitted_through`, rows, sessions) in the description. A site
+   config change reviewed via PR: the command writes the file, the owner commits it. A re-fit
+   bumps the feature version. Nightly scoring is the expression engine reading the file: no label
+   exists at score time and no ingestion task is needed.
+4. **Fitness test.** Every `edge_score_*` feature names an edge with `frozen_from` and records
+   `fitted_through` strictly before it, and reads exactly the features the document declares.
+5. **Refusals.** A fit needs at least 40 independent decision sessions before the frozen period (the quality bar's count) and refuses with the count it has: no scorer file is committed while the stored history gives fewer (momentum_12_1 has 3). A declared `rollup.<group>@v<n>` must be the registry's current version of its group (a fitness test and the renderer check it), and the description records `horizon` and `fitted_through`, which must precede the purge cutoff.
+6. **Not yet.** Event schedules and outcomes that read an implied vol are not fitted (the
+   command refuses). The `impl = "model"` screener, labelling pre-split slices IN_SAMPLE and
+   promotion by site config are ED7b and ED7c.

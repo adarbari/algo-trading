@@ -117,3 +117,18 @@ def test_an_instruments_screener_hits(graph: Graph) -> None:
     assert aaa == [{"screener": {"id": "vrp_scanner", "name": "VRP"},
                     "result": {"decision": "QUALIFIED", "rank": 1, "change": "new"}}]  # fmt: skip
     assert graph(query, {"key": "CCC"})["data"]["instrument"]["screenerHits"] == []  # PAUSED
+
+
+def test_track_record_is_not_run_without_a_canonical_edge_run(graph: Graph) -> None:
+    """The golden store has no edge run, so a screener has no track record: NOT_RUN, not an
+    error (the loader's cases are in tests/unit/services/read/evaluation)."""
+    body = graph(
+        """query { edges { id } edgeRuns(edgeId: "nope") { runId }
+          screener(id: "vrp_scanner") {
+            trackRecords { edgeId runId notRun { code kind } } } }"""
+    )
+    assert "errors" not in body, body
+    data = body["data"]
+    assert data["edges"] and data["edgeRuns"] == []  # the site's edge documents, no runs
+    for entry in data["screener"]["trackRecords"]:
+        assert entry["runId"] is None and entry["notRun"]["code"] == "NOT_RUN"
