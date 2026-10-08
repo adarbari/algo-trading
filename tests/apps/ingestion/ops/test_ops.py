@@ -321,20 +321,23 @@ SOURCES_DEFAULT = SourcesSettings()
 
 
 @pytest.mark.parametrize(
-    ("core_stale", "rest_stale", "fetch_errors", "passes"),
+    ("core_stale", "rest_stale", "fetch_errors", "chain_day", "passes"),
     [
-        (0, 0, 0, True),
-        (1, 10, 0, True),  # exactly 2% of core and 20% of rest
-        (2, 10, 0, False),
-        (1, 11, 0, False),
-        (0, 0, 5, False),  # fetch failures over 2%
-        (1, 10, 1, True),
+        (0, 0, 0, "2026-10-01", True),
+        (1, 10, 0, "2026-10-01", True),  # exactly 2% of core and 20% of rest
+        (2, 10, 0, "2026-10-01", False),
+        (1, 11, 0, "2026-10-01", False),
+        (0, 0, 5, "2026-10-01", False),  # fetch failures over 2%
+        (1, 10, 1, "2026-10-01", True),
+        # stale for more than max_chain_stale_sessions (5): fetch failures, 11 of 100 over 2%
+        (1, 10, 0, "2026-09-24", False),
+        (1, 10, 0, "2026-09-25", True),  # exactly 5 sessions old: still stale, tolerated
     ],
 )
 def test_the_check_and_the_tolerance_agree(
-    core_stale: int, rest_stale: int, fetch_errors: int, passes: bool
+    core_stale: int, rest_stale: int, fetch_errors: int, chain_day: str, passes: bool
 ) -> None:
-    rows = chain_status_rows(50, core_stale, 50, rest_stale, fetch_errors)
+    rows = chain_status_rows(50, core_stale, 50, rest_stale, fetch_errors, chain_day=chain_day)
     backend = MemoryBackend()
     StoreWriter(backend).write_table(
         "chains/status", CHAINS_DAY, "c", stamped(rows, CHAINS_DAY, "c")
@@ -343,5 +346,17 @@ def test_the_check_and_the_tolerance_agree(
     assert (
         all(c.status == "PASS" for c in check_chains(reader, CHAINS_DAY, SOURCES_DEFAULT)) is passes
     )
-    tolerated = tolerated_stale(chain_status(reader, CHAINS_DAY), SOURCES_DEFAULT)
+    tolerated = tolerated_stale(chain_status(reader, CHAINS_DAY), CHAINS_DAY, SOURCES_DEFAULT)
     assert len(tolerated) == (core_stale + rest_stale if passes else 0)
+
+
+def test_the_check_names_chronically_stale_chains_among_the_fetch_failures() -> None:
+    rows = chain_status_rows(50, 0, 50, 3, chain_day="2026-09-23")
+    backend = MemoryBackend()
+    StoreWriter(backend).write_table(
+        "chains/status", CHAINS_DAY, "c", stamped(rows, CHAINS_DAY, "c")
+    )
+    fetch = check_chains(StoreReader(backend), CHAINS_DAY, SOURCES_DEFAULT)[0]
+    assert fetch.status == "FAIL"
+    assert "STALE_DATA 0" in fetch.detail
+    assert "fetch failures 3 (3 STALE_CHRONIC: stale over 5 sessions)" in fetch.detail

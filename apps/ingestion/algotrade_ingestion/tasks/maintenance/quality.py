@@ -19,7 +19,13 @@ from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.settings import SourcesSettings, load_macro
 from algotrade.core.model.instruments import market_id
 from algotrade.data import StoreReader
-from algotrade.data.chains import FETCH_FAILURES, chain_labels, chain_status, stale_in_tier
+from algotrade.data.chains import (
+    CHRONIC,
+    FETCH_FAILURES,
+    chain_labels,
+    chain_status,
+    stale_in_tier,
+)
 from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
@@ -183,7 +189,8 @@ def check_reference_classification(
 
 # A failed or missing chain fetch is a source problem (FAIL); a stale chain is the feed serving
 # an older session (FAIL above the share: a later retry usually gets the session's chains); the
-# rest are answers. The statuses, labels and per-tier shares live in ``data/chains.py``, shared
+# rest are answers; a chain stale for over ``max_chain_stale_sessions`` is a fetch failure
+# (``STALE_CHRONIC``). The statuses, labels and per-tier shares live in ``data/chains.py``, shared
 # with the screens (``tolerated_stale``, ADR 0054).
 EXAMPLES = 8  # stale core names listed in the detail
 REPORTED = ("OK", "STALE_DATA", "NO_CHAIN", "NO_STANDARD_SERIES")
@@ -193,12 +200,15 @@ def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list
     status_frame = chain_status(reader, session)
     if status_frame is None or status_frame.empty:
         return [Check("chains_present", "FAIL", f"no option chains for {session}")]
-    labels = chain_labels(status_frame)
+    labels = chain_labels(status_frame, session, s.max_chain_stale_sessions)
     total = len(labels)
     counts = labels.value_counts()
     failed = int(labels.isin(FETCH_FAILURES).sum())
     breakdown = ", ".join(f"{k} {int(counts.get(k, 0))}" for k in REPORTED)
+    chronic = int(counts.get(CHRONIC, 0))
+    of_them = f" ({chronic} {CHRONIC}: stale over {s.max_chain_stale_sessions} sessions)"
     detail = f"of {total} underlyings: {breakdown}, fetch failures {failed}"
+    detail += of_them if chronic else ""
     return [
         Check(
             "chains_fetch",

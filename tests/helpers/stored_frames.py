@@ -106,18 +106,25 @@ def holdings_rows(
 
 
 def chain_status_rows(
-    core: int, core_stale: int, rest: int, rest_stale: int, fetch_errors: int = 0
+    core: int,
+    core_stale: int,
+    rest: int,
+    rest_stale: int,
+    fetch_errors: int = 0,
+    *,
+    chain_day: str = "2026-10-01",
 ) -> list[dict[str, object]]:
-    """``chains/status`` rows: ``core`` core names (the first ``core_stale`` STALE_DATA) and
-    ``rest`` rest names (the first ``rest_stale`` stale), then ``fetch_errors`` more rest names
-    that failed to fetch. Symbols are ``C<i>`` / ``R<i>`` / ``E<i>``."""
+    """``chains/status`` rows: ``core`` core names (the first ``core_stale`` STALE_DATA, the
+    chain served for ``chain_day``) and ``rest`` rest names (the first ``rest_stale`` stale), then
+    ``fetch_errors`` more rest names that failed to fetch. Symbols are ``C<i>`` / ``R<i>`` /
+    ``E<i>``."""
     spec = (("C", "core", core, core_stale), ("R", "rest", rest, rest_stale))
     rows = [
         {
             "instrument_id": f"EQ:{prefix}{i}",
             "symbol": f"{prefix}{i}",
             "tier": tier,
-            "status": "STALE_DATA: chain is for 2026-10-01" if i < stale else "OK",
+            "status": f"STALE_DATA: chain is for {chain_day}" if i < stale else "OK",
         }
         for prefix, tier, total, stale in spec
         for i in range(total)
