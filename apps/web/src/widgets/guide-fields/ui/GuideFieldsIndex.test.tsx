@@ -6,11 +6,16 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { GuideFieldsIndex } from './GuideFieldsIndex';
 
-const hooks = vi.hoisted(() => ({ useFeatureCatalogue: vi.fn(), useGuideIndex: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  useFeatureCatalogue: vi.fn(),
+  useFeatureCatalogueDetail: vi.fn(),
+  useGuideIndex: vi.fn(),
+}));
 
 vi.mock('@/entities/feature', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useFeatureCatalogue: hooks.useFeatureCatalogue,
+  useFeatureCatalogueDetail: hooks.useFeatureCatalogueDetail,
 }));
 vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -54,6 +59,7 @@ const index = {
 
 beforeEach(() => {
   hooks.useFeatureCatalogue.mockReturnValue(fakeQuery(catalogue));
+  hooks.useFeatureCatalogueDetail.mockReturnValue(fakeQuery(catalogue));
   hooks.useGuideIndex.mockReturnValue(fakeQuery(index));
 });
 

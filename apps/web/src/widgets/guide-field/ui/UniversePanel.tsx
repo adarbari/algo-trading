@@ -15,11 +15,11 @@ import {
   isNumericFeature,
   ruleText,
   useFeatureDistribution,
-  type CatalogueFeature,
+  type DetailedFeature,
 } from '@/entities/feature';
 
 export interface UniversePanelProps {
-  feature: CatalogueFeature;
+  feature: DetailedFeature;
   /** Which of the guide's uses is highlighted (an index into `feature.guide.uses`). */
   useIndex: number;
   onUseChange: (index: number) => void;

@@ -3,14 +3,24 @@
  * results (`/screeners/$id`, where the list opens) and its Builder (`/screeners/$id/edit`).
  * Tickers open in Explore.
  */
-import { createRoute, useNavigate } from '@tanstack/react-router';
+import { createRoute, lazyRouteComponent, useNavigate } from '@tanstack/react-router';
 
 import { compareSearch } from '@/features/idea-compare';
-import { NewScreenerPage, ScreenerBuilderPage } from '@/pages/screener-builder';
-import { ScreenerResultsPage } from '@/pages/screener-results';
-import { ScreenersPage } from '@/pages/trader-screeners';
-
 import { traderRoute } from './layout-route';
+
+const NewScreenerPage = lazyRouteComponent(
+  () => import('@/pages/screener-builder'),
+  'NewScreenerPage',
+);
+const ScreenerBuilderPage = lazyRouteComponent(
+  () => import('@/pages/screener-builder'),
+  'ScreenerBuilderPage',
+);
+const ScreenerResultsPage = lazyRouteComponent(
+  () => import('@/pages/screener-results'),
+  'ScreenerResultsPage',
+);
+const ScreenersPage = lazyRouteComponent(() => import('@/pages/trader-screeners'), 'ScreenersPage');
 
 export const screenersRoute = createRoute({ getParentRoute: () => traderRoute, path: 'screeners' });
 

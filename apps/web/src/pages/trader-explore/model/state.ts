@@ -8,7 +8,7 @@ import {
   splitList,
   type ExploreSearch,
   type ExploreTab,
-} from './search';
+} from '@/entities/explore';
 
 /** A change to the search params; `undefined` removes a key. */
 export type SearchPatch = { [K in keyof ExploreSearch]?: ExploreSearch[K] | undefined };

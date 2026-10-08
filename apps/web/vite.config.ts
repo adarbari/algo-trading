@@ -36,6 +36,28 @@ export default defineConfig({
       generateScopedName: '[name]__[local]__[hash:base64:5]',
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Vendor code in its own long-lived chunks: it changes far less than the app, so a deploy
+        // leaves the browser's cached copy valid (the phone downloads only the app chunks again).
+        codeSplitting: {
+          groups: [
+            {
+              name: 'react',
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'tanstack',
+              test: /node_modules[\\/]@tanstack[\\/](react-router|router-core|history|react-query|query-core|store|react-store)[\\/]/,
+              priority: 20,
+            },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: port(1, 5173),
     strictPort: true,

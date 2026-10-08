@@ -32,10 +32,10 @@ export function guideThemes(catalogue: readonly CatalogueFeature[]): GuideTheme[
   );
 }
 
-export function themeFields(
-  catalogue: readonly CatalogueFeature[],
+export function themeFields<T extends CatalogueFeature>(
+  catalogue: readonly T[],
   theme: string,
-): CatalogueFeature[] {
+): T[] {
   return catalogue.filter((f) => themeOf(f) === theme);
 }
 

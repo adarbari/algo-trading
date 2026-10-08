@@ -10,29 +10,34 @@
  * viewer) and no workspace: the layout shows the top bar of the workspace the user came from
  * (`GuideLayout`), so an admin stays in ADMIN.
  */
-import { createRoute, useNavigate } from '@tanstack/react-router';
+import { createRoute, lazyRouteComponent, useNavigate } from '@tanstack/react-router';
 
 import { parseFieldsSearch } from '@/entities/guide';
-import {
-  GuideEpisodePage,
-  GuideFieldPage,
-  GuideFieldsPage,
-  GuideGlossaryPage,
-  GuideHomePage,
-  GuideIndicatorPage,
-  GuidePlaybookPage,
-  GuidePlaybooksPage,
-  GuideRegimePage,
-  GuideSituationPage,
-  GuideSituationsPage,
-  GuideStartIndexPage,
-  GuideStartPage,
-  GuideTermPage,
-} from '@/pages/guide';
-
 import { GuideLayout } from '../../layouts';
 import { viewerGuard } from '../../workspaces';
 import { rootRoute } from '../root';
+
+// One chunk for the Guide's pages (they share widgets), loaded when the first Guide page opens.
+const GuideEpisodePage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideEpisodePage');
+const GuideFieldPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideFieldPage');
+const GuideFieldsPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideFieldsPage');
+const GuideGlossaryPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideGlossaryPage');
+const GuideHomePage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideHomePage');
+const GuideIndicatorPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideIndicatorPage');
+const GuidePlaybookPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuidePlaybookPage');
+const GuidePlaybooksPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuidePlaybooksPage');
+const GuideRegimePage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideRegimePage');
+const GuideSituationPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideSituationPage');
+const GuideSituationsPage = lazyRouteComponent(
+  () => import('@/pages/guide'),
+  'GuideSituationsPage',
+);
+const GuideStartIndexPage = lazyRouteComponent(
+  () => import('@/pages/guide'),
+  'GuideStartIndexPage',
+);
+const GuideStartPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideStartPage');
+const GuideTermPage = lazyRouteComponent(() => import('@/pages/guide'), 'GuideTermPage');
 
 export const guideRoute = createRoute({
   getParentRoute: () => rootRoute,

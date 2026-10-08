@@ -21,6 +21,7 @@ import {
   shortMeaning,
   themeFields,
   useFeatureCatalogue,
+  useFeatureCatalogueDetail,
   type CatalogueFeature,
 } from '@/entities/feature';
 import {
@@ -77,6 +78,8 @@ export function GuideFieldsIndex({
 }: GuideFieldsIndexProps) {
   const index = useGuideIndex();
   const catalogue = useFeatureCatalogue();
+  // The criteria per intent are the guide's full entry: read only when an intent is opened.
+  const detail = useFeatureCatalogueDetail(view === 'intent' && Boolean(intent));
   const guided = useMemo(
     () => (catalogue.data ?? []).filter((f) => Boolean(f.guide)),
     [catalogue.data],
@@ -94,7 +97,7 @@ export function GuideFieldsIndex({
       />
     );
   }
-  if (index.isPending || catalogue.isPending)
+  if (index.isPending || catalogue.isPending || (view === 'intent' && intent && detail.isPending))
     return <Skeleton variant="rect" height="lg" label="Loading the field index" />;
   const data = index.data;
   if (!data) return <EmptyState bordered title="The Guide has no field index." />;
@@ -102,7 +105,7 @@ export function GuideFieldsIndex({
   let body;
   if (view === 'intent') {
     const offered = intent
-      ? guided.filter((f) => f.guide?.uses.some((u) => u.intent === intent))
+      ? (detail.data ?? []).filter((f) => f.guide?.uses.some((u) => u.intent === intent))
       : null;
     body = offered ? (
       <Stack gap={3}>
