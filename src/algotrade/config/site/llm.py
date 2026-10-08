@@ -55,6 +55,13 @@ class ProviderSettings:
     request: Mapping[str, str | float | bool] = field(default_factory=lambda: MappingProxyType({}))
 
     @property
+    def worst_case_s(self) -> float:
+        """The longest this provider can keep a chain waiting: every attempt timing out, plus
+        the pauses between them (a bare 429 waits 20 s; a ``Retry-After`` may wait longer)."""
+        pauses: float = sum(max(20.0, 3.0 * 2.0**a) for a in range(self.retries))
+        return self.timeout_s * (self.retries + 1) + pauses
+
+    @property
     def local(self) -> bool:
         """Served from this machine: needs no key."""
         return urlsplit(self.base_url).hostname in LOOPBACK
@@ -115,10 +122,22 @@ class LlmSettings:
                     "(each provider names its own base_url and model)"
                 )
             providers, is_legacy = _providers(raw, shared, where), False
+        # The deadline must leave every provider but the last its whole worst case, or a
+        # hanging primary would use up the time and the fallback never gets its turn. Unset: the
+        # sum of every provider's worst case (the chain is then bounded, never cut short).
+        needed = sum(p.worst_case_s for p in providers[:-1])
+        total = needed + providers[-1].worst_case_s
+        deadline = t.number("deadline_s", total, 1)
+        if deadline <= needed:
+            raise ConfigurationError(
+                f"{where} deadline_s: {deadline:g} s is shorter than the providers before the "
+                f"last can take ({needed:g} s: timeout_s x (retries + 1) plus the pauses); "
+                "raise it, or lower their timeout_s / retries, so the fallback is reached"
+            )
         return cls(
             enabled=t.boolean("enabled", d.enabled),
             providers=providers,
-            deadline_s=t.number("deadline_s", d.deadline_s, 1),
+            deadline_s=deadline,
             legacy=is_legacy,
         )
 

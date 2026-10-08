@@ -11,8 +11,10 @@
 #   Anthropic:              base_url = "https://api.anthropic.com/v1",               model = "claude-haiku-4-5"
 
 enabled = false
-base_url = "http://localhost:11434/v1"
-model = "llama3.1"
+# The single-provider form: these two are the defaults (a local Ollama). A machine file
+# llm.local.toml that adds [[provider]] tables must not set them (see the chain below).
+# base_url = "http://localhost:11434/v1"
+# model = "llama3.1"
 timeout_s = 60                   # one request may take this long before "drafting unavailable"
 answer_limit = 8000              # tokens for the answer AND the model's thinking (Gemini 3.x thinks
                                  # ~2,000 tokens first; a draft itself is a few hundred)
@@ -32,10 +34,11 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # top-level `timeout_s`, `answer_limit`, `retries` and `request` are the defaults of every
 # provider; each table may override them. The key of a provider is ALGOTRADE_LLM_API_KEY_<ID
 # upper> (here _CLAUDE and _GEMINI); a remote provider without a key is left out with a warning.
-# `deadline_s`: once the chain has spent this long it starts no further provider.
+# `deadline_s`: once the chain has spent this long it starts no further provider; unset, it is
+# every provider's worst case added up, and a value that would cut off the fallback is refused.
+# A machine's llm.local.toml can hold the [[provider]] tables (and `enabled = true`).
 #
 # enabled = true
-# deadline_s = 120
 #
 # [[provider]]
 # id = "claude"

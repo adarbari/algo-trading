@@ -2,6 +2,8 @@
 is not this machine, no secrets in the file. ``phrasebook.toml``: phrases in file order, each
 with words, fields and a hint; errors name the entry."""
 
+import shutil
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -9,7 +11,8 @@ import pytest
 from algotrade.config.site.llm import LlmSettings, Phrase, PhrasebookSettings
 from algotrade.config.site.settings import load_llm, load_phrasebook
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
+from tests.conftest import REPO_ROOT
 from tests.unit.config.site.test_settings import site
 
 
@@ -18,7 +21,7 @@ def test_defaults_are_off_and_local() -> None:
     (only,) = d.providers
     assert not d.enabled and only.base_url == "http://localhost:11434/v1" and only.local
     assert (only.timeout_s, only.answer_limit, only.retries) == (60.0, 8000, 2)
-    assert d.legacy and d.deadline_s == 120.0
+    assert d.legacy and d.deadline_s == 220.0  # 3 x 60 s + two 20 s pauses
 
 
 def test_the_shipped_file_is_off() -> None:
@@ -200,3 +203,41 @@ def test_both_forms_in_one_file_are_refused() -> None:
 def test_provider_errors_name_the_entry(providers: Any, message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         LlmSettings.from_document({"provider": providers})
+
+
+def test_the_deadline_is_every_providers_worst_case_unless_it_would_cut_off_the_fallback() -> None:
+    s = LlmSettings.from_document(CHAIN)
+    needed = s.providers[0].worst_case_s
+    assert needed == 30 * 2 + 20  # claude: timeout_s 30, retries 1, one 20 s pause
+    assert s.deadline_s == needed + (90 * 2 + 20)  # unset: both worst cases added up
+    ok = LlmSettings.from_document(CHAIN | {"deadline_s": needed + 1})
+    assert ok.deadline_s == needed + 1
+    with pytest.raises(ConfigurationError, match=r"deadline_s: 80 s is shorter"):
+        LlmSettings.from_document(CHAIN | {"deadline_s": needed})
+    with pytest.raises(ConfigurationError, match="deadline_s"):  # the old default of 120 s
+        LlmSettings.from_document(
+            {"provider": CHAIN["provider"], "deadline_s": 120}  # 60 s x 3 attempts + pauses
+        )
+
+
+def test_a_machine_file_adds_the_chain_over_the_shipped_file(tmp_path: Path) -> None:
+    """``llm.local.toml`` is overlaid on the shipped ``llm.toml`` (``merge_local``): the shipped
+    file must not set ``base_url`` / ``model``, or a local ``[[provider]]`` would be both forms."""
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    shutil.copy(REPO_ROOT / "config" / "site" / "llm.toml", site_dir / "llm.toml")
+    (site_dir / "llm.local.toml").write_text(
+        'enabled = true\n[[provider]]\nid = "claude"\n'
+        'base_url = "https://api.anthropic.com/v1"\nmodel = "claude-haiku-4-5"\n'
+        '[[provider]]\nid = "gemini"\n'
+        'base_url = "https://generativelanguage.googleapis.com/v1beta/openai"\n'
+        'model = "gemini-2.5-flash"\n'
+    )
+    s = load_llm(FileConfigStore(tmp_path))
+    assert s.enabled and not s.legacy
+    assert [p.id for p in s.providers] == ["claude", "gemini"]
+    # and a machine file with the single-provider keys still works over the shipped one
+    (site_dir / "llm.local.toml").write_text(
+        'enabled = true\nbase_url = "https://x.example/v1"\nmodel = "m"\n'
+    )
+    assert load_llm(FileConfigStore(tmp_path)).providers[0].model == "m"

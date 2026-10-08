@@ -60,7 +60,10 @@ def test_a_chain_is_one_adapter_per_provider_each_with_its_own_key(
     model, _ = open_text_model(configs(CHAIN))
     assert isinstance(model, FallbackTextModel)
     assert model.names == ("claude-haiku-4-5", "gemini-2.5-flash")
-    assert [pid for pid, _ in model.members] == ["claude", "gemini"] and model.deadline_s == 120.0
+    assert [pid for pid, _ in model.members] == [
+        "claude",
+        "gemini",
+    ] and model.deadline_s == 440.0  # 2 x (3 x 60 s + 2 x 20 s)
     claude = model.members[0][1]
     assert isinstance(claude, ChatCompletions) and claude.provider == "claude"
 

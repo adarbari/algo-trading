@@ -67,6 +67,16 @@ def test_the_secondary_answers_when_the_primary_is_unavailable(
     assert "claude" in caplog.records[0].getMessage() and "HTTP 529" in caplog.text
 
 
+def test_a_client_error_falls_back_but_is_logged_as_an_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    claude = Member("claude", ModelUnavailableError("claude-model at x: HTTP 401 bad key"))
+    with caplog.at_level(logging.WARNING):
+        done = chain(claude, Member("gemini")).complete("s", "u")
+    assert done.provider == "gemini"
+    assert [r.levelname for r in caplog.records] == ["ERROR"]
+
+
 def test_all_failed_names_every_provider_with_its_reason() -> None:
     claude = Member("claude", ModelUnavailableError("claude-model: HTTP 401 bad key"))
     gemini = Member("gemini", ModelUnavailableError("gemini-model: timed out"))

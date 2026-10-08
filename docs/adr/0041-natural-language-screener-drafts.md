@@ -151,11 +151,16 @@ quota is not "drafting unavailable".
 4. **`FallbackTextModel`** (`services/text_model/chain.py`, pure) asks the members in order and
    falls back only on `ModelUnavailableError` (logged at WARNING); any other error propagates.
    When all failed, the error names every provider with its own message. One `deadline_s`
-   (default 120) covers the chain: after it no further provider is started, so retries do not
-   stack across providers; a request already running keeps its own `timeout_s`.
+   covers the chain: after it no further provider is started; a request already running keeps
+   its own `timeout_s`. Unset, it is every provider's worst case added up (`timeout_s` x
+   (`retries` + 1) plus the pauses); a value not above the providers before the last is
+   refused, so a hanging primary can never use up the fallback's turn. A non-retryable 4xx
+   (bad key, unknown model) falls back too but is logged at ERROR.
 5. **The explanation cache is keyed by the model that answered.** A lookup tries each name in
    chain order; a put uses `Completion.model`. A fallback's answer is therefore never kept under
    the primary's name, and a primary-only chain never reads the fallback's answer as its own.
+   A cached fallback answer is served while the primary is up again (the lookup tries every
+   name): an answer is for the signals, not for the model, and is checked again on every read.
 6. The draft and explanation parsers already tolerate a code fence around the JSON object
    (Anthropic's compatibility endpoint may ignore `response_format`); tests cover both.
 
