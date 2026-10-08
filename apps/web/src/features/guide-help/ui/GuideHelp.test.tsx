@@ -51,11 +51,11 @@ async function summarised() {
   return screen.getByRole('button', BUTTON);
 }
 
-function setup(navigate = vi.fn()) {
+function setup(navigate = vi.fn(), onUse?: (use: unknown) => void) {
   const view = render(
     <TestQueryProvider>
       <GuideHelpProvider navigate={navigate}>
-        <GuideHelp entry={{ kind: 'field', id: NAME }} />
+        <GuideHelp entry={{ kind: 'field', id: NAME }} {...(onUse ? { onUse } : {})} />
       </GuideHelpProvider>
     </TestQueryProvider>,
   );
@@ -84,6 +84,23 @@ describe('GuideHelp', () => {
     expect(button).toHaveAttribute('aria-expanded', 'true');
     await expectNoA11yViolations(container);
     expect(GQL.mock.calls[0]?.[1]).toEqual({ name: NAME });
+  });
+
+  it('offers "Use this" per intent only when given onUse, and closes the drawer after it', async () => {
+    const first = setup();
+    await userEvent.click(await summarised());
+    const drawer = await screen.findByRole('dialog');
+    expect(within(drawer).queryByRole('button', { name: /Use this/ })).toBeNull();
+    first.unmount();
+
+    const onUse = vi.fn();
+    const { container } = setup(vi.fn(), onUse);
+    await userEvent.click(await summarised());
+    const open = await screen.findByRole('dialog');
+    await expectNoA11yViolations(container);
+    await userEvent.click(within(open).getByRole('button', { name: 'Use this: heavy volume' }));
+    expect(onUse).toHaveBeenCalledWith(SERVED.guideField.info.guide.uses[0]);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('shows the first sentence as the hover summary', async () => {
