@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
+from algotrade.data.chains import CHRONIC, chain_labels
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
@@ -138,6 +139,19 @@ def test_finished_chain_runs_drop_their_staging(backend: MemoryBackend | LocalBa
     gone = run(writer, FakeFeed({"A": fx.payload("A")}), universe("A", "GONE"), retry_pause_s=0)
     assert gone.status is RunStatus.PARTIAL  # 50% NO_CHAIN is suspicious
     assert writer.staging.keys(gone.run_id, OPTIONS) == []
+
+
+def test_a_stored_stale_status_carries_the_day_the_chain_labels_age() -> None:
+    """The contract between the status text this task writes and ``data.chains.chain_labels``
+    (ADR 0054): if the wording lost the chain's day, a chronically stale chain would quietly be
+    tolerated again."""
+    backend = MemoryBackend()
+    feed = FakeFeed({"OLD": fx.payload("OLD", session=DAY - timedelta(days=21))})
+    run(StoreWriter(backend), feed, universe("OLD"), retry_pause_s=0)
+    status = StoreReader(backend).table(STATUS, DAY)
+    assert status is not None
+    assert list(chain_labels(status, DAY, max_stale_sessions=5)) == [CHRONIC]
+    assert list(chain_labels(status, DAY, max_stale_sessions=30)) == ["STALE_DATA"]
 
 
 def test_rerun_refetches_stale_and_keeps_ok_rows(backend: MemoryBackend | LocalBackend) -> None:

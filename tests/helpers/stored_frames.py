@@ -1,10 +1,12 @@
 """Builders for stamped frames used across storage, service and app tests."""
 
 from collections.abc import Mapping
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.data import StoreReader
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 
 T0 = datetime(2026, 10, 2, 22, 0, tzinfo=UTC)
@@ -101,3 +103,72 @@ def holdings_rows(
         }
         for rank, (ticker, name, weight) in enumerate(lines, start=1)
     ]  # fmt: skip
+
+
+def chain_status_rows(
+    core: int,
+    core_stale: int,
+    rest: int,
+    rest_stale: int,
+    fetch_errors: int = 0,
+    *,
+    chain_day: str = "2026-10-01",
+) -> list[dict[str, object]]:
+    """``chains/status`` rows: ``core`` core names (the first ``core_stale`` STALE_DATA, the
+    chain served for ``chain_day``) and ``rest`` rest names (the first ``rest_stale`` stale), then
+    ``fetch_errors`` more rest names that failed to fetch. Symbols are ``C<i>`` / ``R<i>`` /
+    ``E<i>``."""
+    spec = (("C", "core", core, core_stale), ("R", "rest", rest, rest_stale))
+    rows = [
+        {
+            "instrument_id": f"EQ:{prefix}{i}",
+            "symbol": f"{prefix}{i}",
+            "tier": tier,
+            "status": f"STALE_DATA: chain is for {chain_day}" if i < stale else "OK",
+        }
+        for prefix, tier, total, stale in spec
+        for i in range(total)
+    ]
+    rows += [
+        {
+            "instrument_id": f"EQ:E{i}",
+            "symbol": f"E{i}",
+            "tier": "rest",
+            "status": "FETCH_ERROR: timeout",
+        }
+        for i in range(fetch_errors)
+    ]
+    return rows
+
+
+def seed_chain_screen(
+    session: date, status: list[dict[str, object]]
+) -> tuple[StoreReader, StoreWriter]:
+    """A store a ``short_premium_liquidity`` screen runs over: the universe is the names of
+    ``status`` (``chain_status_rows``), each with an option-liquidity row (``STALE_DATA`` as its
+    ``liq_status`` where its chain is stale, as the rollup copies it), and ``chains/status``."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    symbols = [str(r["symbol"]) for r in status]
+    universe = universe_rows(symbols, last_verified=session.isoformat())
+    snapshot = session - timedelta(days=2)
+    writer.write_table("universe", snapshot, "u1", stamped(universe, session, "u1"))
+    writer.write_table(
+        "instruments/reference", snapshot, "u1", stamped(reference_rows(universe), session, "u1")
+    )
+    features = [
+        {
+            "instrument_id": r["instrument_id"],
+            "liq_status": r["status"],
+            "put_tier": "A",
+            "call_tier": "B",
+            "short_put_ok": True,
+            "short_call_ok": True,
+        }
+        for r in status
+    ]
+    writer.write_table(
+        "rollups/instrument/option_liquidity@v1", session, "f1", stamped(features, session, "f1")
+    )
+    writer.write_table("chains/status", session, "c1", stamped(status, session, "c1"))
+    return StoreReader(backend), writer

@@ -7,6 +7,7 @@ import pytest
 
 from algotrade.config.site.settings import SourcesSettings, load_sources
 from algotrade.data import StoreReader
+from algotrade.data.chains import chain_status, tolerated_stale
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -14,7 +15,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.ops.schedule import LABEL, MONTHLY_LABEL, monthly_fill_plist, nightly_plist
 from algotrade_ingestion.tasks.maintenance.quality import check_chains, run_quality
 from tests.helpers.ingest_fakes import task_ctx
-from tests.helpers.stored_frames import stamped, universe_rows
+from tests.helpers.stored_frames import chain_status_rows, stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 CLOCK = lambda: datetime(2026, 10, 2, 23, tzinfo=UTC)  # noqa: E731
@@ -311,3 +312,51 @@ def test_monthly_fill_plist() -> None:
     for bad in ({"fill": 0}, {"day": 29}, {"hour": 24}):
         with pytest.raises(ValueError, match="invalid"):
             monthly_fill_plist(Path("/repo"), **bad)
+
+
+# The chains acceptance check and the screens read one share (ADR 0054): whatever
+# ``check_chains`` PASSes, ``tolerated_stale`` tolerates, and whatever it FAILs it does not.
+CHAINS_DAY = date(2026, 10, 2)
+SOURCES_DEFAULT = SourcesSettings()
+
+
+@pytest.mark.parametrize(
+    ("core_stale", "rest_stale", "fetch_errors", "chain_day", "passes"),
+    [
+        (0, 0, 0, "2026-10-01", True),
+        (1, 10, 0, "2026-10-01", True),  # exactly 2% of core and 20% of rest
+        (2, 10, 0, "2026-10-01", False),
+        (1, 11, 0, "2026-10-01", False),
+        (0, 0, 5, "2026-10-01", False),  # fetch failures over 2%
+        (1, 10, 1, "2026-10-01", True),
+        # stale for more than max_chain_stale_sessions (5): fetch failures, 11 of 100 over 2%
+        (1, 10, 0, "2026-09-24", False),
+        (1, 10, 0, "2026-09-25", True),  # exactly 5 sessions old: still stale, tolerated
+    ],
+)
+def test_the_check_and_the_tolerance_agree(
+    core_stale: int, rest_stale: int, fetch_errors: int, chain_day: str, passes: bool
+) -> None:
+    rows = chain_status_rows(50, core_stale, 50, rest_stale, fetch_errors, chain_day=chain_day)
+    backend = MemoryBackend()
+    StoreWriter(backend).write_table(
+        "chains/status", CHAINS_DAY, "c", stamped(rows, CHAINS_DAY, "c")
+    )
+    reader = StoreReader(backend)
+    assert (
+        all(c.status == "PASS" for c in check_chains(reader, CHAINS_DAY, SOURCES_DEFAULT)) is passes
+    )
+    tolerated = tolerated_stale(chain_status(reader, CHAINS_DAY), CHAINS_DAY, SOURCES_DEFAULT)
+    assert len(tolerated) == (core_stale + rest_stale if passes else 0)
+
+
+def test_the_check_names_chronically_stale_chains_among_the_fetch_failures() -> None:
+    rows = chain_status_rows(50, 0, 50, 3, chain_day="2026-09-23")
+    backend = MemoryBackend()
+    StoreWriter(backend).write_table(
+        "chains/status", CHAINS_DAY, "c", stamped(rows, CHAINS_DAY, "c")
+    )
+    fetch = check_chains(StoreReader(backend), CHAINS_DAY, SOURCES_DEFAULT)[0]
+    assert fetch.status == "FAIL"
+    assert "STALE_DATA 0" in fetch.detail
+    assert "fetch failures 3 (3 STALE_CHRONIC: stale over 5 sessions)" in fetch.detail

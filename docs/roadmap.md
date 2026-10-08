@@ -293,7 +293,7 @@ the close, not real time) is the likely source.
 | SEC EDGAR contact | A contact email in the user agent (SEC policy) | **done** (`ALGOTRADE_SEC_CONTACT` in `.env`) |
 | FIGI-based `instrument_id` | Keep symbol ids, or migrate to FIGI ids | **decided: FIGI ids** (ADR 0018); owner runs `migrate-ids` on the local store |
 | Cboe terms | Confirm acceptable use of the delayed feed | owner to confirm |
-| Stale-chain limit vs screener coverage | `max_chain_stale_share` 20% (rest tier, ADR 0043) lets `chains` SUCCEED while `short_premium_liquidity` (`min_coverage` 98%) fails on the same names (2026-10-05: 199 of 4,205). Options: rest tier 2% (`1 - min_coverage`, with a fitness test tying the two), or keep 20% and accept the waive when the retry refetch does not clear them | owner to decide (amends ADR 0043) |
+| Stale-chain limit vs screener coverage | `max_chain_stale_share` 20% (rest tier, ADR 0043) lets `chains` SUCCEED while a screener's coverage (`min_coverage` 98%) fell on the same names (2026-10-05: 199 of 4,205; 2026-10-06: 267) | decided 2026-10-07: names the gate tolerated are `EXCLUDED` from coverage with a reason ([ADR 0054](adr/0054-stale-chains-the-gate-tolerated-are-excluded-from-screen-coverage.md)) |
 | User identity scheme | Labels now; auth provider in phase 4 | **decided: site registry + Supabase Auth** (ADR 0040; roadmap ID1-ID4) |
 | Production job queue | Redis/RQ, Postgres-backed, cloud queue | local runner until hosting |
 | Hosting target | VM + docker-compose, a container platform | local only |

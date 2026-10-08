@@ -97,6 +97,11 @@ class FeatureGroup:
     # What one row describes (``Feature.entity``), inherited by its features: ``instrument``
     # (``rollups/instrument/``) or ``market`` (``rollups/market/``, ADR 0047).
     entity: Entity = "instrument"
+    # The group's source may be absent for a session (IB Gateway down, ADR 0055): a screen that
+    # goes without its table is audited, not PARTIAL. Every expression feature reading it falls
+    # back to a required table (coalesce or an is_null branch) and no site HARD criterion reads
+    # it directly (fitness).
+    optional: bool = False
 
     def __post_init__(self) -> None:
         owned = tuple(
