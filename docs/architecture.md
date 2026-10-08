@@ -171,7 +171,9 @@ select (as of session) → FeatureView of the screener's rollups for the selecte
 
 Coverage statuses: `COMPLETE`, `PARTIAL` (below `min_coverage`), `UNIVERSE_INCOMPLETE`
 (universe older than `max_universe_age_days`), `EMPTY_SELECTION`. Only a `COMPLETE` run may
-report "no qualified candidates".
+report "no qualified candidates". Coverage is `processed / (instruments - excluded)`: an
+`EXCLUDED` row (a stale chain the chains acceptance check tolerated, with its reason; never a
+pick) is out of the denominator ([ADR 0054](adr/0054-stale-chains-the-gate-tolerated-are-excluded-from-screen-coverage.md)).
 
 ---
 
@@ -273,7 +275,9 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
 - **Screens are jobs**: one `screen` job per scheduled screener config, for its owner;
   exports are that job's output. The step SUCCEEDS only when every screener's job is
   COMPLETE (its coverage threshold met). The screen audit records `universe_pre_snapshot`
-  (survivorship).
+  (survivorship). A table of an optional group (`FeatureGroup.optional`, e.g. `ibkr_iv@v1`
+  with IB Gateway down) missing for the session leaves the run COMPLETE: it is audited as
+  `missing_optional_tables` and the step carries an `optional_sources` WARN (ADR 0055).
 - **Notification** (`notify.py`): every run writes its summary to
   `var/logs/nightly-latest.json`, then hands a `Notice` to the `Notifier` (one interface;
   `notify(notice)` returns a warning instead of raising). The macOS notifier (`osascript`,
@@ -552,7 +556,8 @@ O(universe); per-user work is O(users × configs). The nightly run ends with a `
 (universe size change, bar freshness and count drop, option chains, earnings present;
 thresholds in `config/site/sources.toml` `[quality]`); any FAIL marks the nightly `PARTIAL`.
 Option chains are judged on two separate counts: **fetch failures** (`FETCH_ERROR`, including
-an open circuit breaker, or never attempted) above `max_chain_fetch_failures` (5% of the
+an open circuit breaker, never attempted, or `STALE_CHRONIC`: stale for more than
+`max_chain_stale_sessions` sessions, ADR 0054) above `max_chain_fetch_failures` (2% of the
 universe) FAIL `chains_fetch`, because the night's data is missing; **stale chains**
 (`STALE_DATA`: the feed served an older session) are graded per tier, the tier stored with each
 status row at fetch time (`tasks/market/tiers.py`: core = S&P 500, `[cboe] priority_symbols`,

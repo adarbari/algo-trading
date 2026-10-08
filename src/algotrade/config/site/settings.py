@@ -232,6 +232,7 @@ class SourcesSettings:
     max_chain_fetch_failures: float = 0.02
     max_chain_stale_share: float = 0.20  # the "rest" tier
     max_chain_stale_share_core: float = 0.02  # core tier (tasks/market/tiers.py)
+    max_chain_stale_sessions: int = 5  # older STALE_DATA chains are fetch failures (data/chains.py)
     max_verify_failures: float = 0.10
     max_macro_stale_share: float = 0.20  # macro series (ADR 0048)
     min_calendar_future_dates: int = 1  # macro-calendar: dates each FRED release must list ahead
@@ -278,6 +279,7 @@ class SourcesSettings:
                 "max_bar_unresolved",
                 "max_chain_fetch_failures",
                 *("max_chain_stale_share", "max_chain_stale_share_core"),
+                "max_chain_stale_sessions",
                 "max_verify_failures",
                 *("max_macro_stale_share", "min_calendar_future_dates", "max_filings_failed"),
                 "filings_backfill_per_night",
@@ -359,6 +361,9 @@ class SourcesSettings:
             ),
             max_chain_stale_share_core=quality.fraction(
                 "max_chain_stale_share_core", d.max_chain_stale_share_core
+            ),
+            max_chain_stale_sessions=quality.integer(
+                "max_chain_stale_sessions", d.max_chain_stale_sessions, 1
             ),
             max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
             max_macro_stale_share=quality.fraction(

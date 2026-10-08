@@ -5,19 +5,23 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
+    CHRONIC,
     chain_expiries,
+    chain_labels,
     chain_status,
     live_option_quotes,
     option_quotes,
+    tolerated_stale,
     underlying_quotes,
 )
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.live_writer import LiveWriter
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.stored_frames import stamped
+from tests.helpers.stored_frames import chain_status_rows, stamped
 
 DAY = date(2026, 10, 1)
 TS = pd.Timestamp("2026-10-01T20:00", tz="UTC")
@@ -101,3 +105,75 @@ def test_live_option_quotes_keep_every_snapshot_and_filter_on_the_underlying() -
     assert only_a is not None and list(only_a["instrument_id"]) == ["OPT:A1", "OPT:A1"]
     every = live_option_quotes(reader, DAY)
     assert every is not None and len(every) == 4
+
+
+SOURCES = SourcesSettings()  # 2% of core and 20% of rest may be stale; 2% fetch failures
+
+
+def test_tolerated_stale_lists_the_stale_names_when_every_tier_is_within_its_limit() -> None:
+    frame = pd.DataFrame(chain_status_rows(50, 1, 50, 10))  # exactly 2% and 20%
+    found = tolerated_stale(frame, DAY, SOURCES)
+    assert sorted(found) == ["EQ:C0", *sorted(f"EQ:R{i}" for i in range(10))]
+    assert set(found.values()) == {"STALE_DATA: chain is for 2026-10-01"}
+
+
+@pytest.mark.parametrize(
+    ("core_stale", "rest_stale", "fetch_errors"),
+    [(2, 0, 0), (0, 11, 0), (1, 10, 5)],  # core over, rest over, fetch failures over 2%
+)
+def test_tolerated_stale_is_empty_when_any_limit_is_exceeded(
+    core_stale: int, rest_stale: int, fetch_errors: int
+) -> None:
+    frame = pd.DataFrame(chain_status_rows(50, core_stale, 50, rest_stale, fetch_errors))
+    assert tolerated_stale(frame, DAY, SOURCES) == {}
+
+
+def test_tolerated_stale_fails_closed_without_core_names_or_a_status() -> None:
+    no_core = pd.DataFrame(chain_status_rows(0, 0, 50, 1))  # tiered, but no core: inputs missing
+    assert tolerated_stale(no_core, DAY, SOURCES) == {}
+    assert tolerated_stale(None, DAY, SOURCES) == {}
+    assert tolerated_stale(pd.DataFrame(), DAY, SOURCES) == {}
+
+
+def test_a_status_without_tiers_counts_as_rest() -> None:
+    frame = pd.DataFrame(chain_status_rows(0, 0, 10, 2)).drop(columns="tier")
+    assert len(tolerated_stale(frame, DAY, SOURCES)) == 2  # 20% of rest
+    assert (
+        tolerated_stale(
+            pd.DataFrame(chain_status_rows(0, 0, 10, 3)).drop(columns="tier"), DAY, SOURCES
+        )
+        == {}
+    )
+
+
+# A chain the feed has served stale for more than ``max_chain_stale_sessions`` sessions is not
+# a feed that has not rolled yet: it is a fetch failure, for the gate and the screens alike.
+LATE = date(2026, 10, 6)  # 2026-09-23 is 9 sessions before it; 2026-09-29 is 5
+
+
+def test_a_chain_stale_for_more_than_the_limit_is_labelled_a_fetch_failure() -> None:
+    frame = pd.DataFrame(
+        [
+            {"status": "STALE_DATA: chain is for 2026-09-23"},  # 9 sessions old
+            {"status": "STALE_DATA: chain is for 2026-09-29"},  # 5: at the limit, still stale
+            {"status": "STALE_DATA"},  # no date: its age is unknown, stale as recorded
+            {"status": "OK"},
+        ]
+    )
+    labels = chain_labels(frame, LATE, max_stale_sessions=5)
+    assert list(labels) == [CHRONIC, "STALE_DATA", "STALE_DATA", "OK"]
+    assert chain_labels(frame, LATE, max_stale_sessions=10).iloc[0] == "STALE_DATA"
+
+
+def test_a_chronically_stale_chain_is_never_tolerated() -> None:
+    frame = pd.DataFrame(chain_status_rows(50, 0, 50, 1, chain_day="2026-09-23"))
+    assert tolerated_stale(frame, LATE, SOURCES) == {}  # a fetch failure (1%), not excluded
+    at_limit = pd.DataFrame(chain_status_rows(50, 0, 50, 1, chain_day="2026-09-29"))
+    assert list(tolerated_stale(at_limit, LATE, SOURCES)) == ["EQ:R0"]
+
+
+def test_chronically_stale_chains_count_against_the_fetch_failure_limit() -> None:
+    chronic = chain_status_rows(50, 0, 50, 3, chain_day="2026-09-23")  # 3% failed
+    fresh = chain_status_rows(0, 0, 1, 1, chain_day="2026-10-05")
+    fresh[0] |= {"instrument_id": "EQ:F0", "symbol": "F0"}
+    assert tolerated_stale(pd.DataFrame([*chronic, *fresh]), LATE, SOURCES) == {}

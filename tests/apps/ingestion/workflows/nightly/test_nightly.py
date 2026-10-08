@@ -13,9 +13,11 @@ import pytest
 from algotrade.config.site.settings import NightlySettings, load_nightly
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.time.calendar import last_closed_session
+from algotrade.services.configs import resolve_config
 from algotrade.services.jobs import JobContext, LocalJobRunner
+from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
@@ -34,8 +36,14 @@ from algotrade_ingestion.workflows.nightly.nightly import (
 from algotrade_ingestion.workflows.nightly.notify import Notice
 from algotrade_ingestion.workflows.nightly.sessions import Plan, last_done, plan_sessions
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus, from_record, judge
+from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import task_ctx
-from tests.helpers.stored_frames import stamped, universe_rows
+from tests.helpers.stored_frames import (
+    chain_status_rows,
+    seed_chain_screen,
+    stamped,
+    universe_rows,
+)
 
 D = date(2026, 10, 2)
 D1 = date(2026, 10, 1)
@@ -449,6 +457,22 @@ def test_stale_chains_are_not_refetched_without_staging_or_for_an_older_session(
     assert third["catch_up"]["held"] == [later.isoformat()]
 
 
+def test_refetch_falls_back_to_the_tasks_own_run_when_the_stored_result_has_no_task_run() -> None:
+    # A nightly record from before ``task_run`` was stored: the step's task job is its registry
+    # ``TASK`` name (``option_chains``), not the step name (``chains``).
+    writer = store()
+    ctx = task_ctx(writer)
+    with IngestRun(ctx, "option_chains", D) as r:
+        r.items.update(STALE["chains"])
+    writer.staging.put(
+        r.record.run_id, "chains/option_quotes", "AAPL", stamped(universe_rows(["AAPL"]), D, "u")
+    )
+    step = next(s for s in nightly_module.NIGHTLY if s.name == "chains")
+    done = {"status": StepStatus.SUCCEEDED.value}  # no "task_run"
+    assert nightly_module._refetch(step, done, ctx, D, True) == (199, True)
+    assert nightly_module._refetch(step, done, ctx, D, False) == (199, False)  # not latest
+
+
 def test_a_dependent_that_failed_on_refetched_data_is_not_taken_from_before(
     fake: Callable[..., Calls],
 ) -> None:
@@ -711,6 +735,27 @@ def test_failed_screen_jobs_fail_the_step(
     runner.shutdown()
     assert step.status.value == "FAILED"
     assert step.result["screens"][0]["error"] == "ValueError: no features"
+
+
+@pytest.mark.parametrize(("rest_stale", "status"), [(10, "SUCCEEDED"), (11, "FAILED")])
+def test_stale_chains_within_the_gates_tolerance_do_not_fail_the_screens(
+    monkeypatch: pytest.MonkeyPatch, rest_stale: int, status: str
+) -> None:
+    # 2026-10-06: chains passed acceptance with 267 STALE_DATA names, yet the screens went
+    # PARTIAL on them and the critical step FAILED. Names the gate tolerated are excluded from
+    # the screen's coverage (ADR 0054); one more than it tolerates and the gate fails (here:
+    # the screens, as before).
+    configs = FileConfigStore(REPO_ROOT / "config")
+    config = resolve_config(configs, "short_premium_liquidity", UserContext(SITE_USER))
+    monkeypatch.setattr(screens_module, "nightly_screeners", lambda store: [config])
+    reader, writer = seed_chain_screen(D, chain_status_rows(50, 1, 50, rest_stale))
+    resources = {"reader": reader, "writer": writer, "configs": configs}
+    runner = LocalJobRunner(writer.runs_backend, LIBRARY_HANDLERS, resources, workers=1)
+    try:
+        step = screens_module.screen_jobs(runner, configs, None)(D)
+    finally:
+        runner.shutdown()
+    assert step.status.value == status
 
 
 # ----------------------------------------------------------------------------- notification

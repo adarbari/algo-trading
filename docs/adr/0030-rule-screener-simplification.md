@@ -1,6 +1,6 @@
 # ADR 0030: Rule screens: one list of criteria, no selection, no SKIPPED
 
-**Status:** accepted (2026-10-04; owner decisions). Amends [0029](0029-rule-screener.md)
+**Status:** accepted (2026-10-04; owner decisions); amended by [0055](0055-optional-source-tables-warn.md) (an optional source's missing table leaves the run COMPLETE). Amends [0029](0029-rule-screener.md)
 (missing data, tiers / classify / label, the screen's selection) and
 [0015](0015-configs-selections-users.md) (rule screens no longer name a selection;
 selections stay for strategies, backtests and Python screeners).
@@ -53,3 +53,8 @@ operator on `near_52w` (a three-valued label) hid that "near either extreme" is 
   item 2. Python screeners keep `UNKNOWN`.
 - A user screen that sets the removed keys keeps working (`tiers`, `classify`, `label` are
   ignored; `selection` is honoured).
+
+## Amendment (ADR 0054)
+A Python screener's `UNKNOWN` row of a stale chain the chains gate tolerated is rewritten to
+`EXCLUDED` by the engine and leaves the coverage denominator; other `UNKNOWN` rows still lower
+coverage.
