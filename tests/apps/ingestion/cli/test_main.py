@@ -61,7 +61,11 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # The repo's universe.toml builds from the network; these tests use CSV-import mode.
     import shutil  # noqa: PLC0415
 
-    shutil.copytree(REPO_ROOT / "config" / "site", tmp_path / "config" / "site")
+    shutil.copytree(
+        REPO_ROOT / "config" / "site",
+        tmp_path / "config" / "site",
+        ignore=shutil.ignore_patterns("*.local.toml"),
+    )
     (tmp_path / "config" / "site" / "universe.toml").write_text('source = "csv_import"\n')
     # A tiered chain status needs a core name (an empty core fails the check): AAPL is pinned.
     cboe = tmp_path / "config" / "site" / "sources.toml"
