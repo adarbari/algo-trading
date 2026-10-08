@@ -1,8 +1,9 @@
-/** Page: the Guide (home, field, playbook, situation and market regime pages). */
+/** Page: the Guide (home, Start here, glossary, field, playbook, situation and market regime pages). */
 export {
   GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
+  GuideGlossaryPage,
   GuideHomePage,
   GuideIndicatorPage,
   GuidePlaybookPage,
@@ -10,6 +11,9 @@ export {
   GuideRegimePage,
   GuideSituationPage,
   GuideSituationsPage,
+  GuideStartIndexPage,
+  GuideStartPage,
+  GuideTermPage,
   type GuideFieldPageProps,
   type GuideFieldsPageProps,
   type GuidePlaybookPageProps,

@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { Button } from '@algotrade/ui';
 
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
@@ -11,6 +12,9 @@ const hooks = vi.hoisted(() => ({ useFeatureCatalogue: vi.fn(), useGuideIndex: v
 vi.mock('@/entities/feature', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useFeatureCatalogue: hooks.useFeatureCatalogue,
+}));
+vi.mock('@/features/guide-search', () => ({
+  GuideSearchButton: () => <Button>Search the Guide</Button>,
 }));
 vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -37,6 +41,11 @@ const index = {
     { id: 'playbooks', title: 'Playbooks', purpose: 'p', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'p', entries: 11 },
     { id: 'situations', title: 'Situations', purpose: 'p', entries: 2 },
+    { id: 'glossary', title: 'Glossary', purpose: 'p', entries: 28 },
+  ],
+  startPages: [
+    { id: 'how_the_app_thinks', order: 1, title: 'How the app thinks about a day', summary: 's' },
+    { id: 'read_a_result', order: 2, title: 'Read a screen result', summary: 's' },
   ],
   families: [
     {
@@ -77,10 +86,9 @@ beforeEach(() => {
 });
 
 describe('GuideRail', () => {
-  it('lists only the sections that have pages, with the server’s count, and the themes under Fields', () => {
+  it('lists every section with the server’s count, and the themes under Fields', () => {
     render(<GuideRail page="fields" />);
     const nav = screen.getByRole('navigation', { name: 'Guide' });
-    expect(within(nav).queryByText('Start here')).toBeNull();
     expect(within(nav).getByRole('link', { name: /^Fields/ })).toHaveTextContent('Fields11');
     expect(within(nav).getByRole('link', { name: /Momentum and trend/ })).toHaveAttribute(
       'href',
@@ -88,14 +96,24 @@ describe('GuideRail', () => {
     );
   });
 
-  it('lists the sections in the server’s order: regime, playbooks, fields, situations', () => {
+  it('lists the sections in the server’s order: Start here first, the Glossary last', () => {
     render(<GuideRail page="home" />);
     const nav = screen.getByRole('navigation', { name: 'Guide' });
     const top = within(nav)
       .getAllByRole('link')
       .map((l) => l.textContent)
-      .filter((t) => /^(Overview|Market regime|Playbooks|Fields|Situations)/.test(t));
-    expect(top).toEqual(['Overview', 'Market regime3', 'Playbooks3', 'Fields11', 'Situations2']);
+      .filter((t) =>
+        /^(Overview|Start here|Market regime|Playbooks|Fields|Situations|Glossary)/.test(t),
+      );
+    expect(top).toEqual([
+      'Overview',
+      'Start here4',
+      'Market regime3',
+      'Playbooks3',
+      'Fields11',
+      'Situations2',
+      'Glossary28',
+    ]);
     expect(within(nav).queryByRole('link', { name: 'Breakout' })).toBeNull();
   });
 
@@ -161,26 +179,34 @@ describe('GuideRail', () => {
     expect(within(nav).queryByRole('link', { name: 'feature.rsi_14' })).toBeNull();
   });
 
-  it('filters the fields in the browser while a query is typed', async () => {
-    const user = userEvent.setup();
-    render(<GuideRail page="home" />);
-    await user.type(screen.getByRole('searchbox', { name: 'Search the guide' }), 'strength');
-    const results = screen.getByRole('navigation', { name: 'Search results' });
+  it('opens the Start here pages in order, numbered, marking the current one', () => {
+    render(<GuideRail page="start_page" startPage="read_a_result" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
     expect(
-      within(results)
+      within(nav)
         .getAllByRole('link')
-        .map((l) => l.textContent),
-    ).toEqual(['feature.rsi_14']);
-    expect(screen.getByText('1 field')).toBeInTheDocument();
-    await user.clear(screen.getByRole('searchbox'));
-    expect(screen.getByRole('navigation', { name: 'Guide' })).toBeInTheDocument();
+        .map((l) => l.getAttribute('href'))
+        .filter((h) => h?.startsWith('/guide/start/')),
+    ).toEqual(['/guide/start/how_the_app_thinks', '/guide/start/read_a_result']);
+    expect(within(nav).getByRole('link', { name: '2. Read a screen result' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
-  it('says when nothing matches', async () => {
-    const user = userEvent.setup();
+  it('marks the glossary current on a term page', () => {
+    render(<GuideRail page="term" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    expect(within(nav).getByRole('link', { name: /^Glossary/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('has the search button and no field filter of its own', () => {
     render(<GuideRail page="home" />);
-    await user.type(screen.getByRole('searchbox'), 'zzzz');
-    expect(screen.getByText('No field matches “zzzz”.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Search the Guide' })).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).toBeNull();
   });
 
   it('has no accessibility violations', async () => {

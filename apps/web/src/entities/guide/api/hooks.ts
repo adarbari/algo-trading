@@ -4,7 +4,8 @@
  * `Query.guideField` (what the server derives for one field's page: its reads and caveats split
  * at the names they mention, related fields, the playbooks that use it, the situations that
  * fool it), `Query.guidePlaybook`, `Query.guideSituation`, `Query.guideIndicator` and
- * `Query.guideEpisode` (the market regime's indicators and reference falls). The field's own facts and guide
+ * `Query.guideEpisode` (the market regime's indicators and reference falls), `Query.guideTerm`
+ * and `Query.guideStartPage` (the glossary and the Start here how-tos). The field's own facts and guide
  * entry come from the catalogue (entities/feature).
  */
 import { useQuery } from '@tanstack/react-query';
@@ -56,6 +57,67 @@ const GuideIndexQuery = graphql(`
       episodes {
         key
         name
+      }
+      startPages {
+        id
+        order
+        title
+        summary
+      }
+      terms {
+        id
+        term
+        short
+      }
+    }
+  }
+`);
+
+const GuideTermQuery = graphql(`
+  query GuideTerm($id: String!) {
+    guideTerm(id: $id) {
+      entry {
+        id
+        term
+        short
+      }
+      body {
+        segments {
+          text
+          field
+        }
+      }
+      seeAlso {
+        id
+        term
+        short
+      }
+    }
+  }
+`);
+
+const GuideStartPageQuery = graphql(`
+  query GuideStartPage($id: String!) {
+    guideStartPage(id: $id) {
+      entry {
+        id
+        order
+        title
+        summary
+      }
+      sections {
+        title
+        body {
+          segments {
+            text
+            field
+          }
+        }
+      }
+      links {
+        kind
+        id
+        title
       }
     }
   }
@@ -289,6 +351,30 @@ const GuideEpisodeQuery = graphql(`
     }
   }
 `);
+
+/** One glossary term's page (null data: no such term). */
+export function useGuideTerm(id: string) {
+  const variables = { id };
+  return useQuery({
+    queryKey: queryKeys.gql('GuideTerm', variables),
+    queryFn: () => gql(GuideTermQuery, variables),
+    select: (data) => data.guideTerm,
+    staleTime: GUIDE_STALE_MS,
+    retry: false,
+  });
+}
+
+/** One Start here page (null data: no such page). */
+export function useGuideStartPage(id: string) {
+  const variables = { id };
+  return useQuery({
+    queryKey: queryKeys.gql('GuideStartPage', variables),
+    queryFn: () => gql(GuideStartPageQuery, variables),
+    select: (data) => data.guideStartPage,
+    staleTime: GUIDE_STALE_MS,
+    retry: false,
+  });
+}
 
 export function useGuideIndex() {
   return useQuery({

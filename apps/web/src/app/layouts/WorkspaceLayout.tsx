@@ -6,7 +6,8 @@
  * design system knows no routes). The account menu (the viewer's name) holds the workspace
  * switch, listing only the workspaces the viewer may enter (hidden when there is one), and,
  * when they signed in through Supabase, a sign-out action; the regime chip (ADR 0047) sits
- * before the name, on both workspaces, and opens the Regime page. A viewer that turns null (the
+ * before the name, on both workspaces, and opens the Regime page. The Guide's search dialog
+ * (Ctrl+K / ⌘K) is mounted here once, for every page of both workspaces and the Guide. A viewer that turns null (the
  * API refused the token) goes back to the login page.
  */
 import {
@@ -21,11 +22,12 @@ import {
   TopBar,
   WorkspaceSwitch,
 } from '@algotrade/ui';
-import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Link, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
+import { GuideSearchProvider } from '@/features/guide-search';
 
 import {
   canEnter,
@@ -46,6 +48,7 @@ const activeSection = (workspace: Workspace, pathname: string): string =>
 export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const navigate = useNavigate();
+  const router = useRouter();
   const viewer = useViewer().data;
   const { session } = useSession();
   const signOut = useSignOut();
@@ -66,57 +69,63 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
   };
   return (
     <LinkProvider render={renderRouterLink}>
-      <AppShell
-        topBar={
-          <TopBar
-            brand={<Mono weight="medium">algotrade</Mono>}
-            utility={
-              <TextLink
-                href="/guide"
-                icon="book"
-                keys={['?']}
-                current={pathname === '/guide' || pathname.startsWith('/guide/')}
-              >
-                Guide
-              </TextLink>
-            }
-            end={
-              viewer && (
-                <Stack direction="row" gap={2} align="center">
-                  <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
-                  <AccountMenu
-                    name={viewer.name}
-                    {...(session ? { onSignOut: () => void signOut() } : {})}
-                  >
-                    {options.length > 1 ? (
-                      <Stack gap={1}>
-                        <Text size="xs" tone="muted">
-                          Workspace
-                        </Text>
-                        <WorkspaceSwitch
-                          workspaces={options}
-                          value={workspace.id}
-                          onValueChange={enter}
-                        />
-                      </Stack>
-                    ) : null}
-                  </AccountMenu>
-                </Stack>
-              )
-            }
-            nav={
-              <NavTabs
-                aria-label={`${workspace.label} sections`}
-                items={workspace.sections.map((s) => ({ href: s.path, label: s.label }))}
-                activeHref={activeSection(workspace, pathname)}
-                renderLink={({ href, ...link }) => <Link to={href} {...link} />}
-              />
-            }
-          />
-        }
+      <GuideSearchProvider
+        navigate={(path) => {
+          router.history.push(path);
+        }}
       >
-        <Outlet />
-      </AppShell>
+        <AppShell
+          topBar={
+            <TopBar
+              brand={<Mono weight="medium">algotrade</Mono>}
+              utility={
+                <TextLink
+                  href="/guide"
+                  icon="book"
+                  keys={['?']}
+                  current={pathname === '/guide' || pathname.startsWith('/guide/')}
+                >
+                  Guide
+                </TextLink>
+              }
+              end={
+                viewer && (
+                  <Stack direction="row" gap={2} align="center">
+                    <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
+                    <AccountMenu
+                      name={viewer.name}
+                      {...(session ? { onSignOut: () => void signOut() } : {})}
+                    >
+                      {options.length > 1 ? (
+                        <Stack gap={1}>
+                          <Text size="xs" tone="muted">
+                            Workspace
+                          </Text>
+                          <WorkspaceSwitch
+                            workspaces={options}
+                            value={workspace.id}
+                            onValueChange={enter}
+                          />
+                        </Stack>
+                      ) : null}
+                    </AccountMenu>
+                  </Stack>
+                )
+              }
+              nav={
+                <NavTabs
+                  aria-label={`${workspace.label} sections`}
+                  items={workspace.sections.map((s) => ({ href: s.path, label: s.label }))}
+                  activeHref={activeSection(workspace, pathname)}
+                  renderLink={({ href, ...link }) => <Link to={href} {...link} />}
+                />
+              }
+            />
+          }
+        >
+          <Outlet />
+        </AppShell>
+      </GuideSearchProvider>
     </LinkProvider>
   );
 }

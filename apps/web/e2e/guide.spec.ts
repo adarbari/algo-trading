@@ -1,8 +1,8 @@
 /**
  * The Guide end to end, against the production build with the API mocked (explore-api.ts): the
  * top bar's Guide link and the "?" key, the home with its theme groups, the field index, a
- * field's page (what it means, its spread, criteria, when it lies, related, a ticker), the rail's
- * search, the playbook and situation pages reached from the home (a linked field and back, the two
+ * field's page (what it means, its spread, criteria, when it lies, related, a ticker), the Start here
+ * steps, the glossary and the search dialog (Ctrl+K and the rail's button), the playbook and situation pages reached from the home (a linked field and back, the two
  * buttons, the linked prose), and the market regime pages (the index, an indicator, an episode);
  * accessible in dark and light.
  */
@@ -69,8 +69,6 @@ for (const theme of ['dark', 'light'] as const) {
     const errors = collectErrors(page);
     await page.goto('/guide');
     await expect(page.getByRole('heading', { level: 2, name: 'Fields' })).toBeVisible();
-    // Sections of later phases are not shown yet.
-    await expect(page.getByRole('link', { name: 'Start here' })).toHaveCount(0);
     await page.getByRole('link', { name: /^Implied volatility · / }).click();
     await expect(page).toHaveURL(/\/guide\/fields\?theme=implied/);
     await page.getByRole('link', { name: IV30 }).first().click();
@@ -211,21 +209,125 @@ test('a field page links its caveats’ fields, its situations and its playbooks
   await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
 });
 
-test('the rail searches the fields and the index has three views', async ({ page }) => {
+test('the field index has three views', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/guide/fields');
-  await page.getByRole('searchbox', { name: 'Search the guide' }).fill('realised');
-  const results = page.getByRole('navigation', { name: 'Search results' });
-  await expect(results.getByRole('link', { name: 'rollup.price_stats@v2.hv30' })).toBeVisible();
-  await expect(results.getByRole('link', { name: IV30 })).toHaveCount(0);
-  await page.getByRole('searchbox', { name: 'Search the guide' }).fill('zzzz');
-  await expect(page.getByText('No field matches “zzzz”.')).toBeVisible();
   await page.getByRole('radio', { name: 'By intent' }).click();
   await expect(page).toHaveURL(/view=intent/);
   await page.getByRole('link', { name: /^Cheap options to buy/ }).click();
   await expect(page.getByRole('link', { name: IV30 })).toBeVisible();
   await page.goto('/guide/fields?view=az');
   await expect(page.getByRole('link', { name: IV30 })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('the home lists Start here first and the Glossary last, and the rail follows that order', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/guide');
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+    'Start here',
+    'Market regime',
+    'Playbooks',
+    'Fields',
+    'Situations',
+    'Glossary',
+  ]);
+  const rail = page.getByRole('navigation', { name: 'Guide' });
+  await expect(rail.getByRole('link').first()).toHaveText('Overview');
+  await expect(rail.getByRole('link', { name: /^Start here/ })).toBeVisible();
+  await expect(rail.getByRole('link', { name: /^Glossary/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('Start here: the steps in order, a page with its links, and the next step', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/guide/start');
+  const steps = page.getByRole('list', { name: /reading order/ });
+  await expect(steps.getByRole('listitem')).toHaveText([
+    /^1\s*How the app thinks about a day/,
+    /^2\s*Read a screen result/,
+  ]);
+  await steps.getByRole('link', { name: 'How the app thinks about a day' }).click();
+  await expect(page).toHaveURL(/\/guide\/start\/how_the_app_thinks$/);
+  await expect(page.getByText('Start here · step 1')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'One session' })).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Where to look next' })
+    .getByRole('link', { name: 'UNKNOWN' })
+    .click();
+  await expect(page).toHaveURL(/\/guide\/glossary\/unknown$/);
+  await page.goto('/guide/start/how_the_app_thinks');
+  await page.getByRole('navigation', { name: 'Next page' }).getByRole('link').click();
+  await expect(page).toHaveURL(/\/guide\/start\/read_a_result$/);
+  await page.goto('/guide/start/nope');
+  await expect(page.getByText('No such page')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`Glossary: A to Z to a term and the terms it sends you to (${theme})`, async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/guide/glossary');
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText(['N', 'S', 'U']);
+    await page.evaluate((t) => {
+      document.documentElement.setAttribute('data-theme', t);
+    }, theme);
+    await expectAccessible(page);
+    await page
+      .getByRole('region', { name: 'Terms starting with S' })
+      .getByRole('link', { name: 'Session' })
+      .click();
+    await expect(page).toHaveURL(/\/guide\/glossary\/session$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
+    await expect(page.getByText('The trading day a page is reading.')).toBeVisible();
+    await page
+      .getByRole('region', { name: 'See also' })
+      .getByRole('link', { name: 'UNKNOWN' })
+      .click();
+    await expect(page).toHaveURL(/\/guide\/glossary\/unknown$/);
+    await expectAccessible(page);
+    await page.goto('/guide/glossary/nope');
+    await expect(page.getByText('No such term')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
+
+test('search: Ctrl+K from any page, type, Enter lands on the entry; the rail button opens it too', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/ideas');
+  await expect(page.getByRole('link', { name: /^Guide/ })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+k');
+  const dialog = page.getByRole('dialog', { name: 'Search the Guide' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('searchbox').fill('session');
+  await expect(dialog.getByRole('region', { name: 'Glossary' })).toBeVisible();
+  await expect(dialog.getByRole('region', { name: 'Start here' })).toBeVisible();
+  await page.keyboard.press('Enter');
+  // The first result is the Start here page that mentions the word, the groups in the server's order.
+  await expect(page).toHaveURL(/\/guide\/start\/how_the_app_thinks$/);
+  await expect(dialog).toHaveCount(0);
+
+  // On a Guide page the rail's button opens the same dialog; arrows walk the results.
+  await page.getByRole('button', { name: 'Search the Guide' }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('searchbox').fill('implied');
+  await expect(dialog.getByRole('region', { name: 'Fields' })).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(dialog.getByRole('link', { name: IV30 })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/guide\/fields\/rollup\.iv30(%40|@)v1\.iv30$/);
+
+  await page.keyboard.press('ControlOrMeta+k');
+  await dialog.getByRole('searchbox').fill('zzzz');
+  await expect(dialog.getByText('Nothing matches “zzzz”.')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

@@ -121,6 +121,10 @@ path = "apps/web/e2e/fixtures/*"
 purpose = "one page's recorded API responses (JSON), served by its e2e route mock"
 
 [[web_dir]]
+path = "apps/web/e2e/guide"
+purpose = "the Guide's end-to-end route mocks (playbooks, situations, regime pages; Start here, glossary and search), served through explore-api.ts"
+
+[[web_dir]]
 path = "apps/web/lint-rules"
 purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4), responsive (rule 10: a multi-column Grid collapses), columns and views (read model WEB 4, 7), guide (messages), and the responsive rule's test"
 

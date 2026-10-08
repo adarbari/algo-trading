@@ -148,7 +148,10 @@ export function guideSituation(slug: string): Json {
 
 const fixture = (name: string): { data: { regime: Json } } =>
   JSON.parse(
-    readFileSync(fileURLToPath(new URL(`./fixtures/regime/${name}.json`, import.meta.url)), 'utf8'),
+    readFileSync(
+      fileURLToPath(new URL(`../fixtures/regime/${name}.json`, import.meta.url)),
+      'utf8',
+    ),
   ) as { data: { regime: Json } };
 
 interface Card {

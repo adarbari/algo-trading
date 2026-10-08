@@ -20,6 +20,15 @@ const index = {
     { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 399 },
     { id: 'situations', title: 'Situations', purpose: 'States that fool fields.', entries: 2 },
+    { id: 'glossary', title: 'Glossary', purpose: 'The app’s own words.', entries: 28 },
+  ],
+  startPages: [
+    { id: 'how_the_app_thinks', order: 1, title: 'How the app thinks', summary: 'A day.' },
+    { id: 'read_a_result', order: 2, title: 'Read a result', summary: 'Hits and misses.' },
+  ],
+  terms: [
+    { id: 'session', term: 'Session', short: 'The day a page reads.' },
+    { id: 'not_run', term: 'NOT_RUN', short: 'No run for the session.' },
   ],
   families: [
     {
@@ -75,18 +84,41 @@ describe('GuideHome', () => {
     ).toHaveAttribute('href', '/guide/regime');
   });
 
-  it('shows only the sections that have pages, in the server’s order, with its purpose', () => {
+  it('shows every section in the server’s order, Start here first and the Glossary last', () => {
     render(<GuideHome />);
     expect(screen.getByRole('heading', { level: 1, name: 'Guide' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Start here',
       'Market regime',
       'Playbooks',
       'Fields',
       'Situations',
+      'Glossary',
     ]);
-    expect(screen.queryByText('Start here')).toBeNull();
     expect(screen.getByText('Every catalogue field.')).toBeInTheDocument();
     expect(screen.getByText('399 entries')).toBeInTheDocument();
+  });
+
+  it('lists the Start here pages numbered, each linked, and the glossary terms', () => {
+    render(<GuideHome />);
+    const start = within(screen.getByRole('region', { name: 'Start here' }));
+    expect(start.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      '1How the app thinksA day.',
+      '2Read a resultHits and misses.',
+    ]);
+    expect(start.getByRole('link', { name: 'Read a result' })).toHaveAttribute(
+      'href',
+      '/guide/start/read_a_result',
+    );
+    const glossary = within(screen.getByRole('region', { name: 'Glossary' }));
+    expect(glossary.getByRole('link', { name: 'NOT_RUN' })).toHaveAttribute(
+      'href',
+      '/guide/glossary/not_run',
+    );
+    expect(glossary.getByRole('link', { name: 'All the terms' })).toHaveAttribute(
+      'href',
+      '/guide/glossary',
+    );
   });
 
   it('lists the theme groups in the server’s order with their counts, each theme a link', () => {

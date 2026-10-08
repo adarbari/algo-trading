@@ -998,6 +998,27 @@ Source: `design-system/components/ScoreMeter`
 | `size` | `'sm' \| 'md'` | no | Track thickness: `sm` 6 px (lists, default) or `md` 10 px (a headline meter). |
 | `loading` | `boolean` | no | Placeholder while the score loads. |
 
+### SearchDialog
+
+SearchDialog: a modal search (the ⌘K palette) over results the caller supplies, grouped by kind. The caller owns the query and the lookup (nothing is ranked or filtered here): this shows the box, the groups and the states (a hint before anything is typed, a skeleton while reading, no matches, an error with a retry). Each result is a real link (`href`), so it can be opened in a new tab; a plain click and Enter call `onSelect` instead. Keyboard: ArrowDown from the box moves focus to the first result, ArrowDown / ArrowUp walk the results (ArrowUp from the first returns to the box), Enter in the box opens the first result (once the results for what was typed have arrived), Escape closes.
+
+Source: `design-system/components/SearchDialog`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes |  |
+| `onOpenChange` | `(open: boolean) => void` | yes |  |
+| `title` | `string` | yes | The dialog's accessible name ("Search the Guide"). |
+| `query` | `string` | yes | The query (controlled). |
+| `onQueryChange` | `(query: string) => void` | yes |  |
+| `placeholder` | `string` | no |  |
+| `groups` | `readonly SearchDialogGroup[]` | yes | The results by group, in the order to show them. |
+| `loading` | `boolean` | no | A read is in flight. |
+| `error` | `boolean` | no | The last read failed; `onRetry` reads again. |
+| `onRetry` | `() => void` | no |  |
+| `hint` | `ReactNode` | no | Shown while the query is empty. |
+| `onSelect` | `(item: SearchDialogItem) => void` | yes | Called when a result is chosen (click or Enter); the caller closes and navigates. |
+
 ### SearchInput
 
 SearchInput: a search box (tickers, names, sectors) with a search icon, a clear button once there is text, and Escape to clear. Sunken (canvas-coloured) as in the mockups' top bar and ticker list. `loading` shows a spinner while results are being fetched. Named "Search" unless given a label or placed in a Field.

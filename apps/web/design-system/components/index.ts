@@ -130,6 +130,12 @@ export {
   type ScoreMeterProps,
   type ScoreThreshold,
 } from './ScoreMeter';
+export {
+  SearchDialog,
+  type SearchDialogGroup,
+  type SearchDialogItem,
+  type SearchDialogProps,
+} from './SearchDialog';
 export { SearchInput, type SearchInputProps } from './SearchInput';
 export {
   SegmentedControl,

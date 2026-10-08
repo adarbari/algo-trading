@@ -5,6 +5,8 @@
  */
 
 export const GUIDE_PATH = '/guide';
+export const GUIDE_START_PATH = '/guide/start';
+export const GUIDE_GLOSSARY_PATH = '/guide/glossary';
 export const GUIDE_FIELDS_PATH = '/guide/fields';
 export const GUIDE_PLAYBOOKS_PATH = '/guide/playbooks';
 export const GUIDE_SITUATIONS_PATH = '/guide/situations';
@@ -13,8 +15,25 @@ export const GUIDE_REGIME_PATH = '/guide/regime';
 /** Today's readings: the Regime page in the Trader workspace. */
 export const REGIME_PAGE_PATH = '/regime';
 
-/** The sections that have pages today, by the id `Query.guideIndex` gives them. */
-export const BUILT_SECTIONS: readonly string[] = ['regime', 'playbooks', 'fields', 'situations'];
+/** The sections that have pages, by the id `Query.guideIndex` gives them (the server orders them). */
+export const BUILT_SECTIONS: readonly string[] = [
+  'start',
+  'regime',
+  'playbooks',
+  'fields',
+  'situations',
+  'glossary',
+];
+
+/** A Start here page (its id is the page's in `start.toml`). */
+export function startPath(id: string): string {
+  return `${GUIDE_START_PATH}/${encodeURIComponent(id)}`;
+}
+
+/** A glossary term's page. */
+export function termPath(id: string): string {
+  return `${GUIDE_GLOSSARY_PATH}/${encodeURIComponent(id)}`;
+}
 
 /** A regime indicator's page (its key is the card's). */
 export function indicatorPath(key: string): string {
@@ -45,6 +64,43 @@ export function screenerResultsPath(id: string): string {
 export function screenerBuilderPath(id: string): string {
   return `/screeners/${encodeURIComponent(id)}/edit`;
 }
+
+/**
+ * The page of a Guide entry by the `kind` and `id` the server gives (a search result, a link in
+ * a Start here page): start, indicator, episode, playbook, field, situation or term. An
+ * unknown kind opens the Guide's home.
+ */
+export function guideEntryPath(kind: string, id: string): string {
+  switch (kind) {
+    case 'start':
+      return startPath(id);
+    case 'indicator':
+      return indicatorPath(id);
+    case 'episode':
+      return episodePath(id);
+    case 'playbook':
+      return playbookPath(id);
+    case 'field':
+      return fieldPath(id);
+    case 'situation':
+      return situationPath(id);
+    case 'term':
+      return termPath(id);
+    default:
+      return GUIDE_PATH;
+  }
+}
+
+/** What each kind of entry is called where entries are grouped (search results, links). */
+export const GUIDE_KIND_TITLES: Readonly<Record<string, string>> = {
+  start: 'Start here',
+  indicator: 'Warning signs',
+  episode: 'Market falls',
+  playbook: 'Playbooks',
+  field: 'Fields',
+  situation: 'Situations',
+  term: 'Glossary',
+};
 
 /** The views of the field index. */
 export type FieldsView = 'theme' | 'intent' | 'az';

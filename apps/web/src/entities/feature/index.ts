@@ -67,7 +67,6 @@ export {
   guideThemes,
   OTHER_THEME,
   resolveSelection,
-  searchFields,
   shortMeaning,
   themeFields,
   themeOf,

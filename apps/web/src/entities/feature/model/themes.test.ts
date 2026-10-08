@@ -5,7 +5,6 @@ import {
   guideThemes,
   OTHER_THEME,
   resolveSelection,
-  searchFields,
   shortMeaning,
   themeFields,
   themeOf,
@@ -51,23 +50,6 @@ describe('guide themes', () => {
       'rollup.bands@v2.bb_squeeze',
       'rollup.bands@v2.bb_width',
     ]);
-  });
-});
-
-describe('searching fields', () => {
-  it('matches every word against names, titles, descriptions and the guide text', () => {
-    expect(searchFields(catalogue, 'squeeze').map((f) => f.name)).toEqual([
-      'rollup.bands@v2.bb_squeeze',
-    ]);
-    expect(searchFields(catalogue, 'QUIET bands').map((f) => f.name)).toEqual([
-      'rollup.bands@v2.bb_squeeze',
-    ]);
-    expect(searchFields(catalogue, 'ticker').map((f) => f.name)).toEqual(['instrument.symbol']);
-    expect(searchFields(catalogue, 'nothing like this')).toEqual([]);
-  });
-
-  it('keeps every field for an empty query', () => {
-    expect(searchFields(catalogue, '  ')).toHaveLength(5);
   });
 });
 
