@@ -76,8 +76,9 @@ rest-allowlist:  ## REST GET routes only shrink (ADR 0037): architecture/rest_al
 rest-allowlist-update: ## after retiring GET routes (removing their entries): lower the committed count
 	$(PY) scripts/check_rest_allowlist.py --update
 
-features-doc:    ## regenerate docs/data/features.md (catalogue), docs/data/field-guide.md (field guide) and docs/edges.md (edges)
+features-doc:    ## regenerate docs/data/features.md (catalogue), docs/data/field-guide.md (field guide), docs/edges.md (edges) and the web's generated catalogue.ts
 	$(PY) scripts/features_doc.py
+	$(PY) scripts/export_catalogue.py
 
 roadmap-check:   ## docs/roadmap.md opens with a Now / Next of at most 25 lines (the one counter: tests/architecture/test_docs.py)
 	$(PY) -m pytest -q tests/architecture/test_docs.py::test_roadmap_opens_with_a_short_now_next_section
