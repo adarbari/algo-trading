@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
+.PHONY: check-gates check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -178,10 +178,11 @@ web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build t
 
 # ----------------------------------------------------------------------------- the gate (docs/ci.md "Scope-aware make check")
 # `make check` runs the gates for the areas changed vs BASE (python / web / docs, CI's rule:
-# scripts/changed_tests.py --areas), the python and web sides side by side (CHECK_JOBS=2).
-# FULL=1 runs every gate whatever changed, as CI and the release do. CHECK_SCOPE overrides the detection.
-# One check at a time on the machine (scripts/check_lock.py: a second one waits and says who holds
-# the lock), so each runs with every core: WORKERS stays auto, no WEB_WORKERS cap.
+# scripts/changed_tests.py --areas), the python and web sides side by side (CHECK_JOBS=2), under
+# the per-worktree lock (scripts/ops/check_lock.sh: a second run here refuses and names the first).
+# FULL=1 runs every gate whatever changed, as the release does. CHECK_SCOPE overrides the detection.
+# Rule 9: sessions run `make changed` and push; CI is the gate; `make check` is for the release
+# and a deliberate full run.
 FULL ?=
 CHECK_JOBS ?= 2
 CHECK_SCOPE ?= $(if $(FULL),python web,$(shell $(PY) scripts/changed_tests.py --areas $(BASE)))
@@ -196,9 +197,11 @@ check-scope:     ## which areas `make check` would gate for this branch (python 
 fitness:         ## the architecture fitness tests only (what CI runs for a docs-only change)
 	$(PY) -m pytest -q -n $(WORKERS) tests/architecture
 
-check:           ## the gate for the areas changed vs BASE (python and web sides in parallel, one check at a time on the machine); FULL=1 = every gate (CI, release)
-	@echo "make check: scope [$(strip $(CHECK_SCOPE))] vs $(BASE) ($(if $(FULL),FULL=1: every gate,FULL=1 runs every gate)); gates: $(strip $(CHECK_TARGETS))"
-	@$(PY) scripts/check_lock.py -- $(MAKE) --no-print-directory -j$(CHECK_JOBS) $(strip $(CHECK_TARGETS))
+check:           ## the gate for the areas changed vs BASE, python and web sides in parallel, one run per worktree; FULL=1 = every gate (the release)
+	scripts/ops/check_lock.sh $(MAKE) --no-print-directory -j$(CHECK_JOBS) check-gates
+
+check-gates: $(strip $(CHECK_TARGETS))  ## the gates of the detected scope (CHECK_SCOPE / FULL=1), run by `make check` under the lock
+	@echo "make check: scope [$(strip $(CHECK_SCOPE))] vs $(BASE); gates run: $^"
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

@@ -46,6 +46,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 | CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | the tests job runs `tests/architecture` only (~1 min) |
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR (396 runs in the week to 2026-10-07, 4.5 per PR, three to five at once on the shared machine) | narrowed by `make changed` (Local fast path below), then the push: CI is the full gate (rule 9). A deliberate local `make check` is scope-aware (below): python-only measured 11 min 48 s on 2026-10-08 (pytest 10 min 45 s of it, 5,174 tests at `-n auto`, another session's pytest running alongside), web-only = the web gates in parallel with no pytest, mixed = the longer side, not the sum; `FULL=1` is the old 30–40 min |
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
+| Several sessions on one machine | web servers fought over 8000 / 5173 / 4173 / 5801-5802 / 8801-8802 / 6007; two `make check` runs timed each other out; `pkill -f node` killed other sessions' runs | each worktree has its own port block (`ALGOTRADE_PORT_BASE` in `worktree.env`); `make check` refuses a second run in a worktree; `make doctor` lists the other runs and warns when the main checkout is off `main` or has local `config/site` edits |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
 | Merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push |
 
@@ -72,13 +73,33 @@ web-storybook web-e2e` in parallel), so `tsc -b` runs once (typecheck) and `vite
 (the e2e's web server); `npm run check` stays the serial form. `FULL=1` runs every gate
 whatever changed: CI runs the gates per job and the release runs `make check FULL=1`.
 `CHECK_SCOPE="python web"` overrides the detection. The outputs interleave (GNU make 3.81 on
-macOS has no `-O`); make names the failed target at the end.
+macOS has no `-O`); make names the failed target at the end. It runs under the per-worktree
+lock below. With rule 9 (sessions push after `make changed`; CI gates) full local runs are
+rare, so the `WORKERS=2 WEB_WORKERS=2` caps go: a run gets every core (10, 4 performance;
+16 GB). The caps dated from the overloads of #94 / #95 / #98, when three to five full checks
+ran side by side.
 
-One check at a time on the machine: `scripts/check_lock.py` wraps the run in a lock
-(`~/.cache/algotrade/check.lock`, `CHECK_LOCK=`), a second check waits and prints who holds it
-(pid, worktree, start time), and each run gets every core (`WORKERS=auto`, no vitest cap: the
-`WORKERS=2 WEB_WORKERS=2` habit dated from the overloads of #94 / #95 / #98, when three to
-five full checks ran side by side). The machine: 10 cores (4 performance), 16 GB.
+Shared machine (several sessions, one Mac):
+
+- **Ports.** `scripts/worktree.sh` writes `ALGOTRADE_PORT_BASE = 10000 + cksum(path) % 500 * 10`
+  into `worktree.env`: API +0, Vite dev +1, real-app api/web pairs +2..+5, Storybook preview
+  +6, vite preview +7 (`vite.config.ts`, `playwright*.config.ts`). Unset (CI, the main
+  checkout) the usual numbers apply. Two worktrees can hash to one block (1 in 500): re-create one.
+- **`make check` lock.** `make check` is `scripts/ops/check_lock.sh make check-gates`: a
+  `mkdir` lock `var/check.lock.d` with the PID, stale when the PID is dead, released on exit.
+  A second `make check` in the same worktree refuses and names the first run's PID and start.
+  Stop a run by its PID, never `pkill -f make|node|vite|playwright` (a rule in CLAUDE.md).
+- **Deploy.** `scripts/ops/deploy.sh [--dry-run]` updates the running site from the main
+  checkout (must be on `main`, clean): pull, `make web-build`, restart the API agent, health.
+- **Machine-local site config.** `config/site/<name>.local.toml` (git-ignored) is merged over
+  `<name>.toml` (docs/configuration.md), so the main checkout stays clean for `deploy.sh`.
+
+### Permission prompts
+
+Commands the owner approves once in `.claude/settings.json` `permissions.allow` stop the
+prompts for the pipeline's own scripts: `launchctl kickstart`, `scripts/worktree.sh`,
+`scripts/ops/deploy.sh`, `scripts/merge_main.sh`, `gh pr ready`, `gh pr edit` (the proposed list
+is in the PR that added this note). Agents never edit `settings.json` themselves.
 
 How the web jobs are cut:
 

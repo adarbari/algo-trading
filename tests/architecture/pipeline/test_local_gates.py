@@ -38,7 +38,8 @@ def test_make_check_is_scope_aware_and_the_release_runs_every_gate() -> None:
     makefile = (ROOT / "Makefile").read_text()
     assert "scripts/changed_tests.py --areas" in makefile
     check = re.search(r"^check:.*?(?=^\S)", makefile, re.S | re.M)
-    assert check and "$(CHECK_TARGETS)" in check.group(0) and "-j$(CHECK_JOBS)" in check.group(0)
+    assert check and "-j$(CHECK_JOBS)" in check.group(0) and "check-gates" in check.group(0)
+    assert re.search(r"^check-gates: \$\(strip \$\(CHECK_TARGETS\)\)", makefile, re.M)
     release = (ROOT / ".github/workflows/release.yml").read_text()
     assert "make check FULL=1" in release
 

@@ -1,10 +1,8 @@
 """Makefile guards: `make install` refuses a linked `.venv`; `make check` gates by scope."""
 
-import os
 import re
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -47,15 +45,15 @@ def test_install_syncs_a_real_venv(tmp_path: Path) -> None:
 
 
 def _dry_check(**vars: str) -> str:
-    # The recipe runs the sub-make through the check lock, so PY must be a real Python; under
-    # -n the sub-make only prints, so no gate runs and CHECK_LOCK keeps the real lock untouched.
+    overrides = [f"{k}={v}" for k, v in vars.items()]
+    # check-gates, not check: `check` takes the worktree lock and runs the sub-make, which a
+    # dry run must not do; the scope variables are the same for both.
     out = subprocess.run(
-        ["make", "-n", "check", f"PY={sys.executable}", *[f"{k}={v}" for k, v in vars.items()]],
+        ["make", "-n", "check-gates", "PY=/nonexistent/python", *overrides],
         cwd=MAKEFILE.parent,
         capture_output=True,
         text=True,
         check=False,
-        env={**os.environ, "CHECK_LOCK": str(MAKEFILE.parent / "var" / "test-check.lock")},
     )
     assert out.returncode == 0, out.stderr
     return out.stdout
@@ -86,4 +84,4 @@ def test_full_runs_every_gate_without_asking_git() -> None:
 def test_the_gates_run_in_parallel_under_one_sub_make() -> None:
     text = MAKEFILE.read_text()
     recipe = re.search(r"^check:.*?(?=^\S)", text, re.S | re.M)
-    assert recipe and "-j$(CHECK_JOBS)" in recipe.group(0)
+    assert recipe and "-j$(CHECK_JOBS)" in recipe.group(0) and "check_lock.sh" in recipe.group(0)

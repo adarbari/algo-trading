@@ -746,7 +746,11 @@ purpose = "tests for the machine and store maintenance scripts in scripts/ (doct
 
 [[test_dir]]
 path = "tests/scripts/gates"
-purpose = "tests for the delivery-pipeline scripts in scripts/ (changed_tests, changed_web, check_lock, check_numbering, merge_main) and the Makefile's gates (split from tests/scripts, at its module cap)"
+purpose = "tests for the delivery-pipeline scripts in scripts/ (changed_tests, changed_web, check_numbering, merge_main) and the Makefile's gates (split from tests/scripts, at its module cap)"
+
+[[test_dir]]
+path = "tests/scripts/ops"
+purpose = "tests for the operator scripts in scripts/ops/ (deploy)"
 
 [[test_dir]]
 path = "tests/reconciliation"

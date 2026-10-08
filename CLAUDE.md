@@ -139,8 +139,8 @@ the skill with the fix.
    on the machine (396 runs in one week, 30-40 min each, were the bottleneck). After a CI
    failure rerun only the failed gate locally (`make <gate>` / `npm run <script>`), fix, push
    again. `make check` stays for the release (`FULL=1`) and for a deliberate full run: it gates
-   the areas changed vs `origin/main` (`make check-scope`), the two sides in parallel, one at a
-   time on the machine.
+   the areas changed vs `origin/main` (`make check-scope`), the two sides in parallel, one run
+   per worktree (`scripts/ops/check_lock.sh`).
 10. **Push and open the PR yourself, then move on.** When `make changed` passes, push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start
@@ -216,12 +216,15 @@ and jobs, the IBKR read-only boundary, a bug that survived two fixes) gets an `a
 review of the diff before it is finished, and an agent that hits ambiguity or fails the same
 check twice escalates one tier instead of retrying.
 
-Shared machine: at most 2 agents at once. `make check` serialises itself (one at a time, every
-core), so nobody passes `WORKERS=2` / `WEB_WORKERS=2` any more (the cap dated from overloads on
-#94 / #95 / #98, when full checks ran side by side); tests run directly use `pytest -n auto`.
+Shared machine: at most 2 agents at once. Rule 9 keeps full checks off the machine, so nobody
+passes `WORKERS=2` / `WEB_WORKERS=2` any more (the cap dated from overloads on #94 / #95 / #98,
+when full checks ran side by side); tests run directly use `pytest -n auto`.
 
 Token habits (every session):
 
+- **Never `pkill -f make`, `pkill -f node`, `pkill -f vite` or `pkill -f playwright`**: it kills
+  another session's 30-40 min run. Stop your own run by its PID or job; `make check` holds a
+  per-worktree lock (`scripts/ops/check_lock.sh`) and `make doctor` lists the other runs.
 - **One fresh session per work item**; batch related bugs into it. Sonnet for scoped fixes,
   Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
   Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
