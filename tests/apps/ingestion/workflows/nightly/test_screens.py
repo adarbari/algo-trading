@@ -1,5 +1,5 @@
 """The nightly ``screens`` step: one ``screen`` job per screener; a COMPLETE run that went
-without an optional source's table is a warning on the step, never its failure (ADR 0054)."""
+without an optional source's table is a warning on the step, never its failure (ADR 0055)."""
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime

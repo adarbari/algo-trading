@@ -205,7 +205,7 @@ VRP_SCREEN: dict[str, Any] = {
 
 
 def test_an_optional_table_read_through_a_coalescing_feature_is_complete_not_partial() -> None:
-    """ADR 0054: with IB Gateway down the session has no ``ibkr_iv@v1`` partition, but
+    """ADR 0055: with IB Gateway down the session has no ``ibkr_iv@v1`` partition, but
     ``vrp_iv30`` coalesces it with Cboe's IV30: the run is COMPLETE, the optional miss is
     audited apart, never PARTIAL (which failed the critical nightly ``screens`` step)."""
     reader, writer = seeded()

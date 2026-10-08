@@ -1,4 +1,4 @@
-# ADR 0054: A screen that goes without an optional source's table warns, never fails
+# ADR 0055: A screen that goes without an optional source's table warns, never fails
 
 **Status:** accepted (2026-10-08; owner decision 2026-10-08). Amends
 [0030](0030-rule-screener-simplification.md) (when a missing table makes a rule screen PARTIAL)

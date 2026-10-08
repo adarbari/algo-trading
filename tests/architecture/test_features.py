@@ -18,7 +18,7 @@
   under ``docs/data/field-guide/``) are up to date;
 - inputs come only through ``algotrade.data.feature_inputs``: no module under ``features/``
   imports storage or a domain reader, and the framework has no loaders of its own;
-- an expression over an optional group (ADR 0054) has a value without it, and no site preset's
+- an expression over an optional group (ADR 0055) has a value without it, and no site preset's
   HARD criterion reads an optional group's field directly.
 """
 
@@ -395,7 +395,7 @@ def test_screened_and_phrased_fields_have_a_guide_entry() -> None:
 
 
 # ----------------------------------------------------------------------------- optional sources
-OPTIONAL = {g.name for g in GROUPS.values() if g.optional}  # ADR 0054
+OPTIONAL = {g.name for g in GROUPS.values() if g.optional}  # ADR 0055
 _SAMPLE = {"float": 0.5, "float32": 0.5, "int": 1, "bool": True, "date": pd.Timestamp("2026-10-02")}
 
 
@@ -410,7 +410,7 @@ def _sample(f: Feature) -> object:
     ),
 )
 def test_an_expression_over_an_optional_source_still_has_a_value_without_it(name: str) -> None:
-    """ADR 0054: a screen goes without an optional group's table (IB Gateway down) and is not
+    """ADR 0055: a screen goes without an optional group's table (IB Gateway down) and is not
     PARTIAL, so every expression feature reading it falls back to a required table (``coalesce``
     or an ``is_null`` branch): with the optional table absent and the rest stored, it has a
     value."""
@@ -425,12 +425,12 @@ def test_an_expression_over_an_optional_source_still_has_a_value_without_it(name
     out = SITE.evaluate(frames, [name])
     assert out[name].notna().all(), (
         f"{name} reads an optional group ({sorted(OPTIONAL)}) with no fallback: coalesce it "
-        "with a required table, or the screens reading it go without a value (ADR 0054)"
+        "with a required table, or the screens reading it go without a value (ADR 0055)"
     )
 
 
 def test_no_site_hard_criterion_reads_an_optional_source_directly() -> None:
-    """ADR 0054: a HARD criterion over an optional group's field would reject every row on a
+    """ADR 0055: a HARD criterion over an optional group's field would reject every row on a
     session without it while the run reads COMPLETE; score or soft it, or read it through an
     expression feature that falls back to a required table."""
     presets = REPO_ROOT / "config" / "site" / "presets" / "screeners"

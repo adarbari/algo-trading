@@ -12,6 +12,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from algotrade.config.site.settings import load_sources
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config
@@ -73,6 +74,7 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
         ctx.resources["writer"],
         config,
         date.fromisoformat(params["session"]),
+        sources=load_sources(ctx.resources["configs"]),
     )
     exports = (
         run_exports(outcome, config, Path(params["export_dir"])) if params.get("export_dir") else ()

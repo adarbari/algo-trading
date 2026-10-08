@@ -171,7 +171,9 @@ select (as of session) → FeatureView of the screener's rollups for the selecte
 
 Coverage statuses: `COMPLETE`, `PARTIAL` (below `min_coverage`), `UNIVERSE_INCOMPLETE`
 (universe older than `max_universe_age_days`), `EMPTY_SELECTION`. Only a `COMPLETE` run may
-report "no qualified candidates".
+report "no qualified candidates". Coverage is `processed / (instruments - excluded)`: an
+`EXCLUDED` row (a stale chain the chains acceptance check tolerated, with its reason; never a
+pick) is out of the denominator ([ADR 0054](adr/0054-stale-chains-the-gate-tolerated-are-excluded-from-screen-coverage.md)).
 
 ---
 
@@ -275,7 +277,7 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
   COMPLETE (its coverage threshold met). The screen audit records `universe_pre_snapshot`
   (survivorship). A table of an optional group (`FeatureGroup.optional`, e.g. `ibkr_iv@v1`
   with IB Gateway down) missing for the session leaves the run COMPLETE: it is audited as
-  `missing_optional_tables` and the step carries an `optional_sources` WARN (ADR 0054).
+  `missing_optional_tables` and the step carries an `optional_sources` WARN (ADR 0055).
 - **Notification** (`notify.py`): every run writes its summary to
   `var/logs/nightly-latest.json`, then hands a `Notice` to the `Notifier` (one interface;
   `notify(notice)` returns a warning instead of raising). The macOS notifier (`osascript`,

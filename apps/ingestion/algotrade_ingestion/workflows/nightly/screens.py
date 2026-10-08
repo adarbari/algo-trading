@@ -6,7 +6,7 @@ job for its owner; exports are that job's output. The step SUCCEEDS when every j
 COMPLETE (each screener reached its coverage threshold, ADR 0039), else it FAILS naming the
 screeners that did not. A screener that ran without an optional source's table
 (``missing_optional_tables``, e.g. ``ibkr_iv@v1`` with IB Gateway down) is a WARN check on
-the step, never its failure (ADR 0054).
+the step, never its failure (ADR 0055).
 """
 
 from collections.abc import Callable
