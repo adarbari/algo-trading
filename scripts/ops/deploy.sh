@@ -4,7 +4,8 @@
 #
 #   scripts/ops/deploy.sh [--dry-run]
 #
-# Refuses unless the main checkout is on `main` with a clean tree. The git-ignored overlay
+# Refuses unless the main checkout is on `main` with a clean tree and no commits origin/main
+# lacks. After the pull it syncs the venv (`uv sync`: allowed in the main checkout only). The git-ignored overlay
 # (config/site/*.local.toml, .env, var/) never counts as dirty. --dry-run prints the plan.
 set -euo pipefail
 
@@ -12,7 +13,7 @@ dry=0
 for a in "$@"; do
   case "$a" in
     --dry-run) dry=1 ;;
-    -h | --help) sed -n '2,8p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,10p' "$0"; exit 0 ;;
     *) echo "usage: scripts/ops/deploy.sh [--dry-run]" >&2; exit 2 ;;
   esac
 done
@@ -34,7 +35,13 @@ run() {
 }
 
 cd "$main"
+# Unpushed local commits on main must never deploy: main has to be an ancestor of origin/main.
+git fetch -q origin main
+if ! git merge-base --is-ancestor main origin/main; then
+  echo "refusing: main has commits that are not on origin/main (unpushed or diverged)" >&2; exit 1
+fi
 run git pull --ff-only origin main
+run uv sync --all-packages --locked  # the venv runs this checkout's code (main checkout only)
 run make web-build
 run launchctl kickstart -k "gui/$(id -u)/com.algotrade.api"
 if [ "$dry" = 1 ]; then

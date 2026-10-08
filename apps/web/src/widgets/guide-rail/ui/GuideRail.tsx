@@ -2,8 +2,9 @@
  * The Guide's compact rail: a search over field names, display names and what they say (it
  * filters what the catalogue already returned, in the browser), and under it the sections that
  * have pages today with their entry counts from the server; Fields expands to its themes, and
- * the theme of the current field to its fields. While a query is typed the rail lists the
- * matching fields instead.
+ * the theme of the current field to its fields; Playbooks (in family order) and Situations list
+ * their pages while one of theirs is open. While a query is typed the rail lists the matching
+ * fields instead.
  */
 import { NavList, SearchInput, Stack, Text, type NavListItem } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
@@ -21,6 +22,10 @@ import {
   fieldsPath,
   GUIDE_FIELDS_PATH,
   GUIDE_PATH,
+  GUIDE_PLAYBOOKS_PATH,
+  GUIDE_SITUATIONS_PATH,
+  playbookPath,
+  situationPath,
   themeTitle,
   useGuideIndex,
 } from '@/entities/guide';
@@ -32,14 +37,18 @@ const MATCHES_SHOWN = 30;
 
 export interface GuideRailProps {
   /** Which Guide page is open. */
-  page: 'home' | 'fields' | 'field';
+  page: 'home' | 'fields' | 'field' | 'playbooks' | 'playbook' | 'situations' | 'situation';
   /** The theme the field index is narrowed to. */
   theme?: string | undefined;
   /** The field whose page is open (catalogue name). */
   field?: string | undefined;
+  /** The playbook whose page is open (the preset id). */
+  playbook?: string | undefined;
+  /** The situation whose page is open (its slug). */
+  situation?: string | undefined;
 }
 
-export function GuideRail({ page, theme, field }: GuideRailProps) {
+export function GuideRail({ page, theme, field, playbook, situation }: GuideRailProps) {
   const index = useGuideIndex();
   const catalogue = useFeatureCatalogue();
   const [query, setQuery] = useState('');
@@ -58,38 +67,79 @@ export function GuideRail({ page, theme, field }: GuideRailProps) {
     current: f.name === field,
   });
 
+  const fieldsSection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_FIELDS_PATH,
+    label: s.title,
+    count: s.entries,
+    current: page === 'fields' && theme === undefined,
+    children: (index.data?.themeGroups ?? [])
+      .flatMap((g) => g.themes)
+      .map((t): NavListItem => {
+        const shown = t.theme === openTheme ? themeFields(all ?? [], t.theme) : [];
+        return {
+          href: fieldsPath({ theme: t.theme }),
+          label: themeTitle(t.theme),
+          count: t.fields,
+          current: page === 'fields' && t.theme === theme,
+          children: [
+            ...shown.slice(0, THEME_FIELDS_SHOWN).map(fieldItem),
+            ...(shown.length > THEME_FIELDS_SHOWN
+              ? [
+                  {
+                    href: fieldsPath({ theme: t.theme }),
+                    label: `${String(shown.length - THEME_FIELDS_SHOWN)} more`,
+                  },
+                ]
+              : []),
+          ],
+        };
+      }),
+  });
+
+  const playbooksSection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_PLAYBOOKS_PATH,
+    label: s.title,
+    count: s.entries,
+    current: page === 'playbooks',
+    children:
+      page === 'playbooks' || page === 'playbook'
+        ? (index.data?.families ?? [])
+            .flatMap((f) => f.playbooks)
+            .map((p) => ({
+              href: playbookPath(p.id),
+              label: p.name,
+              current: page === 'playbook' && p.id === playbook,
+            }))
+        : [],
+  });
+
+  const situationsSection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_SITUATIONS_PATH,
+    label: s.title,
+    count: s.entries,
+    current: page === 'situations',
+    children:
+      page === 'situations' || page === 'situation'
+        ? (index.data?.situations ?? []).map((x) => ({
+            href: situationPath(x.slug),
+            label: x.name,
+            current: page === 'situation' && x.slug === situation,
+          }))
+        : [],
+  });
+
+  const sectionItem: Record<string, (s: { title: string; entries: number }) => NavListItem> = {
+    playbooks: playbooksSection,
+    fields: fieldsSection,
+    situations: situationsSection,
+  };
+
   const sections: NavListItem[] = [
     { href: GUIDE_PATH, label: 'Overview', current: page === 'home' },
     ...(index.data?.sections ?? [])
       .filter((s) => BUILT_SECTIONS.includes(s.id))
-      .map((s): NavListItem => ({
-        href: GUIDE_FIELDS_PATH,
-        label: s.title,
-        count: s.entries,
-        current: page === 'fields' && theme === undefined,
-        children: (index.data?.themeGroups ?? [])
-          .flatMap((g) => g.themes)
-          .map((t): NavListItem => {
-            const shown = t.theme === openTheme ? themeFields(all ?? [], t.theme) : [];
-            return {
-              href: fieldsPath({ theme: t.theme }),
-              label: themeTitle(t.theme),
-              count: t.fields,
-              current: page === 'fields' && t.theme === theme,
-              children: [
-                ...shown.slice(0, THEME_FIELDS_SHOWN).map(fieldItem),
-                ...(shown.length > THEME_FIELDS_SHOWN
-                  ? [
-                      {
-                        href: fieldsPath({ theme: t.theme }),
-                        label: `${String(shown.length - THEME_FIELDS_SHOWN)} more`,
-                      },
-                    ]
-                  : []),
-              ],
-            };
-          }),
-      })),
+      .map((s) => sectionItem[s.id]?.(s))
+      .filter((item): item is NavListItem => item !== undefined),
   ];
 
   return (

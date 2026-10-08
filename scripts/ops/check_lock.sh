@@ -5,7 +5,8 @@
 #
 # Portable (macOS has no flock): the lock is a directory, `var/check.lock.d` (override with
 # CHECK_LOCK_DIR), made with `mkdir` (atomic) and holding `pid` and `started`. A lock whose PID
-# is dead is stale and is taken over. The trap releases it when the command ends or is stopped.
+# is dead is stale and is taken over (under a guard directory, `$lock.takeover`, so two runs
+# never both take over). The trap releases it when the command ends or is stopped.
 set -uo pipefail
 
 [ "$#" -ge 1 ] || { echo "usage: check_lock.sh <command> [args...]" >&2; exit 2; }
@@ -32,9 +33,25 @@ if ! take; then
       "never with pkill. Lock: $lock" >&2
     exit 1
   fi
-  rm -rf "$lock"  # stale: its process is gone
+  # Stale: its process is gone. Only one run may take over at a time: a guard directory
+  # (itself stale when its PID is dead). Inside it the holder is checked again, so a lock that
+  # a faster run took meanwhile is never moved aside; then the old lock moves aside atomically.
+  guard="$lock.takeover"
+  if ! mkdir "$guard" 2>/dev/null; then
+    gpid=$(cat "$guard/pid" 2>/dev/null || true)
+    if [ -n "$gpid" ] && ! kill -0 "$gpid" 2>/dev/null; then rm -rf "$guard"; fi  # stale guard
+    mkdir "$guard" 2>/dev/null || { echo "refusing: another run is taking over $lock; retry" >&2; exit 1; }
+  fi
+  echo $$ >"$guard/pid"
+  trap 'rm -rf "$guard"' EXIT
+  if [ -d "$lock" ] && holder_alive; then
+    echo "refusing: another \`make check\` took $lock first (PID $(cat "$lock/pid"))" >&2; exit 1
+  fi
+  if mv "$lock" "$lock.stale.$$" 2>/dev/null; then rm -rf "$lock.stale.$$"; fi
   take || { echo "refusing: lost the race for $lock to another run" >&2; exit 1; }
+  rm -rf "$guard"
 fi
+[ "$(cat "$lock/pid" 2>/dev/null)" = "$$" ] || { echo "refusing: lost $lock" >&2; exit 1; }
 trap 'rm -rf "$lock"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM

@@ -5,6 +5,7 @@
  */
 import { Chip, Heading, Mono, Stack, Surface, Text } from '@algotrade/ui';
 
+import { GuideProse, type GuideProseValue } from '@/entities/guide';
 import {
   featureMarks,
   featureTitle,
@@ -15,6 +16,8 @@ import {
 
 export interface FieldHeroProps {
   feature: CatalogueFeature;
+  /** "How to read it" split at the field names it mentions (the server's); plain text without. */
+  readsLinked?: GuideProseValue | null | undefined;
 }
 
 /** Tags in reading order; each says what it is (colour is never the only signal). */
@@ -33,7 +36,7 @@ function tags(feature: CatalogueFeature, valued: number | null): string[] {
   ];
 }
 
-export function FieldHero({ feature }: FieldHeroProps) {
+export function FieldHero({ feature, readsLinked }: FieldHeroProps) {
   const distribution = useFeatureDistribution(feature.name).data;
   const valued =
     distribution && !distribution.unknown ? distribution.count - distribution.nulls : null;
@@ -49,7 +52,11 @@ export function FieldHero({ feature }: FieldHeroProps) {
           </Heading>
         </Stack>
         <Text as="p" size="xl">
-          {feature.guide?.reads ?? feature.description}
+          {readsLinked ? (
+            <GuideProse prose={readsLinked} size="xl" />
+          ) : (
+            (feature.guide?.reads ?? feature.description)
+          )}
         </Text>
         <Stack direction="row" gap={2} wrap>
           {tags(feature, valued).map((tag) => (

@@ -1,0 +1,5 @@
+/* LinkedProse: wraps like a paragraph; a long name breaks rather than overflows. */
+.root {
+  display: inline;
+  overflow-wrap: anywhere;
+}

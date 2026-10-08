@@ -5,9 +5,23 @@ import { Text } from '@algotrade/ui';
 
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
-import { GuideFieldPage, GuideFieldsPage, GuideHomePage } from './GuidePages';
+import {
+  GuideFieldPage,
+  GuideFieldsPage,
+  GuideHomePage,
+  GuidePlaybookPage,
+  GuidePlaybooksPage,
+  GuideSituationPage,
+  GuideSituationsPage,
+} from './GuidePages';
 
-const widgets = vi.hoisted(() => ({ rail: vi.fn(), fields: vi.fn(), field: vi.fn() }));
+const widgets = vi.hoisted(() => ({
+  rail: vi.fn(),
+  fields: vi.fn(),
+  field: vi.fn(),
+  playbook: vi.fn(),
+  situation: vi.fn(),
+}));
 
 vi.mock('@/widgets/guide-rail', () => ({
   GuideRail: (props: Record<string, unknown>) => {
@@ -28,6 +42,23 @@ vi.mock('@/widgets/guide-field', () => ({
     return <Text>field page</Text>;
   },
   FieldOutline: () => <Text>outline</Text>,
+}));
+
+vi.mock('@/widgets/guide-playbooks', () => ({
+  GuidePlaybooksIndex: () => <Text>playbook index</Text>,
+}));
+vi.mock('@/widgets/guide-playbook', () => ({
+  GuidePlaybook: (props: Record<string, unknown>) => {
+    widgets.playbook(props);
+    return <Text>playbook page</Text>;
+  },
+}));
+vi.mock('@/widgets/guide-situations', () => ({
+  GuideSituationsIndex: () => <Text>situation index</Text>,
+  GuideSituation: (props: Record<string, unknown>) => {
+    widgets.situation(props);
+    return <Text>situation page</Text>;
+  },
 }));
 
 describe('Guide pages', () => {
@@ -55,6 +86,26 @@ describe('Guide pages', () => {
     expect(widgets.field).toHaveBeenLastCalledWith({ name: 'feature.x', onAddToBuilder });
     expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'field', field: 'feature.x' });
     expect(screen.getByText('outline')).toBeInTheDocument();
+  });
+
+  it('frames the playbook index and a playbook’s page, handing the buttons to the route', () => {
+    render(<GuidePlaybooksPage />);
+    expect(screen.getByText('playbook index')).toBeInTheDocument();
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'playbooks' });
+    const onSeeHits = vi.fn();
+    const onOpenBuilder = vi.fn();
+    render(<GuidePlaybookPage id="breakout" onSeeHits={onSeeHits} onOpenBuilder={onOpenBuilder} />);
+    expect(widgets.playbook).toHaveBeenLastCalledWith({ id: 'breakout', onSeeHits, onOpenBuilder });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'playbook', playbook: 'breakout' });
+  });
+
+  it('frames the situation index and a situation’s page with the rail on it', () => {
+    render(<GuideSituationsPage />);
+    expect(screen.getByText('situation index')).toBeInTheDocument();
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'situations' });
+    render(<GuideSituationPage slug="earnings-gap" />);
+    expect(widgets.situation).toHaveBeenLastCalledWith({ slug: 'earnings-gap' });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'situation', situation: 'earnings-gap' });
   });
 
   it('has no accessibility violations', async () => {

@@ -21,11 +21,15 @@ def _git(cwd: Path, *args: str) -> None:
 
 
 def _repo(tmp_path: Path) -> Path:
+    origin = tmp_path.parent / f"{tmp_path.name}-origin.git"
+    _git(tmp_path.parent, "init", "-q", "--bare", "-b", "main", str(origin))
     _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "remote", "add", "origin", str(origin))
     (tmp_path / ".gitignore").write_text("*.local.toml\n")
     (tmp_path / "a.txt").write_text("a\n")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "init")
+    _git(tmp_path, "push", "-q", "origin", "main")
     return tmp_path
 
 
@@ -55,9 +59,18 @@ def test_on_main_prints_the_plan_and_runs_nothing(tmp_path: Path) -> None:
     out = _deploy(_repo(tmp_path))
     assert out.returncode == 0, out.stderr
     plan = [x for x in out.stdout.splitlines() if x.startswith("[dry-run]")]
-    assert [x.split()[1] for x in plan] == ["git", "make", "launchctl", "curl"]
-    assert "pull --ff-only origin main" in plan[0] and "web-build" in plan[1]
-    assert "kickstart -k" in plan[2] and "/health" in plan[3]
+    assert [x.split()[1] for x in plan] == ["git", "uv", "make", "launchctl", "curl"]
+    assert "pull --ff-only origin main" in plan[0] and "sync --all-packages --locked" in plan[1]
+    assert "web-build" in plan[2] and "kickstart -k" in plan[3] and "/health" in plan[4]
+
+
+def test_refuses_unpushed_local_commits(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / "b.txt").write_text("b\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "local only")
+    out = _deploy(repo)
+    assert out.returncode == 1 and "not on origin/main" in out.stderr
 
 
 def test_script_is_executable_and_bash_parses_it() -> None:

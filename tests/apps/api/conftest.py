@@ -70,7 +70,7 @@ def user_configs(tmp_path_factory: pytest.TempPathFactory) -> Path:
     with another formula (bob has none)."""
     root: Path = tmp_path_factory.mktemp("configs")
     for item in (REPO_ROOT / "config" / "site").iterdir():
-        if item.name != "users.toml":
+        if item.name != "users.toml" and not item.name.endswith(".local.toml"):
             (root / "site" / item.name).parent.mkdir(exist_ok=True)
             (root / "site" / item.name).symlink_to(item)
     (root / "site" / "users.toml").write_text(USERS_TOML)
@@ -93,7 +93,7 @@ def user_client(
     """A client for ``user`` over configs where alice has a feature."""
 
     def client_for(user: str) -> TestClient:
-        store = replace(api_golden[0], configs=FileConfigStore(user_configs))
+        store = replace(api_golden[0], configs=FileConfigStore(user_configs, local=False))
         settings = ApiSettings("memory://", str(user_configs), user)
         return TestClient(create_app(settings, store, authenticator=as_user(user)))
 
