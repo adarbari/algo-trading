@@ -12,6 +12,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section import harness
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     _pbo,
@@ -19,7 +20,12 @@ from algotrade.services.evaluation.cross_section.harness import (
     evaluate_edge,
 )
 from algotrade.services.evaluation.cross_section.picks import screen_variant
-from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
+from algotrade.services.evaluation.cross_section.report import render_edge_report
+from algotrade.services.evaluation.cross_section.results import (
+    edge_eval_frame,
+    lost_sessions,
+    write_edge_eval,
+)
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -652,3 +658,131 @@ def test_the_split_joins_the_run_hash() -> None:
         _split_run(w, split_from=d).run_hash for d in (None, date(2026, 9, 2), date(2026, 9, 9))
     }
     assert len(hashes) == 3
+
+
+def test_an_event_edge_screens_each_session_once_per_screener_whatever_its_variants() -> None:
+    """The edge's variants and horizons share the screens and the event-field reads of a
+    session; the main scope's rows are the same with or without variants."""
+    plain = event_edge(2, baselines=["momo2"])
+    varied = event_edge(
+        2,
+        baselines=["momo2"],
+        variants=[{"id": "cheap", "universe": CHEAP}, {"id": "costly", "outcome": {"cost_bps": 5}}],
+    )
+    w = event_world(EVENTS)
+    w.configs = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "momo"): screen(),
+            ("site", "strategies", "momo2"): {**screen("asc"), "id": "momo2"},
+        }
+    )
+    alone = run(w, plain)
+    calls: list[tuple[str, date]] = []
+    real = harness.screen_variant
+
+    def counting(reader: Any, config: Any, day: date) -> Any:
+        calls.append((config.config.id, day))
+        return real(reader, config, day)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(harness, "screen_variant", counting)
+        both = run(w, varied)
+    assert len(calls) == len(set(calls)) and {d for _, d in calls} == set(EVENTS)
+    assert {c for c, _ in calls} == {"momo", "momo2"}
+    main = [r for r in both.results if r.edge_variant == "main"]
+    assert [dataclasses.replace(r, measures=()) for r in main] == [
+        dataclasses.replace(r, measures=()) for r in alone.results
+    ]
+    assert [m.hits for r in main for m in r.measures] == [
+        m.hits for r in alone.results for m in r.measures
+    ]
+
+
+def test_the_result_is_the_same_whatever_the_chunk_of_sessions_held_in_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Peak memory is flat in the sessions because chunks are measured and dropped; the rows
+    must not depend on where the chunks fall."""
+    whole = run(event_world(EVENTS), event_edge(2))
+    plain = run(build_world())
+    monkeypatch.setattr(harness, "CHUNK_SESSIONS", 2)
+    assert run(event_world(EVENTS), event_edge(2)).results == whole.results
+    assert run(build_world()).results == plain.results
+
+
+def test_a_screener_with_no_data_for_a_session_loses_it_counted_and_the_run_continues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = harness.screen_variant
+
+    def missing_on_third(reader: Any, config: Any, day: date) -> Any:
+        if day == DAYS[2]:
+            raise MissingDataError("rollups/instrument/option_liquidity@v1", "no rows", "ingest")
+        return real(reader, config, day)
+
+    monkeypatch.setattr(harness, "screen_variant", missing_on_third)
+    ev = run(build_world())
+    (r,) = ev.results
+    m = r.measures[0]
+    assert (m.sessions, m.excluded_coverage) == (3, 1)  # never a miss or a zero pick set
+    assert m.picks == 15
+    assert r.lost_sessions == {"rollups/instrument/option_liquidity@v1": 1}
+    (lost,) = lost_sessions(ev)
+    assert (lost["variant"], lost["sessions"]) == ("main/momo", 1)
+    text = render_edge_report({**_report_stub(), "lost_sessions": [lost]})
+    assert "LOST: main/momo" in text and "option_liquidity@v1" in text
+
+
+def _report_stub() -> dict[str, Any]:
+    return {
+        "edge": "drift", "run_id": "r", "trials": 1, "survivorship": {},
+        "unclosed_sessions": {}, "rows": [],
+    }  # fmt: skip
+
+
+@pytest.mark.parametrize("dataset", ["market features", "universe", "instruments/reference"])
+def test_a_missing_wiring_dataset_fails_the_run_it_is_not_a_lost_session(
+    monkeypatch: pytest.MonkeyPatch, dataset: str
+) -> None:
+    def broken(reader: Any, config: Any, day: date) -> Any:
+        raise MissingDataError(dataset, "not loaded for this run", "wire it")
+
+    monkeypatch.setattr(harness, "screen_variant", broken)
+    with pytest.raises(MissingDataError, match=dataset):
+        run(build_world())
+
+
+def test_a_variant_that_loses_every_session_fails_the_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def never(reader: Any, config: Any, day: date) -> Any:
+        raise MissingDataError("rollups/instrument/option_liquidity@v1", "no rows", "ingest")
+
+    monkeypatch.setattr(harness, "screen_variant", never)
+    with pytest.raises(MissingDataError, match="option_liquidity"):
+        run(build_world())  # zero measured sessions is never a SUCCEEDED run
+
+
+def test_other_exceptions_from_a_screen_still_propagate(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(reader: Any, config: Any, day: date) -> Any:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(harness, "screen_variant", broken)
+    with pytest.raises(RuntimeError, match="boom"):
+        run(build_world())
+
+
+def test_the_eligible_sets_read_for_the_events_are_not_kept_once_the_schedules_are_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    caches: list[int] = []
+    real = harness._measure
+
+    def spy(reader: Any, session: Any, *a: Any, **k: Any) -> Any:
+        caches.append(len(session._eligible))
+        return real(reader, session, *a, **k)
+
+    monkeypatch.setattr(harness, "_measure", spy)
+    run(event_world(EVENTS), event_edge(2))
+    assert caches == [0]

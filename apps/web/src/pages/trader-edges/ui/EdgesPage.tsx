@@ -4,6 +4,8 @@
  */
 import { Heading, MasterDetail, Stack, Text } from '@algotrade/ui';
 
+import { EvaluationSplitForm } from '@/features/evaluation-split';
+import { GuideHelp } from '@/features/guide-help';
 import { EdgeDetail } from '@/widgets/edge-detail';
 import { EdgeList } from '@/widgets/edge-list';
 
@@ -24,6 +26,7 @@ export function EdgesPage({ selected = null, onSelect, onClear }: EdgesPageProps
           Each edge, tested on the stored history, and what its frozen period shows.
         </Text>
       </Stack>
+      <EvaluationSplitForm renderTermHelp={(id) => <GuideHelp entry={{ kind: 'term', id }} />} />
       <MasterDetail
         columns="main-aside"
         collapse="lg"

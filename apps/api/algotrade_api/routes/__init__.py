@@ -8,7 +8,7 @@ the caller dependency (``deps.get_caller``, ADR 0040)."""
 from fastapi import APIRouter
 
 from algotrade_api.routes import chains, health
-from algotrade_api.routes.authoring import preferences, screeners, user_features
+from algotrade_api.routes.authoring import evaluation, preferences, screeners, user_features
 from algotrade_api.routes.drafting import screeners as screen_drafting
 from algotrade_api.routes.preview import features as feature_check
 from algotrade_api.routes.preview import screeners as screen_preview
@@ -26,4 +26,5 @@ ROUTERS: tuple[APIRouter, ...] = (
     regime_explain.router,
     screeners.router,
     preferences.router,
+    evaluation.router,
 )

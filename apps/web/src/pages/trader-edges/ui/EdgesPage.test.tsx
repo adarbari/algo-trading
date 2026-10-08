@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { EdgesPage } from './EdgesPage';
 
+vi.mock('@/features/evaluation-split', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { EvaluationSplitForm: () => <Text>split form</Text> };
+});
 vi.mock('@/widgets/edge-list', async () => {
   const { Text } = await import('@algotrade/ui');
   return {
@@ -20,6 +24,7 @@ describe('EdgesPage', () => {
   it('has its heading, the list and the chosen edge beside it', () => {
     render(<EdgesPage selected="momentum_12_1" onSelect={vi.fn()} onClear={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Edges' })).toBeInTheDocument();
+    expect(screen.getByText('split form')).toBeInTheDocument();
     expect(screen.getByText('list momentum_12_1')).toBeInTheDocument();
     expect(screen.getByText('detail momentum_12_1')).toBeInTheDocument();
   });

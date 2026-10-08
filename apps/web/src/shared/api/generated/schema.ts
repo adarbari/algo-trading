@@ -22,6 +22,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/evaluation/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Split */
+        put: operations["save_split_evaluation_split_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/features/check": {
         parameters: {
             query?: never;
@@ -443,6 +460,22 @@ export interface components {
             id: string;
             /** Reason */
             reason: string;
+        };
+        /** EvaluationSplitBody */
+        EvaluationSplitBody: {
+            /**
+             * Split From
+             * @description the first session of the test slice (a stored session); null: clear it
+             */
+            split_from: string | null;
+        };
+        /** EvaluationSplitSaved */
+        EvaluationSplitSaved: {
+            /**
+             * Split From
+             * @description the split now saved (null: none)
+             */
+            split_from: string | null;
         };
         /** ExplainBody */
         ExplainBody: {
@@ -1204,6 +1237,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveOptionChain"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_split_evaluation_split_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluationSplitBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationSplitSaved"];
                 };
             };
             /** @description Validation Error */
