@@ -10,7 +10,8 @@ site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
 site/guide/{glossary,start}.toml           L3 Guide glossary, Start here pages (kind ``guide``)
-site/guide/playbooks/<id>.toml             L3 Guide playbook prose (kind ``guide_playbooks``)
+site/guide/playbooks/<family>/<id>.toml    L3 Guide playbook prose, one folder per family (kind
+                                           ``guide_playbooks``; the name is the id)
 site/edges/<id>.toml                       L3 edge documents (kind ``edges``, ADR 0053)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
@@ -42,6 +43,7 @@ from algotrade.storage.configs.store import KINDS, split_version
 
 SITE = "site"
 SCREENERS = "screeners"
+PLAYBOOKS = "guide_playbooks"
 USER_FILES = ("preferences", "identity", "evaluation")  # one document per user, never the site's
 # site/<folder>/<name>.toml by kind (the folder is the kind's name unless given)
 SITE_FOLDERS = {
@@ -115,12 +117,17 @@ class FileConfigStore:
             if kind == "settings":
                 return self.root / SITE / f"{validate_id(kind, name)}.toml"
             if kind in SITE_FOLDERS:
-                return self.root / SITE / SITE_FOLDERS[kind] / f"{validate_id(kind, name)}.toml"
+                path = self.root / SITE / SITE_FOLDERS[kind] / f"{validate_id(kind, name)}.toml"
+                return self._playbook_path(path) if kind == PLAYBOOKS else path
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
         if kind in USER_FILES:  # one file per user: users/<id>/<kind>.toml
             return self.root / "users" / user / f"{kind}.toml"
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
+
+    def _playbook_path(self, flat: Path) -> Path:
+        """``site/guide/playbooks/<family>/<id>.toml``: the family folder that holds the file."""
+        return next(iter(sorted(flat.parent.glob(f"*/{flat.name}"))), flat)
 
     def screen_dir(self, scope: str, name: str) -> Path:
         """A rule screen's folder of versions: ``site/presets/screeners/<name>/`` (a preset)
@@ -196,6 +203,9 @@ class FileConfigStore:
             return ["defaults"] if scope == SITE and self._path(SITE, kind, "x").exists() else []
         if kind == SCREENERS:
             return [n for n in self.screen_folders(scope) if self.screen_versions(scope, n)]
+        if kind == PLAYBOOKS:
+            base = self.root / SITE / SITE_FOLDERS[PLAYBOOKS]
+            return sorted(p.stem for p in base.glob("*/*.toml")) if scope == SITE else []
         directory = self._path(scope, kind, "x").parent
         return sorted(p.stem for p in directory.glob("*.toml")) if directory.exists() else []
 

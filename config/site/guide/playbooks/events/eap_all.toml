@@ -1,0 +1,33 @@
+# L3 site setting: the Guide's playbook for the site preset eap_all (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "eap_all"
+version = 1  # the preset version this prose was written for
+summary = "Lists every liquid stock whose next earnings report is expected, with the date announced or guessed from last year: the earnings announcement premium, the finding that stocks earn more in the days around a report than at other times. It is a candidate edge under test, and recent studies find it fading in the US."
+hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and its next report date is known (announced) or taken from last year's report plus 52 weeks. Every such name qualifies; the edge holds all of them from five sessions before the report to one after."
+not_checked = "It does not know that the date is confirmed (a guessed date can be wrong by weeks), whether the report is good or bad, or whether the premium exists: the harness measures that."
+before_acting = [
+  "A date taken from last year is a guess: check rollup.earnings_expected@v1.expected_basis, SCHEDULED is an announced date, PRIOR_YEAR is not.",
+  "The hold spans the report, so it carries the report's full price move in either direction, not a small steady premium.",
+  "Studies of the US market since 2010 find the premium much smaller or gone; read the harness's result against the base rate before trusting a pick.",
+]
+sources = [
+  "Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007)",
+  "Savor and Wilson, Earnings Announcements and Systematic Risk (2016)",
+]
+related = [
+  { id = "eap_volume", reason = "the same names ranked by their usual announcement volume" },
+  { id = "momentum_12_1", reason = "a baseline every edge is compared with" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+expected_basis = "Its next report date is announced or taken from last year"
