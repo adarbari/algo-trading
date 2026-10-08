@@ -1,0 +1,71 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: momentum_12_1 among names that just reported.
+id = "momentum_at_earnings"
+name = "12-1 momentum among names that just reported"
+thesis = "Past-year winners keep outperforming the market in the weeks after they report earnings, because the report confirms the news the price had under-reacted to."
+mechanism = """Investors and analysts respond slowly to firm-specific news; price momentum is largely
+the earnings-news component of past returns (Chan, Jegadeesh and Lakonishok 1996; Novy-Marx 2015),
+and the part earned around announcements predicts returns without reversing (Gerard and Jehl 2025)."""
+persistence = """Limits to arbitrage: liquidity risk (Sadka 2006), momentum crashes (Daniel and
+Moskowitz 2016) and attenuation since decimalisation (Chordia, Subrahmanyam and Tong 2014)."""
+schedule = "on_event:earnings_reaction"
+universe = "liquid_common_stocks"
+top_k = 20
+base = "event"
+screeners = ["momentum_12_1"]
+baselines = ["size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Found by the harness 2026-10-08 in the small_cap_earnings_drift run (momentum baseline among
+event names: decile spread +13.1%, t 2.84, 9 decile sessions; frozen +8.3%, 4 sessions). One universe
+snapshot (2026-10-02) serves all history. The decoy (plain momentum_12_1 on all liquid names on the
+same sessions) is not a variant: a variant overrides only the outcome and the universe, never
+`base`, so it would still pick among event names; the plain-momentum comparison stays the
+edge_momentum_12_1 document's own run (month-end sessions), left to a later PR."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 15
+
+[quality_bar]
+outcome = """Excess return over SPY over 20 and 60 sessions from S's close, net of 15 bps a round trip."""
+trigger_timing = """Reports from events/earnings read by known_from; the anchor is E+1 (the reaction's end)
+and S = E+2 (start_offset_sessions = 1); mom_12_1 is read at D = S-1."""
+replication = """Rank the event names by rollup.trend_stats@v2.mom_12_1 and hold the top_k; compare with
+the same ranking over all liquid names on the same sessions (Jegadeesh and Titman 1993, applied to
+the announcement component of Gerard and Jehl 2025)."""
+expected_size = """Published momentum is about 1% a month, halved since 2000; the +13% per 20 sessions
+seen in the first run should shrink."""
+capacity_costs = """Liquid names; one trade per report held 20 sessions; 15 bps a round trip assumed."""
+failure_modes = """Momentum crashes; the 1-5 session post-report reversal if the offset slips. Retire if
+the frozen decile spread is not above plain momentum on the same event names after costs, or the top
+decile does not beat the mean of the eligible event names."""
+decoys = """Plain 12-1 momentum on all liquid names; size; the 2-session reaction; survivorship from
+one universe snapshot (rerun on per-session snapshots before evidenced)."""
+
+[[sources]]
+title = "Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance 51(5), 1996"
+
+[[sources]]
+title = "Chordia, T. and Shivakumar, L., Earnings and Price Momentum, Journal of Financial Economics 80(3), 2006"
+
+[[sources]]
+title = "Novy-Marx, R., Fundamentally, Momentum is Fundamental Momentum, NBER working paper 20984, 2015"
+
+[[sources]]
+title = "Gerard, B. and Jehl, T., The Many Facets of Stock Momentum, Financial Analysts Journal, 2025"
+
+[[sources]]
+title = "Sadka, R., Momentum and Post-Earnings-Announcement Drift Anomalies: The Role of Liquidity Risk, Journal of Financial Economics 80(2), 2006"
+
+[[sources]]
+title = "Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies 29(1), 2016"
+
+[[sources]]
+title = "Chordia, T., Subrahmanyam, A. and Tong, Q., Have Capital Market Anomalies Attenuated in the Recent Era of High Liquidity and Trading Activity?, Journal of Accounting and Economics 58(1), 2014"
+
+[[sources]]
+title = "Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993"
