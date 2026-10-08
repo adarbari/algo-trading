@@ -6,9 +6,31 @@
 
 export const GUIDE_PATH = '/guide';
 export const GUIDE_FIELDS_PATH = '/guide/fields';
+export const GUIDE_PLAYBOOKS_PATH = '/guide/playbooks';
+export const GUIDE_SITUATIONS_PATH = '/guide/situations';
 
 /** The sections that have pages today, by the id `Query.guideIndex` gives them. */
-export const BUILT_SECTIONS: readonly string[] = ['fields'];
+export const BUILT_SECTIONS: readonly string[] = ['playbooks', 'fields', 'situations'];
+
+/** A playbook's page (the id is the site preset's). */
+export function playbookPath(id: string): string {
+  return `${GUIDE_PLAYBOOKS_PATH}/${encodeURIComponent(id)}`;
+}
+
+/** A situation's page. */
+export function situationPath(slug: string): string {
+  return `${GUIDE_SITUATIONS_PATH}/${encodeURIComponent(slug)}`;
+}
+
+/** A screener's results (what "See today's hits" opens). */
+export function screenerResultsPath(id: string): string {
+  return `/screeners/${encodeURIComponent(id)}`;
+}
+
+/** A screener in the Builder. */
+export function screenerBuilderPath(id: string): string {
+  return `/screeners/${encodeURIComponent(id)}/edit`;
+}
 
 /** The views of the field index. */
 export type FieldsView = 'theme' | 'intent' | 'az';

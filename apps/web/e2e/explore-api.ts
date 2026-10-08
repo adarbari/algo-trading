@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 import type { Page, Route } from '@playwright/test';
 
+import { FAMILIES, guidePlaybook, guideSituation, linked, SITUATION } from './guide-pages-api';
+
 type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;
 
@@ -335,8 +337,17 @@ function guideIndex(): Json {
       guideIndex: {
         sections: [
           { id: 'start', title: 'Start here', purpose: 'How the app thinks.', entries: 4 },
+          { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 2 },
           { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 3 },
+          {
+            id: 'situations',
+            title: 'Situations',
+            purpose: 'States that fool fields.',
+            entries: 1,
+          },
         ],
+        families: FAMILIES,
+        situations: [{ name: SITUATION.name, fields: 1, slug: SITUATION.slug }],
         themeGroups: [
           {
             id: 'chart',
@@ -360,9 +371,13 @@ function guideField(name: string): Json {
   const known = name in GUIDES;
   if (!known)
     return { errors: [{ message: `unknown feature ${name}` }], data: { guideField: null } };
+  const guide = GUIDES[name] ?? {};
+  const names = [...CATALOGUE.keys()];
   return {
     data: {
       guideField: {
+        readsLinked: linked(String(guide['reads'] ?? ''), names),
+        caveatsLinked: ((guide['caveats'] ?? []) as string[]).map((c) => linked(c, names)),
         related: name === 'rollup.iv30@v1.iv30' ? ['feature.iv_hv_ratio'] : [],
         playbooks: [
           {
@@ -377,10 +392,9 @@ function guideField(name: string): Json {
         ],
         situations: [
           {
-            name: 'Earnings gap inside the window',
-            signs: 'A report in the next 30 days lifts the reading.',
-            do: 'Screens flag it.',
-            affects: [name],
+            name: SITUATION.name,
+            slug: SITUATION.slug,
+            signsLinked: linked(SITUATION.signs, []),
           },
         ],
       },
@@ -396,6 +410,8 @@ function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
   if (name === 'FeatureCatalogue') return catalogue();
   if (name === 'GuideIndex') return guideIndex();
+  if (name === 'GuidePlaybook') return guidePlaybook(String(operation.variables?.['id']));
+  if (name === 'GuideSituation') return guideSituation(String(operation.variables?.['slug']));
   if (name === 'GuideField') return guideField(String(operation.variables?.['name']));
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
   if (name === 'GuideHelpField') return guideHelp(String(operation.variables?.['name']));
