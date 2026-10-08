@@ -203,7 +203,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0055), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0055), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity. The earnings report window (the E-1 to E+1 excess return, pre-event ADV and volume ratio) is computed once, in earnings_reaction@v1 (corporate/); EV2's event_reaction@v1 must read that group, never recompute the window"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
@@ -926,7 +926,7 @@ detect = [
 
 [[responsibility]]
 id = "text-model-seam"
-description = "The text model both on-demand text features are asked through (ADR 0041, amended 2026-10-06): the TextModel protocol, the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml (off by default; 503 with the reason when off or down)"
+description = "The text model both on-demand text features are asked through (ADR 0041, amended 2026-10-06): the TextModel protocol and its Completion result, the one OpenAI-compatible adapter (built by the source registry, the key only in a header), the FallbackTextModel chain over the llm.toml [[provider]] list (falls back only on ModelUnavailableError) and the API's wiring of it (off by default; 503 with the reason when off or down)"
 owner = [
     "src/algotrade/services/text_model/*",
     "libs/sources/algotrade_sources/llm/*",

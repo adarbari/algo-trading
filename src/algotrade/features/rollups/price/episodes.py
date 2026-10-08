@@ -48,7 +48,13 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price.price_stats import BARS, CLOSE, panel, traded_rows
+from algotrade.features.rollups.price.price_stats import (
+    BARS,
+    CLOSE,
+    panel,
+    symbol_column,
+    traded_rows,
+)
 from algotrade.quant.turning_points import drawdowns
 
 type Matrix = npt.NDArray[np.float64]
@@ -56,7 +62,6 @@ type Matrix = npt.NDArray[np.float64]
 NAME = "episode_behaviour"
 VERSION = 1
 SYMBOLS = "instruments/symbol_ids"
-MARKET_SYMBOL = "SPY"
 BETA_SESSIONS = 252  # returns in the beta window (one more close)
 MIN_RETURNS = 200  # overlapping returns needed for beta and correlation
 LEAD = 5  # sessions before the peak where an episode's window (and its running high) starts
@@ -144,17 +149,6 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-def _spy_column(symbols: pd.DataFrame | None, ids: npt.NDArray[np.str_]) -> int | None:
-    """SPY's column in the bars panel, or ``None`` (no reference, or SPY has no bars)."""
-    if symbols is None:
-        return None
-    found = symbols.loc[symbols["symbol"] == MARKET_SYMBOL, "instrument_id"]
-    if found.empty:
-        return None
-    where = np.flatnonzero(ids == str(found.iloc[0]))
-    return int(where[0]) if len(where) else None
-
-
 def _log_returns(close: Matrix) -> Matrix:
     with np.errstate(divide="ignore", invalid="ignore"):
         levels = np.where(close > 0, np.log(close), np.nan)
@@ -231,7 +225,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     bars = inputs[BARS]
     assert bars is not None  # required input
     px = panel(bars, sessions_ending(session, BETA_SESSIONS + 1))
-    beta, corr = beta_corr(px.close, _spy_column(inputs[SYMBOLS], px.ids))
+    beta, corr = beta_corr(px.close, symbol_column(inputs[SYMBOLS], px.ids))
     values: dict[str, Matrix] = {f"beta_{BETA_SESSIONS}d": beta, f"corr_{BETA_SESSIONS}d": corr}
     for index, e in enumerate(EPISODES):
         values[f"dd_{e.key}"], values[f"recovery_sessions_{e.key}"] = episode_columns(

@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from algotrade.core.model.completion import Completion
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade.services.explaining.prompt import (
     Facts,
@@ -118,8 +119,8 @@ def verify(raw: str, facts: Facts) -> Explanation:
     return Explanation(clean, tuple(Citation(c.title, c.url) for c in cited.values()), True, None)
 
 
-def ask(model: TextModel, facts: Facts, question: str) -> str:
-    """The model's raw answer to ``question`` over ``facts``."""
+def ask(model: TextModel, facts: Facts, question: str) -> Completion:
+    """The model's answer (text and who gave it) to ``question`` over ``facts``."""
     return model.complete(system_prompt(facts), user_prompt(question))
 
 
@@ -132,4 +133,4 @@ def explain(
     """``question`` answered over ``regime``'s facts (``card``: the card the question is about,
     in full). ``ModelUnavailableError`` when the model cannot answer."""
     facts = regime_facts(regime, card)
-    return verify(ask(model, facts, question), facts)
+    return verify(ask(model, facts, question).text, facts)

@@ -20,6 +20,12 @@ def test_dotenv_never_overrides_and_empty_means_unset(
     env.load_dotenv(tmp_path / "missing")
 
 
+def test_a_text_model_provider_has_its_own_key_variable() -> None:
+    assert env.llm_key("claude") == "ALGOTRADE_LLM_API_KEY_CLAUDE"
+    assert env.llm_key("gemini_flash") == "ALGOTRADE_LLM_API_KEY_GEMINI_FLASH"
+    assert env.llm_key("x") != env.LLM_API_KEY  # the legacy variable is the single-provider form
+
+
 def test_locations_and_user_resolve_flag_then_environment_then_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

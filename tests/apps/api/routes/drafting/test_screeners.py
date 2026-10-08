@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from algotrade.core.model.completion import Completion
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
@@ -31,20 +32,20 @@ ANSWER = {
 
 
 class Canned:
-    name = "canned"
+    names = ("canned",)
 
     def __init__(self, answer: Any) -> None:
         self.answer, self.asked = json.dumps(answer), 0
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self, system: str, user: str) -> Completion:
         self.asked += 1
-        return self.answer
+        return Completion(self.answer, "canned", "canned")
 
 
 class Down:
-    name = "down"
+    names = ("down",)
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self, system: str, user: str) -> Completion:
         raise ModelUnavailableError("llama at http://localhost:11434/v1: HTTP 429 slow down")
 
 

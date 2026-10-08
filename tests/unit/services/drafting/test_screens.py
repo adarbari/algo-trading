@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.user import UserContext
+from algotrade.core.model.completion import Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.configs import resolve_rule_draft
 from algotrade.services.drafting.screens import (
@@ -38,21 +39,21 @@ OI = f"{LIQ}.chain_oi"
 class Canned:
     """A ``TextModel`` with one answer; keeps what it was asked."""
 
-    name = "canned"
+    names = ("canned",)
 
     def __init__(self, answer: Any) -> None:
         self.answer = answer if isinstance(answer, str) else json.dumps(answer)
         self.asked: list[tuple[str, str]] = []
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self, system: str, user: str) -> Completion:
         self.asked.append((system, user))
-        return self.answer
+        return Completion(self.answer, "canned", "canned")
 
 
 class Down:
-    name = "down"
+    names = ("down",)
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self, system: str, user: str) -> Completion:
         raise ModelUnavailableError("llama at http://localhost:11434/v1: timed out")
 
 
