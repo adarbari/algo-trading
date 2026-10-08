@@ -95,34 +95,51 @@ def read_events(
     """The event names of ``event_class`` at each of ``decisions`` (ascending), restricted to
     the names ``eligible_of(D)`` gives. The eligible names are only looked up on a session
     where some name has the event; the UNKNOWN count is over them."""
+    return read_events_for(reader, event_class, offset, decisions, {"": eligible_of})[""]
+
+
+def read_events_for(
+    reader: StoreReader,
+    event_class: str,
+    offset: int,
+    decisions: Sequence[date],
+    eligible_of: Mapping[str, Callable[[date], frozenset[str]]],
+) -> dict[str, EventSchedule]:
+    """``read_events`` for several eligible universes (one per key of ``eligible_of``) in one
+    pass: the event fields are read once per decision session, not once per universe, and
+    each universe keeps its own once-per-name dedupe. Same schedules as separate calls."""
     spec = event_field(event_class)
     target = spec.target(offset)
-    names: dict[date, frozenset[str]] = {}
-    unknown: dict[date, Mapping[str, int]] = {}
-    last: dict[str, date] = {}  # name -> the decision session its latest event counted at
+    names: dict[str, dict[date, frozenset[str]]] = {k: {} for k in eligible_of}
+    unknown: dict[str, dict[date, Mapping[str, int]]] = {k: {} for k in eligible_of}
+    last: dict[str, dict[str, date]] = {k: {} for k in eligible_of}  # name -> latest counted D
     for day in decisions:
         view, _ = fields_view(reader, (spec.count, spec.date), day)
         reads = {i: _read(view.get(i, spec.count), view.get(i, spec.date)) for i in view}
         if not any(count == target for count, _ in reads.values()):
             continue
-        reasons: Counter[str] = Counter()
-        known: set[str] = set()
-        for i in sorted(eligible_of(day)):
-            count, when = reads.get(i, (None, None))
-            if count is None:
-                reasons[NO_EVENT_ROW] += 1
-            elif count == target:
-                if not spec.announced_ahead and (when is None or when > day):
-                    reasons[NOT_KNOWN_AT_D] += 1
-                else:
-                    known.add(i)
-        fresh = {i for i in known if i not in last or sessions_to(last[i], day) >= DEDUPE_SESSIONS}
-        last.update(dict.fromkeys(fresh, day))
-        if reasons:
-            unknown[day] = dict(reasons)
-        if fresh:
-            names[day] = frozenset(fresh)
-    return EventSchedule(names, unknown)
+        for key, eligible in eligible_of.items():
+            reasons: Counter[str] = Counter()
+            known: set[str] = set()
+            for i in sorted(eligible(day)):
+                count, when = reads.get(i, (None, None))
+                if count is None:
+                    reasons[NO_EVENT_ROW] += 1
+                elif count == target:
+                    if not spec.announced_ahead and (when is None or when > day):
+                        reasons[NOT_KNOWN_AT_D] += 1
+                    else:
+                        known.add(i)
+            seen = last[key]
+            fresh = {
+                i for i in known if i not in seen or sessions_to(seen[i], day) >= DEDUPE_SESSIONS
+            }
+            seen.update(dict.fromkeys(fresh, day))
+            if reasons:
+                unknown[key][day] = dict(reasons)
+            if fresh:
+                names[key][day] = frozenset(fresh)
+    return {k: EventSchedule(names[k], unknown[k]) for k in eligible_of}
 
 
 def _read(count: object, when: object) -> tuple[int | None, date | None]:

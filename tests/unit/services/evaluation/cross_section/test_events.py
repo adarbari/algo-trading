@@ -3,16 +3,19 @@ D (never an event known only after D), exactly the names whose count field reads
 value, deduplicated by (name, quarter), with a name that has no value excluded with a reason."""
 
 from datetime import date
+from typing import Any
 
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.evaluation.cross_section import events
 from algotrade.services.evaluation.cross_section.events import (
     EVENT_FIELDS,
     NO_EVENT_ROW,
     NOT_KNOWN_AT_D,
     event_field,
     read_events,
+    read_events_for,
 )
 from tests.unit.services.evaluation.cross_section.conftest import DAYS, IDS, build_world
 
@@ -94,3 +97,27 @@ def test_only_the_eligible_names_are_events() -> None:
     w.write_reactions(d, {IDS[0]: 0, IDS[1]: 0})
     found = read_events(w.reader, "earnings_reaction", 1, [d], lambda _: frozenset({IDS[1]}))
     assert found.names == {d: frozenset({IDS[1]})}
+
+
+def test_one_pass_over_several_universes_equals_separate_reads_and_reads_the_fields_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    w = build_world()
+    w.write_reactions(DAYS[1], {IDS[i]: 0 for i in (1, 2, 12)})
+    w.write_reactions(DAYS[2], {IDS[i]: 0 for i in (2, 3)})  # N02 again: deduplicated per name
+    low = frozenset(IDS[:10])
+    universes = {"all": lambda _: ALL, "low": lambda _: low}
+    separate = {
+        k: read_events(w.reader, "earnings_reaction", 1, DAYS[:4], f) for k, f in universes.items()
+    }
+    reads: list[date] = []
+    real = events.fields_view
+
+    def counting(reader: Any, fields: Any, day: date, *a: Any, **k: Any) -> Any:
+        reads.append(day)
+        return real(reader, fields, day, *a, **k)
+
+    monkeypatch.setattr(events, "fields_view", counting)
+    together = read_events_for(w.reader, "earnings_reaction", 1, DAYS[:4], universes)
+    assert together == separate
+    assert reads == list(DAYS[:4])  # each decision session read once, whatever the universes

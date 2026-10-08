@@ -13,10 +13,13 @@ from datetime import date
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.views.feature_view import FeatureView
 from algotrade.data import StoreReader
+from algotrade.data.reference import InstrumentView
 from algotrade.engines.screening.runner import RunCoverage
-from algotrade.services.screening.run import ScreenSession, screen_session
-from algotrade.services.selection import select
+from algotrade.engines.selection.evaluate import evaluate_selection
+from algotrade.services.screening.run import screen_session
+from algotrade.services.selection import fields_view, select, selection_fields
 from algotrade.strategies.screeners.base import Decision
 
 
@@ -33,8 +36,8 @@ class RankedRun:
     qualified: tuple[str, ...]
     pre_snapshot: bool
     coverage: RunCoverage
-    screened: ScreenSession
-    scores: Mapping[str, float | None]
+    snapshot: date  # the universe snapshot the screen read (the run itself is not kept)
+    scores: Mapping[str, float]
 
 
 @dataclass(frozen=True)
@@ -53,15 +56,13 @@ def screen_variant(reader: StoreReader, config: ResolvedConfig, session: date) -
         if spec.tie_break is None:
             raise ConfigurationError("an edge screener needs [rank].tie_break")
         sign = 1.0 if spec.tie_break_descending else -1.0
-        scores = {
-            r.instrument_id: None if r.tie_break is None else sign * r.tie_break for r in rows
-        }
+        scores = {r.instrument_id: sign * r.tie_break for r in rows if r.tie_break is not None}
     else:
         by_score = sorted(
             screened.run.rows, key=lambda r: (r.score is None, -(r.score or 0.0), r.instrument_id)
         )
         ranked = [(r.instrument_id, r.decision) for r in by_score]
-        scores = {r.instrument_id: r.score for r in screened.run.rows}
+        scores = {r.instrument_id: r.score for r in screened.run.rows if r.score is not None}
     ranked = [(i, d) for i, d in ranked if d.processed]
     return RankedRun(
         session=session,
@@ -69,7 +70,7 @@ def screen_variant(reader: StoreReader, config: ResolvedConfig, session: date) -
         qualified=tuple(i for i, d in ranked if d is Decision.QUALIFIED),
         pre_snapshot=screened.universe.pre_snapshot,
         coverage=screened.run.coverage,
-        screened=screened,
+        snapshot=screened.universe.snapshot_date,
         scores=scores,
     )
 
@@ -78,3 +79,23 @@ def eligible(reader: StoreReader, universe: Selection, session: date) -> Eligibl
     """The ids ``universe`` selects at ``session`` (the edge's own, over the site's features)."""
     chosen = select(reader, universe, session)
     return Eligible(frozenset(chosen.instruments), chosen.pre_snapshot)
+
+
+class SelectionReads:
+    """``select`` for several universes at one session with one read of the fields: the last
+    (fields, session) read is kept, so universes over the same fields at the same session
+    (the edge's variants, asked one after the other) read the partitions once. The result is
+    ``select``'s."""
+
+    def __init__(self, reader: StoreReader):
+        self._reader = reader
+        self._last: tuple[tuple[tuple[str, ...], date], FeatureView, InstrumentView] | None = None
+
+    def eligible(self, universe: Selection, session: date) -> Eligible:
+        key = (tuple(selection_fields(universe)), session)
+        if self._last is None or self._last[0] != key:
+            view, source = fields_view(self._reader, key[0], session)
+            self._last = (key, view, source)
+        _, view, source = self._last
+        chosen = evaluate_selection(universe, view)
+        return Eligible(frozenset(chosen.instruments), source.pre_snapshot)
