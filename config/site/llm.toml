@@ -51,3 +51,23 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # model = "gemini-2.5-flash"
 # [provider.request]
 # reasoning_effort = "low"
+
+# The owner's Claude Code login (kind = "claude-cli", ADR 0041 amended 2026-10-08): instead of
+# an endpoint, a provider can run Claude Code headless (`claude -p`) on this machine under the
+# owner's own login (the keychain; no token, no API key). A subscription login must never serve
+# other users, so it needs `only_users` (user ids from users.toml); everyone else goes straight
+# to the next provider. `command` is the absolute path (launchd's PATH is minimal), `model`
+# "haiku" or "sonnet", `retries` defaults to 0. `only_users` may be set on any provider.
+#
+# [[provider]]
+# id = "claude_cli"
+# kind = "claude-cli"
+# command = "/Users/adarbari/.local/bin/claude"
+# model = "haiku"
+# timeout_s = 90
+# only_users = ["abhi"]
+#
+# [[provider]]
+# id = "gemini"
+# base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+# model = "gemini-2.5-flash"

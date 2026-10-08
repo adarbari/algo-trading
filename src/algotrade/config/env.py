@@ -106,6 +106,17 @@ def llm_key(provider_id: str) -> str:
     return LLM_KEY_PREFIX + provider_id.upper()
 
 
+CLAUDE_CLI_ENV = ("HOME", "USER", "PATH", "LANG")
+
+
+def claude_cli_env() -> dict[str, str]:
+    """The environment the Claude Code provider's child process gets (ADR 0041, amended
+    2026-10-08): only ``HOME`` (where the login's keychain entry and config live), ``USER``,
+    ``PATH`` and ``LANG``, so no ``ALGOTRADE_*`` value, API key or ``CLAUDE_CODE_OAUTH_TOKEN``
+    reaches it and it uses the owner's own login."""
+    return {k: v for k in CLAUDE_CLI_ENV if (v := os.environ.get(k))}
+
+
 def credential(name: str) -> str | None:
     """The variable's value; ``None`` when unset or empty. Never logged or stored."""
     return os.environ.get(name) or None

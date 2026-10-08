@@ -164,6 +164,37 @@ quota is not "drafting unavailable".
 6. The draft and explanation parsers already tolerate a code fence around the JSON object
    (Anthropic's compatibility endpoint may ignore `response_format`); tests cover both.
 
+## Amended 2026-10-08: the owner's Claude Code login, for the owner only
+
+The owner has a Claude subscription and wants it to answer his own requests ahead of Gemini.
+
+1. **`kind = "claude-cli"`** on a `[[provider]]` (default kind: the OpenAI-compatible one) runs
+   Claude Code headless (`claude -p`) on the owner's Mac with `command` (an absolute path:
+   launchd's PATH is minimal), `model` ("haiku", "sonnet"), `timeout_s` and `retries` (default
+   0). It uses the owner's existing login (the keychain entry of the user running the API); no
+   `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no API key is read or passed.
+2. **Owner-only, by policy.** A subscription login must not serve other users. `only_users =
+   [...]` (user ids of `users.toml`; any provider may set it) limits a provider to them, and a
+   `claude-cli` provider without it is a `ConfigurationError`. The chain skips a restricted
+   provider without asking it for any other user, and for a call with no user: they go straight
+   to the next provider (Gemini). `CallTag(use_case, user)` (`core/model/completion.py`) is passed
+   by keyword to `TextModel.complete`; the screener draft (`screener-draft`) and the regime
+   explanation (`regime-explain`) tag the viewer. `TextModel.names_for(user)` lists the models
+   that user may be answered by, and the explanation cache is looked up only under those names, so
+   nobody else is served an answer the owner's login wrote.
+3. **Locked down.** argv list (no shell), the prompt on stdin, `--output-format json --model M
+   --system-prompt S --tools "" --strict-mcp-config --setting-sources "" --disable-slash-commands
+   --no-session-persistence`, a fresh empty temporary directory as cwd, and an environment of
+   `HOME`, `USER`, `PATH` and `LANG` only (`config.env.claude_cli_env`: no `ALGOTRADE_*`, no
+   API key, no OAuth token). Never `--dangerously-skip-permissions`; never `--bare`, which skips
+   the keychain read, so the login would not be found. One run at a time (a lock); the timeout
+   kills the process. `--max-turns` does not exist in the installed CLI (2.1.285); with no tools
+   the run is one turn.
+4. **Failures** (non-zero exit, timeout, `is_error`, not logged in, usage limit, a command that
+   will not start) are `ModelUnavailableError`s that never quote stderr, so the chain falls back.
+   `Completion.cost_usd` carries the CLI's `total_cost_usd` (a notional figure on a
+   subscription; `None` when absent).
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

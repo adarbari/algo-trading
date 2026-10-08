@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from algotrade.core.model.completion import Completion
+from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
@@ -20,7 +20,10 @@ class Member:
         self.names = (f"{provider}-model",)
         self.clock, self.cost = clock, cost
 
-    def complete(self, system: str, user: str) -> Completion:
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
         self.calls += 1
         if self.clock is not None:
             self.clock.now += self.cost
@@ -112,3 +115,64 @@ def test_within_the_deadline_the_next_provider_is_tried() -> None:
     gemini = Member("gemini")
     done = chain(claude, gemini, deadline_s=120.0, clock=clock).complete("s", "u")
     assert done.provider == "gemini" and done.latency_s == 100.0
+
+
+class Tagged(Member):
+    """A member that keeps the tag it was asked with."""
+
+    tag: object = None
+
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+        self.tag = tag
+        return super().complete(system, user, tag=tag)
+
+
+def owner_only(owner: Member, gemini: Member) -> FallbackTextModel:
+    return FallbackTextModel(
+        [(owner.provider, owner), (gemini.provider, gemini)],
+        only_users={owner.provider: frozenset({"abhi"})},
+        clock=Clock(),
+    )
+
+
+def test_a_member_limited_to_users_answers_only_them() -> None:
+    cli, gemini = Tagged("cli"), Tagged("gemini")
+    done = owner_only(cli, gemini).complete("s", "u", tag=CallTag("regime-explain", "abhi"))
+    assert done.provider == "cli" and gemini.calls == 0
+    assert cli.tag == CallTag("regime-explain", "abhi")  # the tag reaches the member
+
+
+def test_everyone_else_goes_straight_to_the_next_provider_without_asking_the_limited_one() -> None:
+    cli, gemini = Tagged("cli"), Tagged("gemini")
+    done = owner_only(cli, gemini).complete("s", "u", tag=CallTag("screener-draft", "bob"))
+    assert (done.provider, done.fell_back_from, cli.calls) == ("gemini", None, 0)
+
+
+def test_a_call_with_no_user_or_no_tag_is_no_one() -> None:
+    cli, gemini = Tagged("cli"), Tagged("gemini")
+    model = owner_only(cli, gemini)
+    assert model.complete("s", "u").provider == "gemini"
+    assert model.complete("s", "u", tag=CallTag("regime-explain")).provider == "gemini"
+    assert cli.calls == 0
+
+
+def test_a_chain_with_nothing_for_the_user_is_unavailable() -> None:
+    cli = Tagged("cli")
+    model = FallbackTextModel([("cli", cli)], only_users={"cli": frozenset({"abhi"})})
+    with pytest.raises(ModelUnavailableError, match="may answer this user"):
+        model.complete("s", "u", tag=CallTag("screener-draft", "bob"))
+
+
+def test_the_owners_chain_falls_back_to_gemini_when_the_login_fails() -> None:
+    cli = Tagged("cli", ModelUnavailableError("claude-cli haiku: Not logged in"))
+    done = owner_only(cli, Tagged("gemini")).complete(
+        "s", "u", tag=CallTag("screener-draft", "abhi")
+    )
+    assert (done.provider, done.fell_back_from) == ("gemini", "cli")
+
+
+def test_names_for_lists_only_the_models_that_user_may_be_answered_by() -> None:
+    model = owner_only(Tagged("cli"), Tagged("gemini"))
+    assert model.names == ("cli-model", "gemini-model")
+    assert model.names_for("abhi") == ("cli-model", "gemini-model")
+    assert model.names_for("bob") == model.names_for(None) == ("gemini-model",)

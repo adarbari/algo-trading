@@ -17,7 +17,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from algotrade.core.model.completion import Completion
+from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade.services.explaining.prompt import (
     Facts,
@@ -119,9 +119,10 @@ def verify(raw: str, facts: Facts) -> Explanation:
     return Explanation(clean, tuple(Citation(c.title, c.url) for c in cited.values()), True, None)
 
 
-def ask(model: TextModel, facts: Facts, question: str) -> Completion:
-    """The model's answer (text and who gave it) to ``question`` over ``facts``."""
-    return model.complete(system_prompt(facts), user_prompt(question))
+def ask(model: TextModel, facts: Facts, question: str, tag: CallTag | None = None) -> Completion:
+    """The model's answer (text and who gave it) to ``question`` over ``facts``, asked as
+    ``tag`` (the user and use case, which decide which providers may answer)."""
+    return model.complete(system_prompt(facts), user_prompt(question), tag=tag)
 
 
 def explain(

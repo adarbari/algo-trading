@@ -926,7 +926,7 @@ detect = [
 
 [[responsibility]]
 id = "text-model-seam"
-description = "The text model both on-demand text features are asked through (ADR 0041, amended 2026-10-06): the TextModel protocol and its Completion result, the one OpenAI-compatible adapter (built by the source registry, the key only in a header), the FallbackTextModel chain over the llm.toml [[provider]] list (falls back only on ModelUnavailableError) and the API's wiring of it (off by default; 503 with the reason when off or down)"
+description = "The text model both on-demand text features are asked through (ADR 0041, amended 2026-10-06): the TextModel protocol and its Completion result, the OpenAI-compatible adapter (built by the source registry, the key only in a header) and the Claude Code adapter (claude -p under the owner's own login, locked down, owner-only), the FallbackTextModel chain over the llm.toml [[provider]] list (falls back only on ModelUnavailableError; skips a provider's only_users) and the API's wiring of it (off by default; 503 with the reason when off or down)"
 owner = [
     "src/algotrade/services/text_model/*",
     "libs/sources/algotrade_sources/llm/*",
@@ -936,4 +936,4 @@ allowed = [
     "libs/sources/algotrade_sources/framework/registry.py",  # builds the adapter, as every vendor client (source-construction)
 ]
 section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-06-the-text-model-seam"
-detect = [{ call = "ChatCompletions" }, { call = "build_text_model" }, { string = "chat/completions" }]
+detect = [{ call = "ChatCompletions" }, { call = "build_text_model" }, { call = "ClaudeCli" }, { call = "build_claude_cli" }, { string = "chat/completions" }]

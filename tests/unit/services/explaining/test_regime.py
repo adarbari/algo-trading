@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from algotrade.core.model.completion import Completion
+from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError, RateLimitedError
 from algotrade.services.explaining.cache import cache_key
 from algotrade.services.explaining.limits import RateLimiter
@@ -14,6 +14,7 @@ from algotrade.services.explaining.prompt import WHAT_IS_HAPPENING
 from algotrade.services.explaining.regime import explain_regime
 from algotrade.services.read.context import NotFoundError, ReadContext
 from algotrade.services.read.regime.regime import load_regime
+from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.storage.backends.text_cache import MemoryTextCache
 from tests.unit.services.explaining.conftest import Canned, Down
 from tests.unit.services.read.instruments.conftest import D0
@@ -121,8 +122,8 @@ class Chain(Canned):
         super().__init__(answer)
         self.names, self.answers = names, answers
 
-    def complete(self, system: str, user: str) -> Completion:
-        done = super().complete(system, user)
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+        done = super().complete(system, user, tag=tag)
         return Completion(done.text, self.answers, self.answers, fell_back_from=self.names[0])
 
 
@@ -140,3 +141,36 @@ def test_a_fallback_answer_is_never_cached_under_the_primary(ctx: ReadContext) -
     primary = Chain(GOOD, ("claude",), answers="claude")
     assert not ask(ctx, primary, cache, limiter).cached and len(primary.asked) == 1
     assert cache.get(claude_key) == GOOD
+
+
+class Named(Canned):
+    """A provider that answers as ``name`` and keeps the tag it was asked with."""
+
+    def __init__(self, answer: object, name: str) -> None:
+        super().__init__(answer)
+        self.names, self.name, self.tags = (name,), name, []  # type: ignore[var-annotated]
+
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+        self.tags.append(tag)
+        done = super().complete(system, user, tag=tag)
+        return Completion(done.text, self.name, self.name)
+
+
+def test_the_owners_login_answer_is_never_served_to_another_user(ctx: ReadContext) -> None:
+    cli, gemini = Named(GOOD, "haiku"), Named(GOOD, "gemini")
+    model = FallbackTextModel(
+        [("cli", cli), ("gemini", gemini)], only_users={"cli": frozenset({"abhi"})}
+    )
+    cache = MemoryTextCache()
+    regime = load_regime(ctx)
+
+    def explain(user: str):  # type: ignore[no-untyped-def]
+        return explain_regime(ctx, model, cache, RateLimiter(), user, "What is happening?", None)
+
+    assert not explain("abhi").cached  # answered by the owner's login, kept under "haiku"
+    assert cache.get(cache_key(regime, WHAT_IS_HAPPENING, "haiku")) == GOOD
+    assert cli.tags == [CallTag("regime-explain", "abhi")] and not gemini.tags
+    assert explain("abhi").cached  # the owner reads it back
+    other = explain("bob")  # another user never sees it: the model is asked, and it is gemini
+    assert not other.cached and gemini.tags == [CallTag("regime-explain", "bob")]
+    assert len(cli.tags) == 1
