@@ -108,13 +108,15 @@ test:            ## everything, with the coverage gate, one worker per CPU (WORK
 
 # CI runs the suite as three parallel shards (docs/ci.md "Pipeline"); together they are `make test`.
 # A fitness test (tests/architecture/pipeline) checks the shards cover every tests/ folder.
-TEST_SHARDS = unit apps rest
-TEST_SHARD_unit = tests/unit
+TEST_SHARDS = unit-a unit-b apps rest
+# tests/unit split in two by subfolder (the #286 run: unit 5.6 min, apps 3.3, rest 1.7)
+TEST_SHARD_unit-a = tests/unit/features tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
+TEST_SHARD_unit-b = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
 TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
 # rest: few tests, the slow ones
 TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation
 
-test-shard:      ## one CI shard (SHARD=unit|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
+test-shard:      ## one CI shard (SHARD=unit-a|unit-b|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
 	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }
 	COVERAGE_FILE=.coverage.$(SHARD) $(PY) -m pytest -n $(WORKERS) --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
 

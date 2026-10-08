@@ -61,18 +61,22 @@ def test_storybook_is_built_once_and_handed_to_the_screenshot_shards() -> None:
 
 
 def test_pytest_shards_cover_every_test_folder_and_combine_under_the_protected_name() -> None:
+    """Each shard lists top-level tests/ folders, subfolders or root test files (Makefile
+    TEST_SHARD_*); together they cover every test file exactly once."""
     makefile = (REPO / "Makefile").read_text()
-    shards = re.findall(r"^TEST_SHARD_(\w+) = (.+)$", makefile, flags=re.MULTILINE)
-    assert [name for name, _ in shards] == ["unit", "apps", "rest"]
-    covered = {folder for _, folders in shards for folder in folders.split()}
-    with_tests = {
-        f"tests/{d.name}"
-        for d in (REPO / "tests").iterdir()
-        if d.is_dir() and any(d.rglob("test_*.py"))
-    }
-    assert covered == with_tests, f"shards vs folders: {covered ^ with_tests}"
+    shards = re.findall(r"^TEST_SHARD_([\w-]+) = (.+)$", makefile, flags=re.MULTILINE)
+    names = [name for name, _ in shards]
+    assert names == re.search(r"^TEST_SHARDS = (.+)$", makefile, flags=re.MULTILINE)[1].split()
+    listed = [Path(entry) for _, entries in shards for entry in entries.split()]
+    assert all((REPO / entry).exists() for entry in listed), "a shard names a missing path"
+    tests = {p.relative_to(REPO) for p in (REPO / "tests").rglob("test_*.py")}
+    covering = {test: [e for e in listed if test == e or e in test.parents] for test in tests}
+    uncovered = sorted(str(t) for t, by in covering.items() if not by)
+    twice = sorted(str(t) for t, by in covering.items() if len(by) > 1)
+    assert not uncovered, f"tests no shard runs: {uncovered[:5]}"
+    assert not twice, f"tests two shards run: {twice[:5]}"
     jobs = _jobs()
-    assert jobs["test"]["strategy"]["matrix"]["shard"] == [name for name, _ in shards]
+    assert jobs["test"]["strategy"]["matrix"]["shard"] == names
     assert "make test-shard SHARD=${{ matrix.shard }}" in str(jobs["test"]["steps"])
     gate = jobs["tests"]
     assert gate["name"] == "Tests (py${{ matrix.python }})"
