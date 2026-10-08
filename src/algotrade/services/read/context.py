@@ -23,6 +23,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from algotrade.config.user import UserContext
@@ -68,7 +69,9 @@ def weigh(value: Any) -> int:
     them; anything else weighs nothing: the cache's count bound covers it). Cheap: no deep
     walk of a frame's strings, an object column's cells are priced at ``STRING_CELL_BYTES``."""
     if isinstance(value, pd.DataFrame):
-        objects = sum(1 for t in value.dtypes if getattr(t, "kind", "") == "O")
+        # only a NumPy object column holds Python strings ``memory_usage`` cannot see; the
+        # string dtype (pandas 3's default) and categoricals are counted from their buffers
+        objects = sum(1 for t in value.dtypes if isinstance(t, np.dtype) and t.kind == "O")
         return int(value.memory_usage(index=True, deep=False).sum()) + (
             STRING_CELL_BYTES * len(value) * objects
         )

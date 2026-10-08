@@ -59,7 +59,9 @@ class OffLoop(SchemaExtension):
     The top-level fields of one operation hand back their results together, once the last has
     finished: their children then resolve in one event-loop tick, so dataloaders still batch
     across sibling fields (``a: instrument(..) { features }`` ``b: instrument(..) { features }``
-    is one read, not two)."""
+    is one read, not two). The price: a fast field's nested reads start only when the slowest
+    top-level field is done (latency max(top) + max(nested)); do not release them earlier, that
+    breaks the batching. No deadlock: a failure or cancel still counts the field down."""
 
     def __init__(self) -> None:
         self._running = 0

@@ -248,12 +248,14 @@ class MarketRegime:
         description="The reference drawdowns the session knows (those whose trough has come), "
         "oldest first"
     )
-    def episodes(self, info: Info) -> list[Episode]:
-        return [Episode.of(e) for e in episodes_read.load_regime_episodes(self.ctx).episodes]
+    async def episodes(self, info: Info) -> list[Episode]:
+        found = await off_loop(episodes_read.load_regime_episodes, self.ctx)
+        return [Episode.of(e) for e in found.episodes]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The NBER recessions since 1969 the session knows (listed from the day "
         "the committee dated the peak), oldest first"
     )
-    def recessions(self, info: Info) -> list[Recession]:
-        return [Recession.of(r) for r in episodes_read.load_regime_episodes(self.ctx).recessions]
+    async def recessions(self, info: Info) -> list[Recession]:
+        found = await off_loop(episodes_read.load_regime_episodes, self.ctx)
+        return [Recession.of(r) for r in found.recessions]

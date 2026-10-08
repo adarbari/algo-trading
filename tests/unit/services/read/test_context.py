@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
 import pytest
 
 from algotrade.config.user import UserContext
@@ -220,6 +221,23 @@ def test_result_cache_is_bounded_by_the_bytes_of_its_frames() -> None:
     cache.put("e", frame)
     cache.put("f", frame)
     assert cache.get("d") == 1 and cache.get("e") is frame and cache.get("f") is frame
+
+
+def test_the_weight_of_a_pandas_3_string_frame_is_close_to_its_real_memory() -> None:
+    # the string dtype is counted from its Arrow buffers; pricing every cell again held about
+    # a quarter of the bound (a rule_screen partition weighed 3.8x its size)
+    table = pa.table(
+        {
+            "run_id": [f"screen-run-{i % 50}" for i in range(20_000)],
+            "decision": ["QUALIFIED"] * 20_000,
+            "score": [float(i) for i in range(20_000)],
+        }
+    )
+    frame = table.to_pandas()
+    real = int(frame.memory_usage(deep=True).sum())
+    assert real <= weigh(frame) <= 1.5 * real
+    objects = pd.DataFrame({"s": pd.Series([f"v{i}" for i in range(1000)], dtype=object)})
+    assert weigh(objects) >= int(objects.memory_usage(deep=True).sum()) // 2  # priced per cell
 
 
 def test_a_request_memo_is_its_own_and_shared_by_its_sessions(

@@ -86,8 +86,9 @@ class Market:
         "error",
         extensions=[MaxItems("names", MAX_NAMES)],
     )
-    def features(self, info: Info, names: list[str]) -> list[FeatureValue]:
-        return [FeatureValue.of(v) for v in load_market_feature_values(self.ctx, names)]
+    async def features(self, info: Info, names: list[str]) -> list[FeatureValue]:
+        found = await off_loop(load_market_feature_values, self.ctx, names)  # reads partitions
+        return [FeatureValue.of(v) for v in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The history of `names` (stored market fields only: `market.<group>@v<N>."
