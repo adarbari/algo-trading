@@ -153,5 +153,8 @@ def test_narrow_columns_are_saved_read_back_and_optional(writer_client: TestClie
     saved = writer_client.put(VIEW, json=body)
     assert saved.json()["narrow_columns"] == body["narrow_columns"]
     assert read(writer_client)["narrow_columns"] == body["narrow_columns"]
-    old_client = writer_client.put(VIEW, json=BODY)  # no key: an old client
-    assert old_client.status_code == 200 and old_client.json()["narrow_columns"] == []
+    old_client = writer_client.put(VIEW, json=BODY)  # no key: an old client keeps the phone's
+    assert old_client.status_code == 200
+    assert old_client.json()["narrow_columns"] == body["narrow_columns"]
+    cleared = writer_client.put(VIEW, json={**BODY, "narrow_columns": []})  # an empty list clears
+    assert cleared.json()["narrow_columns"] == []

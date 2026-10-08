@@ -20,9 +20,9 @@ class TableViewBody(BaseModel):
         None, description="a column id ('-' prefix: descending); null: the table's default"
     )
     decisions: list[str] = Field(description="decisions shown (empty: the page's default)")
-    narrow_columns: list[str] = Field(
-        default_factory=list,
-        description="table column ids added back on a narrow (phone) table",
+    narrow_columns: list[str] | None = Field(
+        default=None,
+        description="table column ids added back on a narrow (phone) table; absent: kept as saved",
     )
 
 

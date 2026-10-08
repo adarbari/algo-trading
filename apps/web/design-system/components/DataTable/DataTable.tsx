@@ -115,6 +115,11 @@ export interface DataTableProps<TRow> {
   /** Toolbar content before the column picker (a count, filters). */
   toolbar?: ReactNode;
   /**
+   * Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the
+   * two sit in one row, so a narrow table does not spend a row on each.
+   */
+  toolbarEnd?: ReactNode;
+  /**
    * Pin the checkbox column and the first column at the start while the table scrolls
    * sideways (default true): pass false when the first column is not the row's key.
    */
@@ -160,6 +165,7 @@ export function DataTable<TRow extends RowData>({
   visibleRows = 12,
   rowLines = 1,
   toolbar,
+  toolbarEnd,
   pinFirst = true,
 }: DataTableProps<TRow>) {
   const id = useId();
@@ -389,10 +395,15 @@ export function DataTable<TRow extends RowData>({
 
   return (
     <div ref={rootRef} className={styles.root} style={gridVars} data-narrow={narrow || undefined}>
-      {(toolbar !== undefined || showPicker) && (
+      {(toolbar !== undefined || toolbarEnd !== undefined || showPicker) && (
         <div className={styles.toolbar}>
           <div className={styles.toolbarStart}>{toolbar}</div>
-          {showPicker && <ColumnPicker columns={pickerColumns} onToggle={toggleColumn} />}
+          {(toolbarEnd !== undefined || showPicker) && (
+            <div className={styles.toolbarEnd}>
+              {toolbarEnd}
+              {showPicker && <ColumnPicker columns={pickerColumns} onToggle={toggleColumn} />}
+            </div>
+          )}
         </div>
       )}
       <div

@@ -25,10 +25,12 @@ export interface ViewerMockOptions {
   requireToken?: boolean;
   /** With `requireToken`: the token is valid but the registry has no such user (403). */
   unregistered?: boolean;
+  /** Answer this display name instead of the registry user's (a long one tests truncation). */
+  name?: string;
 }
 
 export async function mockViewer(page: Page, options: ViewerMockOptions = {}): Promise<void> {
-  const { role = 'admin', requireToken = false, unregistered = false } = options;
+  const { role = 'admin', requireToken = false, unregistered = false, name } = options;
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as { query?: string } | null;
     if (!/query\s+Viewer\b/.test(body?.query ?? '')) {
@@ -46,7 +48,9 @@ export async function mockViewer(page: Page, options: ViewerMockOptions = {}): P
         return;
       }
     }
-    await route.fulfill({ json: { data: { viewer: VIEWERS[role] } } });
+    await route.fulfill({
+      json: { data: { viewer: { ...VIEWERS[role], ...(name === undefined ? {} : { name }) } } },
+    });
   });
 }
 

@@ -197,6 +197,12 @@ describe('DataTable', () => {
     expect(onRowActivate).toHaveBeenLastCalledWith(expect.objectContaining({ symbol: 'MSFT' }));
   });
 
+  it('renders toolbarEnd in the same group as the column picker', () => {
+    render(<Table columnPicker toolbarEnd={<button type="button">Catalogue</button>} />);
+    const end = screen.getByRole('button', { name: 'Catalogue' }).parentElement;
+    expect(end).toContainElement(screen.getByRole('button', { name: /Columns/ }));
+  });
+
   it('hides and shows columns from the picker, with descriptions', async () => {
     const onHidden = vi.fn();
     render(<Table columnPicker defaultHiddenColumns={['adv']} onHiddenColumnsChange={onHidden} />);

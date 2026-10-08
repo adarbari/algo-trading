@@ -401,6 +401,7 @@ Source: `design-system/components/DataTable`
 | `visibleRows` | `number` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. |
 | `rowLines` | `1 \| 2` | no | Lines of text per row: 1 (default) or 2 (a symbol with its name underneath). |
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
+| `toolbarEnd` | `ReactNode` | no | Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the two sit in one row, so a narrow table does not spend a row on each. |
 | `pinFirst` | `boolean` | no | Pin the checkbox column and the first column at the start while the table scrolls sideways (default true): pass false when the first column is not the row's key. |
 
 ### Dialog
@@ -612,6 +613,7 @@ Source: `design-system/components/FilterBar`
 | `activeCount` | `number` | no | How many filters are in force: shown on the narrow button as "Filters · 2". |
 | `narrow` | `'sheet' \| 'scroll'` | no | The narrow form: `sheet` (default) or `scroll`. |
 | `label` | `string` | no | Accessible name of the bar (default "Filters"). |
+| `defaultOpen` | `boolean` | no | The narrow filters sheet starts open (a story's open state). |
 
 ### HeatGrid
 

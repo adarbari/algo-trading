@@ -5,7 +5,7 @@
  * dismiss) with their keys. The chart and anything else about the ticker is composed beside it.
  */
 import {
-  Button,
+  ActionGroup,
   formatValue,
   KeyHints,
   type KeyHint,
@@ -121,22 +121,32 @@ export function PickDetail({
           <Text size="sm" tone="muted">{`Flags: ${row.flags.join(', ')}`}</Text>
         ) : null}
         <KeyValue label="Criteria" items={items} alignValues="end" />
-        <Stack direction="row" gap={2} wrap>
-          <Button
-            size="sm"
-            onClick={() => {
-              onOpen(symbol);
-            }}
-          >
-            Open in Explore
-          </Button>
-          <Button size="sm" onClick={onToggleCompare}>
-            {compared ? 'Remove from compare' : 'Add to compare'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onDismiss}>
-            Dismiss
-          </Button>
-        </Stack>
+        <ActionGroup
+          label="Pick actions"
+          actions={[
+            {
+              id: 'open',
+              label: 'Open in Explore',
+              icon: 'external',
+              onClick: () => {
+                onOpen(symbol);
+              },
+            },
+            {
+              id: 'compare',
+              label: compared ? 'Remove from compare' : 'Add to compare',
+              icon: compared ? 'minus' : 'plus',
+              onClick: onToggleCompare,
+            },
+            {
+              id: 'dismiss',
+              label: 'Dismiss',
+              icon: 'close',
+              variant: 'ghost',
+              onClick: onDismiss,
+            },
+          ]}
+        />
         <KeyHints hints={KEY_HINTS} />
       </Stack>
     </Panel>

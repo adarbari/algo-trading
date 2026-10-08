@@ -34,6 +34,8 @@ export interface FilterBarProps {
   narrow?: 'sheet' | 'scroll';
   /** Accessible name of the bar (default "Filters"). */
   label?: string;
+  /** The narrow filters sheet starts open (a story's open state). */
+  defaultOpen?: boolean;
 }
 
 export function FilterBar({
@@ -45,9 +47,10 @@ export function FilterBar({
   activeCount,
   narrow: narrowForm = 'sheet',
   label = 'Filters',
+  defaultOpen = false,
 }: FilterBarProps) {
   const [ref, isNarrow] = useNarrow('sm');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const hasMore = more !== undefined && more !== null;
   const hasActive = active !== undefined && active !== null;
   const trigger = hasMore ? (

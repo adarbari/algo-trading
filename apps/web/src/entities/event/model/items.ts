@@ -96,11 +96,14 @@ const PARTS: Readonly<Record<string, string>> = {
 
 /** One line per part not known for the session: the part, the server's word and its detail. */
 export function gapLines(gaps: readonly StudyGap[]): string[] {
-  return gaps.map(({ part, unknown }) => {
+  const lines = gaps.map(({ part, unknown }) => {
     const what = unknownLabel(unknown.code, unknown.reason);
     const detail = unknown.detail ? ` (${unknown.detail})` : '';
     return `${PARTS[part] ?? part.replace(/_/g, ' ')}: ${what}${detail}`;
   });
+  // Two gaps can read the same (one table missing for several parts): one line each, so a
+  // list keyed by the line stays unique.
+  return [...new Set(lines)];
 }
 
 /**

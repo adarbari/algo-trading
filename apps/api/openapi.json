@@ -1584,12 +1584,19 @@
             "type": "array"
           },
           "narrow_columns": {
-            "description": "table column ids added back on a narrow (phone) table",
-            "items": {
-              "type": "string"
-            },
-            "title": "Narrow Columns",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "table column ids added back on a narrow (phone) table; absent: kept as saved",
+            "title": "Narrow Columns"
           },
           "sort": {
             "anyOf": [

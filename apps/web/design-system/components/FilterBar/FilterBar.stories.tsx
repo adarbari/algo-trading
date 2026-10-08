@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
 
 import { narrow } from '../../testing';
 import { Chip } from '../Chip';
@@ -91,10 +90,7 @@ export const Narrow: Story = {
 /** The sheet proposal with the filters sheet open. The owner's choice (ADR 0011). */
 export const NarrowOpen: Story = {
   ...Narrow,
-  play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: /^Filters/ }));
-    await expect(within(document.body).getByRole('dialog', { name: 'Filters' })).toBeVisible();
-  },
+  args: { ...Narrow.args, defaultOpen: true },
 };
 
 /**

@@ -138,9 +138,9 @@ export function TableFrame({
                   />
                 </Stack>
               ) : null}
-              {controls}
             </Stack>
           }
+          toolbarEnd={controls}
         />
       </Stack>
     </Panel>

@@ -1043,9 +1043,9 @@ export interface components {
             decisions: string[];
             /**
              * Narrow Columns
-             * @description table column ids added back on a narrow (phone) table
+             * @description table column ids added back on a narrow (phone) table; absent: kept as saved
              */
-            narrow_columns?: string[];
+            narrow_columns?: string[] | null;
             /**
              * Sort
              * @description a column id ('-' prefix: descending); null: the table's default
