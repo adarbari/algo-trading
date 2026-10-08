@@ -176,6 +176,7 @@ the skill with the fix.
 | New REST endpoint (writes, jobs, live, files only) | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
+| Start of day: what slowed the last sessions down, top 3 fixed before new work | `.claude/skills/review-sessions` (`/review-sessions`, `make friction`) |
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
@@ -224,6 +225,10 @@ Token habits (every session):
   Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
   Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
   separate tasks.
+- **Never `sleep` to poll a log** (28 blocked calls in one week): run a check in the
+  foreground piped through `tail` (timeout up to 10 min), or background it and wait for the
+  harness's completion notice; judge a backgrounded make by its log tail, not the task exit
+  code. `Monitor` is a deferred tool: load it with `ToolSearch` (`select:Monitor`) first.
 - **Ingestion / backfill runs longer than ~2 h run detached** (`nohup` script writing a status
   file under `var/logs/`; README "Long runs"), never as a tool background command (killed at
   its limit).
@@ -248,3 +253,5 @@ Token habits (every session):
 
 Harness audit: `/audit-harness` (`.claude/skills/audit-harness`); `/start` flags one older than
 30 days (date in `docs/roadmap.md` Now / Next), `/wrap-up` triggers it at CLAUDE.md >= 290 lines.
+Session review: `/review-sessions` (`make friction` over the transcripts, then the top 3 fixed in
+one harness PR); `/start` runs it when the "Session review: last" date is before today.
