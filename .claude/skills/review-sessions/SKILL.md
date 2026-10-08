@@ -29,5 +29,5 @@ not a command. Nothing here reads the store.
    Update "Session review: last <date>" in `docs/roadmap.md` Now / Next.
 5. **One PR**, labelled `no-automerge` (the owner reads a harness change; CLAUDE.md
    rule 10 otherwise), title `Session review <date>: <the three, in a few words>`; the body
-   is the report's top table and the three fixes. `make check` once before the push.
+   is the report's top table and the three fixes. `make changed`, then push: CI is the full gate.
    Then start the day's work item; do not wait for the review.
