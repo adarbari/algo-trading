@@ -180,3 +180,47 @@ def test_close_closes_the_sink() -> None:
     UsageLedger(settings(), sink).close()
     UsageLedger(settings()).close()  # no sink: nothing to do
     assert sink.closed
+
+
+def test_settling_frees_the_room_and_charges_the_cost_in_one_step() -> None:
+    cap = 0.05  # one call's bound ($0.0401) fits; a second only if the first is not charged
+    ledger = UsageLedger(settings(daily_usd=cap))
+    reserved = ledger.admit("paid", CHARS)
+    assert reserved is not None
+    stop, leaked = threading.Event(), []
+
+    def hammer() -> None:
+        while not stop.is_set():
+            if ledger.admit("paid", CHARS) is not None:
+                leaked.append(1)
+
+    thread = threading.Thread(target=hammer)
+    thread.start()
+    actual = {"input_tokens": 400_000, "output_tokens": 0}  # $0.40 > cap: nothing may fit after
+    ledger.record(attempt("paid", **actual), reserved)
+    stop.set()
+    thread.join(5)
+    assert not leaked
+
+
+def test_the_store_is_read_outside_the_lock() -> None:
+    now = [DAY]
+    holder: list[UsageLedger] = []
+    seen: list[float | None] = []
+
+    def seed(start: date, end: date) -> dict[date, float]:
+        if not holder:
+            raise OSError("down at startup")
+        # a held lock would deadlock these (the lock is not re-entrant)
+        seen.extend([holder[0].admit("tier", CHARS), holder[0].admit("paid", CHARS)])
+        return {}
+
+    ledger = UsageLedger(settings(daily_usd=1.0), seed=seed, clock=lambda: now[0])
+    holder.append(ledger)
+    now[0] += timedelta(seconds=31)
+    thread = threading.Thread(target=lambda: ledger.admit("paid", CHARS))  # the lazy re-read
+    thread.start()
+    thread.join(5)
+    assert not thread.is_alive()
+    assert seen == [0.0, None]  # free answers, a paying provider still refused mid-seed
+    assert ledger.admit("paid", CHARS) is not None  # and once read it is admitted

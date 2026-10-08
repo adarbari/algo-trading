@@ -66,6 +66,8 @@ a free provider keeps answering.
   store at startup (`data.usage.spent_by_day`) so a restart keeps the day's spend. Until a seed
   succeeds every spending provider is refused, whatever `over` says; the seed is retried lazily
   with a growing pause (30 s up to 5 min) and the error logged. Free providers answer meanwhile.
+- A `claude-cli` call whose reported cost exceeds `reported_call_usd` can pass a cap by the
+  difference (the reservation was its assumed bound); size `reported_call_usd` accordingly.
 - **A broken ledger** (an exception in `admit`) skips the spending providers; a failure to
   *record* a row is logged and the answer goes on (recording is fail-open; spending is not).
 - **One API process is assumed**: a second would count only its own calls and could overspend

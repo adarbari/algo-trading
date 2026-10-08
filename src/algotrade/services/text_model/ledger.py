@@ -53,9 +53,8 @@ class UsageLedger:
         self._daily = self._monthly = self._reserved = 0.0
         self._seed, self._seeded = seed, seed is None
         self._retry_at, self._pause = clock(), RETRY_FIRST_S
-        if seed is not None:
-            with self._lock:
-                self._ensure_seeded()
+        self._seeding = False
+        self._ensure_seeded()
 
     # ---------------------------------------------------------------- what the chain asks
 
@@ -74,8 +73,7 @@ class UsageLedger:
     @property
     def seeded(self) -> bool:
         """The counters know what the store holds (else spending providers are refused)."""
-        with self._lock:
-            return self._ensure_seeded()
+        return self._ensure_seeded()
 
     def spends(self, provider: str) -> bool:
         rate = self._rates.get(provider)
@@ -101,10 +99,10 @@ class UsageLedger:
         if not self.spends(provider):
             return 0.0
         try:
+            if not self._ensure_seeded():
+                return None
             with self._lock:
                 self._roll()
-                if not self._ensure_seeded():
-                    return None
                 bound = self._bound(self._rates.get(provider), prompt_chars)
                 if self._reached(self._reserved + bound):
                     return None
@@ -115,10 +113,9 @@ class UsageLedger:
             return None
 
     def record(self, attempt: Attempt, reserved: float = 0.0) -> None:
-        with self._lock:
-            self._reserved = max(0.0, self._reserved - reserved)  # settle the reservation first
         cost, basis = self._cost(attempt, reserved)
-        with self._lock:
+        with self._lock:  # one section: a concurrent admit never sees the room freed but unspent
+            self._reserved = max(0.0, self._reserved - reserved)
             self._roll()
             if cost is not None and basis in SPENDING:
                 self._daily += cost
@@ -176,27 +173,33 @@ class UsageLedger:
         self._day, self._daily = today, 0.0
 
     def _ensure_seeded(self) -> bool:
-        """Read the store into the counters once (lock held); after a failure, again only
-        after a pause that doubles up to ``RETRY_MAX_S``."""
-        if self._seeded:
-            return True
-        now = self._clock()
-        if self._seed is None or now < self._retry_at:
-            return False
-        today: date = exchange_date(now)
+        """Read the store into the counters once; after a failure, again only after a pause that
+        doubles up to ``RETRY_MAX_S``. The read runs outside the lock (admits meanwhile still
+        refuse spending providers: unseeded) and only one thread reads at a time."""
+        with self._lock:
+            if self._seeded:
+                return True
+            now = self._clock()
+            if self._seed is None or self._seeding or now < self._retry_at:
+                return False
+            self._seeding = True
+            today: date = exchange_date(now)
         try:
             by_day = self._seed(today.replace(day=1), today)
         except Exception:
-            self._retry_at = now + timedelta(seconds=self._pause)
+            with self._lock:
+                self._seeding = False
+                self._retry_at = now + timedelta(seconds=self._pause)
+                pause, self._pause = self._pause, min(self._pause * 2, RETRY_MAX_S)
             log.exception(
                 "text-model budget: the store could not be read; paid providers are refused "
-                "until it can (next try in %g s)", self._pause,
+                "until it can (next try in %g s)", pause,
             )  # fmt: skip
-            self._pause = min(self._pause * 2, RETRY_MAX_S)
             return False
-        self._day = today
-        self._daily, self._monthly = by_day.get(today, 0.0), sum(by_day.values())
-        self._seeded = True
+        with self._lock:
+            self._day = today
+            self._daily, self._monthly = by_day.get(today, 0.0), sum(by_day.values())
+            self._seeded, self._seeding = True, False
         return True
 
 
