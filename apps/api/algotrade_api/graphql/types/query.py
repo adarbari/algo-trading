@@ -534,10 +534,6 @@ class Query:
         extensions=[AdminOnly(), MaxItems("recent", MAX_CALLS)],
     )
     async def llm_usage(self, info: Ctx, recent: int = 50) -> LlmUsage | None:
-        ctx = info.context.stores()
-        found = (
-            await to_thread.run_sync(usage.load_llm_usage, ctx, None, recent)
-            if ctx is not None
-            else None
-        )
+        ctx = await info.context.astores()
+        found = await off_loop(usage.load_llm_usage, ctx, None, recent) if ctx is not None else None
         return LlmUsage.of(found) if found is not None else None

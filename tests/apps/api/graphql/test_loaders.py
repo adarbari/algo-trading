@@ -77,7 +77,7 @@ def test_a_pane_object_is_read_once_for_every_instrument_asking_it(
     found = graph(query)
     assert "errors" not in found
     assert found["data"] == {"a": {"holdings": {"total": 40}}, "b": {"holdings": None}}
-    assert seen == [["EQ:BULL", "EQ:AAA"]]
+    assert [sorted(ids) for ids in seen] == [["EQ:AAA", "EQ:BULL"]]  # one read, in either order
 
 
 def test_a_failing_batch_is_the_error_of_each_key(ctx: ReadContext) -> None:
