@@ -15,9 +15,16 @@ states one, with the basis:
                                today; ``core.time.calendar``); null when UNKNOWN
 
 PRIOR_YEAR is used only when no row is SCHEDULED, from the earliest report in the 364 days
-before the session (its anniversary is the next one due) and only when that anniversary is on
-or after the session. Every row read is one ``earnings@v1`` reads (``earnings.valid_events``:
-its 8-K / calendar handling and per-date authority) and is known by the session
+before the session whose quarter is not yet reported (a later report within 45 days of its
+anniversary means it is), rolled to the next session when the anniversary is a holiday, and
+only when that date is on or after the session and within 100 days (further out a quarter's
+row is missing or the company reports yearly: UNKNOWN).
+
+Known caveat until ``earnings`` v2: the 8-K results rows are not read (``earnings@v1`` reads
+the calendar rows only), so a report the calendar lacks is not seen.
+
+Every row read is one ``earnings@v1`` reads (``earnings.valid_events``: its per-date
+authority) and is known by the session
 (``known_from <= session``), so a report stored later, or a date nobody knew yet, never
 makes a session SCHEDULED and the actual future dates are never read. One row per
 instrument with a report row known by the session; an instrument with none has no row
@@ -29,7 +36,7 @@ from functools import cache
 
 import pandas as pd
 
-from algotrade.core.time.calendar import sessions_to
+from algotrade.core.time.calendar import is_session, next_session, sessions_to
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.corporate import earnings
@@ -38,6 +45,8 @@ NAME = "earnings_expected"
 VERSION = 1
 SCHEDULED, PRIOR_YEAR, UNKNOWN = "SCHEDULED", "PRIOR_YEAR", "UNKNOWN"
 YEAR = timedelta(days=364)  # 52 weeks: the anniversary falls on the same weekday
+EARLY = timedelta(days=45)  # a report this much before the anniversary is the same quarter's
+MAX_AHEAD = 100  # calendar days: further out, a quarter's row is missing (or it reports yearly)
 
 _REPORT = f"{earnings.EVENTS}.ts"
 _UNKNOWN = (
@@ -72,6 +81,22 @@ def _sessions_to(start: date, end: date) -> int:
     return sessions_to(start, end)
 
 
+def _prior_year(past: list[date], session: date) -> date | None:
+    """The next anniversary of a report in the 364 days before ``session`` (``past``: the
+    report dates before it, ascending), rolled to a session; None when there is none, or it
+    is more than ``MAX_AHEAD`` days out. A quarter already reported this year (the latest
+    report is within ``EARLY`` days of the anchor's anniversary or later) is skipped for the
+    next anchor, so an early report is not expected again."""
+    latest = past[-1]
+    for anchor in (d for d in past if d >= session - YEAR):
+        anniversary = anchor + YEAR
+        if latest >= anniversary - EARLY:
+            continue  # this quarter's report is out
+        expected = anniversary if is_session(anniversary) else next_session(anniversary)
+        return expected if (expected - session).days <= MAX_AHEAD else None
+    return None
+
+
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     stored = inputs[earnings.EVENTS]
     assert stored is not None  # required input
@@ -82,17 +107,17 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     rows = rows.sort_values(["instrument_id", "report"], kind="stable")
     rows = rows.assign(instrument_id=rows["instrument_id"].astype(str))
     upcoming = rows[rows["report"] >= session].drop_duplicates("instrument_id", keep="first")
-    within_year = rows[(rows["report"] < session) & (rows["report"] >= session - YEAR)]
-    anchor = within_year.drop_duplicates(
-        "instrument_id", keep="first"
-    )  # earliest: soonest anniversary
+    past: dict[str, list[date]] = {}
+    for iid, day in zip(rows["instrument_id"], rows["report"], strict=True):
+        if day < session:
+            past.setdefault(iid, []).append(day)  # ascending: rows are sorted
     scheduled = dict(zip(upcoming["instrument_id"], upcoming["report"], strict=True))
-    prior = {i: d + YEAR for i, d in zip(anchor["instrument_id"], anchor["report"], strict=True)}
+    prior = {i: d for i, days in past.items() if (d := _prior_year(days, session)) is not None}
     out = []
     for iid in sorted(set(rows["instrument_id"])):
         if iid in scheduled:
             out.append((iid, scheduled[iid], SCHEDULED))
-        elif iid in prior and prior[iid] >= session:
+        elif iid in prior:
             out.append((iid, prior[iid], PRIOR_YEAR))
         else:
             out.append((iid, None, UNKNOWN))

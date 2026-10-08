@@ -92,3 +92,27 @@ def test_truncation_invariance() -> None:
     for session in (date(2026, 9, 30), date(2026, 10, 5), date(2026, 10, 19), date(2026, 10, 20)):
         known = full[pd.to_datetime(full["known_from"]).dt.date <= session]
         assert _at(full, session) == _at(known, session)  # rows known later change nothing
+
+
+def test_an_already_reported_quarter_is_not_expected_again() -> None:
+    rows = _events(
+        [
+            ("EQ:A", date(2025, 1, 30), date(2025, 1, 30)),
+            ("EQ:A", date(2025, 4, 30), date(2025, 4, 30)),
+            ("EQ:A", date(2026, 1, 25), date(2026, 1, 25)),  # this year's, early
+        ]
+    )
+    got = _at(rows, date(2026, 1, 26))  # no phantom 2026-01-29: the next anchor is April
+    assert got["EQ:A"][:2] == (date(2026, 4, 29), "PRIOR_YEAR")
+
+
+def test_an_expectation_over_100_days_out_is_unknown() -> None:
+    old = date(2025, 10, 20)  # anniversary 2026-10-19 is 197 days after 2026-04-05
+    got = _at(_events([("EQ:A", old, old)]), date(2026, 4, 5))
+    assert got["EQ:A"][1] == "UNKNOWN" and _nulls(got["EQ:A"][0]) is None
+
+
+def test_a_holiday_anniversary_rolls_to_the_next_session() -> None:
+    year_ago = date(2025, 11, 27)  # +364 = 2026-11-26, Thanksgiving: closed
+    got = _at(_events([("EQ:A", year_ago, year_ago)]), date(2026, 11, 23))
+    assert got["EQ:A"] == (date(2026, 11, 27), "PRIOR_YEAR", 3)  # sessions 24, 25, 27
