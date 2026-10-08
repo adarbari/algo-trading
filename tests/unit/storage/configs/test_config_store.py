@@ -107,6 +107,17 @@ def test_the_guide_files_are_site_only(root: Path) -> None:
     assert store.load("alice", "guide", "sections") is None  # never a user's
 
 
+def test_the_guide_playbooks_are_site_only_under_the_guide_folder(root: Path) -> None:
+    (root / "site" / "guide" / "playbooks").mkdir(parents=True)
+    (root / "site" / "guide" / "playbooks" / "pullback.toml").write_text('id = "pullback"\n')
+    (root / "site" / "guide" / "sections.toml").write_text("")
+    store = FileConfigStore(root)
+    assert store.names("site", "guide_playbooks") == ["pullback"]
+    assert store.names("site", "guide") == ["sections"]  # the subfolder is not a guide file
+    assert store.load("site", "guide_playbooks", "pullback") == {"id": "pullback"}
+    assert store.load("alice", "guide_playbooks", "pullback") is None  # never a user's
+
+
 def test_screen_documents_are_read_through_every_store(tmp_path: Path) -> None:
     """Drafts and versions are read through the ``ConfigStore`` (the read model reads them;
     only the writer writes them): files, memory and an overlay over either."""

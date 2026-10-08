@@ -1,0 +1,39 @@
+# L3 site setting: the Guide's playbook for the site preset failed_breakout (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "failed_breakout"
+version = 1  # the preset version this prose was written for
+summary = "Finds shares that broke out above their one-month high recently and have since closed back below that level, with heavy volume and fading momentum: the bull trap. It is a list of short-side candidates, the mirror of the breakout playbook."
+hit = "The latest 20-session breakout of the last 60 sessions has since closed below its level; that breakout was at most 10 sessions ago (11 to 15 sessions is flagged WATCH); today's volume is at least 1.2 times the 20-session average; this week's return fell short of last week's; and the old level, now resistance, is within 1 ATR above the close."
+not_checked = "It does not check whether the share can be borrowed or shorted, nor earnings. The failure test is an approximation: any close below the level since the breakout counts, not strictly 'above yesterday, below today', so the recency gate is what keeps it fresh."
+before_acting = [
+  "One close below the level is enough for feature.breakout_failed, even if price has recovered since: read rollup.retest@v1.sessions_since_breakout and feature.dist_to_resistance_atr to see whether it is back above.",
+  "A breakout from today is never a failed one (rollup.retest@v1.retest_state FRESH); look again in a few sessions.",
+  "Heavy volume on an earnings day or an expiry Friday is not distribution: check rollup.earnings@v1.last_earnings_date before reading rollup.momentum@v1.rel_volume as selling.",
+  "rollup.trend_stats@v2.mom_accel_5d is a difference of two noisy weeks and one big day flips it; confirm with rollup.trend_stats@v2.ret_z_20d and rollup.momentum@v1.rsi_14.",
+]
+sources = [
+  "Raschke and Connors, Street Smarts (Turtle Soup: fading a failed 20-day breakout)",
+  "Edwards and Magee, Technical Analysis of Stock Trends (false breakouts and bull traps)",
+]
+related = [
+  { id = "breakout", reason = "the break this screen watches fail" },
+  { id = "exhaustion", reason = "the other short-side reversal case" },
+  { id = "range_breakout", reason = "a failed break often resets the range" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+breakout_failed = "A recent breakout closed back below its level"
+recent = "That breakout at most 10 sessions ago"
+rel_volume = "Volume at least 1.2 times normal"
+momentum_fading = "This week lagged last week"
+near_resistance = "Within 1 ATR under the old level"

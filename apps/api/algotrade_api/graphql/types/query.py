@@ -20,6 +20,8 @@ from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
 from algotrade.services.read.guide import field as field_page
 from algotrade.services.read.guide import index as guide_contents
+from algotrade.services.read.guide import playbook as playbook_page
+from algotrade.services.read.guide import situation as situation_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
@@ -34,6 +36,8 @@ from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.guide.field import GuideField
 from algotrade_api.graphql.types.guide.index import GuideIndex
+from algotrade_api.graphql.types.guide.playbook import GuidePlaybookDetail
+from algotrade_api.graphql.types.guide.situation import GuideSituationDetail
 from algotrade_api.graphql.types.instruments.distribution import FeatureDistribution
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -259,6 +263,25 @@ class Query:
     def guide_field(self, info: Ctx, name: FeatureName) -> GuideField | None:
         ctx = info.context.stores()
         return GuideField.of(field_page.load_guide_field(ctx, name)) if ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the site playbook `id` (ADR 0051): its prose, the "
+        "preset's latest version and criteria, related playbooks and the situations that fool "
+        "its fields; null: no site rule-screen preset of that id"
+    )
+    def guide_playbook(self, info: Ctx, id: str) -> GuidePlaybookDetail | None:
+        ctx = info.context.stores()
+        found = playbook_page.load_guide_playbook(ctx, id) if ctx is not None else None
+        return GuidePlaybookDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the situation `slug` (ADR 0051): its signs and what to "
+        "do, the fields it fools and the site playbooks reading them; null: no such situation"
+    )
+    def guide_situation(self, info: Ctx, slug: str) -> GuideSituationDetail | None:
+        ctx = info.context.stores()
+        found = situation_page.load_guide_situation(ctx, slug) if ctx is not None else None
+        return GuideSituationDetail.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every strategy and screener config the user sees: site presets, then "
