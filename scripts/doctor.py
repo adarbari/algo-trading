@@ -6,13 +6,13 @@ never fail it). Every probe goes through `Probes`, so tests pass fakes. Never pr
 from __future__ import annotations
 
 import json
+import os
 import plistlib
 import re
 import shutil
 import socket
 import subprocess
 import sys
-import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -279,7 +279,7 @@ def check_llm(p: Probes) -> Result:
         WARN,
         "llm.toml",
         f"{error}: the API starts with drafting off and answers 503 with this message",
-        "edit config/site/llm.toml in the main checkout, then restart the API",
+        "edit config/site/llm.local.toml (git-ignored) in the main checkout, then restart the API",
     )
 
 
@@ -287,13 +287,11 @@ def llm_error(main: Path) -> str | None:
     """What stops ``main``'s ``config/site/llm.toml`` loading, or ``None`` (no file loads)."""
     from algotrade.config.site.llm import LlmSettings  # noqa: PLC0415 (venv may lack it)
     from algotrade.core.model.errors import ConfigurationError  # noqa: PLC0415
+    from algotrade.storage.configs.files import FileConfigStore  # noqa: PLC0415
 
-    path = main / "config" / "site" / "llm.toml"
-    try:
-        document = tomllib.loads(path.read_text()) if path.is_file() else None
+    try:  # llm.toml with this machine's llm.local.toml over it, as the API loads it
+        document = FileConfigStore(main / "config").load("site", "settings", "llm")
         LlmSettings.from_document(document)
-    except tomllib.TOMLDecodeError as exc:
-        return f"llm.toml: not valid TOML ({exc})"
     except ConfigurationError as exc:
         return str(exc)
     return None
@@ -368,6 +366,71 @@ def check_worktrees(p: Probes) -> Result:
     )
 
 
+def check_main_checkout(p: Probes) -> list[Result]:
+    """The main checkout is what the API and the nightly run: it belongs on ``main`` at
+    ``origin/main`` (`scripts/ops/deploy.sh` moves it), and its committed site config is clean
+    (a machine's own values go in the git-ignored ``config/site/<name>.local.toml``)."""
+    main = p.main()
+    git = ["git", "-C", str(main)]
+    _, branch = p.run([*git, "rev-parse", "--abbrev-ref", "HEAD"])
+    _, head = p.run([*git, "rev-parse", "HEAD"])
+    rc, origin = p.run([*git, "rev-parse", "origin/main"])
+    out = []
+    if branch != "main":
+        out.append(
+            Result(
+                WARN,
+                "main checkout",
+                f"on {branch or 'an unknown branch'}, not main (the API and the nightly run it)",
+                f"cd {main} && git switch main",
+            )
+        )
+    elif rc == 0 and head != origin:
+        out.append(
+            Result(
+                WARN,
+                "main checkout",
+                "main is not at origin/main (behind, ahead or not fetched)",
+                f"{main}/scripts/ops/deploy.sh  # or git pull --ff-only origin main",
+            )
+        )
+    else:
+        out.append(Result(OK, "main checkout", "on main at origin/main"))
+    _, dirty = p.run([*git, "status", "--porcelain", "--", "config/site"])
+    if dirty:
+        files = ", ".join(x.split()[-1] for x in dirty.splitlines()[:3])
+        out.append(
+            Result(
+                WARN,
+                "site config",
+                f"uncommitted changes in the main checkout's config/site: {files}",
+                "move this machine's values to config/site/<name>.local.toml (git-ignored), "
+                "then git restore the committed file (docs/configuration.md)",
+            )
+        )
+    return out
+
+
+def check_running_checks(p: Probes) -> Result:
+    """Other `make check` runs on this machine (each takes 30-40 min; two at once time out)."""
+    rc, out = p.run(["pgrep", "-f", "check_lock.sh"])  # once per run, not make + make check-gates
+    pids = [x for x in out.split() if rc == 0 and x.isdigit() and int(x) != os.getpid()]
+    if not pids:
+        return Result(OK, "make check", "no other run in progress")
+    where = []
+    for pid in pids:
+        _, lsof = p.run(["lsof", "-a", "-p", pid, "-d", "cwd", "-Fn"])
+        cwd = next((x[1:] for x in lsof.splitlines() if x.startswith("n")), "?")
+        where.append(f"{pid} in {cwd}")
+    return Result(
+        INFO,
+        "make check",
+        f"{len(pids)} other run(s): "
+        + "; ".join(where)
+        + " (stop your own by its PID, never pkill)",
+    )
+
+
 def run_checks(p: Probes) -> list[Result]:
     return [
         check_uv(p),
@@ -384,6 +447,8 @@ def run_checks(p: Probes) -> list[Result]:
         check_store(p),
         check_web_dist(p),
         check_llm(p),
+        *check_main_checkout(p),
+        check_running_checks(p),
         *check_agents(p),
     ]
 

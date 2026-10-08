@@ -119,6 +119,19 @@ describe('ScreenerList', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('links every rule-screen preset to its playbook in the Guide, and Python screeners to none', () => {
+    setup();
+    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
+    expect(
+      within(presets.getByRole('row', { name: /vrp_scanner/ })).getByRole('link', {
+        name: 'Playbook',
+      }),
+    ).toHaveAttribute('href', '/guide/playbooks/vrp_scanner');
+    expect(
+      within(presets.getByRole('row', { name: /short_premium/ })).queryByRole('link'),
+    ).toBeNull();
+  });
+
   it('lists a draft-only screener, with the preset it copies', () => {
     setup();
     const rows = within(screen.getByRole('grid', { name: 'Your screeners' })).getAllByRole('row');

@@ -17,7 +17,24 @@ const index = {
   sections: [
     { id: 'start', title: 'Start here', purpose: 'How the app thinks.', entries: 4 },
     { id: 'regime', title: 'Market regime', purpose: 'The weather.', entries: 20 },
+    { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 399 },
+    { id: 'situations', title: 'Situations', purpose: 'States that fool fields.', entries: 2 },
+  ],
+  families: [
+    {
+      id: 'breakouts',
+      title: 'Breakouts',
+      playbooks: [
+        { id: 'range_breakout', name: 'Range breakout' },
+        { id: 'breakout', name: 'Breakout' },
+      ],
+    },
+    { id: 'income', title: 'Option income', playbooks: [{ id: 'vrp_scanner', name: 'VRP' }] },
+  ],
+  situations: [
+    { name: 'Pending takeover', fields: 12, slug: 'pending-takeover' },
+    { name: 'Earnings gap inside the window', fields: 1, slug: 'earnings-gap' },
   ],
   themeGroups: [
     {
@@ -38,10 +55,14 @@ beforeEach(() => {
 });
 
 describe('GuideHome', () => {
-  it('shows only the sections that have pages, with the server’s purpose', () => {
+  it('shows only the sections that have pages, in the server’s order, with its purpose', () => {
     render(<GuideHome />);
     expect(screen.getByRole('heading', { level: 1, name: 'Guide' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Fields' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Playbooks',
+      'Fields',
+      'Situations',
+    ]);
     expect(screen.queryByText('Start here')).toBeNull();
     expect(screen.queryByText('Market regime')).toBeNull();
     expect(screen.getByText('Every catalogue field.')).toBeInTheDocument();
@@ -51,7 +72,8 @@ describe('GuideHome', () => {
   it('lists the theme groups in the server’s order with their counts, each theme a link', () => {
     render(<GuideHome />);
     const groups = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'));
-    expect(groups).toEqual(['Fields', 'Who is tradeable', 'The chart']);
+    expect(groups).toContain('Who is tradeable');
+    expect(groups.indexOf('The chart')).toBeGreaterThan(groups.indexOf('Who is tradeable'));
     const tradeable = screen.getByRole('region', { name: 'Who is tradeable' });
     expect(within(tradeable).getByRole('link', { name: 'Instrument gates · 23' })).toHaveAttribute(
       'href',
@@ -64,6 +86,27 @@ describe('GuideHome', () => {
     expect(screen.getByRole('link', { name: 'A to Z' })).toHaveAttribute(
       'href',
       '/guide/fields?view=az',
+    );
+  });
+
+  it('lists the playbook families with each playbook linked to its page', () => {
+    render(<GuideHome />);
+    const family = screen.getByRole('region', { name: 'Breakouts' });
+    expect(within(family).getByRole('link', { name: 'Range breakout' })).toHaveAttribute(
+      'href',
+      '/guide/playbooks/range_breakout',
+    );
+    expect(screen.getByRole('link', { name: 'What each one says' })).toHaveAttribute(
+      'href',
+      '/guide/playbooks',
+    );
+  });
+
+  it('lists the situations with how many fields each fools, each linked to its page', () => {
+    render(<GuideHome />);
+    expect(screen.getByRole('link', { name: 'Pending takeover · 12' })).toHaveAttribute(
+      'href',
+      '/guide/situations/pending-takeover',
     );
   });
 

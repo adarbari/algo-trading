@@ -112,11 +112,25 @@ def test_settings_from_env_open_the_named_store(
 
 
 def test_cli_runs_uvicorn_on_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ALGOTRADE_PORT_BASE", raising=False)
     calls: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: calls.append((app, kw)))
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
     cli.main(["--reload"])
     assert calls == [(cli.APP, {"host": "127.0.0.1", "port": 8000, "reload": True})]
+
+
+def test_cli_serves_on_the_worktrees_port_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ALGOTRADE_PORT_BASE", raising=False)
+    assert cli.serve_port() == 8000
+    monkeypatch.setenv("ALGOTRADE_PORT_BASE", "x")
+    assert cli.serve_port() == 8000
+    calls: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setenv("ALGOTRADE_PORT_BASE", "12340")
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: calls.append((app, kw)))
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    cli.main([])
+    assert calls[0][1]["port"] == 12340
 
 
 def test_asgi_app_is_configured_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -497,3 +511,13 @@ def test_every_page_operation_answers_within_a_second_on_golden_data(
         timings.append(time.process_time() - started)
         assert response.status_code == 200 and "errors" not in response.json(), response.text
     assert min(timings) < 1.0, f"{name} took {min(timings):.2f}s (best of 3: {timings})"
+
+
+def test_the_api_test_store_ignores_a_machines_local_site_file(tmp_path: Path) -> None:
+    from tests.helpers.api_store import site_only_store  # noqa: PLC0415
+
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "llm.toml").write_text("enabled = false\n")
+    (site / "llm.local.toml").write_text("enabled = true\n")
+    assert site_only_store(site).load("site", "settings", "llm") == {"enabled": False}

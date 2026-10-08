@@ -2,7 +2,9 @@
  * The Guide end to end, against the production build with the API mocked (explore-api.ts): the
  * top bar's Guide link and the "?" key, the home with its theme groups, the field index, a
  * field's page (what it means, its spread, criteria, when it lies, related, a ticker), the rail's
- * search, and Explore's retired Field guide tab redirecting here; accessible in dark and light.
+ * search, the playbook and situation pages reached from the home (a linked field and back, the two
+ * buttons, the linked prose), and Explore's retired Field guide tab redirecting here; accessible
+ * in dark and light.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -10,6 +12,7 @@ import { expectAccessible } from './a11y';
 import { mockApi } from './mock-api';
 
 const IV30 = 'rollup.iv30@v1.iv30';
+const SITUATION_NAME = 'Earnings gap inside the window';
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -31,6 +34,10 @@ test('the top bar links to the Guide, and "?" opens it', async ({ page }) => {
   await expect(page).toHaveURL(/\/guide$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Guide' })).toBeVisible();
   await page.goto('/explore');
+  // The shortcut listener mounts with the layout, and "?" inside a text field is a character
+  // (use-guide-shortcut.ts): wait for the page, then make sure nothing has the focus.
+  await expect(page.getByRole('link', { name: /^Guide/ })).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('?');
   await expect(page).toHaveURL(/\/guide$/);
   expect(errors).toEqual([]);
@@ -92,6 +99,98 @@ for (const theme of ['dark', 'light'] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`home to a playbook, a linked field and back (${theme})`, async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/guide');
+    await expect(page.getByRole('heading', { level: 2, name: 'Playbooks' })).toBeVisible();
+    await page
+      .getByRole('region', { name: 'Option income' })
+      .getByRole('link', { name: 'VRP scanner' })
+      .click();
+    await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'VRP scanner' })).toBeVisible();
+    await expect(page.getByText('site preset · vrp_scanner v1 · Option income')).toBeVisible();
+    await expect(page.getByText('Finds names whose options price more movement')).toBeVisible();
+
+    const criteria = page.getByRole('grid', { name: 'VRP scanner criteria' });
+    await expect(criteria.getByRole('row', { name: /Implied volatility is rich/ })).toContainText(
+      'gte 0.4 soft tolerance 0.05',
+    );
+    // The caveat names a field: a link to its page.
+    const before = page.getByRole('region', { name: 'Before you act on a hit' });
+    await expect(before.getByRole('link', { name: IV30 })).toBeVisible();
+    await expect(before.getByRole('link', { name: SITUATION_NAME })).toBeVisible();
+
+    await page.evaluate((t) => {
+      document.documentElement.setAttribute('data-theme', t);
+    }, theme);
+    await expectAccessible(page);
+
+    await criteria.getByRole('link', { name: IV30 }).click();
+    await expect(page).toHaveURL(/\/guide\/fields\/rollup\.iv30(%40|@)v1\.iv30$/);
+    await expect(page.getByRole('region', { name: 'What this field means' })).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'VRP scanner' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
+
+test('a playbook opens today’s hits and its Builder; the index lists the families', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/guide/playbooks');
+  await expect(page.getByRole('region', { name: 'Breakouts' })).toContainText('Finds shares');
+  await page.getByRole('link', { name: 'VRP scanner' }).first().click();
+  await page.getByRole('button', { name: 'See today’s hits' }).click();
+  await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
+  await page.goto('/guide/playbooks/vrp_scanner');
+  await page.getByRole('button', { name: 'Open in Builder' }).click();
+  await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit$/);
+  await page.goto('/guide/playbooks/nope');
+  await expect(page.getByText('No such playbook')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('situations: the index, a situation’s page with its linked fields and playbooks', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/guide/situations');
+  await page.getByRole('link', { name: SITUATION_NAME }).first().click();
+  await expect(page).toHaveURL(/\/guide\/situations\/earnings-gap-inside-the-window$/);
+  await expect(page.getByRole('heading', { level: 1, name: SITUATION_NAME })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What to do' }).getByRole('link', { name: IV30 }),
+  ).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Playbooks it affects' })
+    .getByRole('link', { name: 'VRP scanner' })
+    .click();
+  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+  await page.goto('/guide/situations/nope');
+  await expect(page.getByText('No such situation')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('a field page links its caveats’ fields, its situations and its playbooks', async ({
+  page,
+}) => {
+  await page.goto(`/guide/fields/${IV30}`);
+  const lies = page.locator('#lies');
+  await expect(lies.getByRole('link', { name: SITUATION_NAME })).toHaveAttribute(
+    'href',
+    '/guide/situations/earnings-gap-inside-the-window',
+  );
+  await page
+    .getByRole('region', { name: 'Related fields and playbooks' })
+    .getByRole('link', { name: 'VRP scanner' })
+    .click();
+  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+});
 
 test('the rail searches the fields and the index has three views', async ({ page }) => {
   const errors = collectErrors(page);

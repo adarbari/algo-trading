@@ -775,6 +775,19 @@ Source: `design-system/components/Legend`
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
 
+### LinkedProse
+
+LinkedProse: a paragraph given as parts, some of them links to pages of this app (a field's Guide page inside a caveat): a part with an `href` is a TextLink (the app's router link, so the design system stays router-free), the rest is plain Text in the chosen tone and size. The parts come split from the server (it cuts the sentence at the names it mentions); the caller maps each part to an address. Links to other sites are LinkedText's.
+
+Source: `design-system/components/LinkedProse`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `parts` | `readonly LinkedProsePart[]` | yes | The paragraph in order; the parts are joined as written. |
+| `tone` | `TextTone` | no | Colour role of the plain text, as on Text. |
+| `size` | `FontSize` | no | Type-scale step, as on Text; the links take the same size. |
+| `monoLinks` | `boolean` | no | Set the links in the mono face (they are catalogue names). |
+
 ### LinkedText
 
 LinkedText: a sentence given as parts, some of them links: a part with an `href` is an ExternalLink (real anchor, `rel="noopener"`, visible focus, the external mark and "opens in a new tab" for screen readers), the rest is plain Text in the chosen tone and size. The parts come split from the caller (a server-written sentence arrives already cut); `splitTerms` cuts a sentence at the first occurrence of each term, for stories and tests, and reports the terms it could not place (absent, empty, or overlapping an earlier one) instead of dropping them silently.

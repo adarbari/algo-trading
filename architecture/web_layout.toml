@@ -35,64 +35,33 @@ path = "apps/web/.storybook"
 purpose = "Storybook config: the design-system catalogue (main) and the theme/density decorator (preview)"
 
 [[web_dir]]
-path = "apps/web/lint-rules"
-purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4), responsive (rule 10: a multi-column Grid collapses), columns and views (read model WEB 4, 7), guide (messages), and the responsive rule's test"
-
-[[web_dir]]
-path = "apps/web/scripts"
-purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the node_modules guard (predev), the Playwright Docker runner"
-
-[[web_dir]]
-path = "apps/web/e2e"
-purpose = "Playwright end-to-end tests against the production build"
-
-[[web_dir]]
-path = "apps/web/e2e/fixtures"
-purpose = "API responses recorded from the real API for end-to-end route mocks, one folder per page"
-
-[[web_dir]]
-path = "apps/web/e2e/fixtures/*"
-purpose = "one page's recorded API responses (JSON), served by its e2e route mock"
-
-[[web_dir]]
-path = "apps/web/real"
-purpose = "Playwright real-app smoke: the Vite dev server against the real API on an empty and the golden store, every route, no mocks"
-
-[[web_dir]]
-path = "apps/web/visual"
-purpose = "Playwright screenshot + axe suite over every design-system story, light and dark"
-
-[[web_dir]]
 path = "apps/web/design-system"
 purpose = "package @algotrade/ui: the ONLY place styling and raw HTML elements live; index.ts is its public API"
 styles = true
 
 [[web_dir]]
-path = "apps/web/design-system/tokens"
-purpose = "typed design tokens (FINAL, approved mockups 2026-10-03), the contrast check and the generated tokens.css (npm run tokens)"
+path = "apps/web/design-system/components"
+purpose = "design-system components, one folder each (built on the primitives; design system PR 2 onwards)"
+kind = "layer"
+
+[[web_dir]]
+path = "apps/web/design-system/components/*"
+purpose = "one generic component (Button, DataTable, ...), named for what it is, not the screen"
+kind = "component"
 styles = true
 
 [[web_dir]]
-path = "apps/web/design-system/theme"
-purpose = "UiProvider (fonts, tokens, theme, density, up/down palette) and the one global base.css"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/responsive"
-purpose = "container-width hooks for components that must change their tree, not only their CSS, below a breakpoint"
-
-[[web_dir]]
-path = "apps/web/design-system/testing"
-purpose = "test and story support for design-system components (the axe assertion, sample events and calendars for the event components, the narrow story decorator); never exported"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/format"
-purpose = "value formatters shared by the data components (number, percent, compact currency, date, signed delta with up/down tone); exported from @algotrade/ui"
+path = "apps/web/design-system/components/*/__screenshots__"
+purpose = "the component's screenshot baselines, one per story and theme"
+kind = "screenshots"
 
 [[web_dir]]
 path = "apps/web/design-system/files"
 purpose = "browser file helpers (save text the app built as a download); exported from @algotrade/ui"
+
+[[web_dir]]
+path = "apps/web/design-system/format"
+purpose = "value formatters shared by the data components (number, percent, compact currency, date, signed delta with up/down tone); exported from @algotrade/ui"
 
 [[web_dir]]
 path = "apps/web/design-system/foundations"
@@ -121,20 +90,47 @@ purpose = "the primitive's screenshot baselines, one per story and theme (Linux,
 kind = "screenshots"
 
 [[web_dir]]
-path = "apps/web/design-system/components"
-purpose = "design-system components, one folder each (built on the primitives; design system PR 2 onwards)"
-kind = "layer"
+path = "apps/web/design-system/responsive"
+purpose = "container-width hooks for components that must change their tree, not only their CSS, below a breakpoint"
 
 [[web_dir]]
-path = "apps/web/design-system/components/*"
-purpose = "one generic component (Button, DataTable, ...), named for what it is, not the screen"
-kind = "component"
+path = "apps/web/design-system/testing"
+purpose = "test and story support for design-system components (the axe assertion, sample events and calendars for the event components, the narrow story decorator); never exported"
 styles = true
 
 [[web_dir]]
-path = "apps/web/design-system/components/*/__screenshots__"
-purpose = "the component's screenshot baselines, one per story and theme"
-kind = "screenshots"
+path = "apps/web/design-system/theme"
+purpose = "UiProvider (fonts, tokens, theme, density, up/down palette) and the one global base.css"
+styles = true
+
+[[web_dir]]
+path = "apps/web/design-system/tokens"
+purpose = "typed design tokens (FINAL, approved mockups 2026-10-03), the contrast check and the generated tokens.css (npm run tokens)"
+styles = true
+
+[[web_dir]]
+path = "apps/web/e2e"
+purpose = "Playwright end-to-end tests against the production build"
+
+[[web_dir]]
+path = "apps/web/e2e/fixtures"
+purpose = "API responses recorded from the real API for end-to-end route mocks, one folder per page"
+
+[[web_dir]]
+path = "apps/web/e2e/fixtures/*"
+purpose = "one page's recorded API responses (JSON), served by its e2e route mock"
+
+[[web_dir]]
+path = "apps/web/lint-rules"
+purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4), responsive (rule 10: a multi-column Grid collapses), columns and views (read model WEB 4, 7), guide (messages), and the responsive rule's test"
+
+[[web_dir]]
+path = "apps/web/real"
+purpose = "Playwright real-app smoke: the Vite dev server against the real API on an empty and the golden store, every route, no mocks"
+
+[[web_dir]]
+path = "apps/web/scripts"
+purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the node_modules guard (predev), the Playwright Docker runner"
 
 [[web_dir]]
 path = "apps/web/src"
@@ -144,6 +140,10 @@ kind = "layer"
 [[web_dir]]
 path = "apps/web/src/app"
 purpose = "the shell: entry, App (providers around the router); composition only"
+
+[[web_dir]]
+path = "apps/web/src/app/layouts"
+purpose = "layout routes: the workspace layout (horizontal top bar above the page)"
 
 [[web_dir]]
 path = "apps/web/src/app/providers"
@@ -162,41 +162,22 @@ path = "apps/web/src/app/routes/*"
 purpose = "one workspace's route group (trader, admin): its layout route, guard and section routes"
 
 [[web_dir]]
-path = "apps/web/src/app/layouts"
-purpose = "layout routes: the workspace layout (horizontal top bar above the page)"
-
-[[web_dir]]
 path = "apps/web/src/app/workspaces"
 purpose = "the workspaces (TRADER, ADMIN) and their sections; the workspace guard (the role-gating seam)"
 
 [[web_dir]]
-path = "apps/web/src/pages"
-purpose = "one folder per page (route); no modules of its own"
+path = "apps/web/src/entities"
+purpose = "domain models with read hooks and view components; no modules of its own"
 kind = "layer"
 
 [[web_dir]]
-path = "apps/web/src/pages/*"
-purpose = "one page: composes widgets and features with primitives; no logic, no styling"
+path = "apps/web/src/entities/*"
+purpose = "one entity (e.g. instrument, feature, screen, run)"
 kind = "slice"
 
 [[web_dir]]
-path = "apps/web/src/pages/*/*"
-purpose = "a page's segment (ui, model, ...)"
-kind = "segment"
-
-[[web_dir]]
-path = "apps/web/src/widgets"
-purpose = "page sections composed of features and entities; no modules of its own"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/src/widgets/*"
-purpose = "one widget (e.g. NightlyRunPanel)"
-kind = "slice"
-
-[[web_dir]]
-path = "apps/web/src/widgets/*/*"
-purpose = "a widget's segment (ui, model, ...)"
+path = "apps/web/src/entities/*/*"
+purpose = "an entity's segment (ui, model, api, ...)"
 kind = "segment"
 
 [[web_dir]]
@@ -215,18 +196,18 @@ purpose = "a feature's segment (ui, model, api, ...)"
 kind = "segment"
 
 [[web_dir]]
-path = "apps/web/src/entities"
-purpose = "domain models with read hooks and view components; no modules of its own"
+path = "apps/web/src/pages"
+purpose = "one folder per page (route); no modules of its own"
 kind = "layer"
 
 [[web_dir]]
-path = "apps/web/src/entities/*"
-purpose = "one entity (e.g. instrument, feature, screen, run)"
+path = "apps/web/src/pages/*"
+purpose = "one page: composes widgets and features with primitives; no logic, no styling"
 kind = "slice"
 
 [[web_dir]]
-path = "apps/web/src/entities/*/*"
-purpose = "an entity's segment (ui, model, api, ...)"
+path = "apps/web/src/pages/*/*"
+purpose = "a page's segment (ui, model, ...)"
 kind = "segment"
 
 [[web_dir]]
@@ -248,6 +229,11 @@ path = "apps/web/src/shared/api/generated/graphql"
 purpose = "the GraphQL client preset output: typed documents and the graphql() tag, from apps/api/schema.graphql (codegen.ts, npm run api:generate)"
 
 [[web_dir]]
+path = "apps/web/src/shared/config"
+purpose = "build-time configuration (Vite env); the one place app code reads env"
+kind = "slice"
+
+[[web_dir]]
 path = "apps/web/src/shared/lib"
 purpose = "pure helpers, one folder per kind of value (format/, ...); never utils.ts"
 kind = "slice"
@@ -257,6 +243,20 @@ path = "apps/web/src/shared/lib/*"
 purpose = "one kind of pure helper (format: numbers, percentages)"
 
 [[web_dir]]
-path = "apps/web/src/shared/config"
-purpose = "build-time configuration (Vite env); the one place app code reads env"
+path = "apps/web/src/widgets"
+purpose = "page sections composed of features and entities; no modules of its own"
+kind = "layer"
+
+[[web_dir]]
+path = "apps/web/src/widgets/*"
+purpose = "one widget (e.g. NightlyRunPanel)"
 kind = "slice"
+
+[[web_dir]]
+path = "apps/web/src/widgets/*/*"
+purpose = "a widget's segment (ui, model, ...)"
+kind = "segment"
+
+[[web_dir]]
+path = "apps/web/visual"
+purpose = "Playwright screenshot + axe suite over every design-system story, light and dark"

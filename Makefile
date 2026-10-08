@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
+.PHONY: test-shard coverage-combine check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering roadmap-check unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -76,8 +76,14 @@ rest-allowlist-update: ## after retiring GET routes (removing their entries): lo
 features-doc:    ## regenerate docs/data/features.md (catalogue) and docs/data/field-guide.md (field guide)
 	$(PY) scripts/features_doc.py
 
+roadmap-check:   ## docs/roadmap.md opens with a Now / Next of at most 25 lines (the one counter: tests/architecture/test_docs.py)
+	$(PY) -m pytest -q tests/architecture/test_docs.py::test_roadmap_opens_with_a_short_now_next_section
+
 filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
+
+numbering:       ## ADR numbers not taken on origin/main; web rule numbers 1..n and cited ones exist
+	$(PY) scripts/check_numbering.py
 
 unit:
 	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/libs tests/apps tests/scripts
@@ -94,10 +100,30 @@ e2e:
 changed:         ## narrow first check: mirrored tests of files changed vs origin/main (BASE=...), then the fast gates; `make check` still gates
 	@paths="$$($(PY) scripts/changed_tests.py $(BASE))"; \
 	if [ -n "$$paths" ]; then $(PY) -m pytest -q -x --no-header --tb=short $$paths; else echo "no covering tests changed"; fi
+	@$(PY) scripts/changed_web.py $(BASE)
 	@$(MAKE) --no-print-directory arch layout ownership
 
 test:            ## everything, with the coverage gate, one worker per CPU (WORKERS=0 runs serially)
 	$(PY) -m pytest -n $(WORKERS) --cov --cov-report=term --cov-report=xml
+
+# CI runs the suite as three parallel shards (docs/ci.md "Pipeline"); together they are `make test`.
+# A fitness test (tests/architecture/pipeline) checks the shards cover every tests/ folder.
+TEST_SHARDS = unit-a unit-b apps rest
+# tests/unit split in two by subfolder (the #286 run: unit 5.6 min, apps 3.3, rest 1.7)
+TEST_SHARD_unit-a = tests/unit/features tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
+TEST_SHARD_unit-b = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
+TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
+# rest: few tests, the slow ones
+TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation
+
+test-shard:      ## one CI shard (SHARD=unit-a|unit-b|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
+	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }
+	COVERAGE_FILE=.coverage.$(SHARD) $(PY) -m pytest -n $(WORKERS) --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
+
+coverage-combine: ## the 90% coverage gate over the shards' data files (.coverage.*), then coverage.xml
+	$(BIN)coverage combine --keep $(wildcard .coverage.*)
+	$(BIN)coverage report --fail-under=90
+	$(BIN)coverage xml
 
 perf:            ## strict timing budgets (the `perf` tests), serially; run on an idle machine
 	$(PY) -m pytest -p no:xdist -m perf
@@ -149,7 +175,11 @@ WEB_DIST ?= var/web
 web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build the API serves (ALGOTRADE_WEB_DIST=var/web); redo after a web change
 	cd $(WEB) && VITE_API_BASE_URL= $(NPM) run build -- --outDir $(abspath $(WEB_DIST)) --emptyOutDir
 
-check: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen datasets-verify test evaluate web-check web-real
+# One full check per worktree: a second concurrent run refuses (scripts/ops/check_lock.sh).
+check:
+	scripts/ops/check_lock.sh $(MAKE) check-gates
+
+check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering roadmap-check datasets-verify test evaluate web-check web-real
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

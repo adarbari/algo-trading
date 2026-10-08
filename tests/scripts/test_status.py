@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "status.py"
 _spec = importlib.util.spec_from_file_location("status", SCRIPT)
 assert _spec and _spec.loader
@@ -51,7 +53,10 @@ def probes(tmp_path: Path, **kw: object) -> "status.Probes":
     return status.Probes(**{**base, **kw})
 
 
-def test_report_is_short_and_covers_every_area(tmp_path: Path) -> None:
+def test_report_is_short_and_covers_every_area(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("ALGOTRADE_PORT_BASE", raising=False)
     (tmp_path / "job.status").write_text("chunk 1 exit=0\nchunk 2 exit=0\n")
     text = status.report(probes(tmp_path))
     assert len(text.splitlines()) <= 15
@@ -90,3 +95,8 @@ def test_degrades_without_gh_or_store(tmp_path: Path) -> None:
 def test_gh_failure_says_how_to_fix(tmp_path: Path) -> None:
     text = status.report(probes(tmp_path, run=lambda cmd: (1, "")))
     assert "gh auth login" in text
+
+
+def test_servers_probe_this_worktrees_port_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALGOTRADE_PORT_BASE", "12340")
+    assert list(status.ports()) == [12340, 12341, 12346]

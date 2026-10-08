@@ -7,6 +7,7 @@ Every probe goes through `Probes`; a probe that cannot answer says why on its li
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -16,7 +17,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-PORTS = {8000: "api", 5173: "web dev", 5174: "storybook/preview"}
+
+
+def ports() -> dict[int, str]:
+    """The dev servers to probe: this worktree's block (ALGOTRADE_PORT_BASE) or the usual ports."""
+    base = os.environ.get("ALGOTRADE_PORT_BASE", "")
+    if base.isdigit():
+        return {int(base): "api", int(base) + 1: "web dev", int(base) + 6: "storybook/preview"}
+    return {8000: "api", 5173: "web dev", 5174: "storybook/preview"}
+
+
 JOB_MARKERS = ("algotrade-ingest", "var/logs/")
 MAX_PRS = 5
 
@@ -110,7 +120,7 @@ def store(p: Probes) -> list[str]:
 
 
 def servers(p: Probes) -> list[str]:
-    up = [f"{port} {name}" for port, name in PORTS.items() if p.port_open(port)]
+    up = [f"{port} {name}" for port, name in ports().items() if p.port_open(port)]
     return ["Dev servers: " + (", ".join(up) if up else "none listening")]
 
 

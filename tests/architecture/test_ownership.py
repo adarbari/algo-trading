@@ -34,7 +34,9 @@ CODE_FILES = sorted(
     for p in (REPO_ROOT / top).rglob("*.py")
     if not {".venv", "node_modules"} & set(p.parts)
 )
-SITE_SETTINGS = sorted((REPO_ROOT / "config" / "site").glob("*.toml"))
+SITE_SETTINGS = sorted(
+    p for p in (REPO_ROOT / "config" / "site").glob("*.toml") if not p.stem.endswith(".local")
+)
 # Typed views of L3 settings (the one loader): every field must be used by code, not only parsed.
 TYPED_SETTINGS_FILES = (
     "src/algotrade/config/site/settings.py",

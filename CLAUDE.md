@@ -39,6 +39,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Natural-language screener drafts**: a sentence becomes a draft rule screen through one `TextModel` protocol (`services/text_model`, also behind the on-demand regime explanation in `services/explaining`) and the one OpenAI-compatible adapter in `algotrade_sources/llm` (provider by `config/site/llm.toml` `base_url`; key only from `ALGOTRADE_LLM_API_KEY`; off by default); the prompt is the sentence, the catalogue, the phrasebook and the field guide (`config/site/field_guide/*.toml`: how to read each field, the criterion per intent, the caveats; rendered to `docs/data/field-guide.md` by `make features-doc`); invented fields are dropped with a reason, the rest validated as finalise; a draft the Builder loads, never a write or a run. (ADR 0041)
 - **The Guide** (`/guide`, a utility link on the right of the top bar): every explanation is written once as a Guide entry in site config (fields, situations, regime indicators and episodes, playbooks, glossary, how-to) and a page shows it only through `InfoButton` + `HelpDrawer` given an entry reference, never text; no explanatory prose in `apps/web/src` (shrink-only baseline `architecture/web_prose.toml`); spec `docs/ui/guide.md`, mechanics `.claude/skills/add-guide-content`. (ADR 0051)
 - **Event sensitivity**: what moves a name is measured per event class (own, peer, macro, market structure, unscheduled, factor-dated) as catalogue features over the scope list `config/site/events/scope.toml` plus tier A / B names; every event row carries `known_from` (read as `known_from <= S`; statistics only over events complete by S); unscheduled moves are attributed from 8-K items, then capped headlines through the text-model seam, then the owner-run deep-dive skill whose dossier enters through `dossier-import` (ingestion stays the writer); plan `docs/event-sensitivity-plan.md`. (ADR 0050)
+- **Edges**: an edge is a typed document `config/site/edges/<id>.toml` (thesis, persistence reason, outcome, schedule, frozen period) whose screeners are its implementations; outcomes are a grain `outcomes/instrument/<name>@v1` (`session_date` = start session, `knowledge_ts` = window close) written only by ingestion and read only by `data/outcomes`, importable only from `services/evaluation` (the one exception to the one-session rule); one cross-section harness scores each screener point in time (hit rate vs base rate, lift, decile spread, frozen period, trial log; statistics in `quant/`); ML proposes and implements, never judges; plan `docs/edges-plan.md`. (ADR 0053)
 - **Ingestion workflows** by cadence: `market-daily` (gates screens), weekly `reference`, `enrichment`. A step declares `needs` and runs only when they SUCCEEDED; it SUCCEEDS or FAILS by its acceptance checks (thresholds in `sources.toml [quality]`), never PARTIAL; a failed critical step holds back the workflow and every later session until it succeeds or is waived by hand (`--waive`). (ADR 0039)
 
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
@@ -132,13 +133,17 @@ the skill with the fix.
 8. Secrets come only from environment variables. Never commit credentials.
    Dependencies go in the pyproject of the package that needs them (an app's own, not the
    library's), then `uv lock`; commit `uv.lock`.
-9. Before finishing any change, run `make check`.
+9. Check narrow first (`make changed`: mirrored tests, mapped web checks, fast gates), then run the full
+   `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a failure rerun only the failed
+   gate (`make <gate>` / `npm run <script>`), never the whole `make check` again.
 10. **Push and open the PR yourself, then move on.** When `make check` passes, push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start
     the next work item; do not ask the owner first and do not wait for CI (owner decision
     2026-10-04). Only merging is off limits (below). A harness-learning PR still follows
-    `capture-learning`.
+    `capture-learning`. ADR and web-rule numbers are checked against origin/main
+    (`make numbering`): take the next free number right before the push; `scripts/merge_main.sh`
+    does the merge of main, regenerating generated files on conflict.
     **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
     it `no-automerge`, to keep it open for review. **Never merge yourself**: no
@@ -212,6 +217,9 @@ The owner and CI use the defaults (`WORKERS=auto`).
 
 Token habits (every session):
 
+- **Never `pkill -f make`, `pkill -f node`, `pkill -f vite` or `pkill -f playwright`**: it kills
+  another session's 30-40 min run. Stop your own run by its PID or job; `make check` holds a
+  per-worktree lock (`scripts/ops/check_lock.sh`) and `make doctor` lists the other runs.
 - **One fresh session per work item**; batch related bugs into it. Sonnet for scoped fixes,
   Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
   Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
