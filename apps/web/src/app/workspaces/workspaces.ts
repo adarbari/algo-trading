@@ -74,6 +74,12 @@ export const ADMIN: Workspace = {
         'Completeness grid (dataset x session) with drill-down, quality checks and open issues.',
     },
     {
+      path: '/admin/llm-usage',
+      label: 'LLM usage',
+      summary:
+        'What the text model spends: tokens and cost against the budget, by model, use case and user, and every recent call.',
+    },
+    {
       path: '/admin/screener-runs',
       label: 'Screener runs',
       summary: 'Per-user scheduled screens, run history and publishing (sharing) results.',
