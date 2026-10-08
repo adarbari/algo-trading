@@ -2,7 +2,8 @@
 session (the tie-break order, QUALIFIED only), the edge's universe, the survivorship flag; and
 ``screen_session`` itself saves nothing."""
 
-from datetime import timedelta
+from datetime import date, timedelta
+from typing import Any
 
 import pytest
 
@@ -10,7 +11,12 @@ from algotrade.config.strategy.schema import parse_selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section.picks import eligible, screen_variant
+from algotrade.services.evaluation.cross_section import picks
+from algotrade.services.evaluation.cross_section.picks import (
+    SelectionReads,
+    eligible,
+    screen_variant,
+)
 from algotrade.services.screening.run import screen_session
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -82,3 +88,30 @@ def test_rule_scores_are_tie_break_oriented(world: World) -> None:
     )
     with pytest.raises(ConfigurationError, match="tie_break"):
         screen_variant(world.reader, resolve_config(configs, "momo", USER), DAYS[0])
+
+
+def test_universes_over_the_same_fields_select_the_same_names_from_one_read(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cheap = parse_selection(
+        {
+            "name": "inactive",
+            "where": {"all": [{"field": "instrument.status", "op": "eq", "value": "INACTIVE"}]},
+        },
+        "inactive",
+    )
+    active = parse_selection(ACTIVE, "active")
+    expected = [eligible(world.reader, u, DAYS[0]) for u in (active, cheap)]
+    reads: list[date] = []
+    real = picks.fields_view
+
+    def counting(reader: Any, fields: Any, day: date, *a: Any, **k: Any) -> Any:
+        reads.append(day)
+        return real(reader, fields, day, *a, **k)
+
+    monkeypatch.setattr(picks, "fields_view", counting)
+    reads_of = SelectionReads(world.reader)
+    got = [reads_of.eligible(u, DAYS[0]) for u in (active, cheap)]
+    assert got == expected and reads == [DAYS[0]]  # the same fields at one session: one read
+    reads_of.eligible(active, DAYS[1])
+    assert reads == [DAYS[0], DAYS[1]]

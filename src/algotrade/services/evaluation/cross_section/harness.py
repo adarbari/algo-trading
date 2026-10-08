@@ -45,11 +45,11 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import read_outcomes
+from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events
+from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
     apply_outcome,
@@ -63,8 +63,11 @@ from algotrade.services.evaluation.cross_section.measures import (
     pool_stats,
     slice_measures,
 )
-from algotrade.services.evaluation.cross_section.picks import RankedRun, screen_variant
-from algotrade.services.evaluation.cross_section.picks import eligible as eligible_names
+from algotrade.services.evaluation.cross_section.picks import (
+    RankedRun,
+    SelectionReads,
+    screen_variant,
+)
 from algotrade.services.evaluation.cross_section.sessions import (
     decision_sessions,
     entry_session,
@@ -90,6 +93,7 @@ MIN_SCORE_COVERAGE = 0.8
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
+OUTCOME_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS)  # kept per entry session
 
 
 @dataclass(frozen=True)
@@ -182,6 +186,7 @@ class _Session:
 
     def __init__(self, reader: StoreReader, label_field: str):
         self._reader, self._label_field = reader, label_field
+        self._selections = SelectionReads(reader)
         self._runs: dict[tuple[str, date], RankedRun] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}
         self._labels: dict[date, str] = {}
@@ -194,12 +199,12 @@ class _Session:
 
     def eligible(self, key: str, universe: Selection, day: date) -> frozenset[str]:
         if (key, day) not in self._eligible:
-            self._eligible[key, day] = eligible_names(self._reader, universe, day).ids
+            self._eligible[key, day] = self._selections.eligible(universe, day).ids
         return self._eligible[key, day]
 
     def snapshots(self) -> list[date]:
         """The universe snapshot dates the screens read."""
-        return [run.screened.universe.snapshot_date for run in self._runs.values()]
+        return [run.snapshot for run in self._runs.values()]
 
     def label(self, day: date) -> str:
         if day not in self._labels:
@@ -259,7 +264,7 @@ def _stat(
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     pickable = eligible if event_names is None else event_names & eligible
     ids = pickable if edge.base == "event" else eligible
-    scored = {i: v for i, v in run.scores.items() if i in ids and v is not None}
+    scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
     inside = rows[rows["instrument_id"].isin(ids)]
     implied = (
@@ -422,7 +427,9 @@ def evaluate_edge(
     unclosed: dict[int, int] = {}
     unknown: dict[str, int] = {}
     outcomes_of: dict[tuple[int, tuple[date, ...]], dict[date, pd.DataFrame]] = {}
-    for scope in _scopes(configs, user, edge, iv_field):
+    scopes = _scopes(configs, user, edge, iv_field)
+    schedules = _events(reader, session, scopes, days)
+    for scope in scopes:
         o = scope.edge.outcome
         needs_iv = needs_implied_vol(scope.edge)
         if scope.iv_field in MIXED_SOURCE_IV:
@@ -430,14 +437,15 @@ def evaluate_edge(
                 f"iv_field {scope.iv_field!r} mixes sources: name one vendor's field"
             )
         licence = _licence(configs, user, scope.iv_field) if needs_iv else None
-        events = _events(reader, session, scope, days)
+        events = schedules.get(scope.key)
         for horizon in o.horizon_sessions:
             blocks = _blocks(scope.edge, events, days, horizon)
             entries = tuple(sorted({leg.entry for block in blocks for leg in block}))
             if (horizon, entries) not in outcomes_of:
                 frame = read_outcomes(reader, horizon, entries, BENCHMARK, as_of=as_of)
+                kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
                 outcomes_of[horizon, entries] = dict(
-                    tuple(frame.groupby(frame["session_date"].map(_day)))
+                    tuple(kept.groupby(frame["session_date"].map(_day)))
                 )
             closed = outcomes_of[horizon, entries]
             starts.setdefault(horizon, len(blocks))  # the edge's own count, then its variants'
@@ -533,19 +541,28 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
 
 
 def _events(
-    reader: StoreReader, session: _Session, scope: _Scope, days: Sequence[date]
-) -> EventSchedule | None:
-    """The event names by decision session of an event schedule (None for any other)."""
-    cls = scope.edge.event_class
-    if cls is None:
-        return None
-    return read_events(
-        reader,
-        cls,
-        scope.edge.outcome.start_offset_sessions,
-        days,
-        lambda day: session.eligible(scope.key, scope.universe, day),
-    )
+    reader: StoreReader, session: _Session, scopes: Sequence[_Scope], days: Sequence[date]
+) -> dict[str, EventSchedule]:
+    """The event names by decision session of each scope with an event schedule (by scope key;
+    the others are absent). Scopes with the same event class and offset share one read of the
+    event fields."""
+    groups: dict[tuple[str, int], list[_Scope]] = {}
+    for scope in scopes:
+        if scope.edge.event_class is not None:
+            key = (scope.edge.event_class, scope.edge.outcome.start_offset_sessions)
+            groups.setdefault(key, []).append(scope)
+    found: dict[str, EventSchedule] = {}
+    for (cls, offset), members in groups.items():
+        found.update(
+            read_events_for(
+                reader,
+                cls,
+                offset,
+                days,
+                {m.key: partial(session.eligible, m.key, m.universe) for m in members},
+            )
+        )
+    return found
 
 
 def _blocks(

@@ -12,6 +12,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section import harness
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     _pbo,
@@ -652,3 +653,42 @@ def test_the_split_joins_the_run_hash() -> None:
         _split_run(w, split_from=d).run_hash for d in (None, date(2026, 9, 2), date(2026, 9, 9))
     }
     assert len(hashes) == 3
+
+
+def test_an_event_edge_screens_each_session_once_per_screener_whatever_its_variants() -> None:
+    """The edge's variants and horizons share the screens and the event-field reads of a
+    session; the main scope's rows are the same with or without variants."""
+    plain = event_edge(2, baselines=["momo2"])
+    varied = event_edge(
+        2,
+        baselines=["momo2"],
+        variants=[{"id": "cheap", "universe": CHEAP}, {"id": "costly", "outcome": {"cost_bps": 5}}],
+    )
+    w = event_world(EVENTS)
+    w.configs = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "momo"): screen(),
+            ("site", "strategies", "momo2"): {**screen("asc"), "id": "momo2"},
+        }
+    )
+    alone = run(w, plain)
+    calls: list[tuple[str, date]] = []
+    real = harness.screen_variant
+
+    def counting(reader: Any, config: Any, day: date) -> Any:
+        calls.append((config.config.id, day))
+        return real(reader, config, day)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(harness, "screen_variant", counting)
+        both = run(w, varied)
+    assert len(calls) == len(set(calls)) and {d for _, d in calls} == set(EVENTS)
+    assert {c for c, _ in calls} == {"momo", "momo2"}
+    main = [r for r in both.results if r.edge_variant == "main"]
+    assert [dataclasses.replace(r, measures=()) for r in main] == [
+        dataclasses.replace(r, measures=()) for r in alone.results
+    ]
+    assert [m.hits for r in main for m in r.measures] == [
+        m.hits for r in alone.results for m in r.measures
+    ]
