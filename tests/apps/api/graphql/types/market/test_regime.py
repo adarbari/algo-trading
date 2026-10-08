@@ -146,6 +146,20 @@ def test_the_episodes_and_recessions_are_those_the_session_knew(graph: Graph) ->
     assert len(old["episodes"]) == 11  # the same on the previous session
 
 
+def test_an_episodes_signal_timing_is_unknown_where_nothing_is_stored(graph: Graph) -> None:
+    query = """query S($date: Date) { regime(date: $date) { episodes { key signals {
+      gate { indicator kind flaggedDay clearedDay neverFired unknownReason { code } }
+      indicators { indicator kind neverFired unknownReason { code } } } } } }"""
+    episodes = _data(graph(query, {"date": END.isoformat()}))["regime"]["episodes"]
+    signals = next(e for e in episodes if e["key"] == "covid_2020")["signals"]
+    # the golden store has no regime rows: every signal is unknown, none "never fired"
+    assert signals["gate"]["indicator"] == "gate" and signals["gate"]["kind"] == "GATE"
+    assert signals["gate"]["unknownReason"]["code"] in ("NO_ROW", "NOT_IN_CATALOGUE")
+    assert len(signals["indicators"]) == 8
+    assert all(i["unknownReason"] and not i["neverFired"] for i in signals["indicators"])
+    assert {i["kind"] for i in signals["indicators"]} == {"FAST", "SLOW"}
+
+
 def test_the_history_of_a_stored_market_field(graph: Graph) -> None:
     variables = {"start": PREVIOUS.isoformat(), "end": "2030-01-01", "date": END.isoformat()}
     flag = _data(graph(HISTORY, {**variables, "names": ["market.regime@v3.label"]}))

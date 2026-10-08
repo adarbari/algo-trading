@@ -290,6 +290,19 @@ type Episode {
   cause: String!
   notes: String!
   knownFrom: Date!
+
+  """
+  When each indicator and the screener gate flagged and cleared around this episode, as the session knew it (null on a Guide page, which has no session)
+  """
+  signals: EpisodeSignals
+}
+
+"""
+The signal timing around one episode as the session knew it: the screener `gate` (the regime label in the site's gate labels) and every indicator, cards in file order
+"""
+type EpisodeSignals {
+  gate: SignalTiming!
+  indicators: [SignalTiming!]!
 }
 
 """The portfolio after one bar: equity and gross exposure"""
@@ -1977,6 +1990,40 @@ type Session {
   referenceSnapshot: Date
   preSnapshot: Boolean!
   unavailable: [Unavailable!]!
+}
+
+"""A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""
+enum SignalKind {
+  FAST
+  SLOW
+  GATE
+}
+
+"""
+How a signal did: LED (ON up to the trough), LATE (first ON only after it), NEVER_FIRED (every stored verdict false) or UNKNOWN (no verdict stored up to the trough)
+"""
+enum SignalState {
+  LED
+  LATE
+  NEVER_FIRED
+  UNKNOWN
+}
+
+"""
+One signal around one episode; `state` says how it did. `flaggedDay` / `clearedDay`: exchange sessions from the episode's peak (negative: before it, the signal led); `flaggedDayFromTrough`: from its trough (positive for LATE, where `flaggedDay` is the first ON session after the trough). `flaggedDay` is the first session of the first ON run overlapping the window before the trough; `clearedDay` the first later session it was not ON, null while it is still ON at the session or at the trough plus the clear horizon. `firstKnownDay`: set when the stored verdicts start after the window's start (sessions from the peak), so `flaggedDay` is not the true start of a run already ON then. `unknownReason` is set exactly when `state` is UNKNOWN (never `neverFired` then; also when too few sessions have a verdict to say it never fired). `verdictSessions` of `windowSessions` (window start to the trough) have a stored verdict
+"""
+type SignalTiming {
+  indicator: String!
+  kind: SignalKind!
+  state: SignalState!
+  flaggedDay: Int
+  clearedDay: Int
+  firstKnownDay: Int
+  neverFired: Boolean!
+  unknownReason: Unknown
+  flaggedDayFromTrough: Int
+  verdictSessions: Int!
+  windowSessions: Int!
 }
 
 """
