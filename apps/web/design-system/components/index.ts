@@ -32,6 +32,13 @@ export {
   type CalendarGridProps,
   type CalendarName,
 } from './CalendarGrid';
+export {
+  CauseChain,
+  statusTone,
+  type CauseChainProps,
+  type CauseLevel,
+  type CauseLink,
+} from './CauseChain';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Chip, type ChipProps } from './Chip';
 export { Combobox, type ComboboxOption, type ComboboxProps } from './Combobox';
