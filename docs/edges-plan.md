@@ -78,11 +78,11 @@ leveraged ETF rebalancing rejected (intraday, weak after costs); Russell reconst
 | ED4 | First edges, one PR each: (a) the volatility risk premium on the existing short-premium screener (edge zero: the harness end to end with no new rules); (b) small-cap post-earnings drift on Nasdaq-listed names, surprise = announcement-day excess return (`events/earnings` with `known_from`), outcome over 20 and 60 sessions, reported by cap bucket; (c) the earnings announcement premium (`earnings_schedule@v1`), outcome from five sessions before to one after; plus the 12-1 momentum and size screens as baselines | At least one edge evidenced in its frozen period against the base rate and the baselines | |
 | ED5 | Trader UI, minimum: `OddsLine` and `TrackRecordChip` in the design system, the odds line on Ideas, the chip on the Screeners list, the Edges list page (a fifth TRADER tab), the ADMIN Harness runs tab; Guide entries (ADR 0051): base rate, lift, frozen period, edge states | Every number shows its base rate, events and run | |
 | ED6 | Winners study: `bars-history` widened to the universe as it was from 2010 with a listing-history source; 504-session outcomes; matched controls; the ML discovery job; candidate documents from the tells; Russell reconstitution unblocked | At least five tells with a standardised effect size above 0.3 and a stable sign | later |
-| ED7 | Learned scorers: `edge_score.<edge>@v1` scoring task (LightGBM in the ingestion app, or TOML coefficients for a logistic model applied as an expression feature, the regime probit's precedent); `impl = "model"` screener; promotion by site config | Beats the rule implementation of the same edge in the frozen period | later |
+| ED7 | Learned scorers: `edge_score.<edge>@v1` scoring task (LightGBM in the ingestion app (owner decision 2026-10-08), or TOML coefficients for a logistic model applied as an expression feature, the regime probit's precedent); `impl = "model"` screener; promotion by site config | Beats the rule implementation of the same edge in the frozen period | later |
 
 ## Open decisions (owner)
 
-- Frozen period: proposal, the last two quarters of stored sessions when ED4 starts, named in the ADR.
+- ~~Frozen period~~: decided 2026-10-08, `frozen_from = 2026-04-01` in every open edge (ADR 0053 amendment; pinned by a fitness test).
 - Outcome definitions for ED4 (proposals in the PRD): VRP, realised below implied over the option's horizon with a drawdown cap on a short-straddle proxy; drift, excess return over SPY over 20 and 60 sessions with a cost assumption; premium, excess return over SPY from five sessions before to one after.
 - Cap threshold for the drift edge: proposal, below $2B; the harness reports by bucket either way.
-- ML runtime home for ED7: `apps/ingestion` or a fifth app; the ADR amendment decides.
+- ~~ML runtime home for ED7~~: decided 2026-10-08, `apps/ingestion` (ADR 0053 amendment).

@@ -12,6 +12,7 @@ schedule = "on_event:earnings_scheduled"
 top_k = "all"
 screeners = []
 status = "candidate"
+frozen_from = 2026-04-01
 notes = """Window: from five sessions before the scheduled report to one after (six sessions,
 start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must read
 SCHEDULED (earnings_schedule@v1) at the window's start, never be taken from the report."""

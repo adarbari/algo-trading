@@ -15,11 +15,11 @@ universe = "liquid_optionable"
 top_k = 50
 screeners = ["momentum_12_1"]
 status = "candidate"
+frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1
 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under
 the 40 the bar asks; the harness reports the count beside every number. The frozen period
-(frozen_from) is the owner's decision (proposal: 2026-04-01, the last two quarters); until it is
-set, no frozen slice is reported."""
+starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment)."""
 
 [outcome]
 kind = "excess_return"
