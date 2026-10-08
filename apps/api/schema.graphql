@@ -378,10 +378,32 @@ type GuideCriterionRow {
   onMiss: String
 }
 
-"""A reference market fall: its key and name"""
+"""
+A reference market fall: its key (its page's slug, `Query.guideEpisode(slug)`) and name
+"""
 type GuideEpisode {
   key: String!
   name: String!
+}
+
+"""
+A reference market fall's Guide page: `episode` with every date the config has (no session gating; its key is the page's slug), `cause` and `notes` linked, the indicators whose before-line is about it, in card order
+"""
+type GuideEpisodeDetail {
+  episode: Episode!
+  cause: GuideProse!
+  notes: GuideProse!
+  indicators: [GuideEpisodeIndicator!]!
+}
+
+"""
+A regime indicator whose before-line (`label`: "2008") is about the episode
+"""
+type GuideEpisodeIndicator {
+  key: String!
+  plainName: String!
+  label: String!
+  line: GuideProse!
 }
 
 """A family of playbooks, in reading order"""
@@ -416,10 +438,40 @@ type GuideIndex {
   episodes: [GuideEpisode!]!
 }
 
-"""A regime indicator card: its key and plain-language name"""
+"""
+A regime indicator card: its key (`Query.guideIndicator(key)`) and plain-language name
+"""
 type GuideIndicator {
   key: String!
   plainName: String!
+}
+
+"""
+What an indicator did before one reference fall: `label` as the card writes it ("2008"), `episode` the slug of the episode it means (null: none)
+"""
+type GuideIndicatorBefore {
+  label: String!
+  line: GuideProse!
+  episode: String
+}
+
+"""
+A regime indicator's Guide page (no session value): `summary` (the one-liner), why it matters, when it is on, lead time and `trackRecord` (its false alarms), what it did before each reference fall, all linked; `how` it is computed (terms linked), the catalogue `feature` it reads and its reading list (`sources`); `pace`: slow (macro) or fast (market)
+"""
+type GuideIndicatorDetail {
+  key: String!
+  plainName: String!
+  technicalName: String!
+  pace: String!
+  summary: GuideProse!
+  whyItMatters: GuideProse!
+  whatOnMeans: GuideProse!
+  leadTime: GuideProse!
+  trackRecord: GuideProse!
+  before: [GuideIndicatorBefore!]!
+  how: [TextPart!]!
+  feature: String!
+  sources: [IndicatorLink!]!
 }
 
 """
@@ -1143,6 +1195,16 @@ type Query {
   The Guide page of the situation `slug` (ADR 0051): its signs and what to do, the fields it fools and the site playbooks reading them; null: no such situation
   """
   guideSituation(slug: String!): GuideSituationDetail
+
+  """
+  The Guide page of the regime indicator `key` (ADR 0051): its card's explanation without a session value, how it is computed, the field it reads and its reading list; null: no such card
+  """
+  guideIndicator(key: String!): GuideIndicatorDetail
+
+  """
+  The Guide page of the reference episode `slug` (its key, ADR 0051): the episode as its config holds it and the indicators whose before-line is about it; null: no such episode
+  """
+  guideEpisode(slug: String!): GuideEpisodeDetail
 
   """
   Every strategy and screener config the user sees: site presets, then their own (`kind`: only `strategy` or `screener`)

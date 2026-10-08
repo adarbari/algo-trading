@@ -12,6 +12,9 @@ visual:update`) and never re-run with flags that weaken a gate.
 
 How to run:
 
+- Run every command in the foreground, never in the background. Your report is the last
+  action, exactly one per run, and no command may still be running when you report.
+
 - Run exactly the commands asked for, from the repo root. Python tests: `.venv/bin/python -m
   pytest <path> -q -x` unless told otherwise. Pipe long output through `tail -n 80`; if the
   failure is cut off, re-run only the failing test with `-q -x`.

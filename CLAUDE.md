@@ -157,9 +157,15 @@ the skill with the fix.
     bypass. Branch protection on `main` requires the CI checks (admins included); only
     the workflow merges, and only on green. The repo is public: CI runs on
     GitHub-hosted runners only, never self-hosted ones (`docs/ci.md`).
+    A PR that waits on an owner decision gets `needs-owner` (and `no-automerge` if it must not
+    merge); `/start` lists them. Only the session that set `no-automerge` or `needs-owner`
+    removes it: an agent never removes a label it did not set (#284, #287, #291 auto-merged
+    when another session removed it under the shared account).
     **No stacked PRs into a branch that will be deleted**: squash-merge deletes the base and
     GitHub closes the stacked PR (#99, #103). Branch from `main`; if stacking is unavoidable,
-    label the stacked PR `no-automerge` and retarget it to `main` before its base merges.
+    open the dependent PR as a draft against `main` with the base PR's commits included,
+    labelled `no-automerge`; when the base merges, run `scripts/merge_main.sh`, drop the
+    label, mark it ready.
     **Generated files** (`apps/api/openapi.json`, `apps/web/src/shared/api/generated/*`): on a
     merge conflict never hand-merge; take main's, then regenerate (`scripts/export_openapi.py`,
     `npm run api:generate`).
@@ -207,9 +213,12 @@ user's expression features with `config validate-features`.
 
 ## Agents, models and tokens (spend tokens where mistakes are expensive)
 
-Match the model to the risk of the task, not its size. Subagents in `.claude/agents/`
-(`scout`, `checker`, `implementer`, `architect`; their descriptions say when) pin their
-model; delegate by name (for an ad hoc agent, pass `model` explicitly).
+Match the model to the risk of the task; subagents in `.claude/agents/` pin theirs, delegate by name:
+- Haiku = `checker` (and `scout` for read-only lookups): runs gates, tails logs, reports failures; never fixes.
+- Sonnet = `implementer`: a scoped change with a known owner and pattern.
+- Opus = `architect`: design and review in architect areas, a bug that survived two fixes.
+- The orchestrating session (Sonnet by default; Fable or Opus only for design or research) coordinates, decides design and triages unclear failures; it never runs a long check or rerun itself, it hands them to `checker`.
+No free or open-source model serves agent work (agents pin Claude models); free models only serve the text-model seam (`config/site/llm.toml`).
 
 Quality is not traded for tokens: the cheaper model never decides design, CI's full check
 gates every change whatever wrote it, a change in an `architect` area (new responsibility /
