@@ -63,6 +63,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_macro_calendar,
     check_market_rollups,
     check_reference_classification,
+    check_rollup_inputs,
     check_universe,
     check_verification,
 )
@@ -170,11 +171,14 @@ NIGHTLY: tuple[Step, ...] = (
     # (core-tier prices) fails the step and holds the screens back; the rest are warnings.
     # ibkr-iv does not gate it (optional), but when it succeeds in a later attempt the
     # rollups re-run (ibkr_iv@v1 for the session), and so do the steps that need them.
+    # A group with no input for the session is a WARN, never a FAIL (ADR 0055): an optional
+    # source's group (ibkr_iv@v1) is legitimately empty, but it must not pass unnoticed.
     Step(
         "rollups",
         needs=MARKET_DATA,
         reruns_after=("ibkr-iv",),
         accept=(check_coverage,),
+        accept_stats=(check_rollup_inputs,),
         task_complete=True,
     ),
     # Economic series and index levels with their vintages (ADR 0048), before the market
@@ -194,6 +198,7 @@ NIGHTLY: tuple[Step, ...] = (
         reruns_after=("macro",),
         critical=False,
         accept=(check_market_rollups,),
+        accept_stats=(check_rollup_inputs,),
     ),
     # Forward outcomes of the windows the session closes (ADR 0053), read only by the edge
     # harness: bars and the splits that adjust them. Optional: never holds back the screens.

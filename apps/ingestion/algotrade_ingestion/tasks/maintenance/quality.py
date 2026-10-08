@@ -7,7 +7,7 @@ for a session by hand (any FAIL makes that run PARTIAL). Thresholds come from
 ``config/site/sources.toml`` ``[quality]``.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from typing import Any
@@ -499,6 +499,20 @@ CHECKS: tuple[Callable[[StoreReader, date, SourcesSettings], list[Check]], ...] 
     check_earnings,
     check_verification,
 )
+
+
+def check_rollup_inputs(stats: Mapping[str, Any], session: date) -> list[Check]:
+    """One WARN per rollup group that had no input for a session of the run (never a FAIL: an
+    optional source's group is legitimately empty, ADR 0055). Reads the run record's per-group
+    stats (``no_input`` is the count; ``no_input_sessions`` is truncated)."""
+    checks = []
+    for group, value in stats.items():
+        if not isinstance(value, dict) or not value.get("no_input"):
+            continue
+        n, shown = int(value["no_input"]), value.get("no_input_sessions", [])
+        detail = f"{group}: no input for {n} session(s) ({', '.join(map(str, shown))})"
+        checks.append(Check("rollup_input", "WARN", detail, data={"group": group, "no_input": n}))
+    return checks
 
 
 def run_quality(ctx: TaskContext, session: date) -> RunRecord:

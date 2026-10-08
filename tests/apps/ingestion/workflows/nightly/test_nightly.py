@@ -64,10 +64,12 @@ class Calls:
         on: date | None = None,
         items: Mapping[str, Mapping[str, str]] | None = None,
         skip: tuple[str, ...] = (),
+        stats: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> None:
         self.calls: list[tuple[str, date]] = []
         self.fail, self.partial, self.on, self.skip = fail, partial, on, skip
         self.items: dict[str, Mapping[str, str]] = dict(items or {})
+        self.stats: dict[str, Mapping[str, Any]] = dict(stats or {})
 
     def task(self, name: str) -> Callable[[TaskContext, Mapping[str, Any]], RunRecord]:
         def run(ctx: TaskContext, params: Mapping[str, Any]) -> RunRecord:
@@ -77,6 +79,7 @@ class Calls:
                 raise RuntimeError(f"{name} broke")
             with IngestRun(ctx, f"fake-{name}", session) as r:
                 r.stats["ran"] = name
+                r.stats.update(self.stats.get(name, {}))
                 r.items.update(self.items.get(name, {}))
                 if name in self.skip:
                     r.stats["skipped"] = "gateway down"
@@ -244,6 +247,18 @@ def test_warnings_alone_pass(fake: Callable[..., Calls]) -> None:
     summary = run_nightly(task_ctx(store()), Plan([D]))
     assert statuses(summary)["chains"] == "SUCCEEDED" and summary["status"] == "SUCCEEDED"
     assert steps_of(summary)["chains"]["checks"][0]["status"] == "WARN"
+
+
+def test_rollups_step_warns_on_group_without_input(fake: Callable[..., Calls]) -> None:
+    """2026-10-06: ibkr_iv@v1 had no input, the step SUCCEEDED silently (ADR 0055)."""
+    empty = {"ibkr_iv@v1": {"no_input": 1, "no_input_sessions": [D.isoformat()], "rows": 0}}
+    fake(stats={"rollups": empty})
+    summary = run_nightly(task_ctx(store()), Plan([D]))
+    rollups = steps_of(summary)["rollups"]
+    assert rollups["status"] == "SUCCEEDED" and summary["status"] == "SUCCEEDED"
+    [check] = rollups["checks"]
+    assert (check["name"], check["status"]) == ("rollup_input", "WARN")
+    assert check["detail"] == f"ibkr_iv@v1: no input for 1 session(s) ({D})"
 
 
 def test_a_partial_task_names_its_failed_items() -> None:
