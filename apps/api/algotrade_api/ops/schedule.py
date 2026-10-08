@@ -11,6 +11,12 @@ is the one way to name the restart (printed, never run, by the build-identity ch
 
 ``deploy_plist`` is the second agent (ADR 0057): every five minutes it runs
 ``scripts/ops/deploy.sh --auto`` from the checkout, which deploys what origin/main gained.
+
+``OPEN_FILES`` is the API agent's file-descriptor limit: launchd's default soft limit is 256,
+and every open connection is a descriptor, so a burst of slow requests (a swapping Mac) filled
+it and ``accept()`` failed with ``EMFILE`` (2026-10-08). ``MAX_CONNECTIONS`` caps the
+connections uvicorn serves at once (``cli``; one more is answered 503), well under
+``OPEN_FILES`` so the store reads of the requests in flight always have descriptors left.
 """
 
 import os
@@ -24,6 +30,8 @@ DEPLOY_INTERVAL_S = 300
 DEPLOY_TOOLS = ("uv", "npm", "git")  # the deploy runs these; launchd's PATH has none of them
 HOST = "127.0.0.1"  # loopback only: Funnel (or a browser on this Mac) is the way in
 DEFAULT_PORT = 8000
+OPEN_FILES = 8192  # launchd's default soft limit is 256; macOS refuses more than 10240
+MAX_CONNECTIONS = 1024  # served at once (uvicorn limit_concurrency); the rest are 503
 
 
 def api_plist(repo: Path, port: int = DEFAULT_PORT) -> bytes:
@@ -45,6 +53,8 @@ def api_plist(repo: Path, port: int = DEFAULT_PORT) -> bytes:
         "KeepAlive": True,  # restarted whenever it exits (launchd throttles a crash loop)
         "StandardOutPath": str(logs / "api.log"),
         "StandardErrorPath": str(logs / "api.err.log"),
+        "SoftResourceLimits": {"NumberOfFiles": OPEN_FILES},  # launchd's default is 256
+        "HardResourceLimits": {"NumberOfFiles": OPEN_FILES},
     }
     return plistlib.dumps(agent)
 

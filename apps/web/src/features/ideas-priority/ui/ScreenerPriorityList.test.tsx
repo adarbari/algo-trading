@@ -1,7 +1,8 @@
-import { ToastProvider } from '@algotrade/ui';
+import { Text, ToastProvider } from '@algotrade/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDEAS_OPERATION, type IdeasResponse, type ScreenerSummary } from '@/entities/idea';
@@ -51,7 +52,7 @@ const priorityOf = (data: IdeasResponse | undefined) => data?.ideas?.priority;
 const orderOf = (data: IdeasResponse | undefined) =>
   data?.ideas?.screeners.map((s) => s.screener.id);
 
-function setup(onOpenScreener?: (id: string) => void) {
+function setup(onOpenScreener?: (id: string) => void, renderOdds?: (id: string) => ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
@@ -62,6 +63,7 @@ function setup(onOpenScreener?: (id: string) => void) {
         <ScreenerPriorityList
           screeners={SCREENERS}
           {...(onOpenScreener ? { onOpenScreener } : {})}
+          {...(renderOdds ? { renderOdds } : {})}
         />
       </QueryClientProvider>
     </ToastProvider>,
@@ -87,6 +89,12 @@ describe('ScreenerPriorityList', () => {
     expect(screen.getByText('vrp')).toBeInTheDocument();
     expect(screen.getAllByText('picked')).toHaveLength(2);
     await expectNoA11yViolations(container);
+  });
+
+  it("shows each screener's odds line under its finds when given the renderer", () => {
+    setup(undefined, (id) => <Text>{`odds of ${id}`}</Text>);
+    expect(screen.getByText('odds of vrp')).toBeInTheDocument();
+    expect(screen.getByText('odds of liq')).toBeInTheDocument();
   });
 
   it("opens a screener's results from its name when given the callback", async () => {

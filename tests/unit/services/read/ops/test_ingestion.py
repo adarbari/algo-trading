@@ -50,7 +50,9 @@ def test_chains_against_the_optionable_universe(cells: dict[tuple[str, str], Cel
 def test_snapshots_built_carried_or_missing(cells: dict[tuple[str, str], Cell]) -> None:
     reference = cells[("instruments/reference", "2022-11-22")]
     assert (reference.status, reference.basis) == ("CARRIED", "snapshot of 2020-01-01")
-    assert cells[("universe", "2022-11-22")].status == "MISSING"
+    assert (
+        cells[("universe", "2022-11-22")].status == "CARRIED"
+    )  # the golden load writes one (ED3c)
     assert cells[("universe", "2022-11-23")].status == "COMPLETE"
 
 

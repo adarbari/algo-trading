@@ -7,7 +7,14 @@ from pathlib import Path
 import pytest
 
 from algotrade_api import cli
-from algotrade_api.ops.schedule import DEPLOY_LABEL, LABEL, api_plist, deploy_plist
+from algotrade_api.ops.schedule import (
+    DEPLOY_LABEL,
+    LABEL,
+    MAX_CONNECTIONS,
+    OPEN_FILES,
+    api_plist,
+    deploy_plist,
+)
 
 
 def test_the_agent_serves_on_loopback_and_is_kept_alive() -> None:
@@ -20,6 +27,21 @@ def test_the_agent_serves_on_loopback_and_is_kept_alive() -> None:
     assert agent["RunAtLoad"] is True and agent["KeepAlive"] is True
     assert agent["StandardOutPath"] == "/repo/var/logs/api.log"
     assert agent["StandardErrorPath"] == "/repo/var/logs/api.err.log"
+
+
+def test_the_agent_lifts_launchds_256_open_files_default() -> None:
+    """launchd starts an agent with a soft limit of 256 descriptors; every connection is one,
+    so a burst of slow requests ran the API out (``accept()``: EMFILE, 2026-10-08)."""
+    agent = plistlib.loads(api_plist(Path("/repo"), 8000))
+    for limits in ("SoftResourceLimits", "HardResourceLimits"):
+        assert agent[limits] == {"NumberOfFiles": OPEN_FILES}
+    assert 256 < OPEN_FILES <= 10240  # macOS refuses a limit above OPEN_MAX (10240)
+
+
+def test_the_connection_cap_leaves_descriptors_for_the_reads_in_flight() -> None:
+    # uvicorn answers 503 past MAX_CONNECTIONS; the descriptors above it serve the store reads
+    # (parquet files, index locks) of the requests in flight, and the process's own files
+    assert MAX_CONNECTIONS * 4 <= OPEN_FILES
 
 
 def test_an_invalid_port_is_refused() -> None:

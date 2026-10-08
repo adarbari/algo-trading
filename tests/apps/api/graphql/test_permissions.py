@@ -33,6 +33,7 @@ CALLS = {
     "ingestion_cell": 'ingestionCell(dataset: "bars", date: "2022-11-23")',
     "figi_review": "figiReview",
     "leverage_review": "leverageReview",
+    "llm_usage": "llmUsage",
 }
 
 

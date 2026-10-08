@@ -1809,5 +1809,365 @@
       "code": "OK",
       "status": "OK"
     }
-  ]
+  ],
+  "llmUsage": {
+    "today": "2026-10-08",
+    "recorded": true,
+    "budget": {
+      "dailyUsd": 1,
+      "monthlyUsd": 10,
+      "over": "free",
+      "reportedCallUsd": 0.25,
+      "error": null
+    },
+    "windows": [
+      {
+        "key": "today",
+        "start": "2026-10-08",
+        "end": "2026-10-08",
+        "tally": {
+          "calls": 3,
+          "inputTokens": 2400,
+          "outputTokens": 600,
+          "callsWithoutTokens": 1,
+          "spentUsd": 0.7527,
+          "billedUsd": 0.0027,
+          "reportedUsd": 0.5,
+          "boundUsd": 0.25,
+          "freeCalls": 0,
+          "unknown": null
+        },
+        "cap": {
+          "kind": "daily",
+          "limitUsd": 1,
+          "usedShare": 0.7527
+        }
+      },
+      {
+        "key": "7d",
+        "start": "2026-10-02",
+        "end": "2026-10-08",
+        "tally": {
+          "calls": 9,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "callsWithoutTokens": 0,
+          "spentUsd": 2,
+          "billedUsd": 0,
+          "reportedUsd": 1.5,
+          "boundUsd": 0,
+          "freeCalls": 0,
+          "unknown": null
+        },
+        "cap": null
+      },
+      {
+        "key": "30d",
+        "start": "2026-09-09",
+        "end": "2026-10-08",
+        "tally": {
+          "calls": 20,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "callsWithoutTokens": 0,
+          "spentUsd": 4,
+          "billedUsd": 0,
+          "reportedUsd": 0,
+          "boundUsd": 0,
+          "freeCalls": 0,
+          "unknown": null
+        },
+        "cap": null
+      },
+      {
+        "key": "month",
+        "start": "2026-10-01",
+        "end": "2026-10-08",
+        "tally": {
+          "calls": 12,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "callsWithoutTokens": 0,
+          "spentUsd": 3,
+          "billedUsd": 0,
+          "reportedUsd": 0,
+          "boundUsd": 0,
+          "freeCalls": 0,
+          "unknown": null
+        },
+        "cap": {
+          "kind": "monthly",
+          "limitUsd": 10,
+          "usedShare": 0.3
+        }
+      }
+    ],
+    "breakdowns": [
+      {
+        "by": "model",
+        "rows": [
+          {
+            "key": "claude-haiku-4-5",
+            "provider": "claude",
+            "costShare": 0.6,
+            "tally": {
+              "calls": 5,
+              "inputTokens": 5000,
+              "outputTokens": 900,
+              "callsWithoutTokens": 0,
+              "spentUsd": 2.4,
+              "billedUsd": 0,
+              "reportedUsd": 0,
+              "boundUsd": 0,
+              "freeCalls": 0,
+              "unknown": null
+            }
+          },
+          {
+            "key": "sonnet",
+            "provider": "claude_cli",
+            "costShare": 0.4,
+            "tally": {
+              "calls": 2,
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "callsWithoutTokens": 0,
+              "spentUsd": 1.6,
+              "billedUsd": 0,
+              "reportedUsd": 1.6,
+              "boundUsd": 0,
+              "freeCalls": 0,
+              "unknown": null
+            }
+          }
+        ]
+      },
+      {
+        "by": "use_case",
+        "rows": [
+          {
+            "key": "screener-draft",
+            "provider": null,
+            "costShare": 1,
+            "tally": {
+              "calls": 7,
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "callsWithoutTokens": 0,
+              "spentUsd": 4,
+              "billedUsd": 0,
+              "reportedUsd": 0,
+              "boundUsd": 0,
+              "freeCalls": 0,
+              "unknown": null
+            }
+          }
+        ]
+      },
+      {
+        "by": "user",
+        "rows": [
+          {
+            "key": null,
+            "provider": null,
+            "costShare": 1,
+            "tally": {
+              "calls": 7,
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "callsWithoutTokens": 0,
+              "spentUsd": 4,
+              "billedUsd": 0,
+              "reportedUsd": 0,
+              "boundUsd": 0,
+              "freeCalls": 0,
+              "unknown": null
+            }
+          }
+        ]
+      },
+      {
+        "by": "cost_basis",
+        "rows": [
+          {
+            "key": "price",
+            "provider": null,
+            "costShare": 0.6,
+            "tally": {
+              "calls": 5,
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "callsWithoutTokens": 0,
+              "spentUsd": 2.4,
+              "billedUsd": 0,
+              "reportedUsd": 0,
+              "boundUsd": 0,
+              "freeCalls": 0,
+              "unknown": null
+            }
+          },
+          {
+            "key": "reported",
+            "provider": null,
+            "costShare": 0.4,
+            "tally": {
+              "calls": 2,
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "callsWithoutTokens": 0,
+              "spentUsd": 1.6,
+              "billedUsd": 0,
+              "reportedUsd": 1.6,
+              "boundUsd": 0,
+              "freeCalls": 0,
+              "unknown": null
+            }
+          }
+        ]
+      },
+      {
+        "by": "outcome",
+        "rows": [
+          {
+            "key": "ok",
+            "provider": null,
+            "costShare": 1,
+            "tally": {
+              "calls": 7,
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "callsWithoutTokens": 0,
+              "spentUsd": 4,
+              "billedUsd": 0,
+              "reportedUsd": 0,
+              "boundUsd": 0,
+              "freeCalls": 0,
+              "unknown": null
+            }
+          }
+        ]
+      }
+    ],
+    "daily": [
+      {
+        "day": "2026-10-06",
+        "tally": {
+          "calls": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "callsWithoutTokens": 0,
+          "spentUsd": 0,
+          "billedUsd": 0,
+          "reportedUsd": 0,
+          "boundUsd": 0,
+          "freeCalls": 0,
+          "unknown": null
+        }
+      },
+      {
+        "day": "2026-10-07",
+        "tally": {
+          "calls": 1,
+          "inputTokens": 100,
+          "outputTokens": 10,
+          "callsWithoutTokens": 0,
+          "spentUsd": 0.5,
+          "billedUsd": 0,
+          "reportedUsd": 0,
+          "boundUsd": 0,
+          "freeCalls": 0,
+          "unknown": null
+        }
+      },
+      {
+        "day": "2026-10-08",
+        "tally": {
+          "calls": 2,
+          "inputTokens": 200,
+          "outputTokens": 20,
+          "callsWithoutTokens": 0,
+          "spentUsd": 1,
+          "billedUsd": 0,
+          "reportedUsd": 0,
+          "boundUsd": 0,
+          "freeCalls": 0,
+          "unknown": null
+        }
+      }
+    ],
+    "reliability": {
+      "attempts": 20,
+      "ok": 16,
+      "fellBack": 2,
+      "failed": 1,
+      "skippedBudget": 1,
+      "fallbackRate": 0.1,
+      "failureRate": 0.05
+    },
+    "recent": [
+      {
+        "ts": "2026-10-08T14:00:00+00:00",
+        "provider": "claude",
+        "model": "claude-haiku-4-5",
+        "useCase": "screener-draft",
+        "user": "abhi",
+        "inputTokens": 1200,
+        "outputTokens": 300,
+        "latencyS": 1.8,
+        "costUsd": 0.0027,
+        "costBasis": "price",
+        "outcome": "ok",
+        "fellBackFrom": null,
+        "runId": "llm_usage-2026-10-08-1",
+        "unknownFields": [],
+        "unknown": null
+      },
+      {
+        "ts": "2026-10-08T13:00:00+00:00",
+        "provider": "claude_cli",
+        "model": "sonnet",
+        "useCase": "regime",
+        "user": "abhi",
+        "inputTokens": null,
+        "outputTokens": null,
+        "latencyS": 1.8,
+        "costUsd": 0.5,
+        "costBasis": "reported",
+        "outcome": "ok",
+        "fellBackFrom": null,
+        "runId": "llm_usage-2026-10-08-1",
+        "unknownFields": ["input_tokens", "output_tokens"],
+        "unknown": {
+          "code": "NULL",
+          "kind": "NOT_STORED",
+          "guideTerm": "unavailable_not_stored",
+          "kindText": "not available for this instrument",
+          "cause": null
+        }
+      },
+      {
+        "ts": "2026-10-08T12:00:00+00:00",
+        "provider": "claude",
+        "model": "claude-haiku-4-5",
+        "useCase": "screener-draft",
+        "user": "abhi",
+        "inputTokens": null,
+        "outputTokens": null,
+        "latencyS": 1.8,
+        "costUsd": null,
+        "costBasis": "unknown",
+        "outcome": "skipped_budget",
+        "fellBackFrom": null,
+        "runId": "llm_usage-2026-10-08-1",
+        "unknownFields": ["input_tokens", "output_tokens", "cost_usd"],
+        "unknown": {
+          "code": "NULL",
+          "kind": "NOT_STORED",
+          "guideTerm": "unavailable_not_stored",
+          "kindText": "not available for this instrument",
+          "cause": null
+        }
+      }
+    ]
+  }
 }
