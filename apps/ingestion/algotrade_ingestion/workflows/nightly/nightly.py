@@ -59,6 +59,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_chains,
     check_earnings,
     check_filings,
+    check_ibkr_vols,
     check_macro,
     check_macro_calendar,
     check_market_rollups,
@@ -164,6 +165,7 @@ NIGHTLY: tuple[Step, ...] = (
         requires=universe_exists,
         latest_only=True,
         critical=False,
+        accept=(check_ibkr_vols,),
     ),
     # Every session (catch-up too), after the market data it reads. A rollup that raises
     # (a gap in a lookback window included) fails the step.

@@ -392,6 +392,12 @@ def _ibkr_iv(ctx: TaskContext, p: Params) -> RunRecord:
     return ibkr_iv.nightly_ivs(ctx, _ibkr(ctx), session_of(p), _symbols(p))
 
 
+def _ibkr_iv_repair(ctx: TaskContext, p: Params) -> RunRecord:
+    if not p.get("start"):
+        raise ValueError("ibkr-iv-repair needs --from (the first session to check)")
+    return ibkr_iv.repair_ivs(ctx, p["start"], p.get("end") or session_of(p))
+
+
 def _gateway_down(ctx: TaskContext) -> str | None:
     """Workflows skip the IBKR tasks (with a WARN) when nothing listens on the gateway port."""
     source = ctx.sources.get("ibkr")
@@ -787,6 +793,19 @@ TASKS: dict[str, Task] = {
                 Param("limit", ("--limit",), int, "backfill at most N underlyings this run"),
             ),
             skip=_gateway_down,
+        ),
+        Task(
+            "ibkr-iv-repair",
+            "null the stored IBKR vols outside their declared range, with the reason "
+            "(no request to IB); then rollups --only ibkr_iv@v1 over the range",
+            ibkr_iv,
+            (ibkr_iv.TABLE,),
+            _ibkr_iv_repair,
+            params=(
+                SESSION,
+                Param("start", ("--from",), date.fromisoformat, "first session (needed)"),
+                Param("end", ("--to",), date.fromisoformat, "last session (default: --date)"),
+            ),
         ),
         Task(
             "quality",

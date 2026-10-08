@@ -193,6 +193,11 @@ says which). Everything derived from IBKR is tagged `licence = personal`. Owner 
 .venv/bin/algotrade-ingest run ibkr-iv --from <2 years ago> --to <last session> --limit 1500
 # then the features for that session
 .venv/bin/algotrade-ingest run rollups --date <last session> --only ibkr_iv@v1
+# IB vols that are not vols (zero, an IV above 5) are stored null with a reason (vol_reject,
+# ADR 0028 amendment); to apply that to rows stored before it, no request to IB, then the
+# features over the same range
+.venv/bin/algotrade-ingest run ibkr-iv-repair --from <first session> --to <last session>
+.venv/bin/algotrade-ingest run rollups --from <first session> --to <last session> --only ibkr_iv@v1
 ```
 
 ### Long runs (ops note)

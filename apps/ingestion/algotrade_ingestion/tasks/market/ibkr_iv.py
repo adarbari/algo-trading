@@ -30,6 +30,17 @@ around the work) and only for underlyings with a resolved IBKR contract
   iv_backfill_per_night`` underlyings that have none yet (new names; the initial backfill
   spread over nights), up to the session before.
 
+Every vol is checked before it is staged (``checked``, ADR 0028 amendment 2026-10-08): above
+zero, and an IV at most ``MAX_IV``; one outside is stored null with the reason in
+``vol_reject``, never as a number. The bound is the ingestion's own, not ``ibkr_iv@v1``'s
+``valid_range`` (a range stays a flag, ADR 0023); a fitness test keeps it inside that range.
+HV has no upper bound: a realised vol above 5 is real on a stock that moves that much.
+IB answers with numbers that are not vols: its IV solver's blow-ups after a reverse split
+(1975.6, 3943.4, 15731...), a 0.0 bar for a day without one, and 5-30 on names whose options
+barely trade (measured 2026-10-08: 5,487 of 2.0M stored IVs above 5, 173 at 0).
+**Repair** (``repair_ivs``, the ``ibkr-iv-repair`` task): the same check over the stored rows
+of a range, rewriting only the rows it rejects, with no request to IB.
+
 Runs merge per instrument and session (the latest run's row wins, so a later history
 backfill replaces a snapshot, keeping its HV, as a second backfill of a session does).
 When the gateway cannot be opened the run records ``skipped`` (the nightly step is SKIPPED
@@ -48,7 +59,7 @@ import pandas as pd
 from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data.reference import ibkr_contracts, snapshot
-from algotrade.data.volatility import IBKR_IV30, ibkr_stored_hv
+from algotrade.data.volatility import IBKR_IV30, ibkr_iv30, ibkr_stored_hv
 from algotrade.services.features import field_view, site_features, site_store
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
@@ -70,7 +81,7 @@ from algotrade_sources.framework.base import (
     opened,
 )
 
-NIGHTLY_TASK, HISTORY_TASK = "ibkr_iv", "ibkr_iv_history"
+NIGHTLY_TASK, HISTORY_TASK, REPAIR_TASK = "ibkr_iv", "ibkr_iv_history", "ibkr_iv_repair"
 TABLE = IBKR_IV30
 SOURCE = "ibkr"
 HISTORY, SNAPSHOT = "history", "snapshot"
@@ -78,6 +89,9 @@ DONE = ("OK", "NO_DATA")  # history item statuses that need no refetch
 CHECKPOINT_EVERY = 20
 REQUESTS_PER_NAME = 1  # one historical request per name: the IV series
 VOLS = ("iv30_ibkr", "hv30_ibkr")
+REJECT = "vol_reject"  # why a vol IB sent is null in the table (None: both kept)
+MAX_IV = 5.0  # an IB IV above 500% is its solver failing (reverse splits, untraded options)
+UPPER: dict[str, float | None] = {"iv30_ibkr": MAX_IV, "hv30_ibkr": None}  # None: no cap
 HISTORY_ATTEMPTS = 3  # requests per name before it is FETCH_ERROR (pending)
 BACKOFF_S = 30.0  # first back-off before a retry; doubles each time (30 s, 60 s)
 STOP_AFTER_FAILED = 5  # names IB did not answer in a row (gateway / IB trouble): stop
@@ -86,6 +100,43 @@ STOP_AFTER_FAILED = 5  # names IB did not answer in a row (gateway / IB trouble)
 PRICE_GROUP, OPTION_GROUP = "price_stats", "option_liquidity"
 LIQUID_TIERS, LIQUID_CLASSES = ("A", "B"), ("HIGH", "MEDIUM")
 LIQUIDITY_CLASS = "liquidity_class"
+
+
+def _rejected(column: str, value: float) -> str | None:
+    """Why ``value`` is not a 30-day vol (``None``: it is): zero or below (0.0 is IB's empty
+    bar), or above the column's ``UPPER`` bound."""
+    hi = UPPER[column]
+    if value > 0 and (hi is None or value <= hi):
+        return None
+    return f"{column} {value:g} outside (0, {hi:g}]" if hi else f"{column} {value:g} not above 0"
+
+
+def checked(frame: pd.DataFrame) -> pd.DataFrame:
+    """``frame`` with every vol ``_rejected`` null and the reason in ``vol_reject`` (``None``
+    when both vols were kept; an earlier reason is kept)."""
+    out = frame.copy()
+    reasons: list[list[str]] = [[] for _ in range(len(out))]
+    for column in VOLS:
+        values = out[column].astype(float)
+        why = [None if pd.isna(v) else _rejected(column, v) for v in values]
+        for found, reason in zip(reasons, why, strict=True):
+            found.extend([reason] if reason else [])
+        out[column] = values.mask(pd.Series([w is not None for w in why], index=out.index))
+    earlier = out[REJECT] if REJECT in out else pd.Series([None] * len(out), index=out.index)
+    out[REJECT] = [
+        "; ".join(r) if r else (e if isinstance(e, str) else None)
+        for r, e in zip(reasons, earlier, strict=True)
+    ]
+    return out
+
+
+def _stage(run: IngestRun, frame: pd.DataFrame, part: str) -> pd.DataFrame:
+    """Stage ``frame`` ``checked`` (counted in ``vols_rejected``) -> what was staged."""
+    out = checked(frame)
+    rejected = int(sum(out[c].isna().sum() - frame[c].isna().sum() for c in VOLS))
+    run.stats["vols_rejected"] = int(run.stats.get("vols_rejected", 0)) + rejected
+    run.stage_sessions(TABLE, part, out, SOURCE)
+    return out
 
 
 @dataclass(frozen=True)
@@ -264,7 +315,7 @@ def _fetch_history(
             "session_date": list(rows["date"]),
         }
     )
-    run.stage_sessions(TABLE, f"hist_{name.instrument_id}", frame, SOURCE)
+    _stage(run, frame, f"hist_{name.instrument_id}")
     return f"OK: {_window(start, end)}"
 
 
@@ -339,13 +390,12 @@ def _snapshot(run: IngestRun, source: SessionSource, names: Sequence[Name], size
             hv = found["hv30_ibkr"].get(n.symbol) if not found.empty else None
             if pd.notna(iv) or pd.notna(hv):
                 rows.append((n.instrument_id, n.symbol, iv, hv))
-                with_iv += int(pd.notna(iv))
         run.record_item(item, f"OK: {len(rows)}/{len(batch)}")
         if rows:
             frame = pd.DataFrame(rows, columns=["instrument_id", "symbol", *VOLS])
             frame = frame.astype(dict.fromkeys(VOLS, float))
             frame = frame.assign(source_kind=SNAPSHOT, session_date=run.session)
-            run.stage_sessions(TABLE, f"snap_{at:05d}", frame, SOURCE)
+            with_iv += int(_stage(run, frame, f"snap_{at:05d}")["iv30_ibkr"].notna().sum())
     return with_iv
 
 
@@ -414,3 +464,25 @@ def nightly_ivs(
             run.stats.update(stats)
 
     return _run(ctx, source, NIGHTLY_TASK, session, symbols, work)
+
+
+def repair_ivs(ctx: TaskContext, start: date, end: date) -> RunRecord:
+    """Check the stored rows of ``start..end`` (``checked``) and rewrite only those with a
+    vol it now rejects: null, the reason in ``vol_reject``, the ``source_kind`` kept. No
+    request to IB (it would answer the same). The rewrite wins the merge, so reads from now
+    on see the null; reads as of an earlier time still see what was stored then (ADR 0007).
+    Recompute ``ibkr_iv@v1`` over the range after (``rollups --only ibkr_iv@v1``)."""
+    with IngestRun(ctx, REPAIR_TASK, end, resume=True) as run:
+        stored = ibkr_iv30(run.reader, start, end)
+        out = checked(stored)
+        nulled = (stored[list(VOLS)].notna() & out[list(VOLS)].isna()).any(axis=1)
+        fixes = out[nulled].reset_index(drop=True)
+        run.stats.update(rows_checked=len(stored), rows_rewritten=len(fixes))
+        run.stats["vols_rejected"] = int(
+            sum((stored[c].notna() & out[c].isna()).sum() for c in VOLS)
+        )
+        if not fixes.empty:
+            run.stage_sessions(TABLE, "repair", fixes, SOURCE)
+        written = run.publish_sessions(TABLE)
+        run.stats.update(sessions_written=len(written), rows=sum(written.values()))
+    return run.record

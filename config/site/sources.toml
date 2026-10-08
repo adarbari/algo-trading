@@ -194,6 +194,8 @@ max_chain_stale_sessions = 5     # chains: a STALE_DATA chain for a day over 5 s
                                  # failure (counted in max_chain_fetch_failures, never excluded from screens):
                                  # the feed has stopped serving the name, it is not late (2026-10-06: stale since 09-23)
 max_verify_failures = 0.10       # verification vs IBKR: FAIL if over 10% of checks FAIL (any FAIL: WARN)
+max_ibkr_vol_rejected = 0.02     # ibkr-iv: FAIL if over 2% of the session's rows have a vol out of bounds (zero,
+                                 # or an IV above 5; stored null, vol_reject says why; any: WARN). 0.3% a night on 2026-10-05..06
 max_macro_stale_share = 0.20     # macro (ADR 0048): FAIL if over 20% of the enabled series have no observation newer
                                  # than their cadence + release lag + 2 days (3 for a daily series), or any series lost stored vintages
 min_calendar_future_dates = 1    # macro release calendar (ADR 0050): FAIL if a FRED release lists fewer scheduled dates

@@ -15,16 +15,23 @@ from algotrade.config.site.settings import IbkrSettings, SourcesSettings
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.volatility import ibkr_iv30
+from algotrade.features.rollups.options.ibkr_iv import FEATURES as IBKR_IV_FEATURES
 from algotrade.storage.runs import RunStatus, start_run
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext, finished_runs
+from algotrade_ingestion.tasks.market import ibkr_iv
 from algotrade_ingestion.tasks.market.ibkr_iv import (
     HISTORY_TASK,
+    MAX_IV,
     NIGHTLY_TASK,
     STOP_AFTER_FAILED,
+    UPPER,
+    VOLS,
     backfill_ivs,
+    checked,
     history_done,
     nightly_ivs,
+    repair_ivs,
 )
 from algotrade_ingestion.tasks.reference.ibkr_contracts import resolve_contracts
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
@@ -388,3 +395,81 @@ def test_the_backfill_fetches_the_most_liquid_names_first() -> None:
     ib = fake(names)
     backfill_ivs(ctx, ibkr_source(ib), START, SESSION, symbols=["low", "AAA", "BIG"], limit=2)
     assert [r["symbol"] for r in ib.requests] == ["BIG", "LOW"]
+
+
+# -- vols outside their declared range (2026-10-08: 5,487 stored IVs above 5, up to 31,420) --
+
+
+def test_no_stored_iv_can_fall_outside_its_declared_range() -> None:
+    """The test that would have caught the IV above 5: the ingestion bound on each stored vol
+    is no looser than its declared ``valid_range`` (``ibkr_iv@v1``; the range itself stays a
+    flag, ADR 0023), and a value past it, or zero, is nulled with the reason."""
+    declared = {f.name: f.valid_range for f in IBKR_IV_FEATURES if f.name in VOLS}
+    assert set(UPPER) == set(VOLS) == set(declared)
+    lo, hi = declared["iv30_ibkr"]  # type: ignore[misc]
+    assert lo == 0 and hi is not None and MAX_IV == UPPER["iv30_ibkr"] <= hi
+    for column in VOLS:
+        top = UPPER[column] or 12.3  # HV uncapped: a real realised vol above 5 is kept
+        frame = pd.DataFrame({c: [0.3, 0.3, 0.3] for c in VOLS})
+        frame[column] = [top, top * 1.001, 0.0]
+        out = checked(frame)
+        assert out[column].iloc[0] == top and pd.isna(out[column].iloc[2])
+        assert pd.isna(out[column].iloc[1]) == (UPPER[column] is not None)
+        assert pd.isna(out["vol_reject"].iloc[0])
+        assert out["vol_reject"].iloc[2].startswith(f"{column} 0 ")
+
+
+def test_a_history_iv_outside_the_declared_range_is_stored_null_with_the_reason() -> None:
+    ctx, reader = market(["A"])
+    ib = fake(["A"])
+    ib.iv = {"A": bars([0.2, 1975.646002, 0.0, 5.0, 5.01])}  # IB's solver blow-up, empty bar
+    record = backfill_ivs(ctx, ibkr_source(ib), START, SESSION)
+    rows = ibkr_iv30(reader, START, SESSION)
+    assert rows["iv30_ibkr"].tolist()[0::3] == [0.2, 5.0]
+    assert rows["iv30_ibkr"].iloc[[1, 2, 4]].isna().all()
+    reasons = rows["vol_reject"].tolist()
+    assert pd.isna(reasons[0]) and pd.isna(reasons[3])
+    assert reasons[1] == "iv30_ibkr 1975.65 outside (0, 5]"
+    assert record.stats["vols_rejected"] == 3 and record.items["hist:EQ:A"].startswith("OK")
+
+
+def test_a_snapshot_vol_outside_the_declared_range_is_null_and_not_counted() -> None:
+    ctx, reader = market(["A", "B"], iv_backfill_per_night=0)
+    ib = fake(["A", "B"], vols={"A": (9.07, 0.3), "B": (0.4, 0.0)})
+    record = nightly_ivs(ctx, ibkr_source(ib, stream_wait_s=0.01), SESSION)
+    rows = ibkr_iv30(reader, SESSION, SESSION).set_index("instrument_id")
+    assert pd.isna(rows.loc["EQ:A", "iv30_ibkr"]) and rows.loc["EQ:A", "hv30_ibkr"] == 0.3
+    assert rows.loc["EQ:B", "iv30_ibkr"] == 0.4 and pd.isna(rows.loc["EQ:B", "hv30_ibkr"])
+    assert "iv30_ibkr 9.07" in rows.loc["EQ:A", "vol_reject"]
+    assert rows.loc["EQ:B", "vol_reject"] == "hv30_ibkr 0 not above 0"
+    assert record.stats["with_iv"] == 1 and record.stats["vols_rejected"] == 2
+
+
+def test_repair_nulls_stored_vols_outside_the_range_without_asking_ib(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx, reader = market(["A", "B"])
+    ib = fake(["A", "B"])
+    ib.iv = {"A": bars([0.2, 31420.25, 0.21, 0.0, 0.22]), "B": ib.iv["B"]}
+    with monkeypatch.context() as m:
+        m.setattr(ibkr_iv, "checked", lambda frame: frame.assign(vol_reject=None))  # pre-fix
+        backfill_ivs(ctx, ibkr_source(ib), START, SESSION)
+    before = ibkr_iv30(reader, START, SESSION)
+    assert before["iv30_ibkr"].max() == 31420.25
+    stored_at = ctx.clock()
+    record = repair_ivs(ctx, START, SESSION)
+    after = ibkr_iv30(reader, START, SESSION)
+    a = after[after["instrument_id"] == "EQ:A"]
+    assert a["iv30_ibkr"].tolist()[0::2] == [0.2, 0.21, 0.22]
+    assert a["iv30_ibkr"].iloc[[1, 3]].isna().all() and a["vol_reject"].iloc[[1, 3]].notna().all()
+    assert set(after["source_kind"]) == {"history"}
+    pd.testing.assert_frame_equal(  # B untouched
+        after[after["instrument_id"] == "EQ:B"].reset_index(drop=True),
+        before[before["instrument_id"] == "EQ:B"].reset_index(drop=True),
+    )
+    assert record.stats["rows_rewritten"] == 2 and record.stats["vols_rejected"] == 2
+    # point in time: as of before the repair, what was stored then
+    then = ibkr_iv30(reader, START, SESSION, as_of=stored_at)
+    assert then["iv30_ibkr"].max() == 31420.25
+    again = repair_ivs(ctx, START, SESSION)  # nothing left to rewrite
+    assert again.stats["rows_rewritten"] == 0

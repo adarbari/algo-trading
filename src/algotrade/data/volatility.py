@@ -3,7 +3,8 @@
 One partition per session; runs merge (a history backfill writes many sessions, the nightly
 snapshot one), the latest run's row winning per instrument (``storage/backends``). Rows carry
 ``iv30_ibkr`` / ``hv30_ibkr`` (decimals, IB's 30-day vols) and ``source_kind`` (``history``:
-IB's daily bar, ``snapshot``: the streamed value after the close). ADR 0028.
+IB's daily bar, ``snapshot``: the streamed value after the close) and ``vol_reject`` (why a vol
+IB sent is null: zero, or an IV above 5; null when both were kept). ADR 0028.
 """
 
 from collections.abc import Sequence
@@ -14,7 +15,9 @@ import pandas as pd
 from algotrade.storage.tables.readers import StoreReader
 
 IBKR_IV30 = "volatility/ibkr_iv30"
-COLUMNS = ("session_date", "instrument_id", "symbol", "iv30_ibkr", "hv30_ibkr", "source_kind")
+COLUMNS = (
+    "session_date", "instrument_id", "symbol", "iv30_ibkr", "hv30_ibkr", "source_kind", "vol_reject"
+)  # fmt: skip
 
 
 def ibkr_iv30(
