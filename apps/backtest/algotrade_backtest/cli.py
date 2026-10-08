@@ -7,7 +7,8 @@ algotrade-backtest [--user U] config validate|show sma_trend
 algotrade-backtest [--user U] config validate-features   (the user's expression features)
 algotrade-backtest evaluate [--update-baseline] [--report scorecard.md]
 algotrade-backtest regime-scorecard [--report regime-scorecard.txt]   (the regime episodes)
-algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [--report edges.md]
+algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [--iv-field F]
+                                  [--report edges.md]
 """
 
 import argparse
@@ -77,6 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
     ee.add_argument("--to", dest="end", type=date.fromisoformat, help="last session")
     ee.add_argument(
         "--as-of", type=datetime.fromisoformat, help="outcomes known by this instant (default now)"
+    )
+    ee.add_argument(
+        "--iv-field",
+        help="the one implied-vol field of the run (default: our IV30, rollup.iv30@v1.iv30)",
     )
     ee.add_argument("--report", type=Path, help="also write the report here")
     return parser

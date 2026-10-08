@@ -422,10 +422,14 @@ An edge (ADR 0053, plan [edges-plan.md](edges-plan.md)) is a typed document
 `config/site/edges/<id>.toml`, loaded by `algotrade.config.edges.loading.load_edges` (the
 `edge-documents` owner): `id` (the file name), `name`, a one-sentence `thesis`, `mechanism`,
 `persistence`, `[outcome]` (`kind` `excess_return` | `hit_target`, `horizon_sessions`,
-`benchmark` `SPY` | `none`, `start_offset_sessions` (the start session S is the event's anchor
-plus this; negative only before an event announced ahead), optional `target`, `max_drawdown`,
-`cost_bps`; a `hit_target` also names its `measure` and `direction`), `schedule` (`every_session`,
-`month_end` or `on_event:<class>`), `universe` (a selection preset name, or `[universe] where`
+`benchmark` `SPY` | `none`, `start_offset_sessions` (the entry session S: the decision session D
+plus this, at least 1, for `every_session` and `month_end`; for an event schedule the event's
+anchor plus this, with D = S - 1, at most 0 only for an event announced ahead), optional
+`target`, `max_drawdown`, `cost_bps`; a `hit_target` also names its `measure` and `direction`),
+`schedule` (`every_session`, `month_end` or `on_event:<class>`), `base` (`event` | `universe`:
+what the picks of an event schedule are compared with), `[[variants]]` (an `id` and optional
+`[variants.outcome]` / `universe` overrides, each evaluated like the edge and a trial of the
+deflated Sharpe ratio), `universe` (a selection preset name, or `[universe] where`
 in the selection grammar), `top_k` (an integer or `"all"`), `screeners` and `baselines`
 (screener presets that exist), `status` (`candidate`, `evidenced`, `live`, `retired`,
 `rejected`, `blocked`), `[[sources]]` (`title`, optional `url`), `[quality_bar]` (the other

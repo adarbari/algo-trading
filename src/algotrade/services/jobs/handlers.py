@@ -98,7 +98,8 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
 
 def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``edge`` (id), ``start``, ``end`` (ISO dates), optional ``as_of`` (ISO instant:
-    the outcomes known by then; default now). The harness's rows land in ``results/edge_eval``."""
+    the outcomes known by then; default now), ``iv_field`` (the one implied-vol field of the run;
+    default our IV30). The harness's rows land in ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -113,6 +114,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         date.fromisoformat(params["start"]),
         date.fromisoformat(params["end"]),
         as_of,
+        **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
     )
     record = write_edge_eval(ctx.resources["writer"], evaluation, now)
     rows = edge_eval_frame(evaluation, record.run_id, now)
@@ -125,6 +127,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
         "survivorship": {str(h): list(v) for h, v in survivorship(evaluation).items()},
         "unclosed_sessions": {str(h): n for h, n in evaluation.unclosed_sessions.items()},
+        "event_unknown": dict(evaluation.event_unknown),
         "rows": records(rows),
     }
 

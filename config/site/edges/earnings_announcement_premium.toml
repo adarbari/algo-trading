@@ -8,14 +8,16 @@ cannot be diversified away in a reporting season, is priced (Frazzini and Lamont
 Wilson 2016)."""
 persistence = """Compensation for holding risk that concentrates on known dates: earning it means
 holding the announcement, which arbitrage cannot avoid."""
-schedule = "on_event:earnings_scheduled"
+schedule = "on_event:earnings_expected"
 top_k = "all"
+base = "universe"
 screeners = []
 status = "candidate"
 frozen_from = 2026-04-01
 notes = """Window: from five sessions before the scheduled report to one after (six sessions,
-start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must read
-SCHEDULED (earnings_schedule@v1) at the window's start, never be taken from the report."""
+start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must be
+known by the decision session D = S - 1 (earnings_expected@v1: SCHEDULED, or PRIOR_YEAR), never
+be taken from the actual report date; the entry session is S = A - 5 for the expected report A."""
 
 [universe.where]
 all = [
@@ -32,8 +34,10 @@ start_offset_sessions = -5
 [quality_bar]
 outcome = """Excess return over SPY from five sessions before the scheduled report to one after:
 a hold entered ahead of the date and closed after the reaction."""
-trigger_timing = """The next report date is known when earnings_schedule@v1 reads SCHEDULED; we
-act only if it does on the window's first session, so a date confirmed later is not used."""
+trigger_timing = """The expected report date is read at the decision session D (the day before
+the entry session S = A - 5): earnings_expected@v1 gives SCHEDULED or PRIOR_YEAR (Frazzini and
+Lamont's year-ago date + 364 days); an UNKNOWN date is excluded with a reason, and a date
+confirmed after D is not used."""
 replication = """Frazzini and Lamont's rule first: hold every stock with a report expected in the
 window, equally weighted; their split by expected volume is a variant; the screener is ED4c."""
 expected_size = """Published as a positive abnormal return in announcement months, largest for
