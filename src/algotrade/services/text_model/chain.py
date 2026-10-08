@@ -21,7 +21,6 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from functools import partial
 from typing import Protocol
 
 from algotrade.core.model.completion import (
@@ -47,11 +46,17 @@ class CallLedger(Protocol):
         """The budget is spent and ``over = "refuse"``: no provider is asked."""
         ...
 
-    def skips(self, provider: str) -> bool:
-        """The budget is spent and ``over = "free"``, and ``provider`` spends: not asked."""
+    def spends(self, provider: str) -> bool:
+        """``provider`` costs money (priced or reported), so it is asked only when admitted."""
         ...
 
-    def record(self, attempt: Attempt) -> None: ...
+    def admit(self, provider: str, prompt_chars: int) -> float | None:
+        """``None``: do not ask ``provider``; else the USD reserved for the call."""
+        ...
+
+    def record(self, attempt: Attempt, reserved: float = 0.0) -> None:
+        """One attempt happened; settles its ``reserved`` USD to the actual cost."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -90,7 +95,7 @@ class FallbackTextModel:
         members = [(p, m) for p, m in self.members if self.allowed(p, asking)]
         if not members:
             raise ModelUnavailableError("no text model may answer this user")
-        if self.ledger is not None and self._guard(self.ledger.refuses):
+        if self.ledger is not None and self._refuses():
             for provider, model in members:
                 self._note(tag, provider, model, SKIPPED_BUDGET)
             raise ModelUnavailableError("the text-model budget is spent (llm.toml [budget])")
@@ -99,7 +104,8 @@ class FallbackTextModel:
                 skipped = [pid for pid, _ in members[position:]]
                 failures.append(f"not tried, the {self.deadline_s:g} s deadline passed: {skipped}")
                 break
-            if self.ledger is not None and self._guard(partial(self.ledger.skips, provider)):
+            reserved = self._admit(provider, len(system) + len(user))
+            if reserved is None:
                 self._note(tag, provider, model, SKIPPED_BUDGET)
                 failures.append(f"{provider}: skipped, the budget is spent")
                 continue
@@ -107,7 +113,7 @@ class FallbackTextModel:
             try:
                 completion = model.complete(system, user, tag=tag)
             except ModelUnavailableError as exc:
-                self._note(tag, provider, model, FAILED, took=self.clock() - began)
+                self._note(tag, provider, model, FAILED, reserved, took=self.clock() - began)
                 failures.append(f"{provider}: {exc}")
                 first_failed = first_failed or provider
                 later = position + 1 < len(members)
@@ -121,8 +127,11 @@ class FallbackTextModel:
                     exc,
                 )
                 continue
+            except Exception:  # a bug propagates, but what it may have cost is settled first
+                self._note(tag, provider, model, FAILED, reserved, took=self.clock() - began)
+                raise
             self._note(
-                tag, provider, model, FELL_BACK if first_failed else OK,
+                tag, provider, model, FELL_BACK if first_failed else OK, reserved,
                 took=self.clock() - began, answer=completion, fell_back_from=first_failed,
             )  # fmt: skip
             return replace(
@@ -132,16 +141,37 @@ class FallbackTextModel:
             )
         raise ModelUnavailableError("no text model could answer: " + "; ".join(failures))
 
+    def close(self) -> None:
+        """Shutdown: the ledger writes what it still holds."""
+        close = getattr(self.ledger, "close", None)
+        if close is not None:
+            close()
+
     # ---------------------------------------------------------------- the usage ledger
 
-    @staticmethod
-    def _guard(ask: Callable[[], bool]) -> bool:
-        """The ledger's answer; a ledger that breaks never refuses a call (it is logged)."""
+    def _refuses(self) -> bool:
+        """``over = "refuse"`` and spent. A ledger that breaks does not refuse here: ``_admit``
+        decides member by member, and fails closed for the ones that spend."""
         try:
-            return ask()
+            return self.ledger.refuses() if self.ledger is not None else False
         except Exception:
-            log.exception("the text-model ledger failed; the call goes on")
+            log.exception("the text-model ledger failed (refuses)")
             return False
+
+    def _admit(self, provider: str, chars: int) -> float | None:
+        """The USD reserved for asking ``provider`` (0: no ledger or a free provider), ``None``
+        to skip it. A ledger that raises skips every provider that spends (or might: when it
+        cannot even say, all) and lets a free one answer."""
+        if self.ledger is None:
+            return 0.0
+        try:
+            return self.ledger.admit(provider, chars)
+        except Exception:
+            log.exception("the text-model ledger failed: %s is skipped if it spends", provider)
+            try:
+                return None if self.ledger.spends(provider) else 0.0
+            except Exception:
+                return None
 
     def _note(
         self,
@@ -149,6 +179,7 @@ class FallbackTextModel:
         provider: str,
         model: TextModel,
         outcome: str,
+        reserved: float = 0.0,
         took: float = 0.0,
         answer: Completion | None = None,
         fell_back_from: str | None = None,
@@ -169,7 +200,8 @@ class FallbackTextModel:
                     output_tokens=answer.output_tokens if answer is not None else None,
                     reported_cost_usd=answer.cost_usd if answer is not None else None,
                     fell_back_from=fell_back_from,
-                )
+                ),
+                reserved,
             )
         except Exception:
             log.exception("the text-model ledger could not record a call; the call goes on")

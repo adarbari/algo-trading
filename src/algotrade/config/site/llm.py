@@ -28,7 +28,7 @@ KEYS = (
     "budget",
 )
 PRICE_KEYS = ("model", "input_per_mtok", "output_per_mtok", "free")
-BUDGET_KEYS = ("daily_usd", "monthly_usd", "over")
+BUDGET_KEYS = ("daily_usd", "monthly_usd", "over", "reported_call_usd")
 OVER = ("free", "refuse")
 PRICED, REPORTED, FREE = "price", "reported", "free"  # a rate's basis (usage/llm_calls cost_basis)
 PROVIDER_KEYS = (
@@ -105,6 +105,7 @@ class Rate:
     basis: str
     input_per_mtok: float = 0.0
     output_per_mtok: float = 0.0
+    answer_limit: int = 0  # the most output tokens a call may ask for: the cost's upper bound
 
     @property
     def spends(self) -> bool:
@@ -127,12 +128,17 @@ class PriceSettings:
 @dataclass(frozen=True)
 class BudgetSettings:
     """``[budget]``: ``daily_usd`` / ``monthly_usd`` (exchange-calendar day and month; ``None``:
-    no cap) and ``over``: what a spent budget does: ``free`` (only the free providers answer,
-    the priced and reported ones are skipped) or ``refuse`` (every call is refused)."""
+    no cap), ``reported_call_usd`` (the cost assumed for one ``claude-cli`` call, reserved before
+    it and charged when it reports none) and ``over``: what a spent budget does: ``free`` (only
+    the free providers answer, the priced and reported ones are skipped) or ``refuse`` (every
+    call is refused)."""
 
     daily_usd: float | None = None
     monthly_usd: float | None = None
     over: str = "free"
+    reported_call_usd: float = (
+        0.25  # what one claude-cli call is assumed to cost when it reports none
+    )
 
 
 @dataclass(frozen=True)
@@ -171,7 +177,7 @@ class LlmSettings:
             )
         if price.free:
             return Rate(FREE)
-        return Rate(PRICED, price.input_per_mtok, price.output_per_mtok)
+        return Rate(PRICED, price.input_per_mtok, price.output_per_mtok, provider.answer_limit)
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "LlmSettings":
@@ -275,7 +281,7 @@ def _budget(t: Table) -> BudgetSettings:
     daily, monthly = t.number("daily_usd", None, 0.0), t.number("monthly_usd", None, 0.0)
     if daily is not None and monthly is not None and daily > monthly:
         raise ConfigurationError(f"{t.where}: daily_usd {daily:g} is above monthly_usd {monthly:g}")
-    return BudgetSettings(daily, monthly, over)
+    return BudgetSettings(daily, monthly, over, t.number("reported_call_usd", 0.25, 0.0))
 
 
 def _providers(raw: Any, shared: ProviderSettings, where: str) -> tuple[ProviderSettings, ...]:

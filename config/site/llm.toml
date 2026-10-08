@@ -84,6 +84,9 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # Claude Code reports. [budget] caps what the paid and reported providers may spend per exchange
 # calendar day / month (all optional; absent: no cap). Over a cap, `over = "free"` skips them and
 # lets only the free providers answer (the default), `over = "refuse"` refuses every call.
+# Declare `free = true` only for a key that cannot bill: on a key with billing enabled it would
+# bypass the budget. A call of unknown cost (no usage reported, a failure) is charged an upper bound;
+# `reported_call_usd` (default 0.25) is the bound of one claude-cli call.
 # The Gemini free tier is `free = true`: logged at $0 (cost_basis "free") and still answering
 # when the budget is spent under `over = "free"`.
 #

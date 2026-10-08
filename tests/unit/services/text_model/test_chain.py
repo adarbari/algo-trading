@@ -179,24 +179,46 @@ def test_names_for_lists_only_the_models_that_user_may_be_answered_by() -> None:
 
 
 class Ledger:
-    """A ``CallLedger`` that notes the attempts; ``spent``: the paying providers are skipped."""
+    """A ``CallLedger`` that notes attempts and reservations. ``spent``: the paying providers
+    (all but "free") are not admitted; ``broken``: ``refuses`` / ``admit`` raise; ``blind``:
+    ``spends`` raises too; ``deaf``: ``record`` raises."""
 
-    def __init__(self, spent: bool = False, refuse: bool = False, broken: bool = False) -> None:
-        self.spent, self.refuse, self.broken = spent, refuse, broken
+    def __init__(self, spent: bool = False, refuse: bool = False, broken: bool = False,
+                 blind: bool = False, deaf: bool = False) -> None:  # fmt: skip
+        self.spent, self.refuse, self.broken, self.blind, self.deaf = (
+            spent,
+            refuse,
+            broken,
+            blind,
+            deaf,
+        )
         self.attempts: list[Attempt] = []
+        self.reserved: list[float] = []
+        self.chars: list[int] = []
 
     def refuses(self) -> bool:
         if self.broken:
             raise RuntimeError("ledger bug")
         return self.refuse
 
-    def skips(self, provider: str) -> bool:
-        return self.spent and provider != "free"
+    def spends(self, provider: str) -> bool:
+        if self.blind:
+            raise RuntimeError("ledger bug")
+        return provider != "free"
 
-    def record(self, attempt: Attempt) -> None:
+    def admit(self, provider: str, prompt_chars: int) -> float | None:
         if self.broken:
             raise RuntimeError("ledger bug")
+        if self.spent and self.spends(provider):
+            return None
+        self.chars.append(prompt_chars)
+        return 0.5 if self.spends(provider) else 0.0
+
+    def record(self, attempt: Attempt, reserved: float = 0.0) -> None:
+        if self.deaf:
+            raise RuntimeError("ledger bug")
         self.attempts.append(attempt)
+        self.reserved.append(reserved)
 
 
 def with_ledger(ledger: Ledger, *members: Member) -> FallbackTextModel:
@@ -252,6 +274,53 @@ def test_over_refuse_asks_no_one_and_says_why() -> None:
     assert free.calls == 0 and [a.outcome for a in ledger.attempts] == ["skipped_budget"]
 
 
-def test_a_ledger_that_raises_never_stops_an_answer(caplog: pytest.LogCaptureFixture) -> None:
-    done = with_ledger(Ledger(broken=True), Member("gemini")).complete("s", "u")
-    assert done.provider == "gemini" and "ledger" in caplog.text
+def test_each_attempt_settles_the_reservation_made_for_it_and_sees_the_prompt_size() -> None:
+    ledger = Ledger()
+    claude = Member("claude", ModelUnavailableError("down"))
+    with_ledger(ledger, claude, Member("free")).complete("sys", "question")
+    assert ledger.chars == [len("sys") + len("question")] * 2
+    assert ledger.reserved == [0.5, 0.0]  # the failed paid attempt settles its own reservation
+
+
+def test_a_bug_in_a_member_still_settles_its_reservation() -> None:
+    ledger = Ledger()
+    with pytest.raises(ValueError):
+        with_ledger(ledger, Member("claude", ValueError("a bug"))).complete("s", "u")
+    assert [(a.outcome, r) for a, r in zip(ledger.attempts, ledger.reserved, strict=True)] == [
+        ("failed", 0.5)
+    ]
+
+
+def test_a_ledger_that_breaks_fails_closed_for_paying_members_and_free_ones_answer() -> None:
+    ledger = Ledger(broken=True)
+    paid, free = Member("paid"), Member("free")
+    done = with_ledger(ledger, paid, free).complete("s", "u")
+    assert done.provider == "free" and paid.calls == 0
+
+
+def test_a_ledger_that_cannot_even_say_who_spends_skips_everyone() -> None:
+    ledger = Ledger(broken=True, blind=True)
+    free = Member("free")
+    with pytest.raises(ModelUnavailableError):
+        with_ledger(ledger, free).complete("s", "u")
+    assert free.calls == 0
+
+
+def test_a_ledger_that_cannot_record_never_stops_an_answer(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    done = with_ledger(Ledger(deaf=True), Member("gemini")).complete("s", "u")
+    assert done.provider == "gemini" and "could not record" in caplog.text
+
+
+def test_close_closes_the_ledger() -> None:
+    class Closing(Ledger):
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    ledger = Closing()
+    with_ledger(ledger, Member("free")).close()
+    assert ledger.closed
+    FallbackTextModel([("free", Member("free"))]).close()  # no ledger: nothing to do

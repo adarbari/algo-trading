@@ -30,8 +30,9 @@ key `ts, provider, use_case`). No retention: a few rows a day.
 
 `cost_basis`: `price` (tokens x the model's `[[price]]` per million), `reported` (the notional
 `total_cost_usd` the Claude Code login reports: a subscription is not billed per call, the
-figure is for scale), `free` (0: a local server or a model declared `free = true`), `unknown`
-(null: tokens or reported cost missing, a failed attempt of a paid provider, a skipped one).
+figure is for scale), `free` (0: a local server or a model declared `free = true`), `bound`
+(the upper bound reserved for the call, charged when the actual cost is unknown or the attempt
+failed), `unknown` (null: a skipped attempt).
 `outcome`: `ok`, `failed`, `fell_back` (answered after an earlier provider failed),
 `skipped_budget`.
 
@@ -42,23 +43,38 @@ or `free = true`). A remote provider whose model has no `[[price]]` is a `Config
 as $0. A loopback server is free without an entry; `claude-cli` is `reported`.
 
 ### Budget
-`[budget] daily_usd, monthly_usd, over = "free" | "refuse"`, all optional (absent: no cap).
-Day and month are exchange calendar date and month. Once either cap is reached: `over = "free"`
-skips every provider that spends (`price` or `reported`; outcome `skipped_budget`) and the
-free ones answer, or, with none left, `ModelUnavailableError`; `over = "refuse"` refuses every
-call with `ModelUnavailableError` (503 with the reason). Only `price` / `reported` costs that
-are known count: an `unknown` cost is not $0 but is not summed either (the usage page shows how
-many there were).
+`[budget] daily_usd, monthly_usd, over = "free" | "refuse", reported_call_usd`, all optional
+(absent: no cap; `reported_call_usd` defaults to 0.25). Day and month are exchange calendar date
+and month. **Every ambiguity fails closed for a provider that spends** (`price` or `reported`);
+a free provider keeps answering.
 
-The counter is **in the API process and authoritative**: `UsageLedger` holds today's and this
-month's spend, adds each attempt synchronously (so a burst cannot outrun the background
-write) and is seeded once at startup from the store (`data.usage.spent_by_day`), so a restart
-keeps the day's spend. **One API process is assumed**: a second process would count only its own
-calls and could overspend by its share; running several needs a shared counter (a new ADR). If
-the store cannot be read at startup the counters start at zero and the error is logged.
+- **Reserve, then settle.** Before asking a spending provider the chain calls `admit`, which
+  atomically checks that spent + already reserved + this call's **upper bound** stays within
+  every cap and reserves the bound; `record` settles it to the actual cost. Concurrent requests
+  therefore cannot together pass a cap, which is what "stops at the cap by construction" means.
+  The bound: prompt characters / 3 x the input price + the provider's `answer_limit` x the
+  output price; for a `claude-cli` login, `reported_call_usd`. A call whose bound would pass a
+  cap is not made (outcome `skipped_budget`): `over = "free"` skips the spending providers and
+  the free ones answer, or, with none left, `ModelUnavailableError`; `over = "refuse"` refuses
+  every call once a cap is reached (503 with the reason).
+- **Unknown cost is charged its bound**, `cost_basis = "bound"`: a priced provider that answers
+  without usage, a login that reports no cost, and a **failed** attempt of a spending provider
+  (a timeout after the provider worked may still have billed; a 4xx that billed nothing is
+  charged too, the safe side). A skipped attempt cost nothing (`unknown`, null). Free providers
+  are logged at 0 with `free`.
+- **Seeded or refused.** The counter is in the API process and authoritative, seeded from the
+  store at startup (`data.usage.spent_by_day`) so a restart keeps the day's spend. Until a seed
+  succeeds every spending provider is refused, whatever `over` says; the seed is retried lazily
+  with a growing pause (30 s up to 5 min) and the error logged. Free providers answer meanwhile.
+- **A broken ledger** (an exception in `admit`) skips the spending providers; a failure to
+  *record* a row is logged and the answer goes on (recording is fail-open; spending is not).
+- **One API process is assumed**: a second would count only its own calls and could overspend
+  by its share; running several needs a shared counter (a new ADR).
+- A `[[price]]` with `free = true` on a key whose billing is enabled bypasses the budget: only
+  declare a tier free that cannot bill.
 
 ### The write
-A second API write exception, narrower than any other: `UsageWriter` (a copy of ADR 0028's
+The API's fifth write (after user configs, live quotes, on-request screen results and the regime-explanation cache), the narrowest: `UsageWriter` (a copy of ADR 0028's
 `LiveWriter`) writes only `usage/*` tables; only the usage recorder imports it (import-linter);
 text-model code imports no market-data writer and no jobs. The recorder is the live recorder's
 design: a bounded queue, one daemon thread, one atomic run per batch (ADR 0022), a full queue
@@ -73,7 +89,7 @@ It is not a session-grain table: the read model never lists it as missing for a 
 
 ## Consequences
 - A paid provider cannot be added without its price, and a day's or month's spend stops at its
-  cap by construction (the counter moves before the write).
+  cap by construction (the bound is reserved before the call, the counter moves before the write).
 - Even one provider is wrapped in the chain, so every call is recorded.
 - An existing `llm.toml` with a remote provider needs a `[[price]]` before it loads.
 - The owner's subscription spend appears as `reported` rows: notional, counted against the

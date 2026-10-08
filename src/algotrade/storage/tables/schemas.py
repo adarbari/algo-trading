@@ -317,12 +317,13 @@ LIVE_OPTION_QUOTES = _fixed(
     runs="merge",
     retention_days=7,  # [sources] live_retention_days overrides the window
 )
-# The text-model usage log (ADR 0057, the API's second write exception): one row per provider
+# The text-model usage log (ADR 0057, the API's fifth write): one row per provider
 # attempt of a call (the failed and the budget-skipped ones too), one partition per exchange
 # calendar date of the call. Runs merge (each is a batch of attempts; all kept). Tokens, cost
 # and ``fell_back_from`` are null when unknown or not applicable, never 0: ``cost_basis`` says
 # where ``cost_usd`` came from (``price`` tokens x the model's [[price]], ``reported`` a
-# subscription's notional total, ``free`` 0 for a free provider, ``unknown`` null). Written
+# subscription's notional total, ``bound`` the upper bound reserved when the cost is unknown or
+# the attempt failed, ``free`` 0 for a free provider, ``unknown`` null: a skipped attempt). Written
 # only through ``UsageWriter`` (``usage/*``); read across a date range by ``data.usage``.
 USAGE_LLM_CALLS = _fixed(
     "usage/llm_calls",

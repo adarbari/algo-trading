@@ -317,7 +317,7 @@ PAID = {"id": "p", "base_url": "https://a.io/v1", "model": "m"}
 def test_rates_are_a_price_free_or_reported_and_a_paid_model_without_a_price_is_refused() -> None:
     s = LlmSettings.from_document(CHAIN)
     claude, gemini = s.providers
-    assert s.rate(claude) == Rate("price", 1.0, 5.0) and s.rate(claude).spends
+    assert s.rate(claude) == Rate("price", 1.0, 5.0, 8000) and s.rate(claude).spends
     assert s.rate(gemini) == Rate("free") and not s.rate(gemini).spends
     local = LlmSettings.from_document({"enabled": True})  # a loopback server needs no entry
     assert local.rate(local.providers[0]) == Rate("free")
@@ -356,6 +356,9 @@ def test_the_budget_is_optional_typed_and_daily_cannot_exceed_monthly() -> None:
     assert LlmSettings.from_document({}).budget == BudgetSettings(None, None, "free")
     b = LlmSettings.from_document({"budget": {"daily_usd": 1, "monthly_usd": 15, "over": "refuse"}})
     assert b.budget == BudgetSettings(1.0, 15.0, "refuse")
+    assert LlmSettings.from_document({"budget": {"reported_call_usd": 0.5}}).budget == (
+        BudgetSettings(None, None, "free", 0.5)
+    )
     for doc, message in [
         ({"over": "ignore"}, "over: expected one of"),
         ({"daily_usd": -1}, "daily_usd"),

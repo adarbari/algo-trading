@@ -11,7 +11,7 @@ import pandas as pd
 from algotrade.storage.tables.readers import StoreReader
 
 LLM_CALLS = "usage/llm_calls"
-SPENDING = ("price", "reported")  # cost_basis values that count against a budget
+SPENDING = ("price", "reported", "bound")  # cost_basis values that count against a budget
 
 
 def read_llm_calls(
@@ -24,8 +24,8 @@ def read_llm_calls(
 def spent_by_day(
     reader: StoreReader, start: date, end: date, as_of: datetime | None = None
 ) -> dict[date, float]:
-    """USD spent per day (``cost_basis`` ``price`` or ``reported``, known costs only); a day
-    with none is absent."""
+    """USD spent per day (``cost_basis`` ``price``, ``reported`` or ``bound``, known costs only);
+    a day with none is absent."""
     frame = read_llm_calls(reader, start, end, as_of)
     if frame is None:
         return {}

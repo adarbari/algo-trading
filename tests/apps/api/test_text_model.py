@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.llm import LlmSettings
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.ledger import UsageLedger
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -199,3 +200,28 @@ def test_an_only_users_id_that_is_not_in_users_toml_turns_the_text_model_off() -
     typo = CLI_CHAIN["provider"][0] | {"only_users": ["abhii"]}
     model, reason = open_text_model(configs(CLI_CHAIN | {"provider": [typo, CHAIN["provider"][1]]}))
     assert model is None and "['abhii'] are not in users.toml" in reason
+
+
+def test_shutdown_flushes_the_usage_ledger(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    class Sink:
+        closed = False
+
+        def submit(self, row: Any) -> bool:
+            return True
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Idle:
+        names: tuple[str, ...] = ()
+
+    sink = Sink()
+    ledger = UsageLedger(LlmSettings.from_document({"enabled": True}), sink)
+    model = FallbackTextModel([("default", Idle())], ledger=ledger)  # type: ignore[list-item]
+    app = create_app(
+        ApiSettings("memory://", "config", live=True), api_golden[0], authenticator=as_user(),
+        text_model=model,
+    )  # fmt: skip
+    with TestClient(app):
+        assert not sink.closed
+    assert sink.closed

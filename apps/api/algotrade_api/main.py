@@ -122,6 +122,9 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
         app.state.live.close()
+        close = getattr(app.state.text_model, "close", None)
+        if close is not None:
+            close()  # flush the queued usage rows
         if app.state.ondemand is not None:
             app.state.ondemand.close()
 
