@@ -3,6 +3,9 @@ session, newest first, each labelled by its first item; a company with none know
 
 from datetime import UTC, date, datetime
 
+import pytest
+
+from algotrade.services.read.events import filings
 from algotrade.services.read.events.filings import item_label, load_filings, months_before
 from algotrade.services.read.values import UnknownCode
 from tests.unit.services.read.events.conftest import D1, context, store_with
@@ -29,6 +32,17 @@ def test_a_company_with_no_filing_known_is_unknown() -> None:
     assert gaps["EQ:BBB"].code is UnknownCode.NO_ROW
     assert "event-study scope only" in gaps["EQ:BBB"].cause.text
     assert "EQ:AAA" not in gaps
+
+
+def test_no_instruments_read_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An ETF-only event study asks for no stocks: no read of the filing table (whose every
+    partition an ``ALL_TIME`` read would open to keep no row)."""
+
+    def no_read(*_: object, **__: object) -> None:
+        raise AssertionError("read_events called for no instruments")
+
+    monkeypatch.setattr(filings, "read_events", no_read)
+    assert load_filings(context(store_with()), [], 24) == ({}, {})
 
 
 def test_labels_and_months() -> None:
