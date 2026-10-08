@@ -373,6 +373,26 @@ describe('DataTable on a narrow width', () => {
     expect(headers()).toEqual(['Symbol', 'Close', 'ADV']);
   });
 
+  it('takes the added-back columns from narrowColumns and reports a new one', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    const columns: DataTableColumn<TickerRow>[] = [
+      { id: 'symbol', header: 'Symbol', value: (r) => r.symbol, hideable: false },
+      { id: 'name', header: 'Name', value: (r) => r.name },
+      { id: 'close', header: 'Close', value: (r) => r.close, essential: true },
+      { id: 'adv', header: 'ADV', value: (r) => r.adv },
+    ];
+    const onChange = vi.fn();
+    render(
+      <Table columns={columns} narrowColumns={['name', 'nope']} onNarrowColumnsChange={onChange} />,
+    );
+    const headers = () => screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers()).toEqual(['Symbol', 'Name', 'Close']);
+    await userEvent.click(screen.getByRole('button', { name: /Columns/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'ADV' }));
+    expect(onChange).toHaveBeenCalledWith(['name', 'nope', 'adv']);
+    expect(headers()).toEqual(['Symbol', 'Name', 'Close']); // controlled: the caller decides
+  });
+
   it('keeps the first three columns when none is marked essential', () => {
     vi.stubGlobal('innerWidth', 375);
     const columns: DataTableColumn<TickerRow>[] = [

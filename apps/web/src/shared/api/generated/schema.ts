@@ -1009,6 +1009,11 @@ export interface components {
              */
             names: string[];
             /**
+             * Narrow Columns
+             * @description table column ids added back on a narrow (phone) table
+             */
+            narrow_columns: string[];
+            /**
              * Saved
              * @description false: this view is not saved yet (the page uses defaults)
              */
@@ -1036,6 +1041,11 @@ export interface components {
              * @description decisions shown (empty: the page's default)
              */
             decisions: string[];
+            /**
+             * Narrow Columns
+             * @description table column ids added back on a narrow (phone) table
+             */
+            narrow_columns?: string[];
             /**
              * Sort
              * @description a column id ('-' prefix: descending); null: the table's default

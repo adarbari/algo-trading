@@ -20,6 +20,10 @@ class TableViewBody(BaseModel):
         None, description="a column id ('-' prefix: descending); null: the table's default"
     )
     decisions: list[str] = Field(description="decisions shown (empty: the page's default)")
+    narrow_columns: list[str] = Field(
+        default_factory=list,
+        description="table column ids added back on a narrow (phone) table",
+    )
 
 
 class TableView(Schema):
@@ -30,6 +34,9 @@ class TableView(Schema):
     sort: str | None = Field(description="a column id, '-' prefix descending (null: default)")
     decisions: list[str] = Field(description="decisions shown (empty: the page's default)")
     names: list[str] = Field(description="the user's named views of this table, sorted")
+    narrow_columns: list[str] = Field(
+        description="table column ids added back on a narrow (phone) table"
+    )
 
 
 class ViewNames(Schema):

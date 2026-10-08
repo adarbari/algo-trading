@@ -98,6 +98,7 @@ export {
 } from './IndicatorRow';
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
+export { FilterBar, type FilterBarProps } from './FilterBar';
 export { KeyHints, type KeyHint, type KeyHintsProps } from './KeyHints';
 export { NavList, type NavListItem, type NavListProps } from './NavList';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
@@ -111,6 +112,7 @@ export {
   type LinkedTextProps,
 } from './LinkedText';
 export { LinkedProse, type LinkedProsePart, type LinkedProseProps } from './LinkedProse';
+export { ActionGroup, type ActionGroupProps, type ActionItem } from './ActionGroup';
 export { MasterDetail, type MasterDetailProps } from './MasterDetail';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
 export { NumberInput, type NumberInputProps } from './NumberInput';

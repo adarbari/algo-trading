@@ -36,14 +36,16 @@ VIEW = "/preferences/views/screener:vrp/view"
 CLOSE = "rollup.price_stats@v2.close"
 BODY = {"columns": [CLOSE], "sort": f"-{CLOSE}", "decisions": ["QUALIFIED", "WATCH"]}
 READ = """query View($scope: String!, $name: String) {
-  view(scope: $scope, name: $name) { scope name saved columns sort decisions names }
+  view(scope: $scope, name: $name) { scope name saved columns sort decisions names narrowColumns }
 }"""
 
 
 def read(client: TestClient, name: str | None = None) -> dict[str, Any]:
     body = client.post("/graphql", json={"query": READ, "variables": {
         "scope": "screener:vrp", "name": name}}).json()  # fmt: skip
-    return body["data"]["view"]  # type: ignore[no-any-return]
+    view = body["data"]["view"]
+    view["narrow_columns"] = view.pop("narrowColumns")  # the REST body's spelling
+    return view  # type: ignore[no-any-return]
 
 
 def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
@@ -52,13 +54,20 @@ def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
     prefs = root / "users" / "local" / "preferences.toml"
     assert read(writer_client) == {
         "scope": "screener:vrp", "name": None, "saved": False, "columns": [], "sort": None,
-        "decisions": [], "names": [],
+        "decisions": [], "names": [], "narrow_columns": [],
     }  # fmt: skip
     writer_client.put("/preferences/ideas", json={"priority": ["vrp"]})
     saved = writer_client.put(VIEW, json=BODY)
     assert (saved.status_code, saved.json()) == (
         200,
-        {"scope": "screener:vrp", "name": None, "saved": True, "names": [], **BODY},
+        {
+            "scope": "screener:vrp",
+            "name": None,
+            "saved": True,
+            "names": [],
+            "narrow_columns": [],
+            **BODY,
+        },
     )
     assert read(writer_client) == saved.json()
     text = prefs.read_text()
@@ -93,6 +102,10 @@ def test_a_view_is_checked_before_it_is_saved(writer_client: TestClient, root: P
         {**BODY, "decisions": ["qualified"]},
         {**BODY, "decisions": ["WATCH", "WATCH"]},
         {**BODY, "sort": " "},
+        {**BODY, "narrow_columns": ["name", "name"]},
+        {**BODY, "narrow_columns": [" name"]},
+        {**BODY, "narrow_columns": [""]},
+        {**BODY, "narrow_columns": [f"c{i}" for i in range(41)]},
     )
     for body in refused:
         assert writer_client.put(VIEW, json=body).status_code == 400, body
@@ -133,3 +146,12 @@ def test_view_names_are_checked(writer_client: TestClient, root: Path) -> None:
     for name in ("", " x", "x ", "a" * 41, "tab\there"):
         assert writer_client.put(VIEW, json=BODY, params={"name": name}).status_code == 400, name
     assert not (root / "users").exists()
+
+
+def test_narrow_columns_are_saved_read_back_and_optional(writer_client: TestClient) -> None:
+    body = {**BODY, "narrow_columns": ["name", "criterion:vrp", CLOSE]}
+    saved = writer_client.put(VIEW, json=body)
+    assert saved.json()["narrow_columns"] == body["narrow_columns"]
+    assert read(writer_client)["narrow_columns"] == body["narrow_columns"]
+    old_client = writer_client.put(VIEW, json=BODY)  # no key: an old client
+    assert old_client.status_code == 200 and old_client.json()["narrow_columns"] == []
