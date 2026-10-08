@@ -26,6 +26,13 @@ def test_create_plan_slugs_the_branch_and_pins_pythonpath() -> None:
     assert "npm ci" in out.stdout
 
 
+def test_create_plan_turns_rerere_off_in_the_worktree() -> None:
+    # a reused stale resolution dropped two changes on 2026-10-07
+    out = _run("feat/my-thing").stdout
+    assert "config rerere.enabled false" in out
+    assert out.index("worktree add") < out.index("rerere.enabled")
+
+
 def test_create_plan_uses_the_given_base() -> None:
     assert "origin/release" in _run("x", "release").stdout
 

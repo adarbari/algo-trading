@@ -140,7 +140,9 @@ the skill with the fix.
     when other sessions are landing PRs), open the PR from the template and start
     the next work item; do not ask the owner first and do not wait for CI (owner decision
     2026-10-04). Only merging is off limits (below). A harness-learning PR still follows
-    `capture-learning`.
+    `capture-learning`. ADR and web-rule numbers are checked against origin/main
+    (`make numbering`): take the next free number right before the push; `scripts/merge_main.sh`
+    does the merge of main, regenerating generated files on conflict.
     **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
     it `no-automerge`, to keep it open for review. **Never merge yourself**: no
