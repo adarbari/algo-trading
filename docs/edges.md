@@ -54,7 +54,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 - **Outcome:** excess return, over 20 sessions, vs SPY, costs 10 bps
 - **Schedule:** month end
-- **Universe:** preset `liquid_optionable`
+- **Universe:** preset `liquid_common_stocks`
 - **Top K:** 50
 - **Screeners:** `momentum_12_1`
 - **Baselines:** none yet
@@ -67,7 +67,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 2. **Persistence:** The premium is large, old and widely known, and has survived two decades after its publication in most markets, but it crashes in sharp market rebounds (Daniel and Moskowitz 2016): the risk that keeps arbitrageurs from removing it.
 3. **Outcome:** Excess return over SPY over the 20 sessions after a month-end close, net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
 4. **Trigger timing:** mom_12_1 is computed from the close of S (rollups, nightly), so the first session we act is S+1; the window starts at S+1's close (decision session D, entry S = D + 1, ADR 0053 amendment of 2026-10-08), once ED4-1 sets the offset; until then the window starts at S's close, a slight overstatement.
-5. **Faithful replication:** The published rule: rank by the return from 12 months to 1 month back and hold the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid optionable universe.
+5. **Faithful replication:** The published rule: rank by the return from 12 months to 1 month back and hold the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid common stocks (liquid_common_stocks).
 6. **Expected size and sample:** Historically about 1% a month for the winner-minus-loser decile spread in large US stocks, smaller since 2000 (Daniel and Moskowitz 2016). Ten independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
 7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): turnover is monthly and spreads are small; the 10 bps round trip is the assumption.
 8. **Failure modes and retirement:** Momentum crashes: sharp market rebounds after a drawdown reverse winners and losers (Daniel and Moskowitz 2016). Retire if the frozen-period decile spread is not above zero or the top decile does not beat the buy-and-hold mean of the eligible names.

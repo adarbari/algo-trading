@@ -1,0 +1,13 @@
+# Active, optionable common stocks and ADRs that trade with size: close above $5 and 20-session
+# dollar volume of at least $50M. No ETFs or ETNs. The universe of the published cross-section
+# momentum studies, used by the momentum_12_1 edge (ADR 0053).
+name = "liquid_common_stocks"
+
+[where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+]
