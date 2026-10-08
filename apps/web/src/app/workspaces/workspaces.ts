@@ -80,6 +80,12 @@ export const ADMIN: Workspace = {
         'What the text model spends: tokens and cost against the budget, by model, use case and user, and every recent call.',
     },
     {
+      path: '/admin/harness-runs',
+      label: 'Harness runs',
+      summary:
+        'Every edge evaluation run, newest first: whose, which split, what it measured and left out, and its stored rows.',
+    },
+    {
       path: '/admin/screener-runs',
       label: 'Screener runs',
       summary: 'Per-user scheduled screens, run history and publishing (sharing) results.',

@@ -1,7 +1,7 @@
 /**
  * A mocked admin API for end-to-end tests: Playwright answers the Admin GraphQL reads
  * (`POST /api/graphql`: completeness, ingestionCell, quality, verification, nightlyRuns, run,
- * runItems, figiReview, leverageReview, llmUsage) from fixture JSON shaped from real responses
+ * runItems, figiReview, leverageReview, llmUsage, harnessRuns, harnessRun) from fixture JSON shaped from real responses
  * (admin-ingestion.fixtures.json), keyed by the operation's Query field, or `field:<key>` for
  * a field read by key (`ingestionCell:<dataset>/<date>`, `run:<id>`, `runItems:<id>`). A field
  * with no fixture is null (nothing stored, no such thing); `FAIL` answers a GraphQL error.
@@ -29,6 +29,8 @@ const FIELDS = new Set([
   'figiReview',
   'leverageReview',
   'llmUsage',
+  'harnessRuns',
+  'harnessRun',
 ]);
 
 interface Operation {
@@ -40,12 +42,13 @@ interface Operation {
 function keyOf(field: string, variables: Record<string, unknown>): string {
   if (field === 'ingestionCell')
     return `${field}:${String(variables['dataset'])}/${String(variables['date'])}`;
-  if (field === 'run' || field === 'runItems') return `${field}:${String(variables['runId'])}`;
+  if (field === 'run' || field === 'runItems' || field === 'harnessRun')
+    return `${field}:${String(variables['runId'])}`;
   return field;
 }
 
 export async function mockAdminApi(page: Page, overrides: AdminFixtures = {}): Promise<void> {
-  const answers = { ...ADMIN_FIXTURES, ...overrides };
+  const answers: AdminFixtures = { harnessRuns: [], ...ADMIN_FIXTURES, ...overrides };
   await page.route('**/api/graphql', async (route: Route) => {
     const operation = (route.request().postDataJSON() ?? {}) as Operation;
     const field = /\{\s*(\w+)/.exec(operation.query ?? '')?.[1] ?? '';

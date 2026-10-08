@@ -186,12 +186,16 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
     )
 
 
-def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
-    """The rows ``run`` wrote, as it left them; none when its partition holds none of its own."""
-    record = ctx.reader.run(run.run_id)
-    if record is None:
-        return ()
+def rows_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
+    """The rows the run ``record`` wrote, as it left them; none when its partition holds none
+    of its own."""
     frame = run_partition(ctx, result_table(EDGE_EVAL), record)
     if frame is None:
         return ()
     return tuple(_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records"))
+
+
+def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
+    """The rows ``run`` wrote, as it left them; none when its partition holds none of its own."""
+    record = ctx.reader.run(run.run_id)
+    return rows_of_record(ctx, record) if record is not None else ()

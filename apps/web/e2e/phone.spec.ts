@@ -10,6 +10,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { WORKSPACES } from '../src/app/workspaces/workspaces';
 import { expectAccessible, settled } from './a11y';
+import { mockAdminApi } from './admin-api';
 import { mockViewer } from './auth-api';
 import { mockApi } from './mock-api';
 
@@ -248,6 +249,42 @@ test('Edges: a tapped edge opens its detail as a sheet', async ({ page }) => {
   const sheet = page.getByRole('dialog', { name: 'momentum_12_1' });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText('58.0%').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()?.width ?? 0,
+  );
+});
+
+test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) => {
+  await mockAdminApi(page, {
+    harnessRuns: [
+      {
+        runId: 'run-b',
+        edgeId: 'momentum_12_1',
+        user: 'site',
+        status: 'complete',
+        startedAt: '2026-10-05T02:00:00+00:00',
+        finishedAt: null,
+        rangeFrom: null,
+        rangeTo: '2026-10-02',
+        splitFrom: null,
+        exploratory: false,
+        variants: [],
+        horizons: [],
+        sessions: null,
+        unclosed: null,
+        excludedCoverage: null,
+        scoreCoverage: null,
+        noEntryBar: null,
+        trials: null,
+        knowledgeTs: '2026-10-05T02:00:00+00:00',
+        asOf: null,
+      },
+    ],
+    'harnessRun:run-b': { runId: 'run-b', rows: [] },
+  });
+  await page.goto('/admin/harness-runs');
+  await page.getByRole('row', { name: /run-b/ }).tap();
+  await expect(page.getByRole('dialog', { name: 'run-b' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );

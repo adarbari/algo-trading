@@ -34,6 +34,7 @@ from algotrade.services.read.market import market
 from algotrade.services.read.ops import (
     backtests,
     configs,
+    harness_runs,
     ingestion,
     quality,
     review,
@@ -65,6 +66,7 @@ from algotrade_api.graphql.types.market.market import Market
 from algotrade_api.graphql.types.market.regime import MarketRegime
 from algotrade_api.graphql.types.ops.backtest import Backtest, BacktestDetail
 from algotrade_api.graphql.types.ops.config import Config
+from algotrade_api.graphql.types.ops.harness import HarnessRun
 from algotrade_api.graphql.types.ops.ingestion import CellDetail, Completeness
 from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
 from algotrade_api.graphql.types.ops.review import ReviewList
@@ -556,3 +558,22 @@ class Query:
             else None
         )
         return LlmUsage.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The `limit` most recent edge evaluation runs of any status, newest first: "
+        "every edge the user sees, for the site and every declared user",
+        extensions=[AdminOnly(), MaxItems("limit", MAX_RUNS)],
+    )
+    def harness_runs(self, info: Ctx, limit: int = 50) -> list[HarnessRun]:
+        ctx = info.context.stores()
+        found = harness_runs.load_harness_runs(ctx, limit) if ctx is not None else ()
+        return [HarnessRun.of(r, ctx) for r in found] if ctx is not None else []
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The edge evaluation run `runId`, with its rows; null: no such run",
+        extensions=[AdminOnly()],
+    )
+    def harness_run(self, info: Ctx, run_id: str) -> HarnessRun | None:
+        ctx = info.context.stores()
+        found = harness_runs.load_harness_run(ctx, run_id) if ctx is not None else None
+        return HarnessRun.of(found, ctx) if found is not None and ctx is not None else None
