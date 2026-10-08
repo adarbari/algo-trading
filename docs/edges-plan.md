@@ -82,7 +82,7 @@ leveraged ETF rebalancing rejected (intraday, weak after costs); Russell reconst
 
 ## Open decisions (owner)
 
-- Frozen period: proposal, the last two quarters of stored sessions when ED4 starts, named in the ADR.
+- ~~Frozen period~~: decided 2026-10-08, `frozen_from = 2026-04-01` in every open edge (ADR 0053 amendment; pinned by a fitness test).
 - Outcome definitions for ED4 (proposals in the PRD): VRP, realised below implied over the option's horizon with a drawdown cap on a short-straddle proxy; drift, excess return over SPY over 20 and 60 sessions with a cost assumption; premium, excess return over SPY from five sessions before to one after.
 - Cap threshold for the drift edge: proposal, below $2B; the harness reports by bucket either way.
 - ~~ML runtime home for ED7~~: decided 2026-10-08, `apps/ingestion` (ADR 0053 amendment).

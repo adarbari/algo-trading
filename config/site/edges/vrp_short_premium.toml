@@ -14,6 +14,7 @@ universe = "liquid_optionable"
 top_k = 20
 screeners = ["short_premium_liquidity", "vrp_scanner"]
 status = "candidate"
+frozen_from = 2026-04-01
 notes = """Hit: realised volatility over the window divided by the IV30 at S (measure
 realised_to_implied_vol) is below target 1.0. IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a
 short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of the premium it
