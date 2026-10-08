@@ -144,3 +144,8 @@ A step whose source has not published the latest session yet is WAITING, not FAI
 its deadline (`nightly.toml [schedule]`); a WAITING session is not done, holds later sessions
 back like a FAILED one, is resumed by the hourly run and sends no alert. After the deadline it
 is FAILED as above.
+
+## Amendment (ADR 0054)
+A screener's coverage excludes the stale chains the chains gate tolerated (`Decision.EXCLUDED`, out
+of the denominator, with a reason), so a night the gate passed does not FAIL the `screens` step on
+those same names.

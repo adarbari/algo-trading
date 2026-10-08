@@ -5,6 +5,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
@@ -12,12 +13,13 @@ from algotrade.data.chains import (
     chain_status,
     live_option_quotes,
     option_quotes,
+    tolerated_stale,
     underlying_quotes,
 )
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.live_writer import LiveWriter
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.stored_frames import stamped
+from tests.helpers.stored_frames import chain_status_rows, stamped
 
 DAY = date(2026, 10, 1)
 TS = pd.Timestamp("2026-10-01T20:00", tz="UTC")
@@ -101,3 +103,40 @@ def test_live_option_quotes_keep_every_snapshot_and_filter_on_the_underlying() -
     assert only_a is not None and list(only_a["instrument_id"]) == ["OPT:A1", "OPT:A1"]
     every = live_option_quotes(reader, DAY)
     assert every is not None and len(every) == 4
+
+
+SOURCES = SourcesSettings()  # 2% of core and 20% of rest may be stale; 2% fetch failures
+
+
+def test_tolerated_stale_lists_the_stale_names_when_every_tier_is_within_its_limit() -> None:
+    frame = pd.DataFrame(chain_status_rows(50, 1, 50, 10))  # exactly 2% and 20%
+    found = tolerated_stale(frame, SOURCES)
+    assert sorted(found) == ["EQ:C0", *sorted(f"EQ:R{i}" for i in range(10))]
+    assert set(found.values()) == {"STALE_DATA: chain is for 2026-10-01"}
+
+
+@pytest.mark.parametrize(
+    ("core_stale", "rest_stale", "fetch_errors"),
+    [(2, 0, 0), (0, 11, 0), (1, 10, 5)],  # core over, rest over, fetch failures over 2%
+)
+def test_tolerated_stale_is_empty_when_any_limit_is_exceeded(
+    core_stale: int, rest_stale: int, fetch_errors: int
+) -> None:
+    frame = pd.DataFrame(chain_status_rows(50, core_stale, 50, rest_stale, fetch_errors))
+    assert tolerated_stale(frame, SOURCES) == {}
+
+
+def test_tolerated_stale_fails_closed_without_core_names_or_a_status() -> None:
+    no_core = pd.DataFrame(chain_status_rows(0, 0, 50, 1))  # tiered, but no core: inputs missing
+    assert tolerated_stale(no_core, SOURCES) == {}
+    assert tolerated_stale(None, SOURCES) == {}
+    assert tolerated_stale(pd.DataFrame(), SOURCES) == {}
+
+
+def test_a_status_without_tiers_counts_as_rest() -> None:
+    frame = pd.DataFrame(chain_status_rows(0, 0, 10, 2)).drop(columns="tier")
+    assert len(tolerated_stale(frame, SOURCES)) == 2  # 20% of rest
+    assert (
+        tolerated_stale(pd.DataFrame(chain_status_rows(0, 0, 10, 3)).drop(columns="tier"), SOURCES)
+        == {}
+    )

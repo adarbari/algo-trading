@@ -21,11 +21,16 @@ class Decision(StrEnum):
     # A pick held back by the regime gate (ADR 0049), with its reason. Processed: the row was
     # decided on its data, so it never lowers coverage (a Storm run is not PARTIAL).
     PAUSED = "PAUSED"
+    # A name left out of the run with its reason (ADR 0054): a stale chain the chains gate
+    # tolerated. Never a pick, and out of the coverage denominator: it neither counts as
+    # processed nor lowers coverage.
+    EXCLUDED = "EXCLUDED"
 
     @property
     def processed(self) -> bool:
-        """False for the fail-closed outcomes (UNKNOWN, SKIPPED): they lower coverage."""
-        return self not in (Decision.UNKNOWN, Decision.SKIPPED)
+        """False for the fail-closed outcomes (UNKNOWN, SKIPPED) and EXCLUDED: a run's coverage
+        is ``processed / (instruments - excluded)``, so only UNKNOWN and SKIPPED lower it."""
+        return self not in (Decision.UNKNOWN, Decision.SKIPPED, Decision.EXCLUDED)
 
 
 @dataclass(frozen=True)

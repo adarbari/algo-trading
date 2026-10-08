@@ -5,8 +5,9 @@ earlier one). No run stored for the session is ``NOT_RUN``; an older session's r
 shown (the Ideas 20-session lookback is gone: owner decision, docs/api/read-model.md).
 
 A ticker is *picked* when its decision is not in ``NOT_PICKED`` (REJECT, SKIPPED, UNKNOWN,
-PAUSED: a pick the regime gate held back is counted in ``ScreenerRun.paused``, never in
-``picked``, ADR 0049); ``ScreenerRun.decisions``, ``picked`` and ``paused`` count the whole
+EXCLUDED, a stale chain the chains gate tolerated, ADR 0054; PAUSED: a pick the regime gate
+held back is counted in ``ScreenerRun.paused``, never in ``picked``, ADR 0049);
+``ScreenerRun.decisions``, ``picked`` and ``paused`` count the whole
 run, never a page of it. A run is
 compared with the screener's run in the previous stored session of ``results/rule_screen``
 (``load_previous_run``: that date is named explicitly through ``context.previous_session``,
@@ -30,7 +31,8 @@ ROW_COLUMNS = (
     "reasons", "regime", "size_multiplier",
 )  # fmt: skip
 PAUSED = "PAUSED"  # the regime gate held the pick back (ADR 0049)
-NOT_PICKED = frozenset({"REJECT", "SKIPPED", "UNKNOWN", PAUSED})
+EXCLUDED = "EXCLUDED"  # a stale chain the chains gate tolerated (ADR 0054): never a pick
+NOT_PICKED = frozenset({"REJECT", "SKIPPED", "UNKNOWN", PAUSED, EXCLUDED})
 
 RunKey = tuple[str, str]  # (owner, config id)
 

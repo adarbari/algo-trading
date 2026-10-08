@@ -8,19 +8,26 @@ With ``[regime]`` enabled (ADR 0049) the session's regime label is read (``servi
 .regime``) and the screening engine's gate PAUSES the picks of a screener that pauses in it
 (or of every gated screener, one with a ``pause_in``, when the label is unknown: fail
 closed); every result row carries the session's ``regime`` and ``size_multiplier``, and the
-run record the gate's summary."""
+run record the gate's summary.
 
-from collections.abc import Sequence
+With ``sources`` given (ADR 0054) the session's chain status is read and the stale chains the
+chains acceptance check tolerated (``data.chains.tolerated_stale``) are EXCLUDED from the run
+(a not-processed row of one becomes ``Decision.EXCLUDED`` with the reason; out of the coverage
+denominator) instead of lowering coverage; the audit says how many and why."""
+
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 
 import pandas as pd
 
-from algotrade.config.site.settings import ScreeningSettings
+from algotrade.config.site.settings import ScreeningSettings, SourcesSettings
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
+from algotrade.data.chains import chain_status, tolerated_stale
 from algotrade.data.reference import Universe, load_universe
+from algotrade.engines.screening.exclusions import exclude_rule_result
 from algotrade.engines.screening.gate import RegimeGate, gate_rule_result
 from algotrade.engines.screening.runner import RunCoverage, ScreenRun, audit_rows, run_screen
 from algotrade.engines.selection.evaluate import SelectionResult
@@ -88,15 +95,16 @@ def screen_rules(
     selected: SelectionResult,
     features: FeatureSet,
     gate: RegimeGate | None = None,
+    excluded: Mapping[str, str] | None = None,
 ) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...]]:
     """A rule screen over the selected instruments: the spec's fields read for the session
     (missing values stay missing: a HARD criterion rejects the row), evaluated once, through
-    the regime ``gate``, then audited. Also returns the tables that had no rows for the
-    session."""
+    the regime ``gate`` and the ``excluded`` names (ADR 0054), then audited. Also returns the
+    tables that had no rows for the session."""
     screener = RuleScreener(config.screen_spec)
     ids = list(selected.instruments)
     view, source = fields_view(reader, screener.spec.fields(), session_date, ids, features=features)
-    result = gate_rule_result(screener.evaluate(view), gate)
+    result = exclude_rule_result(gate_rule_result(screener.evaluate(view), gate), excluded or {})
     return rule_run(result, ids, config.screening), result, source.missing
 
 
@@ -153,12 +161,24 @@ def _write(
             writer.write_result(name, stamp.session_date, stamp.run_id, frame, pending=True)
 
 
+def _tolerated_stale(
+    reader: StoreReader, session_date: date, now: datetime, sources: SourcesSettings | None
+) -> Mapping[str, str]:
+    """The stale chains the chains gate tolerated for the session, as the run knew them
+    (``as_of`` its time; nothing without ``sources``: fail closed)."""
+    if sources is None:
+        return {}
+    return tolerated_stale(chain_status(reader, session_date, as_of=now), sources)
+
+
 def run_screener(
     reader: StoreReader,
     writer: ResultWriter,
     config: ResolvedConfig,
     session_date: date,
     now: datetime | None = None,
+    *,
+    sources: SourcesSettings | None = None,
 ) -> ScreenOutcome:
     """Select -> screen -> audit -> save, for one resolved screener config and user."""
     now = now or datetime.now(UTC)
@@ -174,9 +194,10 @@ def run_screener(
     missing_tables: tuple[str, ...] = ()
     market = session_market(reader, market_names(config), session_date)
     gate = regime_gate(config, market)
+    excluded = _tolerated_stale(reader, session_date, now, sources)
     if config.config.impl == RULES:
         run, rules, missing_tables = screen_rules(
-            reader, config, session_date, selected, features, gate
+            reader, config, session_date, selected, features, gate, excluded
         )
     else:
         screener = create_screener(config.config.impl, params=config.config.params)
@@ -184,7 +205,7 @@ def run_screener(
             reader, screener.requires, session_date, selected.instruments, market=market
         )
         ids = list(selected.instruments)
-        run = run_screen(screener, view, ids, screening.min_coverage, gate)
+        run = run_screen(screener, view, ids, screening.min_coverage, gate, excluded)
     run = settle_coverage(run, selected, universe, session_date, screening, missing_tables)
     user = config.user.user_id
     record = start_run(run_job_name(config.config.id, user), session_date, now)
