@@ -36,7 +36,7 @@ def test_the_guide_index_in_the_spec_order(graph: Graph) -> None:
     assert [g["id"] for g in index["themeGroups"]] == ["tradeable", "chart", "options", "company"]
     trend = index["families"][0]
     assert (trend["title"], [p["id"] for p in trend["playbooks"]]) == (
-        "Trend", ["trend_continuation", "pullback"],
+        "Trend", ["trend_continuation", "pullback", "momentum_12_1"],
     )  # fmt: skip
     assert index["indicators"][0]["plainName"] and index["episodes"][0]["name"]
     fields = [i["fields"] for i in index["intents"]]

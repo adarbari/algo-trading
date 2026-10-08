@@ -19,7 +19,7 @@ def test_config_list(graph: Graph) -> None:
     assert "errors" not in body
     configs = {c["configId"]: c for c in body["data"]["configs"]}
     ta = {"breakout", "pullback", "support_reversal", "exhaustion", "trend_continuation",
-          "range_breakout", "failed_breakout", "oversold_reversal"}  # fmt: skip
+          "range_breakout", "failed_breakout", "oversold_reversal", "momentum_12_1"}  # fmt: skip
     assert set(configs) == {"short_premium_liquidity", "sma_trend", "vrp_scanner"} | ta
     assert (configs["sma_trend"]["kind"], configs["sma_trend"]["scope"]) == ("strategy", "site")
     assert configs["sma_trend"]["selection"] == "liquid_optionable"
