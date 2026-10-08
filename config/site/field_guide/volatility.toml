@@ -962,34 +962,3 @@ value = 0.7
 mode = "soft"
 tolerance = 0.1
 note = "with rollup.vol_stats@v1.hv20_pctile_252d lte 0.2 for a contraction against the year as well"
-
-[[field]]
-name = "feature.vrp_ibkr_iv_hv_spread"
-theme = "volatility"
-reads = "IBKR's IV30 minus HV30, in volatility points as a fraction: the volatility premium on one source. 0.10 means options price ten points more movement than the stock delivered over the last 30 sessions. The same reading as feature.vrp_iv_hv_spread, but never the lower of IBKR's and Cboe's, so it exists wherever IBKR's IV30 is stored (about two years) and is the one to screen when a screen is scored over history."
-caveats = [
-  "The caveats of feature.vrp_iv_hv_spread apply: a report ahead inflates it, a quiet month widens it. Check rollup.earnings@v1.days_to_earnings and rollup.price_moves@v1.one_day_move.",
-  "A spread of 0.10 on a 0.08 HV is a pinned or halted name, not a premium; require feature.vrp_ibkr_iv_hv_ratio and rollup.price_stats@v2.hv30 gte 0.10 with it.",
-]
-sources = ["Carr and Wu (2009), Variance risk premiums; ADR 0028 (IBKR-derived, personal licence)"]
-[[field.use]]
-for = "a rich premium on IBKR's IV (the vrp_iv_hv screen)"
-op = "gte"
-value = 0.10
-mode = "hard"
-note = "with feature.vrp_ibkr_iv_hv_ratio gte 1.25"
-
-[[field]]
-name = "feature.vrp_ibkr_iv_hv_ratio"
-theme = "volatility"
-reads = "IBKR's IV30 divided by HV30: how many times the movement options price exceeds the movement the stock delivered. 1.25 means a quarter more. The same reading as feature.vrp_iv_hv_ratio, on IBKR's IV alone."
-caveats = [
-  "The caveats of feature.vrp_iv_hv_ratio apply: no floor on HV30, so a pinned name shows a huge ratio; require rollup.price_stats@v2.hv30 gte 0.10 with it.",
-]
-sources = ["Carr and Wu (2009), Variance risk premiums; ADR 0028 (IBKR-derived, personal licence)"]
-[[field.use]]
-for = "a rich premium on IBKR's IV (the vrp_iv_hv screen)"
-op = "gte"
-value = 1.25
-mode = "hard"
-note = "with feature.vrp_ibkr_iv_hv_spread gte 0.10"

@@ -459,8 +459,6 @@ export const SITE_FEATURES = [
   'feature.vrp_iv30_source',
   'feature.vrp_iv_hv_spread',
   'feature.vrp_iv_hv_ratio',
-  'feature.vrp_ibkr_iv_hv_spread',
-  'feature.vrp_ibkr_iv_hv_ratio',
   'feature.call_otm_pct',
   'feature.cc_yield_annualised',
   'feature.call_strike_above_resistance',

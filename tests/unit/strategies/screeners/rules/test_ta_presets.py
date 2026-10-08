@@ -127,16 +127,16 @@ def test_size_small_ranks_the_smallest_market_cap_first_and_rejects_one_without(
 
 
 def test_vrp_iv_hv_reads_only_ibkr_iv_and_ranks_the_highest_ratio_first() -> None:
-    """The VRP edge's history-evaluable screen (ADR 0053): IBKR IV30 and HV30 only, no chain
-    field and no Cboe-mixed IV; a missing IBKR IV never passes (ADR 0030); ranked by IV/HV."""
+    """The VRP edge's history-evaluable screen (ADR 0053): the VRP IV30 and HV30, no chain
+    field; a missing IV30 never passes (ADR 0030); ranked by IV/HV."""
     spec = resolve_config(STORE, "vrp_iv_hv", UserContext("site")).screen_spec
     fields = {c.rule.field for c in spec.criteria}
-    assert "rollup.ibkr_iv@v1.iv30_ibkr" in fields  # the edge's iv_field
-    assert not {f for f in fields if "put_wing" in f or "option_tier" in f or "vrp_iv30" in f}
-    ratio = "feature.vrp_ibkr_iv_hv_ratio"
+    assert "feature.vrp_iv30" in fields
+    assert not {f for f in fields if "put_wing" in f or "option_tier" in f}
+    ratio = "feature.vrp_iv_hv_ratio"
     assert spec.tie_break == ratio and spec.tie_break_descending
     base = {c.rule.field: _passing(c) for c in spec.criteria}
-    iv = "rollup.ibkr_iv@v1.iv30_ibkr"
+    iv = "feature.vrp_iv30"
     view = FeatureView(
         DAY,
         {

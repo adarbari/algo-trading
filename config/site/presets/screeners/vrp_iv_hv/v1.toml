@@ -1,9 +1,9 @@
-# VRP on the stored history, v1: the volatility premium alone, on IBKR's IV30 and our HV30, over
+# VRP on the stored history, v1: the volatility premium alone, on the VRP IV30 (feature.vrp_iv30: IBKR-only before 2026-10-02) and our HV30, over
 # the sessions where both exist (~500; vrp_scanner v4 and short_premium_liquidity need option
 # chains stored only from 2026-10-02, so the edge harness cannot score them yet). Same
 # thresholds as vrp_scanner v4 minus the chain-dependent parts: no IV30 floor of 50% (it would
 # thin the history; the spread and ratio carry the premium), no 52-week proximity, no put wing,
-# no option tier. IBKR-only IV (never mixed with Cboe's, ADR 0053 amendment); a missing value
+# no option tier. The ADR 0053 one-IV rule governs the edge's outcome, not this selection; a missing value
 # never passes (ADR 0030); leveraged and inverse funds are excluded. IBKR fields are
 # personal-licence (ADR 0028). Ranked by IV/HV, highest first.
 # Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
@@ -49,27 +49,27 @@ op = "gte"
 value = 50_000_000
 
 [criteria.iv30]
-field = "rollup.ibkr_iv@v1.iv30_ibkr"    # the edge's iv_field: no IBKR IV30, no row
+field = "feature.vrp_iv30"    # IBKR's before chains are stored (2026-10-02), else the lower of IBKR and Cboe
 op = "gt"
 value = 0
 
 [criteria.iv_hv_spread]
-field = "feature.vrp_ibkr_iv_hv_spread"
+field = "feature.vrp_iv_hv_spread"
 op = "gte"
 value = 0.10
 
 [criteria.iv_hv_ratio]
-field = "feature.vrp_ibkr_iv_hv_ratio"
+field = "feature.vrp_iv_hv_ratio"
 op = "gte"
 value = 1.25
 
 [columns]
 close = "rollup.price_stats@v2.close"
-iv30 = "rollup.ibkr_iv@v1.iv30_ibkr"
+iv30 = "feature.vrp_iv30"
 hv30 = "rollup.price_stats@v2.hv30"
-iv_hv_spread = "feature.vrp_ibkr_iv_hv_spread"
-iv_hv_ratio = "feature.vrp_ibkr_iv_hv_ratio"
+iv_hv_spread = "feature.vrp_iv_hv_spread"
+iv_hv_ratio = "feature.vrp_iv_hv_ratio"
 adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
 
 [rank]
-tie_break = "feature.vrp_ibkr_iv_hv_ratio"
+tie_break = "feature.vrp_iv_hv_ratio"

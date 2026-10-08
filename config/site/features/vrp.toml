@@ -45,24 +45,3 @@ description = "vrp_iv30 / HV30 (price_stats): plain ratio, no HV30 floor (owner 
 null_meaning = "vrp_iv30 or hv30 is null, or hv30 is 0"
 valid_range = [0, inf]
 version = 1
-
-# IBKR-only IV / HV (the vrp_iv_hv screener, evaluable over the stored history: IBKR's IV30 has
-# ~500 sessions, the Cboe chains few). Never mixed with Cboe's IV30 (ADR 0053 amendment: one
-# source per IV in an evaluation); personal licence through ibkr_iv (ADR 0028).
-[vrp_ibkr_iv_hv_spread]
-expr = "ibkr_iv.iv30_ibkr - price_stats.hv30"
-dtype = "float"
-unit = "decimal"
-description = "IBKR's IV30 minus HV30 (price_stats): the volatility premium on one source, no Cboe mix"
-null_meaning = "IBKR has no IV30 for the session, or hv30 is null (a gap in the last 31 sessions)"
-valid_range = [-5, 5]
-version = 1
-
-[vrp_ibkr_iv_hv_ratio]
-expr = "if(price_stats.hv30 > 0, ibkr_iv.iv30_ibkr / price_stats.hv30, null)"
-dtype = "float"
-unit = "ratio"
-description = "IBKR's IV30 / HV30 (price_stats): plain ratio on one source, no Cboe mix"
-null_meaning = "IBKR has no IV30 for the session, or hv30 is null or 0"
-valid_range = [0, inf]
-version = 1
