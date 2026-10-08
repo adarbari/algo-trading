@@ -22,8 +22,8 @@ import {
   linked,
   REGIME_INDEX,
   SITUATION,
-} from './guide-pages-api';
-import { guideSearch, guideStartPage, guideTerm, START_INDEX } from './guide-start-api';
+} from './guide/pages-api';
+import { guideSearch, guideStartPage, guideTerm, START_INDEX } from './guide/start-api';
 
 type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;

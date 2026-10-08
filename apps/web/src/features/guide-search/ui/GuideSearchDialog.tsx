@@ -46,7 +46,7 @@ export function GuideSearchDialog({ open, onOpenChange, onNavigate }: GuideSearc
       onOpenChange={change}
       title="Search the Guide"
       placeholder="Search fields, playbooks, terms and how-tos"
-      hint="Type a field name, a playbook, or a word the app uses. Press Ctrl+K or ⌘K anywhere to open this."
+      hint="Type a field, a playbook or a word the app uses."
       query={query}
       onQueryChange={setQuery}
       groups={groups}
