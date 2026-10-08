@@ -14,6 +14,10 @@ WORKERS ?= auto
 WEB_WORKERS ?=
 BASE ?= origin/main
 
+# No real model call from a test or a smoke run (ADR 0041 amendment 2026-10-08): every target that
+# runs pytest or the real-app API exports the off-switch (tests/architecture/pipeline/test_llm_off.py).
+test test-shard unit property integration e2e changed perf nightly layout fitness roadmap-check web-real web-e2e: export ALGOTRADE_LLM = off
+
 doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web deps, disk, merged-PR worktrees, .env keys, store); prints the fix for each failure
 	@$(if $(wildcard $(PY)),$(PY),python3) scripts/doctor.py
 

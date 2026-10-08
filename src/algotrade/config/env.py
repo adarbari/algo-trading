@@ -49,6 +49,11 @@ TIINGO_API_KEY = "ALGOTRADE_TIINGO_API_KEY"
 # needs none); the provider is `config/site/llm.toml`, never the environment.
 LLM_API_KEY = "ALGOTRADE_LLM_API_KEY"  # the single-provider (legacy) form of llm.toml only
 LLM_KEY_PREFIX = "ALGOTRADE_LLM_API_KEY_"  # + the provider id upper-cased: see `llm_key`
+# The off-switch (ADR 0041, amended 2026-10-08): `ALGOTRADE_LLM=off` forces the text model off
+# whatever `llm.toml` / `llm.local.toml` say, so no model call can happen. Tests, the Makefile's
+# test and smoke targets, the real-app Playwright API and CI set it; the nightly and the owner's
+# API never do.
+LLM_SWITCH = "ALGOTRADE_LLM"
 REQUIRED_KEYS = (MASSIVE_API_KEY, SEC_CONTACT)
 
 __all__ = [
@@ -61,6 +66,7 @@ __all__ = [
     "data_url",
     "dotenv_keys",
     "llm_key",
+    "llm_off",
     "load_dotenv",
     "supabase_jwt_secret",
     "supabase_url",
@@ -107,6 +113,11 @@ def llm_key(provider_id: str) -> str:
 
 
 CLAUDE_CLI_ENV = ("HOME", "USER", "PATH", "LANG")
+
+
+def llm_off() -> bool:
+    """True when ``$ALGOTRADE_LLM`` is ``off``: the text model is never built (tests, smoke, CI)."""
+    return (credential(LLM_SWITCH) or "").strip().lower() == "off"
 
 
 def claude_cli_env() -> dict[str, str]:

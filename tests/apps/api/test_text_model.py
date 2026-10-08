@@ -12,7 +12,7 @@ from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
-from algotrade_api.text_model import OFF, open_text_model
+from algotrade_api.text_model import FORCED_OFF, OFF, open_text_model
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.llm.claude_cli import ClaudeCli
 from tests.helpers.api_store import as_user
@@ -23,6 +23,26 @@ USERS = {"user": [{"id": u, "role": "admin"} for u in ("local", "site", "abhi", 
 def configs(llm: dict[str, Any] | None) -> MemoryConfigStore:
     docs: dict[Any, Any] = {("site", "settings", "users"): USERS}
     return MemoryConfigStore(docs if llm is None else docs | {("site", "settings", "llm"): llm})
+
+
+@pytest.fixture(autouse=True)
+def _switch_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The root guard sets ALGOTRADE_LLM=off; these tests build the chain (never call it), so
+    each one decides the switch itself."""
+    monkeypatch.delenv("ALGOTRADE_LLM", raising=False)
+
+
+def test_the_off_switch_wins_over_a_file_that_enables_a_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The llm.local.toml of a machine (claude-cli, then Gemini) must not turn a test, smoke or
+    CI run into a model call: with ALGOTRADE_LLM=off no model is built whatever the file says."""
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    for llm in (CLI_CHAIN, CHAIN, {"enabled": True}):
+        assert open_text_model(configs(llm))[0] is not None
+        monkeypatch.setenv("ALGOTRADE_LLM", "off")
+        assert open_text_model(configs(llm)) == (None, FORCED_OFF)
+        monkeypatch.delenv("ALGOTRADE_LLM")
 
 
 def test_a_missing_or_disabled_file_is_off_without_a_complaint(
