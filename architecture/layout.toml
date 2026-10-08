@@ -810,7 +810,7 @@ purpose = "L3 field guide, one <theme>.toml per theme plus situations.toml: how 
 
 [[config_dir]]
 path = "config/site/features"
-purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3); edge_scores.toml is written by algotrade-backtest fit-edge-scorer (ADR 0053, ED7)"
+purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3); ; fit-edge-scorer (ADR 0053, ED7) writes edge_scores.toml here once a fit has 40 sessions"
 
 [[config_dir]]
 path = "config/site/edges"

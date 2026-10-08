@@ -271,6 +271,7 @@ probit is the same model class with the precedent already in place. LightGBM (AD
    exists at score time and no ingestion task is needed.
 4. **Fitness test.** Every `edge_score_*` feature names an edge with `frozen_from` and records
    `fitted_through` strictly before it, and reads exactly the features the document declares.
-5. **Not yet.** Event schedules and outcomes that read an implied vol are not fitted (the
+5. **Refusals.** A fit needs at least 40 independent decision sessions before the frozen period (the quality bar's count) and refuses with the count it has: no scorer file is committed while the stored history gives fewer (momentum_12_1 has 3). A declared `rollup.<group>@v<n>` must be the registry's current version of its group (a fitness test and the renderer check it), and the description records `horizon` and `fitted_through`, which must precede the purge cutoff.
+6. **Not yet.** Event schedules and outcomes that read an implied vol are not fitted (the
    command refuses). The `impl = "model"` screener, labelling pre-split slices IN_SAMPLE and
    promotion by site config are ED7b and ED7c.

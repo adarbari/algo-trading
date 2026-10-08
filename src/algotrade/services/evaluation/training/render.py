@@ -11,6 +11,8 @@ owner commits it."""
 
 import re
 
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.features.registry import GROUPS
 from algotrade.services.evaluation.training.fit import ScorerFit
 
 FILE_HEADER = """# Learned edge scorers (ADR 0053 amendment, ED7): one probit expression feature per
@@ -37,7 +39,24 @@ def expression_name(field: str) -> str:
     return f"{head.split('@')[0]}.{column}"
 
 
+def check_versions(fields: tuple[str, ...]) -> None:
+    """Each ``rollup.<group>@v<n>.<col>`` must name the registry's current version of its group:
+    coefficients fitted on v2 must not silently apply to v3's values. Raises
+    ``ConfigurationError``."""
+    for field in fields:
+        if not field.startswith("rollup."):
+            continue
+        name, _, rest = field.removeprefix("rollup.").partition("@v")
+        declared = int(rest.split(".")[0])
+        current = max((g.version for g in GROUPS.values() if g.name == name), default=None)
+        if declared != current:
+            raise ConfigurationError(
+                f"{field}: group {name} is at v{current} now; refit on its current version"
+            )
+
+
 def render_scorer(fit: ScorerFit, version: int = 1) -> str:
+    check_versions(fit.features)
     params = {"b0": fit.intercept}
     terms = ["b0"]
     for i, name in enumerate(fit.features, start=1):
@@ -51,7 +70,8 @@ def render_scorer(fit: ScorerFit, version: int = 1) -> str:
     expr = " + ".join(terms)
     names = ", ".join(fit.features)
     about = (
-        f"Fitted probability that edge {fit.edge_id} hits ({fit.horizon}-session window): a probit "
+        f"Fitted probability that edge {fit.edge_id} hits (horizon={fit.horizon} sessions): "
+        "a probit "
         f"on {names} standardised on the training rows. fitted_through={fit.fitted_through}; "
         f"{fit.rows} rows, {fit.sessions} sessions, {fit.positives} hits."
     )

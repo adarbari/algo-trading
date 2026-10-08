@@ -2,6 +2,7 @@
 score (the round trip), the file merge keeps other edges' tables, and the field names map."""
 
 import tomllib
+from dataclasses import replace
 from datetime import date
 
 import numpy as np
@@ -9,11 +10,13 @@ import pandas as pd
 import pytest
 
 from algotrade.config.site.features.definitions import feature_definitions
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import GROUPS, SUPERSEDED
 from algotrade.services.evaluation.training.fit import ScorerFit, score
 from algotrade.services.evaluation.training.render import (
     FILE_HEADER,
+    check_versions,
     expression_name,
     feature_name,
     merge_scorers,
@@ -64,3 +67,11 @@ def test_merge_replaces_an_edges_table_with_the_next_version_and_keeps_the_other
     assert list(docs) == ["edge_score_alpha", "edge_score_momo"]  # sorted by name
     assert (docs["edge_score_momo"]["version"], docs["edge_score_alpha"]["version"]) == (2, 1)
     assert "fitted_through=2026-03-03" in docs["edge_score_momo"]["description"]
+
+
+def test_a_field_at_another_version_than_the_registry_is_refused() -> None:
+    check_versions(FIELDS)  # current
+    with pytest.raises(ConfigurationError, match="refit on its current version"):
+        check_versions(("rollup.trend_stats@v1.mom_12_1",))
+    with pytest.raises(ConfigurationError, match="refit"):
+        render_scorer(replace(fitted(), features=("rollup.trend_stats@v1.mom_12_1", FIELDS[1])))

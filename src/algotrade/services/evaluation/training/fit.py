@@ -5,8 +5,8 @@ Each feature is standardised on the training rows (mean, population standard dev
 coefficients are comparable and the fit is well conditioned; the constant is the first
 coefficient. ``score`` applies the fit to raw feature values and equals the expression feature
 ``render.py`` writes (``ncdf(b0 + sum w_i * (x_i - mean_i) / scale_i)``). Deterministic: no
-randomness. The fit is refused, never guessed, on too few rows, one class, a constant feature or
-no convergence.
+randomness. The fit is refused, never guessed, on too few rows, fewer than ``MIN_SESSIONS``
+independent decision sessions, one class, a constant feature or no convergence.
 """
 
 from dataclasses import dataclass
@@ -21,6 +21,7 @@ from algotrade.services.evaluation.training.frame import LABEL, TrainingFrame
 
 MIN_ROWS = 100  # fewer labelled rows than this is not a fit
 MIN_PER_CLASS = 10
+MIN_SESSIONS = 40  # independent decision sessions: the quality bar of docs/edges-plan.md
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,12 @@ def fit_scorer(training: TrainingFrame) -> ScorerFit:
         raise ConfigurationError(
             f"edge {training.edge_id}: {len(y)} training rows ({positives} hits) is too few to "
             f"fit (needs {MIN_ROWS} with {MIN_PER_CLASS} of each class)"
+        )
+    if training.sessions < MIN_SESSIONS:
+        raise ConfigurationError(
+            f"edge {training.edge_id}: {training.sessions} decision sessions before the frozen "
+            f"period is below the {MIN_SESSIONS} independent sessions the quality bar asks; "
+            "wait for more history rather than fit"
         )
     x = frame[list(training.features)].to_numpy(dtype=np.float64)
     means, scales = x.mean(axis=0), x.std(axis=0)

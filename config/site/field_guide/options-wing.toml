@@ -668,7 +668,7 @@ value = 0.015
 mode = "score"
 tolerance = 0.01
 
-# The covered call against the chart and the calendar (config/site/features/swing.toml).
+# The covered call against the chart and the calendar (config/site/features/wings.toml, swing.toml).
 
 [[field]]
 name = "feature.call_otm_pct"

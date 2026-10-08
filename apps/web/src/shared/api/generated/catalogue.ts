@@ -374,7 +374,6 @@ export const SITE_FEATURES = [
   'feature.ex_div_before_expiry',
   'feature.ex_div_before_nearest_expiry',
   'feature.ex_div_before_call_expiry',
-  'feature.edge_score_momentum_12_1',
   'feature.div_yield',
   'feature.market_cap',
   'feature.pe_ratio',
@@ -444,9 +443,6 @@ export const SITE_FEATURES = [
   'feature.dist_to_poc',
   'feature.inside_day_breakout',
   'feature.strong_close',
-  'feature.call_otm_pct',
-  'feature.cc_yield_annualised',
-  'feature.call_strike_above_resistance',
   'feature.iv_hv_spread',
   'feature.iv_hv_ratio',
   'feature.iv_rank',
@@ -463,6 +459,9 @@ export const SITE_FEATURES = [
   'feature.vrp_iv30_source',
   'feature.vrp_iv_hv_spread',
   'feature.vrp_iv_hv_ratio',
+  'feature.call_otm_pct',
+  'feature.cc_yield_annualised',
+  'feature.call_strike_above_resistance',
 ] as const;
 
 /** A site catalogue field name. */
