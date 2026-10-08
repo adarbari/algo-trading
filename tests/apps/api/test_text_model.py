@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
@@ -33,8 +34,60 @@ def test_an_enabled_file_builds_the_model_with_its_request_fields() -> None:
         configs({"enabled": True, "model": "gemini", "request": {"reasoning_effort": "low"}})
     )
     assert isinstance(model, ChatCompletions) and model.model == "gemini"
-    assert model.name == "gemini"
+    assert model.names == ("gemini",)
     assert dict(model.extra) == {"reasoning_effort": "low"}
+
+
+CHAIN: dict[str, Any] = {
+    "enabled": True,
+    "provider": [
+        {"id": "claude", "base_url": "https://api.anthropic.com/v1", "model": "claude-haiku-4-5"},
+        {
+            "id": "gemini",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+            "model": "gemini-2.5-flash",
+        },
+    ],
+}
+
+
+def test_a_chain_is_one_adapter_per_provider_each_with_its_own_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_CLAUDE", "sk-claude")
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY", "sk-legacy")  # the legacy form's, never a chain's
+    model, _ = open_text_model(configs(CHAIN))
+    assert isinstance(model, FallbackTextModel)
+    assert model.names == ("claude-haiku-4-5", "gemini-2.5-flash")
+    assert [pid for pid, _ in model.members] == ["claude", "gemini"] and model.deadline_s == 120.0
+    claude = model.members[0][1]
+    assert isinstance(claude, ChatCompletions) and claude.provider == "claude"
+
+
+def test_a_remote_provider_without_a_key_is_left_out_of_the_chain(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("ALGOTRADE_LLM_API_KEY_CLAUDE", raising=False)
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    with caplog.at_level(logging.WARNING):
+        model, _ = open_text_model(configs(CHAIN))
+    assert isinstance(model, ChatCompletions) and model.provider == "gemini"
+    assert "ALGOTRADE_LLM_API_KEY_CLAUDE" in caplog.text and "sk-gemini" not in caplog.text
+
+
+def test_a_chain_with_no_key_at_all_is_off_with_the_variables_to_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in ("ALGOTRADE_LLM_API_KEY_CLAUDE", "ALGOTRADE_LLM_API_KEY_GEMINI"):
+        monkeypatch.delenv(name, raising=False)
+    model, reason = open_text_model(configs(CHAIN))
+    assert model is None and "ALGOTRADE_LLM_API_KEY_CLAUDE" in reason
+
+
+def test_a_file_with_both_forms_turns_the_text_model_off() -> None:
+    model, reason = open_text_model(configs(CHAIN | {"model": "llama3.1"}))
+    assert model is None and "use one form" in reason
 
 
 def test_a_file_that_does_not_load_is_logged_and_turns_the_text_model_off(

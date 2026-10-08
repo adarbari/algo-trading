@@ -72,7 +72,7 @@ def draft_screen(
     guide = load_field_guide(ctx.configs)
     system = system_prompt(infos.values(), phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
-    answer = model.complete(system, user)
+    answer = model.complete(system, user).text
     proposal = parse_answer(answer)
     criteria, dropped = criteria_of(proposal, set(infos))
     document: dict[str, Any] = {

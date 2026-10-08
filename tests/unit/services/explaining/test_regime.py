@@ -6,10 +6,14 @@ import json
 
 import pytest
 
+from algotrade.core.model.completion import Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError, RateLimitedError
+from algotrade.services.explaining.cache import cache_key
 from algotrade.services.explaining.limits import RateLimiter
+from algotrade.services.explaining.prompt import WHAT_IS_HAPPENING
 from algotrade.services.explaining.regime import explain_regime
 from algotrade.services.read.context import NotFoundError, ReadContext
+from algotrade.services.read.regime.regime import load_regime
 from algotrade.storage.backends.text_cache import MemoryTextCache
 from tests.unit.services.explaining.conftest import Canned, Down
 from tests.unit.services.read.instruments.conftest import D0
@@ -108,3 +112,31 @@ def test_a_model_that_is_down_propagates_and_caches_nothing(ctx: ReadContext) ->
     with pytest.raises(ModelUnavailableError):
         ask(ctx, Down(), cache, RateLimiter())
     assert not cache._items
+
+
+class Chain(Canned):
+    """A chain whose members are ``names``; ``answers`` is the member that answers."""
+
+    def __init__(self, answer: object, names: tuple[str, ...], answers: str) -> None:
+        super().__init__(answer)
+        self.names, self.answers = names, answers
+
+    def complete(self, system: str, user: str) -> Completion:
+        done = super().complete(system, user)
+        return Completion(done.text, self.answers, self.answers, fell_back_from=self.names[0])
+
+
+def test_a_fallback_answer_is_never_cached_under_the_primary(ctx: ReadContext) -> None:
+    regime = load_regime(ctx)
+    claude_key = cache_key(regime, WHAT_IS_HAPPENING, "claude")
+    gemini_key = cache_key(regime, WHAT_IS_HAPPENING, "gemini")
+    cache, limiter = MemoryTextCache(), RateLimiter()
+    chain = Chain(GOOD, ("claude", "gemini"), answers="gemini")
+    assert not ask(ctx, chain, cache, limiter).cached
+    assert cache.get(claude_key) is None and cache.get(gemini_key) == GOOD
+    # the chain finds the fallback's answer on the next ask: free
+    assert ask(ctx, chain, cache, limiter).cached and len(chain.asked) == 1
+    # a model that is only the primary does not read the fallback's answer as its own
+    primary = Chain(GOOD, ("claude",), answers="claude")
+    assert not ask(ctx, primary, cache, limiter).cached and len(primary.asked) == 1
+    assert cache.get(claude_key) == GOOD

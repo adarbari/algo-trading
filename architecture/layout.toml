@@ -108,7 +108,7 @@ contracts = ["Layout: core subpackages are pure (no pandas, pyarrow, storage or 
 
 [[dir]]
 path = "src/algotrade/core/model"
-purpose = "domain value objects: types, instruments, option contracts, field names, ids, errors, three-valued predicates, the rule-screen spec"
+purpose = "domain value objects: types, instruments, option contracts, field names, ids, errors, the text-model Completion, three-valued predicates, the rule-screen spec"
 contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
 
 [[dir]]
@@ -361,7 +361,7 @@ contracts = ["Layout: use-case packages are independent (backtests, screening, a
 
 [[dir]]
 path = "src/algotrade/services/text_model"
-purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through; no vendor, no storage"
+purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08); no vendor, no storage"
 
 [[dir]]
 path = "src/algotrade/storage"

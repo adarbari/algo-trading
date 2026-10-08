@@ -1,6 +1,7 @@
 # L3 site setting: the text model behind "Describe it" in the screener Builder (ADR 0041).
 # Off by default. The key never goes here: set ALGOTRADE_LLM_API_KEY in .env (a local Ollama
-# server needs none). What leaves the machine is the typed sentence and the field catalogue.
+# server needs none; with [[provider]] tables, ALGOTRADE_LLM_API_KEY_<ID upper> per provider).
+# What leaves the machine is the typed sentence and the field catalogue.
 #
 # Any OpenAI-compatible endpoint works; `base_url` is the root that has /chat/completions:
 #   Ollama (local, free):   base_url = "http://localhost:11434/v1",                  model = "llama3.1"
@@ -23,4 +24,27 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # adapter sets them). Gemini 3.x thinks before it answers: `reasoning_effort = "low"` keeps that
 # short, which leaves the answer budget for the draft and answers faster.
 # [request]
+# reasoning_effort = "low"
+
+# A chain (ADR 0041, amended 2026-10-08): `[[provider]]` tables, tried in order; the next one
+# answers only when the one before is unavailable (down, refused, out of retries, an answer that
+# is not text). Use either these tables or the top-level `base_url` / `model`, never both. The
+# top-level `timeout_s`, `answer_limit`, `retries` and `request` are the defaults of every
+# provider; each table may override them. The key of a provider is ALGOTRADE_LLM_API_KEY_<ID
+# upper> (here _CLAUDE and _GEMINI); a remote provider without a key is left out with a warning.
+# `deadline_s`: once the chain has spent this long it starts no further provider.
+#
+# enabled = true
+# deadline_s = 120
+#
+# [[provider]]
+# id = "claude"
+# base_url = "https://api.anthropic.com/v1"
+# model = "claude-haiku-4-5"
+#
+# [[provider]]
+# id = "gemini"
+# base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+# model = "gemini-2.5-flash"
+# [provider.request]
 # reasoning_effort = "low"
