@@ -88,7 +88,7 @@ vendor responses, run and job records); above them sit outputs (results, per use
 | # | Rule | ADR |
 |---|---|---|
 | 1 | Apps are separate processes and packages in one repo. They **never import each other**; they share only the library and storage. | [0004](adr/0004-apps-and-shared-libraries.md) |
-| 2 | **Only `apps/ingestion` writes** market and rollup data. The API writes only user configs ([0029](adr/0029-rule-screener.md)) and its live-quote log ([0028](adr/0028-ibkr-enrichment-source.md)). Everyone else reads. Vendor SDKs live in `libs/sources` ([0027](adr/0027-vendor-sources-shared-package.md)); credentials are read only through `config.env`. | [0005](adr/0005-ingestion-is-the-only-writer.md) |
+| 2 | **Only `apps/ingestion` writes** market and rollup data. The API writes only user configs ([0029](adr/0029-rule-screener.md)) its live-quote log ([0028](adr/0028-ibkr-enrichment-source.md)) and its text-model usage log ([0058](adr/0058-llm-usage-log-prices-and-budget.md)). Everyone else reads. Vendor SDKs live in `libs/sources` ([0027](adr/0027-vendor-sources-shared-package.md)); credentials are read only through `config.env`. | [0005](adr/0005-ingestion-is-the-only-writer.md) |
 | 3 | Storage is organised by **data grain and layer** behind repository interfaces. Parquet on local disk today (DuckDB-readable; a DuckDB query engine is planned); backends swap via `ALGOTRADE_DATA_URL`. | [0006](adr/0006-storage-grains-and-adapters.md), [0016](adr/0016-four-data-layers.md) |
 | 4 | All market and rollup data is **point-in-time**: every row records when it happened *and* when we learned it. | [0007](adr/0007-point-in-time-data.md) |
 | 5 | **Backtests only read from stores.** They never call a vendor. Missing data is an error that names the ingestion job to run. | [0008](adr/0008-backtests-read-only-from-stores.md) |
@@ -328,7 +328,7 @@ and an HTML part (inline styles only, no images or external assets).
 
 ## 7. Consistency and concurrency
 
-- **Writers:** only ingestion writes market and rollup data (the API writes only user configs and its live-quote log, ADRs 0029 / 0028). Every file is written to a unique
+- **Writers:** only ingestion writes market and rollup data (the API writes only user configs and its live-quote log and text-model usage log, ADRs 0029 / 0028 / 0058). Every file is written to a unique
   temp file in its directory and renamed into place; a run replaces only its own partition.
   The per-partition run index (`_runs.json`) is updated under a file lock, so two runs writing
   the same partition at once (threads or processes) are both indexed (contract-tested).
@@ -615,7 +615,7 @@ web (apps/web) ──HTTP/JSON─────▶ routes/<area>.py ──one call
 | admin (Admin workspace only) | no REST reads since read-model PR 10a: GraphQL `Query.{completeness,ingestionCell}` (dataset × session: present vs expected rows, COMPLETE / PARTIAL / MISSING / CARRIED; one cell's drill-down), `nightlyRuns`, `run`, `runItems` (run records), `quality`, `verification` (the session's data-quality checks and live verification vs IBKR, UNKNOWN when not run for it), `figiReview`, `leverageReview` (the owner's curation lists); `docs/api/read-model.md` |
 
 Errors: unknown id / no data for the date → 404; bad configuration → 400; bad parameters →
-422. The API writes nothing except the live quotes it served (`live/*` tables, ADR 0028). The committed `apps/api/openapi.json` must match the app (`scripts/export_openapi.py`; a
+422. The API writes nothing except the live quotes it served (`live/*` tables, ADR 0028) and its text-model usage (`usage/*`, ADR 0058). The committed `apps/api/openapi.json` must match the app (`scripts/export_openapi.py`; a
 test fails when it is stale); the web client is generated from it.
 
 ## 13. Hosting

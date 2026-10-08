@@ -358,6 +358,11 @@ owner = "src/algotrade/services/live/recorder.py"
 note = "the API's one write (ADR 0028): live IBKR quotes it served; personal-use licence"
 
 [[table]]
+name = "usage/llm_calls"
+owner = "src/algotrade/services/text_model/usage.py"
+note = "the API's fifth write (ADR 0058): one row per text-model provider attempt; read across a date range by data/usage"
+
+[[table]]
 name = "verification/ibkr"
 owner = "apps/ingestion/algotrade_ingestion/tasks/verification/verify.py"
 

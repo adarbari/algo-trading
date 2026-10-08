@@ -560,6 +560,13 @@ detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry"
 # --------------------------------------------------------------------------- settings, time, jobs
 
 [[responsibility]]
+id = "background-recording"
+description = "Write what the API records in the background without ever blocking a request: the one queued batch writer (bounded queue, a daemon thread draining batches, drop and log when full or a write fails, unique run id per batch, flush and close) that the live-quote recorder (ADR 0028) and the text-model usage recorder (ADR 0058) are subclasses of"
+owner = ["src/algotrade/storage/recording.py"]
+section = "docs/adr/0058-llm-usage-log-prices-and-budget.md#the-write"
+detect = [{ call = "task_done" }, { call = "put_nowait" }]
+
+[[responsibility]]
 id = "config-authoring"
 description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; for a user the site registry declares (the API passes the registry as a predicate to `author`; no I/O of its own); the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol (which reads drafts and versions back: the read model, services/read/screens/documents.py)"
 owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
@@ -617,7 +624,7 @@ description = "Execute long-running work: threads, locks, recovery, idempotency;
 owner = ["src/algotrade/services/jobs/*"]
 allowed = [
     "libs/sources/algotrade_sources/framework/session_thread.py",  # a gateway session's own thread (its socket + event loop), not work (ADR 0028)
-    "src/algotrade/services/live/recorder.py",  # the API's background writer of live quotes: one thread draining a queue, not a job (ADR 0028)
+    "src/algotrade/storage/recording.py",  # the API's background batch writer (live quotes ADR 0028, usage ADR 0058): one thread draining a queue, not a job
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [
@@ -884,6 +891,23 @@ section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
 detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
+id = "llm-usage"
+description = "What the text model spent (ADR 0058): every provider attempt of a call (failed and budget-skipped ones too) priced from llm.toml [[price]] (a paid remote model without one is a ConfigurationError; claude-cli's reported notional cost; free), counted against [budget] (daily / monthly USD: skip the paid providers or refuse) by an in-process ledger seeded from the store at startup, and recorded in the background to usage/llm_calls (only through UsageWriter, atomic per run); read back across a date range through data.usage"
+owner = [
+    "src/algotrade/services/text_model/usage.py",
+    "src/algotrade/services/text_model/ledger.py",
+    "src/algotrade/storage/tables/usage_writer.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/data/usage/*",  # the read of the recorded usage (spent_by_day, read_llm_calls)
+    "src/algotrade/config/site/llm.py",  # the [[price]] and [budget] settings and each provider's rate
+    "apps/api/algotrade_api/text_model.py",  # wires the ledger into the chain
+]
+section = "docs/adr/0058-llm-usage-log-prices-and-budget.md#budget"
+detect = [{ string = "usage/llm_calls" }, { call = "UsageWriter" }, { call = "UsageLedger" }]
+
+[[responsibility]]
 id = "regime-explaining"
 description = "The market regime explained in plain words on request (ADR 0041, amended 2026-10-06): the prompt of the regime's facts and the allowed links (no market data beyond them, no user data, no credentials), the answer cleaned (links outside the list dropped, markdown removed) and number-checked against the facts, the explanation cache keyed by session, signals, question and model (the API's one derived-cache write, ADR 0005 exception), and the per-user rate limit; nothing is asked of the model unasked"
 owner = [
@@ -961,7 +985,9 @@ detect = [
 id = "text-model-seam"
 description = "The text model both on-demand text features are asked through (ADR 0041, amended 2026-10-06): the TextModel protocol and its Completion result, the OpenAI-compatible adapter (built by the source registry, the key only in a header) and the Claude Code adapter (claude -p under the owner's own login, locked down, owner-only), the FallbackTextModel chain over the llm.toml [[provider]] list (falls back only on ModelUnavailableError; skips a provider's only_users) and the API's wiring of it (off by default; 503 with the reason when off or down)"
 owner = [
-    "src/algotrade/services/text_model/*",
+    "src/algotrade/services/text_model/__init__.py",
+    "src/algotrade/services/text_model/chain.py",
+    "src/algotrade/services/text_model/model.py",
     "libs/sources/algotrade_sources/llm/*",
     "apps/api/algotrade_api/text_model.py",
 ]

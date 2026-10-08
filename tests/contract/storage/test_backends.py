@@ -352,3 +352,31 @@ def test_a_purge_is_committed_whole_and_leaves_pending_runs_alone(backend: Backe
     after = reader.table(LIVE, D1)
     assert after is not None and sorted(after["strike"]) == [100.0, 105.0]
     assert reader.table(LIVE, D2) is not None
+
+
+USAGE = "usage/llm_calls"
+
+
+def usage_rows(
+    day: date, provider: str, tokens: int | None, second: int = 0
+) -> list[dict[str, object]]:
+    ts = pd.Timestamp(day, tz="UTC") + pd.Timedelta(seconds=second)
+    return [{"ts": ts, "provider": provider, "model": "m", "use_case": "screener-draft",
+             "user": None, "input_tokens": tokens, "output_tokens": tokens, "latency_s": 0.5,
+             "cost_usd": None if tokens is None else 0.01,
+             "cost_basis": "price" if tokens else "unknown",
+             "outcome": "ok" if tokens else "failed", "fell_back_from": None}]  # fmt: skip
+
+
+def test_usage_runs_merge_and_unknown_tokens_stay_null_across_a_range(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    writer.write_table(USAGE, D1, "r1", stamped(usage_rows(D1, "claude", 120), D1, "r1"))
+    writer.write_table(USAGE, D1, "r2", stamped(usage_rows(D1, "gemini", None, 5), D1, "r2"))
+    writer.write_table(USAGE, D2, "r3", stamped(usage_rows(D2, "claude", 80), D2, "r3"))
+    day1 = reader.table(USAGE, D1)
+    assert day1 is not None and sorted(day1["provider"]) == ["claude", "gemini"]  # runs merge
+    failed = day1[day1["provider"] == "gemini"].iloc[0]
+    assert pd.isna(failed["input_tokens"]) and pd.isna(failed["cost_usd"])  # null, never 0
+    both = reader.table_range(USAGE, D1, D2)  # no instrument_id column: a range read still works
+    assert both is not None and len(both) == 3
+    assert reader.table_range(USAGE, D1, D2, instruments=None, columns=["provider"]) is not None
