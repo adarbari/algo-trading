@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Text } from '@algotrade/ui';
+
 import { api, gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
@@ -26,7 +28,7 @@ const read = (splitFrom: string | null) => ({
 const setup = () =>
   render(
     <TestQueryProvider>
-      <EvaluationSplitForm renderTermHelp={(term) => <span>{`help ${term}`}</span>} />
+      <EvaluationSplitForm renderTermHelp={(term) => <Text>{`help ${term}`}</Text>} />
     </TestQueryProvider>,
   );
 
