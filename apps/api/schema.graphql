@@ -1690,6 +1690,7 @@ type ScreenerRun {
   audit: JSON!
   coverage: String
   missingTables: [String!]!
+  missingOptionalTables: [String!]!
 
   """
   The session of the previous run it is compared with; null: none (nothing is new or dropped)

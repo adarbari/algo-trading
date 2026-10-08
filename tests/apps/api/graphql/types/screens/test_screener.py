@@ -13,7 +13,7 @@ RESULTS = """query Results($id: String!, $decisions: [String!], $change: String,
   screener(id: $id, date: $date) {
     id criteria { id field mode } displayColumns { name field }
     latestRun {
-      runId session previousSession audit paused regime coverage missingTables
+      runId session previousSession audit paused regime coverage missingTables missingOptionalTables
       decisions { decision count }
       changes { change count }
       results(decisions: $decisions, change: $change, q: $q, sort: $sort, columns: $columns,
@@ -55,6 +55,7 @@ def test_the_run_as_a_review_table(graph: Graph) -> None:
     }  # fmt: skip
     assert (run["paused"], run["regime"]) == (1, "CAUTION")
     assert (run["coverage"], run["missingTables"]) == (run["audit"].get("coverage"), [])
+    assert run["missingOptionalTables"] == []
     assert run["changes"] == [{"change": "new", "count": 1}, {"change": "dropped", "count": 1}]
     page = run["results"]
     assert (page["sort"], page["total"], page["page"], page["missing"]) == ("rank", 3, 1, [])

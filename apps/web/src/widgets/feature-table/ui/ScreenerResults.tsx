@@ -171,6 +171,7 @@ export function ScreenerResults({
                 session: run.session,
                 partial: run.status === 'partial' || run.coverage === 'PARTIAL',
                 missing: run.missingTables,
+                missingOptional: run.missingOptionalTables,
               },
             }
           : null
