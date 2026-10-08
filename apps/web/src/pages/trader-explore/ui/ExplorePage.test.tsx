@@ -190,20 +190,20 @@ describe('ExplorePage', () => {
     );
   });
 
-  it('keeps the Field guide as the last tab; choosing it only sets the tab (the route redirects)', async () => {
-    const user = userEvent.setup();
-    const onSearchChange = vi.fn();
+  it('has no Field guide tab (field help is the Guide, from each help button)', () => {
     render(
-      <ExplorePage
-        search={{ sel: 'AAPL' }}
-        onSearchChange={onSearchChange}
-        onOpenScreener={vi.fn()}
-      />,
+      <ExplorePage search={{ sel: 'AAPL' }} onSearchChange={vi.fn()} onOpenScreener={vi.fn()} />,
     );
     const tabs = screen.getAllByRole('tab').map((t) => t.textContent);
-    expect(tabs.at(-1)).toBe('Field guide');
-    await user.click(screen.getByRole('tab', { name: 'Field guide' }));
-    expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'guide' });
+    expect(tabs).toEqual([
+      'Overview',
+      'Compare',
+      'Chart',
+      'Options',
+      'Features',
+      'Events',
+      'Screener hits',
+    ]);
   });
 
   it('on a phone opens the focused ticker in a sheet and clears the focus on close', async () => {

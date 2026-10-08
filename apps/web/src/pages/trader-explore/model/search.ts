@@ -15,7 +15,6 @@ export const EXPLORE_TABS = [
   'features',
   'events',
   'hits',
-  'guide',
 ] as const;
 export type ExploreTab = (typeof EXPLORE_TABS)[number];
 
@@ -47,10 +46,6 @@ export interface ExploreSearch {
   strikes?: 'all';
   /** The feature whose distribution the Features tab shows. */
   feature?: string;
-  /** Retired with the Field guide tab (it moved to /guide/fields): kept so an old link redirects. */
-  theme?: string;
-  /** Retired with the Field guide tab: the field an old link asked for. */
-  field?: string;
 }
 
 /** The mockup's columns: close, our IV30, IV / HV, distance from the 52-week high, earnings. */
@@ -117,8 +112,6 @@ export function parseExploreSearch(raw: Record<string, unknown>): ExploreSearch 
   set('right', oneOf(['P', 'C'] as const, raw['right']));
   set('strikes', oneOf(['all'] as const, raw['strikes']));
   set('feature', text(raw['feature']));
-  set('theme', text(raw['theme']));
-  set('field', text(raw['field']));
   return out;
 }
 

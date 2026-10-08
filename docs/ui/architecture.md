@@ -81,12 +81,9 @@ request; a 401 ends the session):
 Explore is one page (ticker table with feature-catalogue columns, multi-select compare, detail
 tabs Overview / Compare / Chart / Options / Features / Events / Screener hits; one ticker opens
 on Overview, a compare set of two or more on Compare), not separate universe, instrument, chain
-and feature pages. A last tab, Field guide (`tab=guide`, `widgets/field-guide`), takes the whole
-page instead of the ticker table: a sidebar to find a catalogue field (search, the guide's themes)
-and the field's page (what it means, its spread over the universe with the names passing a
-criterion, one name's year, the criterion per intent, caveats, how it is computed); the theme,
-field and symbol live in the URL (`theme`, `field`, `symbol`), and the pass counts come from
-`FeatureDistribution.passing` (the server counts; the browser derives nothing). The Overview ends with "In rough markets" (`episode_behaviour@v1` features
+and feature pages. Field help is the Guide (`/guide/fields`): every feature name in the Features
+tab, like every feature-table column header, carries its `GuideHelp` button (hover: the entry's
+first sentence; click: the help drawer, with "Open full page"). The Overview ends with "In rough markets" (`episode_behaviour@v1` features
 read by name: beta to SPY, drawdown per reference episode; the episodes' plain names are the
 `entities/regime` map until the API serves `episodes.toml`). Unbuilt sections render the placeholder page.
 
