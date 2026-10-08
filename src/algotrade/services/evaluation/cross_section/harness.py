@@ -518,7 +518,8 @@ def _block_stats(
 def _trial_hash(scope: _Scope, variant: Variant) -> str:
     """The trial's identity: the screener's config hash, the edge variant's id and the resolved
     outcome and universe (the edge's own for ``main``), so an edited override, offset or
-    horizon is another trial."""
+    horizon is another trial. The split is not part of it: an exploratory run adds no trial (its
+    "all" slice, which the deflated Sharpe ratio reads, does not depend on the split)."""
     payload = [variant.config.hash, scope.key, asdict(scope.edge.outcome), scope.edge.universe]
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 

@@ -103,6 +103,7 @@ OUTCOME_KEYS = (
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe")
 EVIDENCE_KEYS = ("run_id", "split_from")
+EVIDENCE_STATUSES = ("evidenced", "live", "retired")
 _SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
 
 
@@ -232,6 +233,10 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         variants=_variants(t, schedule, edge_id, universe),
         evidence=_evidence(t),
     )
+    if edge.evidence is not None and status not in EVIDENCE_STATUSES:
+        raise ConfigurationError(
+            f"{where} evidence: only an evidenced, live or retired edge cites a run"
+        )
     if closed and not edge.rejection_reason:
         raise ConfigurationError(f"{where} rejection_reason: required when status is {status!r}")
     if edge.rejection_reason and status not in (*CLOSED, "retired"):

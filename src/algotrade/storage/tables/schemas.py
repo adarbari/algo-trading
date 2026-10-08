@@ -537,6 +537,8 @@ RULE_SCREEN_VALUES = _fixed(
 # outcome (ED4a), null until then. ``split_from`` (a key column; null: no split) is the first
 # session of the test slice the run used and ``exploratory`` is true when it is not the edge's
 # ``frozen_from``: a user's split writes rows under its own key, never over the site's (ED5a).
+# Rows written before the column stay under the null key (never rewritten) beside a new run's
+# dated one; a reader picks a run by ``run_id`` (ED5c), never by key.
 EDGE_EVAL = _fixed(
     "results/edge_eval",
     "results",

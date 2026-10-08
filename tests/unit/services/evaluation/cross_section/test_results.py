@@ -2,7 +2,7 @@
 together, one per variant, horizon and slice, keyed so a re-run of the range replaces them), its
 run record keeps the trial log, and the survivorship caveat is countable."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import pyarrow as pa
@@ -162,14 +162,19 @@ def test_an_exploratory_split_writes_rows_under_its_own_key_and_leaves_the_sites
     assert record.stats["exploratory"] and record.stats["split_from"] == "2026-09-09"
 
 
-def test_rows_written_before_the_split_columns_still_merge(world: World) -> None:
+def test_rows_written_before_the_split_columns_keep_the_null_key_beside_a_dated_run(
+    world: World,
+) -> None:
     """Runs written before ``split_from`` was a key column carry none: merge_rows reads it as
-    null, so a null-split row and a fresh null-split row are one key (the latest wins)."""
-    new = edge_eval_frame(evaluate(world), "r1", NOW)
-    kept = new.drop(columns=["split_from", "exploratory"])
+    null, a distinct key from a new run's date, so both stay in one partition."""
+    new = edge_eval_frame(evaluate(world), "r1", NOW).assign(split_from=date(2026, 4, 1))
+    old = new.drop(columns=["split_from", "exploratory"]).assign(picks=-1, run_id="r0")
     both = pa.concat_tables(
-        [pa.Table.from_pandas(f, preserve_index=False) for f in (kept.assign(picks=-1), kept)]
+        [pa.Table.from_pandas(f, preserve_index=False) for f in (old, new)],
+        promote_options="default",
     )
-    merged = merge_rows("results/edge_eval", both)
-    assert merged.num_rows == len(new) and "split_from" in merged.column_names
-    assert merged.column("picks").to_pylist() == new["picks"].to_list()  # the later rows won
+    merged = merge_rows("results/edge_eval", both).to_pandas()
+    assert len(merged) == len(old) + len(new)
+    assert set(merged["run_id"]) == {"r0", "r1"}
+    assert merged[merged["run_id"] == "r0"]["split_from"].isna().all()
+    assert (merged[merged["run_id"] == "r1"]["split_from"] == date(2026, 4, 1)).all()
