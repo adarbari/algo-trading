@@ -13,6 +13,7 @@ config/site/                        L3: reviewed via PR, versioned by git
   presets/selections/<id>.toml      shared selections
   presets/strategies/<id>.toml      shared strategy / screener configs
   presets/screeners/<id>/v<N>.toml  rule-screen preset versions: immutable, hash-locked (ADR 0029)
+  <name>.local.toml                 llm only: this machine's values, git-ignored (below)
 config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigStore later
   selections/<id>.toml
   strategies/<id>.toml
@@ -21,6 +22,16 @@ config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigS
   screeners/<id>/v<N>.toml          finalised versions: immutable; the latest (max N) runs nightly
   archive/screeners/<id>-<stamp>/   a deleted screen's folder, moved whole (never run or listed)
 ```
+
+**This machine's site values.** A site setting that differs per machine (the LLM provider and
+`enabled = true` in `llm.toml`) goes in `config/site/<name>.local.toml`, git-ignored: the
+store merges it over `<name>.toml` key by key (a table in both is merged), so the committed
+file stays the reviewed default and the main checkout stays clean for `scripts/ops/deploy.sh`.
+It is the same L3 layer (ADR 0015's amendment: no new layer), with this machine's values. Only
+allowlisted settings take one (`LOCAL_SETTINGS` in `storage/configs/files.py`: `llm`; `users.toml`
+roles, rollups and the universe change access or stored values and never do); it is never listed
+by `names`, tests over the repo's config use `FileConfigStore(..., local=False)`, and
+`make doctor` validates the merged result.
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
 `storage/configs/files.py` knows this layout; everything else uses the `ConfigStore`

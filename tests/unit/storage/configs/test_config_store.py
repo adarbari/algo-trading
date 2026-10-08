@@ -149,3 +149,31 @@ def test_a_users_identity_is_one_file_in_their_folder(root: Path) -> None:
     assert store.load("alice", "identity", "identity") == {"email": "alice@example.com"}
     assert store.load("bob", "identity", "identity") is None
     assert store.load(SITE_USER, "identity", "identity") is None  # a user's, never the site's
+
+
+def test_a_local_site_file_overlays_the_committed_one(tmp_path: Path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "llm.toml").write_text('enabled = false\nmodel = "a"\n[request]\nx = 1\ny = 2\n')
+    store = FileConfigStore(tmp_path)
+    assert store.load("site", "settings", "llm") == {
+        "enabled": False, "model": "a", "request": {"x": 1, "y": 2},
+    }  # fmt: skip
+    (site / "llm.local.toml").write_text("enabled = true\n[request]\ny = 3\n")
+    assert store.load("site", "settings", "llm") == {
+        "enabled": True, "model": "a", "request": {"x": 1, "y": 3},
+    }  # fmt: skip
+    assert store.names("site", "settings") == ["llm"]  # never ``llm.local``
+    assert FileConfigStore(tmp_path, local=False).load("site", "settings", "llm") == {
+        "enabled": False, "model": "a", "request": {"x": 1, "y": 2},
+    }  # fmt: skip
+
+
+def test_only_allowlisted_settings_take_a_local_file(tmp_path: Path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "users.toml").write_text('[[user]]\nid = "a"\nrole = "trader"\n')
+    (site / "users.local.toml").write_text('[[user]]\nid = "root"\nrole = "admin"\n')
+    assert FileConfigStore(tmp_path).load("site", "settings", "users") == {
+        "user": [{"id": "a", "role": "trader"}]
+    }

@@ -32,6 +32,11 @@ own configurations.
 | One filtered "production universe" | Not configurable per strategy or user |
 | Data and rollups per user | Multiplies ingestion cost and lets users' data disagree |
 
+**Amendment 2026-10-07: machine-local site values.** `config/site/<name>.local.toml` (git-ignored)
+is merged over `config/site/<name>.toml` for site settings: the same L3 layer with this
+machine's values, so a provider choice or a key-free `enabled = true` is never an uncommitted
+edit of a reviewed file. It adds no layer to `defaults < site < user < run`.
+
 ## Consequences
 - Adding a strategy subset is a config change, not a code change.
 - Results are reproducible: the config hash identifies exactly what produced them.

@@ -29,6 +29,7 @@ jobs:
     outputs:
       python: ${{ steps.areas.outputs.python }}
       web: ${{ steps.areas.outputs.web }}
+      web_deps: ${{ steps.areas.outputs.web_deps }}
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 2 } # a PR checks out its merge commit: parent 1 is the base
@@ -36,20 +37,22 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
         run: |
-          python=false web=false
-          if [ "$EVENT" != pull_request ]; then python=true web=true; fi
+          python=false web=false web_deps=false
+          if [ "$EVENT" != pull_request ]; then python=true web=true web_deps=true; fi
           while IFS= read -r f; do
             case "$f" in
               "") ;;
               .github/workflows/ci.yml | apps/api/openapi.json | apps/api/schema.graphql) python=true web=true ;;
+              apps/web/package-lock.json | apps/web/package.json | apps/web/design-system/package.json) web=true web_deps=true ;;
               apps/web/*) web=true ;;
               docs/* | .claude/* | *.md | LICENSE) ;; # docs only: the architecture tests cover them
               *) python=true ;;
             esac
           done < <(git diff --name-only HEAD^1 HEAD)
-          echo "python=$python web=$web"
+          echo "python=$python web=$web web_deps=$web_deps"
           echo "python=$python" >> "$GITHUB_OUTPUT"
           echo "web=$web" >> "$GITHUB_OUTPUT"
+          echo "web_deps=$web_deps" >> "$GITHUB_OUTPUT"
 
   quality:
     name: Lint, types, boundaries, ownership, duplicates, file length, strategy evaluation
@@ -68,6 +71,7 @@ jobs:
       - run: make ownership
       - run: make dupes
       - run: make filelen
+      - run: make numbering
       - run: make datasets-verify
       - name: Run every strategy on every golden dataset vs the baseline
         run: make evaluate
@@ -78,10 +82,10 @@ jobs:
         if: always()
         with: { name: scorecard, path: scorecard.md, if-no-files-found: ignore }
 
+  # The suite as three parallel shards (Makefile TEST_SHARD_*), each with its coverage data;
+  # the `tests` job below combines them under the protected name "Tests (py3.12)".
   test:
-    name: Tests (py${{ matrix.python }})
-    # No job-level `if`: GitHub does not expand the matrix of a skipped job, so the protected
-    # check "Tests (py3.12)" would never report. The steps decide instead.
+    name: Tests (py${{ matrix.python }}, ${{ matrix.shard }})
     needs: [changes]
     runs-on: ubuntu-latest
     strategy:
@@ -89,6 +93,7 @@ jobs:
       matrix:
         # PRs test the primary version; every push to main (and the post-merge re-test) runs both.
         python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13"]') }}
+        shard: [unit-a, unit-b, apps, rest]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -103,16 +108,62 @@ jobs:
         if: needs.changes.outputs.python == 'true'
         with:
           path: .hypothesis
-          key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ github.run_id }}
-          restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-
-      - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
+          key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ matrix.shard }}-
+      - name: Unit + architecture + property + integration + e2e, this shard (coverage data, no gate yet)
         if: needs.changes.outputs.python == 'true'
-        run: make test
+        run: make test-shard SHARD=${{ matrix.shard }}
       # A web-only or docs-only change still answers to the fitness tests: the web layout rules
       # (architecture/web_layout.toml [[web_dir]]), the ADR index, the roadmap cap, the links.
       - name: Architecture tests only (the change is web-only or docs-only)
-        if: needs.changes.outputs.python != 'true'
+        if: needs.changes.outputs.python != 'true' && matrix.shard == 'rest'
         run: .venv/bin/python -m pytest -q -n auto tests/architecture
+      - uses: actions/upload-artifact@v7
+        if: needs.changes.outputs.python == 'true'
+        with:
+          name: coverage-py${{ matrix.python }}-${{ matrix.shard }}
+          path: .coverage.${{ matrix.shard }}
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+  # The protected check "Tests (py3.12)": fails when any shard failed; on a Python change it
+  # combines the shards' coverage and applies the 90% gate (Makefile coverage-combine).
+  # No job-level `if` beyond !cancelled(): GitHub does not expand the matrix of a skipped
+  # job, so the check would report under the unexpanded name and never satisfy protection.
+  tests:
+    name: Tests (py${{ matrix.python }})
+    needs: [changes, test]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13"]') }}
+    steps:
+      - env:
+          RESULT: ${{ needs.test.result }}
+        run: |
+          echo "shards: $RESULT"
+          case "$RESULT" in failure | cancelled) exit 1 ;; esac
+      - uses: actions/checkout@v7
+        if: needs.changes.outputs.python == 'true'
+      - uses: astral-sh/setup-uv@v7
+        if: needs.changes.outputs.python == 'true'
+        with: { python-version: "${{ matrix.python }}", enable-cache: true }
+      - uses: actions/cache@v6
+        if: needs.changes.outputs.python == 'true'
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('uv.lock') }}
+      - if: needs.changes.outputs.python == 'true'
+        run: uv sync --all-packages --locked
+      - uses: actions/download-artifact@v7
+        if: needs.changes.outputs.python == 'true'
+        with: { pattern: "coverage-py${{ matrix.python }}-*", merge-multiple: true }
+      - name: Coverage gate 90% over the shards
+        if: needs.changes.outputs.python == 'true'
+        run: make coverage-combine
       - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12' && needs.changes.outputs.python == 'true'
         with: { name: coverage, path: coverage.xml }
@@ -174,6 +225,7 @@ jobs:
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci --no-fund --no-audit
       - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
+        if: needs.changes.outputs.web_deps == 'true' # 44 s; only a dependency change can alter the answer
         run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
       - run: npm run generated:check
       - run: npm run ds:check
@@ -238,7 +290,7 @@ jobs:
         with: { name: storybook-static, path: apps/web/storybook-static, retention-days: 1, if-no-files-found: error }
 
   web-screenshots:
-    name: Web screenshots + axe (shard ${{ matrix.shard }} of 2)
+    name: Web screenshots + axe (shard ${{ matrix.shard }} of 4)
     needs: [changes, web-storybook]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
@@ -248,7 +300,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     defaults:
       run:
         working-directory: apps/web
@@ -271,7 +323,7 @@ jobs:
       - uses: actions/download-artifact@v7
         with: { name: storybook-static, path: apps/web/storybook-static }
       - name: Screenshots + axe (light and dark) over every design-system story
-        run: npm run visual -- --fully-parallel --shard=${{ matrix.shard }}/2 # one story per worker, not one file per worker
+        run: npm run visual -- --fully-parallel --shard=${{ matrix.shard }}/4 # one story per worker, not one file per worker
       - uses: actions/upload-artifact@v7
         if: failure()
         with: { name: "playwright-report-screenshots-${{ matrix.shard }}", path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }

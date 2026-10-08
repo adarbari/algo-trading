@@ -8,11 +8,12 @@ its code on that machine.
 |---|---|
 | CI: changed areas | every run (seconds): decides which jobs a pull request needs |
 | CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Python changes |
-| CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests, four shards (`unit-a`, `unit-b` by subfolder; `apps`, `libs`, `contract`, `architecture`; the slow rest: property, integration, e2e, scripts, reconciliation) per Python version (3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests (the gate: fails on a failed shard; combines the shards' coverage, 90 %) | every run |
 | CI: web static (generated files fresh, ds:check, lint, types, unit) | web changes |
 | CI: web e2e (production build, Playwright, in the Playwright image) | web changes |
 | CI: web Storybook build (uploaded as the `storybook-static` artifact) | web changes |
-| CI: web screenshots + axe, two shards over the artifact, in the Playwright image | web changes |
+| CI: web screenshots + axe, four shards over the artifact, in the Playwright image | web changes |
 | CI: web (the gate: passes when the four web jobs passed or were skipped) | every run |
 | CI: real app smoke (Vite dev server + the real API, empty and golden stores) | Python or web changes |
 | Auto-merge sweeps | after every CI run and every 30 minutes |
@@ -42,11 +43,14 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 
 | Measure | Before (2026-10-07) | After |
 |---|---|---|
-| CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | the longest of four parallel web jobs: Storybook build (~2 min) then two screenshot shards (~3 min each); target 5–6 min; measured on the first PRs after this change |
+| CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | #280: 6.0 min (Storybook 30 s, then two screenshot shards of 5.3 min); #286: 3.0 min (four shards of ~2.5 min) |
+| CI critical path on a Python PR | 12 min (the Web job; the tests job 5 min) | #280: 9.0 min, all of it the one pytest job (5 142 tests with branch coverage, 8 min 34 s); #286: 6.1 min (shards unit 5.6, apps 3.3, rest 1.7 min, then the combine); P1c splits `unit` in two, target ~4 min |
 | CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | the tests job runs `tests/architecture` only (~1 min) |
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR | narrowed by `make changed` (Local fast path below); the full pass still runs once per PR |
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
+| Several sessions on one machine | web servers fought over 8000 / 5173 / 4173 / 5801-5802 / 8801-8802 / 6007; two `make check` runs timed each other out; `pkill -f node` killed other sessions' runs | each worktree has its own port block (`ALGOTRADE_PORT_BASE` in `worktree.env`); `make check` refuses a second run in a worktree; `make doctor` lists the other runs and warns when the main checkout is off `main` or has local `config/site` edits |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
+| Merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push; `architecture/ownership.toml`, `layout.toml` and `web_layout.toml` entries are id-ordered inside each section (fitness test), so two PRs adding an entry stop colliding at the end of the file; screenshot baselines regenerate in CI on the `update-screenshots` label (below) instead of Docker; the roadmap's Now / Next is one line per track (details under "Track details"), so two PRs rarely edit the same line |
 
 ### Local fast path
 
@@ -57,6 +61,28 @@ printed as a Docker command off Linux; any `.ts` / `.tsx` -> `npm run typecheck`
 fast gates. Run the full `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a
 failure rerun only the failed gate. The vitest pool is `vmThreads`: jsdom is created once per
 worker instead of once per file.
+
+Shared machine (several sessions, one Mac):
+
+- **Ports.** `scripts/worktree.sh` writes `ALGOTRADE_PORT_BASE = 10000 + cksum(path) % 500 * 10`
+  into `worktree.env`: API +0, Vite dev +1, real-app api/web pairs +2..+5, Storybook preview
+  +6, vite preview +7 (`vite.config.ts`, `playwright*.config.ts`). Unset (CI, the main
+  checkout) the usual numbers apply. Two worktrees can hash to one block (1 in 500): re-create one.
+- **`make check` lock.** `make check` is `scripts/ops/check_lock.sh make check-gates`: a
+  `mkdir` lock `var/check.lock.d` with the PID, stale when the PID is dead, released on exit.
+  A second `make check` in the same worktree refuses and names the first run's PID and start.
+  Stop a run by its PID, never `pkill -f make|node|vite|playwright` (a rule in CLAUDE.md).
+- **Deploy.** `scripts/ops/deploy.sh [--dry-run]` updates the running site from the main
+  checkout (must be on `main`, clean): pull, `make web-build`, restart the API agent, health.
+- **Machine-local site config.** `config/site/<name>.local.toml` (git-ignored) is merged over
+  `<name>.toml` (docs/configuration.md), so the main checkout stays clean for `deploy.sh`.
+
+### Permission prompts
+
+Commands the owner approves once in `.claude/settings.json` `permissions.allow` stop the
+prompts for the pipeline's own scripts: `launchctl kickstart`, `scripts/worktree.sh`,
+`scripts/ops/deploy.sh`, `scripts/merge_main.sh`, `gh pr ready`, `gh pr edit` (the proposed list
+is in the PR that added this note). Agents never edit `settings.json` themselves.
 
 How the web jobs are cut:
 
@@ -70,7 +96,30 @@ How the web jobs are cut:
   the image tag matches the locked `@playwright/test`, screenshots + axe. Adding a shard is one
   matrix entry plus the `/2` in the command.
 - All four share one `apps/web/node_modules` cache keyed on the lockfile (`npm ci` only on a
-  miss); the real-app job uses the same cache.
+  miss); the real-app job uses the same cache. `npm audit` (44 s) runs only when a package
+  file changed (`changes.web_deps`): nothing else can alter its answer.
+
+How the Python tests are cut (`make test` locally is unchanged):
+
+- **test** runs four shards in parallel, `make test-shard SHARD=unit-a|unit-b|apps|rest` (the folders
+  in the Makefile's `TEST_SHARD_*`; a fitness test keeps them covering every `tests/` folder),
+  each writing `.coverage.<shard>` with the gate off, uploaded as an artifact.
+- **tests** is the protected check `Tests (py3.12)`: it fails when a shard failed, then
+  downloads the data files and runs `make coverage-combine` (`coverage combine`, the
+  90 % gate, `coverage.xml`). A web-only or docs-only PR runs `tests/architecture` in the
+  `rest` shard and the gate passes without coverage.
+
+### Screenshot baselines from CI
+
+Baselines are Linux PNGs, so a change to a story or component used to need Docker locally.
+Add the label `update-screenshots` to the PR (or run the "Screenshot baselines" workflow on a
+branch): `.github/workflows/screenshots.yml` runs in the same Playwright image as CI
+(`mcr.microsoft.com/playwright:v1.63.0-noble`, a fitness test keeps the two in step), builds
+Storybook, runs `npm run visual -- --update-snapshots --fully-parallel`, commits the changed
+PNGs to the PR branch as `github-actions[bot]` and removes the label. It never runs for a
+fork. A push with `GITHUB_TOKEN` starts no CI run, so push any follow-up commit (or
+`gh workflow run ci.yml --ref <branch>`) afterwards, so CI and auto-merge see the new head.
+Review the PNG diff in the PR before that follow-up.
 
 ## Flaky specs
 
@@ -82,6 +131,10 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
   At most 8; the oldest is fixed before another is added.
 - `watched`: still runs and gates; listed with the fix that keeps it green.
 - Every entry: `kind`, `file`, `title` (e2e), `since`, `reason` (what flakes, the fix it waits for).
+- A story whose `play` clicks must settle before the screenshot: `await waitFor(` or
+  `await expect(` after the last click, or `tags: ['no-screenshot']` on the story (the visual
+  suite skips it, so it has no PNG). `npm run ds:check` fails otherwise: a screenshot taken
+  while the click's redraw is in flight is the commonest flake.
 - One retry in CI for Playwright only (`playwright.config.ts`, `playwright.visual.config.ts`);
   the real-app smoke, pytest and vitest never retry. Integration-style vitest files (`pages/`,
   `widgets/`, `features/`, `scripts/`) are the `integration` vitest project with a 20 s timeout

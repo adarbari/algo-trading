@@ -70,7 +70,7 @@ def user_configs(tmp_path_factory: pytest.TempPathFactory) -> Path:
     with another formula (bob has none)."""
     root: Path = tmp_path_factory.mktemp("configs")
     for item in (REPO_ROOT / "config" / "site").iterdir():
-        if item.name != "users.toml":
+        if item.name != "users.toml" and not item.name.endswith(".local.toml"):
             (root / "site" / item.name).parent.mkdir(exist_ok=True)
             (root / "site" / item.name).symlink_to(item)
     (root / "site" / "users.toml").write_text(USERS_TOML)
