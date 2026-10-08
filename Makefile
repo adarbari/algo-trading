@@ -144,12 +144,24 @@ datasets-verify: ## committed golden CSVs match their checksums
 datasets-build:  ## regenerate golden CSVs from the catalogue (then review + commit)
 	$(BIN)algotrade-ingest golden build
 
-golden-store:    ## (re)load the golden CSVs into the fixture store
+# The golden cross-section (fixtures/catalog.py: 420 weekdays from 2020-01-01) gets the real rollups
+# and outcomes tasks over its range, only the groups the momentum_12_1 screen reads (about a
+# minute; every rollup would take three): bump the end when the catalogue's length changes
+# (tests/integration/test_golden_edge.py::test_the_makefile_range_is_the_catalogue_range checks it).
+GOLDEN_FROM = 2020-01-01
+GOLDEN_TO = 2021-08-10
+GOLDEN_ROLLUPS = price_stats@v2,trend_stats@v2
+GOLDEN_EDGE = momentum_12_1
+
+golden-store:    ## (re)load the golden CSVs into the fixture store, then its rollups and outcomes
 	rm -rf datasets/golden/store
 	ALGOTRADE_DATA_URL=$(GOLDEN_URL) $(BIN)algotrade-ingest golden load
+	ALGOTRADE_DATA_URL=$(GOLDEN_URL) $(BIN)algotrade-ingest run rollups --only $(GOLDEN_ROLLUPS) --from $(GOLDEN_FROM) --to $(GOLDEN_TO)
+	ALGOTRADE_DATA_URL=$(GOLDEN_URL) $(BIN)algotrade-ingest run outcomes --from $(GOLDEN_FROM) --to $(GOLDEN_TO)
 
-evaluate: golden-store  ## strategy scorecard vs committed baseline, then the regime scorecard section
+evaluate: golden-store  ## strategy scorecard vs committed baseline, the golden edge line, then the regime scorecard
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --report scorecard.md
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) --baseline benchmarks/baseline.json
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) regime-scorecard
 
 regime-scorecard:  ## the regime episode scorecard over the configured store (ALGOTRADE_DATA_URL)
@@ -157,6 +169,7 @@ regime-scorecard:  ## the regime episode scorecard over the configured store (AL
 
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) --baseline benchmarks/baseline.json --update-baseline
 
 # ----------------------------------------------------------------------------- web (apps/web, ADR 0025)
 # Node 24 + npm (npm workspaces: apps/web and its design-system package); lockfile apps/web/package-lock.json.

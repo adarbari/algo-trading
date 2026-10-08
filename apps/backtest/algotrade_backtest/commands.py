@@ -19,7 +19,15 @@ from algotrade.data import StoreReader
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
-from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
+from algotrade.services.evaluation.baseline import (
+    compare_to_baseline,
+    diff_metrics,
+    edge_metrics,
+    load_baseline,
+    load_edge_baseline,
+    save_baseline,
+    save_edge_baseline,
+)
 from algotrade.services.evaluation.cross_section.report import render_edge_report
 from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
 from algotrade.services.evaluation.regime_report import render
@@ -224,7 +232,11 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     ``--split-from`` (else
     the user's ``evaluation.toml``, else each edge's ``frozen_from``; another split is
     exploratory). Rows land in ``results/edge_eval``;
-    a report with the survivorship line is printed (and written to ``--report``)."""
+    a report with the survivorship line is printed (and written to ``--report``).
+    With ``--baseline`` the measures are compared with the ``edges`` section of that file (exit 1
+    on a difference); ``--update-baseline`` (from ``make baseline``) rewrites that section."""
+    if args.update_baseline and not args.baseline:
+        raise ConfigurationError("--update-baseline needs --baseline FILE")
     backend = open_backend(data_url(args.data_url))
     reader = StoreReader(backend)
     configs = open_config_store(config_dir(args.config_dir))
@@ -242,7 +254,7 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     start, end = args.start or stored[0], args.end or stored[-1]
     as_of = args.as_of or datetime.now(UTC)
     resources = {"reader": reader, "writer": ResultWriter(backend), "configs": configs}
-    reports, failed = [], False
+    reports, failed, metrics = [], False, {}
     for edge in edges:
         params = {
             "edge": edge.id, "start": start.isoformat(), "end": end.isoformat(),
@@ -255,11 +267,39 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
             failed = True
             continue
         reports.append(render_edge_report(job.result))
+        metrics.update(edge_metrics(job.result))
     text = "\n".join(reports)
     print(text, end="")
     if args.report:
         args.report.write_text(text)
-    return 2 if failed else 0
+    if failed:
+        return 2
+    return _edge_baseline(args, {e.id for e in edges}, metrics) if args.baseline else 0
+
+
+def _edge_baseline(
+    args: argparse.Namespace, edge_ids: set[str], metrics: dict[str, dict[str, float]]
+) -> int:
+    """Compare the evaluated edges' measures with (or write them to) the baseline's ``edges``
+    section; the entries of edges not evaluated now are left as they are."""
+    stored = load_edge_baseline(args.baseline) if args.baseline.exists() else {}
+    others = {k: v for k, v in stored.items() if k.split(":")[0] not in edge_ids}
+    if args.update_baseline:
+        save_edge_baseline({**others, **metrics}, args.baseline)
+        print(f"\nedge baseline written to {args.baseline}")
+        return 0
+    if not stored:
+        print(f"\nno edge baseline at {args.baseline}; run `make baseline`", flush=True)
+        return 1
+    diffs = diff_metrics(metrics, {k: v for k, v in stored.items() if k not in others})
+    if diffs:
+        print(f"\n{len(diffs)} edge result(s) differ from baseline:")
+        for d in diffs:
+            print(f"  {d.describe()}")
+        print("If intended: `make baseline`, then commit benchmarks/baseline.json.")
+        return 1
+    print("\nall edge results match baseline")
+    return 0
 
 
 SCORES_FILE = "site/features/edge_scores.toml"

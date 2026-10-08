@@ -1,5 +1,63 @@
 {
   "schema_version": 1,
+  "edges": {
+    "momentum_12_1:momentum_12_1@h20/all=all": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463525,
+      "decile_sessions": 6.0,
+      "decile_spread": 0.05686709971869885,
+      "decile_t": 3.142140856476347,
+      "hit_rate": 0.63,
+      "lift": 1.1544976076555025,
+      "mean_excess_picks": 0.01743540584226573,
+      "picks": 300.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.039796221506499536
+    },
+    "momentum_12_1:momentum_12_1@h20/frozen=frozen": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_12_1@h20/regime=UNKNOWN": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463525,
+      "decile_sessions": 6.0,
+      "decile_spread": 0.05686709971869885,
+      "decile_t": 3.142140856476347,
+      "hit_rate": 0.63,
+      "lift": 1.1544976076555025,
+      "mean_excess_picks": 0.01743540584226573,
+      "picks": 300.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.039796221506499536
+    },
+    "momentum_12_1:momentum_12_1@h20/year=2020": {
+      "base_rate": 0.5404040404040404,
+      "bh_mean": 0.008701354993718444,
+      "decile_sessions": 1.0,
+      "decile_spread": 0.1179871027069409,
+      "hit_rate": 0.68,
+      "lift": 1.2583177570093458,
+      "mean_excess_picks": 0.021835143637225888,
+      "picks": 50.0,
+      "sessions": 11.0,
+      "top_decile_mean": 0.06722124933780016
+    },
+    "momentum_12_1:momentum_12_1@h20/year=2021": {
+      "base_rate": 0.5574229691876751,
+      "bh_mean": 0.009630549828486228,
+      "decile_sessions": 5.0,
+      "decile_spread": 0.04464309912105044,
+      "decile_t": 2.7312026192440335,
+      "hit_rate": 0.62,
+      "lift": 1.1122613065326632,
+      "mean_excess_picks": 0.016555458283273698,
+      "picks": 250.0,
+      "sessions": 5.0,
+      "top_decile_mean": 0.03431121594023941
+    }
+  },
   "results": {
     "buy_and_hold@bear_trend": {
       "annual_volatility": 0.24382791845281923,

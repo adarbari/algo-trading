@@ -13,7 +13,10 @@
 name = "universe"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"]
+also_written_by = [
+    "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py",
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py",
+]
 
 [[table]]
 name = "instruments/reference"
