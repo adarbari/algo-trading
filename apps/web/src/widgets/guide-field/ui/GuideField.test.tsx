@@ -8,7 +8,7 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 import { GuideField } from './GuideField';
 
 const hooks = vi.hoisted(() => ({
-  useFeatureCatalogue: vi.fn(),
+  useFeatureCatalogueDetail: vi.fn(),
   useFeatureDistribution: vi.fn(),
   useFeatureHistory: vi.fn(),
   useGuideField: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('@algotrade/ui', async (importOriginal) => {
 });
 vi.mock('@/entities/feature', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useFeatureCatalogue: hooks.useFeatureCatalogue,
+  useFeatureCatalogueDetail: hooks.useFeatureCatalogueDetail,
   useFeatureDistribution: hooks.useFeatureDistribution,
 }));
 vi.mock('@/entities/guide', async (importOriginal) => ({
@@ -180,7 +180,7 @@ stubElementSize();
 
 beforeEach(() => {
   hooks.chart.mockClear();
-  hooks.useFeatureCatalogue.mockReturnValue(fakeQuery(catalogue));
+  hooks.useFeatureCatalogueDetail.mockReturnValue(fakeQuery(catalogue));
   hooks.useFeatureDistribution.mockReturnValue(fakeQuery(distribution));
   hooks.useGuideField.mockReturnValue(fakeQuery(derived));
   hooks.useFeatureHistory.mockReturnValue({
@@ -382,11 +382,11 @@ describe('GuideField sections', () => {
 
 describe('GuideField states', () => {
   it('shows loading and a retry on error for the catalogue', async () => {
-    hooks.useFeatureCatalogue.mockReturnValue(fakeQuery(undefined));
+    hooks.useFeatureCatalogueDetail.mockReturnValue(fakeQuery(undefined));
     const { rerender } = render(<GuideField name={BB} onAddToBuilder={vi.fn()} />);
     expect(screen.getByRole('status')).toBeInTheDocument();
     const failed = fakeQuery(undefined, { isError: true });
-    hooks.useFeatureCatalogue.mockReturnValue(failed);
+    hooks.useFeatureCatalogueDetail.mockReturnValue(failed);
     rerender(<GuideField name={BB} onAddToBuilder={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(failed.refetch).toHaveBeenCalled();

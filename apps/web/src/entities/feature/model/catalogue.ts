@@ -7,8 +7,11 @@ import type { ValueFormat } from '@algotrade/ui';
 
 import { feature, type gqlTypes } from '@/shared/api';
 
-/** One catalogue field as `Query.catalogue` serves it. */
+/** One catalogue field as `Query.catalogue` serves it (the guide's theme, reads and summary). */
 export type CatalogueFeature = gqlTypes.FeatureCatalogueQuery['catalogue'][number];
+
+/** The same field with the guide's full entry (the Guide's field pages read it). */
+export type DetailedFeature = gqlTypes.FeatureCatalogueDetailQuery['catalogue'][number];
 
 /** Short labels for the features the Explore defaults show (the mockup's headers). */
 const LABELS: Readonly<Record<string, string>> = {
@@ -147,6 +150,6 @@ export function unitLabel(unit: string | null | undefined): string {
 }
 
 /** Catalogue lookup by field name. */
-export function byName(catalogue: readonly CatalogueFeature[]): Map<string, CatalogueFeature> {
+export function byName<T extends CatalogueFeature>(catalogue: readonly T[]): Map<string, T> {
   return new Map(catalogue.map((f) => [f.name, f]));
 }

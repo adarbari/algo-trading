@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import { refreshCatalogue, useFeatureCatalogue, useFeatureDistribution } from './hooks';
+import {
+  refreshCatalogue,
+  useFeatureCatalogue,
+  useFeatureCatalogueDetail,
+  useFeatureDistribution,
+} from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -30,6 +35,23 @@ describe('feature hooks', () => {
     expect(result.current.data).toEqual([{ name: 'feature.market_cap' }]);
   });
 
+  it('keeps the guide entries out of the light catalogue and reads them on the detail read', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({ catalogue: [] });
+    const light = renderHook(() => useFeatureCatalogue(), { wrapper });
+    const detail = renderHook(() => useFeatureCatalogueDetail(), { wrapper });
+    await waitFor(() => {
+      expect(light.result.current.isSuccess && detail.result.current.isSuccess).toBe(true);
+    });
+    const documents = GQL.mock.calls.map(([document]) => String(document));
+    const lightDoc = documents.find((d) => d.includes('query FeatureCatalogue {')) ?? '';
+    const detailDoc = documents.find((d) => d.includes('query FeatureCatalogueDetail')) ?? '';
+    expect(lightDoc).not.toContain('caveats');
+    expect(lightDoc).not.toContain('uses');
+    expect(detailDoc).toContain('caveats');
+    expect(detailDoc).toContain('uses');
+  });
+
   it('reads a distribution by name, and nothing without one', async () => {
     GQL.mockClear();
     GQL.mockResolvedValue({ distribution: { name: 'instrument.sector' } });
@@ -50,5 +72,6 @@ describe('feature hooks', () => {
     const invalidate = vi.spyOn(client, 'invalidateQueries');
     await refreshCatalogue(client);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['gql', 'FeatureCatalogue', {}] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['gql', 'FeatureCatalogueDetail', {}] });
   });
 });

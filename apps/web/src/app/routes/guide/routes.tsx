@@ -13,26 +13,26 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { parseFieldsSearch } from '@/entities/guide';
-import {
-  GuideEpisodePage,
-  GuideFieldPage,
-  GuideFieldsPage,
-  GuideGlossaryPage,
-  GuideHomePage,
-  GuideIndicatorPage,
-  GuidePlaybookPage,
-  GuidePlaybooksPage,
-  GuideRegimePage,
-  GuideSituationPage,
-  GuideSituationsPage,
-  GuideStartIndexPage,
-  GuideStartPage,
-  GuideTermPage,
-} from '@/pages/guide';
-
 import { GuideLayout } from '../../layouts';
 import { viewerGuard } from '../../workspaces';
 import { rootRoute } from '../root';
+import { lazyPage } from '../lazy-page';
+
+// One chunk for the Guide's pages (they share widgets), loaded when the first Guide page opens.
+const GuideEpisodePage = lazyPage(() => import('@/pages/guide'), 'GuideEpisodePage');
+const GuideFieldPage = lazyPage(() => import('@/pages/guide'), 'GuideFieldPage');
+const GuideFieldsPage = lazyPage(() => import('@/pages/guide'), 'GuideFieldsPage');
+const GuideGlossaryPage = lazyPage(() => import('@/pages/guide'), 'GuideGlossaryPage');
+const GuideHomePage = lazyPage(() => import('@/pages/guide'), 'GuideHomePage');
+const GuideIndicatorPage = lazyPage(() => import('@/pages/guide'), 'GuideIndicatorPage');
+const GuidePlaybookPage = lazyPage(() => import('@/pages/guide'), 'GuidePlaybookPage');
+const GuidePlaybooksPage = lazyPage(() => import('@/pages/guide'), 'GuidePlaybooksPage');
+const GuideRegimePage = lazyPage(() => import('@/pages/guide'), 'GuideRegimePage');
+const GuideSituationPage = lazyPage(() => import('@/pages/guide'), 'GuideSituationPage');
+const GuideSituationsPage = lazyPage(() => import('@/pages/guide'), 'GuideSituationsPage');
+const GuideStartIndexPage = lazyPage(() => import('@/pages/guide'), 'GuideStartIndexPage');
+const GuideStartPage = lazyPage(() => import('@/pages/guide'), 'GuideStartPage');
+const GuideTermPage = lazyPage(() => import('@/pages/guide'), 'GuideTermPage');
 
 export const guideRoute = createRoute({
   getParentRoute: () => rootRoute,

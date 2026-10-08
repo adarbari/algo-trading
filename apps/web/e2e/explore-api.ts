@@ -437,7 +437,7 @@ function guideField(name: string): Json {
  */
 function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
-  if (name === 'FeatureCatalogue') return catalogue();
+  if (name === 'FeatureCatalogue' || name === 'FeatureCatalogueDetail') return catalogue();
   if (name === 'GuideIndex') return guideIndex();
   if (name === 'GuidePlaybook') return guidePlaybook(String(operation.variables?.['id']));
   if (name === 'GuideIndicator') return guideIndicator(String(operation.variables?.['key']));

@@ -4,9 +4,10 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
-import { IdeasPage } from '@/pages/trader-ideas';
-
 import { traderRoute } from './layout-route';
+import { lazyPage } from '../lazy-page';
+
+const IdeasPage = lazyPage(() => import('@/pages/trader-ideas'), 'IdeasPage');
 
 function IdeasRoute() {
   const navigate = useNavigate();

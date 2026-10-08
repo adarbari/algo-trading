@@ -13,7 +13,7 @@ import { FeatureTable } from '@/widgets/feature-table';
 import { MAX_COMPARE, nextSelection } from '@/features/compare-set';
 import { TickerFilterBar, toTableFilters, type TickerFilters } from '@/features/ticker-filter';
 
-import { DEFAULT_COLUMNS, formatSort, joinList, type ExploreSearch } from '../model/search';
+import { DEFAULT_COLUMNS, formatSort, joinList, type ExploreSearch } from '@/entities/explore';
 import { exploreState, type SearchPatch } from '../model/state';
 
 import { CompareBar } from './CompareBar';

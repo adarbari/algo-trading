@@ -7,12 +7,14 @@
 import { createRoute, redirect, useNavigate, useSearch } from '@tanstack/react-router';
 
 import { ensureViewer, NOT_REGISTERED } from '@/entities/viewer';
-import { LoginPage } from '@/pages/login';
 import { signOutSession } from '@/shared/api';
 
 import { DEFAULT_WORKSPACE } from '../workspaces';
 import type { LoginReason } from '../workspaces/guard';
 import { rootRoute } from './root';
+import { lazyPage } from './lazy-page';
+
+const LoginPage = lazyPage(() => import('@/pages/login'), 'LoginPage');
 
 interface LoginSearch {
   reason?: LoginReason;

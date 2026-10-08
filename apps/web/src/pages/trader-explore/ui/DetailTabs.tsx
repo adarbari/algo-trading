@@ -17,7 +17,7 @@ import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 import { ScreenerHitsPanel } from '@/widgets/screener-hits-panel';
 
-import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch } from '../model/search';
+import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch } from '@/entities/explore';
 import { exploreState, type SearchPatch } from '../model/state';
 
 import { ExploreTabs } from './ExploreTabs';

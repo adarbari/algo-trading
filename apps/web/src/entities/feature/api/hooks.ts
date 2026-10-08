@@ -35,6 +35,37 @@ const FeatureCatalogue = graphql(`
         theme
         reads
         summary
+      }
+    }
+  }
+`);
+
+/** The same entries with the guide's full entry (criteria per intent, caveats, sources): ~250 KB
+ * more, read only by the Guide's field pages. */
+const FeatureCatalogueDetail = graphql(`
+  query FeatureCatalogueDetail {
+    catalogue {
+      name
+      kind
+      source
+      dtype
+      format
+      description
+      nullMeaning
+      version
+      group
+      key
+      inputs
+      unit
+      range
+      categories
+      scope
+      owner
+      licence
+      guide {
+        theme
+        reads
+        summary
         caveats
         sources
         uses {
@@ -104,9 +135,23 @@ export function useFeatureCatalogue() {
   });
 }
 
+/** The catalogue with every field's full guide entry (the Guide's field pages only). */
+export function useFeatureCatalogueDetail(enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: queryKeys.gql('FeatureCatalogueDetail', {}),
+    queryFn: () => gql(FeatureCatalogueDetail, {}),
+    select: (data) => data.catalogue,
+    staleTime: CATALOGUE_STALE_MS,
+  });
+}
+
 /** Read the catalogue again (a user feature was saved). */
 export function refreshCatalogue(client: QueryClient): Promise<void> {
-  return client.invalidateQueries({ queryKey: queryKeys.gql('FeatureCatalogue', {}) });
+  return Promise.all([
+    client.invalidateQueries({ queryKey: queryKeys.gql('FeatureCatalogue', {}) }),
+    client.invalidateQueries({ queryKey: queryKeys.gql('FeatureCatalogueDetail', {}) }),
+  ]).then(() => undefined);
 }
 
 /** `name` across the universe for the latest session; null: nothing stored at all. */
