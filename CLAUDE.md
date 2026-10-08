@@ -131,7 +131,9 @@ the skill with the fix.
 8. Secrets come only from environment variables. Never commit credentials.
    Dependencies go in the pyproject of the package that needs them (an app's own, not the
    library's), then `uv lock`; commit `uv.lock`.
-9. Before finishing any change, run `make check`.
+9. Check narrow first (`make changed`: mirrored tests, mapped web checks, fast gates), then run the full
+   `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a failure rerun only the failed
+   gate (`make <gate>` / `npm run <script>`), never the whole `make check` again.
 10. **Push and open the PR yourself, then move on.** When `make check` passes, push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start

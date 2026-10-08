@@ -36,5 +36,6 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}', 'design-system/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     restoreMocks: true,
+    pool: 'vmThreads',
   },
 });

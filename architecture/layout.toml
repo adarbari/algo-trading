@@ -720,6 +720,10 @@ path = "tests/architecture/api"
 purpose = "fitness tests for the API surface and the read model"
 
 [[test_dir]]
+path = "tests/architecture/pipeline"
+purpose = "fitness tests for the build and check pipeline (local gates, CI shape, harness rules)"
+
+[[test_dir]]
 path = "tests/contract"
 purpose = "contract suites every implementation of a protocol must pass, one folder per protocol"
 holds = "folders"
@@ -738,7 +742,7 @@ purpose = "a real store and engine across every golden dataset"
 
 [[test_dir]]
 path = "tests/scripts"
-purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests)"
+purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests, changed_web)"
 
 [[test_dir]]
 path = "tests/reconciliation"

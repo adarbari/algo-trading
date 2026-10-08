@@ -28,3 +28,19 @@ auto-merge. Every push to main runs everything.
 
 `make check` runs every CI step (tests in parallel, one worker per CPU; `make test
 WORKERS=0` runs them serially). The web screenshots need Docker: `make web-visual`.
+
+## Pipeline
+
+| Measure | Before (2026-10-07) | After |
+|---|---|---|
+| `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
+
+### Local fast path
+
+`make changed` runs the mirrored Python tests, then the web checks `scripts/changed_web.py`
+maps from the changed `apps/web` files (slice or component folder -> vitest; page or route ->
+the e2e spec named after it, else `smoke`; story or CSS module -> that component's screenshots,
+printed as a Docker command off Linux; any `.ts` / `.tsx` -> `npm run typecheck`), then the
+fast gates. Run the full `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a
+failure rerun only the failed gate. The vitest pool is `vmThreads`: jsdom is created once per
+worker instead of once per file.
