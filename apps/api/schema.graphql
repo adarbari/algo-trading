@@ -2000,13 +2000,25 @@ enum SignalKind {
 }
 
 """
-One signal around one episode. `flaggedDay` / `clearedDay`: exchange sessions from the episode's peak (negative: before it, the signal led); `flaggedDayFromTrough`: from its trough. `flaggedDay` is the first session of the first ON run overlapping the window before the trough (a run already ON at the window's start counts from there); `clearedDay` the first later session it was not ON, null while it is still ON at the session. `neverFired`: verdicts are stored and every one is false. `unknownReason`: set exactly when no verdict is stored in the window (never `neverFired` then). All three null with neither set: it turned ON only after the trough
+How a signal did: LED (ON up to the trough), LATE (first ON only after it), NEVER_FIRED (every stored verdict false) or UNKNOWN (no verdict stored up to the trough)
+"""
+enum SignalState {
+  LED
+  LATE
+  NEVER_FIRED
+  UNKNOWN
+}
+
+"""
+One signal around one episode; `state` says how it did. `flaggedDay` / `clearedDay`: exchange sessions from the episode's peak (negative: before it, the signal led); `flaggedDayFromTrough`: from its trough (positive for LATE, where `flaggedDay` is the first ON session after the trough). `flaggedDay` is the first session of the first ON run overlapping the window before the trough; `clearedDay` the first later session it was not ON, null while it is still ON at the session or at the trough plus the clear horizon. `firstKnownDay`: set when the stored verdicts start after the window's start (sessions from the peak), so `flaggedDay` is not the true start of a run already ON then. `unknownReason` is set exactly when `state` is UNKNOWN (never `neverFired` then)
 """
 type SignalTiming {
   indicator: String!
   kind: SignalKind!
+  state: SignalState!
   flaggedDay: Int
   clearedDay: Int
+  firstKnownDay: Int
   neverFired: Boolean!
   unknownReason: Unknown
   flaggedDayFromTrough: Int

@@ -188,7 +188,11 @@ class Episode:
         "episode, as the session knew it (null on a Guide page, which has no session)"
     )
     async def signals(self, info: Info) -> EpisodeSignals | None:
-        found = await off_loop(timeline.load_episode_signals, self.ctx, self.key)
+        found = (
+            None
+            if self.ctx is None
+            else await off_loop(timeline.load_episode_signals, self.ctx, self.key)
+        )
         return EpisodeSignals.of(found) if found is not None else None
 
 

@@ -13,6 +13,7 @@ from algotrade.services.read.regime.timeline import (
     GATE,
     EpisodeSignals,
     SignalKind,
+    SignalState,
     SignalTiming,
     load_episode_signals,
 )
@@ -92,6 +93,7 @@ def test_flagged_and_cleared_days_count_sessions_from_the_peak_and_the_trough() 
     # on from 21 Sep (one session before the peak); the null on 23 Sep neither clears nor
     # flags; first not ON on 25 Sep (3 sessions after the peak); 5 sessions before the trough
     assert (curve.kind, curve.flagged_day, curve.cleared_day) == (SignalKind.SLOW, -1, 3)
+    assert curve.state is SignalState.LED and curve.first_known_day is None  # rows from the start
     assert (curve.flagged_day_from_trough, curve.never_fired, curve.unknown_reason) == (
         -5,
         False,
@@ -110,6 +112,7 @@ def test_the_gate_is_the_regime_label_in_the_gate_labels() -> None:
 def test_a_signal_false_on_every_stored_session_never_fired() -> None:
     trend = timing(signals(ROWS), "trend")
     assert trend.never_fired and trend.unknown_reason is None
+    assert trend.state is SignalState.NEVER_FIRED
     assert (trend.flagged_day, trend.cleared_day, trend.flagged_day_from_trough) == (None,) * 3
 
 
@@ -130,7 +133,9 @@ def test_rows_after_the_session_are_ignored_and_a_run_still_on_has_no_clear() ->
     assert timing(at_d0, "trend").never_fired  # its 1 Oct ON is after the session
     # the same store read as of 1 Oct: the trend turned ON only after the trough
     late = timing(signals(rows, day=D1), "trend")
-    assert (late.flagged_day, late.never_fired, late.unknown_reason) == (None, False, None)
+    # LATE: the first ON session after the trough, 7 sessions after the peak, 3 after the trough
+    assert (late.state, late.flagged_day, late.flagged_day_from_trough) == (SignalState.LATE, 7, 3)
+    assert (late.never_fired, late.unknown_reason) == (False, None)
 
 
 def test_no_stored_verdict_in_the_window_is_unknown_never_never_fired() -> None:
@@ -154,3 +159,27 @@ def test_a_card_without_a_verdict_column_is_not_in_the_catalogue() -> None:
 def test_an_unknown_or_an_unlisted_episode_is_none() -> None:
     assert signals(ROWS, key="nope") is None
     assert signals(ROWS, key="late", day=D1) is None  # its trough (2 Oct) has not come
+
+
+def test_an_unknown_label_neither_shuts_nor_opens_the_gate() -> None:
+    rows = {
+        SEP24: {"label": "CALM"},
+        SEP25: {"label": "STRESS"},
+        SEP28: {"label": "SUNNY"},  # not a regime label: unknown, so the gate stays shut
+        SEP29: {"label": "CAUTION"},
+    }
+    gate = signals(rows).gate
+    assert (gate.state, gate.flagged_day, gate.cleared_day) == (SignalState.LED, 3, 5)
+
+
+def test_verdicts_stored_only_after_the_trough_are_unknown_not_never_fired() -> None:
+    found = signals({SEP29: {"label": "CALM", "trend_on": False}})
+    for t in (found.gate, timing(found, "trend")):
+        assert (t.state, t.never_fired) == (SignalState.UNKNOWN, False)
+        assert t.unknown_reason is not None and t.unknown_reason.code is UnknownCode.NO_ROW
+
+
+def test_first_known_day_says_when_stored_verdicts_start_mid_window() -> None:
+    rows = {d: v for d, v in ROWS.items() if d >= SEP21}
+    curve = timing(signals(rows), "curve")
+    assert (curve.flagged_day, curve.first_known_day) == (-1, -1)  # on from the first stored day
