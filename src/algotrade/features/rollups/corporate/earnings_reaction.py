@@ -140,6 +140,14 @@ def _pre_adv(dollar: Matrix, column: int, before: int) -> float:
     return float(_mean(dollar[before + 1 - ADV_WINDOW : before + 1, [column]])[0])
 
 
+def _share(numerator: float, denominator: float) -> float:
+    """``numerator / denominator``, NaN (never an error or an infinity) when the denominator is
+    zero, negative or missing: a name with no pre-event trading has no volume ratio."""
+    if not np.isfinite(denominator) or denominator <= 0.0:
+        return np.nan
+    return numerator / denominator
+
+
 def _one_per_quarter(reports: list[date]) -> list[date]:
     """Newest first, keeping the earliest of reports less than ``SAME_QUARTER`` apart (the
     calendar listed one quarter twice: a moved date)."""
@@ -157,20 +165,20 @@ def _row(
     last = _window(grid, reports[0])
     assert last is not None  # counted reports have a closed window on the grid
     before, after = last
-    with np.errstate(invalid="ignore", divide="ignore"):
-        excess = (px[after, column] / px[before, column] - 1.0) - (
-            np.nan if spy is None else px[after, spy] / px[before, spy] - 1.0
-        )
+    move = _share(float(px[after, column]), float(px[before, column])) - 1.0
+    market = np.nan if spy is None else _share(float(px[after, spy]), float(px[before, spy])) - 1.0
+    excess = move - market
     ratios = []
     for report in reports[:REPORTS]:
         w = _window(grid, report)
         if w is None:
             ratios.append(np.nan)
             continue
-        with np.errstate(invalid="ignore", divide="ignore"):
-            ratios.append(
-                float(_mean(dollar[w[0] : w[1] + 1, [column]])[0]) / _pre_adv(dollar, column, w[0])
+        ratios.append(
+            _share(
+                float(_mean(dollar[w[0] : w[1] + 1, [column]])[0]), _pre_adv(dollar, column, w[0])
             )
+        )
     ratio = float(np.mean(ratios)) if len(reports) >= REPORTS else np.nan
     return {
         "reaction_excess_return": excess,
