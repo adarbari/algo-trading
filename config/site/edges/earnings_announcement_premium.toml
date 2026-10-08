@@ -1,0 +1,56 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. The screener comes with ED4c.
+id = "earnings_announcement_premium"
+name = "Earnings announcement premium"
+thesis = "Stocks earn more in the days around a scheduled earnings report than at other times."
+mechanism = """Announcements draw attention-driven buying, and the announcement's own risk, which
+cannot be diversified away in a reporting season, is priced (Frazzini and Lamont 2007; Savor and
+Wilson 2016)."""
+persistence = """Compensation for holding risk that concentrates on known dates: earning it means
+holding the announcement, which arbitrage cannot avoid."""
+schedule = "on_event:earnings_scheduled"
+top_k = "all"
+screeners = []
+status = "candidate"
+notes = """Window: from five sessions before the scheduled report to one after (six sessions,
+start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must read
+SCHEDULED (earnings_schedule@v1) at the window's start, never be taken from the report."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [6]
+benchmark = "SPY"
+start_offset_sessions = -5
+
+[quality_bar]
+outcome = """Excess return over SPY from five sessions before the scheduled report to one after:
+a hold entered ahead of the date and closed after the reaction."""
+trigger_timing = """The next report date is known when earnings_schedule@v1 reads SCHEDULED; we
+act only if it does on the window's first session, so a date confirmed later is not used."""
+replication = """Frazzini and Lamont's rule first: hold every stock with a report expected in the
+window, equally weighted; their split by expected volume is a variant; the screener is ED4c."""
+expected_size = """Published as a positive abnormal return in announcement months, largest for
+names with high expected announcement volume (Frazzini and Lamont 2007), and found in most
+markets (Barber, De George, Lehavy and Trueman 2013). About eight reports per name in the
+stored bars, clustered in about eight seasons."""
+capacity_costs = """One entry and one exit per report, no short leg; the cost is the stock's
+spread, small for liquid names."""
+failure_modes = """Moved or estimated dates, and a market sell-off in a season. Retire if the
+frozen-period excess return is not above the base rate of the same names outside their windows."""
+decoys = """Market beta in reporting seasons and the size effect: the size and 12-1 momentum
+baselines on the same sessions, and the same names outside their windows."""
+
+[[sources]]
+title = "Frazzini, A. and Lamont, O., The Earnings Announcement Premium and Trading Volume, NBER working paper, 2007"
+
+[[sources]]
+title = "Savor, P. and Wilson, M., Earnings Announcements and Systematic Risk, Journal of Finance, 2016"
+
+[[sources]]
+title = "Barber, B., De George, E., Lehavy, R. and Trueman, B., The Earnings Announcement Premium Around the Globe, Journal of Financial Economics, 2013"
