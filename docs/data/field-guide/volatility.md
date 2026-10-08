@@ -572,3 +572,36 @@ Sources: Volatility breakout systems (Kaufman, Trading Systems and Methods: rang
 - Null after a gap in the last 61 sessions, a shorter history, or hv60 of 0.
 
 Sources: Sinclair (2013), Volatility Trading: volatility cones and term comparison
+
+### `feature.vrp_ibkr_iv_hv_spread`
+
+**How to read it.** IBKR's IV30 minus HV30, in volatility points as a fraction: the volatility premium on one source. 0.10 means options price ten points more movement than the stock delivered over the last 30 sessions. The same reading as feature.vrp_iv_hv_spread, but never the lower of IBKR's and Cboe's, so it exists wherever IBKR's IV30 is stored (about two years) and is the one to screen when a screen is scored over history.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a rich premium on IBKR's IV (the vrp_iv_hv screen) | `gte 0.1` | hard | - | with feature.vrp_ibkr_iv_hv_ratio gte 1.25 |
+
+**When the reading lies**
+
+- The caveats of feature.vrp_iv_hv_spread apply: a report ahead inflates it, a quiet month widens it. Check rollup.earnings@v1.days_to_earnings and rollup.price_moves@v1.one_day_move.
+- A spread of 0.10 on a 0.08 HV is a pinned or halted name, not a premium; require feature.vrp_ibkr_iv_hv_ratio and rollup.price_stats@v2.hv30 gte 0.10 with it.
+
+Sources: Carr and Wu (2009), Variance risk premiums; ADR 0028 (IBKR-derived, personal licence)
+
+### `feature.vrp_ibkr_iv_hv_ratio`
+
+**How to read it.** IBKR's IV30 divided by HV30: how many times the movement options price exceeds the movement the stock delivered. 1.25 means a quarter more. The same reading as feature.vrp_iv_hv_ratio, on IBKR's IV alone.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a rich premium on IBKR's IV (the vrp_iv_hv screen) | `gte 1.25` | hard | - | with feature.vrp_ibkr_iv_hv_spread gte 0.10 |
+
+**When the reading lies**
+
+- The caveats of feature.vrp_iv_hv_ratio apply: no floor on HV30, so a pinned name shows a huge ratio; require rollup.price_stats@v2.hv30 gte 0.10 with it.
+
+Sources: Carr and Wu (2009), Variance risk premiums; ADR 0028 (IBKR-derived, personal licence)
