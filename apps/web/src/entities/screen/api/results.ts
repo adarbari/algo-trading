@@ -50,6 +50,7 @@ const ScreenerResults = graphql(`
         status
         coverage
         missingTables
+        missingOptionalTables
         regime
         paused
         decisions {

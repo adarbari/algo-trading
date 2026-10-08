@@ -91,6 +91,7 @@ function served(total = 2) {
         status: 'complete',
         coverage: 'COMPLETE',
         missingTables: [] as string[],
+        missingOptionalTables: [] as string[],
         regime: 'STRESS',
         paused: 1,
         decisions: [
@@ -254,6 +255,27 @@ describe('ScreenerResults', () => {
       ),
     ).toBeVisible();
     expect(screen.getByText(/Not stored for 2026-10-02: fund_reference@v1\./)).toBeVisible();
+  });
+
+  // ADR 0055: a COMPLETE run without ibkr_iv (IB Gateway down) looked clean on the page.
+  it('warns that a COMPLETE run ran without an optional source table', () => {
+    const base = served();
+    hooks.useScreenerResults.mockReturnValue(
+      fakeQuery({
+        ...base,
+        screener: {
+          ...base.screener,
+          latestRun: {
+            ...base.screener.latestRun,
+            missingOptionalTables: ['rollups/instrument/ibkr_iv@v1'],
+          },
+        },
+      }),
+    );
+    setup();
+    expect(screen.getByText('Optional data missing')).toBeVisible();
+    expect(screen.getByText('The run for 2026-10-02 had no ibkr_iv@v1.')).toBeVisible();
+    expect(screen.queryByText('Partial run')).toBeNull();
   });
 
   it('shows no run banner for a COMPLETE run', () => {

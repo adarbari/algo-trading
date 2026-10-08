@@ -91,6 +91,7 @@ def test_a_run_carries_its_record_stats(ctx: ReadContext) -> None:
     beta = latest_run(ctx, "me", "beta").run
     assert beta is not None and beta.audit == {}  # no record at all
     assert (beta.coverage, beta.missing_tables) == (None, ())
+    assert beta.missing_optional_tables == ()
 
 
 def test_a_partial_run_names_the_tables_it_ran_without(backend: MemoryBackend) -> None:
@@ -106,6 +107,21 @@ def test_a_partial_run_names_the_tables_it_ran_without(backend: MemoryBackend) -
     assert run.coverage == "PARTIAL"
     assert run.missing_tables == (
         "rollups/instrument/trend_stats@v2", "rollups/instrument/vol_stats@v1",
+    )  # fmt: skip
+
+
+def test_a_complete_run_without_an_optional_table_names_it(backend: MemoryBackend) -> None:
+    """ADR 0055: ``stats["missing_optional_tables"]`` reaches the read model, so a COMPLETE run
+    without ibkr_iv (IB Gateway down) does not look clean; it is not in ``missing_tables``."""
+    stats = {"coverage": "COMPLETE", "missing_tables": [],
+             "missing_optional_tables": ["rollups/instrument/ibkr_iv@v1"]}  # fmt: skip
+    StoreWriter(backend).save_run(
+        RunRecord("rs", "screen-beta-site", D1, T).finish(T, complete=True, stats=stats)
+    )
+    run = latest_run(context(StoreReader(backend), user="site"), "site", "beta").run
+    assert run is not None and run.status == "complete"
+    assert (run.missing_tables, run.missing_optional_tables) == (
+        (), ("rollups/instrument/ibkr_iv@v1",)
     )  # fmt: skip
 
 

@@ -56,6 +56,7 @@ class ScreenerRun:
     audit: JSON
     coverage: str | None
     missing_tables: list[str]
+    missing_optional_tables: list[str]
     run: strawberry.Private[runs.ScreenerRun]
     ctx: strawberry.Private[ReadContext]
 
@@ -76,6 +77,7 @@ class ScreenerRun:
             audit=JSON(dict(d.audit)),
             coverage=d.coverage,
             missing_tables=list(d.missing_tables),
+            missing_optional_tables=list(d.missing_optional_tables),
             run=d,
             ctx=ctx,
         )

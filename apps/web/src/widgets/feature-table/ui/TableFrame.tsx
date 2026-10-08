@@ -32,6 +32,8 @@ export interface RunNotes {
   partial: boolean;
   /** The tables that had no rows when it ran. */
   missing: readonly string[];
+  /** The optional sources' tables it ran without (ADR 0055: a warning, the run is complete). */
+  missingOptional?: readonly string[] | undefined;
 }
 
 export interface SessionNotes {
@@ -86,8 +88,17 @@ function Notes({ notes }: { notes: SessionNotes }) {
         </Banner>
       ) : null}
       {notes.run && runShows(notes.run) ? <RunBanner run={notes.run} /> : null}
+      {notes.run && optionalOf(notes.run).length > 0 ? (
+        <Banner tone="warning" title="Optional data missing">
+          {`The run for ${notes.run.session} had no ${optionalOf(notes.run).join(', ')}.`}
+        </Banner>
+      ) : null}
     </>
   );
+}
+
+function optionalOf(run: RunNotes): string[] {
+  return missingTables(run.missingOptional ?? []);
 }
 
 function runShows(run: RunNotes): boolean {
@@ -111,7 +122,7 @@ function shows(notes: SessionNotes | null | undefined): notes is SessionNotes {
     (isStale(notes.session) ||
       notes.missing.length > 0 ||
       notes.preSnapshot ||
-      (!!notes.run && runShows(notes.run)))
+      (!!notes.run && (runShows(notes.run) || optionalOf(notes.run).length > 0)))
   );
 }
 

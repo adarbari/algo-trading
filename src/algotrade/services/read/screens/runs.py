@@ -57,7 +57,9 @@ class ScreenerRun:
     stamped on its rows (None: gate off, unknown, or a run before the stamp); ``audit``: its
     run record's stats (coverage, the selection's audit; empty: no record); ``coverage``: the
     record's coverage (COMPLETE, PARTIAL; None: not recorded) and ``missing_tables``: the
-    tables that had no rows when it ran (its own, not the session's as read now)."""
+    tables that had no rows when it ran (its own, not the session's as read now);
+    ``missing_optional_tables``: the optional sources' tables it ran without (ADR 0055: a
+    COMPLETE run, warned not failed)."""
 
     run_id: str
     config_id: str
@@ -73,6 +75,7 @@ class ScreenerRun:
     audit: Mapping[str, Any]
     coverage: str | None = None
     missing_tables: tuple[str, ...] = ()
+    missing_optional_tables: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -106,12 +109,18 @@ def _regime(rows: pd.DataFrame) -> str | None:
     return found[0] if found else None
 
 
-def _coverage(stats: Mapping[str, Any]) -> tuple[str | None, tuple[str, ...]]:
-    """The run record's coverage and the tables it ran without (``stats["missing_tables"]``)."""
+def _tables(stats: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    return tuple(sorted(str(t) for t in stats.get(key) or ()))
+
+
+def _coverage(stats: Mapping[str, Any]) -> tuple[str | None, tuple[str, ...], tuple[str, ...]]:
+    """The run record's coverage, the tables it ran without (``stats["missing_tables"]``) and
+    the optional ones (``stats["missing_optional_tables"]``)."""
     coverage = stats.get("coverage")
     return (
         None if coverage is None else str(coverage),
-        tuple(sorted(str(t) for t in stats.get("missing_tables") or ())),
+        _tables(stats, "missing_tables"),
+        _tables(stats, "missing_optional_tables"),
     )
 
 
@@ -123,7 +132,7 @@ def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> Sc
     counts = mine["decision"].astype(str).value_counts()
     record = ctx.reader.run(run_id)
     stats: Mapping[str, Any] = {} if record is None else dict(record.stats)
-    coverage, missing_tables = _coverage(stats)
+    coverage, missing_tables, missing_optional = _coverage(stats)
     return ScreenerRun(
         run_id=run_id,
         config_id=config_id,
@@ -142,6 +151,7 @@ def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> Sc
         audit=stats,
         coverage=coverage,
         missing_tables=missing_tables,
+        missing_optional_tables=missing_optional,
     )
 
 
