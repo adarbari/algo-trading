@@ -18,6 +18,12 @@ const INTEGRATION_INCLUDE = [
 ];
 const INTEGRATION_TEST_TIMEOUT_MS = 20_000;
 
+// One machine, several worktrees: scripts/worktree.sh gives each a port block (ALGOTRADE_PORT_BASE)
+// so their servers never collide. Unset (CI, the main checkout): today's numbers.
+const base = process.env['ALGOTRADE_PORT_BASE'];
+const port = (offset: number, fallback: number): number =>
+  base === undefined ? fallback : Number(base) + offset;
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -31,19 +37,19 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: port(1, 5173),
     strictPort: true,
     // The API (apps/api, `algotrade-api`) serves its routes at the root (/health, /graphql, ...);
     // the web app calls them under /api, which the dev server strips and proxies.
     proxy: {
       '/api': {
-        target: process.env['API_PROXY_TARGET'] ?? 'http://127.0.0.1:8000',
+        target: process.env['API_PROXY_TARGET'] ?? `http://127.0.0.1:${String(port(0, 8000))}`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },
-  preview: { port: 4173, strictPort: true },
+  preview: { port: port(7, 4173), strictPort: true },
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
