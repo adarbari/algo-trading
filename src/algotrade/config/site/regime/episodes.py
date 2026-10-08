@@ -13,7 +13,10 @@ reviewed session the S&P 500 regained the pre-episode peak (absent while it has 
 (the first day of the peak and trough months) and the days the committee announced them
 (``announced_start`` / ``announced_end``, absent where NBER published none). The loader checks
 the order (start before end, an announcement not before the month it announces, recessions
-in order and not overlapping). That the dates agree with the dating in ``quant`` and with the
+in order and not overlapping). ``[timeline]`` sets the window of the per-episode signal timing
+read (``services.read.regime.timeline``): ``lookback_sessions`` before the peak,
+``clear_horizon_sessions`` after the trough, and the regime labels (``gate_labels``) that count
+as the screener gate being shut. That the dates agree with the dating in ``quant`` and with the
 episode feature columns is a fitness test."""
 
 from collections import Counter
@@ -45,6 +48,8 @@ KEYS = (
     "notes",
 )
 RECESSION_KEYS = ("start", "end", "announced_start", "announced_end")
+TIMELINE_KEYS = ("lookback_sessions", "clear_horizon_sessions", "gate_labels")
+GATE_LABELS = ("CALM", "CAUTION", "STRESS", "CRISIS")
 
 
 class Documents(Protocol):
@@ -89,19 +94,31 @@ class Recession:
 
 
 @dataclass(frozen=True)
+class Timeline:
+    """The signal-timing window: ``lookback_sessions`` before an episode's peak and
+    ``clear_horizon_sessions`` after its trough (to see when a signal cleared), and the regime
+    ``gate_labels`` at which the screener gate counts as flagged."""
+
+    lookback_sessions: int = 260
+    clear_horizon_sessions: int = 260
+    gate_labels: tuple[str, ...] = ("STRESS", "CRISIS")
+
+
+@dataclass(frozen=True)
 class Episodes:
     """``episodes.toml``: the episodes and the recessions in file order (none without the
-    file)."""
+    file), and the ``timeline`` window."""
 
     episodes: tuple[Episode, ...] = ()
     recessions: tuple[Recession, ...] = ()
+    timeline: Timeline = Timeline()
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "Episodes":
         where = f"{FOLDER}/{NAME}.toml"
         reject_secrets(doc or {}, where)
         root = Table(doc, where)
-        root.only(("episode", "recession"))
+        root.only(("episode", "recession", "timeline"))
         found = tuple(
             _episode(Table(e, f"{where} [[episode]][{i}]"))
             for i, e in enumerate(_tables(root, "episode", where))
@@ -115,7 +132,7 @@ class Episodes:
         repeated = sorted(k for k, n in Counter(e.key for e in found).items() if n > 1)
         if repeated:
             raise ConfigurationError(f"{where}: keys declared more than once: {repeated}")
-        return cls(found, recessions)
+        return cls(found, recessions, _timeline(root.table("timeline", TIMELINE_KEYS)))
 
     def by_key(self, key: str) -> Episode:
         found = next((e for e in self.episodes if e.key == key), None)
@@ -196,6 +213,22 @@ def _episode(t: Table) -> Episode:
     if e.recovered is not None and e.recovered <= e.trough:
         raise ConfigurationError(f"{t.where}: recovered {e.recovered} is not after the trough")
     return e
+
+
+def _timeline(t: Table) -> Timeline:
+    default = Timeline()
+    labels = t.strings("gate_labels", default.gate_labels)
+    bad = sorted(set(labels) - set(GATE_LABELS))
+    if bad or not labels:
+        raise ConfigurationError(
+            f"{t.where} gate_labels: expected one or more of {list(GATE_LABELS)}, "
+            f"got {list(labels)}"
+        )
+    return Timeline(
+        t.integer("lookback_sessions", default.lookback_sessions, 1),
+        t.integer("clear_horizon_sessions", default.clear_horizon_sessions, 1),
+        labels,
+    )
 
 
 def _recession(t: Table) -> Recession:

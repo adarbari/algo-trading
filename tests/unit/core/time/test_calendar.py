@@ -17,6 +17,7 @@ from algotrade.core.time.calendar import (
     nth_weekday,
     previous_session,
     russell_reconstitution,
+    session_offset,
     session_on_or_before,
     sessions_between,
     third_friday,
@@ -273,3 +274,9 @@ def test_last_session_of_month_skips_weekends_and_holidays() -> None:
 )  # fmt: skip
 def test_russell_reconstitution_is_the_fourth_friday_of_june(year: int, day: date) -> None:
     assert russell_reconstitution(year) == day
+
+
+def test_session_offset_is_signed() -> None:
+    assert session_offset(date(2026, 11, 25), date(2026, 11, 30)) == 2
+    assert session_offset(date(2026, 11, 30), date(2026, 11, 25)) == -2
+    assert session_offset(date(2026, 11, 25), date(2026, 11, 25)) == 0

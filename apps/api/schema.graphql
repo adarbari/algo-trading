@@ -290,6 +290,19 @@ type Episode {
   cause: String!
   notes: String!
   knownFrom: Date!
+
+  """
+  When each indicator and the screener gate flagged and cleared around this episode, as the session knew it (null on a Guide page, which has no session)
+  """
+  signals: EpisodeSignals
+}
+
+"""
+The signal timing around one episode as the session knew it: the screener `gate` (the regime label in the site's gate labels) and every indicator, cards in file order
+"""
+type EpisodeSignals {
+  gate: SignalTiming!
+  indicators: [SignalTiming!]!
 }
 
 """The portfolio after one bar: equity and gross exposure"""
@@ -1977,6 +1990,26 @@ type Session {
   referenceSnapshot: Date
   preSnapshot: Boolean!
   unavailable: [Unavailable!]!
+}
+
+"""A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""
+enum SignalKind {
+  FAST
+  SLOW
+  GATE
+}
+
+"""
+One signal around one episode. `flaggedDay` / `clearedDay`: exchange sessions from the episode's peak (negative: before it, the signal led); `flaggedDayFromTrough`: from its trough. `flaggedDay` is the first session of the first ON run overlapping the window before the trough (a run already ON at the window's start counts from there); `clearedDay` the first later session it was not ON, null while it is still ON at the session. `neverFired`: verdicts are stored and every one is false. `unknownReason`: set exactly when no verdict is stored in the window (never `neverFired` then). All three null with neither set: it turned ON only after the trough
+"""
+type SignalTiming {
+  indicator: String!
+  kind: SignalKind!
+  flaggedDay: Int
+  clearedDay: Int
+  neverFired: Boolean!
+  unknownReason: Unknown
+  flaggedDayFromTrough: Int
 }
 
 """

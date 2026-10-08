@@ -10,9 +10,10 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime import episodes as episodes_read
-from algotrade.services.read.regime import history, regime
+from algotrade.services.read.regime import history, regime, timeline
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.instruments.feature import Unknown
+from algotrade_api.graphql.types.market.episode_signals import EpisodeSignals
 from algotrade_api.graphql.types.market.indicator import RegimeIndicator
 
 strawberry.enum(regime.RegimeLabel, description="The regime; UNKNOWN when it is not stored")
@@ -160,9 +161,10 @@ class Episode:
     cause: str
     notes: str
     known_from: dt.date
+    ctx: strawberry.Private[ReadContext | None]
 
     @classmethod
-    def of(cls, d: episodes_read.Episode) -> Self:
+    def of(cls, d: episodes_read.Episode, ctx: ReadContext | None = None) -> Self:
         return cls(
             key=d.key,
             name=d.name,
@@ -178,7 +180,16 @@ class Episode:
             cause=d.cause,
             notes=d.notes,
             known_from=d.known_from,
+            ctx=ctx,
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="When each indicator and the screener gate flagged and cleared around this "
+        "episode, as the session knew it (null on a Guide page, which has no session)"
+    )
+    async def signals(self, info: Info) -> EpisodeSignals | None:
+        found = await off_loop(timeline.load_episode_signals, self.ctx, self.key)
+        return EpisodeSignals.of(found) if found is not None else None
 
 
 @strawberry.type(
@@ -250,7 +261,7 @@ class MarketRegime:
     )
     async def episodes(self, info: Info) -> list[Episode]:
         found = await off_loop(episodes_read.load_regime_episodes, self.ctx)
-        return [Episode.of(e) for e in found.episodes]
+        return [Episode.of(e, self.ctx) for e in found.episodes]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The NBER recessions since 1969 the session knows (listed from the day "

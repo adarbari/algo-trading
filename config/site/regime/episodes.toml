@@ -252,3 +252,15 @@ start = 2020-02-01
 end = 2020-04-01
 announced_start = 2020-06-08
 announced_end = 2021-07-19
+
+# The window of the per-episode signal timing read (services/read/regime/timeline.py):
+# - lookback_sessions: sessions before the peak the read starts (260 = about a year: the
+#   slow macro signals led by 6 to 18 months, and a year shows whether one was already on
+#   when the fall began without reaching into an unrelated earlier regime).
+# - clear_horizon_sessions: sessions after the trough the read still looks for a signal to
+#   clear (never past the session asked for).
+# - gate_labels: the regime labels at which the screener gate counts as shut.
+[timeline]
+lookback_sessions = 260
+clear_horizon_sessions = 260
+gate_labels = ["STRESS", "CRISIS"]
