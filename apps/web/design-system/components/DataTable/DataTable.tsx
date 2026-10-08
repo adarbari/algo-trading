@@ -79,6 +79,14 @@ export interface DataTableProps<TRow> {
   /** Initially hidden column ids when uncontrolled. */
   defaultHiddenColumns?: readonly string[];
   onHiddenColumnsChange?: (hidden: string[]) => void;
+  /**
+   * Controlled ids of the columns the user added back on a narrow table (pair with
+   * `onNarrowColumnsChange`). A page backs it with the user's saved view or the URL so a phone
+   * remembers the columns the user added; uncontrolled, the table keeps them for the session.
+   * Ids that are not columns are ignored.
+   */
+  narrowColumns?: readonly string[];
+  onNarrowColumnsChange?: (ids: string[]) => void;
   /** Show the "Columns" picker in the toolbar (a narrow table shows it whenever it hid a column). */
   columnPicker?: boolean;
   /** Add the checkbox column. Selection is controlled: pass `selectedIds` and `onSelectionChange`. */
@@ -106,6 +114,11 @@ export interface DataTableProps<TRow> {
   rowLines?: 1 | 2;
   /** Toolbar content before the column picker (a count, filters). */
   toolbar?: ReactNode;
+  /**
+   * Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the
+   * two sit in one row, so a narrow table does not spend a row on each.
+   */
+  toolbarEnd?: ReactNode;
   /**
    * Pin the checkbox column and the first column at the start while the table scrolls
    * sideways (default true): pass false when the first column is not the row's key.
@@ -135,6 +148,8 @@ export function DataTable<TRow extends RowData>({
   hiddenColumns,
   defaultHiddenColumns = EMPTY_IDS,
   onHiddenColumnsChange,
+  narrowColumns,
+  onNarrowColumnsChange,
   columnPicker = false,
   selectable = false,
   selectedIds = EMPTY_IDS,
@@ -150,6 +165,7 @@ export function DataTable<TRow extends RowData>({
   visibleRows = 12,
   rowLines = 1,
   toolbar,
+  toolbarEnd,
   pinFirst = true,
 }: DataTableProps<TRow>) {
   const id = useId();
@@ -164,9 +180,11 @@ export function DataTable<TRow extends RowData>({
   const [ownHidden, setOwnHidden] = useState<readonly string[]>(defaultHiddenColumns);
   const activeSort = sort === undefined ? ownSort : sort;
   const chosenHidden = hiddenColumns ?? ownHidden;
-  // Narrow: the non-essential columns wait in the picker until the user adds them (per table,
-  // for the session); a column the user then hides goes into the hidden set like on wide.
-  const [narrowShown, setNarrowShown] = useState<readonly string[]>([]);
+  // Narrow: the non-essential columns wait in the picker until the user adds them (controlled
+  // by `narrowColumns`, else per table for the session); a column the user then hides goes into
+  // the hidden set like on wide.
+  const [ownNarrowShown, setOwnNarrowShown] = useState<readonly string[]>([]);
+  const narrowShown = narrowColumns ?? ownNarrowShown;
   const narrowHidden = useMemo(() => {
     if (!narrow) return [];
     const shown = narrowDefaults(columns);
@@ -186,6 +204,10 @@ export function DataTable<TRow extends RowData>({
   const setHidden = (next: string[]) => {
     if (hiddenColumns === undefined) setOwnHidden(next);
     onHiddenColumnsChange?.(next);
+  };
+  const setNarrowShown = (next: string[]) => {
+    if (narrowColumns === undefined) setOwnNarrowShown(next);
+    onNarrowColumnsChange?.(next);
   };
   const toggleColumn = (columnId: string, visible: boolean) => {
     if (visible) {
@@ -373,10 +395,15 @@ export function DataTable<TRow extends RowData>({
 
   return (
     <div ref={rootRef} className={styles.root} style={gridVars} data-narrow={narrow || undefined}>
-      {(toolbar !== undefined || showPicker) && (
+      {(toolbar !== undefined || toolbarEnd !== undefined || showPicker) && (
         <div className={styles.toolbar}>
           <div className={styles.toolbarStart}>{toolbar}</div>
-          {showPicker && <ColumnPicker columns={pickerColumns} onToggle={toggleColumn} />}
+          {(toolbarEnd !== undefined || showPicker) && (
+            <div className={styles.toolbarEnd}>
+              {toolbarEnd}
+              {showPicker && <ColumnPicker columns={pickerColumns} onToggle={toggleColumn} />}
+            </div>
+          )}
         </div>
       )}
       <div

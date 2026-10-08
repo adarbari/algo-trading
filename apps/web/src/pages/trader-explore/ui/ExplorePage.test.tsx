@@ -139,11 +139,16 @@ describe('ExplorePage', () => {
     expect(onSearchChange).toHaveBeenLastCalledWith({ sel: 'AAPL', focus: undefined });
     const table = widgets.table.mock.lastCall?.[0] as {
       onColumnsChange: (c: string[]) => void;
+      narrowColumns: string[];
+      onNarrowColumnsChange: (c: string[]) => void;
       onRowActivate: (s: string) => void;
       onSelectedChange: (s: string[]) => void;
     };
     table.onColumnsChange([]);
     expect(onSearchChange).toHaveBeenLastCalledWith({ cols: 'none' });
+    expect(table.narrowColumns).toEqual([]);
+    table.onNarrowColumnsChange(['change']);
+    expect(onSearchChange).toHaveBeenLastCalledWith({ ncols: 'change' });
     table.onRowActivate('KO');
     expect(onSearchChange).toHaveBeenLastCalledWith({
       focus: 'KO',

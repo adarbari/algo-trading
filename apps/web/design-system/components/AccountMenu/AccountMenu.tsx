@@ -30,9 +30,11 @@ export function AccountMenu({ name, children, onSignOut }: AccountMenuProps) {
       label="Account"
       placement="bottom-end"
       trigger={(props) => (
-        <Button {...props} variant="ghost" size="sm" iconEnd="chevron-down">
-          {name}
-        </Button>
+        <span className={styles.trigger}>
+          <Button {...props} variant="ghost" size="sm" iconEnd="chevron-down" fullWidth>
+            {name}
+          </Button>
+        </span>
       )}
     >
       <div className={styles.menu}>

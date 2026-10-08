@@ -64,3 +64,23 @@ to the space and the pointer it has.
 - **Tooltips open on a tap** under a coarse pointer; **keyboard hints** are a `KeyHints` row the
   design system hides under a coarse pointer; a table row that opens something takes a tap
   (`onRowActivate`); Explore's compare set has a Compare button that opens the detail sheet.
+
+## Amendment 2026-10-07 (MU3)
+- **A table's filter bar is `FilterBar`**: wide, the search then the quick chips, the active
+  chips and a "+ Filter" popover; under `sm` the search and one "Filters · N" button share a row
+  and the chips and fields open in a sheet (`narrow="sheet"`, default; `"scroll"`, one sideways
+  row, is the alternative the owner may pick: ADR 0011 mockup gate). A page never arranges chips
+  for a phone itself.
+- **A phone remembers the columns added back on a narrow table.** `DataTable` takes
+  `narrowColumns` / `onNarrowColumnsChange`; the page backs them with the user's saved view
+  (`views.<scope>.view.narrow_columns`, written through the one view write, shape-checked: table
+  column ids, not only catalogue fields) or, where the page's state is the link (Explore), the
+  URL (`ncols`). Never browser storage (ADR 0029: shared state lives in the user's config).
+- **A row of actions is `ActionGroup`**: full buttons where there is room, icon buttons with a
+  tooltip under `sm`; a page lists the actions and never picks the form.
+- **The real store is a check the mocks are not.** The phone project runs against mocks; a
+  phone-width smoke of the Vite dev server against the real API found a 10,000 px wide Calendar
+  (an absolutely positioned hidden caption escaping an unpositioned scroller), duplicate React
+  keys the mocks never produced, and a clipped account name. Each fix made the mock
+  representative and added the assertion (`e2e/phone.spec.ts`); the toolbar's end group
+  (`toolbarEnd`) keeps a caller's column picker beside the table's own.

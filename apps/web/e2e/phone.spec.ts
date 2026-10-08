@@ -10,6 +10,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { WORKSPACES } from '../src/app/workspaces/workspaces';
 import { expectAccessible, settled } from './a11y';
+import { mockViewer } from './auth-api';
 import { mockApi } from './mock-api';
 
 /** Every section, and the Guide (its own layout, outside the workspaces). */
@@ -31,6 +32,8 @@ function collectErrors(page: Page): string[] {
 
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
+  // A long name: the account menu must truncate it, not overflow the top bar.
+  await mockViewer(page, { name: 'Alexandra Montgomery-Fitzwilliam' });
 });
 
 for (const route of ROUTES) {
@@ -140,4 +143,58 @@ test('Explore: ticked tickers open the compare detail from the Compare button', 
   await page.goto('/explore?sel=AAPL,MSFT');
   await page.getByRole('button', { name: 'Compare 2' }).tap();
   await expect(page.getByRole('dialog', { name: 'AAPL' })).toBeVisible();
+});
+
+test('Explore: the filter bar is one "Filters" button that opens a sheet with the quick chips', async ({
+  page,
+}) => {
+  await page.goto('/explore');
+  const bar = page.getByRole('group', { name: 'Filters' });
+  await expect(bar.getByRole('searchbox', { name: 'Filter tickers' })).toBeVisible();
+  await expect(bar.getByRole('button', { name: 'Optionable' })).toHaveCount(0);
+  await bar.getByRole('button', { name: /^Filters/ }).tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  await expect(sheet.getByRole('button', { name: 'Optionable' })).toBeVisible();
+});
+
+test('Screener results: the pick actions are icon buttons named by their label', async ({
+  page,
+}) => {
+  await page.goto('/screeners/vrp_scanner');
+  await page.getByRole('grid').first().getByRole('row', { name: /AAPL/ }).tap();
+  const sheet = page.getByRole('dialog', { name: 'AAPL' });
+  const open = sheet.getByRole('button', { name: 'Open in Explore' });
+  await expect(open).toBeVisible();
+  await expect(open).toHaveText('');
+  await expect(open).toHaveAccessibleDescription('Open in Explore');
+});
+
+test('Explore: a column added on the phone is kept in the URL (ncols)', async ({ page }) => {
+  await page.goto('/explore');
+  await page.getByRole('button', { name: /Columns \d+ of \d+/ }).tap();
+  const panel = page.getByRole('group', { name: 'Show columns' });
+  const unchecked = panel.getByRole('checkbox', { checked: false }).first();
+  await unchecked.check();
+  await expect(page).toHaveURL(/ncols=/);
+});
+
+test('Explore: the catalogue and narrow-table Columns buttons share one row', async ({ page }) => {
+  await page.goto('/explore');
+  const buttons = page.getByRole('button', { name: /^Columns/ });
+  await expect(buttons).toHaveCount(2);
+  const [a, b] = await Promise.all([buttons.nth(0).boundingBox(), buttons.nth(1).boundingBox()]);
+  expect(a?.y).toBeDefined();
+  expect(a?.y).toBe(b?.y);
+});
+
+test('the top bar keeps every button on screen with a long viewer name', async ({ page }) => {
+  await page.goto('/ideas');
+  const buttons = page.getByRole('banner').getByRole('button');
+  await expect(buttons.first()).toBeVisible();
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  for (const button of await buttons.all()) {
+    const box = await button.boundingBox();
+    // Hidden ones (a collapsed menu's items) have no box.
+    if (box) expect(box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  }
 });
