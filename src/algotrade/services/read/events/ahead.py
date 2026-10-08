@@ -151,7 +151,8 @@ def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown
             else (UnknownCode.NO_ROW, "no future release dates known by")
         )
         message = f"{MACRO_TABLE} has {detail} the session {day.isoformat()}"
-        return (), Unknown(code, table_cause(MACRO_TABLE, message, code.value, day))
+        cause = table_cause(MACRO_TABLE, message, code.value, day)
+        return (), Unknown(code, cause, None, ctx.kind_of(code, MACRO_TABLE))
     days = pd.to_datetime(frame["release_date"]).dt.date
     frame = frame[days <= end]
     events = tuple(

@@ -52,11 +52,12 @@ def code_of(error: GraphQLError) -> str:
 
 
 def _worded(error: GraphQLError, code: str, admin: bool) -> dict[str, Any]:
-    """``error`` as the response shows it: for a caller who is not an admin, a NO_DATA error
-    (a stored table is unreadable) or any text that names a stored table says only that the
-    data is not available because of a system error (ADR 0056); the admin reads the cause."""
+    """``error`` as the response shows it: for a caller who is not an admin, a NO_DATA or
+    INTERNAL error (a stored table is unreadable; a bug, whose text names vendors and paths) or
+    any text that names a stored table says only that the data is not available because of a
+    system error (ADR 0056); the admin reads the cause."""
     formatted: dict[str, Any] = dict(error.formatted)
-    if not admin and (code == NO_DATA or names_a_table(error.message)):
+    if not admin and (code in (NO_DATA, INTERNAL) or names_a_table(error.message)):
         formatted["message"] = GENERIC_REASONS[UnavailableKind.SYSTEM]
     return {**formatted, "extensions": {**(error.extensions or {}), "code": code}}
 

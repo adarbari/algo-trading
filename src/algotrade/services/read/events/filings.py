@@ -110,6 +110,8 @@ def load_filings(
                 "NO_ROW",
                 day,
             ),
+            None,
+            ctx.kind_of(UnknownCode.NO_ROW, FILING_TABLE),
         )
         for iid in ids
         if iid not in seen

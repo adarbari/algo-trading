@@ -32,7 +32,9 @@ from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
 from tests.conftest import REPO_ROOT
 from tests.helpers.api_store import as_user
 
-CAUSE_WORDS = re.compile(r"^(detail|error|message|problems|unresolved|missing.*)$")
+CAUSE_WORDS = re.compile(
+    r"^(detail|error|message|problems|unresolved|reason|why|note|notes|table|tables|missing.*)$"
+)
 DRAFT = {
     "id": "my_draft",
     "kind": "screener",
@@ -88,14 +90,19 @@ def _fields(model: type) -> Iterator[tuple[str, Any, bool]]:
 
 def _texts(annotation: Any) -> bool:
     """Whether ``annotation`` holds text (a str, or a list or optional of it)."""
-    if typing.get_origin(annotation) is dict:  # counts keyed by a name, not words
-        return False
+    if typing.get_origin(annotation) is dict:  # a document is free-form; counts are not
+        return Any in typing.get_args(annotation)
     return annotation is str or any(_texts(a) for a in typing.get_args(annotation))
 
 
 def _listed() -> set[str]:
     document = tomllib.loads((REPO_ROOT / "architecture" / "cause_fields.toml").read_text())
-    return {e["name"] for kind in ("fact", "legacy") for e in document.get(kind, [])}
+    return {
+        e["name"]
+        for kind in ("fact", "legacy")
+        for e in document.get(kind, [])
+        if e.get("surface") == "rest"
+    }
 
 
 def test_the_served_models_include_the_ones_that_carry_causes() -> None:
@@ -110,7 +117,11 @@ def test_no_cause_wording_is_served_to_a_trader_unless_marked_or_listed() -> Non
         for m in _served()
         for name, annotation, marked in _fields(m)
         if m.__name__ != "CauseLink"  # reached only through the marked ``cause`` field
-        and CAUSE_WORDS.match(name)
+        and (
+            CAUSE_WORDS.match(name)
+            or typing.get_origin(annotation) is dict
+            or any(typing.get_origin(a) is dict for a in typing.get_args(annotation))
+        )
         and _texts(annotation)
         and not marked
         and f"{m.__name__}.{name}" not in listed

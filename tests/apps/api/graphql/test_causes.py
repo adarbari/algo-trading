@@ -33,7 +33,9 @@ from tests.apps.api.graphql.conftest import Graph
 from tests.conftest import REPO_ROOT
 from tests.helpers.api_store import END, PREVIOUS, as_user
 
-CAUSE_WORDS = re.compile(r"^(detail|error|message|problems|unresolved|missing.*)$")
+CAUSE_WORDS = re.compile(
+    r"^(detail|error|message|problems|unresolved|reason|why|note|notes|table|tables|missing.*)$"
+)
 OPS = "algotrade_api.graphql.types.ops."
 TRADER_OPS = (OPS + "backtest", OPS + "config")
 CHAIN = "cause { links { level subject status message runId } }"
@@ -76,7 +78,18 @@ def _definitions() -> list[Any]:
 
 def _listed() -> set[str]:
     document = tomllib.loads((REPO_ROOT / "architecture" / "cause_fields.toml").read_text())
-    return {e["name"] for kind in ("fact", "legacy") for e in document.get(kind, [])}
+    return {
+        e["name"]
+        for kind in ("fact", "legacy")
+        for e in document.get(kind, [])
+        if e.get("surface", "graphql") == "graphql"
+    }
+
+
+def _free_form(kind: Any) -> bool:
+    """A string or a JSON document: a place free text (or a table) can hide."""
+    inner = _unwrap(kind)
+    return inner is str or "JSON" in str(inner)
 
 
 def _is_admin_type(definition: Any) -> bool:
@@ -107,8 +120,8 @@ def test_no_cause_wording_is_readable_by_a_trader_unless_listed() -> None:
         for d in _definitions()
         if d.name not in ("Cause", "CauseLink") and not _is_admin_type(d)
         for f in d.fields
-        if CAUSE_WORDS.match(f.python_name)
-        and _unwrap(f.type) is str
+        if (CAUSE_WORDS.match(f.python_name) or "JSON" in str(_unwrap(f.type)))
+        and _free_form(f.type)
         and not _admin(f)
         and f"{d.name}.{f.python_name}" not in listed
     ]
@@ -177,10 +190,12 @@ def test_an_admin_reads_the_chain_from_the_source_to_the_features(
     assert "errors" not in body, body
     gaps = body["data"]["session"]["unavailable"]
     chain = next(g["cause"]["links"] for g in gaps if "ibkr_iv@v1" in json.dumps(g["cause"]))
-    assert [link["level"] for link in chain] == ["SOURCE", "STEP", "TABLE", "FEATURE"]
+    levels = ["SOURCE", "STEP", "TABLE", "TABLE", "FEATURE"]  # the gateway-fed input, its rollup
+    assert [link["level"] for link in chain] == levels
     assert chain[0]["message"] == "IB Gateway unreachable"
     assert (chain[1]["subject"], chain[1]["status"]) == ("ibkr-iv", "SKIPPED")
-    assert chain[1]["runId"] and chain[2]["subject"] == "rollups/instrument/ibkr_iv@v1"
+    assert chain[1]["runId"] and chain[2]["subject"] == "volatility/ibkr_iv30"
+    assert chain[3]["subject"] == "rollups/instrument/ibkr_iv@v1"
     assert body["data"]["session"]["missing"], "an admin still reads the legacy table list"
     unknown = next(v["unknown"] for v in body["data"]["instrument"]["features"] if v["unknown"])
     assert unknown["cause"]["links"] and "rollups/" in unknown["detail"]
@@ -197,3 +212,28 @@ def test_an_error_about_missing_data_is_generic_for_a_trader() -> None:
     assert shown["message"] == GENERIC_REASONS[UnavailableKind.SYSTEM]
     admin = response_of(result, admin=True)["errors"][0]  # type: ignore[typeddict-item]
     assert "rollups/instrument/x@v1" in admin["message"]
+
+
+IBKR_IV = "rollup.ibkr_iv@v1.iv30_ibkr"
+KIND_QUERY = """query($date: Date, $names: [FeatureName!]!) {
+  instrument(key: "AAA", date: $date) { features(names: $names) { name unknown { code kind } } }
+}"""
+
+
+def test_a_gap_behind_a_skipped_step_is_system_not_not_stored(
+    as_role: Callable[[Role], Graph],
+) -> None:
+    """The gateway was down (ibkr-iv SKIPPED) and the rollup SUCCEEDED empty: the row is absent
+    (NO_ROW) but a failure stands behind it, so a trader is told SYSTEM (owner rule, ADR 0056)."""
+    body = as_role(Role.TRADER)(KIND_QUERY, {"date": END.isoformat(), "names": [IBKR_IV, NAMES[1]]})
+    gaps = {v["name"]: v["unknown"] for v in body["data"]["instrument"]["features"]}
+    assert gaps[IBKR_IV]["kind"] == "SYSTEM", gaps
+
+
+def test_an_internal_error_is_generic_for_a_trader() -> None:
+    error = GraphQLError("IB Gateway refused: rollups/x", original_error=RuntimeError("boom"))
+    result = ExecutionResult(data=None, errors=[error])
+    shown = response_of(result)["errors"][0]  # type: ignore[typeddict-item]
+    assert shown["message"] == GENERIC_REASONS[UnavailableKind.SYSTEM]
+    admin = response_of(result, admin=True)["errors"][0]  # type: ignore[typeddict-item]
+    assert "IB Gateway" in admin["message"]

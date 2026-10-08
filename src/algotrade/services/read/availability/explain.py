@@ -8,21 +8,22 @@ the table), and, when that step is fine, the tables its feature group reads
 with a SOURCE link before it when it was SKIPPED because a source was down. Called only for
 admins, through one dataloader per request: a trader's read never pays for it."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import date
 from typing import Any
 
 from algotrade.core.model.fields import group_of_table
+from algotrade.data import StoreReader
 from algotrade.features.registry import GROUPS
 from algotrade.services.read.availability.cause import (
     Cause,
     CauseLevel,
     CauseLink,
 )
-from algotrade.services.read.context import Stores
+from algotrade.services.read.context import ResultCache, Stores
 from algotrade.services.read.ops.runs import NIGHTLY
 
-__all__ = ["explain"]
+__all__ = ["explain", "failed_tables"]
 
 MAX_DEPTH = 3  # tables upstream of the leaf (a rollup over a rollup over a rollup)
 PROBLEM = frozenset({"FAILED", "NOT_RUN", "SKIPPED", "WAITING"})  # a step that did not deliver
@@ -31,14 +32,52 @@ SKIPPED_PREFIX = "skipped: "
 type Steps = Mapping[str, Mapping[str, Any]]
 
 
-def _nightly(ctx: Stores, session: date) -> tuple[str | None, Steps]:
-    """The run id and recorded steps of the session's latest nightly record (none: no record)."""
-    found = ctx.reader.runs(NIGHTLY, session)
-    if not found:
-        return None, {}
-    record = max(found, key=lambda r: r.started_at)
-    steps = record.stats.get("steps")
-    return record.run_id, steps if isinstance(steps, dict) else {}
+def _nightly(
+    reader: StoreReader, session: date, cache: ResultCache | None = None
+) -> tuple[str | None, Steps]:
+    """The run id and recorded steps of the session's latest nightly record (none: no record);
+    read once per published state of the store when a ``cache`` is given."""
+    key = ("nightly-steps", session, reader.visible_seq())
+    hit = cache.get(key) if cache is not None else None
+    if hit is not None:
+        found: tuple[str | None, Steps] = hit
+        return found
+    runs = reader.runs(NIGHTLY, session)
+    if not runs:
+        result: tuple[str | None, Steps] = (None, {})
+    else:
+        record = max(runs, key=lambda r: r.started_at)
+        steps = record.stats.get("steps")
+        result = (record.run_id, steps if isinstance(steps, dict) else {})
+    if cache is not None:
+        cache.put(key, result)
+    return result
+
+
+def failed_tables(
+    reader: StoreReader,
+    session: date,
+    missing: Iterable[str] = (),
+    cache: ResultCache | None = None,
+) -> frozenset[str]:
+    """The tables a failure stands behind for ``session``: those of a nightly step that did not
+    SUCCEED, the ``missing`` ones (no partition), and every feature group table that reads one
+    (to ``MAX_DEPTH``). A gap in such a table is a system failure, never NOT_STORED."""
+    _, steps = _nightly(reader, session, cache)
+    bad = {
+        str(t)
+        for step in steps.values()
+        if step.get("status") != "SUCCEEDED"
+        for t in step.get("tables", [])
+        if isinstance(step.get("tables"), list)
+    }
+    bad |= set(missing)
+    for _ in range(MAX_DEPTH):
+        grown = {g.table for g in GROUPS.values() if any(i.table in bad for i in g.inputs)}
+        if grown <= bad:
+            break
+        bad |= grown
+    return frozenset(bad)
 
 
 def _writer(table: str, steps: Steps) -> str | None:
@@ -63,7 +102,9 @@ def _step_links(
     status = str(step.get("status", ""))
     words = str(step.get("error") or step.get("reason") or status)
     links: list[CauseLink] = []
-    if status == "SKIPPED":
+    if status == "SKIPPED" and words.startswith(
+        SKIPPED_PREFIX
+    ):  # a source down, not a catch-up skip
         source = words.removeprefix(SKIPPED_PREFIX)
         links.append(CauseLink(CauseLevel.SOURCE, name, "UNAVAILABLE", source, run_id, session))
     links.append(CauseLink(CauseLevel.STEP, name, status, words, run_id, session))
@@ -90,9 +131,11 @@ def _upstream(
 def explain(ctx: Stores, leaf: Cause) -> Cause:
     """``leaf`` with the chain that explains it upstream, root cause first; ``leaf`` itself
     when it names no table or session, or nothing recorded explains it."""
-    table = leaf.first(CauseLevel.TABLE)
-    if table is None or table.session is None:
-        return leaf
-    run_id, steps = _nightly(ctx, table.session)
-    upstream = _upstream(table.subject, steps, run_id, table.session, MAX_DEPTH)
-    return Cause((*upstream, *leaf.links)) if upstream else leaf
+    for table in (link for link in leaf.links if link.level is CauseLevel.TABLE):
+        if table.session is None:
+            continue
+        run_id, steps = _nightly(ctx.reader, table.session, ctx.cache)
+        upstream = _upstream(table.subject, steps, run_id, table.session, MAX_DEPTH)
+        if upstream:
+            return Cause((*upstream, *leaf.links))
+    return leaf

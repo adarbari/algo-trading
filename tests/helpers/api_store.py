@@ -29,6 +29,7 @@ from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_api.deps import ReadStore
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
+from algotrade_ingestion.workflows.nightly.steps import StepResult, StepStatus
 from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import chain_rows, write_chains, write_dividends, write_split
@@ -170,13 +171,12 @@ def _runs(writer: StoreWriter) -> None:
         "steps": {
             "bars": {"status": "COMPLETE", "duration_s": 1.5, "result": {"rows": 11}},
             "chains": {"status": "PARTIAL", "duration_s": 9.0, "result": {"statuses": {"OK": 1}}},
-            # a step that did not deliver its table: the admin's cause chain follows it (ADR 0056)
-            "ibkr-iv": {
-                "status": "SKIPPED",
-                "duration_s": 0.0,
-                "reason": "skipped: IB Gateway unreachable",
-                "tables": ["rollups/instrument/ibkr_iv@v1"],
-            },
+            # real step dicts (``StepResult.as_dict``: they record the tables their task writes):
+            # the gateway-fed step was skipped, so the IV rollup that reads it is empty (ADR 0056)
+            "ibkr-iv": StepResult(
+                "ibkr-iv", StepStatus.SKIPPED, False, reason="skipped: IB Gateway unreachable"
+            ).as_dict(),
+            "rollups": StepResult("rollups", StepStatus.SUCCEEDED).as_dict(),
         },
         "partial": ["steps not complete: chains"],
     }

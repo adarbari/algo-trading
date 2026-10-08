@@ -75,12 +75,15 @@ class Unknown:
     code: UnknownCode
     cause: Cause
     reason: NullReason | None = None
-    # The public kind of the gap and its Guide term: all a trader is told (from ``code``).
-    kind: UnavailableKind = field(init=False)
+    # The public kind of the gap and its Guide term: all a trader is told. ``kind`` defaults to
+    # the code's (``KIND_OF_CODE``); a site that knows the table passes ``ctx.kind_of(...)``,
+    # which makes a gap behind a failed or missing table SYSTEM (ADR 0056).
+    kind: UnavailableKind = field(default=None)  # type: ignore[assignment]
     guide_term: str = field(init=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "kind", KIND_OF_CODE[self.code])
+        if self.kind is None:
+            object.__setattr__(self, "kind", KIND_OF_CODE[self.code])  # type: ignore[unreachable]
         object.__setattr__(self, "guide_term", GUIDE_TERMS[self.kind])
 
     @property

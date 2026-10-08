@@ -7,11 +7,12 @@ from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.features.registry import GROUPS
 from algotrade.services.read.availability.cause import (
+    Cause,
     CauseLevel,
     UnavailableKind,
     table_cause,
 )
-from algotrade.services.read.availability.explain import explain
+from algotrade.services.read.availability.explain import explain, failed_tables
 from algotrade.services.read.availability.unavailable import features_of, unavailable_tables
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.storage.backends.memory import MemoryBackend
@@ -104,3 +105,39 @@ def test_unavailable_tables_name_the_features_and_end_the_chain_with_them() -> N
 
 def _tables_with_features() -> list[str]:
     return [g.table for g in GROUPS.values()]
+
+
+def test_a_catch_up_skip_is_a_step_not_a_source() -> None:
+    steps = {
+        "ibkr-iv": {
+            "status": "SKIPPED",
+            "reason": "latest closed session only",
+            "tables": [IBKR_IV],
+        }
+    }
+    chain = explain(_stores(steps), table_cause(IBKR_IV, "no partition", session=DAY))
+    assert [link.level for link in chain.links] == [CauseLevel.STEP, CauseLevel.TABLE]
+
+
+def test_every_table_link_of_the_leaf_is_tried() -> None:
+    steps = {"ibkr-iv": {"status": "FAILED", "error": "down", "tables": [IBKR_IV]}}
+    two = Cause(
+        (
+            table_cause("rollups/instrument/other@v1", "no rows", session=DAY).leaf,
+            table_cause(IBKR_IV, "no rows", session=DAY).leaf,
+        )
+    )
+    chain = explain(_stores(steps), two)
+    assert chain.links[0].level is CauseLevel.STEP and len(chain.links) == 3
+
+
+def test_failed_tables_close_over_the_groups_that_read_them() -> None:
+    """The feed step was skipped and its rollup SUCCEEDED empty: the rollup is behind a failure,
+    so a gap in it is SYSTEM; with the step SUCCEEDED nothing is failed."""
+    group = next(g for g in GROUPS.values() if g.inputs and g.inputs[0].table != g.table)
+    source = group.inputs[0].table
+    skipped = {"feed": {"status": "SKIPPED", "tables": [source]}}
+    done = {"feed": {"status": "SUCCEEDED", "tables": [source]}}
+    assert group.table in failed_tables(_stores(skipped).reader, DAY)
+    assert failed_tables(_stores(done).reader, DAY) == frozenset()
+    assert source in failed_tables(_stores(None).reader, DAY, [source])  # no partition

@@ -29,8 +29,12 @@ a browser-side filter is not enforcement: the response itself carried the words.
    model construction site builds the leaf it knows (`table_cause`, `feature_cause`,
    `run_cause`); `explain(ctx, leaf)` expands it upstream from stored facts only (feature ->
    group table -> the group's input tables, bounded depth; table -> the nightly step that wrote
-   it, from the run record). The kind comes from the code alone, so a trader's read never pays
-   for the chain: the chain is built only for an admin, behind one dataloader per request.
+   it, from the run record). The kind comes from the code and from one cheap fact, whether a failure stands behind
+   the table: `ReadContext.kind_of` is SYSTEM when the table's writing step in the session's
+   nightly record did not SUCCEED (FAILED, SKIPPED, NOT_RUN, WAITING, WAIVED), the table has no
+   partition for the session, or a feature group reading such a table (to a bounded depth) wrote
+   it; NOT_STORED only when no failure is behind the gap. A trader's read never pays for the
+   chain: it is built only for an admin, behind one dataloader per request.
 3. **The server withholds, the browser never filters.** GraphQL: `AdminCause()` (beside
    `AdminOnly`, `graphql/permissions.py`) resolves to null (never FORBIDDEN) for a caller who is
    not an admin, so a query selecting `cause` succeeds; the legacy table lists and `detail` /
@@ -55,10 +59,9 @@ a browser-side filter is not enforcement: the response itself carried the words.
 ## Consequences
 - A trader sees which features are out and one generic sentence plus a Guide term per kind; an
   admin sees the full chain wherever the same gap is shown, on any page.
-- `NOT_STORED` versus `SYSTEM` is decided from the code (a missing partition is a system
-  failure; a missing row or a stored null is not), not from the chain: an admin may find a failed
-  step behind a `NOT_STORED` value. A later change can promote a kind from the chain without
-  changing the public vocabulary.
+- `NOT_STORED` versus `SYSTEM` is decided by the owner rule above: a gap behind a failed step or
+  a missing table is SYSTEM even when the row is merely absent (the gateway was down, the rollup
+  succeeded empty). The record read is once per published state.
 - Old fields stay until the web converts (its surfaces are listed in the plan); for a trader
   they are empty or generic, so those pages show less, never more. The web conversion, the
   `CauseChain` design-system component and the ESLint rule that keeps `.cause` inside

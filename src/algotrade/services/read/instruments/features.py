@@ -226,7 +226,8 @@ def _value(
     if row is None:
         detail = f"{iid} is not in {REFERENCE_TABLE} (snapshot {ctx.session.reference_snapshot})"
         cause = table_cause(REFERENCE_TABLE, detail, "NO_ROW", day)
-        return FeatureValue(info.name, None, Unknown(UnknownCode.NO_ROW, cause), info)
+        kind = ctx.kind_of(UnknownCode.NO_ROW, REFERENCE_TABLE)
+        return FeatureValue(info.name, None, Unknown(UnknownCode.NO_ROW, cause, None, kind), info)
     value = to_scalar(row.get(info.name))
     if value is not None:  # a formula may give a value without every input row (exists())
         return FeatureValue(info.name, value, None, info)
@@ -263,9 +264,12 @@ def _absence(
     if rowless:
         detail = f"{' / '.join(rowless)} has no row for {iid} on {day.isoformat()}"
         links = tuple(table_cause(t, detail, "NO_ROW", day).leaf for t in rowless)
-        return Unknown(UnknownCode.NO_ROW, Cause(links))
+        return Unknown(
+            UnknownCode.NO_ROW, Cause(links), None, ctx.kind_of(UnknownCode.NO_ROW, *rowless)
+        )
     detail = f"{info.name} is null for {iid} on {day.isoformat()}"
-    return Unknown(UnknownCode.NULL, feature_cause(info.name, detail, "NULL", day))
+    kind = ctx.kind_of(UnknownCode.NULL, *tables)
+    return Unknown(UnknownCode.NULL, feature_cause(info.name, detail, "NULL", day), None, kind)
 
 
 def cell_codes(

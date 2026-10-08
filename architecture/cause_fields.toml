@@ -6,9 +6,12 @@
 # listed here. A new gap is `Unavailable` / `Unknown` with a public kind, never a line here.
 #
 # [[fact]]   a fact about the request or the caller's own document, not a cause: stays.
+#            Every free-form field a trader can read (a string named detail / error / message /
+#            problems / unresolved / reason / why / note(s) / table(s) / missing*, a JSON or dict
+#            document) is role-scoped or listed here with its reason.
 # [[legacy]] a field the server already makes role-aware in its resolver, kept until the web
 #            reads `Unknown.cause` / `kind` (PR-3 of ADR 0056 empties this list).
-# Names are `Type.field` (GraphQL) or `Model.field` (REST schema).
+# Names are `Type.field` (GraphQL) or `Model.field` (REST schema, with `surface = "rest"`).
 
 [[fact]]
 name = "EventCalendar.missing"
@@ -25,6 +28,129 @@ reason = "the validation error of the caller's own config document"
 [[fact]]
 name = "ScreenDetail.error"
 reason = "the validation error of the caller's own screen document"
+
+[[fact]]
+name = "FeatureValue.value"
+reason = "a stored value of the catalogue field (a number, text, date): the fact asked for"
+
+[[fact]]
+name = "GuideUse.value"
+reason = "the threshold of a field-guide criterion (site config)"
+
+[[fact]]
+name = "GuideUse.tolerance"
+reason = "the tolerance of a field-guide criterion (site config)"
+
+[[fact]]
+name = "GuideUse.note"
+reason = "field-guide prose written by the owner (site config)"
+
+[[fact]]
+name = "Event.table"
+reason = "the stored event class an event row belongs to: its identity, not a gap"
+
+[[fact]]
+name = "Event.values"
+reason = "the stored columns of an event row"
+
+[[fact]]
+name = "SeriesPoint.values"
+reason = "stored values of a feature series point"
+
+[[fact]]
+name = "ScreenResultPage.rows"
+reason = "stored values of the result columns; an absent one is null with `unknown` saying why"
+
+[[fact]]
+name = "CriterionResult.value"
+reason = "the value a criterion judged"
+
+[[fact]]
+name = "ResultColumn.value"
+reason = "the value of a display column"
+
+[[fact]]
+name = "FeatureTable.rows"
+reason = "stored values of the table columns; an absent one is null with `unknown` saying why"
+
+[[fact]]
+name = "RegimeIndicator.value"
+reason = "the stored value of a regime indicator"
+
+[[fact]]
+name = "Episode.notes"
+reason = "reference-episode prose written by the owner (site config)"
+
+[[fact]]
+name = "GuideRelatedPlaybook.reason"
+reason = "why the Guide relates a playbook to a field (site config prose)"
+
+[[fact]]
+name = "Backtest.metrics"
+reason = "the caller's own saved backtest metrics"
+
+[[fact]]
+name = "BacktestDetail.selection"
+reason = "the caller's own backtest document"
+
+[[fact]]
+name = "BacktestDetail.data"
+reason = "the caller's own backtest results"
+
+[[fact]]
+name = "BacktestDetail.rebalances"
+reason = "the caller's own backtest results"
+
+[[fact]]
+name = "ScreenDetail.draft"
+reason = "the caller's own screen document"
+
+[[fact]]
+name = "ScreenDetail.resolved"
+reason = "the caller's own screen document"
+
+[[fact]]
+name = "ScreenDetail.working"
+reason = "the caller's own screen document"
+
+[[fact]]
+name = "ScreenVersion.document"
+reason = "the caller's own screen document"
+
+[[fact]]
+name = "Health.tables"
+surface = "rest"
+reason = "the stored table names of the public health probe (an ops check, unchanged by ADR 0056)"
+
+[[fact]]
+name = "PreviewRow.columns"
+surface = "rest"
+reason = "the display values of a previewed row"
+
+[[fact]]
+name = "ScreenDraft.document"
+surface = "rest"
+reason = "the caller's own draft document"
+
+[[fact]]
+name = "ScreenDraft.notes"
+surface = "rest"
+reason = "the drafting model's notes on the caller's own sentence"
+
+[[fact]]
+name = "DroppedCriterion.reason"
+surface = "rest"
+reason = "why the drafting model dropped a criterion the caller asked for"
+
+[[fact]]
+name = "RegimeExplanation.note"
+surface = "rest"
+reason = "the text model's note on the regime explanation"
+
+[[fact]]
+name = "Draft.document"
+surface = "rest"
+reason = "the caller's own draft document"
 
 [[legacy]]
 name = "Unknown.detail"

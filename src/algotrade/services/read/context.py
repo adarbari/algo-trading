@@ -19,6 +19,7 @@ from collections import OrderedDict
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
@@ -29,9 +30,9 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import Snapshot, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
-from algotrade.services.read.availability.cause import table_cause
+from algotrade.services.read.availability.cause import UnavailableKind, table_cause
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
-from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.services.read.values import KIND_OF_CODE, Unknown, UnknownCode
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
@@ -100,6 +101,22 @@ class ReadContext:
     features: FeatureSet = field(repr=False)
     cache: ResultCache = field(compare=False, repr=False)
     loaders: Any = field(default=None, compare=False, repr=False)
+
+    @cached_property
+    def failed_tables(self) -> frozenset[str]:
+        """The tables a failure stands behind for the session (a nightly step that did not
+        SUCCEED, a table with no partition, and the groups that read one): ADR 0056."""
+        # a function-level import: explain imports this module (a cycle at module level)
+        from algotrade.services.read.availability.explain import failed_tables  # noqa: PLC0415
+
+        return failed_tables(self.reader, self.session.date, self.session.missing, self.cache)
+
+    def kind_of(self, code: UnknownCode, *tables: str) -> UnavailableKind:
+        """The public kind of a gap of ``code`` in ``tables``: SYSTEM when a failure stands
+        behind any of them, else the code's own kind (NO_ROW / NULL with none: NOT_STORED)."""
+        if any(t in self.failed_tables for t in tables):
+            return UnavailableKind.SYSTEM
+        return KIND_OF_CODE[code]
 
 
 @dataclass(frozen=True)

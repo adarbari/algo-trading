@@ -60,9 +60,8 @@ def _no_chain(ctx: ReadContext, underlying_id: str) -> Unknown:
         return found
     day = ctx.session.date.isoformat()
     message = f"{OPTION_QUOTES} has no quotes of {underlying_id} for {day}"
-    return Unknown(
-        UnknownCode.NO_ROW, table_cause(OPTION_QUOTES, message, "NO_ROW", ctx.session.date)
-    )
+    cause = table_cause(OPTION_QUOTES, message, "NO_ROW", ctx.session.date)
+    return Unknown(UnknownCode.NO_ROW, cause, None, ctx.kind_of(UnknownCode.NO_ROW, OPTION_QUOTES))
 
 
 def load_instrument_events(

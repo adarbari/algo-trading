@@ -4,8 +4,10 @@ generic wording and Guide term, the admin-only ``Cause`` chain made of ``CauseLi
 
 A construction site builds the leaf it knows (``table_cause``: a table with no partition or
 no row for the session); ``explain.explain`` expands it upstream from stored run records. The
-kind and the generic reason come from the code alone, never from the chain, so a trader's
-read never pays for (or leaks) the chain."""
+kind comes from the code and from whether a failure stands behind the table
+(``ReadContext.kind_of``: a step that did not SUCCEED, a table with no partition, or a group
+reading one is SYSTEM; a gap with none is NOT_STORED), never from the chain itself, so a
+trader's read never pays for (or leaks) the chain."""
 
 from dataclasses import dataclass, field
 from datetime import date

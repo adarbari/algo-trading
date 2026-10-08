@@ -84,7 +84,10 @@ def _not_found(request: Request, exc: Exception) -> JSONResponse:
 
 
 def _bad_request(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    text = str(exc)
+    if names_a_table(text) and not _is_admin(request):
+        text = GENERIC_REASONS[UnavailableKind.SYSTEM]
+    return JSONResponse(status_code=400, content={"detail": text})
 
 
 def _conflict(request: Request, exc: Exception) -> JSONResponse:
