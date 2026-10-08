@@ -1,5 +1,5 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. The screener comes with ED4b.
+# src/algotrade/config/edges/document.py. Screener: pead_small_cap (ED4b).
 id = "small_cap_earnings_drift"
 name = "Small-cap post-earnings drift"
 thesis = "Small Nasdaq-listed stocks keep drifting for weeks in the direction of their earnings-day reaction."
@@ -9,13 +9,21 @@ persistence = """Limits to arbitrage: the drift survives where spreads, short-sa
 capacity keep institutions out; it has faded in large caps but not in the smallest names
 (Martineau 2022)."""
 schedule = "on_event:earnings_reaction"
-top_k = "all"
-screeners = []
+top_k = 20
+base = "event"
+screeners = ["pead_small_cap"]
+baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 frozen_from = 2026-04-01
-notes = """Surprise = the reaction-session excess return over SPY (Brandt et al. 2008), from
-events/earnings read by known_from. The $2B cap is the owner's open decision (ADR 0053); the
-harness reports by cap bucket either way."""
+notes = """Surprise = the excess return over SPY from the close before the report to the close after
+it (Brandt et al. 2008), earnings_reaction@v1 from events/earnings read by known_from. E is the
+report date (the group's definition), the window close(E-1) -> close(E+1). Long only. The $2B cap was decided 2026-10-08 (ED4 decisions);
+the harness reports the micro (under $300M) and small ($300M to $2B) buckets as variants, each a
+trial of the deflated Sharpe ratio. The large-cap control (from $10B) runs the same screener,
+whose own cap criterion (under $2B) leaves it no picks: only its base rate (event names of large
+caps) and the baselines are informative, the screener's row is empty by construction. A
+long-short variant is not expressible: a variant overrides only the outcome and the universe,
+and an outcome has no short leg (the harness would need a new kind); left to a later PR."""
 
 [universe.where]
 all = [
@@ -25,27 +33,63 @@ all = [
   { field = "feature.market_cap", op = "lt", value = 2_000_000_000 },
 ]
 
+[[variants]]
+id = "micro"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.exchange", op = "eq", value = "NASDAQ" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "feature.market_cap", op = "lt", value = 300_000_000 },
+]
+
+[[variants]]
+id = "small"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.exchange", op = "eq", value = "NASDAQ" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "feature.market_cap", op = "gte", value = 300_000_000 },
+  { field = "feature.market_cap", op = "lt", value = 2_000_000_000 },
+]
+
+[[variants]]
+id = "large_cap_control"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.exchange", op = "eq", value = "NASDAQ" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "feature.market_cap", op = "gte", value = 10_000_000_000 },
+]
+
 [outcome]
 kind = "excess_return"
 horizon_sessions = [20, 60]
 benchmark = "SPY"
 start_offset_sessions = 1
-cost_bps = 20
+cost_bps = 40
 
 [quality_bar]
 outcome = """Excess return over SPY over 20 and 60 sessions after the reaction session, net of
-20 bps a round trip (the PRD's proposal, ADR 0053 open decisions): drift is held for weeks."""
-trigger_timing = """The reaction is two sessions, close(E-1) to close(E+1) (E: the first session to
-trade after the report); the anchor is E+1 and the decision session D = E+1, so the entry session
+40 bps a round trip (the ED4 decision 2026-10-08: small-cap spreads): drift is held for weeks."""
+trigger_timing = """The reaction is two sessions, close(E-1) to close(E+1) (E: the report date, the first
+session on which the report can trade; the window is close(E-1) -> close(E+1)); the anchor is E+1 and the decision session D = E+1, so the entry session
 is S = E+2 (start_offset_sessions = 1). The event names are read at D from
 earnings_reaction@v1 (sessions_since_reaction = 0), never from a row known after D."""
 replication = """The source's rule first: rank by the announcement-period return (Brandt,
-Kishore, Santa-Clara and Venkatachalam 2008) and hold the top bucket; the screener is ED4b."""
+Kishore, Santa-Clara and Venkatachalam 2008) and hold the top bucket; here pead_small_cap v1:
+Nasdaq common stock, market cap under $2B, close at least $3, 20-day dollar volume before the
+report at least $2M, a complete reaction window of at least +5% over SPY, the top 20 by reaction."""
 expected_size = """The drift is largest in the smallest names and has decayed in large caps since
 the 1990s (Martineau 2022). Bars start 2024-10-03 (2018 for the event scope names, ADR 0050):
 about eight reports per name, thousands of events, but clustered in about eight reporting
 seasons, so independent sessions are the binding count."""
-capacity_costs = """Small caps trade with wide spreads and thin volume: the outcome deducts 20 bps
+capacity_costs = """Small caps trade with wide spreads and thin volume: the outcome deducts 40 bps
 (an assumption) and the harness reports by cap bucket; an individual can trade the liquid end."""
 failure_modes = """Fat tails (takeovers, dilution, delisting) and a wrong report time that puts
 the reaction on the wrong session. Retire if the frozen-period excess return of the top bucket is

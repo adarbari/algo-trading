@@ -74,3 +74,8 @@ presets = ["support_reversal", "oversold_reversal", "exhaustion"]
 id = "income"
 title = "Option income"
 presets = ["vrp_scanner"]
+
+[[family]]
+id = "events"
+title = "Earnings events"
+presets = ["pead_small_cap"]

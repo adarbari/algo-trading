@@ -1,0 +1,66 @@
+# Small-cap post-earnings drift (ADR 0053, the ED4b amendment; edge small_cap_earnings_drift): a
+# Nasdaq-listed common stock under $2B whose last report moved it at least 5% more than SPY over the
+# reaction window (close before the report to close after it; Brandt et al. 2008), liquid enough to
+# trade by its volume BEFORE the report (the event's own spike excluded). Ranked by the reaction,
+# largest first. A missing value never passes (ADR 0030). What it does not check: the quality of
+# the surprise (no analyst estimates are stored), the age of the reaction (the edge's schedule reads
+# only the first session after it), or costs beyond the liquidity floor.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "pead_small_cap"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Small-cap post-earnings drift"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.exchange]
+field = "instrument.exchange"
+op = "eq"
+value = "NASDAQ"
+
+[criteria.market_cap]
+field = "feature.market_cap"
+op = "lt"
+value = 2_000_000_000
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gte"
+value = 3
+
+[criteria.pre_event_adv]
+field = "rollup.earnings_reaction@v1.pre_event_adv_usd_20d"
+op = "gte"
+value = 2_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.reaction_status]
+field = "rollup.earnings_reaction@v1.reaction_status"
+op = "eq"
+value = "OK"
+
+[criteria.reaction]
+field = "rollup.earnings_reaction@v1.reaction_excess_return"
+op = "gte"
+value = 0.05
+
+[columns]
+close = "rollup.price_stats@v2.close"
+market_cap = "feature.market_cap"
+reaction_excess_return = "rollup.earnings_reaction@v1.reaction_excess_return"
+sessions_since_reaction = "rollup.earnings_reaction@v1.sessions_since_reaction"
+pre_event_adv_usd_20d = "rollup.earnings_reaction@v1.pre_event_adv_usd_20d"
+
+[rank]
+tie_break = "rollup.earnings_reaction@v1.reaction_excess_return"
+tie_break_order = "desc"

@@ -42,7 +42,13 @@ def test_the_shipped_sections_follow_the_spec() -> None:
     shipped = load_guide_sections(SHIPPED)
     assert tuple(s.id for s in shipped.sections) == SECTIONS
     assert [s.title for s in shipped.sections][:2] == ["Start here", "Market regime"]
-    assert [f.id for f in shipped.families] == ["trend", "breakouts", "reversals", "income"]
+    assert [f.id for f in shipped.families] == [
+        "trend",
+        "breakouts",
+        "reversals",
+        "income",
+        "events",
+    ]
     assert shipped.families[1].presets == ("range_breakout", "breakout", "failed_breakout")
     assert shipped.theme_groups[0].themes == ("instrument gates", "liquidity")
 

@@ -11,7 +11,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 |---|---|---|---|---|
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event | none yet |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
-| Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | none yet |
+| Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps | `pead_small_cap` |
 | Volatility risk premium (`vrp_short_premium`) | candidate | every session | expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon | `short_premium_liquidity`, `vrp_scanner` |
 | Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | rejected | every session | excess return, over 1 session, vs SPY, entered 1 session after the decision session | none yet |
 | S&P 500 index changes (`sp500_index_changes`) | rejected | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
@@ -83,24 +83,24 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Status:** candidate. **Thesis:** Small Nasdaq-listed stocks keep drifting for weeks in the direction of their earnings-day reaction.
 
-- **Outcome:** excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps
-- **Schedule:** on each `earnings_reaction` (a reported result's two-session reaction (earnings_reaction@v1); anchor: the reaction's last session, E+1 (E: the first session to trade after the report))
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps
+- **Schedule:** on each `earnings_reaction` (a reported result's two-session reaction (earnings_reaction@v1); anchor: the reaction's last session, E+1 (E: the report date))
 - **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.exchange eq 'NASDAQ'` and `instrument.status eq 'ACTIVE'` and `feature.market_cap lt 2000000000`
-- **Top K:** all qualified names
-- **Screeners:** none yet
-- **Baselines:** none yet
+- **Top K:** 20
+- **Screeners:** `pead_small_cap`
+- **Baselines:** `momentum_12_1`, `size_small`
 - **Frozen period:** from 2026-04-01
-- **Notes:** Surprise = the reaction-session excess return over SPY (Brandt et al. 2008), from events/earnings read by known_from. The $2B cap is the owner's open decision (ADR 0053); the harness reports by cap bucket either way.
+- **Notes:** Surprise = the excess return over SPY from the close before the report to the close after it (Brandt et al. 2008), earnings_reaction@v1 from events/earnings read by known_from. E is the report date (the group's definition), the window close(E-1) -> close(E+1). Long only. The $2B cap was decided 2026-10-08 (ED4 decisions); the harness reports the micro (under $300M) and small ($300M to $2B) buckets as variants, each a trial of the deflated Sharpe ratio. The large-cap control (from $10B) runs the same screener, whose own cap criterion (under $2B) leaves it no picks: only its base rate (event names of large caps) and the baselines are informative, the screener's row is empty by construction. A long-short variant is not expressible: a variant overrides only the outcome and the universe, and an outcome has no short leg (the harness would need a new kind); left to a later PR.
 
 **Quality bar**
 
 1. **Mechanism:** Investors underreact to earnings news, most in small names that few analysts cover and where arbitrage is expensive (Bernard and Thomas 1989; Chordia et al. 2009).
 2. **Persistence:** Limits to arbitrage: the drift survives where spreads, short-sale costs and low capacity keep institutions out; it has faded in large caps but not in the smallest names (Martineau 2022).
-3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the reaction session, net of 20 bps a round trip (the PRD's proposal, ADR 0053 open decisions): drift is held for weeks.
-4. **Trigger timing:** The reaction is two sessions, close(E-1) to close(E+1) (E: the first session to trade after the report); the anchor is E+1 and the decision session D = E+1, so the entry session is S = E+2 (start_offset_sessions = 1). The event names are read at D from earnings_reaction@v1 (sessions_since_reaction = 0), never from a row known after D.
-5. **Faithful replication:** The source's rule first: rank by the announcement-period return (Brandt, Kishore, Santa-Clara and Venkatachalam 2008) and hold the top bucket; the screener is ED4b.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the reaction session, net of 40 bps a round trip (the ED4 decision 2026-10-08: small-cap spreads): drift is held for weeks.
+4. **Trigger timing:** The reaction is two sessions, close(E-1) to close(E+1) (E: the report date, the first session on which the report can trade; the window is close(E-1) -> close(E+1)); the anchor is E+1 and the decision session D = E+1, so the entry session is S = E+2 (start_offset_sessions = 1). The event names are read at D from earnings_reaction@v1 (sessions_since_reaction = 0), never from a row known after D.
+5. **Faithful replication:** The source's rule first: rank by the announcement-period return (Brandt, Kishore, Santa-Clara and Venkatachalam 2008) and hold the top bucket; here pead_small_cap v1: Nasdaq common stock, market cap under $2B, close at least $3, 20-day dollar volume before the report at least $2M, a complete reaction window of at least +5% over SPY, the top 20 by reaction.
 6. **Expected size and sample:** The drift is largest in the smallest names and has decayed in large caps since the 1990s (Martineau 2022). Bars start 2024-10-03 (2018 for the event scope names, ADR 0050): about eight reports per name, thousands of events, but clustered in about eight reporting seasons, so independent sessions are the binding count.
-7. **Capacity and costs:** Small caps trade with wide spreads and thin volume: the outcome deducts 20 bps (an assumption) and the harness reports by cap bucket; an individual can trade the liquid end.
+7. **Capacity and costs:** Small caps trade with wide spreads and thin volume: the outcome deducts 40 bps (an assumption) and the harness reports by cap bucket; an individual can trade the liquid end.
 8. **Failure modes and retirement:** Fat tails (takeovers, dilution, delisting) and a wrong report time that puts the reaction on the wrong session. Retire if the frozen-period excess return of the top bucket is not above the base rate of every eligible name after costs.
 9. **Decoys:** Short-term momentum (a big move continues for any reason) and the small-cap illiquidity premium: the 12-1 momentum and size baselines on the same sessions.
 
