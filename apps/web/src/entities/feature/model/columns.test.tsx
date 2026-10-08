@@ -261,7 +261,7 @@ describe('column factories', () => {
       <DataTable
         columns={[
           tickerColumn(),
-          decisionColumn(new Set(['MRVL'])),
+          decisionColumn(),
           screenColumn({ name: 'close', field: CLOSE.name }, CLOSE),
           screenColumn({ name: 'iv_hv_ratio', field: 'feature.iv_hv_ratio' }),
           changeColumn(),
@@ -274,7 +274,6 @@ describe('column factories', () => {
       />,
     );
     const grid = screen.getByRole('grid', { name: 'Stored' });
-    expect(within(grid).getByText('Would leave')).toBeInTheDocument();
     expect(within(grid).getByText('$70.25')).toBeInTheDocument();
     expect(within(grid).getByText('1.23')).toBeInTheDocument();
     expect(within(grid).getByText('Dropped (was event risk)')).toBeInTheDocument();

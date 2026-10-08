@@ -8,14 +8,7 @@
  * never from the feature's name, and shows UNKNOWN with the reason where the session has no
  * value.
  */
-import {
-  Mono,
-  Stack,
-  StatusBadge,
-  Text,
-  isNumericFormat,
-  type DataTableColumn,
-} from '@algotrade/ui';
+import { Mono, Stack, Text, isNumericFormat, type DataTableColumn } from '@algotrade/ui';
 
 import { DecisionBadge, OUTCOME_FILL, ScoreBreakdown, decisionLabel } from '@/entities/screen';
 import { feature } from '@/shared/api';
@@ -175,15 +168,8 @@ export function rankColumn(): DataTableColumn<TableRow> {
   };
 }
 
-const NO_TICKERS: ReadonlySet<string> = new Set();
-
-/**
- * The screen's decision as a badge; a ticker in `leaving` (the unsaved criteria would drop it
- * from the picks: the server's preview changes) is marked "Would leave".
- */
-export function decisionColumn(
-  leaving: ReadonlySet<string> = NO_TICKERS,
-): DataTableColumn<TableRow> {
+/** The screen's decision as a badge. */
+export function decisionColumn(): DataTableColumn<TableRow> {
   return {
     id: 'decision',
     header: 'Decision',
@@ -191,13 +177,7 @@ export function decisionColumn(
     value: (row) => row.decision,
     width: 'lg',
     essential: true,
-    cell: ({ row }) =>
-      row.decision ? (
-        <Stack gap={0}>
-          <DecisionBadge decision={row.decision} />
-          {leaving.has(row.symbol) ? <StatusBadge tone="warning">Would leave</StatusBadge> : null}
-        </Stack>
-      ) : null,
+    cell: ({ row }) => (row.decision ? <DecisionBadge decision={row.decision} /> : null),
   };
 }
 

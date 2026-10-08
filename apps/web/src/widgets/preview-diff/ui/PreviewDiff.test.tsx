@@ -1,8 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PreviewChangesReporter, PreviewDiff } from './PreviewDiff';
+import { PreviewDiff } from './PreviewDiff';
 
 const state = vi.hoisted(() => ({ builder: {} }));
 
@@ -28,13 +27,10 @@ describe('PreviewDiff', () => {
     expect(screen.getByText('+1 enter: KO. -1 leave: SOXS.')).toBeInTheDocument();
   });
 
-  it('offers to review the criteria, and says when nothing would change', async () => {
-    const onReview = vi.fn();
+  it('says when nothing would change', () => {
     state.builder = { dirty: true, preview: { data: { changes: changes([], []) } } };
-    render(<PreviewDiff onReview={onReview} />);
+    render(<PreviewDiff />);
     expect(screen.getByText('The same tickers are picked.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Review criteria' }));
-    expect(onReview).toHaveBeenCalled();
   });
 
   it('shows nothing without unsaved changes, a preview or a saved run', () => {
@@ -47,13 +43,5 @@ describe('PreviewDiff', () => {
     state.builder = { dirty: true, preview: { data: { changes: null } } };
     rerender(<PreviewDiff />);
     expect(container).toBeEmptyDOMElement();
-  });
-
-  it('reports the tickers that would leave, and none once gone', () => {
-    const onChange = vi.fn();
-    const { unmount } = render(<PreviewChangesReporter onChange={onChange} />);
-    expect(onChange).toHaveBeenLastCalledWith(new Set(['SOXS']));
-    unmount();
-    expect(onChange).toHaveBeenLastCalledWith(new Set());
   });
 });

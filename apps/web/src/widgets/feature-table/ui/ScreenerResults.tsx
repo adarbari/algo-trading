@@ -62,8 +62,6 @@ export interface ScreenerResultsProps {
   /** Instrument ids hidden for now. */
   dismissed: ReadonlySet<string>;
   onShowDismissed: () => void;
-  /** Tickers the unsaved criteria would drop from the picks (marked in the grid). */
-  leaving?: ReadonlySet<string>;
   /** What to show beside the table for the row under review (its detail, chart, ...). */
   renderDetail?: (focus: { row: TableRow; criteria: readonly CriterionInfo[] }) => ReactNode;
 }
@@ -82,7 +80,6 @@ export function ScreenerResults({
   onDismiss,
   dismissed,
   onShowDismissed,
-  leaving,
   renderDetail,
 }: ScreenerResultsProps) {
   const view = useTableView(screenerScope(id));
@@ -121,10 +118,9 @@ export function ScreenerResults({
         displayColumns: screener?.displayColumns ?? [],
         added: run?.results.columns ?? [],
         catalogue: known,
-        leaving,
         changes: true,
       }),
-    [screener, run, known, leaving],
+    [screener, run, known],
   );
   const rows = useMemo(
     () => (run ? resultRows(run.results) : []).filter((row) => !dismissed.has(row.instrumentId)),

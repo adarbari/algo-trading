@@ -76,7 +76,7 @@ reads both until then), written by `PUT` / `DELETE /preferences/views/{scope}/vi
 only through `features/table-view` (`useTableView(scope)`, `ViewControls`; WEB 7); the
 `widgets/feature-table` renders all four tables (`FeatureTable`, `ScreenerResults`,
 `PreviewResults` on one `TableFrame`; `widgets/{screener-results,preview-results}` deleted) with
-the new factories `screenColumn`, `reasonsColumn` (and `decisionColumn(leaving)`,
+the new factories `screenColumn`, `reasonsColumn` (and `decisionColumn`,
 `scoreColumn(labelOf)`); `POST /screeners/preview` stays REST but its rows carry the
 instrument's name, its draft's `criteria` / `display_columns` and `changes` against the saved
 run of the session (`entered` / `left`, decided on the server: the NOT_PICKED entry is on);

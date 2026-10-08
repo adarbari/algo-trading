@@ -40,8 +40,6 @@ export interface ResultsPlanInput {
   added: readonly ColumnInfo[];
   /** The catalogue: formats and labels the criteria and display columns by their field. */
   catalogue: ReadonlyMap<string, ColumnInfo>;
-  /** Tickers the unsaved criteria would drop from the picks. */
-  leaving?: ReadonlySet<string> | undefined;
   /** A stored run: the change since the previous run gets a column. */
   changes?: boolean | undefined;
   /** A criterion's label in a score breakdown (the preview's scores open one). */
@@ -53,7 +51,6 @@ export function resultsPlan({
   displayColumns,
   added,
   catalogue,
-  leaving,
   changes = false,
   labelOf,
 }: ResultsPlanInput): ColumnPlan {
@@ -62,7 +59,7 @@ export function resultsPlan({
   return [
     rankColumn(),
     tickerColumn(),
-    decisionColumn(leaving),
+    decisionColumn(),
     scoreColumn(labelOf),
     ...shown.map((c) => criterionColumn(c, catalogue.get(c.field))),
     ...displayColumns
