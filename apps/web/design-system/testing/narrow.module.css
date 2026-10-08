@@ -1,0 +1,9 @@
+/*
+ * The narrow story frame: a phone-wide box (the `phone` size token) that is its own size
+ * container, so container queries and useNarrow see a phone without resizing the viewport.
+ */
+.frame {
+  container-type: inline-size;
+  inline-size: var(--size-phone);
+  max-inline-size: 100%;
+}

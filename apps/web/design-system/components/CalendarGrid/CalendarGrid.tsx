@@ -9,12 +9,12 @@
  * 1-30 of 64" line. A real table (caption = `label`, row and column headers). Loading, empty and
  * error states.
  */
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { formatValue } from '../../format';
 import { Text } from '../../primitives/Text';
 import { VisuallyHidden } from '../../primitives/VisuallyHidden';
-import { breakpoint } from '../../tokens';
+import { useNarrow } from '../../responsive';
 import { Button } from '../Button';
 import { EmptyState } from '../EmptyState';
 import { ErrorState } from '../ErrorState';
@@ -56,25 +56,6 @@ export interface CalendarGridProps {
 
 const dayHead = (iso: string) => formatValue(iso, { kind: 'date', style: 'weekday' }).text;
 
-/** True while the element is narrower than the medium breakpoint (false until measured). */
-function useNarrow(): [RefObject<HTMLDivElement | null>, boolean] {
-  const ref = useRef<HTMLDivElement>(null);
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element || typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
-      setNarrow(width > 0 && width < breakpoint.md);
-    });
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-  return [ref, narrow];
-}
-
 function Cell({ events, ruled }: { events: readonly CalendarEvent[] | undefined; ruled: boolean }) {
   return (
     <td className={styles.cell} data-ruled={ruled || undefined}>
@@ -105,7 +86,7 @@ export function CalendarGrid({
   onRetry,
   emptyMessage = 'No events in this window.',
 }: CalendarGridProps) {
-  const [ref, narrow] = useNarrow();
+  const [ref, narrow] = useNarrow('md');
   const [page, setPage] = useState(0);
   const acrossDays = orientation === 'auto' ? narrow : orientation === 'days-across';
 

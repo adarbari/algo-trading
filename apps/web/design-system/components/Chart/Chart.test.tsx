@@ -32,6 +32,8 @@ import {
 const engine = vi.hoisted(() => ({
   draw: vi.fn(),
   cleanup: vi.fn(),
+  zoom: vi.fn(),
+  reset: vi.fn(),
   crosshair: undefined as ((info: CrosshairInfo | null) => void) | undefined,
 }));
 vi.mock('./engine', () => ({
@@ -43,7 +45,7 @@ vi.mock('./engine', () => ({
   ) => {
     engine.draw(input);
     engine.crosshair = onCrosshair;
-    return engine.cleanup;
+    return { dispose: engine.cleanup, zoom: engine.zoom, reset: engine.reset };
   },
 }));
 
@@ -52,6 +54,8 @@ const lastInput = () => engine.draw.mock.lastCall?.[0] as EngineInput;
 beforeEach(() => {
   engine.draw.mockClear();
   engine.cleanup.mockClear();
+  engine.zoom.mockClear();
+  engine.reset.mockClear();
 });
 
 describe('chart data', () => {
@@ -224,6 +228,21 @@ describe('Chart', () => {
       engine.crosshair?.(null);
     });
     expect(screen.queryByText('10 Aug 2026')).toBeNull();
+  });
+
+  it('zooms the drawn chart in, out and back to the window from its toolbar', async () => {
+    const user = userEvent.setup();
+    render(<Chart label="AAPL close" series={[aapl]} range="1Y" />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    const zoom = screen.getByRole('group', { name: 'Zoom' });
+    await user.click(within(zoom).getByRole('button', { name: 'Zoom in' }));
+    expect(engine.zoom).toHaveBeenLastCalledWith(0.5);
+    await user.click(within(zoom).getByRole('button', { name: 'Zoom out' }));
+    expect(engine.zoom).toHaveBeenLastCalledWith(2);
+    await user.click(within(zoom).getByRole('button', { name: 'Reset zoom' }));
+    expect(engine.reset).toHaveBeenCalledOnce();
   });
 
   it('switches to a table of the same numbers and back', async () => {

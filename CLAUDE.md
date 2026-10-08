@@ -29,6 +29,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Configs, selections, users**: layering defaults < site < user < run; site presets in `config/site/`, user configs in `config/users/<id>/`; runs record user + config hash; missing data never passes a selection. (ADR 0015) **Users** are declared in `config/site/users.toml` with a role (`admin` / `trader`; `UsersSettings`); Supabase Auth authenticates them behind the one `Authenticator` seam in `apps/api/algotrade_api/auth/` (roles never come from the provider), and `guard.ts` reads the role from `Query.viewer`. (ADR 0040)
 - **Hosting**: from the owner's Mac behind Tailscale Funnel; the API serves the built web (`make web-build` -> `var/web`, `ALGOTRADE_WEB_DIST`) on its own origin, mounted last; the API runs as a launchd agent (`algotrade-api schedule`, written, never installed); runbook `docs/hosting.md`. (ADR 0044)
 - **Design-system-first UI**: screens use only `@algotrade/ui`; a missing component is added to the design system first; the web app is layered and component-only (Web UI below). (ADRs 0011, 0025)
+- **One UI for phones and desktops**: no mobile pages or variants; layout by container query, a multi-column `Grid` passes `collapse`, a list beside its detail is `MasterDetail`, touch sizing from the density tokens; checked by ESLint rule 10, a `Narrow` story per responsive component and the e2e `phone` project; skill `.claude/skills/responsive-ui`. (ADR 0052)
 - **Vendors**: free first behind the source interface; Cboe chains, IBKR for futures and enrichment (IV rank prefers IBKR, labelled `iv_rank_source`; IBKR-derived features carry `licence = "personal"`); we compute Greeks ourselves; descriptions: Massive overview for stocks (capped per night), SEC prospectus objective for ETFs (ADR 0034). (ADRs 0012, 0014, 0028, 0034)
 - **Broker access is read-only**: IBKR only through `algotrade_sources/vendors/ibkr/gateway.py`; no orders, no account functions (fitness test + import-linter). (ADR 0026)
 - **Universe**: S&P 500 + Nasdaq-listed stocks + all ETFs, daily snapshots. (ADR 0013)
@@ -131,7 +132,9 @@ the skill with the fix.
 8. Secrets come only from environment variables. Never commit credentials.
    Dependencies go in the pyproject of the package that needs them (an app's own, not the
    library's), then `uv lock`; commit `uv.lock`.
-9. Before finishing any change, run `make check`.
+9. Check narrow first (`make changed`: mirrored tests, mapped web checks, fast gates), then run the full
+   `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a failure rerun only the failed
+   gate (`make <gate>` / `npm run <script>`), never the whole `make check` again.
 10. **Push and open the PR yourself, then move on.** When `make check` passes, push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start
@@ -164,6 +167,7 @@ the skill with the fix.
 | New screener | `.claude/skills/add-screener` |
 | New UI component (design system) or visual element | `.claude/skills/add-ui-component` |
 | Explaining anything to the user (meaning, how to read, when it lies), or moving an explanation into the Guide | `.claude/skills/add-guide-content` |
+| Any UI change: keep it working on phones and desktops (one tree) | `.claude/skills/responsive-ui` |
 | New web page, route or data hook | `.claude/skills/add-web-page` |
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
 | New page read (a GraphQL field) | `.claude/skills/add-graphql-field` |

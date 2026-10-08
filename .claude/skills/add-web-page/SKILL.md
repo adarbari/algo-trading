@@ -37,6 +37,10 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    `STRUCTURE` with the reason.
 5. **Page** (`src/pages/<page>/`): composes widgets / features with primitives (`Stack`,
    `Text`); receives route params as props; no logic, no styling, no Query, no router.
+   Phones and desktops from the same page (`.claude/skills/responsive-ui`, ADR 0052): every
+   multi-column `Grid` passes `collapse`; a list beside its detail is `MasterDetail`, whose
+   `onDetailClose` clears the chosen row in the URL; every name that opens something is a
+   Button. The e2e `phone` project covers the route; add its flows to `e2e/phone.spec.ts`.
    Export it from `index.ts`; add `<Page>.test.tsx`.
 6. **Route** (`src/app/routes/<workspace>/routes.tsx`): replace the section's
    `placeholderRoute` with a `createRoute` whose component is the page (params validated

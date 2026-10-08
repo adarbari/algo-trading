@@ -75,6 +75,8 @@
 }
 
 .row {
+  --dt-row-bg: var(--color-surface);
+
   display: grid;
   grid-template-columns: var(--dt-columns);
   width: 100%;
@@ -95,16 +97,22 @@
 }
 
 .row[data-virtual]:hover {
-  background: var(--color-row);
+  --dt-row-bg: var(--color-row);
+
+  background: var(--dt-row-bg);
 }
 
 .row[aria-selected='true'],
 .row[aria-selected='true']:hover {
-  background: var(--color-accent-soft);
+  --dt-row-bg: var(--color-accent-soft);
+
+  background: var(--dt-row-bg);
 }
 
 .row[data-active] {
-  background: var(--color-row);
+  --dt-row-bg: var(--color-row);
+
+  background: var(--dt-row-bg);
 }
 
 .headerCell,
@@ -114,6 +122,28 @@
   align-items: center;
   min-width: 0;
   padding: 0 var(--density-cell-padding-x);
+}
+
+/*
+ * The pinned start: the checkbox column and the first column stay in view while the canvas
+ * scrolls sideways, over the row's own background (hover, selected, active: --dt-row-bg); the
+ * first column's end border shows once the table is scrolled. Before the fills, so a filled
+ * first cell keeps its fill.
+ */
+.row > [data-pinned] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: var(--z-raised);
+  background: var(--dt-row-bg);
+}
+
+.row > [data-pinned='first'] {
+  inset-inline-start: var(--dt-pin-offset);
+  border-inline-end: var(--border-width-thin) solid transparent;
+}
+
+.scroller[data-scrolled-x] .row > [data-pinned='first'] {
+  border-inline-end-color: var(--color-border);
 }
 
 .cell[data-fill='warning'] {

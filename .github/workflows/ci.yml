@@ -15,9 +15,14 @@ permissions:
 
 env:
   HYPOTHESIS_PROFILE: ci
+  # The official Playwright image: browsers and fonts identical to the screenshot baselines
+  # (apps/web/scripts/in-playwright-docker.sh uses the same image locally). Its tag must match
+  # @playwright/test in apps/web/package-lock.json (checked in the screenshots job).
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
 
 jobs:
   # Which side a pull request touches (docs/ci.md). main (push, post-merge re-test) runs all.
+  # A docs-only change (docs/, *.md, .claude/) is neither: only the architecture tests run.
   changes:
     name: Changed areas
     runs-on: ubuntu-latest
@@ -38,6 +43,7 @@ jobs:
               "") ;;
               .github/workflows/ci.yml | apps/api/openapi.json | apps/api/schema.graphql) python=true web=true ;;
               apps/web/*) web=true ;;
+              docs/* | .claude/* | *.md | LICENSE) ;; # docs only: the architecture tests cover them
               *) python=true ;;
             esac
           done < <(git diff --name-only HEAD^1 HEAD)
@@ -75,6 +81,8 @@ jobs:
 
   test:
     name: Tests (py${{ matrix.python }})
+    # No job-level `if`: GitHub does not expand the matrix of a skipped job, so the protected
+    # check "Tests (py3.12)" would never report. The steps decide instead.
     needs: [changes]
     runs-on: ubuntu-latest
     strategy:
@@ -101,8 +109,9 @@ jobs:
       - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
         if: needs.changes.outputs.python == 'true'
         run: make test
-      # A web-only change still answers to the layout rules (architecture/web_layout.toml [[web_dir]]).
-      - name: Architecture only (the change is web-only)
+      # A web-only or docs-only change still answers to the fitness tests: the web layout rules
+      # (architecture/web_layout.toml [[web_dir]]), the ADR index, the roadmap cap, the links.
+      - name: Architecture tests only (the change is web-only or docs-only)
         if: needs.changes.outputs.python != 'true'
         run: .venv/bin/python -m pytest -q -n auto tests/architecture
       - uses: actions/upload-artifact@v7
@@ -125,7 +134,13 @@ jobs:
       - run: uv sync --all-packages --locked
       - uses: actions/setup-node@v6
         with: { node-version: "24" }
-      - run: npm ci --no-fund --no-audit
+      - uses: actions/cache@v6
+        id: node-modules
+        with:
+          path: apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci --no-fund --no-audit
         working-directory: apps/web
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
@@ -134,14 +149,44 @@ jobs:
         if: failure()
         with: { name: real-app-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
 
-  web:
-    name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
+  # ---------------------------------------------------------------------------------- web
+  # Four jobs in parallel instead of one serial job (docs/ci.md "Pipeline"): the static checks
+  # and unit tests; the production build with the e2e suite; the Storybook build, handed as an
+  # artifact to the screenshot shards. They share one node_modules cache keyed on the lockfile.
+  web-static:
+    name: Web static (generated files, ds:check, lint, types, unit)
     needs: [changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
-    # The official Playwright image: browsers and fonts identical to the screenshot baselines
-    # (apps/web/scripts/in-playwright-docker.sh uses the same image locally). Its tag must
-    # match @playwright/test in apps/web/package-lock.json (checked below).
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with: { node-version: "24" }
+      - uses: actions/cache@v6
+        id: node-modules
+        with:
+          path: apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci --no-fund --no-audit
+      - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
+        run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
+      - run: npm run generated:check
+      - run: npm run ds:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+
+  web-e2e:
+    name: Web e2e (production build, Playwright)
+    needs: [changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       options: --ipc=host
@@ -154,21 +199,95 @@ jobs:
       - uses: actions/checkout@v7
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/cache@v6
+        id: node-modules
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
-          restore-keys: npm-${{ runner.os }}-
-      - run: npm ci --no-fund --no-audit
-      - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
-        run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
+          path: apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci --no-fund --no-audit
+      # `npm run e2e` builds the production bundle itself (playwright.config.ts webServer):
+      # the `tsc -b` half of `npm run build` is web-static's typecheck.
+      - name: "Production build + e2e (quarantined specs skipped: apps/web/quarantine.json)"
+        run: npm run e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with: { name: playwright-report-e2e, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
+
+  web-storybook:
+    name: Web Storybook build
+    needs: [changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with: { node-version: "24" }
+      - uses: actions/cache@v6
+        id: node-modules
+        with:
+          path: apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci --no-fund --no-audit
+      - run: npm run storybook:build
+      - uses: actions/upload-artifact@v7
+        with: { name: storybook-static, path: apps/web/storybook-static, retention-days: 1, if-no-files-found: error }
+
+  web-screenshots:
+    name: Web screenshots + axe (shard ${{ matrix.shard }} of 2)
+    needs: [changes, web-storybook]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/cache@v6
+        id: node-modules
+        with:
+          path: apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci --no-fund --no-audit
       - name: Playwright image matches the locked @playwright/test
         run: |
           locked=$(node -p "require('@playwright/test/package.json').version")
-          test "$locked" = "1.63.0" || { echo "bump the web job's container image to v$locked-noble"; exit 1; }
-      - name: Generated files fresh, ds:check, lint, types, unit, build, Storybook, e2e
-        run: npm run check
+          test "$PLAYWRIGHT_IMAGE" = "mcr.microsoft.com/playwright:v$locked-noble" || { echo "bump PLAYWRIGHT_IMAGE and the container images to v$locked-noble"; exit 1; }
+      - uses: actions/download-artifact@v7
+        with: { name: storybook-static, path: apps/web/storybook-static }
       - name: Screenshots + axe (light and dark) over every design-system story
-        run: npm run visual -- --fully-parallel  # one story per worker, not one file per worker
+        run: npm run visual -- --fully-parallel --shard=${{ matrix.shard }}/2 # one story per worker, not one file per worker
       - uses: actions/upload-artifact@v7
         if: failure()
-        with: { name: playwright-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
+        with: { name: "playwright-report-screenshots-${{ matrix.shard }}", path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
+
+  # The one web check branch protection requires (its name is the protected context; the four
+  # jobs above can change without touching the repo settings). Passes when every web job
+  # passed or was skipped (a python-only or docs-only change); fails on any failure.
+  web:
+    name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
+    needs: [web-static, web-e2e, web-storybook, web-screenshots]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "web jobs: $RESULTS"
+          case " $RESULTS " in *" failure "* | *" cancelled "*) exit 1 ;; esac

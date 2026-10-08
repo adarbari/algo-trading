@@ -1,0 +1,41 @@
+{
+  "doc": "Known flaky specs (docs/ci.md 'Flaky specs'). `skipped` entries do not run in `npm run e2e` / `npm run test` (playwright.config.ts grepInvert, vite.config.ts exclude); `QUARANTINE=only npm run e2e` runs just them. `watched` entries still run and gate; they are listed with the fix that keeps them green. Every entry names its file, the date it was seen flaking, the reason and the fix it waits for; tests/architecture/pipeline/test_quarantine.py keeps the list honest (the test still exists, at most 8 skipped).",
+  "skipped": [
+    {
+      "kind": "e2e",
+      "file": "e2e/screener-builder.spec.ts",
+      "title": "editing a threshold previews after 300 ms, then saves the draft and finalizes",
+      "since": "2026-10-05",
+      "reason": "the 300 ms preview debounce races the mock under load (make check WORKERS=2); the timing belongs in a unit test of the Builder's debounce, the e2e should only assert the preview arrives"
+    },
+    {
+      "kind": "e2e",
+      "file": "e2e/smoke.spec.ts",
+      "title": "the admin workspace is reachable (light)",
+      "since": "2026-10-05",
+      "reason": "axe scan of the admin workspace in light theme fails intermittently (colour-contrast on a transient loading state); fix: wait for the ingestion table before expectAccessible"
+    },
+    {
+      "kind": "e2e",
+      "file": "e2e/ideas.spec.ts",
+      "title": "shows the stored display values and the watch-outs",
+      "since": "2026-10-05",
+      "reason": "the grid headers arrive after the assertion under load (#196 added a retrying assertion; it failed once more on 2026-10-05); fix: assert on the row, not the header count"
+    }
+  ],
+  "watched": [
+    {
+      "kind": "e2e",
+      "file": "e2e/screener-builder.spec.ts",
+      "title": "the first edit of a preset makes your copy, which you change, rerun and finalize",
+      "since": "2026-10-06",
+      "reason": "the roadmap's 'one builder e2e' flake was never named; this is the Builder spec's longest flow (three writes, each followed by a preview) and the likeliest under load. Watched, not skipped: it still gates. If it fails again under load, move it to `skipped` with the failure text"
+    },
+    {
+      "kind": "unit",
+      "file": "scripts/lint-help-drawer.test.ts",
+      "since": "2026-10-05",
+      "reason": "'Test timed out in 5000ms': it runs ESLint in-process over fixture files, which takes 5 to 15 s under load; kept, with the 20 s integration-style timeout (vite.config.ts, the integration project)"
+    }
+  ]
+}

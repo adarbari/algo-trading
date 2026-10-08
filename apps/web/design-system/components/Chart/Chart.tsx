@@ -10,8 +10,9 @@
  * (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own
  * time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window
  * (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws
- * in the active theme's tokens when the theme changes, and has no animation (scroll / zoom
- * off). Accessible: an image with a generated text summary, and a "View as table" switch that
+ * in the active theme's tokens when the theme changes, and has no animation. Inside the window,
+ * Zoom in / Zoom out / Reset zoom buttons (and, on touch, a horizontal drag and a pinch) move and
+ * scale the view; the mouse wheel scrolls the page, never the chart. Accessible: an image with a generated text summary, and a "View as table" switch that
  * shows the same numbers in a DataTable. Loading, empty and error states.
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -21,6 +22,7 @@ import { Button } from '../Button';
 import { DataTable, type DataTableColumn } from '../DataTable';
 import { EmptyState } from '../EmptyState';
 import { ErrorState } from '../ErrorState';
+import { IconButton } from '../IconButton';
 import { VisuallyHidden } from '../../primitives/VisuallyHidden';
 import { Skeleton } from '../Skeleton';
 import styles from './Chart.module.css';
@@ -43,7 +45,7 @@ import {
 import { ChartLegend } from './ChartLegend';
 import { readTheme, useThemeVersion } from './chartTheme';
 import { ChartTooltip } from './ChartTooltip';
-import { drawChart, type CrosshairInfo } from './engine';
+import { drawChart, type ChartHandle, type CrosshairInfo } from './engine';
 
 export interface ChartProps {
   /** What the chart shows ("AAPL close", "AAPL, MSFT and NVDA"): the summary's first words. */
@@ -159,6 +161,7 @@ export function Chart({
   const [crosshair, setCrosshair] = useState<(CrosshairInfo & { width: number }) | null>(null);
   const [ready, setReady] = useState(false);
   const host = useRef<HTMLDivElement>(null);
+  const handle = useRef<ChartHandle | null>(null);
   const themeVersion = useThemeVersion();
   const hasData = chart.series.length > 0;
   const showCanvas = status === 'ready' && hasData && view === 'chart';
@@ -183,7 +186,7 @@ export function Chart({
   useEffect(() => {
     const element = host.current;
     if (!showCanvas || !element) return undefined;
-    let cleanup: (() => void) | undefined;
+    let drawn: ChartHandle | undefined;
     let cancelled = false;
     let frame = 0;
     setReady(false);
@@ -201,7 +204,7 @@ export function Chart({
       : Promise.resolve([]);
     void fontsReady.then(() => {
       if (cancelled) return;
-      cleanup = drawChart(
+      drawn = drawChart(
         element,
         {
           type,
@@ -221,6 +224,7 @@ export function Chart({
           setCrosshair(info ? { ...info, width: element.clientWidth } : null);
         },
       );
+      handle.current = drawn;
       // Ready (for screenshots) once the canvas has painted: two frames after the draw.
       frame = requestAnimationFrame(() => {
         frame = requestAnimationFrame(() => {
@@ -231,7 +235,8 @@ export function Chart({
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
-      cleanup?.();
+      drawn?.dispose();
+      handle.current = null;
       setCrosshair(null);
     };
   }, [showCanvas, chart, type, rebase, themeVersion, formatKey]);
@@ -305,6 +310,28 @@ export function Chart({
         <ChartLegend chart={chart} bandKey={bandKey} />
         <div className={styles.tools}>
           {toolbar}
+          {showCanvas && (
+            <div className={styles.zoom} role="group" aria-label="Zoom">
+              <IconButton
+                icon="zoom-in"
+                label="Zoom in"
+                size="sm"
+                onClick={() => handle.current?.zoom(0.5)}
+              />
+              <IconButton
+                icon="zoom-out"
+                label="Zoom out"
+                size="sm"
+                onClick={() => handle.current?.zoom(2)}
+              />
+              <IconButton
+                icon="fit"
+                label="Reset zoom"
+                size="sm"
+                onClick={() => handle.current?.reset()}
+              />
+            </div>
+          )}
           {tableView && (
             <Button
               size="sm"

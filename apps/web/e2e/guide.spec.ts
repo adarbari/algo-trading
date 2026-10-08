@@ -31,6 +31,10 @@ test('the top bar links to the Guide, and "?" opens it', async ({ page }) => {
   await expect(page).toHaveURL(/\/guide$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Guide' })).toBeVisible();
   await page.goto('/explore');
+  // The shortcut listener mounts with the layout, and "?" inside a text field is a character
+  // (use-guide-shortcut.ts): wait for the page, then make sure nothing has the focus.
+  await expect(page.getByRole('link', { name: /^Guide/ })).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('?');
   await expect(page).toHaveURL(/\/guide$/);
   expect(errors).toEqual([]);

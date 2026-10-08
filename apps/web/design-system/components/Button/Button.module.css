@@ -86,3 +86,9 @@
   border-color: transparent;
   background: transparent;
 }
+
+@media (pointer: coarse) {
+  .button[data-size='sm'] {
+    min-height: var(--density-control-height);
+  }
+}
