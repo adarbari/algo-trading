@@ -1,4 +1,4 @@
-/* TopBar: a surface strip with a bottom border; under 720px the nav takes its own full-width row. */
+/* TopBar: a surface strip with a bottom border; under 720px a two-row grid (see TopBar.tsx). */
 .topBar {
   container-type: inline-size;
   display: flex;
@@ -31,15 +31,6 @@
   display: contents;
 }
 
-@container (width < 720px) {
-  .nav {
-    display: block;
-    flex-basis: 100%;
-    order: 1;
-    min-width: 0;
-  }
-}
-
 /* The utility slot takes the push to the far side; `end` then follows it directly. */
 .utility {
   display: flex;
@@ -49,4 +40,42 @@
 
 .utility + .end {
   margin-inline-start: 0;
+}
+
+@container (width < 720px) {
+  .topBar {
+    display: grid;
+    grid-template-areas:
+      'brand utility end'
+      'nav nav nav';
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+    padding-inline: var(--space-4);
+  }
+
+  .brand {
+    grid-area: brand;
+  }
+
+  .utility {
+    grid-area: utility;
+    margin-inline-start: 0;
+    justify-self: end;
+  }
+
+  /* The end slot keeps one line and scrolls sideways rather than wrapping into a third row. */
+  .end {
+    grid-area: end;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    overflow-x: auto;
+    margin-inline-start: 0;
+    scrollbar-width: none;
+  }
+
+  .nav {
+    display: block;
+    grid-area: nav;
+    min-width: 0;
+  }
 }

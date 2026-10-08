@@ -58,6 +58,9 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
           rows={own}
           getRowId={(s) => s.screenerId}
           getRowLabel={(s) => s.screenerId}
+          onRowActivate={(s) => {
+            onOpen(s.screenerId);
+          }}
           defaultSort={{ columnId: 'name', direction: 'asc' }}
           emptyMessage="You have no screener yet. Create one, or open a preset and change it."
         />
@@ -77,6 +80,9 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
           rows={presets}
           getRowId={(s) => s.configId}
           getRowLabel={(s) => s.configId}
+          onRowActivate={(s) => {
+            if (s.impl === 'rules') onOpen(s.configId);
+          }}
           defaultSort={{ columnId: 'name', direction: 'asc' }}
           emptyMessage="No site screener presets."
         />

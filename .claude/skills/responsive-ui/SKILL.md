@@ -27,15 +27,22 @@ Never a mobile page, route, widget or component variant: adapt the one component
 4. **Touch targets.** Controls size from the density tokens; under `@media (pointer: coarse)`
    they take the `touch` values (36 px controls, 40 px rows). A new small variant keeps
    `min-height: var(--density-control-height)` under a coarse pointer. Nothing depends on
-   hover alone: a tooltip also opens on focus and tap, a read-out has a tap equivalent, a
-   keyboard shortcut is never the only way to an action (a button exists too).
+   hover alone: `Tooltip` opens on focus and on a tap (a disabled trigger's anchor takes the
+   tap), a read-out has a tap equivalent, a keyboard shortcut is never the only way to an
+   action (a button exists too). Shortcut hints are a `KeyHints` row (hidden under a coarse
+   pointer by the design system), never Kbd + Text in page code.
 5. **Tables** are `DataTable` with the key column pinned (`pinFirst`, default on) and
-   sideways scroll; never a second "cards" table. Put the columns a phone needs first.
+   sideways scroll; never a second "cards" table. Under `sm` (480: a phone, not a desktop's
+   aside column, which is about 600 px) the table shows only its
+   `essential` columns (else the first three; a column with `hideable: false` always) and its
+   column picker, so the user adds the rest: mark the columns a phone needs `essential` in the
+   column factory. A row that opens something passes `onRowActivate` (a tap is a click).
 6. **Charts** keep touch on (pinch, horizontal drag) and the zoom buttons; mouse wheel and
    drag stay off (the range control sets the window).
 7. **Navigation is reachable by touch**: every name that opens something (a screener, a
    ticker, a run) is a Button or link, not text beside a hidden column or a keyboard hint.
-8. **Top bar**: sections scroll sideways in one row under `md`; never a hamburger menu.
+8. **Top bar**: two rows under `md` (brand, Guide and the end slot; then the sections scrolling
+   sideways in one row); the workspace switch lives in the `AccountMenu`; never a hamburger menu.
 
 ## Checks (all in `make web-check`)
 
@@ -50,3 +57,4 @@ Never a mobile page, route, widget or component variant: adapt the one component
   master-detail or link flow adds an assertion there.
 - Verify by hand once: the Vite dev server in the browser pane at the `mobile` preset
   (375 x 812), text and accessibility tree first, one reduced-scale screenshot per state.
+- To look at a `Narrow` story, use the built Storybook (`npm run storybook:build`, then serve `storybook-static`, e.g. `python3 -m http.server 6008 -d storybook-static`): the dev server cannot load a story that imports `design-system/testing` (vitest's `expect` in the browser).

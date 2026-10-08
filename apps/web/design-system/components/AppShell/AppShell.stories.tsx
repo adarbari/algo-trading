@@ -7,23 +7,12 @@ import { Text } from '../../primitives/Text';
 import { narrow } from '../../testing';
 import { NavTabs } from '../NavTabs';
 import { Panel } from '../Panel';
-import { WorkspaceSwitch } from '../WorkspaceSwitch';
 import { TopBar } from '../TopBar';
 import { AppShell } from './AppShell';
 
 const topBar = (
   <TopBar
     brand={<Mono weight="medium">algotrade</Mono>}
-    workspace={
-      <WorkspaceSwitch
-        workspaces={[
-          { value: 'trader', label: 'Trader' },
-          { value: 'admin', label: 'Admin' },
-        ]}
-        value="trader"
-        onValueChange={() => undefined}
-      />
-    }
     nav={
       <NavTabs
         aria-label="Trader sections"

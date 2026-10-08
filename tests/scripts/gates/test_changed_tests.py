@@ -3,7 +3,7 @@
 import importlib.util
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "changed_tests.py"
+SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "changed_tests.py"
 _spec = importlib.util.spec_from_file_location("changed_tests", SCRIPT)
 assert _spec and _spec.loader
 changed_tests = importlib.util.module_from_spec(_spec)
