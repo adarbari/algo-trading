@@ -1,5 +1,5 @@
 /**
- * The feature picker: the catalogue as a searchable Combobox, each option with its description,
+ * The feature picker: the catalogue as a searchable Combobox, each option with its guide summary,
  * unit and licence, grouped by feature group; the user's own formulas are badged.
  */
 import { Combobox, type ComboboxOption } from '@algotrade/ui';
@@ -16,7 +16,8 @@ import {
 
 export function featureOptions(catalogue: readonly CatalogueFeature[]): ComboboxOption[] {
   return catalogue.map((feature) => {
-    const parts = [feature.description, unitLabel(feature.unit)];
+    // The guide's one-line summary says what the field is for; the catalogue text is the fallback.
+    const parts = [feature.guide?.summary || feature.description, unitLabel(feature.unit)];
     if (isPersonal(feature)) parts.push('personal licence');
     const badge = isOwn(feature) ? 'yours' : feature.name.startsWith('feature.') ? 'formula' : null;
     return {

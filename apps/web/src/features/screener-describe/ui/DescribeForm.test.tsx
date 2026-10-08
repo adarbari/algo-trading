@@ -1,6 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { IconButton } from '@algotrade/ui';
 
 import { api, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
@@ -38,11 +41,16 @@ const ANSWER = {
   notes: ['no IV rank field in the catalogue'],
 };
 
-function setup() {
+function setup(renderFieldHelp?: (field: string) => ReactNode) {
   const onDraft = vi.fn();
   const view = render(
     <TestQueryProvider>
-      <DescribeForm screenerId="mine" document={DOCUMENT} onDraft={onDraft} />
+      <DescribeForm
+        screenerId="mine"
+        document={DOCUMENT}
+        onDraft={onDraft}
+        {...(renderFieldHelp ? { renderFieldHelp } : {})}
+      />
     </TestQueryProvider>,
   );
   return { onDraft, ...view };
@@ -68,7 +76,28 @@ describe('DescribeForm', () => {
     });
     expect(screen.getByText('Drafted 2 criteria; review and save')).toBeInTheDocument();
     expect(screen.getByText(/Left out iv_rank/)).toBeInTheDocument();
+    expect(screen.getByText('Kept price:')).toBeInTheDocument();
     expect(screen.getByText('no IV rank field in the catalogue')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('gives every field the draft names (left out or kept) the help the widget supplies', async () => {
+    POST.mockResolvedValue({ data: ANSWER, response: new Response(null, { status: 200 }) });
+    const { container } = setup((field) => (
+      <IconButton icon="info" label={`What is ${field}?`} size="sm" />
+    ));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Describe the screen' }),
+      'stocks{Enter}',
+    );
+    expect(
+      await screen.findByRole('button', { name: 'What is rollup.nope@v1.iv_rank?' }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'What is instrument.status?' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'What is rollup.price_stats@v2.close?' }),
+    ).toBeVisible();
+    expect(screen.getByText(/Left out iv_rank \(/)).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

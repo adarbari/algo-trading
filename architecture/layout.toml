@@ -104,7 +104,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/guide"
-purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, playbook families; split from config/site, at its module cap)"
+purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, playbook families; playbooks/<id>.toml: each site playbook's prose; split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
@@ -343,7 +343,7 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/guide"
-purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes) and GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it)"
+purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), and the one splitter of prose at the catalogue names it mentions"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
@@ -511,7 +511,7 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types/guide"
-purpose = "GraphQL types of the Guide (mirrors services/read/guide, ADR 0051): GuideIndex and GuideField with its playbook uses and situations"
+purpose = "GraphQL types of the Guide (mirrors services/read/guide, ADR 0051): GuideIndex, GuideField with its playbook uses and situations, GuidePlaybookDetail, GuideSituationDetail and GuideProse (prose split at catalogue names)"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
@@ -720,6 +720,10 @@ path = "tests/architecture/api"
 purpose = "fitness tests for the API surface and the read model"
 
 [[test_dir]]
+path = "tests/architecture/pipeline"
+purpose = "fitness tests over the delivery pipeline: the CI workflow's shape, the flaky-spec quarantine list, the local gates that keep a measured speed-up (docs/ci.md Pipeline)"
+
+[[test_dir]]
 path = "tests/contract"
 purpose = "contract suites every implementation of a protocol must pass, one folder per protocol"
 holds = "folders"
@@ -775,7 +779,11 @@ purpose = "event-sensitivity track settings: the scope list of names the event s
 
 [[config_dir]]
 path = "config/site/guide"
-purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order); the playbook prose joins in GD4 (config/site/guide/playbooks/)"
+purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order); the playbook prose in playbooks/"
+
+[[config_dir]]
+path = "config/site/guide/playbooks"
+purpose = "the Guide's playbook prose (ADR 0051), one <id>.toml per site rule-screen preset: summary, what a hit looks like, what it does not check, the caveats before acting, related playbooks, sources and what each criterion asks (loaded by config/site/guide/playbooks.py; fitness tests: one per preset, asks match the latest version)"
 
 [[config_dir]]
 path = "config/site/regime"

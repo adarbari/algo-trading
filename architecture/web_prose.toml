@@ -24,7 +24,6 @@ max_sentence_words = 25
 "src/entities/feature/model/columns.tsx" = 1
 "src/entities/regime/ui/RegimeHeadline.tsx" = 1
 "src/features/indicator-history/ui/IndicatorHistory.tsx" = 1
-"src/features/screener-builder/ui/FieldGuideHelp.tsx" = 1
 "src/features/screener-delete/ui/DeleteScreenerDialog.tsx" = 1
 "src/features/screener-describe/ui/DescribeForm.tsx" = 1
 "src/features/screener-finalise/ui/RebaseBanner.tsx" = 1

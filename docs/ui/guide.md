@@ -118,9 +118,16 @@ Header (preset id and version, the plain summary as the hero), **See today's hit
 in Builder** with the last run; "What a hit looks like" beside "What it does not check"; the
 criteria table (what it asks in words, the field linked, the rule, what a miss does; the base
 gates as one line); "Before you act on a hit" (the caveats of its fields, each attributed) and
-the situations; related playbooks. The prose (summary, what a hit looks like, what it does not
-check, family) is a Guide source of its own, `config/site/guide/playbooks/<id>.toml`, because a preset
-version is immutable; a fitness test requires one per site preset.
+the situations; related playbooks. The prose is a Guide source of its own,
+`config/site/guide/playbooks/<id>.toml`, because a preset version is immutable: `version` (the
+preset version it was written for; a new preset version fails a fitness test until the prose
+is re-read), `summary` (the hero), `hit`, `not_checked`, `before_acting` (caveats naming catalogue fields), `related`
+(`{id, reason}`), `sources` and `[asks]` (each criterion of the latest version in a few plain
+words). The family stays in `sections.toml` (one owner). Fitness tests: one file per site
+preset and none more, `asks` names exactly the latest version's criteria, every related id
+exists, every catalogue name in the prose exists. The presets mark the base gates only with a
+TOML comment, so the read (`Query.guidePlaybook`, GD4a) lists the criteria in file order (base
+gates first in every site preset); prose comes split at catalogue names (`GuideProse`).
 
 ### The help drawer
 
@@ -146,9 +153,9 @@ Inventory of 2026-10-07. Each row moves in the phase named; the PR that moves it
 |---|---|---|
 | Explore "Field guide" tab and its panels (`widgets/field-guide`, `pages/trader-explore`) | `/guide/fields`, `/guide/fields/<name>`; the tab redirects for one release | 1 (done in GD3b: the panels live in `widgets/guide-field`, the route redirects `tab=guide`; remove the redirect and the tab one release later) |
 | Feature table column headers (`widgets/feature-table`, column factories in `entities/feature`), Ideas columns | `InfoButton` in every field header, opening the field's drawer | 1 |
-| Builder "How to read it" Disclosure (`features/screener-builder/ui/FieldGuideHelp.tsx`) | `InfoButton` beside the criterion's field; the drawer's "Use this" fills the row | 2 |
+| Builder "How to read it" Disclosure (`features/screener-builder/ui/FieldGuideHelp.tsx`) | `InfoButton` beside the criterion's field; the drawer's "Use this" fills the row | 2 (done in GD4c: the widget gives `CriterionRow` the drawer through `renderFieldHelp`; the picker's options show the guide's `summary`) |
 | Preset descriptions in TOML comments; Screeners list rows, the Builder header of a preset | playbook pages; a "Playbook" link on every preset | 2 |
-| Drafter "Left out ... (reason)" lines (`features/screener-describe`) | the field name opens its drawer, a kept criterion its intent card | 2 |
+| Drafter "Left out ... (reason)" lines (`features/screener-describe`) | the field name opens its drawer, a kept criterion its intent card | 2 (done in GD4c: a left-out field in the catalogue and every kept criterion's field carry the help button; an intent card per kept criterion is not built) |
 | Regime cards' "Why it matters, what it did before" Disclosure (`widgets/regime-indicators`), the reading list (`widgets/reading-list`) | indicator pages; `InfoButton` on each card opening its drawer (text stays in `cards.toml`, written once) | 2 |
 | Regime "Market falls we compare with" (`widgets/regime-episodes`) | episode pages; a row opens its drawer; the table of live drawdowns stays | 2 |
 | Regime "How to read the charts" legend (`widgets/regime-legend`), the history note (`features/indicator-history`) | a Start here page; an `InfoButton` on the chart headers | 3 |

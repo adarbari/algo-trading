@@ -1,10 +1,30 @@
-/** Playwright end-to-end tests (e2e/): the production build served by `vite preview`. */
+/**
+ * Playwright end-to-end tests (e2e/): the production build served by `vite preview`.
+ * Specs listed as `skipped` in quarantine.json do not run (docs/ci.md "Flaky specs");
+ * `QUARANTINE=only` runs exactly those, to see whether a fix holds.
+ */
+import { readFileSync } from 'node:fs';
+
 import { defineConfig, devices } from '@playwright/test';
+
+interface Quarantine {
+  skipped: { kind: string; title: string }[];
+}
+
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const quarantine = JSON.parse(
+  readFileSync(new URL('./quarantine.json', import.meta.url), 'utf8'),
+) as Quarantine;
+const quarantined = quarantine.skipped.filter((q) => q.kind === 'e2e').map((q) => escape(q.title));
+const quarantinePattern = quarantined.length > 0 ? new RegExp(quarantined.join('|')) : undefined;
 
 export default defineConfig({
   testDir: './e2e',
   forbidOnly: Boolean(process.env['CI']),
   retries: process.env['CI'] ? 1 : 0,
+  ...(process.env['QUARANTINE'] === 'only'
+    ? { grep: quarantinePattern ?? /$^/ }
+    : quarantinePattern && { grepInvert: quarantinePattern }),
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure' },
   projects: [

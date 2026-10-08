@@ -1,0 +1,44 @@
+# L3 site setting: the Guide's playbook for the site preset oversold_reversal (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "oversold_reversal"
+version = 1  # the preset version this prose was written for
+summary = "Finds shares that had one of the worst weeks in the market and are deeply oversold, yet closed up today on a burst of volume, with a support level still beneath them and the long-term trend not broken. These are bounce candidates after a washout."
+hit = "This week's return is in the bottom 10% of the universe's stocks and RSI(14) is below 30; the close is still above a confirmed swing low; the close is above the 200-day average (up to 5% below is flagged WATCH) and the share is scored, not rejected, on not being in a DOWNTREND; this week's return beat last week's (the fall is decelerating); today's volume was at least two standard deviations above its 20-session norm, with 1.5 times average volume adding to the score; and today closed up."
+not_checked = "It does not ask why the share sold off: a profit warning and a market-wide flush look the same here. Nothing checks earnings dates; support_reversal adds the tested level, and exhaustion is the mirror case on the upside."
+before_acting = [
+  "Oversold in a downtrend keeps falling: the SMA200 gate is soft, so a WATCH row below its 200-day average is a falling knife unless feature.trend_state says otherwise. Read feature.pct_vs_sma_200 and feature.trend_state together.",
+  "A volume spike on an earnings day is routine (rollup.volume@v1.volume_z_20d of 3 or more); check rollup.earnings@v1.last_earnings_date and rollup.price_moves@v1.one_day_move before reading it as capitulation.",
+  "feature.pct_vs_sma_200 is null for listings under ten months old, so they are listed as near misses rather than rejected; check instrument.listed_on.",
+  "An ETF's rollup.relative_strength@v1.ret_5d_pctile ranks it against stocks it is not a member of, and a leveraged or inverse fund's 'oversold' describes its decay, not the market: exclude with instrument.is_leveraged and instrument.is_inverse false.",
+]
+sources = [
+  "Wilder, New Concepts in Technical Trading Systems (RSI and the 30 line)",
+  "Connors and Alvarez, Short Term Trading Strategies That Work (buying oversold pullbacks above the 200-day average)",
+  "Raschke and Connors, Street Smarts (climax reversals on volume)",
+]
+related = [
+  { id = "support_reversal", reason = "the bounce from a tested level" },
+  { id = "pullback", reason = "the shallow dip, not the washout" },
+  { id = "exhaustion", reason = "the same extremes on the upside" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+ret_5d_rank = "Among the week's bottom 10%"
+rsi = "Oversold: RSI below 30"
+above_support = "Still above a swing low"
+above_sma200 = "Above its 200-day average"
+not_downtrend = "Not in a downtrend"
+momentum_improving = "This week beat last week"
+volume_spike = "Volume far above its usual range"
+rel_volume = "Volume at least 1.5 times normal"
+up_close = "Closed up today"
