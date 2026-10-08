@@ -123,6 +123,12 @@ export { ActionGroup, type ActionGroupProps, type ActionItem } from './ActionGro
 export { MasterDetail, type MasterDetailProps } from './MasterDetail';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
 export { NumberInput, type NumberInputProps } from './NumberInput';
+export {
+  OddsLine,
+  type OddsLineNotReady,
+  type OddsLineProps,
+  type OddsLineReady,
+} from './OddsLine';
 export { OptionList, type OptionListItem, type OptionListProps } from './OptionList';
 export { Panel, type PanelProps, type PanelState } from './Panel';
 export {
@@ -181,5 +187,10 @@ export {
   type TextLinkProps,
 } from './TextLink';
 export { Tooltip, type TooltipProps, type TooltipTriggerProps } from './Tooltip';
+export {
+  TrackRecordChip,
+  type TrackRecordChipProps,
+  type TrackRecordStatus,
+} from './TrackRecordChip';
 export { TopBar, type TopBarProps } from './TopBar';
 export { WorkspaceSwitch, type WorkspaceSwitchProps } from './WorkspaceSwitch';
