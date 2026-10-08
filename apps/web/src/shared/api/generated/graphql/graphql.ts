@@ -127,14 +127,28 @@ export type FeatureTableQuery = { table: { universeSnapshot: string | null, preS
 export type GuideIndexQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }> } | null };
+export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, playbooks: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }> } | null };
 
 export type GuideFieldQueryVariables = Exact<{
   name: string;
 }>;
 
 
-export type GuideFieldQuery = { guideField: { related: Array<string>, playbooks: Array<{ id: string, name: string, family: string | null, rules: Array<string>, column: boolean, rank: boolean, flag: boolean }>, situations: Array<{ name: string, signs: string, do: string, affects: Array<string> }> } | null };
+export type GuideFieldQuery = { guideField: { related: Array<string>, readsLinked: { segments: Array<{ text: string, field: string | null }> } | null, caveatsLinked: Array<{ segments: Array<{ text: string, field: string | null }> }>, playbooks: Array<{ id: string, name: string, family: string | null, rules: Array<string>, column: boolean, rank: boolean, flag: boolean }>, situations: Array<{ name: string, slug: string, signsLinked: { segments: Array<{ text: string, field: string | null }> } }> } | null };
+
+export type GuidePlaybookQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type GuidePlaybookQuery = { guidePlaybook: { id: string, name: string, family: string | null, familyTitle: string | null, version: number | null, tieBreak: string | null, tieBreakDescending: boolean, prose: { sources: Array<string>, summary: { segments: Array<{ text: string, field: string | null }> }, hit: { segments: Array<{ text: string, field: string | null }> }, notChecked: { segments: Array<{ text: string, field: string | null }> }, beforeActing: Array<{ segments: Array<{ text: string, field: string | null }> }> } | null, criteria: Array<{ name: string, asks: string | null, field: string, rule: string, mode: string, onMiss: string | null }>, related: Array<{ id: string, name: string, reason: string }>, situations: Array<{ slug: string, name: string, fields: Array<string> }> } | null };
+
+export type GuideSituationQueryVariables = Exact<{
+  slug: string;
+}>;
+
+
+export type GuideSituationQuery = { guideSituation: { slug: string, name: string, affects: Array<string>, signs: { segments: Array<{ text: string, field: string | null }> }, do: { segments: Array<{ text: string, field: string | null }> }, playbooks: Array<{ id: string, name: string, fields: Array<string> }> } | null };
 
 export type EtfHoldingsQueryVariables = Exact<{
   key: string;
@@ -684,12 +698,37 @@ export const GuideIndexDocument = new TypedDocumentString(`
       intent
       fields
     }
+    families {
+      id
+      title
+      playbooks {
+        id
+        name
+      }
+    }
+    situations {
+      name
+      fields
+      slug
+    }
   }
 }
     `) as unknown as TypedDocumentString<GuideIndexQuery, GuideIndexQueryVariables>;
 export const GuideFieldDocument = new TypedDocumentString(`
     query GuideField($name: FeatureName!) {
   guideField(name: $name) {
+    readsLinked {
+      segments {
+        text
+        field
+      }
+    }
+    caveatsLinked {
+      segments {
+        text
+        field
+      }
+    }
     related
     playbooks {
       id
@@ -702,13 +741,101 @@ export const GuideFieldDocument = new TypedDocumentString(`
     }
     situations {
       name
-      signs
-      do
-      affects
+      slug
+      signsLinked {
+        segments {
+          text
+          field
+        }
+      }
     }
   }
 }
     `) as unknown as TypedDocumentString<GuideFieldQuery, GuideFieldQueryVariables>;
+export const GuidePlaybookDocument = new TypedDocumentString(`
+    query GuidePlaybook($id: String!) {
+  guidePlaybook(id: $id) {
+    id
+    name
+    family
+    familyTitle
+    version
+    prose {
+      summary {
+        segments {
+          text
+          field
+        }
+      }
+      hit {
+        segments {
+          text
+          field
+        }
+      }
+      notChecked {
+        segments {
+          text
+          field
+        }
+      }
+      beforeActing {
+        segments {
+          text
+          field
+        }
+      }
+      sources
+    }
+    criteria {
+      name
+      asks
+      field
+      rule
+      mode
+      onMiss
+    }
+    tieBreak
+    tieBreakDescending
+    related {
+      id
+      name
+      reason
+    }
+    situations {
+      slug
+      name
+      fields
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuidePlaybookQuery, GuidePlaybookQueryVariables>;
+export const GuideSituationDocument = new TypedDocumentString(`
+    query GuideSituation($slug: String!) {
+  guideSituation(slug: $slug) {
+    slug
+    name
+    signs {
+      segments {
+        text
+        field
+      }
+    }
+    do {
+      segments {
+        text
+        field
+      }
+    }
+    affects
+    playbooks {
+      id
+      name
+      fields
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideSituationQuery, GuideSituationQueryVariables>;
 export const EtfHoldingsDocument = new TypedDocumentString(`
     query EtfHoldings($key: String!, $top: Int!) {
   instrument(key: $key) {

@@ -18,6 +18,10 @@ const EXTRA_ROUTES = [
   '/explore?sel=BULL',
   '/guide',
   '/guide/fields',
+  '/guide/playbooks',
+  '/guide/playbooks/breakout',
+  '/guide/situations',
+  '/guide/situations/pending-takeover',
 ];
 const ROUTES = [...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)), ...EXTRA_ROUTES];
 

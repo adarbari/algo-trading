@@ -46,3 +46,28 @@ def test_a_lock_of_a_dead_pid_is_stale(tmp_path: Path) -> None:
     dead.wait()
     (lock / "pid").write_text(f"{dead.pid}\n")
     assert _lock(tmp_path, "true").returncode == 0
+
+
+def test_a_live_takeover_guard_refuses_a_second_taker(tmp_path: Path) -> None:
+    lock = tmp_path / "var" / "check.lock.d"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text("999999\n")  # stale lock
+    guard = tmp_path / "var" / "check.lock.d.takeover"
+    guard.mkdir()
+    holder = subprocess.Popen(["sleep", "30"])  # another run mid-takeover
+    try:
+        (guard / "pid").write_text(f"{holder.pid}\n")
+        out = _lock(tmp_path, "true")
+        assert out.returncode == 1 and "taking over" in out.stderr
+    finally:
+        holder.terminate()
+        holder.wait()
+    assert _lock(tmp_path, "true").returncode == 0  # the guard's PID is dead: stale, taken over
+
+
+def test_a_stale_takeover_moves_the_old_lock_aside(tmp_path: Path) -> None:
+    lock = tmp_path / "var" / "check.lock.d"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text("999999\n")
+    assert _lock(tmp_path, "true").returncode == 0
+    assert list((tmp_path / "var").iterdir()) == []  # no check.lock.d, no *.stale.* left

@@ -1,8 +1,10 @@
 /**
  * The Guide reads (ADR 0051, ADR 0037): `Query.guideIndex` (the sections with their entry
- * counts, the field theme groups, the intents) and `Query.guideField` (what the server derives
- * for one field's page: related fields, the playbooks that use it, the situations that fool it).
- * The field's own facts and guide entry come from the catalogue (entities/feature).
+ * counts, the field theme groups, the intents, the playbook families, the situations),
+ * `Query.guideField` (what the server derives for one field's page: its reads and caveats split
+ * at the names they mention, related fields, the playbooks that use it, the situations that
+ * fool it), `Query.guidePlaybook` and `Query.guideSituation`. The field's own facts and guide
+ * entry come from the catalogue (entities/feature).
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -32,6 +34,19 @@ const GuideIndexQuery = graphql(`
         intent
         fields
       }
+      families {
+        id
+        title
+        playbooks {
+          id
+          name
+        }
+      }
+      situations {
+        name
+        fields
+        slug
+      }
     }
   }
 `);
@@ -39,6 +54,18 @@ const GuideIndexQuery = graphql(`
 const GuideFieldQuery = graphql(`
   query GuideField($name: FeatureName!) {
     guideField(name: $name) {
+      readsLinked {
+        segments {
+          text
+          field
+        }
+      }
+      caveatsLinked {
+        segments {
+          text
+          field
+        }
+      }
       related
       playbooks {
         id
@@ -51,9 +78,99 @@ const GuideFieldQuery = graphql(`
       }
       situations {
         name
-        signs
-        do
-        affects
+        slug
+        signsLinked {
+          segments {
+            text
+            field
+          }
+        }
+      }
+    }
+  }
+`);
+
+const GuidePlaybookQuery = graphql(`
+  query GuidePlaybook($id: String!) {
+    guidePlaybook(id: $id) {
+      id
+      name
+      family
+      familyTitle
+      version
+      prose {
+        summary {
+          segments {
+            text
+            field
+          }
+        }
+        hit {
+          segments {
+            text
+            field
+          }
+        }
+        notChecked {
+          segments {
+            text
+            field
+          }
+        }
+        beforeActing {
+          segments {
+            text
+            field
+          }
+        }
+        sources
+      }
+      criteria {
+        name
+        asks
+        field
+        rule
+        mode
+        onMiss
+      }
+      tieBreak
+      tieBreakDescending
+      related {
+        id
+        name
+        reason
+      }
+      situations {
+        slug
+        name
+        fields
+      }
+    }
+  }
+`);
+
+const GuideSituationQuery = graphql(`
+  query GuideSituation($slug: String!) {
+    guideSituation(slug: $slug) {
+      slug
+      name
+      signs {
+        segments {
+          text
+          field
+        }
+      }
+      do {
+        segments {
+          text
+          field
+        }
+      }
+      affects
+      playbooks {
+        id
+        name
+        fields
       }
     }
   }
@@ -76,6 +193,28 @@ export function useGuideField(name: string | null) {
     queryFn: () => gql(GuideFieldQuery, variables),
     select: (data) => data.guideField,
     enabled: Boolean(name),
+    staleTime: GUIDE_STALE_MS,
+  });
+}
+
+/** One site playbook's page (null data: no such playbook). */
+export function useGuidePlaybook(id: string) {
+  const variables = { id };
+  return useQuery({
+    queryKey: queryKeys.gql('GuidePlaybook', variables),
+    queryFn: () => gql(GuidePlaybookQuery, variables),
+    select: (data) => data.guidePlaybook,
+    staleTime: GUIDE_STALE_MS,
+  });
+}
+
+/** One situation's page (null data: no such situation). */
+export function useGuideSituation(slug: string) {
+  const variables = { slug };
+  return useQuery({
+    queryKey: queryKeys.gql('GuideSituation', variables),
+    queryFn: () => gql(GuideSituationQuery, variables),
+    select: (data) => data.guideSituation,
     staleTime: GUIDE_STALE_MS,
   });
 }
