@@ -103,15 +103,14 @@ acceptance checks; a stored grain is backfilled once and verified like any table
   bare hit rate.
 
 ## Open decisions (owner)
-- The frozen period: proposal, the last two quarters of stored sessions when ED4 starts, recorded
-  here by amendment.
+- ~~The frozen period~~: decided 2026-10-08, 2026-04-01 (amendment below).
 - The ED4 outcome definitions (proposals in the PRD): the volatility risk premium, realised below
   implied over the option's horizon with a drawdown cap on a short-straddle proxy; post-earnings
   drift, excess return over SPY over 20 and 60 sessions with a cost assumption; the earnings
   announcement premium, excess return over SPY from five sessions before to one after.
 - The cap threshold for the drift edge: proposal, below $2B (the harness reports by bucket either
   way).
-- The runtime home of learned scorers (ED7): `apps/ingestion` or a fifth app, by amendment.
+- ~~The runtime home of learned scorers (ED7)~~: decided 2026-10-08, see the amendment below.
 - If ED2 finds the grain must differ from decision 3, it amends this ADR in the same PR.
 
 ## Amendment (2026-10-07, ED2): the grain as built
@@ -147,3 +146,18 @@ Decision 3 holds; ED2 fixes what it left open.
   and its acceptance recounts the eligible names: each has a row or a reason. The task reads
   each window's bars through `data.prices.session_bars` (split-adjusted as of the window's
   end, the read rollups use), an `allowed` reuse under `feature-input-loading`.
+
+## Amendment 2026-10-08: learned scorers run in the ingestion app (owner decision)
+
+The runtime home of learned scorers (ED7) is `apps/ingestion`: the `edge_score.<edge>@v1` scoring
+task trains and scores there, and its model dependency goes in the ingestion app's pyproject (rule
+8). No fifth app. Ingestion stays the only writer of the scores (ADR 0005); screeners read them
+as catalogue features (ADR 0038).
+
+
+## Amendment 2026-10-08: the frozen period starts 2026-04-01 (owner decision)
+
+Every open edge document sets `frozen_from = 2026-04-01` (the last two quarters of the stored
+sessions when ED4 starts): fixed, never rolling; the harness reports it as its own slice and an
+edge is `evidenced` only on it. A fitness test pins the date
+(`tests/architecture/data/test_edge_outcomes_expressible.py`); moving it is a further amendment.
