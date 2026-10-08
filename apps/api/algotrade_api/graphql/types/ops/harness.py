@@ -5,11 +5,11 @@ import datetime as dt
 from typing import Self
 
 import strawberry
-from anyio import to_thread
 from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
 from algotrade.services.read.ops import harness_runs
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.evaluation.edge import EdgeRow
 
 
@@ -74,5 +74,5 @@ class HarnessRun:
         "run's partition holds none"
     )
     async def rows(self, info: Info) -> list[EdgeRow]:
-        found = await to_thread.run_sync(harness_runs.load_harness_run_rows, self.ctx, self.run_id)
+        found = await off_loop(harness_runs.load_harness_run_rows, self.ctx, self.run_id)
         return [EdgeRow.of(r) for r in found or ()]
