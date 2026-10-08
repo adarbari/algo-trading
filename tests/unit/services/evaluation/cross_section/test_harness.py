@@ -4,7 +4,7 @@ see an outcome (the lookahead tests), a deterministic result, and the trial coun
 import dataclasses
 import random
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -12,7 +12,12 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, _pbo, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import (
+    EdgeEvaluation,
+    _pbo,
+    _prior_trials,
+    evaluate_edge,
+)
 from algotrade.services.evaluation.cross_section.picks import screen_variant
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -72,7 +77,7 @@ def test_an_unclosed_or_null_window_is_excluded_never_a_miss() -> None:
         return out
 
     first = run(build_world(rows_of=rows)).results[0].stats[0]
-    assert (first.excluded_unclosed, first.excluded_missing) == (1, 1)
+    assert (first.no_entry_bar, first.excluded_missing) == (1, 1)
     assert first.pick_hits == len(first.pick_values) == 3  # the other three picks, all hits
     assert first.eligible == 18  # neither name is in the base rate
 
@@ -150,9 +155,7 @@ def test_the_run_hash_follows_the_document_the_range_and_the_as_of(world: World)
     assert run(world, as_of=AS_OF + timedelta(days=1)).run_hash != base
 
 
-def test_an_event_schedule_and_an_edge_without_screeners_are_not_evaluated(world: World) -> None:
-    with pytest.raises(ConfigurationError, match="ED4"):
-        run(world, edge(schedule="on_event:earnings"))
+def test_an_edge_without_screeners_is_not_evaluated(world: World) -> None:
     with pytest.raises(ConfigurationError, match="no screeners"):
         run(world, edge(screeners=[]))
 
@@ -189,7 +192,7 @@ def test_baselines_are_variants_and_probability_of_overfitting_needs_enough_sess
 def test_a_ratio_measure_divides_the_realised_vol_by_the_implied_vol_known_at_the_start() -> None:
     vrp = {
         "kind": "hit_target", "horizon_sessions": [2], "benchmark": "none", "target": 1.0,
-        "measure": "realised_to_implied_vol", "direction": "below",
+        "measure": "realised_to_implied_vol", "direction": "below", "start_offset_sessions": 1,
     }  # fmt: skip
 
     def rows(day: date) -> list[dict[str, Any]]:
@@ -279,3 +282,265 @@ def test_score_coverage_boundary() -> None:
 
     assert measured(4) == 4  # 16 of 20 scored: exactly 80%, ranked
     assert measured(5) == 0  # 75%: no deciles (the picks still count)
+
+
+# ---- decision session D, entry session S (ADR 0053 amendment of 2026-10-08) ----------------
+
+
+def _poisoned(rows_at: set[date]) -> World:
+    """The world whose outcome partitions on ``rows_at`` hold nonsense (a huge loss)."""
+
+    def rows(day: date) -> list[dict[str, Any]]:
+        bad = day in rows_at
+        return [
+            outcome_row(iid, i, day, **({"fwd_excess_return": -9.0} if bad else {}))
+            for i, iid in enumerate(IDS)
+        ]
+
+    return build_world(rows_of=rows)
+
+
+def test_the_outcome_is_the_partition_at_the_entry_session_never_the_decision_session() -> None:
+    clean = run(build_world())
+    # Every decision session's own partition is poisoned: the window starts at S's close.
+    poisoned = run(_poisoned(set(STARTS)))
+    assert poisoned.results == clean.results
+    # Poisoning an entry session (the day after each decision) changes it: S is what is read.
+    assert run(_poisoned({d for d in DAYS if d not in STARTS})).results != clean.results
+
+
+def test_the_screen_is_read_at_the_decision_session_not_the_entry_session() -> None:
+    clean = run(build_world())
+    # The features at every entry session are reversed: the picks and ranking at D do not move.
+    flipped = build_world(price_of=lambda d, i: 100.0 + 10 * (i if d in STARTS else N - i))
+    a, b = clean.results[0].stats, run(flipped).results[0].stats
+    assert [(s.pick_hits, s.top_decile, s.spread) for s in a] == [
+        (s.pick_hits, s.top_decile, s.spread) for s in b
+    ]
+
+
+def test_a_name_eligible_at_the_decision_with_no_row_at_the_entry_has_no_entry_bar() -> None:
+    def rows(day: date) -> list[dict[str, Any]]:
+        return [outcome_row(iid, i, day) for i, iid in enumerate(IDS) if i != 19]
+
+    stat = run(build_world(rows_of=rows)).results[0].stats[0]
+    assert stat.no_entry_bar == 1 and stat.excluded_unclosed == 0  # N19: counted here only
+    assert stat.eligible == 19  # neither a hit nor a miss, and not in the base rate
+    assert run(build_world()).results[0].stats[0].no_entry_bar == 0
+
+
+def test_the_implied_vol_is_read_at_the_decision_session() -> None:
+    vrp = {
+        "kind": "hit_target", "horizon_sessions": [2], "benchmark": "none", "target": 1.0,
+        "measure": "realised_to_implied_vol", "direction": "below", "start_offset_sessions": 1,
+    }  # fmt: skip
+    w = build_world()
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:  # 0.4 at the decisions, 0.1 at the entries
+        level = 0.4 if day in STARTS else 0.1
+        iv = [{"instrument_id": iid, "iv30": level} for iid in IDS]
+        w.writer.write_table(
+            "rollups/instrument/iv30@v1", day, f"iv-{day}", stamped(iv, day, f"iv-{day}")
+        )
+    stat = run(w, edge(outcome=vrp)).results[0].stats[0]
+    assert stat.pick_values == pytest.approx((-0.5,) * 5)  # 0.2 / 0.4 at D, not 0.2 / 0.1
+
+
+def test_the_run_records_the_iv_field_its_source_and_licence() -> None:
+    vrp = {
+        "kind": "hit_target", "horizon_sessions": [2], "benchmark": "none", "target": 1.0,
+        "measure": "realised_to_implied_vol", "direction": "below", "start_offset_sessions": 1,
+    }  # fmt: skip
+    w = build_world()
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:
+        iv = [{"instrument_id": iid, "iv30_ibkr": 0.4} for iid in IDS]
+        w.writer.write_table(
+            "rollups/instrument/ibkr_iv@v1", day, f"ib-{day}", stamped(iv, day, f"ib-{day}")
+        )
+    ibkr = "rollup.ibkr_iv@v1.iv30_ibkr"
+    (r,) = evaluate_edge(
+        w.reader, w.results, w.configs, USER, edge(outcome=vrp), DAYS[0], DAYS[-1], AS_OF, ibkr
+    ).results
+    assert (r.iv_source, r.licence) == (ibkr, "personal")  # the catalogue's, never assumed
+    assert r.stats[0].pick_hits == 5  # read from IBKR's field
+    (plain,) = run(w).results  # an outcome that reads no implied vol records none
+    assert (plain.iv_source, plain.licence) == (None, None)
+    with pytest.raises(ConfigurationError, match="mixes sources"):
+        evaluate_edge(
+            w.reader, w.results, w.configs, USER, edge(), DAYS[0], DAYS[-1], AS_OF,
+            "feature.vrp_iv30",
+        )  # fmt: skip
+    with pytest.raises(ConfigurationError, match="not a catalogue feature"):
+        evaluate_edge(
+            w.reader, w.results, w.configs, USER, edge(outcome=vrp), DAYS[0], DAYS[-1], AS_OF,
+            "rollup.nothing@v1.iv",
+        )  # fmt: skip
+
+
+# ---- event schedules: names at D, blocks of one horizon, one statistic per block ----------
+
+
+def event_world(days_with: dict[date, list[int]]) -> World:
+    """Names ``i`` have the reaction on a decision session: sessions-since 0 (= offset 1)."""
+    w = build_world()
+    for day, names in days_with.items():
+        w.write_reactions(day, {IDS[i]: 0 for i in names})
+    return w
+
+
+def event_edge(horizon: int = 2, **changes: Any):  # type: ignore[no-untyped-def]
+    outcome = {
+        "kind": "excess_return", "horizon_sessions": [horizon], "benchmark": "SPY",
+        "start_offset_sessions": 1,
+    }  # fmt: skip
+    return edge(schedule="on_event:earnings_reaction", top_k="all", outcome=outcome, **changes)
+
+
+EVENTS = {DAYS[1]: [10, 11, 12], DAYS[2]: [15, 16], DAYS[5]: [0, 1, 2]}
+
+
+def test_event_names_are_the_picks_and_the_base_and_blocks_pool_overlapping_windows() -> None:
+    ev = run(event_world(EVENTS), event_edge(2))
+    (r,) = ev.results
+    # Sessions DAYS[1] and DAYS[2] are one block (fewer than 2 sessions apart): one statistic,
+    # at the block's first day, pooling both days' names; DAYS[5] is the second block.
+    assert [s.session for s in r.stats] == [DAYS[1], DAYS[5]]
+    assert [len(s.pick_values) for s in r.stats] == [5, 3]
+    assert ev.start_sessions == {2: 2} and ev.unclosed_sessions == {2: 0}
+    first, second = r.stats
+    # Names 10, 11, 12, 15, 16 earn (i - 9.5)%: all hit; names 0, 1, 2 lose.
+    assert (first.pick_hits, second.pick_hits) == (5, 0)
+    assert (first.eligible, second.eligible) == (5, 3)  # the base is the event names
+    m = r.measures[0]
+    assert (m.sessions, m.picks, m.hits, m.eligible, m.base_hits) == (2, 8, 5, 8, 5)
+    assert m.lift == pytest.approx(1.0)  # picks = base: nothing to beat
+    assert ev.event_unknown == {"no_event_row": 17 + 18 + 17}  # names with no row, by session
+
+
+def test_overlapping_event_days_never_add_independent_sessions() -> None:
+    # Events on two consecutive sessions have overlapping 2-session windows: one block, one
+    # session; the same names matching again the next day are one event, not a second.
+    w = event_world({DAYS[0]: [10, 11], DAYS[1]: [12, 10], DAYS[4]: [13]})
+    r = run(w, event_edge(2)).results[0]
+    assert [s.session for s in r.stats] == [DAYS[0], DAYS[4]]
+    assert [len(s.pick_values) for s in r.stats] == [3, 1]  # N10 counted once (name, quarter)
+    assert r.measures[0].sessions == 2
+
+
+def test_a_universe_base_compares_the_event_names_with_every_eligible_name() -> None:
+    ev = run(event_world(EVENTS), event_edge(2, base="universe"))
+    (r,) = ev.results
+    assert [len(s.pick_values) for s in r.stats] == [5, 3]
+    assert [s.eligible for s in r.stats] == [
+        N * 2,
+        N,
+    ]  # every eligible name, each session of a block
+
+
+def test_an_event_session_whose_entry_is_not_closed_is_counted_not_measured() -> None:
+    w = build_world(closed=[d for d in DAYS if d != DAYS[6]])  # DAYS[5]'s entry: nothing stored
+    for day, names in EVENTS.items():
+        w.write_reactions(day, {IDS[i]: 0 for i in names})
+    ev = run(w, event_edge(2))
+    assert ev.start_sessions == {2: 2} and ev.unclosed_sessions == {2: 1}
+    assert [s.session for s in ev.results[0].stats] == [DAYS[1]]
+
+
+def test_an_event_class_without_a_declared_field_is_refused() -> None:
+    with pytest.raises(ConfigurationError, match="no declared field"):
+        run(build_world(), edge(schedule="on_event:index_change", top_k="all"))
+
+
+def test_an_event_edge_with_no_event_in_range_has_empty_blocks_not_a_guess() -> None:
+    ev = run(event_world({}), event_edge(2))
+    assert ev.results[0].stats == () and ev.results[0].measures[0].sessions == 0
+    assert ev.start_sessions == {2: 0}
+
+
+# ---- edge variants: [[variants]] evaluated like the edge, each a trial --------------------
+
+
+CHEAP = {"where": {"all": [{"field": PRICE, "op": "lt", "value": 200}]}}  # names N00..N09
+
+
+def test_each_variant_is_evaluated_under_its_own_key_and_is_a_trial() -> None:
+    e = edge(
+        variants=[
+            {"id": "cheap", "universe": CHEAP},
+            {"id": "costly", "outcome": {"cost_bps": 1500}},
+        ]
+    )
+    w = build_world()
+    ev = run(w, e)
+    keys = [(r.edge_variant, r.variant) for r in ev.results]
+    assert keys == [("main", "momo"), ("cheap", "momo"), ("costly", "momo")]
+    assert ev.trials == 3 and ev.results[0].measures[0].trials == 3
+    main, cheap, costly = (r.measures[0] for r in ev.results)
+    assert main.eligible == 80 and cheap.eligible == 40  # the cheap names only
+    assert main.hit_rate == 1.0 and costly.hit_rate < main.hit_rate  # 15% cost: top names miss
+    assert [r.measures[0].trials for r in ev.results] == [3, 3, 3]
+    # Re-running the same trials adds none: the trial key includes the edge variant.
+    write_edge_eval(w.results, ev, AS_OF)
+    assert run(w, e).trials == 3
+    assert run(w, edge(variants=[{"id": "cheap", "universe": CHEAP}])).trials == 3
+
+
+def test_a_trial_logged_before_edge_variants_is_the_edges_own() -> None:
+    class Record:
+        stats: ClassVar = {"trials": [{"variant": "momo", "config_hash": "h", "horizon": 2}]}
+
+    class Writer:
+        def runs_for(self, job: str) -> list[Record]:
+            return [Record()]
+
+    assert _prior_trials(Writer(), "drift", "site") == {("main", "momo", "h", 2)}  # type: ignore[arg-type]
+
+
+def test_changing_a_variants_override_changes_its_trial_key_and_adds_a_trial() -> None:
+    w = build_world()
+    first = run(w, edge(variants=[{"id": "costly", "outcome": {"cost_bps": 100}}]))
+    write_edge_eval(w.results, first, AS_OF)
+    again = run(w, edge(variants=[{"id": "costly", "outcome": {"cost_bps": 100}}]))
+    edited = run(w, edge(variants=[{"id": "costly", "outcome": {"cost_bps": 200}}]))
+    assert again.trials == 2 and edited.trials == 3  # main + the old override + the new one
+    hashes = {r.edge_variant: r.config_hash for r in edited.results}
+    assert hashes["costly"] != hashes["main"] != ""
+    assert hashes["costly"] != {r.edge_variant: r.config_hash for r in first.results}["costly"]
+
+
+def test_changing_the_edges_offset_or_horizon_adds_a_trial() -> None:
+    w = build_world()
+    write_edge_eval(w.results, run(w), AS_OF)
+    assert run(w).trials == 1
+    longer = {"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+              "start_offset_sessions": 2}  # fmt: skip
+    assert run(w, edge(outcome=longer)).trials == 2  # the same screener, another entry session
+
+
+def test_an_event_edge_never_reads_the_decision_sessions_own_outcome_partition() -> None:
+    events = {DAYS[1]: [10, 11], DAYS[5]: [0, 1]}  # entries DAYS[2] and DAYS[6]
+    clean = run(event_world(events), event_edge(2))
+    poisoned = _poisoned({DAYS[1], DAYS[5]})
+    for day, names in events.items():
+        poisoned.write_reactions(day, {IDS[i]: 0 for i in names})
+    assert run(poisoned, event_edge(2)).results == clean.results
+    assert len(clean.results[0].stats) == 2
+
+
+def test_a_reaction_row_stored_only_from_the_next_session_is_not_an_event_before_it() -> None:
+    w = build_world()
+    w.write_reactions(DAYS[2], {IDS[10]: 0})  # truncated at D = DAYS[1]: no row there yet
+    (r,) = run(w, event_edge(2)).results
+    assert [s.session for s in r.stats] == [DAYS[2]]  # D is the first session that has the row
+
+
+def test_a_variant_may_override_the_offset_and_reads_its_own_entry_partition() -> None:
+    late = {"id": "late", "outcome": {"start_offset_sessions": 2}}
+    e = edge(variants=[late])
+    clean = run(build_world(), e)
+    # Poison the partitions two sessions after each decision (the variant's S, not the edge's).
+    poisoned = run(_poisoned({DAYS[2], DAYS[4], DAYS[6]}), e)
+    main_clean, late_clean = clean.results
+    main_bad, late_bad = poisoned.results
+    assert main_bad.stats == main_clean.stats  # the edge's own entries are untouched
+    assert late_bad.stats != late_clean.stats and late_bad.stats[0].pick_values[0] == -9.0
+    assert [s.session for s in late_clean.stats] == [DAYS[0], DAYS[2], DAYS[4]]  # DAYS[6]: no S

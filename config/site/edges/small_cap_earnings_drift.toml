@@ -8,7 +8,7 @@ and where arbitrage is expensive (Bernard and Thomas 1989; Chordia et al. 2009).
 persistence = """Limits to arbitrage: the drift survives where spreads, short-sale costs and low
 capacity keep institutions out; it has faded in large caps but not in the smallest names
 (Martineau 2022)."""
-schedule = "on_event:earnings"
+schedule = "on_event:earnings_reaction"
 top_k = "all"
 screeners = []
 status = "candidate"
@@ -29,15 +29,16 @@ all = [
 kind = "excess_return"
 horizon_sessions = [20, 60]
 benchmark = "SPY"
+start_offset_sessions = 1
 cost_bps = 20
 
 [quality_bar]
 outcome = """Excess return over SPY over 20 and 60 sessions after the reaction session, net of
 20 bps a round trip (the PRD's proposal, ADR 0053 open decisions): drift is held for weeks."""
-trigger_timing = """A report is known from its events/earnings known_from session; the reaction
-session is the first one after the release (an after-close report reacts the next day); we act
-on the session after the reaction, so S is the reaction session (the class's anchor) and the
-window starts at its close, after the return the surprise is measured on."""
+trigger_timing = """The reaction is two sessions, close(E-1) to close(E+1) (E: the first session to
+trade after the report); the anchor is E+1 and the decision session D = E+1, so the entry session
+is S = E+2 (start_offset_sessions = 1). The event names are read at D from
+earnings_reaction@v1 (sessions_since_reaction = 0), never from a row known after D."""
 replication = """The source's rule first: rank by the announcement-period return (Brandt,
 Kishore, Santa-Clara and Venkatachalam 2008) and hold the top bucket; the screener is ED4b."""
 expected_size = """The drift is largest in the smallest names and has decayed in large caps since

@@ -132,3 +132,46 @@ def test_snapshot_tables_keep_latest_run_wins(backend: Backend) -> None:
     assert latest is not None and list(latest["instrument_id"]) == ["EQ:A"]
     before = backend.tables.read(ROLLUP, DAY, as_of=T0)
     assert before is not None and len(before) == 3
+
+
+EDGE_EVAL = "results/edge_eval"
+
+
+def edge_row(variant: str | None, hit_rate: float, **extra: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "edge_id": "e", "user_id": "u", "variant": "v", "horizon_sessions": 20,
+        "slice_kind": "all", "slice_value": "all", "range_from": DAY, "hit_rate": hit_rate,
+    }  # fmt: skip
+    if variant is not None or "edge_variant" in extra:
+        row["edge_variant"] = variant
+    return row
+
+
+def write_eval(backend: Backend, run: str, rows: list[dict[str, object]], at: object) -> None:
+    # Straight to the table store: a run written before the key column existed (the writer's
+    # validation would refuse such a frame today, but the partition on disk is what is read).
+    frame = stamped(rows, DAY, run, at)  # type: ignore[arg-type]
+    backend.tables.write(EDGE_EVAL, DAY, run, frame)
+
+
+def test_runs_written_before_a_key_column_existed_merge_with_it_null(backend: Backend) -> None:
+    # Two runs from before ``edge_variant`` (no such column): the later row wins on the key.
+    write_eval(backend, "old1", [edge_row(None, 0.1)], T0)
+    write_eval(backend, "old2", [edge_row(None, 0.2)], NIGHTLY)
+    merged = backend.tables.read(EDGE_EVAL, DAY)
+    assert merged is not None and list(merged["hit_rate"]) == [0.2]
+    assert merged["edge_variant"].isna().all()
+    # One old run and one new run: the null key is the edge itself ("main"), so the new row
+    # (edge_variant null) replaces the old one, and a named variant is a row of its own.
+    write_eval(
+        backend,
+        "new",
+        [edge_row(None, 0.3, edge_variant=None), edge_row("cheap", 0.4)],
+        NIGHTLY + timedelta(hours=1),
+    )
+    merged = backend.tables.read(EDGE_EVAL, DAY)
+    assert merged is not None
+    assert sorted(zip(merged["edge_variant"].fillna("main"), merged["hit_rate"], strict=True)) == [
+        ("cheap", 0.4),
+        ("main", 0.3),
+    ]

@@ -60,11 +60,12 @@ SITE = FileConfigStore(config_dir())
 
 
 def horizons_and_benchmarks(configs: Documents | None = None) -> tuple[list[int], list[str]]:
-    """The horizons (sessions) and benchmark tickers of the site's open edge documents, with the
-    harness default."""
+    """The horizons (sessions) and benchmark tickers of the site's open edge documents and their
+    ``[[variants]]``, with the harness default."""
     edges = [e for e in load_edges(configs or SITE) if e.status not in CLOSED]
-    horizons = {DEFAULT_HORIZON, *(h for e in edges for h in e.outcome.horizon_sessions)}
-    benchmarks = {DEFAULT_BENCHMARK, *(e.outcome.benchmark for e in edges)} - {"none"}
+    outcomes = [o for e in edges for o in (e.outcome, *(v.outcome for v in e.variants))]
+    horizons = {DEFAULT_HORIZON, *(h for o in outcomes for h in o.horizon_sessions)}
+    benchmarks = {DEFAULT_BENCHMARK, *(o.benchmark for o in outcomes)} - {"none"}
     return sorted(horizons), sorted(benchmarks)
 
 

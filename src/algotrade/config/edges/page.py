@@ -38,7 +38,7 @@ def render(edges: Iterable[Edge]) -> str:
     lines = [HEADER, "| Edge | Status | Schedule | Outcome | Screeners |", "|---|---|---|---|---|"]
     lines += [
         f"| {e.name} (`{e.id}`) | {e.status} | {_schedule(e.schedule, brief=True)} "
-        f"| {_outcome(e.outcome)} "
+        f"| {_outcome(e.outcome, e.event_class is not None)} "
         f"| {_ids(e.screeners)} |"
         for e in found
     ]
@@ -58,7 +58,7 @@ def _section(e: Edge) -> list[str]:
     if e.rejection_reason:
         lines += [f"**Why {e.status}:** {e.rejection_reason}", ""]
     lines += [
-        f"- **Outcome:** {_outcome(e.outcome)}",
+        f"- **Outcome:** {_outcome(e.outcome, e.event_class is not None)}",
         f"- **Schedule:** {_schedule(e.schedule, brief=False)}",
         f"- **Universe:** {universe}",
         f"- **Top K:** {'all qualified names' if e.top_k is None else e.top_k}",
@@ -79,14 +79,17 @@ def _section(e: Edge) -> list[str]:
     return lines
 
 
-def _outcome(o: Outcome) -> str:
+def _outcome(o: Outcome, event: bool) -> str:
     horizons = ", ".join(str(h) for h in o.horizon_sessions)
     plural = "" if o.horizon_sessions == (1,) else "s"
     parts = [o.kind.replace("_", " "), f"over {horizons} session{plural}"]
     if o.benchmark != "none":
         parts.append(f"vs {o.benchmark}")
-    if o.start_offset_sessions:
+    if event and o.start_offset_sessions:
         parts.append(f"starting {o.start_offset_sessions:+d} sessions from the event")
+    elif not event:
+        n = o.start_offset_sessions
+        parts.append(f"entered {n} session{'' if n == 1 else 's'} after the decision session")
     if o.target is not None:
         parts.append(f"hit when {o.measure} is {o.direction} {o.target:g}")
     if o.max_drawdown is not None:

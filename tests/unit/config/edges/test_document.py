@@ -21,8 +21,13 @@ def document(**changes: Any) -> dict[str, Any]:
         "thesis": "Small names drift after earnings.",
         "mechanism": "Underreaction.",
         "persistence": "Limits to arbitrage.",
-        "outcome": {"kind": "excess_return", "horizon_sessions": [20, 60], "benchmark": "SPY"},
-        "schedule": "on_event:earnings",
+        "outcome": {
+            "kind": "excess_return",
+            "horizon_sessions": [20, 60],
+            "benchmark": "SPY",
+            "start_offset_sessions": 1,
+        },
+        "schedule": "on_event:earnings_reaction",
         "universe": "liquid_optionable",
         "top_k": "all",
         "screeners": [],
@@ -45,11 +50,12 @@ def test_a_full_document_types_into_an_edge() -> None:
             "kind": "excess_return",
             "horizon_sessions": [20, 60],
             "benchmark": "SPY",
+            "start_offset_sessions": 1,
             "cost_bps": 20,
         },
         sources=[{"title": "A paper", "url": "https://example.org/a"}],
     )
-    assert edge.event_class == "earnings"
+    assert edge.event_class == "earnings_reaction"
     assert edge.outcome.horizon_sessions == (20, 60)
     assert edge.outcome.cost_bps == 20.0
     assert edge.top_k is None
@@ -78,6 +84,7 @@ def test_a_hit_target_with_a_drawdown_cap_and_no_benchmark() -> None:
         "measure": "realised_to_implied_vol",
         "direction": "below",
         "max_drawdown": 0.5,
+        "start_offset_sessions": 1,
     }
     edge = parse(outcome=outcome, schedule="every_session")
     assert (edge.outcome.target, edge.outcome.max_drawdown) == (1.0, 0.5)
@@ -91,7 +98,7 @@ def test_a_window_may_start_before_an_event_announced_ahead() -> None:
         "benchmark": "SPY",
         "start_offset_sessions": -5,
     }
-    edge = parse(outcome=outcome, schedule="on_event:earnings_scheduled")
+    edge = parse(outcome=outcome, schedule="on_event:earnings_expected")
     assert edge.outcome.start_offset_sessions == -5
 
 
@@ -109,7 +116,10 @@ def test_a_retired_edge_may_carry_a_reason() -> None:
 
 
 def _outcome(**changes: Any) -> dict[str, Any]:
-    base = {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY"}
+    base = {
+        "kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+        "start_offset_sessions": 1,
+    }  # fmt: skip
     return {k: v for k, v in {**base, **changes}.items() if v is not None}
 
 
@@ -158,12 +168,22 @@ def _outcome(**changes: Any) -> dict[str, Any]:
         ({"outcome": _outcome(cost_bps=-1)}, "cost_bps: expected a number >= 0"),
         (
             {"outcome": _outcome(start_offset_sessions=-5)},
-            "a window may start before the event only when it is announced ahead",
+            "an entry before the event needs it announced ahead",
         ),
         (
-            {"outcome": _outcome(start_offset_sessions=1), "schedule": "every_session"},
-            "only an on_event schedule has an offset",
+            {"outcome": _outcome(start_offset_sessions=0)},
+            "an entry before the event needs it announced ahead",
         ),
+        (
+            {"outcome": _outcome(start_offset_sessions=0), "schedule": "every_session"},
+            "the entry session is at least 1 session later",
+        ),
+        (
+            {"outcome": _outcome(start_offset_sessions=None), "schedule": "month_end"},
+            "the entry session is at least 1 session later",
+        ),
+        ({"base": "event", "schedule": "month_end"}, "base: 'event' needs an on_event schedule"),
+        ({"base": "all"}, "base: expected one of"),
         ({"api_key": "x"}, "looks like a secret"),
     ],
 )
@@ -182,3 +202,50 @@ def test_the_frozen_period_start_is_optional_and_a_date() -> None:
     for bad in ("last quarter", 20260401, "2026-13-01"):
         with pytest.raises(ConfigurationError, match="frozen_from"):
             parse(frozen_from=bad)
+
+
+def test_event_and_universe_bases_default_by_schedule() -> None:
+    assert parse().base == "event"
+    assert parse(base="universe").base == "universe"
+    assert parse(schedule="month_end").base == "universe"
+
+
+def test_an_event_announced_ahead_may_enter_before_on_or_after_the_anchor() -> None:
+    for offset in (-5, 0, 1):
+        outcome = _outcome(start_offset_sessions=offset, horizon_sessions=[6])
+        edge = parse(outcome=outcome, schedule="on_event:earnings_expected")
+        assert edge.outcome.start_offset_sessions == offset
+
+
+def test_variants_override_the_outcome_and_the_universe_each_with_its_own_id() -> None:
+    rule = {"field": "instrument.status", "op": "eq", "value": "ACTIVE"}
+    edge = parse(
+        variants=[
+            {"id": "micro", "universe": {"where": {"all": [rule]}}},
+            {"id": "long_hold", "outcome": {"horizon_sessions": [60], "cost_bps": 40}},
+        ]
+    )
+    micro, hold = edge.variants
+    assert isinstance(micro.universe, Selection) and micro.outcome == edge.outcome
+    assert hold.universe == edge.universe
+    assert hold.outcome.horizon_sessions == (60,) and hold.outcome.cost_bps == 40.0
+    assert hold.outcome.kind == edge.outcome.kind  # the rest is the edge's own
+    assert parse().variants == ()
+
+
+@pytest.mark.parametrize(
+    ("variants", "message"),
+    [
+        ([{"id": "main"}], "'main' is reserved or listed twice"),
+        ([{"id": "a"}, {"id": "a"}], "'a' is reserved or listed twice"),
+        ([{"id": "A b"}], "invalid variant id"),
+        ([{"outcome": {"cost_bps": 1}}], "id: required"),
+        ([{"id": "a", "colour": "red"}], "unknown keys"),
+        ([{"id": "a", "outcome": {"horizon_sessions": [60, 20]}}], "horizon_sessions: expected"),
+        ([{"id": "a", "outcome": {"start_offset_sessions": 0}}], "an entry before the event"),
+        ("a", "expected \\[\\[variants\\]\\] tables"),
+    ],
+)
+def test_a_variant_is_checked_like_the_edge(variants: Any, message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(variants=variants)

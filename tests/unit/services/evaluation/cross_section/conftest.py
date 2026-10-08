@@ -1,6 +1,7 @@
 """One small store for the harness tests: 20 names, a rule screen ``momo`` that qualifies every
 name and ranks it by ``underlying_price`` (name i costs 100 + 10 i), and stored outcomes whose
-excess return rises with i (half the names hit), over the sessions of Sept 1-10 2026."""
+excess return rises with i (half the names hit), over the decision sessions of Sept 1-10 2026
+(the entry session is the next one: Sept 11 is stored too)."""
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -11,7 +12,7 @@ import pandas as pd
 import pytest
 
 from algotrade.config.edges.document import QUALITY_BAR, Edge, parse_edge
-from algotrade.core.time.calendar import sessions_between
+from algotrade.core.time.calendar import next_session, sessions_between
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -33,6 +34,9 @@ ACTIVE = {
 
 
 PRICE = "rollup.option_liquidity@v1.underlying_price"
+REACTION = (
+    "rollups/instrument/earnings_reaction@v1"  # the event field of on_event:earnings_reaction
+)
 
 
 def screen(rank: str = "desc") -> dict[str, Any]:
@@ -52,7 +56,10 @@ def edge_document(**changes: Any) -> dict[str, Any]:
     doc: dict[str, Any] = {
         "id": "drift", "name": "Drift", "thesis": "Dear names keep rising.",
         "mechanism": "m", "persistence": "p",
-        "outcome": {"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY"},
+        "outcome": {
+            "kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+            "start_offset_sessions": 1,
+        },
         "schedule": "every_session", "universe": "active", "top_k": 5, "screeners": ["momo"],
         "status": "candidate", "sources": [{"title": "A paper"}],
         "quality_bar": {k: f"answer {k}" for k in QUALITY_BAR},
@@ -92,6 +99,23 @@ class World:
         frame = stamped(rows, day, f"o-{day}", known, "outcomes")
         self.writer.write_table(FORWARD_RETURNS, day, f"o-{day}", frame)
 
+    def write_reactions(
+        self, day: date, since: dict[str, int | None], ended: date | dict[str, date] | None = None
+    ) -> None:
+        """Rows of the reaction group at ``day``: sessions since the reaction (None: unknown)
+        and the reaction's end date (``ended``: one for all, or by name; default ``day``)."""
+        rows = [
+            {
+                "instrument_id": iid,
+                "sessions_since_reaction": n,
+                "reaction_end_date": ended.get(iid, day)
+                if isinstance(ended, dict)
+                else ended or day,
+            }
+            for iid, n in since.items()
+        ]
+        self.writer.write_table(REACTION, day, f"r-{day}", stamped(rows, day, f"r-{day}"))
+
     def write_features(
         self, day: date, price_of: Callable[[int], float] = lambda i: 100.0 + 10 * i
     ) -> None:
@@ -124,7 +148,7 @@ def build_world(
         {("site", "selections", "active"): ACTIVE, ("site", "strategies", "momo"): screen()}
     )
     w = World(backend, writer, StoreReader(backend), configs)
-    for day in days:
+    for day in [*days, next_session(days[-1])]:
         if day not in no_features:
             w.write_features(
                 day, (lambda i, d=day: price_of(d, i)) if price_of else lambda i: 100.0 + 10 * i

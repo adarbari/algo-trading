@@ -1,22 +1,29 @@
-"""Evaluate one edge over a range of sessions (ADR 0053 decisions 5 to 7, ``docs/edges-plan.md``).
+"""Evaluate one edge over a range of sessions (ADR 0053 decisions 5 to 7 and its amendment of
+2026-10-08, ``docs/edges-plan.md``).
 
-For each horizon the edge stores, the start sessions of its schedule (``sessions``) are screened
-for every listed screener and baseline (``picks``: only what was known at the session), and the
-picks, the eligible names and the screener's ranking are joined to the closed outcomes read as
-of the run's start (``hit.apply_outcome``) and measured per slice (``measures``). **This is the
-only module that reads outcomes** (``read_outcomes``; the picks never see one: a fitness test
-checks both). A window not closed has no outcome row and is excluded, never a miss; a session
-with no closed window at all is counted in ``unclosed_sessions``.
+Each row has a decision session D and an entry session S > D (``sessions``). For each horizon
+the edge stores, the decision sessions of its schedule (an event schedule: the sessions with
+events, ``events``, pooled into blocks of one horizon) are screened at D for every listed
+screener and baseline (``picks``: only what was known at D); the eligible names, the implied
+vol and the event names are read at D too. The picks, the base names and the screener's ranking
+are joined to the closed outcomes of the partition at S, read as of the run's ``as_of``
+(``hit.apply_outcome``), and measured per slice (``measures``). **This is the only module that
+reads outcomes** (``read_outcomes``; the picks never see one: a fitness test checks both). A
+window not closed has no outcome row and is excluded, never a miss; a name eligible at D with
+no outcome row at S has no entry bar (``no_entry_bar``); a block with no closed window at all
+is counted in ``unclosed_sessions``.
 
-The deflated Sharpe ratio counts every distinct (variant, config hash, horizon) tried in
-earlier runs of the edge plus this one (the trial log, ``results.py``); the probability of
-backtest overfitting compares the variants' per-session pick means over the same sessions.
+An edge's ``[[variants]]`` are evaluated like the edge itself under their own id
+(``edge_variant``, "main" for the edge). The deflated Sharpe ratio counts every distinct
+(edge variant, variant, config hash, horizon) tried in earlier runs of the edge plus this one
+(the trial log, ``results.py``); the probability of backtest overfitting compares the variants'
+per-session pick means over the same sessions.
 """
 
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from functools import partial
 from typing import Any
@@ -24,7 +31,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from algotrade.config.edges.document import Edge
+from algotrade.config.edges.document import MAIN, Edge
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -36,6 +43,7 @@ from algotrade.data.outcomes import read_outcomes
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
     apply_outcome,
@@ -46,11 +54,17 @@ from algotrade.services.evaluation.cross_section.measures import (
     Slice,
     SliceMeasure,
     decile_means,
+    pool_stats,
     slice_measures,
 )
 from algotrade.services.evaluation.cross_section.picks import RankedRun, screen_variant
 from algotrade.services.evaluation.cross_section.picks import eligible as eligible_names
-from algotrade.services.evaluation.cross_section.sessions import edge_sessions
+from algotrade.services.evaluation.cross_section.sessions import (
+    decision_sessions,
+    entry_session,
+    event_blocks,
+)
+from algotrade.services.features import catalogue
 from algotrade.services.screening.regime import session_market
 from algotrade.services.selection import fields_view
 from algotrade.storage.configs.store import ConfigStore
@@ -66,6 +80,8 @@ UNKNOWN = "UNKNOWN"
 # history, but a session where the signal was not computed at all is dropped). The screen's own
 # coverage (``DEFAULT_MIN_COVERAGE``) is a different check.
 MIN_SCORE_COVERAGE = 0.8
+# The one fixed implied-vol field of a run is never a field mixing sources by name or by rule.
+MIXED_SOURCE_IV = ("feature.vrp_iv30",)
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
 
@@ -85,6 +101,9 @@ class VariantResult:
     horizon: int
     stats: tuple[SessionStat, ...]
     measures: tuple[SliceMeasure, ...]
+    edge_variant: str = MAIN  # the edge's own ``[[variants]]`` id, "main" for the edge itself
+    iv_source: str | None = None  # the run's iv_field when the outcome reads an implied vol
+    licence: str | None = None  # that field's catalogue licence
 
 
 @dataclass(frozen=True)
@@ -99,8 +118,9 @@ class EdgeEvaluation:
     snapshot: date | None  # the first (here: earliest read) universe snapshot
     results: tuple[VariantResult, ...]
     trials: int
-    start_sessions: Mapping[int, int]  # horizon -> start sessions the schedule gave
-    unclosed_sessions: Mapping[int, int]  # horizon -> of those, sessions with no closed window
+    start_sessions: Mapping[int, int]  # horizon -> decision blocks the schedule gave
+    unclosed_sessions: Mapping[int, int]  # horizon -> of those, blocks with no closed window
+    event_unknown: Mapping[str, int] = field(default_factory=dict)  # reason -> names excluded
 
 
 def job_name(edge_id: str, user_id: str) -> str:
@@ -109,12 +129,18 @@ def job_name(edge_id: str, user_id: str) -> str:
 
 
 def run_hash(
-    edge: Edge, variants: Sequence[Variant], start: date, end: date, as_of: datetime
+    edge: Edge,
+    variants: Sequence[Variant],
+    start: date,
+    end: date,
+    as_of: datetime,
+    iv_field: str = IMPLIED_VOL_FIELD,
 ) -> str:
     """Identity of one evaluation: the parsed document, each variant's config hash, the range,
-    the outcomes' ``as_of`` and the harness version."""
+    the outcomes' ``as_of``, the run's implied-vol field and the harness version."""
     payload = {
         "edge": asdict(edge),
+        "iv_field": iv_field,
         "variants": [(v.id, v.config.hash) for v in variants],
         "range": [start, end],
         "as_of": as_of,
@@ -144,27 +170,26 @@ def _universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
 
 
 class _Session:
-    """What is read once per start session, whatever the horizon: each variant's run, the
-    eligible names, the regime label and (when the measure needs it) the implied vol."""
+    """What is read once per decision session, whatever the horizon or the edge variant: each
+    screener's run and the regime label; per edge variant (``key``) the eligible names and, when
+    the measure needs it, the implied vol (the run's one ``iv_field``) at D."""
 
-    def __init__(self, reader: StoreReader, edge: Edge, universe: Selection, label_field: str):
-        self._reader, self._edge, self._universe, self._label_field = (
-            reader, edge, universe, label_field,
-        )  # fmt: skip
+    def __init__(self, reader: StoreReader, label_field: str, iv_field: str):
+        self._reader, self._label_field, self._iv_field = reader, label_field, iv_field
         self._runs: dict[tuple[str, date], RankedRun] = {}
-        self._eligible: dict[date, frozenset[str]] = {}
+        self._eligible: dict[tuple[str, date], frozenset[str]] = {}
         self._labels: dict[date, str] = {}
-        self._implied: dict[date, dict[str, float | None]] = {}
+        self._implied: dict[tuple[str, date], dict[str, float | None]] = {}
 
     def run(self, variant: Variant, day: date) -> RankedRun:
         if (variant.id, day) not in self._runs:
             self._runs[variant.id, day] = screen_variant(self._reader, variant.config, day)
         return self._runs[variant.id, day]
 
-    def eligible(self, day: date) -> frozenset[str]:
-        if day not in self._eligible:
-            self._eligible[day] = eligible_names(self._reader, self._universe, day).ids
-        return self._eligible[day]
+    def eligible(self, key: str, universe: Selection, day: date) -> frozenset[str]:
+        if (key, day) not in self._eligible:
+            self._eligible[key, day] = eligible_names(self._reader, universe, day).ids
+        return self._eligible[key, day]
 
     def snapshots(self) -> list[date]:
         """The universe snapshot dates the screens read."""
@@ -177,33 +202,63 @@ class _Session:
             self._labels[day] = UNKNOWN if value is None else str(value)
         return self._labels[day]
 
-    def implied(self, day: date) -> dict[str, float | None]:
-        if day not in self._implied:
-            ids = sorted(self.eligible(day))
-            view, _ = fields_view(self._reader, (IMPLIED_VOL_FIELD,), day, ids)
-            values = {i: view.get(i, IMPLIED_VOL_FIELD) for i in ids}
-            self._implied[day] = {
+    def implied(self, key: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
+        if (key, day) not in self._implied:
+            wanted = sorted(ids)
+            view, _ = fields_view(self._reader, (self._iv_field,), day, wanted)
+            values = {i: view.get(i, self._iv_field) for i in wanted}
+            self._implied[key, day] = {
                 i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
                 for i, v in values.items()
             }
-        return self._implied[day]
+        return self._implied[key, day]
+
+
+@dataclass(frozen=True)
+class _Leg:
+    """One decision session D and its entry session S: the screen and the names are read at D,
+    the outcome rows of the partition at S."""
+
+    decision: date
+    entry: date
+
+
+@dataclass(frozen=True)
+class _Scope:
+    """One evaluation of the edge: ``main`` or one of its ``[[variants]]``."""
+
+    key: str
+    edge: Edge  # the edge with the variant's outcome and universe applied
+    universe: Selection
 
 
 def _stat(
-    edge: Edge, session: _Session, variant: Variant, day: date, rows: pd.DataFrame
+    scope: _Scope,
+    session: _Session,
+    variant: Variant,
+    leg: _Leg,
+    rows: pd.DataFrame,
+    event_names: frozenset[str] | None,
 ) -> SessionStat:
-    """One variant at one session: ``rows`` are the stored outcomes of the session."""
-    run, ids = session.run(variant, day), session.eligible(day)
+    """One variant at one decision session: ``rows`` are the stored outcomes at the entry
+    session. The eligible names, the screen and the implied vol are read at D. ``event_names``
+    (an event schedule): the picks are the qualified names within them, and the base is them
+    (``base = "event"``) or every eligible name."""
+    edge, day = scope.edge, leg.decision
+    run, eligible = session.run(variant, day), session.eligible(scope.key, scope.universe, day)
     if run.coverage not in MEASURED_COVERAGE:  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
+    pickable = eligible if event_names is None else event_names & eligible
+    ids = pickable if edge.base == "event" else eligible
     scored = {i: v for i, v in run.scores.items() if i in ids and v is not None}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
     inside = rows[rows["instrument_id"].isin(ids)]
-    implied = session.implied(day) if needs_implied_vol(edge) else None
+    implied = session.implied(scope.key, eligible, day) if needs_implied_vol(edge) else None
     res = apply_outcome(edge, inside, implied).set_index("instrument_id")
     counted = res[res["excluded"] == ""]
-    in_universe = [i for i in run.qualified if i in ids]
-    picks = in_universe if edge.top_k is None else in_universe[: edge.top_k]
+    in_universe = [i for i in run.qualified if i in eligible]
+    chosen = [i for i in in_universe if i in pickable]
+    picks = chosen if edge.top_k is None else chosen[: edge.top_k]
     pick_set = set(picks)
     have = set(res.index)
     got = [i for i in picks if i in counted.index]
@@ -225,11 +280,11 @@ def _stat(
         ranked=len(ranked),
         unscored=0 if thin else len(ids) - len(scored),
         excluded_score_coverage=int(thin),
-        excluded_unclosed=sum(1 for i in picks if i not in have),
         excluded_missing=sum(1 for i in picks if i in have and i not in counted.index),
         delisted=int(counted.loc[got, "delisted"].sum()),
         pre_snapshot=run.pre_snapshot,
         outside_universe=len(run.qualified) - len(in_universe),
+        no_entry_bar=len(ids - have),
     )
 
 
@@ -260,11 +315,17 @@ def _since(day: date, stat: SessionStat) -> bool:
     return stat.session >= day
 
 
-def _prior_trials(writer: ResultWriter, edge_id: str, user_id: str) -> set[tuple[str, str, int]]:
-    found: set[tuple[str, str, int]] = set()
+def _prior_trials(
+    writer: ResultWriter, edge_id: str, user_id: str
+) -> set[tuple[str, str, str, int]]:
+    """(edge variant, variant, config hash, horizon) of earlier runs; a trial logged before
+    edge variants existed is the edge's own ("main")."""
+    found: set[tuple[str, str, str, int]] = set()
     for record in writer.runs_for(job_name(edge_id, user_id)):
         for t in record.stats.get("trials", []):
-            found.add((t["variant"], t["config_hash"], int(t["horizon"])))
+            found.add(
+                (t.get("edge_variant") or MAIN, t["variant"], t["config_hash"], int(t["horizon"]))
+            )
     return found
 
 
@@ -317,40 +378,67 @@ def evaluate_edge(
     start: date,
     end: date,
     as_of: datetime,
+    iv_field: str = IMPLIED_VOL_FIELD,
 ) -> EdgeEvaluation:
-    """``edge`` over the start sessions in ``start..end`` for every horizon, its screeners and
-    baselines, with outcomes known by ``as_of``. Raises ``ConfigurationError`` for an event
-    schedule (ED4) and ``MissingDataError`` when no outcome is stored for a horizon."""
-    if edge.event_class is not None:
-        raise ConfigurationError(f"edge {edge.id}: {edge.schedule} arrives with ED4")
+    """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
+    horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
+    one implied-vol field of the run (an outcome that reads one; its source and licence are
+    recorded). Raises ``ConfigurationError`` for an event class with no declared field and
+    ``MissingDataError`` when no outcome is stored for a horizon."""
+    if iv_field in MIXED_SOURCE_IV:
+        raise ConfigurationError(f"iv_field {iv_field!r} mixes sources: name one vendor's field")
     variants = _variants(configs, user, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
-    session = _Session(reader, edge, _universe(configs, user, edge), label)
+    session = _Session(reader, label, iv_field)
     days = sessions_between(start, end)
     results: list[VariantResult] = []
     starts: dict[int, int] = {}
     unclosed: dict[int, int] = {}
-    for horizon in edge.outcome.horizon_sessions:
-        sessions = edge_sessions(edge.schedule, days, horizon)
-        outcomes = read_outcomes(reader, horizon, sessions, BENCHMARK, as_of=as_of)
-        closed = dict(tuple(outcomes.groupby(outcomes["session_date"].map(_day))))
-        starts[horizon], unclosed[horizon] = len(sessions), sum(d not in closed for d in sessions)
-        for variant in variants:
-            stats = tuple(
-                _stat(edge, session, variant, d, closed[d]) for d in sessions if d in closed
-            )
-            measures = tuple(slice_measures(stats, _slices(edge, stats)))
-            results.append(
-                VariantResult(
-                    variant.id, variant.role, variant.config.hash, horizon, stats, measures
+    unknown: dict[str, int] = {}
+    outcomes_of: dict[tuple[int, tuple[date, ...]], dict[date, pd.DataFrame]] = {}
+    for scope in _scopes(configs, user, edge):
+        o = scope.edge.outcome
+        needs_iv = needs_implied_vol(scope.edge)
+        licence = _licence(configs, user, iv_field) if needs_iv else None
+        events = _events(reader, session, scope, days)
+        for horizon in o.horizon_sessions:
+            blocks = _blocks(scope.edge, events, days, horizon)
+            entries = tuple(sorted({leg.entry for block in blocks for leg in block}))
+            if (horizon, entries) not in outcomes_of:
+                frame = read_outcomes(reader, horizon, entries, BENCHMARK, as_of=as_of)
+                outcomes_of[horizon, entries] = dict(
+                    tuple(frame.groupby(frame["session_date"].map(_day)))
                 )
+            closed = outcomes_of[horizon, entries]
+            starts.setdefault(horizon, len(blocks))  # the edge's own count, then its variants'
+            unclosed.setdefault(
+                horizon, sum(all(leg.entry not in closed for leg in block) for block in blocks)
             )
-    tried = {(r.variant, r.config_hash, r.horizon) for r in results}
+            for variant in variants:
+                stats = _block_stats(scope, session, variant, blocks, closed, events)
+                measures = tuple(slice_measures(stats, _slices(scope.edge, stats)))
+                results.append(
+                    VariantResult(
+                        variant.id,
+                        variant.role,
+                        _trial_hash(scope, variant),
+                        horizon,
+                        stats,
+                        measures,
+                        edge_variant=scope.key,
+                        iv_source=iv_field if needs_iv else None,
+                        licence=licence,
+                    )
+                )
+        if events is not None:
+            for reason, n in events.unknown_total().items():
+                unknown[reason] = unknown.get(reason, 0) + n
+    tried = {(r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results}
     trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(
         edge_id=edge.id,
-        run_hash=run_hash(edge, variants, start, end, as_of),
+        run_hash=run_hash(edge, variants, start, end, as_of, iv_field),
         user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,
@@ -361,7 +449,91 @@ def evaluate_edge(
         trials=trials,
         start_sessions=starts,
         unclosed_sessions=unclosed,
+        event_unknown=unknown,
     )
+
+
+def _block_stats(
+    scope: _Scope,
+    session: _Session,
+    variant: Variant,
+    blocks: Sequence[Sequence[_Leg]],
+    closed: Mapping[date, pd.DataFrame],
+    events: EventSchedule | None,
+) -> tuple[SessionStat, ...]:
+    """One statistic per block with at least one closed leg: its closed legs, pooled."""
+    out = []
+    for block in blocks:
+        legs = [leg for leg in block if leg.entry in closed]
+        if legs:
+            names = (None if events is None else events.names[leg.decision] for leg in legs)
+            out.append(
+                pool_stats(
+                    [
+                        _stat(scope, session, variant, leg, closed[leg.entry], n)
+                        for leg, n in zip(legs, names, strict=True)
+                    ]
+                )
+            )
+    return tuple(out)
+
+
+def _trial_hash(scope: _Scope, variant: Variant) -> str:
+    """The trial's identity: the screener's config hash, the edge variant's id and the resolved
+    outcome and universe (the edge's own for ``main``), so an edited override, offset or
+    horizon is another trial."""
+    payload = [variant.config.hash, scope.key, asdict(scope.edge.outcome), scope.edge.universe]
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _scopes(configs: ConfigStore, user: UserContext, edge: Edge) -> list[_Scope]:
+    """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides."""
+    scopes = [_Scope(MAIN, edge, _universe(configs, user, edge))]
+    for v in edge.variants:
+        applied = replace(edge, outcome=v.outcome, universe=v.universe, variants=())
+        scopes.append(_Scope(v.id, applied, _universe(configs, user, applied)))
+    return scopes
+
+
+def _events(
+    reader: StoreReader, session: _Session, scope: _Scope, days: Sequence[date]
+) -> EventSchedule | None:
+    """The event names by decision session of an event schedule (None for any other)."""
+    cls = scope.edge.event_class
+    if cls is None:
+        return None
+    return read_events(
+        reader,
+        cls,
+        scope.edge.outcome.start_offset_sessions,
+        days,
+        lambda day: session.eligible(scope.key, scope.universe, day),
+    )
+
+
+def _blocks(
+    edge: Edge, events: EventSchedule | None, days: Sequence[date], horizon: int
+) -> list[list[_Leg]]:
+    """The blocks of decision legs a horizon's windows are measured in: one leg per decision
+    session of a plain schedule (S = D + the offset), a block of the event days within one
+    horizon of its first for an event schedule (S = D + 1: the offset places D, not S)."""
+    if events is None:
+        offset = edge.outcome.start_offset_sessions
+        return [[_Leg(d, entry_session(d, offset))] for d in decision_sessions(
+            edge.schedule, days, horizon
+        )]  # fmt: skip
+    return [
+        [_Leg(d, entry_session(d, 1)) for d in block]
+        for block in event_blocks(sorted(events.names), days, horizon)
+    ]
+
+
+def _licence(configs: ConfigStore, user: UserContext, iv_field: str) -> str:
+    """The catalogue licence of ``iv_field`` (a stored rollup column or an expression feature)."""
+    found = catalogue(configs, user.user_id).feature(iv_field)
+    if found is None:
+        raise ConfigurationError(f"iv_field {iv_field!r} is not a catalogue feature")
+    return str(found.licence)
 
 
 def _day(value: Any) -> date:
