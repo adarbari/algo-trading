@@ -57,7 +57,7 @@ class GuideEpisodeDetail:
 
 def before_episode(label: str, episodes: tuple[Episode, ...]) -> Episode | None:
     """The one episode a ``before`` label means (module docstring); ``None`` for none or two."""
-    if not label.isdigit():
+    if not label.isdecimal():
         return None
     year = int(label)
     found = [e for e in episodes if e.peak.year <= year <= e.trough.year]
@@ -97,5 +97,5 @@ def _indicators(
         GuideEpisodeIndicator(card.key, card.plain_name, label, link_prose(line, fields))
         for card in load_cards(ctx.configs).cards
         for label, line in card.before.items()
-        if before_episode(label, episodes) == episode
+        if (found := before_episode(label, episodes)) is not None and found.key == episode.key
     )
