@@ -15,6 +15,8 @@ the domain rules on top:
                  (ADR 0048): ``macro.series``, and the ``pit = "lag"`` rule (``macro.vintages``)
 - ``volatility`` IBKR's implied and historical vol per underlying and session (ADR 0028;
                  the IBKR contracts snapshot is a ``reference`` read)
+- ``outcomes``   forward outcomes after a start session (ADR 0053): read across sessions,
+                 importable only from ``services.evaluation`` (the edge harness)
 - ``feature_inputs``  what a feature group reads, by table name (``load_input``): each
                  table's point-in-time read for features, from the owners above
 

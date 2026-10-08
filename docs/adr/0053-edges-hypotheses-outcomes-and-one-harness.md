@@ -113,3 +113,31 @@ acceptance checks; a stored grain is backfilled once and verified like any table
   way).
 - The runtime home of learned scorers (ED7): `apps/ingestion` or a fifth app, by amendment.
 - If ED2 finds the grain must differ from decision 3, it amends this ADR in the same PR.
+
+## Amendment (2026-10-07, ED2): the grain as built
+Decision 3 holds; ED2 fixes what it left open.
+- **One table, no stored hit.** `outcomes/instrument/forward_returns@v1` (fixed schema in
+  `storage/tables/schemas.py`), one row per (instrument, start session S, horizon, benchmark):
+  `window_end` (T, the h-th exchange session after S), `fwd_return`, `fwd_excess_return`,
+  `fwd_max_return` and `fwd_max_drawdown` (intraday highs and lows after S: the path a drawdown
+  cap tests), `fwd_realised_vol`, `outcome_status` (COMPLETE, or DELISTED when the reference
+  snapshot at T dates a delisting on or before T: measured to the last bar; a gap at T, or a
+  name that left without a delisting date, has no row and a reason in the run). Whether an
+  edge's outcome held (its target, direction and drawdown cap; for `realised_to_implied_vol` the
+  implied volatility at S, a one-session read) is computed by the harness from these fields
+  (ED3), so a document edit never rewrites the grain.
+- **Horizons and benchmarks come from the documents.** The union over the site's edges that are
+  not rejected or blocked, plus 20 sessions over SPY (the harness default); the benchmark ticker
+  becomes an id through the resolver (ADR 0018). A new edge needs no code change.
+- **`knowledge_ts` is the write time**, as for every stored row (ADR 0007), never before the
+  close of `window_end`: the task refuses a window that has not closed. Partition S receives one
+  run per horizon on different nights, so runs merge, the latest row winning per (instrument,
+  horizon, benchmark); a backfill is one run per window end (exactly the nightly's), and
+  `read_outcomes` filters rows by `knowledge_ts` as well as runs.
+- **Return basis**: price return, split-adjusted as of T; total return is a later `@v2`.
+- **Eligible names** are the universe at S with a bar at S. Universe snapshots start 2026-10-02,
+  so every earlier window uses that snapshot (`pre_snapshot` in the run's stats): survivorship
+  the harness must report until ED6's listing history. Bars restated after T are read as stored
+  when the backfill runs.
+- The nightly step `outcomes` needs `bars` and `corporate-actions` (the splits), is optional,
+  and its acceptance recounts the eligible names: each has a row or a reason.

@@ -562,6 +562,18 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "load", arg = "edges" }, { call = "names", arg = "edges" }, { call = "parse_edge" }]
 
 [[responsibility]]
+id = "forward-outcomes"
+description = "Compute and store forward outcomes (ADR 0053 decision 3): for each window a session closes (S = T - h exchange sessions, horizons and benchmarks from the open edge documents plus the 20-session SPY default), every name in the universe at S with a bar at S measured from S's close to T's on bars split-adjusted as of T (return, excess over the benchmark, max favourable and adverse excursion, realised volatility; DELISTED by the reference snapshot's delisting date, else a reason), one run per window end into outcomes/instrument/forward_returns@v1, and its acceptance check; read back only through algotrade.data.outcomes, importable only from services/evaluation"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/outcome_paths.py",
+    "src/algotrade/data/outcomes/*",
+]
+allowed = ["src/algotrade/storage/tables/schemas.py"]  # declares the outcomes tables' one schema
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, { call = "read_outcomes" }]
+
+[[responsibility]]
 id = "job-execution"
 description = "Execute long-running work: threads, locks, recovery, idempotency; apps run jobs through services.jobs.run_job, fan-out through services.jobs.as_completed"
 owner = ["src/algotrade/services/jobs/*"]
