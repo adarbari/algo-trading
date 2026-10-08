@@ -1,6 +1,84 @@
 {
   "components": {
     "schemas": {
+      "Build": {
+        "properties": {
+          "api": {
+            "$ref": "#/components/schemas/BuildStamp"
+          },
+          "checkout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuildStamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mismatches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mismatches",
+            "type": "array"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "web": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuildStamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "api",
+          "web",
+          "checkout",
+          "stale",
+          "mismatches"
+        ],
+        "title": "Build",
+        "type": "object"
+      },
+      "BuildStamp": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "git_sha": {
+            "title": "Git Sha",
+            "type": "string"
+          },
+          "schema_hash": {
+            "title": "Schema Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "git_sha",
+          "schema_hash",
+          "at"
+        ],
+        "title": "BuildStamp",
+        "type": "object"
+      },
       "CheckBody": {
         "properties": {
           "expr": {
@@ -433,6 +511,9 @@
       },
       "Health": {
         "properties": {
+          "build": {
+            "$ref": "#/components/schemas/Build"
+          },
           "latest_session": {
             "anyOf": [
               {
@@ -473,7 +554,8 @@
           "storage",
           "latest_session",
           "tables",
-          "versions"
+          "versions",
+          "build"
         ],
         "title": "Health",
         "type": "object"
@@ -1521,6 +1603,14 @@
             "title": "Names",
             "type": "array"
           },
+          "narrow_columns": {
+            "description": "table column ids added back on a narrow (phone) table",
+            "items": {
+              "type": "string"
+            },
+            "title": "Narrow Columns",
+            "type": "array"
+          },
           "saved": {
             "description": "false: this view is not saved yet (the page uses defaults)",
             "title": "Saved",
@@ -1551,7 +1641,8 @@
           "columns",
           "sort",
           "decisions",
-          "names"
+          "names",
+          "narrow_columns"
         ],
         "title": "TableView",
         "type": "object"
@@ -1573,6 +1664,21 @@
             },
             "title": "Decisions",
             "type": "array"
+          },
+          "narrow_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "table column ids added back on a narrow (phone) table; absent: kept as saved",
+            "title": "Narrow Columns"
           },
           "sort": {
             "anyOf": [

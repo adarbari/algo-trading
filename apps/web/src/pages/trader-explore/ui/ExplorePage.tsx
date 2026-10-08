@@ -59,6 +59,10 @@ export function ExplorePage({ search, onSearchChange, onOpenScreener }: ExploreP
             onColumnsChange={(cols) => {
               onSearchChange({ cols: joinList(cols, DEFAULT_COLUMNS) });
             }}
+            narrowColumns={state.narrowColumns}
+            onNarrowColumnsChange={(cols) => {
+              onSearchChange({ ncols: joinList(cols) });
+            }}
             filters={toTableFilters(filters)}
             header={
               <TickerFilterBar

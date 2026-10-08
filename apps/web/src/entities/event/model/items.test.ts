@@ -73,6 +73,17 @@ describe('gapLines', () => {
       ]),
     ).toEqual(['Macro releases: Unknown (no macro calendar stored)', 'Filings: n/a']);
   });
+
+  it('reads two identical gaps once, so a list keyed by the line has unique keys', () => {
+    const gap: Parameters<typeof gapLines>[0][number] = {
+      instrumentId: null,
+      part: 'fund_reference',
+      unknown: { code: 'NO_PARTITION', detail: 'no fund reference stored', reason: null },
+    };
+    const lines = gapLines([gap, { ...gap }]);
+    expect(lines).toHaveLength(1);
+    expect(new Set(lines).size).toBe(lines.length);
+  });
 });
 
 describe('studyChartEvents', () => {

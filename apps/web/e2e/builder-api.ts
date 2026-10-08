@@ -225,8 +225,9 @@ export async function mockBuilderApi(
       if (method === 'PUT') {
         const view = body();
         mock.views.push({ id, name, view });
-        saved[key] = { scope: `screener:${id}`, name, saved: true, ...view };
-        return json({ ...saved[key], names: namesOf(id) });
+        const { narrow_columns: narrowColumns = [], ...rest } = view;
+        saved[key] = { scope: `screener:${id}`, name, saved: true, ...rest, narrowColumns };
+        return json({ ...saved[key], narrow_columns: narrowColumns, names: namesOf(id) });
       }
       if (method === 'DELETE') {
         mock.removedViews.push(String(name));

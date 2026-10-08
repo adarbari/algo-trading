@@ -1,0 +1,26 @@
+/* FilterBar: the root is the size container's measured element; the narrow rows scroll sideways. */
+.root {
+  min-width: 0;
+}
+
+.grow {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.scrollRow {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scrollRow::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollRow > * {
+  flex: none;
+}

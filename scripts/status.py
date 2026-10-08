@@ -1,6 +1,7 @@
 """`make status`: where things stand, in about 15 lines. Read-only: open PRs with CI state (gh),
 running ingest jobs and `var/logs/*.status` tails, the last nightly run and the store's latest
-session (through the read model, never a path), dev servers on 8000 / 5173 / 5174.
+session (through the read model, never a path), dev servers on 8000 / 5173 / 5174, and whether
+the API on 8000 is out of step with its checkout or the web it serves (its ``/health``).
 Every probe goes through `Probes`; a probe that cannot answer says why on its line.
 """
 
@@ -63,12 +64,20 @@ def _store_facts() -> tuple[str, str]:
     return str(latest) if latest else "empty", last
 
 
+def _api_build(url: str) -> tuple[str, ...] | None:
+    """What the API at ``url`` reports out of step (``algotrade_api.ops.build``); None: no API."""
+    from algotrade_api.ops.build import running_mismatches  # noqa: PLC0415 (venv may lack it)
+
+    return running_mismatches(url)
+
+
 @dataclass
 class Probes:
     which: Callable[[str], str | None] = shutil.which
     run: Callable[[list[str]], tuple[int, str]] = _run
     port_open: Callable[[int], bool] = _port_open
     store_facts: Callable[[], tuple[str, str]] = _store_facts
+    api_build: Callable[[str], tuple[str, ...] | None] = _api_build
     logs: Path = field(default_factory=lambda: REPO / "var" / "logs")
 
 
@@ -124,8 +133,24 @@ def servers(p: Probes) -> list[str]:
     return ["Dev servers: " + (", ".join(up) if up else "none listening")]
 
 
+def api_build(p: Probes) -> list[str]:
+    """The running API's build identity: a process keeps the code and schema it started with."""
+    port = next(port for port, name in ports().items() if name == "api")
+    if not p.port_open(port):
+        return []
+    try:
+        found = p.api_build(f"http://127.0.0.1:{port}")
+    except Exception as exc:  # a missing venv must not crash a status report
+        return [f"API build: unknown ({type(exc).__name__})"]
+    if found is None:
+        return [f"API build: {port} open but /health does not answer"]
+    if not found:
+        return ["API build: in step with its checkout and the served web"]
+    return ["API build: OUT OF STEP", *(f"  {m}" for m in found)]
+
+
 def report(p: Probes) -> str:
-    return "\n".join([*prs(p), *jobs(p), *store(p), *servers(p)])
+    return "\n".join([*prs(p), *jobs(p), *store(p), *servers(p), *api_build(p)])
 
 
 def main() -> int:

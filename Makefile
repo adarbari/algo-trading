@@ -202,6 +202,8 @@ web-visual:      ## screenshots + axe over every story, in the CI Linux image (n
 WEB_DIST ?= var/web
 web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build the API serves (ALGOTRADE_WEB_DIST=var/web); redo after a web change
 	cd $(WEB) && VITE_API_BASE_URL= $(NPM) run build -- --outDir $(abspath $(WEB_DIST)) --emptyOutDir
+	@# stamp it with the commit + GraphQL schema; warns (with the restart command) when the running API is behind (ADR 0044)
+	$(PY) -m algotrade_api stamp-web $(abspath $(WEB_DIST))
 
 # ----------------------------------------------------------------------------- the gate (docs/ci.md "Scope-aware make check")
 # `make check` runs the gates for the areas changed vs BASE (python / web / docs, CI's rule:

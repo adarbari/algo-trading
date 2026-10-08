@@ -43,6 +43,18 @@ Never a mobile page, route, widget or component variant: adapt the one component
    ticker, a run) is a Button or link, not text beside a hidden column or a keyboard hint.
 8. **Top bar**: two rows under `md` (brand, Guide and the end slot; then the sections scrolling
    sideways in one row); the workspace switch lives in the `AccountMenu`; never a hamburger menu.
+9. **A filter bar is `FilterBar`** (`search`, `quick` chips, `active` chips, `more` fields,
+   `activeCount`): under `sm` it becomes the search plus a "Filters · N" button opening a sheet.
+   **A row of actions is `ActionGroup`** (icon buttons with tooltips under `sm`). Never arrange
+   chips or shrink buttons for a phone in page code.
+10. **Columns a phone user adds back are remembered**: pass the table's `narrowColumns` /
+    `onNarrowColumnsChange` from the user's saved view (`features/table-view`) or the page's URL
+    state (Explore `ncols`); never browser storage. A caller's own column picker goes in
+    `toolbarEnd`, beside the table's.
+11. **Anything absolutely positioned inside a scroller** (a `VisuallyHidden` caption, a badge)
+    needs a positioned scroller (`position: relative`), or it widens the page on a phone.
+12. **Keys from text dedupe at the source** (`gapLines`, screener ids): two identical lines, or
+    a user copy beside a site preset, log a React duplicate-key error the mocks never show.
 
 ## Checks (all in `make web-check`)
 
@@ -55,6 +67,13 @@ Never a mobile page, route, widget or component variant: adapt the one component
   errors, axe; Explore row tap opens the detail sheet; Ideas screener name opens its results;
   the chart has its zoom buttons. A new route is covered by the workspaces list; a new
   master-detail or link flow adds an assertion there.
-- Verify by hand once: the Vite dev server in the browser pane at the `mobile` preset
-  (375 x 812), text and accessibility tree first, one reduced-scale screenshot per state.
+- Verify by hand once **against the real API** (the mocks render little: the real store found
+  four phone defects the phone project missed, MU3). From the worktree: the API with auth off on
+  the worktree's port (`ALGOTRADE_AUTH=off ALGOTRADE_USER=local
+  ALGOTRADE_DATA_URL=file://<main>/var/data ALGOTRADE_CONFIG_DIR=<main>/config
+  .venv/bin/algotrade-api --port $ALGOTRADE_PORT_BASE`), `npm run dev`, the browser pane at the
+  `mobile` preset (375 x 812); check `document.documentElement.scrollWidth`, the console for
+  errors, the top bar's controls inside the viewport, then the accessibility tree; one
+  reduced-scale screenshot per state. Restore any user config the smoke wrote
+  (`config/users/<id>/preferences.toml`).
 - To look at a `Narrow` story, use the built Storybook (`npm run storybook:build`, then serve `storybook-static`, e.g. `python3 -m http.server 6008 -d storybook-static`): the dev server cannot load a story that imports `design-system/testing` (vitest's `expect` in the browser).

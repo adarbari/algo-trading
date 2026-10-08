@@ -170,6 +170,18 @@ Source: `design-system/components/AccountMenu`
 | `children` | `ReactNode` | no | The menu's content: the workspace switch, settings links. Nothing: only "Sign out". |
 | `onSignOut` | `() => void` | no | Shown as a "Sign out" button at the end of the menu; absent: no sign-out (auth off). |
 
+### ActionGroup
+
+ActionGroup: a row of actions that are full Buttons where there is room and IconButtons with a Tooltip (the label) when the group's own width is under `sm`, so a sheet on a phone does not wrap three buttons into two rows. A page lists the actions; it never picks the form.
+
+Source: `design-system/components/ActionGroup`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `actions` | `readonly ActionItem[]` | yes |  |
+| `size` | `'sm' \| 'md'` | no | Default `sm`. |
+| `label` | `string` | no | Accessible name of the group (default "Actions"). |
+
 ### AppShell
 
 AppShell: the frame of every screen: a skip link, the TopBar, and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
@@ -372,6 +384,8 @@ Source: `design-system/components/DataTable`
 | `hiddenColumns` | `readonly string[]` | no | Controlled hidden column ids (pair with `onHiddenColumnsChange`). |
 | `defaultHiddenColumns` | `readonly string[]` | no | Initially hidden column ids when uncontrolled. |
 | `onHiddenColumnsChange` | `(hidden: string[]) => void` | no |  |
+| `narrowColumns` | `readonly string[]` | no | Controlled ids of the columns the user added back on a narrow table (pair with `onNarrowColumnsChange`). A page backs it with the user's saved view or the URL so a phone remembers the columns the user added; uncontrolled, the table keeps them for the session. Ids that are not columns are ignored. |
+| `onNarrowColumnsChange` | `(ids: string[]) => void` | no |  |
 | `columnPicker` | `boolean` | no | Show the "Columns" picker in the toolbar (a narrow table shows it whenever it hid a column). |
 | `selectable` | `boolean` | no | Add the checkbox column. Selection is controlled: pass `selectedIds` and `onSelectionChange`. |
 | `selectedIds` | `readonly string[]` | no |  |
@@ -387,6 +401,7 @@ Source: `design-system/components/DataTable`
 | `visibleRows` | `number` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. |
 | `rowLines` | `1 \| 2` | no | Lines of text per row: 1 (default) or 2 (a symbol with its name underneath). |
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
+| `toolbarEnd` | `ReactNode` | no | Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the two sit in one row, so a narrow table does not spend a row on each. |
 | `pinFirst` | `boolean` | no | Pin the checkbox column and the first column at the start while the table scrolls sideways (default true): pass false when the first column is not the row's key. |
 
 ### Dialog
@@ -581,6 +596,24 @@ Source: `design-system/components/Field`
 | `hideLabel` | `boolean` | no | Keep the label for screen readers only (a control whose purpose is obvious in context). |
 | `id` | `string` | no | The control's id, if the caller needs it (generated otherwise). |
 | `children` | `ReactNode` | yes | Exactly one design-system control. |
+
+### FilterBar
+
+FilterBar: a table's filter bar (search, quick toggle chips, the many-valued filters in force, and a "more filters" panel) that uses a phone's space well. Wide, the search takes the row, under it the quick chips, the active chips and a "+ Filter" popover with the fields. Narrow (the bar's own width under `sm`), `sheet`: the search and one "Filters · N" button share a row, the button opens a side sheet with the quick chips and the fields, and the active chips scroll sideways under the row. Narrow, `scroll`: the search, then one row that scrolls sideways ("+ Filter" first, then the quick and the active chips). The two narrow forms are proposals; the owner picks one (ADR 0011).
+
+Source: `design-system/components/FilterBar`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `search` | `ReactNode` | yes | The caller's `SearchInput`. |
+| `quick` | `ReactNode` | no | Toggle `Chip`s of the quick filters. |
+| `active` | `ReactNode` | no | Removable `Chip`s of the many-valued filters in force (null: none). |
+| `more` | `ReactNode` | no | The fields of the many-valued filters (a `Field` + `Select` stack). |
+| `moreLabel` | `string` | no | Text of the wide "+ Filter" trigger (default "Filter"). |
+| `activeCount` | `number` | no | How many filters are in force: shown on the narrow button as "Filters · 2". |
+| `narrow` | `'sheet' \| 'scroll'` | no | The narrow form: `sheet` (default) or `scroll`. |
+| `label` | `string` | no | Accessible name of the bar (default "Filters"). |
+| `defaultOpen` | `boolean` | no | The narrow filters sheet starts open (a story's open state). |
 
 ### HeatGrid
 

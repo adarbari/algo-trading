@@ -151,3 +151,16 @@ def test_nothing_can_be_screened_before_any_data_is_stored() -> None:
             ondemand.request("big_liquid", SITE)
     finally:
         ondemand.close()
+
+
+def test_a_partial_run_is_run_again_on_request(
+    runner: OnDemandScreens,
+) -> None:
+    """A PARTIAL run read a table with no rows for the session; the data may land later (a
+    rollup backfilled after the screen rejected every row as missing, 2026-10-07), so "Run now"
+    runs it again instead of reporting the stale run as ready."""
+    first = wait(runner, runner.request("big_liquid", SITE, SNAPSHOT))
+    assert first.state == "partial" and first.run_id  # no features that day
+    again = runner.request("big_liquid", SITE, SNAPSHOT)
+    assert again.state != READY and again.job_id
+    assert wait(runner, again).state == "partial"  # ran again: still no features that day

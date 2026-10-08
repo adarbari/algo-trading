@@ -27,6 +27,15 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
   });
 
+  it('wraps a full-width trigger in a shrinking span, so a long name truncates', () => {
+    render(<AccountMenu name="Alexandra Montgomery-Fitzwilliam" />);
+    const button = screen.getByRole('button', { name: 'Alexandra Montgomery-Fitzwilliam' });
+    const wrapper = button.parentElement;
+    expect(wrapper?.tagName).toBe('SPAN');
+    expect(wrapper?.className).toMatch(/trigger/);
+    expect(button).toHaveAttribute('data-full-width', 'true');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<AccountMenu name="Bo" onSignOut={() => undefined} />);
     await expectNoA11yViolations(container);

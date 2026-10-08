@@ -38,6 +38,34 @@ proxies `/api` to the API.
 - The site is up only while the Mac is awake and online (the nightly already needs that);
   moving to a server later changes the host, not the app: the same build and settings.
 - A web change is live only after `make web-build` (the API serves the files as built; a
-  reload picks them up, no restart).
+  reload picks them up). A change to the API's schema or code also needs a restart of the
+  agent: see the amendment below.
 - One more GET in the shrink-only allow-list, kept by this ADR.
 - The token protects the API on the network, not the files on the Mac (ADR 0040).
+
+## Amendment 2026-10-07: build identity
+
+**Incident.** The agent started at 12:05; GD4a (#279) added `FieldGuide.summary` to the schema
+and `make web-build` rebuilt `var/web` at 17:55. The process kept the schema it started with
+while serving the new files from disk, every catalogue query failed ("Cannot query field
+'summary'") and the Builder showed "Choose a feature…" on every row until the agent was
+restarted. The Consequence "no restart" held for web-only changes, not for a web built against
+a new API.
+
+**Decision.** The running API knows which build it is and says when it is out of step
+(`apps/api/algotrade_api/ops/build.py`, responsibility `build-identity`):
+1. `create_app` takes the API's stamp once: the commit of the checkout its code runs from and
+   a 12-character hash of its live GraphQL SDL (the same text as `apps/api/schema.graphql`,
+   so the same hash).
+2. `make web-build` stamps the build: `algotrade-api stamp-web var/web` writes
+   `var/web/build.json` (commit, hash of the committed schema the codegen read, build time).
+3. `GET /health` adds `build`: the API's, the served web's and the checkout's stamps (the last
+   two read on each request), `stale` and `mismatches`, each naming its fix: a web built against
+   another schema (restart the agent when the web is newer, else rebuild), a served web without
+   a stamp (built outside `make web-build`), a checkout whose schema or commit moved since the
+   start (restart). `status` stays `ok`: the API is up; staleness is not downtime.
+4. `make web-build`, `make status` and `make doctor` ask the running API's `/health` and print
+   the mismatches with `launchctl kickstart -k gui/<uid>/com.algotrade.api`. Code never
+   restarts the agent (decision 4): `scripts/ops/deploy.sh` remains the one-command update.
+5. The GET of `/health` from `ops/build.py` is our own API on loopback, not a vendor: it is
+   `allowed` under `vendor-http` in `architecture/ownership.toml` for that reason.

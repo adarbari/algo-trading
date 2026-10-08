@@ -1653,6 +1653,7 @@ type TableView {
   sort: String
   decisions: [String!]!
   names: [String!]!
+  narrowColumns: [String!]!
 }
 
 """A run of a sentence: plain text, or a term linked to `url`"""

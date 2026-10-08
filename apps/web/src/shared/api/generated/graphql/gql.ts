@@ -58,7 +58,7 @@ type Documents = {
     "\n  query Verification {\n    verification {\n      session\n      runIds\n      instruments\n      counts\n      byCheck {\n        check\n        counts\n      }\n      failing\n      unknown {\n        code\n        detail\n      }\n    }\n  }\n": typeof types.VerificationDocument,
     "\n  query Viewer {\n    viewer {\n      id\n      name\n      role\n      workspaces\n    }\n  }\n": typeof types.ViewerDocument,
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": typeof types.GuideHelpFieldDocument,
-    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      sort\n      decisions\n      names\n    }\n  }\n": typeof types.TableViewDocument,
+    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      sort\n      decisions\n      names\n    }\n  }\n": typeof types.TableViewDocument,
 };
 const documents: Documents = {
     "\n  query OptionChain($key: String!, $names: [FeatureName!]!) {\n    instrument(key: $key) {\n      instrumentId\n      symbol\n      features(names: $names) {\n        name\n        value\n        unknown {\n          code\n          detail\n        }\n        info {\n          format\n          unit\n          dtype\n          nullMeaning\n        }\n      }\n      chain {\n        underlyingId\n        session\n        status\n        expiries {\n          date\n          days\n        }\n        strikes\n      }\n    }\n  }\n": types.OptionChainDocument,
@@ -103,7 +103,7 @@ const documents: Documents = {
     "\n  query Verification {\n    verification {\n      session\n      runIds\n      instruments\n      counts\n      byCheck {\n        check\n        counts\n      }\n      failing\n      unknown {\n        code\n        detail\n      }\n    }\n  }\n": types.VerificationDocument,
     "\n  query Viewer {\n    viewer {\n      id\n      name\n      role\n      workspaces\n    }\n  }\n": types.ViewerDocument,
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": types.GuideHelpFieldDocument,
-    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      sort\n      decisions\n      names\n    }\n  }\n": types.TableViewDocument,
+    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      sort\n      decisions\n      names\n    }\n  }\n": types.TableViewDocument,
 };
 
 /**
@@ -277,7 +277,7 @@ export function graphql(source: "\n  query GuideHelpField($name: FeatureName!) {
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      sort\n      decisions\n      names\n    }\n  }\n"): typeof import('./graphql').TableViewDocument;
+export function graphql(source: "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      sort\n      decisions\n      names\n    }\n  }\n"): typeof import('./graphql').TableViewDocument;
 
 
 export function graphql(source: string) {

@@ -28,6 +28,8 @@ export interface ExploreSearch {
   tab?: ExploreTab;
   /** Ticker table columns: catalogue feature names, comma-separated. */
   cols?: string;
+  /** Columns added back on a narrow (phone) table: table column ids, comma-separated. */
+  ncols?: string;
   /** Sort: a column id, `-` prefix for descending. */
   sort?: string;
   q?: string;
@@ -100,6 +102,7 @@ export function parseExploreSearch(raw: Record<string, unknown>): ExploreSearch 
   set('focus', text(raw['focus'])?.toUpperCase());
   set('tab', oneOf(EXPLORE_TABS, raw['tab']));
   set('cols', text(raw['cols']));
+  set('ncols', text(raw['ncols']));
   set('sort', text(raw['sort']));
   set('q', text(raw['q']));
   set('type', text(raw['type']));

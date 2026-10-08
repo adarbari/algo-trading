@@ -15,6 +15,7 @@ function state(patch: Partial<TableViewState> = {}): TableViewState {
     names: ['Earnings'],
     ready: true,
     columns: [],
+    narrowColumns: [],
     sort: null,
     decisions: null,
     change: vi.fn(),

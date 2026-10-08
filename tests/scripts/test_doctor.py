@@ -26,6 +26,7 @@ def probes(tmp_path: Path, tools: dict[str, str], **kw: object) -> "doctor.Probe
         "which": lambda name: f"/bin/{name}" if name in tools.get("have", "") else None,
         "run": run,
         "port_open": lambda host, port: False,
+        "api_build": lambda: None,
     }
     return doctor.Probes(**{**base, **kw})
 
@@ -332,3 +333,12 @@ def test_running_checks_lists_other_runs_with_their_directory(tmp_path: Path) ->
     assert r.level == doctor.INFO and "4242 in /work/algo-trading-x" in r.detail
     none = doctor.check_running_checks(probes(tmp_path, {}, run=lambda cmd, cwd=None: (1, "")))
     assert none.level == doctor.OK
+
+
+def test_an_api_out_of_step_with_its_build_warns_with_the_fix(tmp_path: Path) -> None:
+    # 2026-10-07: an API started before make web-build served a web it could not answer.
+    stale = ("the API runs commit a, the checkout is at b; restart the API: launchctl kickstart",)
+    warn = doctor.check_api_build(probes(tmp_path, {}, api_build=lambda: stale))
+    assert (warn.level, warn.detail) == (doctor.WARN, stale[0])
+    assert doctor.check_api_build(probes(tmp_path, {}, api_build=lambda: ())).level == doctor.OK
+    assert doctor.check_api_build(probes(tmp_path, {})).level == doctor.INFO  # none answering

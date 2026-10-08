@@ -35,7 +35,7 @@ def save_view(
     writer: Writer, user: User, scope: str, body: TableViewBody, name: ViewName = None
 ) -> TableView:
     saved, names = preferences.save_view(
-        writer, user, scope, body.columns, body.sort, body.decisions, name
+        writer, user, scope, body.columns, body.sort, body.decisions, name, body.narrow_columns
     )
     return TableView(
         scope=scope,
@@ -45,6 +45,7 @@ def save_view(
         sort=saved.get("sort"),
         decisions=saved["decisions"],
         names=names,
+        narrow_columns=saved["narrow_columns"],
     )
 
 
