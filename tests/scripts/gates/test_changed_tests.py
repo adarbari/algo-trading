@@ -78,3 +78,12 @@ def test_areas_without_the_base_ref_are_every_code_area(
     assert changed_tests.main(["changed_tests.py", "--areas", "no/such/ref"]) == 0
     out = capsys.readouterr()
     assert out.out.strip() == "python web" and "every area" in out.err
+
+
+def test_a_site_config_change_maps_to_the_tests_that_read_the_site_config() -> None:
+    present = set(changed_tests.SITE_CONFIG_TESTS).__contains__
+    found = changed_tests.covering_tests(
+        ["config/site/presets/screeners/momentum_12_1/v1.toml"], present
+    )
+    assert found == sorted(changed_tests.SITE_CONFIG_TESTS)
+    assert changed_tests.covering_tests(["config/users/u1/x.toml"], present) == []

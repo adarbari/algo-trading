@@ -33,6 +33,10 @@ MIRRORS = (
 # The Python fitness tests that read apps/web (and architecture/web_*.toml); a few seconds.
 WEB_FITNESS = "tests/architecture/test_layout_web.py"
 
+# Tests that read config/site/ as shipped (the API graph, the read model, the config fitness
+# tests): a site config change has no mirrored test, so these cover it.
+SITE_CONFIG_TESTS = ("tests/architecture", "tests/apps/api/graphql", "tests/unit/services/read")
+
 
 def _git(*args: str) -> list[str]:
     out = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True)
@@ -57,6 +61,8 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
     for name in files:
         if name.startswith("architecture/"):
             paths.add("tests/architecture")
+        if name.startswith("config/site/"):
+            paths.update(p for p in SITE_CONFIG_TESTS if present(p))
         if name.startswith("apps/web/") or name.startswith("architecture/web_"):
             paths.add(WEB_FITNESS)
         if not name.endswith(".py"):
