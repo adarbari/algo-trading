@@ -107,7 +107,7 @@ def _tables_with_features() -> list[str]:
     return [g.table for g in GROUPS.values()]
 
 
-def test_a_catch_up_skip_is_a_step_not_a_source() -> None:
+def test_a_catch_up_skip_explains_nothing() -> None:
     steps = {
         "ibkr-iv": {
             "status": "SKIPPED",
@@ -116,7 +116,7 @@ def test_a_catch_up_skip_is_a_step_not_a_source() -> None:
         }
     }
     chain = explain(_stores(steps), table_cause(IBKR_IV, "no partition", session=DAY))
-    assert [link.level for link in chain.links] == [CauseLevel.STEP, CauseLevel.TABLE]
+    assert [link.level for link in chain.links] == [CauseLevel.TABLE]
 
 
 def test_every_table_link_of_the_leaf_is_tried() -> None:
@@ -136,8 +136,19 @@ def test_failed_tables_close_over_the_groups_that_read_them() -> None:
     so a gap in it is SYSTEM; with the step SUCCEEDED nothing is failed."""
     group = next(g for g in GROUPS.values() if g.inputs and g.inputs[0].table != g.table)
     source = group.inputs[0].table
-    skipped = {"feed": {"status": "SKIPPED", "tables": [source]}}
+    skipped = {"feed": {"status": "SKIPPED", "reason": "skipped: down", "tables": [source]}}
     done = {"feed": {"status": "SUCCEEDED", "tables": [source]}}
     assert group.table in failed_tables(_stores(skipped).reader, DAY)
     assert failed_tables(_stores(done).reader, DAY) == frozenset()
     assert source in failed_tables(_stores(None).reader, DAY, [source])  # no partition
+
+
+def test_a_catch_up_skip_delivers_nothing_wrong_so_a_gap_behind_it_is_not_system() -> None:
+    group = next(g for g in GROUPS.values() if g.inputs and g.inputs[0].table != g.table)
+    source = group.inputs[0].table
+    catch_up = {
+        "feed": {"status": "SKIPPED", "reason": "latest closed session only", "tables": [source]}
+    }
+    assert failed_tables(_stores(catch_up).reader, DAY) == frozenset()
+    waived = {"feed": {"status": "WAIVED", "tables": [source]}}
+    assert source in failed_tables(_stores(waived).reader, DAY)

@@ -90,18 +90,6 @@ name = "Backtest.metrics"
 reason = "the caller's own saved backtest metrics"
 
 [[fact]]
-name = "BacktestDetail.selection"
-reason = "the caller's own backtest document"
-
-[[fact]]
-name = "BacktestDetail.data"
-reason = "the caller's own backtest results"
-
-[[fact]]
-name = "BacktestDetail.rebalances"
-reason = "the caller's own backtest results"
-
-[[fact]]
 name = "ScreenDetail.draft"
 reason = "the caller's own screen document"
 

@@ -22,7 +22,7 @@ from enum import StrEnum
 from algotrade.config.site.settings import load_rollup
 from algotrade.config.strategy.regime import site_regime
 from algotrade.features.rollups.market import regime as scores
-from algotrade.services.read.availability.cause import feature_cause
+from algotrade.services.read.availability.cause import UnavailableKind, feature_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime.fields import (
     FRAGILITY,
@@ -151,7 +151,8 @@ def _label(reading: Reading) -> tuple[RegimeLabel, Unknown | None]:
     found = next((label for label in KNOWN if label.value == reading.value), None)
     if found is None:
         detail = f"{LABEL} holds {reading.value!r}, not one of {[k.value for k in KNOWN]}"
-        return RegimeLabel.UNKNOWN, Unknown(UnknownCode.NULL, feature_cause(LABEL, detail, "NULL"))
+        cause = feature_cause(LABEL, detail, "NULL")  # a label we do not know is a system fault
+        return RegimeLabel.UNKNOWN, Unknown(UnknownCode.NULL, cause, None, UnavailableKind.SYSTEM)
     return found, None
 
 

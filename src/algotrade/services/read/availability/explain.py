@@ -26,10 +26,19 @@ from algotrade.services.read.ops.runs import NIGHTLY
 __all__ = ["explain", "failed_tables"]
 
 MAX_DEPTH = 3  # tables upstream of the leaf (a rollup over a rollup over a rollup)
-PROBLEM = frozenset({"FAILED", "NOT_RUN", "SKIPPED", "WAITING"})  # a step that did not deliver
+NOT_DELIVERED = frozenset({"FAILED", "NOT_RUN", "WAITING", "WAIVED"})
 SKIPPED_PREFIX = "skipped: "
 
 type Steps = Mapping[str, Mapping[str, Any]]
+
+
+def not_delivered(step: Mapping[str, Any]) -> bool:
+    """Whether a recorded step did not deliver its tables: FAILED, NOT_RUN, WAITING, WAIVED, or
+    SKIPPED because a source was down (``skipped: ...``); a latest-only catch-up skip is not."""
+    status = step.get("status")
+    if status == "SKIPPED":
+        return str(step.get("reason", "")).startswith(SKIPPED_PREFIX)
+    return status in NOT_DELIVERED
 
 
 def _nightly(
@@ -67,7 +76,7 @@ def failed_tables(
     bad = {
         str(t)
         for step in steps.values()
-        if step.get("status") != "SUCCEEDED"
+        if not_delivered(step)
         for t in step.get("tables", [])
         if isinstance(step.get("tables"), list)
     }
@@ -116,7 +125,7 @@ def _upstream(
 ) -> list[CauseLink]:
     """The links upstream of ``table`` (root first); empty: nothing recorded explains it."""
     name = _writer(table, steps)
-    if name is not None and steps[name].get("status") in PROBLEM:
+    if name is not None and not_delivered(steps[name]):
         return _step_links(name, steps[name], run_id, session)
     if depth <= 1:
         return []

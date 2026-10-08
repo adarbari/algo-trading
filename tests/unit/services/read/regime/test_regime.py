@@ -10,6 +10,7 @@ from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.strategy.regime import DEFAULT_MULTIPLIERS
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.features import catalogue
+from algotrade.services.read.availability.cause import UnavailableKind
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.regime.fields import (
     FRAGILITY,
@@ -127,6 +128,7 @@ def test_a_label_outside_the_four_is_unknown_not_guessed() -> None:
         found.unknown_reason.code is UnknownCode.NULL
         and "'SUNNY'" in found.unknown_reason.cause.text
     )
+    assert found.unknown_reason.kind is UnavailableKind.SYSTEM  # a label we do not know: a fault
 
 
 def test_a_null_label_is_unknown_with_the_stored_null() -> None:
