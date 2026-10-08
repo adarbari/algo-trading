@@ -52,4 +52,6 @@ export const size = {
   popover: 280,
   /** A search box in the top bar (mockups: 220). */
   search: 220,
+  /** A phone's width (the narrowest iPhone): the frame of the `Narrow` stories. */
+  phone: 375,
 } as const;

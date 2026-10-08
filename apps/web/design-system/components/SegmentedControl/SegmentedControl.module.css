@@ -62,3 +62,9 @@
   font-size: var(--font-size-xs);
   line-height: var(--line-height-xs);
 }
+
+@media (pointer: coarse) {
+  .option {
+    min-height: var(--density-control-height);
+  }
+}

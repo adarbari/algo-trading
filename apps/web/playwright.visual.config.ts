@@ -11,6 +11,7 @@ export default defineConfig({
   snapshotPathTemplate: '{arg}{ext}',
   updateSnapshots: process.env['CI'] ? 'none' : 'missing',
   forbidOnly: Boolean(process.env['CI']),
+  retries: process.env['CI'] ? 1 : 0, // a story that redraws after its play function; the rule in docs/ci.md
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0, animations: 'disabled', caret: 'hide' } },
   use: { baseURL: 'http://127.0.0.1:6007', viewport: { width: 640, height: 360 } },

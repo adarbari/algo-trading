@@ -20,6 +20,7 @@ export const elements = [
   { type: 'ds-theme', pattern: 'design-system/theme' },
   { type: 'ds-testing', pattern: 'design-system/testing' },
   { type: 'ds-format', pattern: 'design-system/format' },
+  { type: 'ds-responsive', pattern: 'design-system/responsive' },
   { type: 'ds-foundations', pattern: 'design-system/foundations' },
   { type: 'ds-primitive', pattern: 'design-system/primitives/*', capture: ['name'] },
   { type: 'ds-component', pattern: 'design-system/components/*', capture: ['name'] },
@@ -102,7 +103,9 @@ const policies = [
       to: [
         { element: { type, captured: { name: '{{from.element.captured.name}}' } } },
         index('ds-primitive'),
-        ...(type === 'ds-component' ? [index('ds-component'), index('ds-format')] : []),
+        ...(type === 'ds-component'
+          ? [index('ds-component'), index('ds-format'), index('ds-responsive')]
+          : []),
         index('ds-tokens'),
         index('ds-testing'),
       ],
@@ -115,6 +118,11 @@ const policies = [
   },
   { from: { element: { type: 'ds-tokens' } }, allow: { to: { element: { type: 'ds-tokens' } } } },
   { from: { element: { type: 'ds-testing' } }, allow: { to: { element: { type: 'ds-testing' } } } },
+  // Container-width hooks: measure against the breakpoint tokens; used by components only.
+  {
+    from: { element: { type: 'ds-responsive' } },
+    allow: { to: [{ element: { type: 'ds-responsive' } }, index('ds-tokens')] },
+  },
   // Value formatters: pure functions, used by the data components and exported by the entry.
   { from: { element: { type: 'ds-format' } }, allow: { to: { element: { type: 'ds-format' } } } },
   // Storybook foundation pages (the tokens page) document tokens using primitives.

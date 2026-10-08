@@ -36,6 +36,17 @@ export const density = {
   },
 } as const satisfies Record<string, Density>;
 
+/**
+ * Floors for coarse pointers (a finger): Apple's 44 pt hit target minus the row gap. A token,
+ * not a density: `@media (pointer: coarse)` in `tokens.css` applies it to every density, and
+ * the small control variants take `--density-control-height` as a minimum height.
+ */
+export const touch = {
+  controlHeight: 36,
+  rowHeight: 40,
+  cellPaddingY: 9,
+} as const;
+
 export type DensityName = keyof typeof density;
 
 export const defaultDensity: DensityName = 'compact';

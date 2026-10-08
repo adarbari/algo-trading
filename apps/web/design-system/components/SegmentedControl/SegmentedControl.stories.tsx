@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
 import { SegmentedControl } from './SegmentedControl';
+import { narrow } from '../../testing';
 
 const RANGE = [
   { value: '3M', label: '3M' },
@@ -95,3 +96,6 @@ export const Dense: Story = {
     </Stack>
   ),
 };
+
+/** A 375 px phone frame; under a coarse pointer the control floors apply. */
+export const Narrow: Story = { ...Dense, decorators: [narrow] };

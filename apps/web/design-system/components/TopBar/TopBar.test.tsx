@@ -43,6 +43,11 @@ describe('TopBar', () => {
     expect(screen.getByRole('banner')).toHaveTextContent('algotrade');
   });
 
+  it('wraps the nav in its own slot so a narrow bar can give it a row', () => {
+    render(<TopBar brand="b" nav={<span>nav</span>} />);
+    expect(screen.getByText('nav').parentElement).toHaveClass(/nav/);
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <TopBar
