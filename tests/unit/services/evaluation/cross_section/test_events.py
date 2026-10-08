@@ -68,17 +68,24 @@ def test_an_event_known_only_after_the_decision_session_is_absent() -> None:
     assert EVENT_FIELDS["earnings_expected"].announced_ahead
 
 
-def test_an_event_is_counted_once_per_name_and_quarter() -> None:
+def test_an_event_is_counted_once_per_name_within_forty_sessions() -> None:
     w = build_world()
-    first, again, next_quarter = date(2026, 9, 2), date(2026, 9, 3), date(2026, 10, 1)
-    for day, ended in ((first, first), (again, first), (next_quarter, next_quarter)):
-        w.write_reactions(day, {IDS[0]: 0}, ended=ended)  # N00 matches on three sessions
-    found = read_events(
-        w.reader, "earnings_reaction", 1, [first, again, next_quarter], lambda _: ALL
-    )
-    # The second match is the same report (same quarter) and drops; the Q4 one is a new event.
-    assert found.names == {first: frozenset({IDS[0]}), next_quarter: frozenset({IDS[0]})}
+    first, again, far = date(2026, 9, 2), date(2026, 9, 3), date(2026, 12, 1)
+    for day in (first, again, far):
+        w.write_reactions(day, {IDS[0]: 0})  # N00 matches on three sessions
+    found = read_events(w.reader, "earnings_reaction", 1, [first, again, far], lambda _: ALL)
+    # The second match is the same report and drops; the one 60 sessions on is a new event.
+    assert found.names == {first: frozenset({IDS[0]}), far: frozenset({IDS[0]})}
     assert found.unknown_total() == {NO_EVENT_ROW: 3 * 19}
+
+
+def test_a_report_date_that_moves_across_a_quarter_end_is_one_event() -> None:
+    w = build_world()
+    prior_year, scheduled = date(2026, 9, 29), date(2026, 10, 2)  # Q3 and Q4, three sessions apart
+    for day in (prior_year, scheduled):
+        w.write_reactions(day, {IDS[0]: 0}, ended=day)
+    found = read_events(w.reader, "earnings_reaction", 1, [prior_year, scheduled], lambda _: ALL)
+    assert found.names == {prior_year: frozenset({IDS[0]})}
 
 
 def test_only_the_eligible_names_are_events() -> None:

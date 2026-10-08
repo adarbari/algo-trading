@@ -44,7 +44,7 @@ class SessionStat:
     ranked: int = 0  # eligible names with a rank and a counted outcome
     unscored: int = 0  # eligible names with no score, in sessions whose deciles were ranked
     excluded_score_coverage: int = 0  # 1: too few names scored; picks counted, no deciles
-    excluded_unclosed: int = 0
+    excluded_unclosed: int = 0  # not set by the harness any more: no row at S is ``no_entry_bar``
     excluded_missing: int = 0
     excluded_coverage: int = (
         0  # 1: the screen's coverage was not COMPLETE; the session is not measured

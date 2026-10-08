@@ -153,6 +153,9 @@ def merge_rows(table: str, data: pa.Table) -> pa.Table:
     if spec is None or data.num_rows == 0:
         return data
     key = table_key(spec, data.column_names)
+    for name in key:  # runs written before a key column was declared: null, not a KeyError
+        if name not in data.column_names:
+            data = data.append_column(name, pa.nulls(data.num_rows))
     numbered = data.select(key).append_column(_ROW, pa.array(np.arange(data.num_rows)))
     last = numbered.group_by(key, use_threads=False).aggregate([(_ROW, "max")])
     rows = last.column(f"{_ROW}_max").combine_chunks()

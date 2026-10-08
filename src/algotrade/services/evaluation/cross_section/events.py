@@ -9,8 +9,9 @@ session S = anchor + offset and D = S - 1, a name has the event at D when its co
 ``earnings_expected@v1.sessions_to_expected_report == 1 - offset``. A name with no value in the
 count field is UNKNOWN (counted with its reason, never read as "no event"); a reaction whose
 date is after D is not known at D and is excluded the same way. An event is counted once per
-(name, quarter of its date): a PRIOR_YEAR expectation that turns SCHEDULED, or a report date
-that moves, can match on two decision sessions, and only the earlier one counts.
+name within ``DEDUPE_SESSIONS`` sessions: a PRIOR_YEAR expectation that turns SCHEDULED, or a
+report date that moves, can match on two decision sessions (even across a quarter end), and
+only the earlier one counts.
 """
 
 from collections import Counter
@@ -19,9 +20,11 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.time.calendar import sessions_to
 from algotrade.data import StoreReader
 from algotrade.services.selection import fields_view
 
+DEDUPE_SESSIONS = 40  # one report per name in this many sessions
 NO_EVENT_ROW = "no_event_row"  # eligible at D, but the event field has no value for the name
 NOT_KNOWN_AT_D = "event_not_known_at_decision"  # the field's event date is after D
 
@@ -96,14 +99,14 @@ def read_events(
     target = spec.target(offset)
     names: dict[date, frozenset[str]] = {}
     unknown: dict[date, Mapping[str, int]] = {}
-    seen: set[tuple[str, int, int]] = set()
+    last: dict[str, date] = {}  # name -> the decision session its latest event counted at
     for day in decisions:
         view, _ = fields_view(reader, (spec.count, spec.date), day)
         reads = {i: _read(view.get(i, spec.count), view.get(i, spec.date)) for i in view}
         if not any(count == target for count, _ in reads.values()):
             continue
         reasons: Counter[str] = Counter()
-        known: dict[str, date] = {}
+        known: set[str] = set()
         for i in sorted(eligible_of(day)):
             count, when = reads.get(i, (None, None))
             if count is None:
@@ -112,9 +115,9 @@ def read_events(
                 if not spec.announced_ahead and (when is None or when > day):
                     reasons[NOT_KNOWN_AT_D] += 1
                 else:
-                    known[i] = when or day
-        fresh = {i for i, when in known.items() if (i, *_quarter(when)) not in seen}
-        seen.update((i, *_quarter(known[i])) for i in fresh)
+                    known.add(i)
+        fresh = {i for i in known if i not in last or sessions_to(last[i], day) >= DEDUPE_SESSIONS}
+        last.update(dict.fromkeys(fresh, day))
         if reasons:
             unknown[day] = dict(reasons)
         if fresh:
@@ -126,7 +129,3 @@ def _read(count: object, when: object) -> tuple[int | None, date | None]:
     """The count field as an int and the date field as a date (None when not stored)."""
     number = int(count) if isinstance(count, (int, float)) and not isinstance(count, bool) else None
     return number, date.fromisoformat(when[:10]) if isinstance(when, str) else None
-
-
-def _quarter(day: date) -> tuple[int, int]:
-    return day.year, (day.month - 1) // 3 + 1

@@ -77,7 +77,7 @@ def test_an_unclosed_or_null_window_is_excluded_never_a_miss() -> None:
         return out
 
     first = run(build_world(rows_of=rows)).results[0].stats[0]
-    assert (first.excluded_unclosed, first.excluded_missing) == (1, 1)
+    assert (first.no_entry_bar, first.excluded_missing) == (1, 1)
     assert first.pick_hits == len(first.pick_values) == 3  # the other three picks, all hits
     assert first.eligible == 18  # neither name is in the base rate
 
@@ -324,7 +324,7 @@ def test_a_name_eligible_at_the_decision_with_no_row_at_the_entry_has_no_entry_b
         return [outcome_row(iid, i, day) for i, iid in enumerate(IDS) if i != 19]
 
     stat = run(build_world(rows_of=rows)).results[0].stats[0]
-    assert stat.no_entry_bar == 1 and stat.excluded_unclosed == 1  # N19: a pick, no bar
+    assert stat.no_entry_bar == 1 and stat.excluded_unclosed == 0  # N19: counted here only
     assert stat.eligible == 19  # neither a hit nor a miss, and not in the base rate
     assert run(build_world()).results[0].stats[0].no_entry_bar == 0
 
@@ -505,3 +505,42 @@ def test_changing_a_variants_override_changes_its_trial_key_and_adds_a_trial() -
     hashes = {r.edge_variant: r.config_hash for r in edited.results}
     assert hashes["costly"] != hashes["main"] != ""
     assert hashes["costly"] != {r.edge_variant: r.config_hash for r in first.results}["costly"]
+
+
+def test_changing_the_edges_offset_or_horizon_adds_a_trial() -> None:
+    w = build_world()
+    write_edge_eval(w.results, run(w), AS_OF)
+    assert run(w).trials == 1
+    longer = {"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+              "start_offset_sessions": 2}  # fmt: skip
+    assert run(w, edge(outcome=longer)).trials == 2  # the same screener, another entry session
+
+
+def test_an_event_edge_never_reads_the_decision_sessions_own_outcome_partition() -> None:
+    events = {DAYS[1]: [10, 11], DAYS[5]: [0, 1]}  # entries DAYS[2] and DAYS[6]
+    clean = run(event_world(events), event_edge(2))
+    poisoned = _poisoned({DAYS[1], DAYS[5]})
+    for day, names in events.items():
+        poisoned.write_reactions(day, {IDS[i]: 0 for i in names})
+    assert run(poisoned, event_edge(2)).results == clean.results
+    assert len(clean.results[0].stats) == 2
+
+
+def test_a_reaction_row_stored_only_from_the_next_session_is_not_an_event_before_it() -> None:
+    w = build_world()
+    w.write_reactions(DAYS[2], {IDS[10]: 0})  # truncated at D = DAYS[1]: no row there yet
+    (r,) = run(w, event_edge(2)).results
+    assert [s.session for s in r.stats] == [DAYS[2]]  # D is the first session that has the row
+
+
+def test_a_variant_may_override_the_offset_and_reads_its_own_entry_partition() -> None:
+    late = {"id": "late", "outcome": {"start_offset_sessions": 2}}
+    e = edge(variants=[late])
+    clean = run(build_world(), e)
+    # Poison the partitions two sessions after each decision (the variant's S, not the edge's).
+    poisoned = run(_poisoned({DAYS[2], DAYS[4], DAYS[6]}), e)
+    main_clean, late_clean = clean.results
+    main_bad, late_bad = poisoned.results
+    assert main_bad.stats == main_clean.stats  # the edge's own entries are untouched
+    assert late_bad.stats != late_clean.stats and late_bad.stats[0].pick_values[0] == -9.0
+    assert [s.session for s in late_clean.stats] == [DAYS[0], DAYS[2], DAYS[4]]  # DAYS[6]: no S

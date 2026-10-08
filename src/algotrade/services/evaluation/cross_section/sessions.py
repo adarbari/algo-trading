@@ -52,16 +52,16 @@ def entry_session(decision: date, offset: int) -> date:
 def event_blocks(
     event_days: Sequence[date], sessions: Sequence[date], horizon: int
 ) -> list[list[date]]:
-    """``event_days`` (ascending decision sessions with events) pooled into blocks: a block
-    starts at its first day and takes every event day fewer than ``horizon`` sessions after it,
-    so a block's windows are not counted as independent sessions of their own (one statistic
-    per block)."""
+    """``event_days`` (ascending decision sessions with events) pooled into blocks: a day joins
+    the current block when it is fewer than ``horizon`` sessions after the block's last day, so
+    no window of one block overlaps the first window of the next and a block is one statistic,
+    never several independent sessions."""
     if horizon < 1:
         raise ConfigurationError(f"horizon must be >= 1 session, got {horizon}")
     position = {day: i for i, day in enumerate(sessions)}
     blocks: list[list[date]] = []
     for day in sorted(event_days):
-        if blocks and position[day] - position[blocks[-1][0]] < horizon:
+        if blocks and position[day] - position[blocks[-1][-1]] < horizon:
             blocks[-1].append(day)
         else:
             blocks.append([day])

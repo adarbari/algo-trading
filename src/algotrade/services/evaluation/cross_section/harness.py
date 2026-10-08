@@ -280,7 +280,6 @@ def _stat(
         ranked=len(ranked),
         unscored=0 if thin else len(ids) - len(scored),
         excluded_score_coverage=int(thin),
-        excluded_unclosed=sum(1 for i in picks if i not in have),
         excluded_missing=sum(1 for i in picks if i in have and i not in counted.index),
         delisted=int(counted.loc[got, "delisted"].sum()),
         pre_snapshot=run.pre_snapshot,
@@ -480,10 +479,9 @@ def _block_stats(
 
 
 def _trial_hash(scope: _Scope, variant: Variant) -> str:
-    """The screener's config hash; for an edge variant it also covers the variant's id and
-    resolved outcome and universe, so an edited override is another trial."""
-    if scope.key == MAIN:
-        return variant.config.hash
+    """The trial's identity: the screener's config hash, the edge variant's id and the resolved
+    outcome and universe (the edge's own for ``main``), so an edited override, offset or
+    horizon is another trial."""
     payload = [variant.config.hash, scope.key, asdict(scope.edge.outcome), scope.edge.universe]
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
