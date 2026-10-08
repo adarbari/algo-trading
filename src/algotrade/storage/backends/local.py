@@ -296,8 +296,9 @@ def _read_file(
 ) -> pa.Table:
     """One version file (``columns``: only those and ``keep_columns``), its rows of
     ``instruments`` in file order. ``ParquetFile`` + an Arrow filter, not ``read_table``: a
-    third of the cost on a small file (no dataset discovery), the same columns and types. An
-    empty ``instruments`` raises ``ArrowTypeError`` (a null-typed set), as ``read_table`` did."""
+    third of the cost on a small file (no dataset discovery), the same columns and types. The
+    value set takes the id column's type: an empty ``instruments`` selects no rows (as the
+    memory backend does) instead of raising on a null-typed set."""
     with pq.ParquetFile(path) as parquet:
         keep = None if columns is None else keep_columns(columns)
         present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
@@ -305,7 +306,7 @@ def _read_file(
     if instruments is None:
         return data
     ids = data.column("instrument_id")
-    return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments))))
+    return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
 
 
 class LocalRaw:
