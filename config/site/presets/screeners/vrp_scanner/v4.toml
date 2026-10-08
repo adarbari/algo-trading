@@ -1,0 +1,161 @@
+# VRP scanner v4: v3 with IV rank read through the catalogue's `feature.iv_rank` (IBKR's
+# rank where it has one, else ours from Cboe chains; config/site/features/volatility.toml)
+# instead of IBKR's only, and an `iv_rank_source` column saying which (owner 2026-10-08).
+# Everything else is v3 (ADR 0030): the base gates as criteria over the whole snapshot, a
+# missing HARD value a REJECT, `dist_52w <= 10%`, no tiers, classify or labels. An
+# identification layer, not a trade signal (docs/screeners/vrp-scanner.md).
+# Immutable: change it by adding v5.toml (architecture/preset_versions.toml). v1-v3 stay as is.
+# Not scheduled: run it on request (preview, a `screen` job) or schedule a user copy.
+id = "vrp_scanner"
+kind = "screener"
+impl = "rules"
+version = 4
+name = "VRP"
+
+# ------------------------------------------------ who is screened (HARD; the snapshot's names)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.optionable]
+field = "instrument.optionable"
+op = "eq"
+value = true
+
+# ---------------------------------------------------------------- core gates (HARD; funnel order)
+[criteria.iv30]
+field = "feature.vrp_iv30"        # lower of IBKR and Cboe IV30; missing -> REJECT (no IV30)
+op = "gte"
+value = 0.50                      # the owner may lower it to 0.40
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.iv_hv_spread]
+field = "feature.vrp_iv_hv_spread"
+op = "gte"
+value = 0.10
+
+[criteria.iv_hv_ratio]
+field = "feature.vrp_iv_hv_ratio"  # plain IV30 / HV30, no HV30 floor
+op = "gte"
+value = 1.25
+
+[criteria.near_52w]
+field = "feature.dist_52w"        # the nearer of the distances to the 52W high and low
+op = "lte"
+value = 0.10
+
+# ----------------------------------------------- liquidity (SOFT: flag a near miss, don't reject)
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------- score only (a miss lowers the score)
+# The best put (put_wing@v1). Nothing here filters: a missing value (no chain, no put in
+# 0.05..0.35 delta) only costs the criterion's points.
+[criteria.delta_closeness]
+field = "rollup.put_wing@v1.delta_band_distance"   # 0 inside 8-15 delta
+op = "lte"
+value = 0
+mode = "score"
+tolerance = 0.20                  # linear: full points at 0, none at 0.20 (20 delta: 0.05 off)
+
+[criteria.put_open_interest]
+field = "rollup.put_wing@v1.best_put_oi"
+op = "gt"
+value = 1_000
+mode = "score"
+tolerance = { relative = 1.0 }    # linear from 0 to 1,000 contracts
+
+[criteria.put_trading_volume]
+field = "rollup.put_wing@v1.best_put_volume"
+op = "gt"
+value = 1_000
+mode = "score"
+tolerance = { relative = 1.0 }
+
+[criteria.put_bid_ask]
+field = "rollup.put_wing@v1.best_put_spread_pct"   # the stored quote: confirm it live
+op = "lt"
+value = 0.15
+mode = "score"
+tolerance = 0.15                  # linear from 15% to 30% of mid
+
+[criteria.iv_rank]
+field = "feature.iv_rank"        # IBKR's, else ours; missing (neither) -> no points
+op = "gte"
+value = 0.5
+mode = "score"
+tolerance = 0.5
+
+[criteria.execution]
+field = "feature.option_tier"
+op = "in"
+value = ["A", "B"]
+mode = "score"
+
+[flags.large_move]
+any = [{ field = "rollup.price_moves@v1.one_day_move", op = "gt", value = 0.10 }]  # HV30 unstable
+
+[flags.leveraged_inverse]
+any = [
+  { field = "instrument.is_leveraged", op = "eq", value = true },
+  { field = "instrument.is_inverse", op = "eq", value = true },
+]
+
+[columns]
+close = "rollup.price_stats@v2.close"
+iv30 = "feature.vrp_iv30"
+iv30_source = "feature.vrp_iv30_source"
+hv20 = "rollup.price_stats@v2.hv20"
+hv30 = "rollup.price_stats@v2.hv30"
+iv_hv_spread = "feature.vrp_iv_hv_spread"
+iv_hv_ratio = "feature.vrp_iv_hv_ratio"
+iv_rank = "feature.iv_rank"
+iv_rank_source = "feature.iv_rank_source"
+high_52w = "rollup.price_stats@v2.high_52w"
+pct_from_high_52w = "feature.pct_from_high_52w"
+low_52w = "rollup.price_stats@v2.low_52w"
+pct_from_low_52w = "feature.pct_from_low_52w"
+dist_52w = "feature.dist_52w"
+near_52w = "feature.near_52w"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+ret_60d = "rollup.price_stats@v2.ret_60d"
+vs_sma_20 = "feature.pct_vs_sma_20"
+vs_sma_50 = "feature.pct_vs_sma_50"
+vs_sma_200 = "feature.pct_vs_sma_200"
+next_earnings = "rollup.earnings@v1.next_earnings_date"
+days_to_earnings = "rollup.earnings@v1.days_to_earnings"
+adv_usd = "rollup.price_stats@v2.adv_usd_20d"
+option_volume = "feature.option_chain_volume"
+one_day_move = "rollup.price_moves@v1.one_day_move"
+put_strike = "rollup.put_wing@v1.best_put_strike"     # with put_expiry: the contract to quote live
+put_expiry = "rollup.put_wing@v1.target_expiry"
+put_dte = "rollup.put_wing@v1.target_dte"
+put_delta = "rollup.put_wing@v1.best_put_delta"
+put_premium = "rollup.put_wing@v1.best_put_mid"
+put_roc = "rollup.put_wing@v1.best_put_roc"
+put_oi = "rollup.put_wing@v1.best_put_oi"
+put_volume = "rollup.put_wing@v1.best_put_volume"
+put_spread_pct = "rollup.put_wing@v1.best_put_spread_pct"
+put_delta_band_distance = "rollup.put_wing@v1.delta_band_distance"
+put_status = "rollup.put_wing@v1.wing_status"
+wing_strikes = "rollup.put_wing@v1.n_strikes"
+wing_oi = "rollup.put_wing@v1.wing_oi"
+wing_volume = "rollup.put_wing@v1.wing_volume"
+
+[rank]
+tie_break = "feature.vrp_iv_hv_spread"
