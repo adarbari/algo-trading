@@ -27,6 +27,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Top K:** all qualified names
 - **Screeners:** none yet
 - **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
 - **Notes:** Window: from five sessions before the scheduled report to one after (six sessions, start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must read SCHEDULED (earnings_schedule@v1) at the window's start, never be taken from the report.
 
 **Quality bar**
@@ -57,7 +58,8 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Top K:** 50
 - **Screeners:** `momentum_12_1`
 - **Baselines:** none yet
-- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period (frozen_from) is the owner's decision (proposal: 2026-04-01, the last two quarters); until it is set, no frozen slice is reported.
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
 
 **Quality bar**
 
@@ -87,6 +89,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Top K:** all qualified names
 - **Screeners:** none yet
 - **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
 - **Notes:** Surprise = the reaction-session excess return over SPY (Brandt et al. 2008), from events/earnings read by known_from. The $2B cap is the owner's open decision (ADR 0053); the harness reports by cap bucket either way.
 
 **Quality bar**
@@ -118,6 +121,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Top K:** 20
 - **Screeners:** `short_premium_liquidity`, `vrp_scanner`
 - **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
 - **Notes:** Hit: realised volatility over the window divided by the IV30 at S (measure realised_to_implied_vol) is below target 1.0. IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of the premium it collected in the window. ED4a fixes the proxy (ADR 0053 open decisions).
 
 **Quality bar**

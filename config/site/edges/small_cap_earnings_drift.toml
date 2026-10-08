@@ -12,6 +12,7 @@ schedule = "on_event:earnings"
 top_k = "all"
 screeners = []
 status = "candidate"
+frozen_from = 2026-04-01
 notes = """Surprise = the reaction-session excess return over SPY (Brandt et al. 2008), from
 events/earnings read by known_from. The $2B cap is the owner's open decision (ADR 0053); the
 harness reports by cap bucket either way."""

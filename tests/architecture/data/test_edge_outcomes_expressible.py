@@ -85,3 +85,13 @@ def test_only_the_harness_reads_outcomes_within_services_evaluation() -> None:
         if rel != HARNESS and any(n == PROTECTED or n.startswith(f"{PROTECTED}.") for n in names):
             offenders.append(rel)
     assert not offenders, f"only {HARNESS} may read outcomes: {offenders}"
+
+
+# Owner decision 2026-10-08 (ADR 0053 amendment): fixed, never rolling.
+FROZEN_FROM = date(2026, 4, 1)
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_every_open_edge_names_the_decided_frozen_period(edge: Edge) -> None:
+    """An open edge is judged in the one frozen period; moving it needs an ADR amendment."""
+    assert edge.frozen_from == FROZEN_FROM, f"{edge.id}: frozen_from must be {FROZEN_FROM}"
