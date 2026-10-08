@@ -87,7 +87,7 @@ def test_pre_event_adv_excludes_the_event_volume() -> None:
 def test_open_window_report_does_not_count_yet() -> None:
     e = date(2026, 10, 2)  # reports today: E+1 is after the session
     got = _row(_compute([(A, e, e)], _bars()))
-    assert got["reaction_status"] == "INCOMPLETE"
+    assert got["reaction_status"] == "NO_REPORT"  # a window not closed is no report yet
     assert pd.isna(got["reaction_excess_return"]) and pd.isna(got["sessions_since_reaction"])
 
 
@@ -141,7 +141,7 @@ def test_truncation_invariance() -> None:
     later = [*reports, (A, date(2026, 10, 7), date(2026, 10, 5))]  # known after S
     kept = full[full["session_date"] <= SESSION]
     expected = _compute(reports, kept)
-    got = _compute(later, kept)
+    got = _compute(later, full)
     pd.testing.assert_frame_equal(expected, got)
     # the reaction of the later report is not read: window not closed by S, not known by S
     assert _row(got)["reaction_end_date"] == date(2026, 7, 23)
@@ -151,3 +151,16 @@ def test_deterministic() -> None:
     reports = [(A, q, q) for q in QUARTERS]
     bars = _bars(close={date(2026, 7, 23): 105.0})
     pd.testing.assert_frame_equal(_compute(reports, bars), _compute(reports, bars))
+
+
+def test_a_missing_pre_event_bar_keeps_the_event_ok_with_a_null_adv() -> None:
+    e = date(2026, 9, 16)
+    got = _row(_compute([(A, e, e)], _bars(missing={(A, date(2026, 9, 1))})))
+    assert got["reaction_status"] == "OK"
+    assert not pd.isna(got["reaction_excess_return"]) and pd.isna(got["pre_event_adv_usd_20d"])
+
+
+def test_a_moved_date_listed_twice_is_one_report() -> None:
+    first, moved = date(2026, 7, 22), date(2026, 8, 5)  # one quarter, two dates
+    got = _row(_compute([(A, first, first), (A, moved, moved)], _bars()))
+    assert got["reaction_end_date"] == date(2026, 7, 23)  # the earliest, not the 08-06 one

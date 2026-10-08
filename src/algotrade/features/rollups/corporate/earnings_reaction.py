@@ -36,7 +36,7 @@ counted reports. The windows (two sessions, 20, four reports,
 """
 
 from bisect import bisect_left, bisect_right
-from datetime import date
+from datetime import date, timedelta
 from functools import cache
 from typing import Any
 
@@ -48,7 +48,14 @@ from algotrade.core.time.calendar import sessions_ending, sessions_to
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.corporate import earnings
-from algotrade.features.rollups.price.price_stats import ADV_WINDOW, BARS, CLOSE, VOLUME, panel
+from algotrade.features.rollups.price.price_stats import (
+    ADV_WINDOW,
+    BARS,
+    CLOSE,
+    VOLUME,
+    _mean,
+    panel,
+)
 
 type Matrix = npt.NDArray[np.float64]
 
@@ -58,6 +65,7 @@ SYMBOLS = "instruments/symbol_ids"
 MARKET_SYMBOL = "SPY"
 OK, NO_REPORT, INCOMPLETE = "OK", "NO_REPORT", "INCOMPLETE"
 REPORTS = 4  # the reports the volume ratio averages
+SAME_QUARTER = timedelta(days=40)  # reports closer than this are one quarter's moved date
 LOOKBACK = 330  # sessions back: four quarters of reports and the 20 sessions before the oldest
 
 _REPORT = f"{earnings.EVENTS}.ts"
@@ -68,8 +76,8 @@ FEATURES = (
     Feature(
         "reaction_status", "str", "category",
         "OK: the last report's window closed with its bars; NO_REPORT: no report known by the "
-        "session; INCOMPLETE: a report is known but its window is open, off the stored history "
-        "or lacks a bar (the other columns may be null)",
+        "session; INCOMPLETE: the last report's window lacks a stock or SPY bar (the "
+        "other columns may be null)",
         "never", "label", categories=(OK, NO_REPORT, INCOMPLETE), inputs=(_REPORT,),
     ),
     Feature(
@@ -140,7 +148,17 @@ def _pre_adv(dollar: Matrix, column: int, before: int) -> float:
     history too short)."""
     if before + 1 < ADV_WINDOW:
         return np.nan
-    return float(np.mean(dollar[before + 1 - ADV_WINDOW : before + 1, column]))
+    return float(_mean(dollar[before + 1 - ADV_WINDOW : before + 1, [column]])[0])
+
+
+def _one_per_quarter(reports: list[date]) -> list[date]:
+    """Newest first, keeping the earliest of reports less than ``SAME_QUARTER`` apart (the
+    calendar listed one quarter twice: a moved date)."""
+    kept: list[date] = []
+    for day in sorted(reports):
+        if not kept or day - kept[-1] >= SAME_QUARTER:
+            kept.append(day)
+    return kept[::-1]
 
 
 def _row(
@@ -162,7 +180,7 @@ def _row(
             continue
         with np.errstate(invalid="ignore", divide="ignore"):
             ratios.append(
-                float(np.mean(dollar[w[0] : w[1] + 1, column])) / _pre_adv(dollar, column, w[0])
+                float(_mean(dollar[w[0] : w[1] + 1, [column]])[0]) / _pre_adv(dollar, column, w[0])
             )
     ratio = float(np.mean(ratios)) if len(reports) >= REPORTS else np.nan
     return {
@@ -186,29 +204,24 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     column_of = {iid: i for i, iid in enumerate(px.ids)}
     spy = _spy_column(inputs[SYMBOLS], px.ids)
     dollar = px.close * px.volume
-    # a report counts once its reaction window (E-1 .. E+1) is on the grid: E+1 on or before
-    # the session, E-1 inside the lookback
-    counted = rows[rows["report"].map(lambda d: _window(grid, d) is not None)]
+    # the newest report (one per quarter) counts once its reaction window (E-1 .. E+1) is on
+    # the grid: E+1 on or before the session, E-1 inside the lookback
     by_report = {
-        str(iid): list(g["report"])
-        for iid, g in counted.sort_values("report", ascending=False).groupby("instrument_id")
+        str(iid): _one_per_quarter(list(g["report"])) for iid, g in rows.groupby("instrument_id")
     }
-    known_ids = set(rows["instrument_id"].astype(str))
+    by_report = {i: r for i, r in by_report.items() if _window(grid, r[0]) is not None}
     out = []
     for traded in px.ids[~np.isnan(px.close[-1])]:  # every instrument traded on the session
         iid = str(traded)
         if iid in by_report:
             values = _row(by_report[iid], grid, column_of[iid], px.close, dollar, spy)
-            if pd.notna(values["reaction_excess_return"]) and pd.notna(
-                values["pre_event_adv_usd_20d"]
-            ):
+            if pd.notna(values["reaction_excess_return"]):  # the ADV may be null: a filter's call
                 out.append({"instrument_id": iid, "reaction_status": OK, **values})
                 continue
             values = {**values, "sessions_since_reaction": pd.NA}
             out.append({"instrument_id": iid, "reaction_status": INCOMPLETE, **values})
-        else:  # a known report whose window is open or off the grid: INCOMPLETE, else none
-            status = INCOMPLETE if iid in known_ids else NO_REPORT
-            out.append({"instrument_id": iid, "reaction_status": status})
+        else:  # no report with a closed window on the grid (none, future only, or too old)
+            out.append({"instrument_id": iid, "reaction_status": NO_REPORT})
     frame = pd.DataFrame(out, columns=["instrument_id", *COLUMNS])
     frame["sessions_since_reaction"] = frame["sessions_since_reaction"].astype("Int64")
     return frame.sort_values("instrument_id", kind="stable").reset_index(drop=True)
