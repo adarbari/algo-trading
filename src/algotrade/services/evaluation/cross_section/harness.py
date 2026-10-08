@@ -285,6 +285,7 @@ class _Scope:
     edge: Edge  # the edge with the variant's outcome and universe applied
     universe: Selection
     iv_field: str  # the outcome's own, else the run's
+    overrides: tuple[str, ...] = ()  # the variant's base / picks overrides, in its trial key
 
 
 def _stat(
@@ -305,8 +306,14 @@ def _stat(
         run is None or run.coverage not in MEASURED_COVERAGE
     ):  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
-    pickable = eligible if event_names is None else event_names & eligible
-    ids = pickable if edge.base == "event" else eligible
+    pickable = (
+        eligible if event_names is None or edge.picks == "universe" else event_names & eligible
+    )
+    ids = (
+        (eligible if event_names is None else event_names & eligible)
+        if edge.base == "event"
+        else eligible
+    )
     scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
     inside = rows[rows["instrument_id"].isin(ids)]
@@ -687,7 +694,14 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
     outcome and universe (the edge's own for ``main``), so an edited override, offset or
     horizon is another trial. The split is not part of it: an exploratory run adds no trial (its
     "all" slice, which the deflated Sharpe ratio reads, does not depend on the split)."""
-    payload = [variant.config.hash, scope.key, asdict(scope.edge.outcome), scope.edge.universe]
+    payload: list[Any] = [
+        variant.config.hash,
+        scope.key,
+        asdict(scope.edge.outcome),
+        scope.edge.universe,
+    ]
+    if scope.overrides:  # a main or plain variant keeps its earlier key
+        payload.append(scope.overrides)
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 
@@ -698,9 +712,15 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
         _Scope(MAIN, edge, edge_universe(configs, user, edge), edge.outcome.iv_field or iv_field)
     ]
     for v in edge.variants:
-        applied = replace(edge, outcome=v.outcome, universe=v.universe, variants=())
+        base, picks = v.base or edge.base, v.picks or edge.picks
+        applied = replace(
+            edge, outcome=v.outcome, universe=v.universe, base=base, picks=picks, variants=()
+        )
         field_name = v.outcome.iv_field or iv_field
-        scopes.append(_Scope(v.id, applied, edge_universe(configs, user, applied), field_name))
+        marks = (f"base={base}", f"picks={picks}") if v.base or v.picks else ()
+        scopes.append(
+            _Scope(v.id, applied, edge_universe(configs, user, applied), field_name, marks)
+        )
     return scopes
 
 

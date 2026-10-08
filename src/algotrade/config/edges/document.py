@@ -21,7 +21,12 @@ and the key.
     schedule          ``every_session`` | ``month_end`` | ``on_event:<class>`` (EVENT_CLASSES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D; default for an event schedule) | ``universe`` (every eligible name)
-    [[variants]]      id, optional [variants.outcome] and universe overriding the edge's: each
+    picks             where an event schedule's picks come from: ``event`` (the qualified names
+                      within the event names; default) | ``universe`` (the qualified names of
+                      every eligible name on the event sessions; a decoy). Plain schedules
+                      ignore it
+    [[variants]]      id, optional [variants.outcome], universe, base and picks overriding the
+                      edge's: each
                       is another evaluation of the same edge, one trial in the deflated Sharpe
                       ratio (ADR 0053 amendment 2026-10-08; the id ``main`` is the edge itself)
     universe          a selection preset name, or an inline selection (``[universe] where``)
@@ -70,6 +75,7 @@ STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short optio
 BENCHMARKS = ("SPY", "none")
 SCHEDULES = ("every_session", "month_end")
 BASES = ("event", "universe")
+PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
 ON_EVENT = "on_event:"
 # The event classes a schedule may trigger on, and its ANCHOR session. The entry session is
@@ -105,14 +111,14 @@ QUALITY_BAR = (
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
-    "notes", "frozen_from", "base", "variants", "evidence", "scorer", "implementation",
+    "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
-VARIANT_KEYS = ("id", "outcome", "universe")
+VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
 EVIDENCE_KEYS = ("run_id", "split_from")
 IMPLEMENTATION_KEYS = ("promoted", "compared")
 COMPARED_KEYS = ("horizon", "screener", "lift", "decile_spread", "sessions", "decile_sessions")
@@ -151,6 +157,8 @@ class EdgeVariant:
     id: str
     outcome: Outcome
     universe: str | Selection
+    base: str | None = None  # None: the edge's own
+    picks: str | None = None  # None: the edge's own
 
 
 @dataclass(frozen=True)
@@ -200,6 +208,7 @@ class Edge:
     notes: str = ""
     frozen_from: date | None = None
     base: str = "universe"  # what the picks are compared with: the event's names | the universe
+    picks: str = "event"  # an event schedule's pick set: within the event names | the universe
     variants: tuple[EdgeVariant, ...] = ()
     scorer_features: tuple[str, ...] = ()  # the fields a learned scorer reads (ADR 0053, ED7)
     evidence: Evidence | None = None
@@ -264,6 +273,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         notes=_prose(t, "notes"),
         frozen_from=_frozen_from(t),
         base=_base(t, schedule),
+        picks=t.choice("picks", "event", PICKS),
         variants=_variants(t, schedule, edge_id, universe),
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
@@ -346,10 +356,12 @@ def _schedule(t: Table) -> str:
     raise ConfigurationError(f"{t.where} schedule: expected one of {options}, got {schedule!r}")
 
 
-def _base(t: Table, schedule: str) -> str:
+def _base(t: Table, schedule: str, default: str | None = None) -> str:
     event = event_class(schedule) is not None
     base = (
-        t.choice("base", "", BASES) if "base" in t.names() else ("event" if event else "universe")
+        t.choice("base", "", BASES)
+        if "base" in t.names()
+        else default or ("event" if event else "universe")
     )
     if base == "event" and not event:
         raise ConfigurationError(f"{t.where} base: 'event' needs an on_event schedule")
@@ -492,6 +504,8 @@ def _variants(
                 id=vid,
                 outcome=_outcome_of(merged, schedule),
                 universe=_universe(v, f"{edge_id}-{vid}") if "universe" in v.names() else universe,
+                base=_base(v, schedule) if "base" in v.names() else None,
+                picks=v.choice("picks", "event", PICKS) if "picks" in v.names() else None,
             )
         )
     return tuple(found)

@@ -502,6 +502,26 @@ def test_a_universe_base_compares_the_event_names_with_every_eligible_name() -> 
     ]  # every eligible name, each session of a block
 
 
+def test_a_picks_universe_variant_picks_outside_the_event_names_and_is_its_own_trial() -> None:
+    w = event_world(EVENTS)
+    ev = run(w, event_edge(2, variants=[{"id": "decoy", "base": "universe", "picks": "universe"}]))
+    main, decoy = ev.results
+    assert [len(s.pick_values) for s in main.stats] == [5, 3]  # event names only
+    assert all(
+        len(d.pick_values) > len(m.pick_values)
+        for d, m in zip(decoy.stats, main.stats, strict=True)
+    )
+    assert [s.eligible for s in decoy.stats] == [N * 2, N]  # the universe is the base
+    assert ev.trials == 2
+    write_edge_eval(w.results, ev, AS_OF)
+    again = run(
+        w, event_edge(2, variants=[{"id": "decoy", "base": "universe", "picks": "universe"}])
+    )
+    changed = run(w, event_edge(2, variants=[{"id": "decoy", "picks": "universe"}]))
+    assert again.trials == 2 and changed.trials == 3  # an override is part of the trial key
+    assert [m.hit_rate for m in again.results[0].measures] == [m.hit_rate for m in main.measures]
+
+
 def test_an_event_session_whose_entry_is_not_closed_is_counted_not_measured() -> None:
     w = build_world(closed=[d for d in DAYS if d != DAYS[6]])  # DAYS[5]'s entry: nothing stored
     for day, names in EVENTS.items():
