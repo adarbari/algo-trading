@@ -79,7 +79,17 @@ const QualityChecks = graphql(`
       }
       unknown {
         code
-        detail
+        kind
+        guideTerm
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
     }
   }

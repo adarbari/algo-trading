@@ -12,14 +12,8 @@
  */
 import { formatValue, type KeyValueItem, type StatItem, type ValueFormat } from '@algotrade/ui';
 
-import {
-  isUnknown,
-  shownValue,
-  unknownLabel,
-  unknownReason,
-  valueFormat,
-  type ServedValue,
-} from '@/entities/feature';
+import { unknownText, unknownWord } from '@/entities/availability';
+import { isUnknown, shownValue, valueFormat, type ServedValue } from '@/entities/feature';
 import { earningsOn, reportTime, type InstrumentEvent } from '@/entities/instrument';
 import { typeLabel } from '@/features/ticker-filter';
 import { feature, type gqlTypes, type SiteFeature } from '@/shared/api';
@@ -233,8 +227,13 @@ export function factItem(values: Values, spec: FactSpec): Fact | null {
   const value = values.get(spec.name);
   if (!value) return null;
   if (isUnknown(value)) {
-    if (value.unknown?.code !== 'NO_PARTITION') return null;
-    return { id: spec.id, label: spec.label, value: UNKNOWN, hint: unknownReason(value) };
+    if (value.unknown?.kind !== 'SYSTEM') return null;
+    return {
+      id: spec.id,
+      label: spec.label,
+      value: UNKNOWN,
+      hint: unknownText(value.unknown, value.info.nullMeaning),
+    };
   }
   return {
     id: spec.id,
@@ -265,8 +264,8 @@ function nextEarnings(values: Values): Fact {
     return {
       id: 'next',
       label: 'Next earnings',
-      value: unknownLabel(next?.unknown?.code, next?.unknown?.reason),
-      hint: unknownReason(next),
+      value: unknownWord(next?.unknown),
+      hint: unknownText(next?.unknown, next?.info.nullMeaning),
     };
   }
   const when = [
@@ -314,8 +313,8 @@ export function earningsGroup(values: Values, events: readonly InstrumentEvent[]
     items.push({
       id: 'last',
       label: 'Last earnings',
-      value: unknownLabel(last?.unknown?.code, last?.unknown?.reason),
-      hint: unknownReason(last),
+      value: unknownWord(last?.unknown),
+      hint: unknownText(last?.unknown, last?.info.nullMeaning),
     });
     return { id: 'earnings', title: 'Earnings', items };
   }
@@ -349,9 +348,4 @@ export function factGroups(values: Values): FactGroup[] {
     title: group.title,
     items: group.facts.flatMap((spec) => factItem(values, spec) ?? []),
   })).filter((group) => group.items.length > 0);
-}
-
-/** The expected nightly tables with no partition for the session, by short name. */
-export function missingTables(missing: readonly string[]): string[] {
-  return missing.map((table) => table.replace(/^rollups\/instrument\//, ''));
 }

@@ -11,7 +11,6 @@ from strawberry.scalars import JSON
 from algotrade.services.read import values
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments import table
-from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.types.availability import Unavailable
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -24,8 +23,7 @@ from algotrade_api.graphql.types.session import Session
     "of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why "
     "(`reasons[i][j]`: its NullReason when EXPLAINED). "
     "`unavailable`: what the tables the filters and sort read have nothing for the session "
-    "leave out (no row passes a filter on them); `missing` lists those tables (legacy, admins "
-    "only: empty for anyone else)"
+    "leave out (no row passes a filter on them)"
 )
 class FeatureTable:
     session: Session
@@ -40,7 +38,6 @@ class FeatureTable:
     total: int
     page: int
     size: int
-    missing: list[str] = strawberry.field(extensions=[AdminCause([])])
     unavailable: list[Unavailable]
 
     @classmethod
@@ -58,6 +55,5 @@ class FeatureTable:
             total=d.total,
             page=d.page,
             size=d.size,
-            missing=list(d.missing),
             unavailable=[Unavailable.of(u) for u in d.unavailable],
         )

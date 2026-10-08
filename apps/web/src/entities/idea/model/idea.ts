@@ -7,6 +7,7 @@
  * by the server over the whole run. Pure: it chooses among served values, it never computes
  * one (docs/api/read-model.md "Presentation is not derivation").
  */
+import type { ServedUnknown } from '@/entities/availability';
 import type { ServedValue } from '@/entities/feature';
 import type { gqlTypes } from '@/shared/api';
 
@@ -90,7 +91,8 @@ export interface ScreenerSummary {
   /** How many tickers its run for the session picked (over the whole run). */
   picked: number;
   /** Why it has no run for the session (null: it ran). */
-  notRun: string | null;
+  /** Why the screener has no run for the session (ADR 0056), else null. */
+  notRun: ServedUnknown | null;
   /** Its best picks of the run, by rank. */
   top: { symbol: string; score: number | null }[];
 }
@@ -207,7 +209,7 @@ function toScreener(entry: ServedScreener): ScreenerSummary {
     owner: entry.screener.owner,
     version: entry.run?.configVersion ?? entry.screener.version ?? null,
     picked: entry.picked,
-    notRun: entry.notRun ? entry.notRun.detail : null,
+    notRun: entry.notRun ?? null,
     top: entry.top.map((t) => ({
       symbol: t.instrument?.symbol ?? t.instrumentId,
       score: t.score ?? null,

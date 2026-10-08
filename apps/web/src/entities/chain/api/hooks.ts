@@ -20,7 +20,17 @@ const OptionChain = graphql(`
         value
         unknown {
           code
-          detail
+          kind
+          guideTerm
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
         info {
           format

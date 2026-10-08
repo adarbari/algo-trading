@@ -73,7 +73,17 @@ const FeatureDistribution = graphql(`
       }
       unknown {
         code
-        detail
+        kind
+        guideTerm
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
       passing {
         intent

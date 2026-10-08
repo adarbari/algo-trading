@@ -54,3 +54,8 @@ def test_the_backtests_page_reads_no_rest(client: TestClient) -> None:
 def test_a_traders_copy_of_a_backtest_document_has_no_tables() -> None:
     audit = {"instruments": ["EQ:AAA"], "missing_tables": ["rollups/x@v1"]}
     assert _public(None, audit) == {"instruments": ["EQ:AAA"]}
+
+
+def test_a_traders_backtest_data_names_no_table() -> None:
+    data = {"as_of": "2026-10-02", "data_versions": {"bars/daily@v1": "r1"}}
+    assert _public(None, data) == {"as_of": "2026-10-02"}

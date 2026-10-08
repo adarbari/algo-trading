@@ -2,7 +2,8 @@
 import { RouterProvider } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { GuideHelpProvider } from '@/features/guide-help';
+import { TermHelpProvider } from '@/entities/availability';
+import { GuideHelp, GuideHelpProvider } from '@/features/guide-help';
 
 import { AppProviders, createQueryClient } from './providers';
 import { router } from './router';
@@ -17,7 +18,9 @@ export function App() {
           router.history.push(path);
         }}
       >
-        <RouterProvider router={router} context={{ queryClient }} />
+        <TermHelpProvider render={(id) => <GuideHelp entry={{ kind: 'term', id }} />}>
+          <RouterProvider router={router} context={{ queryClient }} />
+        </TermHelpProvider>
       </GuideHelpProvider>
     </AppProviders>
   );

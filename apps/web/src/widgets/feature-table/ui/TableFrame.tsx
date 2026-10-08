@@ -1,7 +1,7 @@
 /**
  * The frame every table of the widget shares: a panel (title, actions, states), the session
  * notes (a stale session, nightly tables missing for it, a universe snapshot from after it; for a
- * screener's run, the run's own coverage: a PARTIAL run and the tables it ran without),
+ * screener's run, the run's own coverage: a PARTIAL run and what it ran without),
  * the caller's header (filters), and the design system's `DataTable` over `TableRow`s with a
  * toolbar: the summary, the pager (server paging) and the caller's controls (column picker,
  * views). The columns are a `ColumnPlan` from the factories (ADR 0038); a field column's
@@ -20,25 +20,23 @@ import {
 } from '@algotrade/ui';
 import type { ReactNode } from 'react';
 
+import { UnavailableNote, type ServedUnavailable } from '@/entities/availability';
 import { isStale } from '@/entities/explore';
 import type { ColumnPlan, TableRow } from '@/entities/feature';
 import { helped } from '@/features/guide-help';
-
-import { missingTables } from '../model/plan';
 
 /** A screener run's own coverage, as its run record says (not the session as read now). */
 export interface RunNotes {
   session: string;
   partial: boolean;
-  /** The tables that had no rows when it ran. */
-  missing: readonly string[];
-  /** The optional sources' tables it ran without (ADR 0055: a warning, the run is complete). */
-  missingOptional?: readonly string[] | undefined;
+  /** What the tables that had no rows when it ran leave out (ADR 0056). */
+  unavailable: readonly ServedUnavailable[];
 }
 
 export interface SessionNotes {
   session: string;
-  missing: readonly string[];
+  /** What the nightly tables missing for the session leave out, by kind (ADR 0056). */
+  unavailable: readonly ServedUnavailable[];
   preSnapshot: boolean;
   /** The run the rows come from (absent: not a run). */
   run?: RunNotes | null | undefined;
@@ -71,7 +69,6 @@ export interface TableFrameProps {
 const count = (n: number) => n.toLocaleString('en-US');
 
 function Notes({ notes }: { notes: SessionNotes }) {
-  const missing = missingTables(notes.missing);
   return (
     <>
       {isStale(notes.session) ? (
@@ -79,40 +76,19 @@ function Notes({ notes }: { notes: SessionNotes }) {
           The latest stored session is old: a nightly run may have been missed.
         </Banner>
       ) : null}
-      {missing.length > 0 || notes.preSnapshot ? (
+      {notes.preSnapshot ? (
         <Banner tone="warning" title="Partial data">
-          {notes.preSnapshot ? 'The universe snapshot is from after this session. ' : ''}
-          {missing.length > 0
-            ? `Not stored for ${notes.session}: ${missing.join(', ')}. Values from these tables read Unknown.`
-            : ''}
+          The universe snapshot is from after this session.
         </Banner>
       ) : null}
-      {notes.run && runShows(notes.run) ? <RunBanner run={notes.run} /> : null}
-      {notes.run && optionalOf(notes.run).length > 0 ? (
-        <Banner tone="warning" title="Optional data missing">
-          {`The run for ${notes.run.session} had no ${optionalOf(notes.run).join(', ')}.`}
+      <UnavailableNote gaps={notes.unavailable} />
+      {notes.run?.partial ? (
+        <Banner tone="warning" title="Partial run">
+          {`The run for ${notes.run.session} is PARTIAL; Run now re-runs it.`}
         </Banner>
       ) : null}
+      {notes.run ? <UnavailableNote gaps={notes.run.unavailable} /> : null}
     </>
-  );
-}
-
-function optionalOf(run: RunNotes): string[] {
-  return missingTables(run.missingOptional ?? []);
-}
-
-function runShows(run: RunNotes): boolean {
-  return run.partial || run.missing.length > 0;
-}
-
-function RunBanner({ run }: { run: RunNotes }) {
-  const missing = missingTables(run.missing);
-  return (
-    <Banner tone="warning" title="Partial run">
-      {missing.length > 0
-        ? `The run for ${run.session} is PARTIAL, run without ${missing.join(', ')}; Run now re-runs it.`
-        : `The run for ${run.session} is PARTIAL; Run now re-runs it.`}
-    </Banner>
   );
 }
 
@@ -120,9 +96,9 @@ function shows(notes: SessionNotes | null | undefined): notes is SessionNotes {
   return (
     !!notes &&
     (isStale(notes.session) ||
-      notes.missing.length > 0 ||
+      notes.unavailable.length > 0 ||
       notes.preSnapshot ||
-      (!!notes.run && (runShows(notes.run) || optionalOf(notes.run).length > 0)))
+      (!!notes.run && (notes.run.partial || notes.run.unavailable.length > 0)))
   );
 }
 

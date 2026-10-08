@@ -82,8 +82,18 @@ const InstrumentFeatureValues = graphql(`
         value
         unknown {
           code
-          detail
           reason
+          kind
+          guideTerm
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
         info {
           format

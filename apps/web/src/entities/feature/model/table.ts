@@ -77,9 +77,10 @@ export interface TableRow {
 
 export interface FeatureTableData {
   session: string;
-  /** Nightly tables with no partition for the session, and tables the filters or the sort
-   * read that have nothing for it (no row passes a filter on them). */
-  missing: readonly string[];
+  /** What the nightly tables with no partition for the session leave out, and what the tables
+   * the filters or the sort read have nothing for (no row passes a filter on them): by kind
+   * (ADR 0056; `entities/availability` draws it). */
+  unavailable: readonly Served['unavailable'][number][];
   /** The universe snapshot is from after the session (survivorship). */
   preSnapshot: boolean;
   columns: readonly ColumnInfo[];
@@ -94,7 +95,7 @@ export interface FeatureTableData {
 export function toTableData(table: Served): FeatureTableData {
   return {
     session: table.session.date,
-    missing: [...new Set([...table.session.missing, ...table.missing])],
+    unavailable: [...table.session.unavailable, ...table.unavailable],
     preSnapshot: table.preSnapshot,
     columns: table.columns,
     rows: table.instruments.map((instrument, i) => {

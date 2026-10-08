@@ -53,19 +53,13 @@ def test_an_earlier_session_never_shows_a_later_or_older_partition(graph: Graph)
     body = graph(FACTS, {"key": "CCC", "names": [CLOSE, HV20, NEXT], "date": PREVIOUS.isoformat()})
     assert "errors" not in body
     assert body["data"]["session"]["date"] == PREVIOUS.isoformat()
-    assert "rollups/instrument/earnings@v1" in body["data"]["session"]["missing"]
+    assert body["data"]["session"]["unavailable"]
     values = {v["name"]: v for v in body["data"]["instrument"]["features"]}
     assert values[CLOSE]["value"] == 102.0  # PREVIOUS's close for CCC (99 + 3)
     assert values[HV20]["unknown"]["code"] == "NULL"
-    assert values[NEXT] == {
-        "name": NEXT,
-        "value": None,
-        "unknown": {
-            "code": "NO_PARTITION",
-            "detail": f"rollups/instrument/earnings@v1 has no partition for {PREVIOUS}",
-        },
-        "info": {"format": "DATE", "unit": "date"},
-    }
+    assert values[NEXT]["value"] is None
+    assert values[NEXT]["unknown"] == {"code": "NO_PARTITION", "kind": "SYSTEM"}
+    assert values[NEXT]["info"] == {"format": "DATE", "unit": "date"}
 
 
 def test_no_such_instrument_is_null_not_an_error(graph: Graph) -> None:

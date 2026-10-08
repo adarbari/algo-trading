@@ -6,6 +6,8 @@
  */
 import { Heading, ScoreMeter, Stack, StatusBadge, Text, type ScoreThreshold } from '@algotrade/ui';
 
+import { UnknownNote, unknownText } from '@/entities/availability';
+
 import { plainLabel, regimeTone, type Regime, type RegimeScore } from '../model/regime';
 
 /** Where a score reads as caution and as stress on its 0-100 scale. */
@@ -35,7 +37,7 @@ function Meter({
       value={score.value}
       caption={caption}
       size="md"
-      unknownReason={score.unknown?.detail ?? 'Not available'}
+      unknownReason={unknownText(score.unknown)}
       {...(banded ? { thresholds: BANDS, baseTone: 'positive', baseLabel: 'calm' } : {})}
     />
   );
@@ -53,11 +55,7 @@ export function RegimeHeadline({ regime }: RegimeHeadlineProps) {
           <StatusBadge tone={regimeTone(regime.label)}>{regime.label}</StatusBadge>
         </Stack>
         <Text tone="secondary">{regime.headline}</Text>
-        {regime.unknownReason && (
-          <Text size="sm" tone="muted">
-            {regime.unknownReason.detail}
-          </Text>
-        )}
+        {regime.unknownReason && <UnknownNote unknown={regime.unknownReason} />}
       </Stack>
       <Stack gap={3}>
         <Meter

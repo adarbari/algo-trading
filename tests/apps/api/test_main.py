@@ -307,11 +307,11 @@ def test_every_endpoint_answers_within_a_second_on_golden_data(
 # the Explore ticker table and the compare set side by side) and the compare chart's prices
 # (apps/web/src/entities/{feature,explore}/api).
 INSTRUMENT_FACTS = """query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
-  session { date isLatest missing }
+  session { date isLatest }
   instrument(key: $key) {
     instrumentId symbol name securityType exchange isEtf description referenceSnapshot
     features(names: $names) {
-      name value unknown { code detail } info { format unit nullMeaning description }
+      name value unknown { code kind } info { format unit nullMeaning description }
     }
   }
 }"""
@@ -330,7 +330,7 @@ IDEAS_PAGE = """query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
   ideas(limit: $limit) {
     session priority total
     screeners {
-      screener { id name owner version } run { runId configVersion } notRun { code detail }
+      screener { id name owner version } run { runId configVersion } notRun { code kind }
       picked top { instrumentId score instrument { symbol } }
     }
     items {
@@ -338,7 +338,7 @@ IDEAS_PAGE = """query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
       instrument {
         symbol
         features(names: $names) {
-          name value unknown { code detail } info { format unit dtype nullMeaning }
+          name value unknown { code kind } info { format unit dtype nullMeaning }
         }
       }
       picks {
@@ -361,7 +361,7 @@ DETAIL = {
     "Date!, $date: Date!) { instrument(key: $key, date: $date) { instrumentId series(names: "
     "$names, start: $start) { names points { session values } } } }",
     "OptionChain": "query OptionChain($key: String!, $names: [FeatureName!]!) { instrument(key: "
-    "$key) { instrumentId symbol features(names: $names) { name value unknown { code detail } "
+    "$key) { instrumentId symbol features(names: $names) { name value unknown { code kind } "
     "info { format unit dtype nullMeaning } } chain { underlyingId session status expiries { "
     "date days } strikes } } }",
     "OptionQuotes": "query OptionQuotes($key: String!, $expiry: Date!, $date: Date!) { "
@@ -378,7 +378,7 @@ FEATURE_TABLE = """query FeatureTable($columns: [FeatureName!]!, $keys: [String!
   table(columns: $columns, keys: $keys, securityType: $securityType, sector: $sector,
         liquidityClass: $liquidityClass, leveraged: $leveraged, optionable: $optionable,
         q: $q, sort: $sort, page: $page, size: $size) {
-    session { date missing } universeSnapshot preSnapshot sort total page size
+    session { date } universeSnapshot preSnapshot sort total page size
     columns { name description format unit dtype nullMeaning licence scope }
     instruments { instrumentId symbol name }
     rows unknown
@@ -403,15 +403,15 @@ HISTORY_NAMES = [n for n in OVERVIEW_NAMES if not n.startswith("instrument.") an
 # on a catalogue column over the whole run.
 SCREENER_RESULTS = """query ScreenerResults($id: String!, $decisions: [String!], $change: String,
   $q: String, $sort: String, $columns: [FeatureName!], $page: Int, $size: Int) {
-  session { date missing }
+  session { date }
   screener(id: $id) {
     id name criteria { id field mode } displayColumns { name field }
-    notRun { code detail }
+    notRun { code kind }
     latestRun {
       runId session previousSession decisions { decision count } changes { change count }
       results(decisions: $decisions, change: $change, q: $q, sort: $sort, columns: $columns,
               page: $page, size: $size) {
-        sort total page size missing
+        sort total page size
         columns { name description format unit dtype nullMeaning licence scope }
         rows unknown
         results {

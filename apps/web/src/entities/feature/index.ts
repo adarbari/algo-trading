@@ -78,7 +78,6 @@ export {
   reasonLabel,
   shownValue,
   unknownLabel,
-  unknownReason,
   valueFormat,
   type FeatureFormatName,
   type NullReasonName,

@@ -6,7 +6,6 @@ import {
   reasonLabel,
   shownValue,
   unknownLabel,
-  unknownReason,
   valueFormat,
   type NullReasonName,
   type ServedValue,
@@ -40,22 +39,12 @@ describe('valueFormat', () => {
 
 describe('unknown values', () => {
   const value = (
-    code: 'NO_PARTITION' | 'NO_ROW' | 'NULL' | 'LICENCE' | 'NOT_APPLICABLE' | 'ILLIQUID',
+    code: 'NO_PARTITION' | 'NO_ROW' | 'NULL' | 'LICENCE' | 'NOT_APPLICABLE',
   ): ServedValue => ({
     name: 'rollup.earnings@v1.next_earnings_date',
     value: null,
-    unknown: { code, detail: 'rollups/instrument/earnings@v1 has no partition for 2026-10-02' },
+    unknown: { code, kind: 'SYSTEM', guideTerm: 'unavailable_system', cause: null },
     info: { format: 'DATE', nullMeaning: 'no report date on or after the session' },
-  });
-
-  it('says why, in words', () => {
-    expect(unknownReason(value('NO_PARTITION'))).toBe(
-      'not stored for this session (rollups/instrument/earnings@v1 has no partition for 2026-10-02)',
-    );
-    expect(unknownReason(value('NO_ROW'))).toBe('no row for this instrument in this session');
-    expect(unknownReason(value('NULL'))).toBe('no report date on or after the session');
-    expect(unknownReason(value('LICENCE'))).toMatch(/has no partition/);
-    expect(unknownReason(undefined)).toBe('not known');
   });
 
   it('tells a known value from an unknown one and shows flags in words', () => {
@@ -75,7 +64,6 @@ describe('unknown values', () => {
     ]);
     expect(codeReason('NOT_APPLICABLE', null)).toMatch(/does not apply/);
     expect(codeReason('ILLIQUID', null)).toMatch(/too thin to price/);
-    expect(unknownReason(value('ILLIQUID'))).toMatch(/has no partition/); // the server's detail
   });
 
   it('words each explained absence, exhaustively (ADR 0046)', () => {
@@ -95,20 +83,9 @@ describe('unknown values', () => {
     expect(codeReason('EXPLAINED', null, 'FEW_BARS')).toBe('trades too rarely to fill the window');
   });
 
-  it('reads an EXPLAINED cell without a reason as Unknown, and keeps the server detail', () => {
+  it('reads an EXPLAINED cell without a reason as Unknown, ', () => {
     expect(unknownLabel('EXPLAINED')).toBe('Unknown');
     expect(unknownLabel('EXPLAINED', null)).toBe('Unknown');
     expect(codeReason('EXPLAINED', null)).toBe('not known for this session');
-    const explained: ServedValue = {
-      name: 'rollup.earnings@v1.next_earnings_date',
-      value: null,
-      unknown: {
-        code: 'EXPLAINED',
-        detail: 'the next report is not announced',
-        reason: 'NOT_ANNOUNCED',
-      },
-      info: { format: 'DATE' },
-    };
-    expect(unknownReason(explained)).toBe('the next report is not announced');
   });
 });

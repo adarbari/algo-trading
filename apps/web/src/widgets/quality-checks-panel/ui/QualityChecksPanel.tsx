@@ -12,6 +12,7 @@ import {
   type DataTableColumn,
 } from '@algotrade/ui';
 
+import { unknownText } from '@/entities/availability';
 import { RunStatusBadge, useQualityChecks, type QualityCheck } from '@/entities/run';
 
 const RANK: Record<string, number> = { FAIL: 0, WARN: 1, PASS: 2 };
@@ -66,7 +67,7 @@ export function QualityChecksPanel() {
           title="No quality checks for this session"
           description={
             served?.unknown
-              ? `${served.unknown.detail}. The nightly run records them after ingesting a session.`
+              ? `Quality checks are ${unknownText(served.unknown)}.`
               : 'The nightly run records them after ingesting a session.'
           }
         />

@@ -96,3 +96,10 @@ description = "Measuring a component's own width against a breakpoint token when
 owner = ["apps/web/design-system/responsive/*"]
 section = "docs/adr/0052-one-ui-for-phones-and-desktops.md#decision"
 enforced_by = ["eslint no-restricted-globals / no-restricted-syntax (apps/web/lint-rules/restrictions.js: no matchMedia / ResizeObserver in src)", "review: a tree that changes by width calls useNarrow from @algotrade/ui internals only (the hook is not exported to src)"]
+
+[[web_responsibility]]
+id = "web-gap-causes"
+description = "Showing why something is not available: a gap (Unknown, Unavailable) by its public kind with the Guide term, and the cause chain the server sent an admin; no other code reads a gap's cause or an Unknown's code (ADR 0056)"
+owner = ["apps/web/src/entities/availability/**"]
+section = "docs/adr/0056-role-scoped-causes.md#decision"
+enforced_by = ["eslint [ADR 0025 rule 11] (apps/web/lint-rules/availability.js)", "tests/apps/api/graphql/test_causes.py (the server withholds the cause from a trader)"]

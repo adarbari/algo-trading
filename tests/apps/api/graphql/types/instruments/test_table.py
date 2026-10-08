@@ -16,7 +16,7 @@ TABLE = """query($columns: [FeatureName!]!, $keys: [String!], $sort: String, $pa
   $size: Int, $q: String, $leveraged: Boolean, $optionable: Boolean, $liquidityClass: String) {
   table(columns: $columns, keys: $keys, sort: $sort, page: $page, size: $size, q: $q,
         leveraged: $leveraged, optionable: $optionable, liquidityClass: $liquidityClass) {
-    session { date missing } universeSnapshot preSnapshot sort total page size
+    session { date } universeSnapshot preSnapshot sort total page size
     columns { name format }
     instruments { instrumentId symbol }
     rows unknown

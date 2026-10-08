@@ -92,12 +92,12 @@ describe('QualityChecksPanel', () => {
         status: null,
         finishedAt: null,
         checks: [],
-        unknown: { code: 'NOT_RUN', detail: 'no data_quality run for 2026-10-02' },
+        unknown: { code: 'NOT_RUN', kind: 'NOT_RUN', guideTerm: 'not_run', cause: null },
       },
     });
     renderWith(<QualityChecksPanel />);
     expect(await screen.findByText('No quality checks for this session')).toBeInTheDocument();
-    expect(screen.getByText(/no data_quality run for 2026-10-02/)).toBeInTheDocument();
+    expect(screen.getByText(/Quality checks are not run for this session/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Quality checks · Fri 2 Oct' })).toBeInTheDocument();
   });
 

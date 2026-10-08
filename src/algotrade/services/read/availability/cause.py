@@ -41,7 +41,8 @@ __all__ = [
 ADMIN_CAUSE = "admin_cause"
 GENERIC = "generic"
 AUDIT = "audit"  # a stored audit document: ``public_audit`` drops the keys that name tables
-AUDIT_CAUSE_KEYS = frozenset({"missing_tables", "missing_optional_tables"})
+# `data_versions` of a backtest run is keyed by the stored tables it read
+AUDIT_CAUSE_KEYS = frozenset({"missing_tables", "missing_optional_tables", "data_versions"})
 
 
 class UnavailableKind(StrEnum):

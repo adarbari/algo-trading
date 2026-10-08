@@ -42,8 +42,7 @@ class DecisionCount:
     "held back, never counted as picked; `regime`: the label the run stamped, null when the "
     "gate was off or the label unknown); `coverage`: the run record's own coverage (COMPLETE, "
     "PARTIAL; null: not recorded); `unavailable`: what the tables that had no rows when it "
-    "ran leave out, not the session's as read now; `missingTables` / `missingOptionalTables` "
-    "list those tables (legacy, admins only: empty for anyone else)"
+    "ran leave out, not the session's as read now"
 )
 class ScreenerRun:
     run_id: str
@@ -58,8 +57,6 @@ class ScreenerRun:
     paused: int
     regime: str | None
     coverage: str | None
-    missing_tables: list[str] = strawberry.field(extensions=[AdminCause([])])
-    missing_optional_tables: list[str] = strawberry.field(extensions=[AdminCause([])])
     unavailable: list[Unavailable]
     run: strawberry.Private[runs.ScreenerRun]
     ctx: strawberry.Private[ReadContext]
@@ -79,8 +76,6 @@ class ScreenerRun:
             paused=d.paused,
             regime=d.regime,
             coverage=d.coverage,
-            missing_tables=list(d.missing_tables),
-            missing_optional_tables=list(d.missing_optional_tables),
             unavailable=[Unavailable.of(u) for u in d.unavailable],
             run=d,
             ctx=ctx,

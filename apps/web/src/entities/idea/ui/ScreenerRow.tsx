@@ -5,6 +5,8 @@
  */
 import { Button, Mono, Stack, Text } from '@algotrade/ui';
 
+import { unknownText } from '@/entities/availability';
+
 import type { ScreenerSummary } from '../model/idea';
 
 const score = (value: number | null) => (value === null ? '—' : value.toFixed(0));
@@ -52,7 +54,7 @@ export function ScreenerRow({ screener, rank, onOpen }: ScreenerRowProps) {
           <Text
             size="xs"
             tone={screener.notRun !== null ? 'muted' : 'secondary'}
-            {...(screener.notRun === null ? {} : { title: screener.notRun })}
+            {...(screener.notRun === null ? {} : { title: unknownText(screener.notRun) })}
           >
             {finds}
           </Text>

@@ -5,6 +5,7 @@
  */
 import { Banner, Disclosure, KeyValue, Panel, Stack, StatStrip, Text } from '@algotrade/ui';
 
+import { fromRest, UnavailableNote } from '@/entities/availability';
 import { previewPanelState, useScreenerBuilder } from '@/features/screener-builder';
 import {
   decisionCounts,
@@ -58,11 +59,10 @@ function Summary({ preview }: { preview: ScreenPreview }) {
           tone="warning"
           title={`Coverage: ${coverage.coverage.toLowerCase().replace(/_/g, ' ')}`}
         >
-          {coverage.missing_tables.length > 0
-            ? `No rows stored for ${coverage.missing_tables.join(', ')} on ${preview.session}.`
-            : 'Some rows could not be evaluated.'}
+          Some rows could not be evaluated.
         </Banner>
       )}
+      <UnavailableNote gaps={fromRest(coverage.unavailable)} />
       {reasons.length > 0 && (
         <Disclosure
           label="Missing data"

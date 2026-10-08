@@ -469,11 +469,6 @@ export interface components {
             inputs: string[];
             /** Licence */
             licence: string;
-            /**
-             * Missing
-             * @description the inputs' tables with no partition for the session (their values UNKNOWN; legacy, admins only: empty for anyone else)
-             */
-            missing: string[];
             /** Non Null */
             non_null: number;
             /** Rows */
@@ -775,11 +770,6 @@ export interface components {
              * @description below this the run is PARTIAL
              */
             min_coverage: number;
-            /**
-             * Missing Tables
-             * @description tables with no rows for the session (legacy, admins only: empty for anyone else; `unavailable` says what they leave out)
-             */
-            missing_tables: string[];
             /**
              * Pre Snapshot
              * @description the reference snapshot is after the session

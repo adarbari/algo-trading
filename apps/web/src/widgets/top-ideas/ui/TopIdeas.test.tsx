@@ -34,7 +34,15 @@ const pick = (configId: string, decision: string, score: number) => ({
 const fact = (name: string, value: unknown, format: 'DATE' | 'NUMBER' | 'PERCENT' | 'FLAG') => ({
   name,
   value,
-  unknown: value === null ? { code: 'NULL' as const, detail: `${name} is null` } : null,
+  unknown:
+    value === null
+      ? {
+          code: 'NULL' as const,
+          kind: 'NOT_STORED' as const,
+          guideTerm: 'unavailable_not_stored',
+          cause: null,
+        }
+      : null,
   info: { format, unit: format === 'PERCENT' ? 'decimal' : null, dtype: 'float', nullMeaning: '' },
 });
 const facts = (
@@ -152,7 +160,7 @@ describe('TopIdeas', () => {
     const spy = within(grid()).getByRole('row', { name: /SPY/ });
     expect(within(spy).getAllByText('Unknown')[0]).toHaveAttribute(
       'title',
-      'not known for this session',
+      'not available for this instrument',
     );
   });
 
@@ -250,7 +258,15 @@ describe('TopIdeas', () => {
     await expectNoA11yViolations(empty.container);
     empty.unmount();
 
-    const notRun = data.screeners.map((s) => ({ ...s, notRun: 'no run for 2026-10-02' }));
+    const notRun = data.screeners.map((s) => ({
+      ...s,
+      notRun: {
+        code: 'NOT_RUN' as const,
+        kind: 'NOT_RUN' as const,
+        guideTerm: 'not_run',
+        cause: null,
+      },
+    }));
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>({ ...data, ideas: [], screeners: notRun }));
     const idle = setup();
     expect(screen.getByText(/No screener has run for this session/)).toBeInTheDocument();

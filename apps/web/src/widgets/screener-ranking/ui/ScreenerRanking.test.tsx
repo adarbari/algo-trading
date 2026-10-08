@@ -49,7 +49,7 @@ const data: IdeasData = {
       owner: 'abhinav',
       version: 1,
       picked: 0,
-      notRun: 'idle (abhinav) has no run in results/rule_screen for 2026-10-02',
+      notRun: { code: 'NOT_RUN', kind: 'NOT_RUN', guideTerm: 'not_run', reason: null, cause: null },
       top: [],
     },
   ],

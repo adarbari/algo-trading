@@ -318,7 +318,7 @@ type FeatureSeries {
 }
 
 """
-Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the filters and sort read have nothing for the session leave out (no row passes a filter on them); `missing` lists those tables (legacy, admins only: empty for anyone else)
+Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the filters and sort read have nothing for the session leave out (no row passes a filter on them)
 """
 type FeatureTable {
   session: Session!
@@ -333,7 +333,6 @@ type FeatureTable {
   total: Int!
   page: Int!
   size: Int!
-  missing: [String!]!
   unavailable: [Unavailable!]!
 }
 
@@ -1639,7 +1638,7 @@ type ScreenResult {
 }
 
 """
-One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the search and sort read have nothing for the session leave out; `missing` lists those tables (legacy, admins only: empty for anyone else)
+One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the search and sort read have nothing for the session leave out
 """
 type ScreenResultPage {
   runId: String!
@@ -1652,7 +1651,6 @@ type ScreenResultPage {
   rows: [[JSON]!]!
   unknown: [[UnknownCode]!]!
   reasons: [[NullReason]!]!
-  missing: [String!]!
   unavailable: [Unavailable!]!
 }
 
@@ -1701,7 +1699,7 @@ type ScreenerHit {
 }
 
 """
-A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown); `coverage`: the run record's own coverage (COMPLETE, PARTIAL; null: not recorded); `unavailable`: what the tables that had no rows when it ran leave out, not the session's as read now; `missingTables` / `missingOptionalTables` list those tables (legacy, admins only: empty for anyone else)
+A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown); `coverage`: the run record's own coverage (COMPLETE, PARTIAL; null: not recorded); `unavailable`: what the tables that had no rows when it ran leave out, not the session's as read now
 """
 type ScreenerRun {
   runId: String!
@@ -1716,8 +1714,6 @@ type ScreenerRun {
   paused: Int!
   regime: String
   coverage: String
-  missingTables: [String!]!
-  missingOptionalTables: [String!]!
   unavailable: [Unavailable!]!
 
   """
@@ -1758,7 +1754,7 @@ type SeriesPoint {
 }
 
 """
-The session a read serves: every value in the response is for `date` (ADR 0036). `unavailable` says what the nightly tables with no partition for it leave out; `present` / `missing` list those tables (legacy, admins only: empty for anyone else); identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: one taken later).
+The session a read serves: every value in the response is for `date` (ADR 0036). `unavailable` says what the nightly tables with no partition for it leave out; identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: one taken later).
 """
 type Session {
   date: Date!
@@ -1767,8 +1763,6 @@ type Session {
   latestWithBars: Date
   referenceSnapshot: Date
   preSnapshot: Boolean!
-  present: [String!]!
-  missing: [String!]!
   unavailable: [Unavailable!]!
 }
 
@@ -1817,18 +1811,13 @@ enum UnavailableKind {
 }
 
 """
-A value not known for the session: `code` and, in public words, `kind` (with its Guide term `guideTerm`); `reason` is set exactly when `code` is EXPLAINED. `cause` is the chain behind it, source to table: admins only (null for anyone else). `detail` is legacy: the chain as one line for an admin, the generic words for anyone else
+A value not known for the session: `code` and, in public words, `kind` (with its Guide term `guideTerm`); `reason` is set exactly when `code` is EXPLAINED. `cause` is the chain behind it, source to table: admins only (null for anyone else)
 """
 type Unknown {
   code: UnknownCode!
   reason: NullReason
   kind: UnavailableKind!
   guideTerm: String!
-
-  """
-  Legacy (ADR 0056; the web moves to `cause` / `kind`): why and where it looked, as one line for an admin; the generic words for anyone else
-  """
-  detail: String!
 
   """
   The chain behind it, source to table; null unless the caller is an admin

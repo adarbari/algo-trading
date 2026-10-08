@@ -414,15 +414,6 @@
             "title": "Licence",
             "type": "string"
           },
-          "missing": {
-            "admin_cause": [],
-            "description": "the inputs' tables with no partition for the session (their values UNKNOWN; legacy, admins only: empty for anyone else)",
-            "items": {
-              "type": "string"
-            },
-            "title": "Missing",
-            "type": "array"
-          },
           "non_null": {
             "title": "Non Null",
             "type": "integer"
@@ -473,7 +464,6 @@
           "inputs",
           "licence",
           "session",
-          "missing",
           "rows",
           "non_null",
           "sample"
@@ -1083,15 +1073,6 @@
             "title": "Min Coverage",
             "type": "number"
           },
-          "missing_tables": {
-            "admin_cause": [],
-            "description": "tables with no rows for the session (legacy, admins only: empty for anyone else; `unavailable` says what they leave out)",
-            "items": {
-              "type": "string"
-            },
-            "title": "Missing Tables",
-            "type": "array"
-          },
           "pre_snapshot": {
             "description": "the reference snapshot is after the session",
             "title": "Pre Snapshot",
@@ -1141,7 +1122,6 @@
           "coverage_pct",
           "min_coverage",
           "selection",
-          "missing_tables",
           "pre_snapshot",
           "universe_snapshot"
         ],

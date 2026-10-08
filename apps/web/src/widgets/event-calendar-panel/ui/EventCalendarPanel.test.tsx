@@ -64,14 +64,14 @@ describe('EventCalendarPanel', () => {
       fakeQuery({
         screener: {
           latestRun: null,
-          notRun: { code: 'NOT_RUN', detail: 'No run for 2026-10-07.' },
+          notRun: { code: 'NOT_RUN', kind: 'NOT_RUN', guideTerm: 'not_run', cause: null },
         },
       }),
     );
     hooks.useEventCalendar.mockReturnValue(fakeQuery(undefined, { isPending: true }));
     render(<EventCalendarPanel />);
     await userEvent.setup().selectOptions(screen.getByLabelText('Names'), 'vrp_scanner');
-    expect(screen.getByText('No run for 2026-10-07.')).toBeInTheDocument();
+    expect(screen.getByText('This screener: not run for this session.')).toBeInTheDocument();
     expect(hooks.useEventCalendar).toHaveBeenLastCalledWith([], false, false);
   });
 
@@ -83,14 +83,22 @@ describe('EventCalendarPanel', () => {
           {
             instrumentId: null,
             part: 'macro_release',
-            unknown: { code: 'NO_PARTITION', detail: 'no macro calendar', reason: null },
+            unknown: {
+              code: 'NO_PARTITION',
+              kind: 'SYSTEM',
+              guideTerm: 'unavailable_system',
+              cause: null,
+              reason: null,
+            },
           },
         ],
         unresolved: ['XYZ'],
       }),
     );
     render(<EventCalendarPanel />);
-    expect(screen.getByText('Macro releases: Unknown (no macro calendar)')).toBeInTheDocument();
+    expect(
+      screen.getByText('Macro releases: not available because of a system error'),
+    ).toBeInTheDocument();
     expect(screen.getByText('XYZ')).toBeInTheDocument();
   });
 

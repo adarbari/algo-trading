@@ -23,8 +23,26 @@ export interface ServedInfo {
 export interface ServedValue {
   name: string;
   value?: unknown;
+  /** Why it is not known (ADR 0056); `entities/availability` words it. */
   unknown?:
-    | { code: UnknownCodeName; detail: string; reason?: NullReasonName | null | undefined }
+    | {
+        code: UnknownCodeName;
+        reason?: NullReasonName | null | undefined;
+        kind: gqlTypes.UnavailableKind;
+        guideTerm: string;
+        cause?:
+          | {
+              links: readonly {
+                level: gqlTypes.CauseLevel;
+                subject: string;
+                status: string;
+                message: string;
+                runId?: string | null | undefined;
+              }[];
+            }
+          | null
+          | undefined;
+      }
     | null
     | undefined;
   info: ServedInfo;
@@ -117,24 +135,7 @@ export function unknownLabel(
   return 'Unknown';
 }
 
-/**
- * Why a value is UNKNOWN, in words: the table had no partition for the session, the instrument
- * had no row, or what a stored null means for this feature (`info.nullMeaning`).
- */
-export function unknownReason(value: ServedValue | undefined): string {
-  const unknown = value?.unknown;
-  if (!value || !unknown) return 'not known';
-  if (unknown.code === 'EXPLAINED') {
-    return unknown.detail || codeReason(unknown.code, value.info.nullMeaning, unknown.reason);
-  }
-  if (unknown.code === 'NO_PARTITION') return `not stored for this session (${unknown.detail})`;
-  if (unknown.code === 'NO_ROW' || unknown.code === 'NULL') {
-    return codeReason(unknown.code, value.info.nullMeaning);
-  }
-  return unknown.detail;
-}
-
-/** Why a table cell is UNKNOWN, from its code alone (a table sends codes, not details). */
+/** Why a table cell is UNKNOWN, from its code alone (a table sends codes only). */
 export function codeReason(
   code: UnknownCodeName | null,
   nullMeaning: string | null | undefined,

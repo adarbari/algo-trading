@@ -96,11 +96,6 @@ class PreviewCoverage(Schema):
         description="the selection's audit (without the tables it went without, unless an admin)",
         json_schema_extra={ADMIN_CAUSE: AUDIT},
     )
-    missing_tables: list[str] = Field(
-        description="tables with no rows for the session (legacy, admins only: empty for "
-        "anyone else; `unavailable` says what they leave out)",
-        json_schema_extra={ADMIN_CAUSE: []},
-    )
     unavailable: list[Unavailable] = Field(
         default_factory=list,
         description="what the tables with no rows for the session leave out, in public words",

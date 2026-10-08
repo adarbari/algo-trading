@@ -18,7 +18,7 @@ import {
 import type { EventCalendarResponse } from '../api/calendar';
 import type { EventStudyResponse } from '../api/study';
 
-import { unknownLabel } from '@/entities/feature';
+import { unknownText } from '@/entities/availability';
 
 /** A dated event as `eventStudy.ahead` / `eventCalendar` select it. */
 export interface AheadShape {
@@ -94,12 +94,10 @@ const PARTS: Readonly<Record<string, string>> = {
   ladder: 'Expiry ladder',
 };
 
-/** One line per part not known for the session: the part, the server's word and its detail. */
+/** One line per part not known for the session: the part and why it is not known (by kind). */
 export function gapLines(gaps: readonly StudyGap[]): string[] {
   const lines = gaps.map(({ part, unknown }) => {
-    const what = unknownLabel(unknown.code, unknown.reason);
-    const detail = unknown.detail ? ` (${unknown.detail})` : '';
-    return `${PARTS[part] ?? part.replace(/_/g, ' ')}: ${what}${detail}`;
+    return `${PARTS[part] ?? part.replace(/_/g, ' ')}: ${unknownText(unknown)}`;
   });
   // Two gaps can read the same (one table missing for several parts): one line each, so a
   // list keyed by the line stays unique.

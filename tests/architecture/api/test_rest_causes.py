@@ -149,9 +149,7 @@ def test_the_preview_serves_a_trader_no_table_and_an_admin_the_chain(
     assert [
         text[max(0, text.find(p) - 80) : text.find(p) + 60] for p in TABLE_PREFIXES if p in text
     ] == []
-    assert trader["coverage"]["missing_tables"] == []
     assert all(u["cause"] is None and u["guide_term"] for u in trader["coverage"]["unavailable"])
-    assert admin["coverage"]["missing_tables"], "the golden session lacks ibkr_iv@v1"
     assert trader["coverage"]["unavailable"]
     assert all(u["cause"] for u in admin["coverage"]["unavailable"])
 

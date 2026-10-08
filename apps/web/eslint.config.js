@@ -7,9 +7,11 @@
  *                    in design-system/components/Chart
  *   columns.js       read model WEB 4: table columns only from the column factories
  *   responsive.js    rule 9: a multi-column Grid in app code collapses on narrow screens
+ *   availability.js  rule 11: a gap's cause and an Unknown's code are read only in entities/availability
  *   views.js         read model WEB 7: a table's saved view only through features/table-view
  * Every message names its rule, docs/ui/architecture.md and the skill that explains the fix.
  */
+import { availability } from './lint-rules/availability.js';
 import { base } from './lint-rules/base.js';
 import { columnFactories } from './lint-rules/columns.js';
 import { layers } from './lint-rules/layers.js';
@@ -40,5 +42,6 @@ export default [
   chartRestrictions,
   columnFactories,
   responsive,
+  availability,
   viewAdapter,
 ];

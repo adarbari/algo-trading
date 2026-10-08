@@ -37,7 +37,13 @@ describe('useIdeas', () => {
           {
             screener: { id: 'vrp', name: 'VRP scanner', owner: 'abhinav', version: 1 },
             run: null,
-            notRun: { code: 'NOT_RUN', detail: 'vrp (abhinav) has no run' },
+            notRun: {
+              code: 'NOT_RUN',
+              kind: 'NOT_RUN',
+              guideTerm: 'not_run',
+              reason: null,
+              cause: null,
+            },
             picked: 0,
             top: [],
           },
@@ -52,8 +58,8 @@ describe('useIdeas', () => {
     const [document, variables] = GQL.mock.calls[0] ?? [];
     expect(String(document)).toContain('query IdeasPage');
     expect(variables).toEqual({ limit: IDEAS_LIMIT, names: IDEA_FEATURES });
-    expect(result.current.data?.screeners.map((s) => [s.id, s.notRun])).toEqual([
-      ['vrp', 'vrp (abhinav) has no run'],
+    expect(result.current.data?.screeners.map((s) => [s.id, s.notRun?.kind])).toEqual([
+      ['vrp', 'NOT_RUN'],
     ]);
   });
 

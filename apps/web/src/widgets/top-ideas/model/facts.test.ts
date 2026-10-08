@@ -18,10 +18,15 @@ const known = (name: string, value: unknown): ServedValue => ({
   unknown: null,
   info: { format: 'DATE' },
 });
-const unknown = (name: string, code: 'NULL' | 'NO_PARTITION', detail: string): ServedValue => ({
+const unknown = (name: string, code: 'NULL' | 'NO_PARTITION'): ServedValue => ({
   name,
   value: null,
-  unknown: { code, detail },
+  unknown: {
+    code,
+    kind: code === 'NO_PARTITION' ? 'SYSTEM' : 'NOT_STORED',
+    guideTerm: code === 'NO_PARTITION' ? 'unavailable_system' : 'unavailable_not_stored',
+    cause: null,
+  },
   info: { format: 'DATE', nullMeaning: 'no report date on or after the session' },
 });
 
@@ -56,7 +61,7 @@ describe('earningsCell', () => {
 
   it('falls back to a muted "Last <d MMM>" when no next date is stored (MRVL)', () => {
     const mrvl = idea([
-      unknown(IDEA_FACTS.nextEarnings, 'NULL', 'null'),
+      unknown(IDEA_FACTS.nextEarnings, 'NULL'),
       known(IDEA_FACTS.lastEarnings, '2026-08-27'),
     ]);
     expect(earningsCell(mrvl)).toEqual({
@@ -68,13 +73,13 @@ describe('earningsCell', () => {
 
   it('says UNKNOWN, and why, when neither date is known', () => {
     const none = idea([
-      unknown(IDEA_FACTS.nextEarnings, 'NO_PARTITION', 'earnings@v1 has no partition'),
-      unknown(IDEA_FACTS.lastEarnings, 'NO_PARTITION', 'earnings@v1 has no partition'),
+      unknown(IDEA_FACTS.nextEarnings, 'NO_PARTITION'),
+      unknown(IDEA_FACTS.lastEarnings, 'NO_PARTITION'),
     ]);
     expect(earningsCell(none)).toEqual({
       text: UNKNOWN_LABEL,
       muted: true,
-      title: 'not stored for this session (earnings@v1 has no partition)',
+      title: 'not available because of a system error',
     });
     expect(earningsCell(idea([]))).toEqual({
       text: UNKNOWN_LABEL,
@@ -89,10 +94,10 @@ describe('the other served facts', () => {
     const x = idea([
       known(IDEA_FACTS.sessionsToEarnings, 9),
       known(IDEA_FACTS.iv30, 0.42),
-      unknown(IDEA_FACTS.expiryDte, 'NO_PARTITION', 'nearest_expiry@v1 has no partition'),
+      unknown(IDEA_FACTS.expiryDte, 'NO_PARTITION'),
     ]);
     expect([sessionsToEarnings(x), iv30(x), expiryDte(x)]).toEqual([9, 0.42, null]);
-    expect(dteReason(x)).toBe('not stored for this session (nearest_expiry@v1 has no partition)');
+    expect(dteReason(x)).toBe('not available because of a system error');
     expect(dteReason(idea([known(IDEA_FACTS.expiryDte, 3)]))).toBeUndefined();
   });
 });

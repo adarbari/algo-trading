@@ -18,6 +18,7 @@ import {
 } from '@algotrade/ui';
 import { useState } from 'react';
 
+import { unknownText } from '@/entities/availability';
 import {
   indicatorChange,
   indicatorFormat,
@@ -50,7 +51,7 @@ export function IndicatorCard({
   const range = useRegimeRange(session);
   const format = indicatorFormat(indicator);
   const change = indicatorChange(indicator);
-  const reason = indicator.unknown?.detail;
+  const reason = indicator.unknown ? unknownText(indicator.unknown) : undefined;
   const sources = sourceItems(indicator);
   const provenance = indicator.sources.flatMap((source) => provenanceLine(source) ?? []);
   const thresholds = meterThresholds(indicator);

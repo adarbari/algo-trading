@@ -134,7 +134,3 @@ reason = "the text model's note on the regime explanation"
 name = "Draft.document"
 surface = "rest"
 reason = "the caller's own draft document"
-
-[[legacy]]
-name = "Unknown.detail"
-reason = "a resolver: the chain as one line for an admin, the generic words for anyone else"

@@ -39,20 +39,20 @@ CAUSE_WORDS = re.compile(
 OPS = "algotrade_api.graphql.types.ops."
 TRADER_OPS = (OPS + "backtest", OPS + "config")
 CHAIN = "cause { links { level subject status message runId } }"
-UNKNOWN = f"code reason kind guideTerm detail {CHAIN}"
+UNKNOWN = f"code reason kind guideTerm {CHAIN}"
 GAPS = f"unavailable {{ kind features guideTerm {CHAIN} }}"
 GAPS_QUERY = f"""query($date: Date, $names: [FeatureName!]!, $dist: FeatureName!) {{
-  session(date: $date) {{ missing present {GAPS} }}
+  session(date: $date) {{ {GAPS} }}
   instrument(key: "CCC", date: $date) {{
     features(names: $names) {{ name unknown {{ {UNKNOWN} }} }}
   }}
   regime(date: $date) {{ unknownReason {{ {UNKNOWN} }} }}
   distribution(name: $dist, date: $date) {{ unknown {{ {UNKNOWN} }} }}
-  table(columns: $names, date: $date) {{ session {{ missing {GAPS} }} missing {GAPS} }}
+  table(columns: $names, date: $date) {{ session {{ {GAPS} }} {GAPS} }}
   ideas(limit: 3, date: $date) {{
     screeners {{
       notRun {{ {UNKNOWN} }}
-      run {{ audit missingTables missingOptionalTables {GAPS} }}
+      run {{ audit {GAPS} }}
     }}
   }}
 }}"""
@@ -178,8 +178,7 @@ def test_a_trader_reads_no_table_and_no_cause_over_every_unknown_root(
         assert causes and all(c is None for c in causes)
     values = trader(GAPS_QUERY, {**VARIABLES, "date": PREVIOUS.isoformat()})["data"]
     gap = next(v["unknown"] for v in values["instrument"]["features"] if v["unknown"])
-    assert gap["detail"] == GENERIC_REASONS[UnavailableKind(gap["kind"])]
-    assert gap["guideTerm"] and values["session"]["missing"] == []  # the legacy list is empty
+    assert gap["guideTerm"]
     assert values["session"]["unavailable"], "a trader still learns which features are out"
 
 
@@ -196,9 +195,8 @@ def test_an_admin_reads_the_chain_from_the_source_to_the_features(
     assert (chain[1]["subject"], chain[1]["status"]) == ("ibkr-iv", "SKIPPED")
     assert chain[1]["runId"] and chain[2]["subject"] == "volatility/ibkr_iv30"
     assert chain[3]["subject"] == "rollups/instrument/ibkr_iv@v1"
-    assert body["data"]["session"]["missing"], "an admin still reads the legacy table list"
     unknown = next(v["unknown"] for v in body["data"]["instrument"]["features"] if v["unknown"])
-    assert unknown["cause"]["links"] and "rollups/" in unknown["detail"]
+    assert unknown["cause"]["links"] and "rollups/" in json.dumps(unknown["cause"])
 
 
 def test_an_error_about_missing_data_is_generic_for_a_trader() -> None:

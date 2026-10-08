@@ -57,28 +57,49 @@ describe('ladderRows', () => {
 });
 
 describe('gapLines', () => {
-  it('says the part, the server word and its detail', () => {
+  it('says the part and why, by kind', () => {
     expect(
       gapLines([
         {
           instrumentId: null,
           part: 'macro_release',
-          unknown: { code: 'NO_PARTITION', detail: 'no macro calendar stored', reason: null },
+          unknown: {
+            code: 'NO_PARTITION',
+            kind: 'SYSTEM',
+            guideTerm: 'unavailable_system',
+            reason: null,
+            cause: null,
+          },
         },
         {
           instrumentId: null,
           part: 'filings',
-          unknown: { code: 'NOT_APPLICABLE', detail: '', reason: null },
+          unknown: {
+            code: 'NOT_APPLICABLE',
+            kind: 'NOT_APPLICABLE',
+            guideTerm: 'unavailable_not_applicable',
+            reason: null,
+            cause: null,
+          },
         },
       ]),
-    ).toEqual(['Macro releases: Unknown (no macro calendar stored)', 'Filings: n/a']);
+    ).toEqual([
+      'Macro releases: not available because of a system error',
+      'Filings: does not apply to this instrument',
+    ]);
   });
 
   it('reads two identical gaps once, so a list keyed by the line has unique keys', () => {
     const gap: Parameters<typeof gapLines>[0][number] = {
       instrumentId: null,
       part: 'fund_reference',
-      unknown: { code: 'NO_PARTITION', detail: 'no fund reference stored', reason: null },
+      unknown: {
+        code: 'NO_PARTITION',
+        kind: 'SYSTEM',
+        guideTerm: 'unavailable_system',
+        reason: null,
+        cause: null,
+      },
     };
     const lines = gapLines([gap, { ...gap }]);
     expect(lines).toHaveLength(1);

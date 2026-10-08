@@ -8,7 +8,6 @@ import {
   exchangeLabel,
   factGroups,
   headlineStats,
-  missingTables,
   OVERVIEW_FEATURES,
   profileOf,
   valuesOf,
@@ -32,7 +31,12 @@ const unknown = (
 ) => ({
   name,
   value: null,
-  unknown: { code, detail: `rollups/instrument/x@v1 has no partition for 2026-10-02` },
+  unknown: {
+    code,
+    kind: code === 'NO_PARTITION' ? ('SYSTEM' as const) : ('NOT_STORED' as const),
+    guideTerm: code === 'NO_PARTITION' ? 'unavailable_system' : 'unavailable_not_stored',
+    cause: null,
+  },
   info: { format, unit: null, dtype: 'date', nullMeaning },
 });
 
@@ -136,7 +140,7 @@ describe('headlineStats and factGroups', () => {
       ['next', '2026-10-29'], // P/E is null for AAPL here: left out
     ]);
     expect(stats[1]?.format).toEqual({ kind: 'currency-compact' });
-    expect(stats[2]?.sub).toMatch(/^not stored for this session/);
+    expect(stats[2]?.sub).toBe('not available because of a system error');
     expect(stats[3]?.sub).toBe('in 19 sessions, before the open');
     const groups = factGroups(valuesOf(stock()));
     expect(groups.map((g) => g.id)).toEqual(['range', 'dividends']);
@@ -200,15 +204,6 @@ describe('earningsGroup', () => {
       ['next', 'Unknown'],
       ['last', 'Unknown'],
     ]);
-    expect(group.items[1]?.hint).toBe('no row for this instrument in this session');
-  });
-});
-
-describe('missingTables', () => {
-  it('names the missing nightly tables briefly', () => {
-    expect(missingTables(['rollups/instrument/earnings@v1', 'bars/1d'])).toEqual([
-      'earnings@v1',
-      'bars/1d',
-    ]);
+    expect(group.items[1]?.hint).toBe('not known');
   });
 });
