@@ -50,3 +50,4 @@ Never a mobile page, route, widget or component variant: adapt the one component
   master-detail or link flow adds an assertion there.
 - Verify by hand once: the Vite dev server in the browser pane at the `mobile` preset
   (375 x 812), text and accessibility tree first, one reduced-scale screenshot per state.
+- To look at a `Narrow` story, use the built Storybook (`npm run storybook:build`, then serve `storybook-static`, e.g. `python3 -m http.server 6008 -d storybook-static`): the dev server cannot load a story that imports `design-system/testing` (vitest's `expect` in the browser).
