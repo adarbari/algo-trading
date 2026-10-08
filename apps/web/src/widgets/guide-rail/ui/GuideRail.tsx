@@ -2,8 +2,8 @@
  * The Guide's compact rail: a search over field names, display names and what they say (it
  * filters what the catalogue already returned, in the browser), and under it the sections that
  * have pages today with their entry counts from the server; Fields expands to its themes, and
- * the theme of the current field to its fields; Playbooks (in family order) and Situations list
- * their pages while one of theirs is open. While a query is typed the rail lists the matching
+ * the theme of the current field to its fields; Market regime (indicators, then market falls),
+ * Playbooks (in family order) and Situations list their pages while one of theirs is open. While a query is typed the rail lists the matching
  * fields instead.
  */
 import { NavList, SearchInput, Stack, Text, type NavListItem } from '@algotrade/ui';
@@ -18,12 +18,15 @@ import {
 } from '@/entities/feature';
 import {
   BUILT_SECTIONS,
+  episodePath,
   fieldPath,
   fieldsPath,
   GUIDE_FIELDS_PATH,
   GUIDE_PATH,
   GUIDE_PLAYBOOKS_PATH,
+  GUIDE_REGIME_PATH,
   GUIDE_SITUATIONS_PATH,
+  indicatorPath,
   playbookPath,
   situationPath,
   themeTitle,
@@ -37,7 +40,17 @@ const MATCHES_SHOWN = 30;
 
 export interface GuideRailProps {
   /** Which Guide page is open. */
-  page: 'home' | 'fields' | 'field' | 'playbooks' | 'playbook' | 'situations' | 'situation';
+  page:
+    | 'home'
+    | 'fields'
+    | 'field'
+    | 'playbooks'
+    | 'playbook'
+    | 'situations'
+    | 'situation'
+    | 'regime'
+    | 'indicator'
+    | 'episode';
   /** The theme the field index is narrowed to. */
   theme?: string | undefined;
   /** The field whose page is open (catalogue name). */
@@ -46,9 +59,21 @@ export interface GuideRailProps {
   playbook?: string | undefined;
   /** The situation whose page is open (its slug). */
   situation?: string | undefined;
+  /** The regime indicator whose page is open (its key). */
+  indicator?: string | undefined;
+  /** The market fall whose page is open (its slug). */
+  episode?: string | undefined;
 }
 
-export function GuideRail({ page, theme, field, playbook, situation }: GuideRailProps) {
+export function GuideRail({
+  page,
+  theme,
+  field,
+  playbook,
+  situation,
+  indicator,
+  episode,
+}: GuideRailProps) {
   const index = useGuideIndex();
   const catalogue = useFeatureCatalogue();
   const [query, setQuery] = useState('');
@@ -128,7 +153,30 @@ export function GuideRail({ page, theme, field, playbook, situation }: GuideRail
         : [],
   });
 
+  const regimeSection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_REGIME_PATH,
+    label: s.title,
+    count: s.entries,
+    current: page === 'regime',
+    children:
+      page === 'regime' || page === 'indicator' || page === 'episode'
+        ? [
+            ...(index.data?.indicators ?? []).map((i) => ({
+              href: indicatorPath(i.key),
+              label: i.plainName,
+              current: page === 'indicator' && i.key === indicator,
+            })),
+            ...(index.data?.episodes ?? []).map((e) => ({
+              href: episodePath(e.key),
+              label: e.name,
+              current: page === 'episode' && e.key === episode,
+            })),
+          ]
+        : [],
+  });
+
   const sectionItem: Record<string, (s: { title: string; entries: number }) => NavListItem> = {
+    regime: regimeSection,
     playbooks: playbooksSection,
     fields: fieldsSection,
     situations: situationsSection,

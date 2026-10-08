@@ -212,6 +212,16 @@ The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_nigh
 names a night (~17 min), so new names fill in without a command; the email's `ibkr-iv` line
 shows coverage, names still pending and the estimated hours left.
 
+The `outcomes` backfill (ADR 0053: forward outcomes for the edge harness) takes about 1.3 s per
+window-end session over the whole universe, so the 500 stored sessions take about 11 minutes; one
+run per window end, so an interrupted backfill is resumed by starting it again from the last
+session in its log (`--from <that session> --to <last session>`):
+
+```bash
+nohup sh -c '.venv/bin/algotrade-ingest run outcomes --from 2024-10-03 --to <last session> \
+  > var/logs/outcomes.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/outcomes.status' >/dev/null 2>&1 &
+```
+
 The `bars-history` task (Tiingo daily bars from 2018 for the event-study scope list and the stocks its
 funds track, ADR 0050) makes one request per name, 72 s apart on the free tier (50 requests an hour:
 the ~140 scoped names take about 3 hours), so run it detached. `--include-tiers` adds the tier A / B

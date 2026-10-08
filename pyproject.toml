@@ -181,6 +181,12 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"
+type = "protected"
+protected_modules = ["algotrade.data.outcomes"]
+allowed_importers = ["algotrade.services.evaluation"]
+
+[[tool.importlinter.contracts]]
 name = "Configs are pure: no storage I/O"
 type = "forbidden"
 source_modules = ["algotrade.config"]

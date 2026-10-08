@@ -48,6 +48,11 @@ const index = {
     { id: 'chart', title: 'The chart', themes: [{ theme: 'volume', fields: 35 }] },
   ],
   intents: [{ intent: 'A squeeze', fields: 3 }],
+  indicators: [
+    { key: 'curve_10y3m', plainName: 'Is the yield curve inverted?', pace: 'slow' },
+    { key: 'vix_term', plainName: 'Is fear rising?', pace: 'fast' },
+  ],
+  episodes: [{ key: 'gfc_2007', name: 'Global financial crisis, 2007-09' }],
 };
 
 beforeEach(() => {
@@ -55,16 +60,31 @@ beforeEach(() => {
 });
 
 describe('GuideHome', () => {
+  it('lists the warning signs and the market falls under Market regime, each a link to its page', () => {
+    render(<GuideHome />);
+    const regime = screen.getByRole('region', { name: 'Market regime' });
+    expect(within(regime).getByRole('link', { name: 'Is fear rising?' })).toHaveAttribute(
+      'href',
+      '/guide/regime/indicators/vix_term',
+    );
+    expect(
+      within(regime).getByRole('link', { name: 'Global financial crisis, 2007-09' }),
+    ).toHaveAttribute('href', '/guide/regime/episodes/gfc_2007');
+    expect(
+      within(regime).getByRole('link', { name: 'The warning signs and the falls' }),
+    ).toHaveAttribute('href', '/guide/regime');
+  });
+
   it('shows only the sections that have pages, in the server’s order, with its purpose', () => {
     render(<GuideHome />);
     expect(screen.getByRole('heading', { level: 1, name: 'Guide' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Market regime',
       'Playbooks',
       'Fields',
       'Situations',
     ]);
     expect(screen.queryByText('Start here')).toBeNull();
-    expect(screen.queryByText('Market regime')).toBeNull();
     expect(screen.getByText('Every catalogue field.')).toBeInTheDocument();
     expect(screen.getByText('399 entries')).toBeInTheDocument();
   });

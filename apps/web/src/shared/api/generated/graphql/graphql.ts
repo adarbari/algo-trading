@@ -127,7 +127,7 @@ export type FeatureTableQuery = { table: { universeSnapshot: string | null, preS
 export type GuideIndexQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, playbooks: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }> } | null };
+export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, playbooks: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }>, indicators: Array<{ key: string, plainName: string, pace: string }>, episodes: Array<{ key: string, name: string }> } | null };
 
 export type GuideFieldQueryVariables = Exact<{
   name: string;
@@ -149,6 +149,20 @@ export type GuideSituationQueryVariables = Exact<{
 
 
 export type GuideSituationQuery = { guideSituation: { slug: string, name: string, affects: Array<string>, signs: { segments: Array<{ text: string, field: string | null }> }, do: { segments: Array<{ text: string, field: string | null }> }, playbooks: Array<{ id: string, name: string, fields: Array<string> }> } | null };
+
+export type GuideIndicatorQueryVariables = Exact<{
+  key: string;
+}>;
+
+
+export type GuideIndicatorQuery = { guideIndicator: { key: string, plainName: string, technicalName: string, pace: string, feature: string, summary: { segments: Array<{ text: string, field: string | null }> }, whyItMatters: { segments: Array<{ text: string, field: string | null }> }, whatOnMeans: { segments: Array<{ text: string, field: string | null }> }, leadTime: { segments: Array<{ text: string, field: string | null }> }, trackRecord: { segments: Array<{ text: string, field: string | null }> }, before: Array<{ label: string, episode: string | null, line: { segments: Array<{ text: string, field: string | null }> } }>, how: Array<{ text: string, url: string | null }>, sources: Array<{ title: string, url: string }> } | null };
+
+export type GuideEpisodeQueryVariables = Exact<{
+  slug: string;
+}>;
+
+
+export type GuideEpisodeQuery = { guideEpisode: { episode: { key: string, name: string, kind: string, peak: string, trough: string, recovered: string | null, spxDrawdown: number, nasdaqDrawdown: number, recession: boolean, nberStart: string | null, nberEnd: string | null, knownFrom: string }, cause: { segments: Array<{ text: string, field: string | null }> }, notes: { segments: Array<{ text: string, field: string | null }> }, indicators: Array<{ key: string, plainName: string, label: string, line: { segments: Array<{ text: string, field: string | null }> } }> } | null };
 
 export type EtfHoldingsQueryVariables = Exact<{
   key: string;
@@ -711,6 +725,15 @@ export const GuideIndexDocument = new TypedDocumentString(`
       fields
       slug
     }
+    indicators {
+      key
+      plainName
+      pace
+    }
+    episodes {
+      key
+      name
+    }
   }
 }
     `) as unknown as TypedDocumentString<GuideIndexQuery, GuideIndexQueryVariables>;
@@ -836,6 +859,108 @@ export const GuideSituationDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideSituationQuery, GuideSituationQueryVariables>;
+export const GuideIndicatorDocument = new TypedDocumentString(`
+    query GuideIndicator($key: String!) {
+  guideIndicator(key: $key) {
+    key
+    plainName
+    technicalName
+    pace
+    summary {
+      segments {
+        text
+        field
+      }
+    }
+    whyItMatters {
+      segments {
+        text
+        field
+      }
+    }
+    whatOnMeans {
+      segments {
+        text
+        field
+      }
+    }
+    leadTime {
+      segments {
+        text
+        field
+      }
+    }
+    trackRecord {
+      segments {
+        text
+        field
+      }
+    }
+    before {
+      label
+      episode
+      line {
+        segments {
+          text
+          field
+        }
+      }
+    }
+    how {
+      text
+      url
+    }
+    feature
+    sources {
+      title
+      url
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideIndicatorQuery, GuideIndicatorQueryVariables>;
+export const GuideEpisodeDocument = new TypedDocumentString(`
+    query GuideEpisode($slug: String!) {
+  guideEpisode(slug: $slug) {
+    episode {
+      key
+      name
+      kind
+      peak
+      trough
+      recovered
+      spxDrawdown
+      nasdaqDrawdown
+      recession
+      nberStart
+      nberEnd
+      knownFrom
+    }
+    cause {
+      segments {
+        text
+        field
+      }
+    }
+    notes {
+      segments {
+        text
+        field
+      }
+    }
+    indicators {
+      key
+      plainName
+      label
+      line {
+        segments {
+          text
+          field
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideEpisodeQuery, GuideEpisodeQueryVariables>;
 export const EtfHoldingsDocument = new TypedDocumentString(`
     query EtfHoldings($key: String!, $top: Int!) {
   instrument(key: $key) {

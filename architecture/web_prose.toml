@@ -37,7 +37,6 @@ max_sentence_words = 25
 "src/widgets/feature-table/ui/ScreenerResults.tsx" = 1
 "src/widgets/options-panel/ui/OptionsPanel.tsx" = 1
 "src/widgets/paused-ideas/ui/PausedIdeas.tsx" = 1
-"src/widgets/regime-indicators/ui/IndicatorCard.tsx" = 1
 "src/widgets/regime-legend/ui/RegimeLegend.tsx" = 1
 "src/widgets/screener-list/ui/ScreenerList.tsx" = 1
 "src/widgets/screener-ranking/ui/ScreenerRanking.tsx" = 1
