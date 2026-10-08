@@ -5,6 +5,7 @@
  * to it. The app gives it navigation (`GuideHelpProvider`) for "Open full page".
  */
 export { GuideHelp, type GuideHelpProps } from './ui/GuideHelp';
+export { helped } from './ui/helped';
 export { GuideHelpProvider, type GuideNavigate } from './model/navigation';
 export { guidePath, type GuideEntry } from './model/entry';
 export { useGuideHelp } from './api/hooks';

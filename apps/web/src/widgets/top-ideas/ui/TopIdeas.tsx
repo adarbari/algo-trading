@@ -6,6 +6,7 @@
 import { Button, Chip, DataTable, Panel, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
+import { helped } from '@/features/guide-help';
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
 import { useIdeas, type Idea } from '@/entities/idea';
 import { decisionLabel } from '@/entities/screen';
@@ -104,7 +105,7 @@ export function TopIdeas({ onCompare, onOpen, onOpenScreener, onScreeners }: Top
     >
       <DataTable<Idea>
         label="Top ideas"
-        columns={columns}
+        columns={columns.map(helped)}
         rows={rows}
         getRowId={(idea) => idea.instrumentId}
         getRowLabel={(idea) => idea.symbol ?? idea.instrumentId}

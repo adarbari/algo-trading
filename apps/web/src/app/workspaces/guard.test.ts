@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Viewer } from '@/entities/viewer';
 import { ApiError, gql } from '@/shared/api';
 
-import { canEnter, homeFor, workspaceGuard } from './guard';
+import { canEnter, homeFor, viewerGuard, workspaceGuard } from './guard';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -21,9 +21,10 @@ beforeEach(() => {
 });
 
 /** What the guard throws (a router redirect), or undefined when it lets the route load. */
-async function outcome(workspace: 'trader' | 'admin') {
+async function outcome(workspace: 'trader' | 'admin' | 'any') {
   try {
-    await workspaceGuard(workspace)({ context: { queryClient } });
+    const guard = workspace === 'any' ? viewerGuard : workspaceGuard(workspace);
+    await guard({ context: { queryClient } });
   } catch (thrown) {
     const { options } = thrown as { options: { to: string; search?: () => unknown } };
     return { to: options.to, search: options.search?.() };
@@ -85,5 +86,20 @@ describe('workspaceGuard', () => {
   it('treats an API that answers without a session (auth off) as signed in', async () => {
     GQL.mockResolvedValue({ viewer: ADMIN });
     await expect(outcome('trader')).resolves.toBeUndefined();
+  });
+});
+
+describe('viewerGuard (the Guide: every role, no workspace)', () => {
+  it('lets a trader and an admin in', async () => {
+    GQL.mockResolvedValue({ viewer: TRADER });
+    await expect(outcome('any')).resolves.toBeUndefined();
+    queryClient.clear();
+    GQL.mockResolvedValue({ viewer: ADMIN });
+    await expect(outcome('any')).resolves.toBeUndefined();
+  });
+
+  it('sends no session to the login page', async () => {
+    GQL.mockRejectedValue(new ApiError(401, 'Unauthorized'));
+    await expect(outcome('any')).resolves.toEqual({ to: '/login', search: {} });
   });
 });

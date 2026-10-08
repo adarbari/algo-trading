@@ -3,9 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDEA_FACTS, toIdeasData, type IdeasData, type IdeasResponse } from '@/entities/idea';
+import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { TopIdeas } from './TopIdeas';
+
+vi.mock('@/shared/api', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  gql: vi.fn(),
+}));
 
 const hooks = vi.hoisted(() => ({ useIdeas: vi.fn() }));
 vi.mock('@/entities/idea', async (importOriginal) => ({
@@ -117,7 +123,11 @@ function setup() {
     onOpenScreener: vi.fn(),
     onScreeners: vi.fn(),
   };
-  const view = render(<TopIdeas {...handlers} />);
+  const view = render(
+    <TestQueryProvider>
+      <TopIdeas {...handlers} />
+    </TestQueryProvider>,
+  );
   return { ...view, ...handlers, grid: () => screen.getByRole('grid', { name: 'Top ideas' }) };
 }
 
@@ -260,5 +270,25 @@ describe('TopIdeas', () => {
     const failed = setup();
     expect(screen.getByText('The ideas failed to load.')).toBeInTheDocument();
     await expectNoA11yViolations(failed.container);
+  });
+});
+
+describe('TopIdeas field headers', () => {
+  it('puts the Guide help button in the catalogue field headers, not in the rest', async () => {
+    vi.mocked(gql).mockResolvedValue({ guideField: null });
+    const { grid } = setup();
+    const help = (name: RegExp) =>
+      within(within(grid()).getAllByRole('columnheader', { name })[0] as HTMLElement).queryByRole(
+        'button',
+        {
+          name: /^What is .*\?$/,
+        },
+      );
+    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(3);
+    expect(help(/Earnings/)).toBeVisible();
+    expect(help(/Expiry DTE/)).toBeVisible();
+    expect(help(/IV30/)).toBeVisible();
+    expect(help(/Score/)).toBeNull();
+    expect(help(/Decision/)).toBeNull();
   });
 });

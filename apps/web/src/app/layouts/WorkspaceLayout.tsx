@@ -27,7 +27,13 @@ import { useEffect } from 'react';
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
 
-import { canEnter, WORKSPACES, type Workspace, type WorkspaceId } from '../workspaces';
+import {
+  canEnter,
+  rememberWorkspace,
+  WORKSPACES,
+  type Workspace,
+  type WorkspaceId,
+} from '../workspaces';
 
 import { renderRouterLink } from './router-link';
 import { useGuideShortcut } from './use-guide-shortcut';
@@ -44,6 +50,9 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
   const { session } = useSession();
   const signOut = useSignOut();
   useGuideShortcut();
+  useEffect(() => {
+    rememberWorkspace(workspace);
+  }, [workspace]);
   useEffect(() => {
     if (viewer === null) void navigate({ to: '/login', search: {} });
   }, [viewer, navigate]);

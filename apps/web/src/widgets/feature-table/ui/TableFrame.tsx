@@ -20,8 +20,8 @@ import {
 import type { ReactNode } from 'react';
 
 import { isStale } from '@/entities/explore';
-import type { ColumnPlan, PlanColumn, TableRow } from '@/entities/feature';
-import { GuideHelp } from '@/features/guide-help';
+import type { ColumnPlan, TableRow } from '@/entities/feature';
+import { helped } from '@/features/guide-help';
 
 import { missingTables } from '../model/plan';
 
@@ -53,11 +53,6 @@ export interface TableFrameProps {
     'toolbar' | 'getRowId' | 'getRowLabel' | 'rowLines' | 'columns'
   > &
     Partial<Pick<DataTableProps<TableRow>, 'getRowId'>> & { columns: ColumnPlan };
-}
-
-/** The column with its help button beside the header, where its factory named a Guide entry. */
-function helped({ help, ...column }: PlanColumn): PlanColumn {
-  return help ? { ...column, headerAction: <GuideHelp entry={help} /> } : column;
 }
 
 const count = (n: number) => n.toLocaleString('en-US');

@@ -34,13 +34,25 @@ export interface ColumnHelp {
   id: string;
 }
 
+/** A column of any row type carrying the Guide entry its header button opens. */
+export type HelpedColumn<R> = DataTableColumn<R> & { help?: ColumnHelp };
+
 /** A column from a factory: a field's carries the Guide entry its header button opens. */
-export type PlanColumn = DataTableColumn<TableRow> & { help?: ColumnHelp };
+export type PlanColumn = HelpedColumn<TableRow>;
 
 /** A table's columns, in order: each one a factory call. */
 export type ColumnPlan = readonly PlanColumn[];
 
 const fieldHelp = (name: string): { help: ColumnHelp } => ({ help: { kind: 'field', id: name } });
+
+/**
+ * A column of a table whose rows are not `TableRow`s (the Top ideas table) that shows one
+ * catalogue field: the same header help as `featureColumn`, so every field header explains
+ * itself the same way. The caller's column keeps its cells and values.
+ */
+export function fieldColumn<R>(name: string, column: DataTableColumn<R>): HelpedColumn<R> {
+  return { ...column, ...fieldHelp(name) };
+}
 
 /** The ticker column's id (and the server's sort key for it). */
 export const TICKER_COLUMN = 'symbol';
