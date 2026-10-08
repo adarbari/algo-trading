@@ -58,7 +58,7 @@ themes = ["events", "fundamentals", "episode behaviour"]
 [[family]]
 id = "trend"
 title = "Trend"
-presets = ["trend_continuation", "pullback", "momentum_12_1"]
+presets = ["trend_continuation", "pullback", "momentum_12_1", "size_small"]
 
 [[family]]
 id = "breakouts"
