@@ -12,12 +12,15 @@ it)."""
 
 from collections.abc import Container
 from dataclasses import dataclass
+from datetime import date
 
 from algotrade.config.site.regime.cards import load_cards
-from algotrade.config.site.regime.episodes import Episode, load_episodes
+from algotrade.config.site.regime.episodes import Episode as EpisodeConfig
+from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.prose import LinkedProse, link_prose
+from algotrade.services.read.regime.episodes import Episode, episode_known_by
 
 
 @dataclass(frozen=True)
@@ -32,8 +35,8 @@ class GuideEpisodeIndicator:
 
 @dataclass(frozen=True)
 class GuideEpisodeDetail:
-    """An episode as the config holds it (``episode``: dates, drawdowns, recession months,
-    ``known_from``; the config's own type, never copied field by field), with ``cause`` and
+    """An episode as the Regime read maps it, with every date the config has (``episode``:
+    ``episode_known_by`` as of ``date.max``: the Guide has no session), with ``cause`` and
     ``notes`` linked and the indicators whose ``before`` line is about it."""
 
     episode: Episode
@@ -46,7 +49,7 @@ class GuideEpisodeDetail:
         return self.episode.key
 
 
-def before_episode(label: str, episodes: tuple[Episode, ...]) -> Episode | None:
+def before_episode(label: str, episodes: tuple[EpisodeConfig, ...]) -> EpisodeConfig | None:
     """The one episode a ``before`` label means (module docstring); ``None`` for none or two."""
     if not label.isdecimal():
         return None
@@ -57,13 +60,14 @@ def before_episode(label: str, episodes: tuple[Episode, ...]) -> Episode | None:
 
 def load_guide_episode(ctx: Stores, slug: str) -> GuideEpisodeDetail | None:
     """The episode ``slug`` names (module docstring); ``None``: no such episode."""
-    episodes = load_episodes(ctx.configs).episodes
+    config = load_episodes(ctx.configs)
+    episodes = config.episodes
     e = next((e for e in episodes if e.key == slug), None)
     if e is None:
         return None
     fields = catalog_of(ctx.features).fields
     return GuideEpisodeDetail(
-        episode=e,
+        episode=episode_known_by(e, date.max, config.recessions),
         cause=link_prose(e.cause, fields),
         notes=link_prose(e.notes, fields),
         indicators=_indicators(ctx, e, episodes, fields),
@@ -71,7 +75,10 @@ def load_guide_episode(ctx: Stores, slug: str) -> GuideEpisodeDetail | None:
 
 
 def _indicators(
-    ctx: Stores, episode: Episode, episodes: tuple[Episode, ...], fields: Container[str]
+    ctx: Stores,
+    episode: EpisodeConfig,
+    episodes: tuple[EpisodeConfig, ...],
+    fields: Container[str],
 ) -> tuple[GuideEpisodeIndicator, ...]:
     return tuple(
         GuideEpisodeIndicator(card.key, card.plain_name, label, link_prose(line, fields))

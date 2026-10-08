@@ -387,21 +387,10 @@ type GuideEpisode {
 }
 
 """
-A reference market fall's Guide page, as the config holds it (no session gating): `spxDrawdown` / `nasdaqDrawdown` peak-to-trough fractions (zero or negative), `nberStart` / `nberEnd` the recession's first and last months (null: none), `recovered` null while the S&P 500 has not regained its peak; `cause` and `notes` linked; the indicators whose before-line is about it, in card order
+A reference market fall's Guide page: `episode` with every date the config has (no session gating; its key is the page's slug), `cause` and `notes` linked, the indicators whose before-line is about it, in card order
 """
 type GuideEpisodeDetail {
-  slug: String!
-  name: String!
-  kind: String!
-  peak: Date!
-  trough: Date!
-  recovered: Date
-  spxDrawdown: Float!
-  nasdaqDrawdown: Float!
-  recession: Boolean!
-  nberStart: Date
-  nberEnd: Date
-  knownFrom: Date!
+  episode: Episode!
   cause: GuideProse!
   notes: GuideProse!
   indicators: [GuideEpisodeIndicator!]!
