@@ -311,6 +311,20 @@ describe('DataTable', () => {
     expect(onActiveRowChange).toHaveBeenCalledTimes(2); // focus, ArrowDown: j did not move it
   });
 
+  it('marks rows clickable only when a click acts on them (open, or focus for a detail)', () => {
+    const clickable = () => bodyRows().map((row) => row.hasAttribute('data-clickable'));
+    const none = rows.map(() => false);
+    const all = rows.map(() => true);
+    const { rerender } = render(<Table />);
+    expect(clickable()).toEqual(none);
+    rerender(<Table onRowActivate={vi.fn()} />);
+    expect(clickable()).toEqual(all);
+    rerender(<Table onRowActivate={vi.fn()} activateOnClick={false} />);
+    expect(clickable()).toEqual(none);
+    rerender(<Table activateOnClick={false} onActiveRowChange={vi.fn()} />);
+    expect(clickable()).toEqual(all);
+  });
+
   it('can make a click only select the row, and the caller can control the active row', async () => {
     const onRowActivate = vi.fn();
     const onActiveRowChange = vi.fn();

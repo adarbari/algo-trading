@@ -400,7 +400,7 @@ Source: `design-system/components/DataTable`
 | `selectable` | `boolean` | no | Add the checkbox column. Selection is controlled: pass `selectedIds` and `onSelectionChange`. |
 | `selectedIds` | `readonly string[]` | no |  |
 | `onSelectionChange` | `(ids: string[]) => void` | no |  |
-| `onRowActivate` | `(row: TRow) => void` | no | Enter on the active row, or a click on a row (unless `activateOnClick` is false). |
+| `onRowActivate` | `(row: TRow) => void` | no | Enter on the active row, or a click on a row (unless `activateOnClick` is false): open the row's page. Give it whenever a row has a page to open, so every table's rows click through the same way; rows that open nothing show no hover and no pointer. |
 | `activateOnClick` | `boolean` | no | A click activates the row (default), or only makes it the active row (`false`). |
 | `activeRowId` | `string \| null` | no | The active (keyboard) row id, when the caller controls it (else the table keeps it). |
 | `onActiveRowChange` | `(row: TRow) => void` | no | The active row changed: arrows, `j` / `k`, Home / End, Page Up / Down, or a click. |
@@ -1121,7 +1121,7 @@ Source: `design-system/components/Skeleton`
 
 ### SortableList
 
-SortableList: an ordered list whose items the user reorders, by dragging an item's handle (pointer) or from the keyboard: focus the handle, Space to grab, Up / Down to move, Space to drop, Escape to cancel. Every move is announced through a live region. Controlled: `items` in, `onReorder(newOrder)` out when a move is dropped. Items render arbitrary content through `renderItem`. Use it for a priority order the user owns (rule priority, column order).
+SortableList: an ordered list whose items the user reorders, by dragging an item's handle (pointer) or from the keyboard: focus the handle, Space to grab, Up / Down to move, Space to drop, Escape to cancel. Every move is announced through a live region. Controlled: `items` in, `onReorder(newOrder)` out when a move is dropped. Items render arbitrary content through `renderItem`. Use it for a priority order the user owns (rule priority, column order). With `onActivate`, a click anywhere on an item (not its handle, nor a button or link inside it) opens it, and the item shows the pointer and the hover; the keyboard reaches the same action through the button or link the item renders (its name).
 
 Source: `design-system/components/SortableList`
 
@@ -1135,6 +1135,7 @@ Source: `design-system/components/SortableList`
 | `label` | `string` | yes | Accessible name of the list ("Screener priority"). |
 | `disabled` | `boolean` | no | Handles are inert; the order cannot change. |
 | `empty` | `ReactNode` | no | Shown instead of the list when `items` is empty (an `EmptyState`). |
+| `onActivate` | `(item: T) => void` | no | A click on an item opens it (its page). Pair it with a button or link inside `renderItem` doing the same, the keyboard's way in. |
 
 ### SourceLine
 

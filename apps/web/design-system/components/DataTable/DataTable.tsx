@@ -93,7 +93,11 @@ export interface DataTableProps<TRow> {
   selectable?: boolean;
   selectedIds?: readonly string[];
   onSelectionChange?: (ids: string[]) => void;
-  /** Enter on the active row, or a click on a row (unless `activateOnClick` is false). */
+  /**
+   * Enter on the active row, or a click on a row (unless `activateOnClick` is false): open the
+   * row's page. Give it whenever a row has a page to open, so every table's rows click through
+   * the same way; rows that open nothing show no hover and no pointer.
+   */
   onRowActivate?: (row: TRow) => void;
   /** A click activates the row (default), or only makes it the active row (`false`). */
   activateOnClick?: boolean;
@@ -350,6 +354,11 @@ export function DataTable<TRow extends RowData>({
     '--dt-row-lines': rowLines,
   } as CSSProperties;
 
+  // A click on a row does something (opens it, or focuses it for the caller's detail): the row
+  // shows the pointer and the hover; a row a click does nothing to shows neither.
+  const clickable =
+    (activateOnClick && onRowActivate !== undefined) || onActiveRowChange !== undefined;
+
   const allSelected = table.getIsAllRowsSelected();
   const someSelected = table.getIsSomeRowsSelected();
   const rowIdFor = (rowId: string) => `${id}-row-${encodeURIComponent(rowId)}`;
@@ -555,6 +564,7 @@ export function DataTable<TRow extends RowData>({
                     aria-rowindex={item.index + 2}
                     aria-selected={selectable ? selected : undefined}
                     data-active={item.index === activeIndex || undefined}
+                    data-clickable={clickable || undefined}
                     data-virtual
                     style={{
                       transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`,

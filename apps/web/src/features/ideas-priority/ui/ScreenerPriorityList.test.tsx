@@ -96,6 +96,17 @@ describe('ScreenerPriorityList', () => {
     expect(onOpenScreener).toHaveBeenCalledWith('liq');
   });
 
+  it("opens a screener's results from a click anywhere on its row, once", async () => {
+    const onOpenScreener = vi.fn();
+    setup(onOpenScreener);
+    const user = userEvent.setup();
+    await user.click(screen.getAllByText('AAPL 84')[1] as HTMLElement);
+    expect(onOpenScreener).toHaveBeenCalledExactlyOnceWith('liq');
+    await user.click(screen.getByRole('button', { name: 'vrp' }));
+    expect(onOpenScreener).toHaveBeenLastCalledWith('vrp');
+    expect(onOpenScreener).toHaveBeenCalledTimes(2);
+  });
+
   it('saves the new order at once (optimistic) and refetches when settled', async () => {
     let resolve: (value: unknown) => void = () => undefined;
     PUT.mockReturnValue(new Promise((r) => (resolve = r)) as never);
