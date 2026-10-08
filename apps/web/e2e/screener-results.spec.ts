@@ -72,7 +72,12 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
     .toEqual({
       id: 'vrp_scanner',
       name: null,
-      view: { columns: [], sort: null, decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED'] },
+      view: {
+        columns: [],
+        narrow_columns: [],
+        sort: null,
+        decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED'],
+      },
     });
   await expect
     .poll(() => mock.tables.at(-1)?.['decisions'])

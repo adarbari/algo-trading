@@ -30,6 +30,9 @@ export interface FeatureTableProps {
   /** Catalogue names shown as columns, in order (after the ticker). */
   columns: readonly string[];
   onColumnsChange: (columns: string[]) => void;
+  /** The columns added back on a narrow table (the page keeps them in its URL); absent: the table keeps them. */
+  narrowColumns?: readonly string[];
+  onNarrowColumnsChange?: (columns: string[]) => void;
   /** The column picker's trigger ("Columns", "Dimension") and icon. */
   pickerLabel?: string;
   pickerIcon?: IconName;
@@ -66,6 +69,8 @@ export function FeatureTable({
   label,
   columns,
   onColumnsChange,
+  narrowColumns,
+  onNarrowColumnsChange,
   pickerLabel = 'Columns',
   pickerIcon = 'columns',
   keys,
@@ -138,6 +143,8 @@ export function FeatureTable({
         ...(sort !== undefined ? { sort } : {}),
         ...(onSortChange ? { onSortChange } : {}),
         sortMode,
+        ...(narrowColumns !== undefined ? { narrowColumns } : {}),
+        ...(onNarrowColumnsChange ? { onNarrowColumnsChange } : {}),
         selectable: selected !== undefined,
         selectedIds: selected ?? [],
         onSelectionChange: (ids) => {

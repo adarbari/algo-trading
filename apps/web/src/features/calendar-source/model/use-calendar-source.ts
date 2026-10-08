@@ -65,7 +65,8 @@ export function useCalendarSource(): CalendarSource {
   return {
     value,
     setValue,
-    screeners: (configs.data ?? []).map((c) => c.configId),
+    // The user's own screener and a site preset can share an id: each once.
+    screeners: [...new Set((configs.data ?? []).map((c) => c.configId))],
     scope: isScope,
     ids,
     ready: isScope || (!results.isPending && !results.isError && message === null),

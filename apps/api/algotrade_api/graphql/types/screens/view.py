@@ -21,6 +21,7 @@ class TableView:
     sort: str | None
     decisions: list[str]
     names: list[str]
+    narrow_columns: list[str]
 
     @classmethod
     def of(cls, d: views.TableView) -> Self:
@@ -32,4 +33,5 @@ class TableView:
             sort=d.sort,
             decisions=list(d.decisions),
             names=list(d.names),
+            narrow_columns=list(d.narrow_columns),
         )

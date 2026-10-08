@@ -25,11 +25,18 @@ const view = (patch: Record<string, unknown> = {}) => ({
   name: null,
   saved: true,
   columns: [CLOSE],
+  narrowColumns: ['name'],
   sort: '-score',
   decisions: ['QUALIFIED'],
   names: ['Earnings'],
   ...patch,
 });
+
+/** The REST response of a save: the view with the snake_case key. */
+const restView = (patch: Record<string, unknown> = {}) => {
+  const { narrowColumns, ...rest } = view(patch);
+  return { ...rest, narrow_columns: narrowColumns };
+};
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -45,7 +52,7 @@ beforeEach(() => {
 describe('useTableView', () => {
   it('starts from the saved view and saves every change into the view in use', async () => {
     GQL.mockResolvedValue({ view: view() });
-    PUT.mockResolvedValue(ok(view({ sort: 'symbol' })));
+    PUT.mockResolvedValue(ok(restView({ sort: 'symbol' })));
     const { result } = renderHook(() => useTableView(SCOPE), { wrapper });
     await waitFor(() => {
       expect(result.current.ready).toBe(true);
@@ -55,6 +62,7 @@ describe('useTableView', () => {
       name: null,
       names: ['Earnings'],
       columns: [CLOSE],
+      narrowColumns: ['name'],
       sort: '-score',
       decisions: ['QUALIFIED'],
     });
@@ -65,13 +73,20 @@ describe('useTableView', () => {
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/preferences/views/{scope}/view', {
         params: { path: { scope: SCOPE }, query: { name: null } },
-        body: { columns: [CLOSE], sort: 'symbol', decisions: ['QUALIFIED'] },
+        body: {
+          columns: [CLOSE],
+          narrow_columns: ['name'],
+          sort: 'symbol',
+          decisions: ['QUALIFIED'],
+        },
       });
     });
   });
 
   it('nothing saved: empty lists and no decisions (the table applies its defaults)', async () => {
-    GQL.mockResolvedValue({ view: view({ saved: false, columns: [], sort: null, decisions: [] }) });
+    GQL.mockResolvedValue({
+      view: view({ saved: false, columns: [], narrowColumns: [], sort: null, decisions: [] }),
+    });
     const { result } = renderHook(() => useTableView(SCOPE), { wrapper });
     await waitFor(() => {
       expect(result.current.ready).toBe(true);
@@ -83,9 +98,27 @@ describe('useTableView', () => {
     ]);
   });
 
+  it('saves the columns added on a narrow table into the view', async () => {
+    GQL.mockResolvedValue({ view: view() });
+    PUT.mockResolvedValue(ok(restView({ narrowColumns: ['name', 'change'] })));
+    const { result } = renderHook(() => useTableView(SCOPE), { wrapper });
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+    act(() => {
+      result.current.change({ narrowColumns: ['name', 'change'] });
+    });
+    expect(result.current.narrowColumns).toEqual(['name', 'change']);
+    await waitFor(() => {
+      expect(PUT.mock.calls[0]?.[1]).toMatchObject({
+        body: { narrow_columns: ['name', 'change'] },
+      });
+    });
+  });
+
   it('saves the current choice under a name, switches to it, and removes it', async () => {
     GQL.mockResolvedValue({ view: view() });
-    PUT.mockResolvedValue(ok(view({ name: 'Mine', names: ['Earnings', 'Mine'] })));
+    PUT.mockResolvedValue(ok(restView({ name: 'Mine', names: ['Earnings', 'Mine'] })));
     DELETE.mockResolvedValue(ok({ names: ['Earnings'] }));
     const { result } = renderHook(() => useTableView(SCOPE), { wrapper });
     await waitFor(() => {

@@ -7,6 +7,8 @@ import type { DataTableSort } from '@algotrade/ui';
 
 export interface ViewContent {
   columns: readonly string[];
+  /** The table column ids the user added back on a narrow (phone) table. */
+  narrowColumns: readonly string[];
   /** A column id, `-` prefix for descending; null: the table's default. */
   sort: string | null;
   decisions: readonly string[];

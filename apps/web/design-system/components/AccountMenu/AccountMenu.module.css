@@ -1,4 +1,15 @@
-/* AccountMenu: the popover's content keeps the label width so a short name does not squeeze the switch. */
+/*
+ * AccountMenu: the trigger yields width in a tight row (a phone's top bar): the name truncates
+ * with an ellipsis rather than clipping or pushing the bar wider. The popover's content keeps
+ * the label width so a short name does not squeeze the switch.
+ */
+.trigger {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .menu {
   min-width: var(--size-label);
 }

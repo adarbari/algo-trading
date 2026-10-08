@@ -1603,6 +1603,14 @@
             "title": "Names",
             "type": "array"
           },
+          "narrow_columns": {
+            "description": "table column ids added back on a narrow (phone) table",
+            "items": {
+              "type": "string"
+            },
+            "title": "Narrow Columns",
+            "type": "array"
+          },
           "saved": {
             "description": "false: this view is not saved yet (the page uses defaults)",
             "title": "Saved",
@@ -1633,7 +1641,8 @@
           "columns",
           "sort",
           "decisions",
-          "names"
+          "names",
+          "narrow_columns"
         ],
         "title": "TableView",
         "type": "object"
@@ -1655,6 +1664,21 @@
             },
             "title": "Decisions",
             "type": "array"
+          },
+          "narrow_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "table column ids added back on a narrow (phone) table; absent: kept as saved",
+            "title": "Narrow Columns"
           },
           "sort": {
             "anyOf": [

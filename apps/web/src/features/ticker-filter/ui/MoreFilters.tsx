@@ -1,8 +1,9 @@
 /**
- * "+ Filter": a popover with the filters that have many values (sector, liquidity class,
- * security type), their options read from the feature distributions across the universe.
+ * The fields of the filters that have many values (sector, liquidity class, security type),
+ * their options read from the feature distributions across the universe. The filter bar
+ * places them (a popover wide, a sheet on a phone).
  */
-import { Button, Field, Popover, Select, Stack } from '@algotrade/ui';
+import { Field, Select, Stack } from '@algotrade/ui';
 
 import { distributionCategories, useFeatureDistribution } from '@/entities/feature';
 import { feature } from '@/shared/api';
@@ -31,45 +32,35 @@ export function MoreFilters({ filters, onChange }: MoreFiltersProps) {
     onChange({ ...filters, [key]: value === ANY ? undefined : value });
   };
   return (
-    <Popover
-      label="More filters"
-      trapFocus
-      trigger={(props) => (
-        <Button {...props} variant="dashed" size="sm" icon="plus">
-          Filter
-        </Button>
-      )}
-    >
-      <Stack gap={3}>
-        <Field label="Sector">
-          <Select
-            options={options(distributionCategories(sectors.data), (v) => v, filters.sector)}
-            value={filters.sector ?? ANY}
-            onValueChange={set('sector')}
-            disabled={sectors.isPending}
-          />
-        </Field>
-        <Field label="Liquidity class">
-          <Select
-            options={options(
-              distributionCategories(liquidity.data),
-              liquidityLabel,
-              filters.liquidity,
-            )}
-            value={filters.liquidity ?? ANY}
-            onValueChange={set('liquidity')}
-            disabled={liquidity.isPending}
-          />
-        </Field>
-        <Field label="Security type">
-          <Select
-            options={options(distributionCategories(types.data), typeLabel, filters.type)}
-            value={filters.type ?? ANY}
-            onValueChange={set('type')}
-            disabled={types.isPending}
-          />
-        </Field>
-      </Stack>
-    </Popover>
+    <Stack gap={3}>
+      <Field label="Sector">
+        <Select
+          options={options(distributionCategories(sectors.data), (v) => v, filters.sector)}
+          value={filters.sector ?? ANY}
+          onValueChange={set('sector')}
+          disabled={sectors.isPending}
+        />
+      </Field>
+      <Field label="Liquidity class">
+        <Select
+          options={options(
+            distributionCategories(liquidity.data),
+            liquidityLabel,
+            filters.liquidity,
+          )}
+          value={filters.liquidity ?? ANY}
+          onValueChange={set('liquidity')}
+          disabled={liquidity.isPending}
+        />
+      </Field>
+      <Field label="Security type">
+        <Select
+          options={options(distributionCategories(types.data), typeLabel, filters.type)}
+          value={filters.type ?? ANY}
+          onValueChange={set('type')}
+          disabled={types.isPending}
+        />
+      </Field>
+    </Stack>
   );
 }

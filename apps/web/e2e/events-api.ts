@@ -30,6 +30,7 @@ const event = (
 
 const CPI = event('macro_release', '2026-10-14', 'CPI', '08:30', 'BLS');
 const EARNINGS = event('own_earnings', '2026-10-29', 'Earnings', 'after_hours', 'Company calendar');
+const JOBS = event('macro_release', '2026-10-09', 'Jobs report', '08:30', 'BLS');
 const OPEX = event('market_structure', '2026-10-16', 'Monthly expiry', 'close', 'Rule', true);
 
 const AAPL_STUDY = {
@@ -92,16 +93,29 @@ function calendar(ids: string[], scope: boolean): unknown {
   const names = scope ? [AAPL, SOXS] : [AAPL, SOXS].filter((n) => ids.includes(n.instrumentId));
   const own = names.some((n) => n.symbol === 'AAPL');
   const day = (date: string, events: unknown[]) => ({ date, isSession: true, events });
+  // The real store's shape: the 90 days ahead, an event on most of them (so the grid renders
+  // every row, which is what widened the page on a phone), and two gaps that read the same.
+  const named = new Map<string, unknown[]>([
+    ['2026-10-14', [{ instrumentId: null, symbol: null, event: CPI }]],
+    ['2026-10-16', [{ instrumentId: null, symbol: null, event: OPEX }]],
+    ['2026-10-29', own ? [{ ...AAPL, event: EARNINGS }] : []],
+  ]);
+  const days = Array.from({ length: 90 }, (_, i) => {
+    const date = new Date(Date.UTC(2026, 9, 8 + i)).toISOString().slice(0, 10);
+    const filler = i % 3 === 0 ? [{ instrumentId: null, symbol: null, event: JOBS }] : [];
+    return day(date, named.get(date) ?? filler);
+  });
+  const gap = {
+    instrumentId: null,
+    part: 'fund_reference',
+    unknown: { code: 'NO_PARTITION', detail: 'no fund reference stored', reason: null },
+  };
   return {
     session: '2026-10-07',
     end: '2027-01-05',
     names,
-    days: [
-      day('2026-10-14', [{ instrumentId: null, symbol: null, event: CPI }]),
-      day('2026-10-16', [{ instrumentId: null, symbol: null, event: OPEX }]),
-      day('2026-10-29', own ? [{ ...AAPL, event: EARNINGS }] : []),
-    ],
-    gaps: [],
+    days,
+    gaps: [gap, { ...gap }],
     missing: [],
     unresolved: [],
   };

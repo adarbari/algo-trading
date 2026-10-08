@@ -1,0 +1,4 @@
+/* ActionGroup: the measured root only; layout comes from Stack. */
+.root {
+  min-width: 0;
+}
