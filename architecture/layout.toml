@@ -84,7 +84,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/guide"
-purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, playbook families; playbooks/<id>.toml: each site playbook's prose; split from config/site, at its module cap)"
+purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, playbook families; playbooks/<id>.toml: each site playbook's prose; glossary.toml: the terms; start.toml: the Start here pages; shape.py: the shape checks they share; split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
@@ -317,7 +317,7 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/guide"
-purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), and the one splitter of prose at the catalogue names it mentions"
+purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), the indicator and episode pages, GuideTerm and GuideStartPage (the glossary and Start here pages, written.py), the one Guide search (search.py) and the one splitter of prose at the catalogue names it mentions; at its module cap (10): the next kind splits the folder"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
@@ -809,7 +809,7 @@ purpose = "event-sensitivity track settings: the scope list of names the event s
 
 [[config_dir]]
 path = "config/site/guide"
-purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order); the playbook prose in playbooks/"
+purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), glossary.toml (the app's words and the rule grammar, [[term]]), start.toml (the numbered Start here pages, [[page]]); the playbook prose in playbooks/"
 
 [[config_dir]]
 path = "config/site/guide/playbooks"

@@ -58,3 +58,16 @@ def test_the_shipped_index() -> None:
     assert [i.fields for i in index.intents] == sorted(
         (i.fields for i in index.intents), reverse=True
     )
+
+
+def test_the_index_lists_the_start_pages_in_order_and_the_terms() -> None:
+    configs = FileConfigStore(REPO_ROOT / "config")
+    index = load_guide_index(
+        open_stores(StoreReader(MemoryBackend()), configs, UserContext("local"))
+    )
+    counts = {s.id: s.entries for s in index.sections}
+    assert counts["start"] == len(index.start_pages) > 0
+    assert counts["glossary"] == len(index.terms) > 0
+    assert [p.order for p in index.start_pages] == sorted(p.order for p in index.start_pages)
+    assert index.start_pages[0].title == "How the app thinks about a day"
+    assert all(t.id and t.term and t.short for t in index.terms)

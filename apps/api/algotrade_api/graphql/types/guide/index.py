@@ -116,9 +116,39 @@ class GuideEpisode:
 
 
 @strawberry.type(
+    description="A Start here page: its id (`Query.guideStartPage(id)`), number, title and "
+    "one-line summary"
+)
+class GuideStartEntry:
+    id: str
+    order: int
+    title: str
+    summary: str
+
+    @classmethod
+    def of(cls, d: index.GuideStartEntry) -> Self:
+        return cls(id=d.id, order=d.order, title=d.title, summary=d.summary)
+
+
+@strawberry.type(
+    description="A glossary term: its id (`Query.guideTerm(id)`), the term as the app writes "
+    "it and `short`, one sentence (the help button's hover)"
+)
+class GuideTermEntry:
+    id: str
+    term: str
+    short: str
+
+    @classmethod
+    def of(cls, d: index.GuideTermEntry) -> Self:
+        return cls(id=d.id, term=d.term, short=d.short)
+
+
+@strawberry.type(
     description="What the Guide holds (ADR 0051): the sections in order with entry counts, the "
     "field theme groups, the intents (most fields first), the situations, the playbooks by "
-    "family, the regime indicators and the reference episodes"
+    "family, the regime indicators, the reference episodes, the Start here pages in order and "
+    "the glossary terms"
 )
 class GuideIndex:
     sections: list[GuideSection]
@@ -128,6 +158,8 @@ class GuideIndex:
     families: list[GuideFamily]
     indicators: list[GuideIndicator]
     episodes: list[GuideEpisode]
+    start_pages: list[GuideStartEntry]
+    terms: list[GuideTermEntry]
 
     @classmethod
     def of(cls, d: index.GuideIndex) -> Self:
@@ -139,4 +171,6 @@ class GuideIndex:
             families=[GuideFamily.of(f) for f in d.families],
             indicators=[GuideIndicator.of(i) for i in d.indicators],
             episodes=[GuideEpisode.of(e) for e in d.episodes],
+            start_pages=[GuideStartEntry.of(p) for p in d.start_pages],
+            terms=[GuideTermEntry.of(t) for t in d.terms],
         )

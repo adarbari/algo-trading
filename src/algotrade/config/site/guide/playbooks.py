@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from algotrade.config.site.fields import Table, reject_secrets
+from algotrade.config.site.guide.shape import line, lines
 from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "guide_playbooks"  # the config store's kind: site/guide/playbooks/<id>.toml
@@ -77,7 +78,7 @@ class PlaybookProse:
         reject_secrets(doc or {}, where)
         t = Table(doc, where)
         t.only(KEYS)
-        if _line(t, "id") != name:
+        if line(t, "id") != name:
             raise ConfigurationError(f"{where} id: expected {name!r} (the file's name)")
         if t.raw("version") is None:
             raise ConfigurationError(f"{where} version: required (the preset version written for)")
@@ -90,13 +91,13 @@ class PlaybookProse:
         return cls(
             id=name,
             version=version,
-            summary=_line(t, "summary"),
-            hit=_line(t, "hit"),
-            not_checked=_line(t, "not_checked"),
-            before_acting=_lines(t, "before_acting"),
+            summary=line(t, "summary"),
+            hit=line(t, "hit"),
+            not_checked=line(t, "not_checked"),
+            before_acting=lines(t, "before_acting"),
             related=related,
-            sources=_lines(t, "sources"),
-            asks=tuple((key, _line(asks, key)) for key in asks.names()),
+            sources=lines(t, "sources"),
+            asks=tuple((key, line(asks, key)) for key in asks.names()),
         )
 
 
@@ -118,21 +119,6 @@ def load_guide_playbooks(configs: Documents) -> GuidePlaybooks:
     )
 
 
-def _line(t: Table, key: str) -> str:
-    """``key`` with its whitespace collapsed; required and non-empty."""
-    value = " ".join(t.text(key, "").split())
-    if not value:
-        raise ConfigurationError(f"{t.where} {key}: expected a non-empty string")
-    return value
-
-
-def _lines(t: Table, key: str) -> tuple[str, ...]:
-    values = tuple(" ".join(v.split()) for v in t.strings(key, ()))
-    if not values or not all(values):
-        raise ConfigurationError(f"{t.where} {key}: expected one or more non-empty strings")
-    return values
-
-
 def _related(t: Table, name: str) -> list[RelatedPlaybook]:
     raw = t.raw("related") or []
     if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
@@ -141,7 +127,7 @@ def _related(t: Table, name: str) -> list[RelatedPlaybook]:
     for i, entry in enumerate(raw):
         row = Table(entry, f"{t.where} related[{i}]")
         row.only(RELATED_KEYS)
-        related = RelatedPlaybook(_line(row, "id"), _line(row, "reason"))
+        related = RelatedPlaybook(line(row, "id"), line(row, "reason"))
         if related.id == name:
             raise ConfigurationError(f"{row.where} id: a playbook is not related to itself")
         found.append(related)
