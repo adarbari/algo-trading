@@ -55,12 +55,17 @@ main() {
 
   # ---- phase A: guards, fetch, plan (the old code, no lock) -------------------------------
   if [ "$mode" = auto ] && [ -f "$state/blocked" ]; then return 0; fi
-  if [ "$mode" = auto ]; then
-    local tool
-    for tool in uv npm node curl git; do
-      command -v "$tool" > /dev/null 2>&1 || { block "$tool not found on PATH"; return 1; }
-    done
+  local pid
+  if [ "$mode" = auto ] && [ -f "$state/applying" ]; then
+    pid=$(cat "$state/applying")
+    if kill -0 "$pid" 2> /dev/null; then  # a deploy is mid-merge: its dirty tree is not a fault
+      say "skipped: deploy running (pid $pid)"; return 0
+    fi
   fi
+  local tool
+  for tool in uv npm node curl git; do
+    command -v "$tool" > /dev/null 2>&1 || { block "$tool not found on PATH"; return 1; }
+  done
   local branch
   branch=$(git rev-parse --abbrev-ref HEAD)
   if [ "$branch" != main ]; then
@@ -87,11 +92,11 @@ main() {
   local target last acts
   target=$(git rev-parse origin/main)
   if [ "$mode" = auto ]; then
-    if [ ! -f "$state/last_sha" ]; then
+    if [ ! -f "$state/last_sha" ] && [ "$dry" = 0 ]; then
       git rev-parse HEAD > "$state/last_sha"
       say "seeded last_sha from HEAD $(cat "$state/last_sha")"
     fi
-    last=$(cat "$state/last_sha")
+    if [ -f "$state/last_sha" ]; then last=$(cat "$state/last_sha"); else last=$(git rev-parse HEAD); fi
     if ! git merge-base --is-ancestor "$last" "$target" 2> /dev/null; then
       block "the last deployed commit ${last:0:9} is not an ancestor of origin/main ${target:0:9}"
       return 1
@@ -161,6 +166,10 @@ apply_phase() {
   has() { case "$acts" in *" $1 "*) return 0 ;; esac; return 1; }
   before=$(git rev-parse HEAD)
   local verify=("$api" deploy-verify --expect "$target")
+  if [ "$dry" = 0 ]; then
+    echo "$$" > "$state/applying"
+    trap "rm -f '$PWD/$state/applying'" EXIT  # expanded now: main's locals are gone by then
+  fi
 
   run git merge --ff-only "$target" || { block "git merge --ff-only ${target:0:9} failed"; return 1; }
   if has sync; then
@@ -183,7 +192,7 @@ apply_phase() {
       echo "[dry-run] swap $state/web.next into var/web (old assets/ kept for open tabs)"
     else
       # Hashed asset names: an open tab keeps loading the files of the build it has.
-      if [ -d var/web/assets ]; then cp -Rn var/web/assets/. "$state/web.next/assets/" || true; fi
+      carry_assets var/web "$state/web.next"
       rm -rf "$state/web.prev"
       if [ -d var/web ]; then mv var/web "$state/web.prev"; fi
       mv "$state/web.next" var/web
@@ -198,6 +207,17 @@ apply_phase() {
     say "deployed ${target:0:9} ($*)"
   fi
   return 0
+}
+
+# Only the previous build's own assets (the files its index.html references), not every
+# generation: the one an open tab was loaded with keeps loading, and the folder cannot grow.
+carry_assets() {
+  local from=$1 to=$2 f
+  [ -f "$from/index.html" ] || return 0
+  mkdir -p "$to/assets"
+  for f in $(grep -o 'assets/[^"'"'"' )?]*' "$from/index.html" | sort -u); do
+    if [ -f "$from/$f" ] && [ ! -e "$to/$f" ]; then cp "$from/$f" "$to/$f"; fi
+  done
 }
 
 # A launchd plist writer changed: regenerate into var/deploy/plists and say which installed

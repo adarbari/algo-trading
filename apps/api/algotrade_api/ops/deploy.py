@@ -91,7 +91,7 @@ def verify(
     expect_sha: str,
     fetch: Fetch,
     check: str = "full",
-    tries: int = 15,
+    tries: int = 45,
     sleep: Callable[[float], object] = _PAUSE.wait,
     delay_s: float = 2.0,
 ) -> list[str]:

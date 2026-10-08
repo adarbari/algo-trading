@@ -247,6 +247,40 @@ def test_a_missing_tool_blocks(site: Site) -> None:
     assert "node not found" in out.stderr and site.state("blocked").exists()
 
 
+def test_a_manual_deploy_also_needs_its_tools(site: Site) -> None:
+    (site.bin / "npm").unlink()
+    out = site.run(PATH=f"{site.bin}:/usr/bin:/bin")
+    assert out.returncode == 1 and "npm not found" in out.stderr and site.called() == []
+
+
+def test_an_auto_dry_run_does_not_seed_or_block(site: Site) -> None:
+    out = site.run("--auto", "--dry-run")
+    assert out.returncode == 0, out.stderr
+    assert not site.state("last_sha").exists() and site.log() == ""
+
+
+def test_a_running_deploy_makes_auto_skip_instead_of_blocking_on_its_dirty_tree(site: Site) -> None:
+    sleeper = subprocess.Popen(["sleep", "30"])
+    try:
+        site.state("applying").parent.mkdir(parents=True)
+        site.state("applying").write_text(f"{sleeper.pid}\n")
+        (site.repo / "a.txt").write_text("mid-merge\n")
+        out = site.run("--auto")
+        assert out.returncode == 0 and not site.state("blocked").exists()
+        assert "skipped: deploy running" in site.log() and site.notices() == []
+    finally:
+        sleeper.kill()
+        sleeper.wait()
+    stale = site.run("--auto")  # the pid is gone: the marker no longer excuses the dirty tree
+    assert stale.returncode == 1 and site.state("blocked").exists()
+
+
+def test_the_applying_marker_is_removed_when_a_deploy_ends(site: Site) -> None:
+    _advance(site.repo, "src/x.py")
+    assert site.run().returncode == 0
+    assert not site.state("applying").exists()
+
+
 def test_a_dirty_tree_blocks_and_notifies_once(site: Site) -> None:
     (site.repo / "a.txt").write_text("changed\n")
     out = site.run("--auto")
@@ -300,14 +334,16 @@ def test_a_web_change_is_built_aside_and_swapped_in_keeping_old_assets(site: Sit
     site.seed()
     web = site.repo / "var" / "web"
     (web / "assets").mkdir(parents=True)
-    (web / "index.html").write_text("old")
+    (web / "index.html").write_text('<script src="/assets/old.js"></script>')
     (web / "assets" / "old.js").write_text("old")
+    (web / "assets" / "ancient.js").write_text("older generation")
     sha = _advance(site.repo, "apps/web/src/a.ts")
     out = site.run("--auto", STUB_PLAN="web")
     assert out.returncode == 0, out.stdout + out.stderr
     assert (web / "index.html").read_text().strip() == "new"
     assert (web / "assets" / "new.js").exists() and (web / "assets" / "old.js").exists()
-    assert (site.repo / "var" / "deploy" / "web.prev" / "index.html").read_text() == "old"
+    assert not (web / "assets" / "ancient.js").exists()  # only the previous build's own files
+    assert "old.js" in (site.repo / "var" / "deploy" / "web.prev" / "index.html").read_text()
     calls = site.called()
     assert any("make web-build WEB_DIST=var/deploy/web.next" in c for c in calls)
     assert any(f"deploy-verify --expect {sha} --check web" in c for c in calls)
