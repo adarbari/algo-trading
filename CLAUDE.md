@@ -150,9 +150,15 @@ the skill with the fix.
     bypass. Branch protection on `main` requires the CI checks (admins included); only
     the workflow merges, and only on green. The repo is public: CI runs on
     GitHub-hosted runners only, never self-hosted ones (`docs/ci.md`).
+    A PR that waits on an owner decision gets `needs-owner` (and `no-automerge` if it must not
+    merge); `/start` lists them. Only the session that set `no-automerge` or `needs-owner`
+    removes it: an agent never removes a label it did not set (#284, #287, #291 auto-merged
+    when another session removed it under the shared account).
     **No stacked PRs into a branch that will be deleted**: squash-merge deletes the base and
     GitHub closes the stacked PR (#99, #103). Branch from `main`; if stacking is unavoidable,
-    label the stacked PR `no-automerge` and retarget it to `main` before its base merges.
+    open the dependent PR as a draft against `main` with the base PR's commits included,
+    labelled `no-automerge`; when the base merges, run `scripts/merge_main.sh`, drop the
+    label, mark it ready.
     **Generated files** (`apps/api/openapi.json`, `apps/web/src/shared/api/generated/*`): on a
     merge conflict never hand-merge; take main's, then regenerate (`scripts/export_openapi.py`,
     `npm run api:generate`).

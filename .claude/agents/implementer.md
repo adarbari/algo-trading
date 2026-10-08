@@ -53,8 +53,14 @@ these is true (these need the `architect` agent or the main session):
   `architect` review of the diff in the hand-back and the PR.
 - The same check has failed twice after your fixes.
 
+Foreground rule: every check (`make check`, a gate, a test run) runs in the foreground, never
+as a background command. The hand-back is your last action, exactly one per run, and no
+command may still be running when you hand back.
+Only the session that set `no-automerge` or `needs-owner` removes it; an agent never removes a label it did not set (CLAUDE.md rule 10).
+
 Finish with a hand-back of at most 150 words: the PR link (or files changed), checks run and
 their result, deviations from the brief, and decisions the caller must make. Everything else
 (what the change does, real-data findings, screenshots) goes in the PR description, not the
 hand-back. Do not claim a check passed unless you ran it. Never merge a PR or enable
 auto-merge yourself (`gh pr merge`): the repo's workflow merges on green (CLAUDE.md rule 10).
+The hand-back is the last action of the run.

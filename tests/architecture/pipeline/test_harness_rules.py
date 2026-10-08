@@ -32,3 +32,26 @@ def test_web_servers_read_the_worktree_port_base() -> None:
         assert "ALGOTRADE_PORT_BASE" in (WEB / name).read_text(), name
     script = (REPO / "scripts" / "worktree.sh").read_text()
     assert "ALGOTRADE_PORT_BASE=" in script  # worktree.env sets it
+
+
+def _flat(*parts: str) -> str:
+    return " ".join(REPO.joinpath(*parts).read_text().split())
+
+
+def test_needs_owner_label_is_in_the_rules_and_in_start() -> None:
+    assert "`needs-owner`" in _flat("CLAUDE.md")
+    assert "`needs-owner`" in _flat(".claude", "commands", "start.md")
+
+
+def test_agent_briefs_demand_foreground_checks_and_a_last_action_hand_back() -> None:
+    for name in ("implementer", "checker"):
+        text = _flat(".claude", "agents", f"{name}.md")
+        assert "foreground" in text, f"{name}.md must say checks run in the foreground"
+        assert "no command may still be running" in text, name
+
+
+def test_only_the_label_setter_removes_the_label() -> None:
+    for parts in (("CLAUDE.md",), (".claude", "agents", "implementer.md")):
+        text = _flat(*parts)
+        assert "Only the session that set `no-automerge` or `needs-owner` removes it" in text
+        assert "an agent never removes a label it did not set" in text, parts
