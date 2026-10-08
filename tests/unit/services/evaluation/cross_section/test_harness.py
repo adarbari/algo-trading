@@ -739,3 +739,50 @@ def _report_stub() -> dict[str, Any]:
         "edge": "drift", "run_id": "r", "trials": 1, "survivorship": {},
         "unclosed_sessions": {}, "rows": [],
     }  # fmt: skip
+
+
+@pytest.mark.parametrize("dataset", ["market features", "universe", "instruments/reference"])
+def test_a_missing_wiring_dataset_fails_the_run_it_is_not_a_lost_session(
+    monkeypatch: pytest.MonkeyPatch, dataset: str
+) -> None:
+    def broken(reader: Any, config: Any, day: date) -> Any:
+        raise MissingDataError(dataset, "not loaded for this run", "wire it")
+
+    monkeypatch.setattr(harness, "screen_variant", broken)
+    with pytest.raises(MissingDataError, match=dataset):
+        run(build_world())
+
+
+def test_a_variant_that_loses_every_session_fails_the_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def never(reader: Any, config: Any, day: date) -> Any:
+        raise MissingDataError("rollups/instrument/option_liquidity@v1", "no rows", "ingest")
+
+    monkeypatch.setattr(harness, "screen_variant", never)
+    with pytest.raises(MissingDataError, match="option_liquidity"):
+        run(build_world())  # zero measured sessions is never a SUCCEEDED run
+
+
+def test_other_exceptions_from_a_screen_still_propagate(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(reader: Any, config: Any, day: date) -> Any:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(harness, "screen_variant", broken)
+    with pytest.raises(RuntimeError, match="boom"):
+        run(build_world())
+
+
+def test_the_eligible_sets_read_for_the_events_are_not_kept_once_the_schedules_are_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    caches: list[int] = []
+    real = harness._measure
+
+    def spy(reader: Any, session: Any, *a: Any, **k: Any) -> Any:
+        caches.append(len(session._eligible))
+        return real(reader, session, *a, **k)
+
+    monkeypatch.setattr(harness, "_measure", spy)
+    run(event_world(EVENTS), event_edge(2))
+    assert caches == [0]

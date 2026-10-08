@@ -44,9 +44,12 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
+from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.core.time.calendar import sessions_between
+from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes
+from algotrade.data.reference import UNIVERSE_TABLE
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
 from algotrade.services.configs import resolve_config
@@ -94,6 +97,9 @@ MIN_SCORE_COVERAGE = 0.8
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
+# Not an input table a screener lacks for a session but the run's own wiring (market features
+# not loaded, no universe or reference snapshot): always an error, never a lost session.
+WIRING_DATASETS = (MARKET_FEATURES, UNIVERSE_TABLE, REFERENCE_TABLE)
 CHUNK_SESSIONS = 20  # decision sessions screened and measured before the frames are dropped
 OUTCOME_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS)  # kept per entry session
 
@@ -197,6 +203,7 @@ class _Session:
         self._labels: dict[date, str] = {}
         self._implied: dict[tuple[str, date], dict[str, float | None]] = {}
         self._snapshots: set[date] = set()
+        self.errors: dict[str, MissingDataError] = {}  # variant -> its first lost session's error
         self.lost: dict[tuple[str, date], str] = {}  # (variant, D) -> the table it had no data in
 
     def run(self, variant: Variant, day: date) -> RankedRun | None:
@@ -210,7 +217,10 @@ class _Session:
         try:
             found = screen_variant(self._reader, variant.config, day)
         except MissingDataError as error:
+            if error.dataset in WIRING_DATASETS:  # not an input the screener lacks: a broken run
+                raise
             self.lost[variant.id, day] = error.dataset
+            self.errors.setdefault(variant.id, error)
             return None
         self._snapshots.add(found.snapshot)
         return found
@@ -460,6 +470,7 @@ def evaluate_edge(
             _licence(configs, user, scope.iv_field) if needs_implied_vol(scope.edge) else None
         )
     schedules = _events(reader, session, scopes, days)
+    session.release()  # the eligible sets read for the events are not kept
     plans = [
         _Plan(scope, horizon, _blocks(scope.edge, schedules.get(scope.key), days, horizon))
         for scope in scopes
@@ -580,6 +591,9 @@ def _measure(
     for horizon, missing in failed.items():
         if not out.closed[horizon]:  # nothing stored for any session of the range
             raise missing
+    for (_, variant_id), lost in out.lost.items():  # a variant measured nowhere is a failure
+        if lost and len(lost) == len(out.legs[_, variant_id]):
+            raise session.errors[variant_id]
     return out
 
 

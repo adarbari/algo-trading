@@ -19,7 +19,7 @@ from algotrade.data.reference import InstrumentView
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.engines.selection.evaluate import evaluate_selection
 from algotrade.services.screening.run import screen_session
-from algotrade.services.selection import fields_view, select
+from algotrade.services.selection import fields_view, select, selection_fields
 from algotrade.strategies.screeners.base import Decision
 
 
@@ -92,10 +92,7 @@ class SelectionReads:
         self._last: tuple[tuple[tuple[str, ...], date], FeatureView, InstrumentView] | None = None
 
     def eligible(self, universe: Selection, session: date) -> Eligible:
-        fields = {r.field for r in universe.where.rules()}
-        if universe.order_by:
-            fields.add(universe.order_by)
-        key = (tuple(sorted(fields)), session)
+        key = (tuple(selection_fields(universe)), session)
         if self._last is None or self._last[0] != key:
             view, source = fields_view(self._reader, key[0], session)
             self._last = (key, view, source)
