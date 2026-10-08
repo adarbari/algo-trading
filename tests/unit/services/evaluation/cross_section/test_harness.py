@@ -19,7 +19,7 @@ from algotrade.services.evaluation.cross_section.harness import (
     evaluate_edge,
 )
 from algotrade.services.evaluation.cross_section.picks import screen_variant
-from algotrade.services.evaluation.cross_section.results import write_edge_eval
+from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -374,6 +374,66 @@ def test_the_run_records_the_iv_field_its_source_and_licence() -> None:
             w.reader, w.results, w.configs, USER, edge(outcome=vrp), DAYS[0], DAYS[-1], AS_OF,
             "rollup.nothing@v1.iv",
         )  # fmt: skip
+
+
+# ---- expires_otm: the strike, the reference rate and the touch rate over a run -------------
+
+IBKR = "rollup.ibkr_iv@v1.iv30_ibkr"
+OTM_OUTCOME = {
+    "kind": "expires_otm", "horizon_sessions": [2], "benchmark": "none", "structure": "put",
+    "strike_delta": 0.30, "iv_field": IBKR, "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def otm_world(poison: set[date] = frozenset()) -> World:  # type: ignore[assignment]
+    def rows(day: date) -> list[dict[str, Any]]:
+        bad = {"fwd_return": -0.9, "fwd_max_drawdown": 0.95} if day in poison else {}
+        return [outcome_row(iid, i, day, **bad) for i, iid in enumerate(IDS)]
+
+    w = build_world(rows_of=rows)
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:
+        iv = [{"instrument_id": iid, "iv30_ibkr": 0.4} for iid in IDS]
+        w.writer.write_table(
+            "rollups/instrument/ibkr_iv@v1", day, f"ib-{day}", stamped(iv, day, f"ib-{day}")
+        )
+    return w
+
+
+def test_an_expires_otm_run_reports_the_reference_and_touch_rates_beside_the_hit_rate() -> None:
+    evaluation = run(otm_world(), edge(outcome=OTM_OUTCOME))
+    (r,) = evaluation.results
+    m = r.measures[0]
+    stored = edge_eval_frame(evaluation, "run-1", AS_OF)
+    assert stored["reference_rate"].iloc[0] == m.reference_rate  # the stored columns, filled
+    assert stored["touch_rate"].iloc[0] == 0.0
+    assert m.hit_rate is not None and 0.0 <= m.hit_rate <= 1.0
+    assert m.reference_rate is not None and 0.5 < m.reference_rate < 0.9  # N(d2) of a 0.30 put
+    assert m.touch_rate == 0.0  # the stored drawdown is 0: no strike was reached
+    assert (r.iv_source, r.licence) == (IBKR, "personal")  # from the catalogue, never assumed
+
+
+def test_an_expires_otm_outcome_reads_the_entry_partition_never_the_decision_sessions() -> None:
+    e = edge(outcome=OTM_OUTCOME)
+    clean = run(otm_world(), e)
+    assert run(otm_world(set(STARTS)), e).results == clean.results  # D's rows are poisoned
+    assert run(otm_world({d for d in DAYS if d not in STARTS}), e).results != clean.results
+
+
+def test_an_edge_variant_reads_its_own_iv_field_and_licence() -> None:
+    w = otm_world()
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:
+        iv = [{"instrument_id": iid, "iv30": 0.4} for iid in IDS]
+        w.writer.write_table(
+            "rollups/instrument/iv30@v1", day, f"iv-{day}", stamped(iv, day, f"iv-{day}")
+        )
+    e = edge(
+        outcome=OTM_OUTCOME,
+        variants=[{"id": "ours", "outcome": {"iv_field": "rollup.iv30@v1.iv30"}}],
+    )
+    main, ours = run(w, e).results
+    assert (main.edge_variant, main.iv_source, main.licence) == ("main", IBKR, "personal")
+    assert (ours.edge_variant, ours.iv_source) == ("ours", "rollup.iv30@v1.iv30")
+    assert ours.licence != "personal"
 
 
 # ---- event schedules: names at D, blocks of one horizon, one statistic per block ----------

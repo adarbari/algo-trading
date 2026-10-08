@@ -32,6 +32,10 @@ MEASURE_COLUMNS = (
 )  # fmt: skip
 
 
+def _nan(value: float | None) -> float:
+    return float("nan") if value is None else value
+
+
 def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> pd.DataFrame:
     """The ``results/edge_eval`` rows of ``evaluation``, stamped."""
     rows = []
@@ -57,9 +61,9 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                     "range_to": evaluation.end,
                     "iv_source": r.iv_source,
                     "licence": r.licence,
-                    # Filled by the expires_otm outcome (ED4a): null until then.
-                    "reference_rate": float("nan"),
-                    "touch_rate": float("nan"),
+                    # Filled by an expires_otm outcome only (ADR 0053 amendment 2026-10-08).
+                    "reference_rate": _nan(m.reference_rate),
+                    "touch_rate": _nan(m.touch_rate),
                     **{c: measured[c] for c in MEASURE_COLUMNS},
                 }
             )

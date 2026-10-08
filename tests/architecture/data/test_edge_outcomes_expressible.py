@@ -17,7 +17,12 @@ from algotrade.core.time.calendar import sessions_between
 from algotrade.data.outcomes import OUTCOME_FIELDS
 from algotrade.services.configs import field_catalog
 from algotrade.services.evaluation.cross_section.events import EVENT_FIELDS
-from algotrade.services.evaluation.cross_section.hit import IMPLIED_VOL_FIELD, MEASURE_FIELDS
+from algotrade.services.evaluation.cross_section.harness import MIXED_SOURCE_IV
+from algotrade.services.evaluation.cross_section.hit import (
+    EXPIRES_OTM_FIELDS,
+    IMPLIED_VOL_FIELD,
+    MEASURE_FIELDS,
+)
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade_ingestion.tasks.derived.outcomes import horizons_and_benchmarks
@@ -39,7 +44,15 @@ def _measure(edge: Edge) -> str:
 
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
 def test_the_measure_and_the_path_condition_are_stored_outcome_fields(edge: Edge) -> None:
-    fields = MEASURE_FIELDS[_measure(edge)]
+    for o in (edge.outcome, *(v.outcome for v in edge.variants)):
+        fields = (
+            EXPIRES_OTM_FIELDS
+            if o.kind == "expires_otm"
+            else MEASURE_FIELDS[o.measure or "excess_return"]
+        )
+        stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
+        assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
+    fields = MEASURE_FIELDS[_measure(edge)] if edge.outcome.kind != "expires_otm" else ()
     stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
     assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
     if edge.outcome.max_drawdown is not None:
@@ -56,6 +69,17 @@ def test_horizons_and_benchmark_are_written_by_the_outcomes_task(edge: Edge) -> 
 
 def test_the_implied_vol_a_ratio_measure_divides_by_is_in_the_catalogue() -> None:
     field_catalog(STORE).check_field(IMPLIED_VOL_FIELD, "IMPLIED_VOL_FIELD")
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_every_expires_otm_iv_field_is_a_catalogue_feature_with_a_licence(edge: Edge) -> None:
+    """An expires_otm outcome names the one implied-vol field it reads (iv_source and licence
+    are recorded from it): it is in the catalogue and never the mixed-source field."""
+    catalogue = field_catalog(STORE)
+    for o in (edge.outcome, *(v.outcome for v in edge.variants)):
+        if o.kind == "expires_otm":
+            assert o.iv_field is not None and o.iv_field not in MIXED_SOURCE_IV
+            catalogue.check_field(o.iv_field, f"{edge.id} iv_field")
 
 
 def _stored(field: str) -> bool:
@@ -137,3 +161,14 @@ def test_an_evidenced_or_live_edge_cites_a_run_at_its_frozen_split(edge: Edge) -
 def test_every_open_edge_names_the_decided_frozen_period(edge: Edge) -> None:
     """An open edge is judged in the one frozen period; moving it needs an ADR amendment."""
     assert edge.frozen_from == FROZEN_FROM, f"{edge.id}: frozen_from must be {FROZEN_FROM}"
+
+
+def test_the_vrp_earnings_exclusion_keeps_etfs_and_clears_the_whole_window() -> None:
+    """The window ends D + offset + horizon, the expected date is read at D: the threshold is
+    that many sessions, and an ETF (no earnings rows: UNKNOWN) is not dropped by the filter."""
+    edge = next(e for e in load_edges(STORE) if e.id == "vrp_short_premium")
+    variant = next(v for v in edge.variants if v.id == "no_earnings")
+    text = repr(variant.universe)
+    window = max(edge.outcome.horizon_sessions) + edge.outcome.start_offset_sessions
+    assert window == 32 and f"value={window}" in text.replace(" ", "")
+    assert "'ETF'" in text and "UNKNOWN" in text

@@ -57,12 +57,12 @@ def test_sharpe() -> None:
 
 @pytest.mark.parametrize("p", [1e-9, 0.001, 0.02, 0.3, 0.5, 0.9, 0.975, 0.999, 1 - 1e-9])
 def test_inverse_normal_round_trips(p: float) -> None:
-    assert float(norm_cdf(es._inverse_normal_cdf(p))) == pytest.approx(p, rel=1e-9)
+    assert float(norm_cdf(es.inverse_normal_cdf(p))) == pytest.approx(p, rel=1e-9)
 
 
 def test_inverse_normal_known_values() -> None:
-    assert es._inverse_normal_cdf(0.975) == pytest.approx(1.959963984540054, abs=1e-9)
-    assert es._inverse_normal_cdf(0.5) == pytest.approx(0.0, abs=1e-12)
+    assert es.inverse_normal_cdf(0.975) == pytest.approx(1.959963984540054, abs=1e-9)
+    assert es.inverse_normal_cdf(0.5) == pytest.approx(0.0, abs=1e-12)
 
 
 def _series() -> np.ndarray:
@@ -88,7 +88,7 @@ def test_deflated_sharpe_falls_with_trials() -> None:
 
 def test_deflated_sharpe_benchmark_hand_computed() -> None:
     # SR0 for N=10, V=1: (1-g) * Phi^-1(0.9) + g * Phi^-1(1 - 1/(10e))
-    sr0 = (1 - es._EULER_GAMMA) * 1.2815515655446004 + es._EULER_GAMMA * es._inverse_normal_cdf(
+    sr0 = (1 - es._EULER_GAMMA) * 1.2815515655446004 + es._EULER_GAMMA * es.inverse_normal_cdf(
         1 - 1 / (10 * math.e)
     )
     assert sr0 == pytest.approx(1.5746, abs=1e-3)  # Bailey-Lopez de Prado's table value

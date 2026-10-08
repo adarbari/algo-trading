@@ -183,10 +183,10 @@ def _universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
 class _Session:
     """What is read once per decision session, whatever the horizon or the edge variant: each
     screener's run and the regime label; per edge variant (``key``) the eligible names and, when
-    the measure needs it, the implied vol (the run's one ``iv_field``) at D."""
+    the measure needs it, the implied vol (the scope's one ``iv_field``) at D."""
 
-    def __init__(self, reader: StoreReader, label_field: str, iv_field: str):
-        self._reader, self._label_field, self._iv_field = reader, label_field, iv_field
+    def __init__(self, reader: StoreReader, label_field: str):
+        self._reader, self._label_field = reader, label_field
         self._runs: dict[tuple[str, date], RankedRun] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}
         self._labels: dict[date, str] = {}
@@ -213,11 +213,13 @@ class _Session:
             self._labels[day] = UNKNOWN if value is None else str(value)
         return self._labels[day]
 
-    def implied(self, key: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
+    def implied(
+        self, key: str, field_name: str, ids: frozenset[str], day: date
+    ) -> dict[str, float | None]:
         if (key, day) not in self._implied:
             wanted = sorted(ids)
-            view, _ = fields_view(self._reader, (self._iv_field,), day, wanted)
-            values = {i: view.get(i, self._iv_field) for i in wanted}
+            view, _ = fields_view(self._reader, (field_name,), day, wanted)
+            values = {i: view.get(i, field_name) for i in wanted}
             self._implied[key, day] = {
                 i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
                 for i, v in values.items()
@@ -241,6 +243,7 @@ class _Scope:
     key: str
     edge: Edge  # the edge with the variant's outcome and universe applied
     universe: Selection
+    iv_field: str  # the outcome's own, else the run's
 
 
 def _stat(
@@ -264,7 +267,11 @@ def _stat(
     scored = {i: v for i, v in run.scores.items() if i in ids and v is not None}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
     inside = rows[rows["instrument_id"].isin(ids)]
-    implied = session.implied(scope.key, eligible, day) if needs_implied_vol(edge) else None
+    implied = (
+        session.implied(scope.key, scope.iv_field, eligible, day)
+        if needs_implied_vol(edge)
+        else None
+    )
     res = apply_outcome(edge, inside, implied).set_index("instrument_id")
     counted = res[res["excluded"] == ""]
     in_universe = [i for i in run.qualified if i in eligible]
@@ -296,6 +303,8 @@ def _stat(
         pre_snapshot=run.pre_snapshot,
         outside_universe=len(run.qualified) - len(in_universe),
         no_entry_bar=len(ids - have),
+        pick_reference=tuple(float(v) for v in counted.loc[got, "reference"].dropna()),
+        pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
     )
 
 
@@ -408,22 +417,24 @@ def evaluate_edge(
     recorded); ``split_from``: the run's own split over the user's and the edge's. Raises
     ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon."""
-    if iv_field in MIXED_SOURCE_IV:
-        raise ConfigurationError(f"iv_field {iv_field!r} mixes sources: name one vendor's field")
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, configs, user, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
-    session = _Session(reader, label, iv_field)
+    session = _Session(reader, label)
     days = sessions_between(start, end)
     results: list[VariantResult] = []
     starts: dict[int, int] = {}
     unclosed: dict[int, int] = {}
     unknown: dict[str, int] = {}
     outcomes_of: dict[tuple[int, tuple[date, ...]], dict[date, pd.DataFrame]] = {}
-    for scope in _scopes(configs, user, edge):
+    for scope in _scopes(configs, user, edge, iv_field):
         o = scope.edge.outcome
         needs_iv = needs_implied_vol(scope.edge)
-        licence = _licence(configs, user, iv_field) if needs_iv else None
+        if scope.iv_field in MIXED_SOURCE_IV:
+            raise ConfigurationError(
+                f"iv_field {scope.iv_field!r} mixes sources: name one vendor's field"
+            )
+        licence = _licence(configs, user, scope.iv_field) if needs_iv else None
         events = _events(reader, session, scope, days)
         for horizon in o.horizon_sessions:
             blocks = _blocks(scope.edge, events, days, horizon)
@@ -450,7 +461,7 @@ def evaluate_edge(
                         stats,
                         measures,
                         edge_variant=scope.key,
-                        iv_source=iv_field if needs_iv else None,
+                        iv_source=scope.iv_field if needs_iv else None,
                         licence=licence,
                     )
                 )
@@ -512,12 +523,14 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 
-def _scopes(configs: ConfigStore, user: UserContext, edge: Edge) -> list[_Scope]:
-    """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides."""
-    scopes = [_Scope(MAIN, edge, _universe(configs, user, edge))]
+def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) -> list[_Scope]:
+    """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides. Each
+    reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
+    scopes = [_Scope(MAIN, edge, _universe(configs, user, edge), edge.outcome.iv_field or iv_field)]
     for v in edge.variants:
         applied = replace(edge, outcome=v.outcome, universe=v.universe, variants=())
-        scopes.append(_Scope(v.id, applied, _universe(configs, user, applied)))
+        field_name = v.outcome.iv_field or iv_field
+        scopes.append(_Scope(v.id, applied, _universe(configs, user, applied), field_name))
     return scopes
 
 

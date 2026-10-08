@@ -90,6 +90,11 @@ def _outcome(o: Outcome, event: bool) -> str:
     elif not event:
         n = o.start_offset_sessions
         parts.append(f"entered {n} session{'' if n == 1 else 's'} after the decision session")
+    if o.structure is not None:
+        strike = (
+            f"delta {o.strike_delta:g}" if o.strike_delta else f"{o.otm_pct:.0%} out of the money"
+        )
+        parts.append(f"short {o.structure} struck at {strike}, not assigned at the horizon")
     if o.target is not None:
         parts.append(f"hit when {o.measure} is {o.direction} {o.target:g}")
     if o.max_drawdown is not None:

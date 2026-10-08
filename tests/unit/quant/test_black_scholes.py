@@ -99,3 +99,50 @@ def test_no_arbitrage_bounds() -> None:
     )
     assert float(bs.bounds(100, 120, 1.0, 0.05, 0.02)[0][()]) == 0.0  # OTM call
     np.testing.assert_allclose(upper, [100 * np.exp(-0.02), 110 * np.exp(-0.05)])
+
+
+@pytest.mark.parametrize("delta", [0.05, 0.16, 0.30, 0.50])
+@pytest.mark.parametrize("sigma,t", [(0.2, 21 / 252), (0.6, 31 / 252), (1.5, 15 / 252)])
+def test_the_strike_from_delta_has_that_exact_delta(delta: float, sigma: float, t: float) -> None:
+    put = float(bs.strike_from_delta(100.0, sigma, t, delta, "put"))
+    call = float(bs.strike_from_delta(100.0, sigma, t, -delta, "call"))  # the sign is ignored
+    assert float(bs.greeks(100.0, put, t, 0.0, 0.0, sigma, False).delta) == pytest.approx(-delta)
+    assert float(bs.greeks(100.0, call, t, 0.0, 0.0, sigma, True).delta) == pytest.approx(delta)
+    assert put <= 100.0 * np.exp(0.5 * sigma * sigma * t) * (1 + 1e-12) and call >= 100.0
+
+
+def test_the_chance_of_expiring_out_of_the_money_matches_a_seeded_lognormal_simulation() -> None:
+    price, sigma, t = 100.0, 0.35, 21 / 252
+    rng = np.random.default_rng(7)
+    end = price * np.exp(-0.5 * sigma**2 * t + sigma * np.sqrt(t) * rng.standard_normal(400_000))
+    kp = float(bs.strike_from_delta(price, sigma, t, 0.30, "put"))
+    kc = float(bs.strike_from_delta(price, sigma, t, 0.16, "call"))
+    assert float(bs.prob_otm(price, kp, sigma, t, "put")) == pytest.approx(
+        float((end > kp).mean()), abs=0.004
+    )
+    assert float(bs.prob_otm(price, kc, sigma, t, "call")) == pytest.approx(
+        float((end < kc).mean()), abs=0.004
+    )
+    assert float(bs.prob_between(price, kp, kc, sigma, t)) == pytest.approx(
+        float(((end > kp) & (end < kc)).mean()), abs=0.004
+    )
+
+
+def test_the_chance_of_expiring_out_of_the_money_is_monotone_in_the_strike() -> None:
+    puts = bs.prob_otm(100.0, [80.0, 90.0, 100.0], 0.3, 0.1, "put")
+    calls = bs.prob_otm(100.0, [100.0, 110.0, 120.0], 0.3, 0.1, "call")
+    assert np.all(np.diff(puts) < 0) and np.all(np.diff(calls) > 0)
+    far = bs.prob_between(100.0, 70.0, 130.0, 0.3, 0.1)
+    near = bs.prob_between(100.0, 90.0, 110.0, 0.3, 0.1)
+    assert near < far < 1.0
+
+
+def test_a_strike_or_probability_is_nan_without_a_positive_vol_or_time_and_refuses_bad_input() -> (
+    None
+):
+    assert np.isnan(bs.strike_from_delta(100.0, 0.0, 0.1, 0.3, "put"))
+    assert np.isnan(bs.prob_otm(100.0, 90.0, 0.2, 0.0, "put"))
+    with pytest.raises(ValueError):
+        bs.strike_from_delta(100.0, 0.2, 0.1, 1.2, "put")
+    with pytest.raises(ValueError):
+        bs.prob_otm(100.0, 90.0, 0.2, 0.1, "straddle")

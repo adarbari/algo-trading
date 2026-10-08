@@ -13,7 +13,11 @@ and the key.
                       least 1; for an event schedule the event's anchor session + this, D = S - 1;
                       <= 0 only for an event announced ahead), optional target, max_drawdown (a
                       fraction), cost_bps; a hit_target also names its measure (MEASURES) and
-                      direction (``below`` | ``above``)
+                      direction (``below`` | ``above``); an ``expires_otm`` outcome (the short
+                      option is not assigned at the horizon's close: put | call | strangle) names
+                      its ``structure``, exactly one of ``strike_delta`` (a delta in (0, 1)) and
+                      ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
+                      ``iv_field`` is allowed on a ratio measure too (default: the run's)
     schedule          ``every_session`` | ``month_end`` | ``on_event:<class>`` (EVENT_CLASSES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D; default for an event schedule) | ``universe`` (every eligible name)
@@ -50,7 +54,8 @@ from algotrade.core.model.ids import validate_id
 
 STATUSES = ("candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
-OUTCOME_KINDS = ("excess_return", "hit_target")
+OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm")
+STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 BENCHMARKS = ("SPY", "none")
 SCHEDULES = ("every_session", "month_end")
 BASES = ("event", "universe")
@@ -93,8 +98,9 @@ KEYS = (
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
-    "cost_bps", "measure", "direction",
+    "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
 )  # fmt: skip
+SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe")
 EVIDENCE_KEYS = ("run_id", "split_from")
 _SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
@@ -117,6 +123,10 @@ class Outcome:
     cost_bps: float | None = None
     measure: str | None = None
     direction: str | None = None
+    structure: str | None = None
+    strike_delta: float | None = None
+    otm_pct: float | None = None
+    iv_field: str | None = None
 
 
 @dataclass(frozen=True)
@@ -340,6 +350,7 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     drawdown = o.number("max_drawdown", None, 0)
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
+    structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -350,7 +361,37 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         cost_bps=o.number("cost_bps", None, 0),
         measure=measure,
         direction=direction,
+        structure=structure,
+        strike_delta=strike_delta,
+        otm_pct=otm_pct,
+        iv_field=iv_field,
     )
+
+
+def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
+    """``(structure, strike_delta, otm_pct, iv_field)`` of an outcome: the first three only for
+    ``expires_otm`` (exactly one of the two strikes; the implied vol field is required there)."""
+    names = o.names()
+    structure = o.choice("structure", "", STRUCTURES) if "structure" in names else None
+    delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
+    iv_field = _prose(o, "iv_field") or None
+    if kind != "expires_otm":
+        for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
+            if value is not None:
+                raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")
+        return None, None, None, iv_field
+    if structure is None:
+        _missing(o, "structure")
+    if (delta is None) == (pct is None):
+        raise ConfigurationError(
+            f"{o.where}: an expires_otm outcome names exactly one of strike_delta and otm_pct"
+        )
+    for key, value in (("strike_delta", delta), ("otm_pct", pct)):
+        if value is not None and not 0 < value < 1:
+            raise ConfigurationError(f"{o.where} {key}: expected a fraction in (0, 1), got {value}")
+    if iv_field is None:
+        raise ConfigurationError(f"{o.where} iv_field: required for an expires_otm outcome")
+    return structure, delta, pct, iv_field
 
 
 def _horizons(o: Table) -> tuple[int, ...]:
@@ -393,7 +434,12 @@ def _variants(
         if vid == MAIN or vid in {x.id for x in found}:
             raise ConfigurationError(f"{v.where} id: {vid!r} is reserved or listed twice")
         over = v.table("outcome", OUTCOME_KEYS)
-        merged = Table({**base, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
+        kept = (
+            base
+            if "kind" not in over.names() or over.raw("kind") == base.get("kind")
+            else {k: x for k, x in base.items() if k in SHARED_KEYS}
+        )  # a variant of another kind drops the base's kind-specific keys
+        merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         found.append(
             EdgeVariant(
                 id=vid,
