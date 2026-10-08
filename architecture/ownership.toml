@@ -63,7 +63,7 @@ detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|b
 
 [[responsibility]]
 id = "option-pricing"
-description = "European option prices and Greeks (Black-Scholes-Merton, continuous q and r) and the normal CDF they use"
+description = "European option prices and Greeks (Black-Scholes-Merton, continuous q and r), delta strikes and out-of-the-money probabilities (ADR 0053 expires_otm), and the normal CDF and its inverse they use"
 owner = ["src/algotrade/quant/black_scholes.py"]
 section = "docs/adr/0021-option-pricing-conventions.md#model"
 detect = [{ import = "scipy.stats" }, { call = "erfc" }, { call = "erf" }]
@@ -77,7 +77,7 @@ detect = [{ call_regex = "(^|\\.)linalg\\.(eigh|eigvalsh|eig|eigvals|pinv|svd|in
 
 [[responsibility]]
 id = "quant-edge-statistics"
-description = "The statistics that judge a screener's picks (ADR 0053): lift, Hedges' g, decile spread and its t, Sharpe, the deflated Sharpe ratio and the probability of backtest overfitting (CSCV), with the inverse normal CDF they need"
+description = "The statistics that judge a screener's picks (ADR 0053): lift, Hedges' g, decile spread and its t, Sharpe, the deflated Sharpe ratio and the probability of backtest overfitting (CSCV)"
 owner = ["src/algotrade/quant/edge_statistics.py"]
 allowed = ["src/algotrade/services/evaluation/cross_section/measures.py"]  # the harness calls these statistics (ADR 0053)
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"

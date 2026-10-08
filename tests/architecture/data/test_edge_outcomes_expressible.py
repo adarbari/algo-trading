@@ -148,3 +148,14 @@ FROZEN_FROM = date(2026, 4, 1)
 def test_every_open_edge_names_the_decided_frozen_period(edge: Edge) -> None:
     """An open edge is judged in the one frozen period; moving it needs an ADR amendment."""
     assert edge.frozen_from == FROZEN_FROM, f"{edge.id}: frozen_from must be {FROZEN_FROM}"
+
+
+def test_the_vrp_earnings_exclusion_keeps_etfs_and_clears_the_whole_window() -> None:
+    """The window ends D + offset + horizon, the expected date is read at D: the threshold is
+    that many sessions, and an ETF (no earnings rows: UNKNOWN) is not dropped by the filter."""
+    edge = next(e for e in load_edges(STORE) if e.id == "vrp_short_premium")
+    variant = next(v for v in edge.variants if v.id == "no_earnings")
+    text = repr(variant.universe)
+    window = max(edge.outcome.horizon_sessions) + edge.outcome.start_offset_sessions
+    assert window == 32 and f"value={window}" in text.replace(" ", "")
+    assert "'ETF'" in text and "UNKNOWN" in text

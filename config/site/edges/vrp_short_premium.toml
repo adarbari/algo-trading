@@ -26,7 +26,8 @@ efficient premium would give) and touch_rate (the strike reached intraday). No p
 P&L is modelled: a win rate overstates expectancy, because the rare losses are large. IBKR's IV
 is personal-use (licence recorded on the result rows), fine for this private evaluation. Variants:
 delta 0.16, strangle, call, our own IV30, windows with no report expected, and the older
-realised-to-implied ratio below 1."""
+realised-to-implied ratio below 1. IV30 (a 30-day tenor) is applied to the 15- and 31-session
+horizons too: a term-structure approximation, the same in the hit and in the reference rate."""
 
 [outcome]
 kind = "expires_otm"
@@ -58,9 +59,10 @@ id = "our_iv30"
 [variants.outcome]
 iv_field = "rollup.iv30@v1.iv30"
 
-# Windows with no report expected inside the largest horizon (31 sessions): the premium is not
-# an earnings premium. A name whose date is UNKNOWN (null) never passes, never read as "no
-# earnings" (earnings_expected@v1).
+# Windows with no report expected inside the largest window (read at D, the window ends at
+# D + 1 + 31, so more than 32 sessions to the expected report): the premium is not an earnings
+# premium. A stock whose date is UNKNOWN (null) never passes, never read as "no earnings"
+# (earnings_expected@v1); an ETF has no earnings, so it stays.
 [[variants]]
 id = "no_earnings"
 [variants.universe]
@@ -69,8 +71,13 @@ all = [
   { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "instrument.optionable", op = "eq", value = true },
-  { field = "rollup.earnings_expected@v1.expected_basis", op = "ne", value = "UNKNOWN" },
-  { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 31 },
+  { any = [
+    { field = "instrument.security_type", op = "eq", value = "ETF" },
+    { all = [
+      { field = "rollup.earnings_expected@v1.expected_basis", op = "ne", value = "UNKNOWN" },
+      { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 32 },
+    ] },
+  ] },
 ]
 
 [[variants]]
