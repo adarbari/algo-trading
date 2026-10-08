@@ -488,7 +488,7 @@ contracts = ["API: routes reach the library only through services.read, services
 
 [[dir]]
 path = "apps/api/algotrade_api/graphql"
-purpose = "the GraphQL read layer (ADR 0037): Strawberry schema at POST /graphql, scalars, errors, request context, dataloaders; thin types over services.read in types/"
+purpose = "the GraphQL read layer (ADR 0037): Strawberry schema at POST /graphql, scalars, errors, request context, dataloaders, the event-loop offload (offload.py); thin types over services.read in types/"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]

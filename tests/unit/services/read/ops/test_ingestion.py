@@ -2,10 +2,12 @@
 each dataset's cells by kind (session, chains, snapshot), and one cell's drill-down."""
 
 from datetime import UTC, date, datetime
+from typing import Any
 
 import pytest
 
 from algotrade.services.read.context import ReadContext, open_context
+from algotrade.services.read.ops import ingestion
 from algotrade.services.read.ops.ingestion import (
     Cell,
     load_cell_detail,
@@ -79,3 +81,21 @@ def test_drill_down_groups_run_items(api_golden: tuple[ReadStore, dict[str, str]
 
 def test_an_unlisted_dataset_is_none(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
     assert load_cell_detail(_ctx(api_golden), "nope") is None
+
+
+def test_the_grid_lists_each_tables_stored_dates_once(
+    api_golden: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # listing walks every partition directory of a table (14 000 for a market rollup): the
+    # grid asked it for every cell, 35 s for the Admin Ingestion page on the real store
+    listed: list[str] = []
+    real = ingestion.stored_dates
+
+    def counting(ctx: Any, table: str) -> tuple[date, ...]:
+        listed.append(table)
+        return real(ctx, table)
+
+    monkeypatch.setattr(ingestion, "stored_dates", counting)
+    grid = load_completeness(_ctx(api_golden), 5, NOW)
+    assert len(grid.cells) == 5 * len(grid.datasets)
+    assert len(listed) == len(set(listed))

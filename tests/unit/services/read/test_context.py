@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
 import pytest
 
 from algotrade.config.user import UserContext
@@ -23,6 +24,7 @@ from algotrade.services.read.context import (
     previous_session,
     snapshot_on,
     stored_dates,
+    weigh,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -202,6 +204,48 @@ def test_result_cache_holds_32_entries_by_default() -> None:
     for i in range(33):
         cache.put(i, i)
     assert cache.get(0) is None and cache.get(1) == 1 and cache.get(32) == 32
+
+
+def test_result_cache_is_bounded_by_the_bytes_of_its_frames() -> None:
+    frame = pd.DataFrame({"x": range(1000)})  # 8 000 bytes and its index
+    held = weigh(frame)
+    assert held >= 8000 and weigh((frame, {"k": frame})) == 2 * held and weigh("text") == 0
+    cache = ResultCache(size=32, max_bytes=2 * held + 1)
+    for key in "abc":
+        cache.put(key, frame)
+    # the oldest went to keep the frames under the bound; the newest always stays
+    assert (cache.get("a"), cache.get("b") is frame, cache.get("c") is frame) == (None, True, True)
+    cache.put("d", pd.DataFrame({"x": range(10 * 1000)}))  # alone over the bound
+    assert cache.get("d") is not None and cache.get("b") is None and cache.get("c") is None
+    cache.put("d", 1)  # replaced by a small value: its weight is released
+    cache.put("e", frame)
+    cache.put("f", frame)
+    assert cache.get("d") == 1 and cache.get("e") is frame and cache.get("f") is frame
+
+
+def test_the_weight_of_a_pandas_3_string_frame_is_close_to_its_real_memory() -> None:
+    # the string dtype is counted from its Arrow buffers; pricing every cell again held about
+    # a quarter of the bound (a rule_screen partition weighed 3.8x its size)
+    table = pa.table(
+        {
+            "run_id": [f"screen-run-{i % 50}" for i in range(20_000)],
+            "decision": ["QUALIFIED"] * 20_000,
+            "score": [float(i) for i in range(20_000)],
+        }
+    )
+    frame = table.to_pandas()
+    real = int(frame.memory_usage(deep=True).sum())
+    assert real <= weigh(frame) <= 1.5 * real
+    objects = pd.DataFrame({"s": pd.Series([f"v{i}" for i in range(1000)], dtype=object)})
+    assert weigh(objects) >= int(objects.memory_usage(deep=True).sum()) // 2  # priced per cell
+
+
+def test_a_request_memo_is_its_own_and_shared_by_its_sessions(
+    stored: tuple[StoreWriter, StoreReader],
+) -> None:
+    ctx = open_for(stored[1])
+    assert ctx.memo == {} and at_session(ctx, D1).memo is ctx.memo
+    assert open_for(stored[1]).memo is not ctx.memo
 
 
 def test_open_read_stores_opens_the_store_and_the_configs(tmp_path: Path) -> None:

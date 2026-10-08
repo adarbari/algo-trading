@@ -127,7 +127,7 @@ def _spy_reads(monkeypatch: pytest.MonkeyPatch, ctx: Any) -> list[tuple[Any, ...
     return reads
 
 
-def test_every_window_slices_one_cached_read_until_something_is_published(
+def test_a_window_reads_only_its_own_days_and_is_cached_until_something_is_published(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ctx = regime_ctx()
@@ -135,15 +135,21 @@ def test_every_window_slices_one_cached_read_until_something_is_published(
     whole = load_market_history(ctx, [RISK], SEP28, D1)
     recent = load_market_history(ctx, [RISK], SEP30, D1)  # another window, same session
     narrow = load_market_history(ctx, [RISK, LABEL], SEP29, SEP29)
-    assert reads == [("rollups/market/regime@v3", date.min, D1)]  # one read: the whole range
+    # a day is a partition: each window reads its own days (never the whole stored history
+    # since 1971 for a one-year chart), once per start
+    assert reads == [
+        ("rollups/market/regime@v3", SEP28, D1),
+        ("rollups/market/regime@v3", SEP30, D1),
+        ("rollups/market/regime@v3", SEP29, D1),
+    ]
     assert [p.session for p in whole[0].points] == [SEP28, SEP29, SEP30, D1]
     assert [p.session for p in recent[0].points] == [SEP30, D1]
     assert narrow[0].points == (Point(SEP29, 10.0),)
-    assert load_market_history(ctx, [RISK], SEP28, D1) == whole and len(reads) == 1
+    assert load_market_history(ctx, [RISK], SEP28, D1) == whole and len(reads) == 3
     seq = ctx.reader.visible_seq()
     monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
     load_market_history(ctx, [RISK], SEP28, D1)
-    assert len(reads) == 2
-    # a window with no stored row at all is still a gap series, from the cached read
+    assert len(reads) == 4
+    # a window with no stored row at all is still a gap series
     [empty] = load_market_history(ctx, [RISK], date(2020, 1, 1), date(2020, 1, 10))
-    assert [p.value for p in empty.points] == [None] and len(reads) == 2
+    assert [p.value for p in empty.points] == [None]

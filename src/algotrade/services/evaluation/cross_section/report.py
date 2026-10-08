@@ -44,6 +44,11 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
         )
     for horizon, n in result["unclosed_sessions"].items():
         lines.append(f"UNCLOSED: {n} start sessions at h={horizon} have no closed window")
+    for lost in result.get("lost_sessions", []):
+        lines.append(
+            f"LOST: {lost['variant']} h={lost['horizon']} lost {lost['sessions']} sessions: "
+            f"no data in {lost['table']} (counted as unmeasured, not a miss)"
+        )
     rows: Sequence[Mapping[str, Any]] = result["rows"]
     header = "| " + " | ".join(label for _, label, _ in COLUMNS) + " |"
     divider = "|" + "|".join("---" for _ in COLUMNS) + "|"

@@ -103,7 +103,23 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "outside_universe": sum(s.outside_universe for s in r.stats),
         "no_entry_bar": sum(s.no_entry_bar for s in r.stats),
         "excluded_coverage": m.excluded_coverage,
+        "lost_sessions": dict(r.lost_sessions),  # table with no data -> decision sessions
     }
+
+
+def lost_sessions(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """The decision sessions each variant lost to a table with no data for them (a screener
+    that could not run there), by reason: counted in ``excluded_coverage``, never a miss."""
+    return [
+        {
+            "variant": f"{r.edge_variant}/{r.variant}",
+            "horizon": r.horizon,
+            "table": table,
+            "sessions": n,
+        }
+        for r in evaluation.results
+        for table, n in sorted(r.lost_sessions.items())
+    ]
 
 
 def survivorship(evaluation: EdgeEvaluation) -> dict[int, tuple[int, int]]:

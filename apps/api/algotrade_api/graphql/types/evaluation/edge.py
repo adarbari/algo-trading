@@ -8,11 +8,11 @@ import datetime as dt
 from typing import Any, Self
 
 import strawberry
-from anyio import to_thread
 from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, runs
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
 
@@ -122,7 +122,7 @@ class EdgeRun:
         "run's partition holds none"
     )
     async def rows(self, info: Info) -> list[EdgeRow]:
-        found = await to_thread.run_sync(runs.load_run_rows, self.ctx, self.run)
+        found = await off_loop(runs.load_run_rows, self.ctx, self.run)
         return [EdgeRow.of(r) for r in found]
 
 
@@ -187,7 +187,7 @@ class Edge:
         """The canonical run, read once per Edge object (off the event loop)."""
         if "canonical" not in self.cache:
             self.cache["canonical"] = asyncio.ensure_future(
-                to_thread.run_sync(runs.load_canonical_run, self.ctx, self.edge)
+                off_loop(runs.load_canonical_run, self.ctx, self.edge)
             )
         found: runs.CanonicalRun = await self.cache["canonical"]
         return found
@@ -212,5 +212,5 @@ class Edge:
         "newest first, exploratory ones flagged"
     )
     async def runs(self, info: Info) -> list[EdgeRun]:
-        found = await to_thread.run_sync(runs.load_edge_runs, self.ctx, self.edge)
+        found = await off_loop(runs.load_edge_runs, self.ctx, self.edge)
         return [EdgeRun.of(r, self.ctx) for r in found]

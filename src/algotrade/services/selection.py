@@ -48,10 +48,15 @@ def selection_view(
 ) -> tuple[FeatureView, InstrumentView]:
     """``fields_view`` of the fields ``selection`` reads, for every instrument known on
     ``session``."""
+    return fields_view(reader, selection_fields(selection), session, as_of=as_of, features=features)
+
+
+def selection_fields(selection: Selection) -> list[str]:
+    """The fields ``selection`` reads (its rules' and its order), sorted."""
     fields = {r.field for r in selection.where.rules()}
     if selection.order_by:
         fields.add(selection.order_by)
-    return fields_view(reader, sorted(fields), session, as_of=as_of, features=features)
+    return sorted(fields)
 
 
 def select(

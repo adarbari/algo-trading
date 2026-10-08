@@ -8,7 +8,6 @@ import datetime as dt
 from typing import Self
 
 import strawberry
-from anyio import to_thread
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
@@ -16,6 +15,7 @@ from algotrade.services.read.market import buckets, market
 from algotrade.services.read.market import history as history_read
 from algotrade.services.read.market.features import load_market_feature_values
 from algotrade_api.graphql.limits import MAX_NAMES, MaxItems
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.instruments.feature import FeatureValue
 
 
@@ -86,8 +86,9 @@ class Market:
         "error",
         extensions=[MaxItems("names", MAX_NAMES)],
     )
-    def features(self, info: Info, names: list[str]) -> list[FeatureValue]:
-        return [FeatureValue.of(v) for v in load_market_feature_values(self.ctx, names)]
+    async def features(self, info: Info, names: list[str]) -> list[FeatureValue]:
+        found = await off_loop(load_market_feature_values, self.ctx, names)  # reads partitions
+        return [FeatureValue.of(v) for v in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The history of `names` (stored market fields only: `market.<group>@v<N>."
@@ -102,7 +103,7 @@ class Market:
         self, info: Info, names: list[str], start: dt.date, end: dt.date, points: int = 600
     ) -> list[SeriesHistory]:
         # Off the event loop: a range read of one partition per session.
-        found = await to_thread.run_sync(
+        found = await off_loop(
             history_read.load_market_history, self.ctx, names, start, end, points
         )
         return [SeriesHistory.of(h) for h in found]
