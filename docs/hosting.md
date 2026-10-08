@@ -202,6 +202,12 @@ off, confirm email on, anonymous off).
    their first sign-in optionally `subject = "<UID>"` from Authentication -> Users.
 4. Restart the API (`scripts/ops/deploy.sh`, or `launchctl kickstart -k gui/$(id -u)/com.algotrade.api` for config only).
 
+`Too many open files` / `socket.accept() out of system resource` in `api.err.log`: launchd
+gives an agent 256 descriptors and every open connection takes one. The agent's plist sets
+`NumberOfFiles` and the CLI raises its own soft limit when it starts, so a restart is enough;
+past `MAX_CONNECTIONS` (`ops/schedule.py`) connections are answered 503. Slow answers with
+few connections open usually mean the Mac is swapping (`sysctl vm.swapusage`).
+
 ## The Mac
 
 The site is up only while the Mac is awake, online and logged in (the API agent is a user
