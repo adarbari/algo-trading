@@ -12,7 +12,10 @@ const hooks = vi.hoisted(() => ({
   change: vi.fn(),
 }));
 
-vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null })); // the header help button: TableFrame.test.tsx
+// The header help button: TableFrame.test.tsx.
+vi.mock('@/features/guide-help', () => ({
+  helped: ({ help: _help, ...column }: { help?: unknown }) => column,
+}));
 vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreenerResults: hooks.useScreenerResults,
