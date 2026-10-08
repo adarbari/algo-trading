@@ -62,6 +62,47 @@ def _multi_asset(rng: np.random.Generator) -> dict[str, PriceSeries]:
     return {s: ohlcv_from_closes(s, rng, ts, p) for s, p in zip(symbols, paths, strict=True)}
 
 
+CROSS_SECTION_NAMES = 60
+CROSS_SECTION_BARS = 420  # 252 sessions of history for 12-1 momentum, then about 170 to test
+CROSS_SECTION_BENCHMARK = "SPY"
+CROSS_SECTION_TAG = (
+    "cross-section"  # the strategy grid skips it (``run_suite``): it is an edge fixture
+)
+
+
+def cross_section_drift(i: int) -> float:
+    """The planted annual drift of name ``i``: persistent, from -30% to +60% across the names."""
+    return -0.30 + 0.90 * i / (CROSS_SECTION_NAMES - 1)
+
+
+def _cross_section(rng: np.random.Generator) -> dict[str, PriceSeries]:
+    """60 names (``X01``..``X60``) and ``SPY``: each name's drift is planted and persistent
+    (``cross_section_drift``), so the 12-1 momentum decile spread is positive by construction;
+    the shocks share a market factor. Volume keeps every name above the liquidity gates."""
+    ts = business_days(START, CROSS_SECTION_BARS)
+    dt = 1.0 / 252
+    market = rng.standard_normal(CROSS_SECTION_BARS)
+    idio = rng.standard_normal((CROSS_SECTION_BARS, CROSS_SECTION_NAMES))
+    vol = 0.22
+
+    def path(drift: float, shocks: np.ndarray, sigma: float) -> np.ndarray:
+        rets = (drift - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * shocks
+        return np.asarray(100.0 * np.exp(np.concatenate([[0.0], np.cumsum(rets)[:-1]])), np.float64)
+
+    out = {
+        CROSS_SECTION_BENCHMARK: ohlcv_from_closes(
+            CROSS_SECTION_BENCHMARK, rng, ts, path(0.08, market, 0.15), base_volume=5_000_000.0
+        )
+    }
+    for i in range(CROSS_SECTION_NAMES):
+        shocks = np.sqrt(0.3) * market + np.sqrt(0.7) * idio[:, i]
+        symbol = f"X{i + 1:02d}"
+        out[symbol] = ohlcv_from_closes(
+            symbol, rng, ts, path(cross_section_drift(i), shocks, vol), base_volume=3_000_000.0
+        )
+    return out
+
+
 GOLDEN_DATASETS: tuple[GoldenSpec, ...] = (
     GoldenSpec(
         "bull_trend", "Steady uptrend, moderate volatility", 101, ("trend",),
@@ -99,6 +140,10 @@ GOLDEN_DATASETS: tuple[GoldenSpec, ...] = (
     GoldenSpec(
         "multi_asset_correlated", "Four correlated assets with mixed drifts", 108,
         ("multi-asset",), _multi_asset,
+    ),
+    GoldenSpec(
+        "cross_section", "60 names and SPY with a planted persistent drift (edge harness)",
+        109, ("edge", CROSS_SECTION_TAG), _cross_section,
     ),
 )  # fmt: skip
 

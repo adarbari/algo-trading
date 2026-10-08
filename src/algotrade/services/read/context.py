@@ -23,6 +23,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from algotrade.config.user import UserContext
@@ -58,17 +59,46 @@ __all__ = [
 ]
 
 
-class ResultCache:
-    """A small LRU of computed results. Callers key on ``StoreReader.visible_seq()`` (read
-    before computing), so a publish makes every earlier entry unreachable (ADR 0022). One
-    cache serves every caller of the API (ADR 0040): a result that depends on the request's
-    user has ``ctx.user.user_id`` in its key, and one that depends on their catalogue (a user
-    feature's formula) also ``catalogue_key(ctx)``, so an edited feature never hits a stale
-    entry; stored rows of a named run (the run names its owner) and market data need not."""
+STRING_CELL_BYTES = 60  # what a Python string in an object column costs, about
 
-    def __init__(self, size: int = 32) -> None:
+MAX_CACHE_BYTES = 400 * 1024 * 1024  # the frames a cache holds, together (the hosted API's RSS)
+
+
+def weigh(value: Any) -> int:
+    """About how many bytes ``value`` holds in frames (a DataFrame, or a tuple, list or dict of
+    them; anything else weighs nothing: the cache's count bound covers it). Cheap: no deep
+    walk of a frame's strings, an object column's cells are priced at ``STRING_CELL_BYTES``."""
+    if isinstance(value, pd.DataFrame):
+        # only a NumPy object column holds Python strings ``memory_usage`` cannot see; the
+        # string dtype (pandas 3's default) and categoricals are counted from their buffers
+        objects = sum(1 for t in value.dtypes if isinstance(t, np.dtype) and t.kind == "O")
+        return int(value.memory_usage(index=True, deep=False).sum()) + (
+            STRING_CELL_BYTES * len(value) * objects
+        )
+    if isinstance(value, tuple | list):
+        return sum(weigh(v) for v in value)
+    if isinstance(value, dict):
+        return sum(weigh(v) for v in value.values())
+    return 0
+
+
+class ResultCache:
+    """A small LRU of computed results, bounded by entries and by the bytes of the frames it
+    holds (``max_bytes``: one page can leave dozens of megabytes per screener behind, and a
+    publish leaves the old entries until they age out). Callers key on
+    ``StoreReader.visible_seq()`` (read before computing), so a publish makes every earlier
+    entry unreachable (ADR 0022). One cache serves every caller of the API (ADR 0040): a
+    result that depends on the request's user has ``ctx.user.user_id`` in its key, and one
+    that depends on their catalogue (a user feature's formula) also ``catalogue_key(ctx)``, so
+    an edited feature never hits a stale entry; stored rows of a named run (the run names its
+    owner) and market data need not."""
+
+    def __init__(self, size: int = 32, max_bytes: int = MAX_CACHE_BYTES) -> None:
         self._size = size
+        self._max_bytes = max_bytes
         self._items: OrderedDict[Hashable, Any] = OrderedDict()
+        self._weights: dict[Hashable, int] = {}
+        self._held = 0
         self._lock = threading.Lock()
 
     def get(self, key: Hashable) -> Any | None:
@@ -79,11 +109,19 @@ class ResultCache:
             return self._items[key]
 
     def put(self, key: Hashable, value: Any) -> None:
+        weight = weigh(value)
         with self._lock:
+            self._held -= self._weights.pop(key, 0)
             self._items[key] = value
             self._items.move_to_end(key)
-            while len(self._items) > self._size:
-                self._items.popitem(last=False)
+            self._weights[key] = weight
+            self._held += weight
+            # the newest entry stays even when it alone is over the byte bound
+            while len(self._items) > 1 and (
+                len(self._items) > self._size or self._held > self._max_bytes
+            ):
+                old, _ = self._items.popitem(last=False)
+                self._held -= self._weights.pop(old, 0)
 
 
 @dataclass(frozen=True)
@@ -92,7 +130,8 @@ class ReadContext:
     every value is for, the caller's catalogue (read once per request), the result cache
     (shared across requests; entries keyed on the published state) and ``loaders``: the
     GraphQL layer's per-request dataloaders (``algotrade_api.graphql.loaders``; None outside
-    a GraphQL request, which loaders never need)."""
+    a GraphQL request, which loaders never need) and ``memo``, the request's own scratch for a
+    result several loaders of it ask for (never shared across requests)."""
 
     reader: StoreReader
     configs: ConfigStore
@@ -101,6 +140,9 @@ class ReadContext:
     features: FeatureSet = field(repr=False)
     cache: ResultCache = field(compare=False, repr=False)
     loaders: Any = field(default=None, compare=False, repr=False)
+    # What one request derived from the session's rows, by key (keys carry the session date:
+    # ``at_session`` shares it): a loader asked for the same thing twice computes it once.
+    memo: dict[Hashable, Any] = field(default_factory=dict, compare=False, repr=False)
 
     @cached_property
     def failed_tables(self) -> frozenset[str]:

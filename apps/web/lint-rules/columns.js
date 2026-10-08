@@ -23,6 +23,7 @@ const PENDING = [
 
 // Not feature tables: their rows are not instruments x catalogue features.
 const STRUCTURE = [
+  'src/widgets/edge-list/model/columns.tsx', // the edge documents, one row each
   'src/widgets/events-panel/ui/EventsPanel.tsx', // an instrument's stored events
   'src/widgets/event-study-panel/model/columns.tsx', // an instrument's events ahead and its 8-Ks
   'src/widgets/features-panel/model/rows.tsx', // one instrument's features, one row each
@@ -35,6 +36,8 @@ const STRUCTURE = [
   'src/widgets/recent-runs-panel/ui/RecentRunsPanel.tsx', // admin: nightly runs
   'src/widgets/review-items-panel/ui/ReviewItemsPanel.tsx', // admin: review lists
   'src/widgets/verification-panel/ui/VerificationPanel.tsx', // admin: IBKR verification
+  'src/widgets/usage-breakdown-panel/model/columns.tsx', // admin: text-model usage by group
+  'src/widgets/usage-calls-panel/model/columns.tsx', // admin: text-model calls, one log row each
   'src/entities/run/ui/RunRecordDrawer.tsx', // admin: a run's items
 ];
 

@@ -188,16 +188,23 @@ def latest_run(ctx: ReadContext, owner: str, config_id: str) -> LatestRun:
 
 
 def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
-    """The rows ``run`` stored (one per instrument), in rank order."""
-    stored = screen_rows(ctx)
-    if isinstance(stored, Unknown):  # pragma: no cover - the run was found in these rows
-        return pd.DataFrame(columns=["instrument_id", *ROW_COLUMNS])
-    mine = stored[
-        (stored["user_id"] == run.owner)
-        & (stored["config_id"] == run.config_id)
-        & (stored["run_id"] == run.run_id)
-    ]
-    return mine.sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
+    """The rows ``run`` stored (one per instrument), in rank order. Filtering the session's
+    whole partition for a run is the cost, and a page asks for each run's rows several times:
+    kept in the request's ``ctx.memo`` (read only by callers)."""
+    key = ("run_rows", ctx.session.date, run.owner, run.config_id, run.run_id)
+    found: pd.DataFrame | None = ctx.memo.get(key)
+    if found is None:
+        stored = screen_rows(ctx)
+        if isinstance(stored, Unknown):  # pragma: no cover - the run was found in these rows
+            return pd.DataFrame(columns=["instrument_id", *ROW_COLUMNS])
+        mine = stored[
+            (stored["user_id"] == run.owner)
+            & (stored["config_id"] == run.config_id)
+            & (stored["run_id"] == run.run_id)
+        ]
+        found = mine.sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
+        ctx.memo[key] = found
+    return found
 
 
 def load_previous_run(ctx: ReadContext, run: ScreenerRun) -> ScreenerRun | None:

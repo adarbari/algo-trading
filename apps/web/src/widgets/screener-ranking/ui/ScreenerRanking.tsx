@@ -4,8 +4,10 @@
  */
 import { Button, Panel } from '@algotrade/ui';
 
-import { ScreenerPriorityList } from '@/features/ideas-priority';
+import { ScreenerOdds } from '@/entities/edge';
 import { useIdeas } from '@/entities/idea';
+import { GuideHelp } from '@/features/guide-help';
+import { ScreenerPriorityList } from '@/features/ideas-priority';
 
 export interface ScreenerRankingProps {
   /** Open the screener Builder for a new screener. */
@@ -40,7 +42,16 @@ export function ScreenerRanking({ onNewScreener, onOpenScreener }: ScreenerRanki
         </Button>
       }
     >
-      <ScreenerPriorityList screeners={screeners} onOpenScreener={onOpenScreener} />
+      <ScreenerPriorityList
+        screeners={screeners}
+        onOpenScreener={onOpenScreener}
+        renderOdds={(id) => (
+          <ScreenerOdds
+            screenerId={id}
+            info={<GuideHelp entry={{ kind: 'term', id: 'hit_rate' }} />}
+          />
+        )}
+      />
     </Panel>
   );
 }

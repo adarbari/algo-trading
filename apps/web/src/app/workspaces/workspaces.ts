@@ -36,6 +36,12 @@ export const TRADER: Workspace = {
         'Builder: criteria with hard, soft or score mode, thresholds and tolerances, live preview, save and finalize.',
     },
     {
+      path: '/edges',
+      label: 'Edges',
+      summary:
+        'Each edge, a written reason a pattern should last, with its status, frozen period and the odds of its screeners.',
+    },
+    {
       path: '/explore',
       label: 'Explore',
       summary:
@@ -66,6 +72,12 @@ export const ADMIN: Workspace = {
       label: 'Ingestion',
       summary:
         'Completeness grid (dataset x session) with drill-down, quality checks and open issues.',
+    },
+    {
+      path: '/admin/llm-usage',
+      label: 'LLM usage',
+      summary:
+        'What the text model spends: tokens and cost against the budget, by model, use case and user, and every recent call.',
     },
     {
       path: '/admin/screener-runs',

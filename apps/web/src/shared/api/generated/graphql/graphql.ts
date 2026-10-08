@@ -89,6 +89,16 @@ export type OptionQuotesQueryVariables = Exact<{
 
 export type OptionQuotesQuery = { instrument: { instrumentId: string, chain: { quotes: Array<{ instrumentId: string, expiry: string, right: string, strike: number, bid: number | null, ask: number | null, last: number | null, volume: number | null, openInterest: number | null, iv: number | null, delta: number | null, gamma: number | null, theta: number | null, vega: number | null }> } | null } | null };
 
+export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, schedule: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, variants: Array<string>, frozenFrom: string | null, rejectionReason: string, evidence: { runId: string, splitFrom: string } | null, canonicalRun: { runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, afterSession: boolean, rows: Array<{ edgeVariant: string, variant: string, role: string, horizonSessions: number, sliceKind: string, sliceValue: string, sessions: number | null, picks: number | null, hitRate: number | null, baseRate: number | null, lift: number | null, exploratory: boolean }> } | null, canonicalNotRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string }> }> };
+
+export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: string }>, screeners: Array<{ id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, lift: number | null, sessions: number | null, picks: number | null }> }> }> };
+
 export type EventCalendarQueryVariables = Exact<{
   instrumentIds: Array<string> | string;
   scope: boolean;
@@ -272,6 +282,13 @@ export type InstrumentHistoryQueryVariables = Exact<{
 
 
 export type InstrumentHistoryQuery = { instrument: { instrumentId: string, series: { names: Array<string>, points: Array<{ session: string, values: Array<unknown> }> } } | null };
+
+export type LlmUsageQueryVariables = Exact<{
+  recent: number;
+}>;
+
+
+export type LlmUsageQuery = { llmUsage: { today: string, recorded: boolean, budget: { dailyUsd: number | null, monthlyUsd: number | null, over: string | null, reportedCallUsd: number | null, error: string | null }, windows: Array<{ key: string, start: string, end: string, cap: { kind: string, limitUsd: number | null, usedShare: number | null } | null, tally: { calls: number, inputTokens: number, outputTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number, freeCalls: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, breakdowns: Array<{ by: string, rows: Array<{ key: string | null, provider: string | null, costShare: number | null, tally: { calls: number, inputTokens: number, outputTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number } }> }>, daily: Array<{ day: string, tally: { calls: number, inputTokens: number, outputTokens: number, spentUsd: number, reportedUsd: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, reliability: { attempts: number, ok: number, fellBack: number, failed: number, skippedBudget: number, fallbackRate: number | null, failureRate: number | null }, recent: Array<{ ts: string, provider: string, model: string, useCase: string, user: string | null, inputTokens: number | null, outputTokens: number | null, latencyS: number | null, costUsd: number | null, costBasis: string, outcome: string, fellBackFrom: string | null, runId: string, unknownFields: Array<string>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }> } | null };
 
 export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -502,6 +519,120 @@ export const OptionQuotesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<OptionQuotesQuery, OptionQuotesQueryVariables>;
+export const EdgesPageDocument = new TypedDocumentString(`
+    query EdgesPage {
+  edges {
+    id
+    name
+    status
+    thesis
+    mechanism
+    persistence
+    schedule
+    horizons
+    screeners
+    baselines
+    variants
+    frozenFrom
+    rejectionReason
+    evidence {
+      runId
+      splitFrom
+    }
+    canonicalRun {
+      runId
+      owner
+      rangeFrom
+      rangeTo
+      splitFrom
+      exploratory
+      knowledgeTs
+      afterSession
+      rows {
+        edgeVariant
+        variant
+        role
+        horizonSessions
+        sliceKind
+        sliceValue
+        sessions
+        picks
+        hitRate
+        baseRate
+        lift
+        exploratory
+      }
+    }
+    canonicalNotRun {
+      code
+      reason
+      kind
+      guideTerm
+      kindText
+      cause {
+        links {
+          level
+          subject
+          status
+          message
+          runId
+        }
+      }
+    }
+    runs {
+      runId
+      owner
+      rangeFrom
+      rangeTo
+      splitFrom
+      exploratory
+      knowledgeTs
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
+    query ScreenerTrackRecords {
+  edges {
+    id
+    status
+  }
+  screeners {
+    id
+    trackRecords {
+      screenerId
+      edgeId
+      edgeName
+      runLabel
+      afterSession
+      notRun {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      horizons {
+        horizonSessions
+        hitRate
+        baseRate
+        lift
+        sessions
+        picks
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenerTrackRecordsQuery, ScreenerTrackRecordsQueryVariables>;
 export const EventCalendarDocument = new TypedDocumentString(`
     query EventCalendar($instrumentIds: [String!]!, $scope: Boolean!) {
   eventCalendar(instrumentIds: $instrumentIds, scope: $scope) {
@@ -1499,6 +1630,122 @@ export const InstrumentHistoryDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<InstrumentHistoryQuery, InstrumentHistoryQueryVariables>;
+export const LlmUsageDocument = new TypedDocumentString(`
+    query LlmUsage($recent: Int!) {
+  llmUsage(recent: $recent) {
+    today
+    recorded
+    budget {
+      dailyUsd
+      monthlyUsd
+      over
+      reportedCallUsd
+      error
+    }
+    windows {
+      key
+      start
+      end
+      cap {
+        kind
+        limitUsd
+        usedShare
+      }
+      tally {
+        calls
+        inputTokens
+        outputTokens
+        callsWithoutTokens
+        spentUsd
+        billedUsd
+        reportedUsd
+        boundUsd
+        freeCalls
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+    }
+    breakdowns {
+      by
+      rows {
+        key
+        provider
+        costShare
+        tally {
+          calls
+          inputTokens
+          outputTokens
+          callsWithoutTokens
+          spentUsd
+          billedUsd
+          reportedUsd
+          boundUsd
+        }
+      }
+    }
+    daily {
+      day
+      tally {
+        calls
+        inputTokens
+        outputTokens
+        spentUsd
+        reportedUsd
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+    }
+    reliability {
+      attempts
+      ok
+      fellBack
+      failed
+      skippedBudget
+      fallbackRate
+      failureRate
+    }
+    recent {
+      ts
+      provider
+      model
+      useCase
+      user
+      inputTokens
+      outputTokens
+      latencyS
+      costUsd
+      costBasis
+      outcome
+      fellBackFrom
+      runId
+      unknownFields
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<LlmUsageQuery, LlmUsageQueryVariables>;
 export const RegimeDocument = new TypedDocumentString(`
     query Regime {
   regime {

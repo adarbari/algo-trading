@@ -42,7 +42,11 @@ def test_one_read_for_every_instrument_asking_the_same_names(
     body = graph(query, {"n": [CLOSE], "m": [SECTOR, CLOSE]})
     assert "errors" not in body
     assert [v["value"] for v in body["data"]["b"]["features"]] == [102.0]
-    assert sorted(calls) == [(["EQ:AAA", "EQ:BBB"], (CLOSE,)), (["EQ:CCC"], (SECTOR, CLOSE))]
+    # (top-level fields resolve in threads, so the order the siblings asked in is not fixed)
+    assert sorted((sorted(ids), names) for ids, names in calls) == [
+        (["EQ:AAA", "EQ:BBB"], (CLOSE,)),
+        (["EQ:CCC"], (SECTOR, CLOSE)),
+    ]
 
 
 def test_an_error_is_the_result_of_each_key_that_asked(ctx: ReadContext) -> None:
@@ -73,7 +77,7 @@ def test_a_pane_object_is_read_once_for_every_instrument_asking_it(
     found = graph(query)
     assert "errors" not in found
     assert found["data"] == {"a": {"holdings": {"total": 40}}, "b": {"holdings": None}}
-    assert seen == [["EQ:BULL", "EQ:AAA"]]
+    assert [sorted(ids) for ids in seen] == [["EQ:AAA", "EQ:BULL"]]  # one read, in either order
 
 
 def test_a_failing_batch_is_the_error_of_each_key(ctx: ReadContext) -> None:

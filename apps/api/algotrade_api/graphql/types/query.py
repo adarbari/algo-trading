@@ -13,7 +13,6 @@ import datetime as dt
 from typing import Annotated
 
 import strawberry
-from anyio import to_thread
 from strawberry.types import Info
 
 from algotrade.services.read.evaluation import edges as edge_reads
@@ -31,12 +30,21 @@ from algotrade.services.read.guide import written as written_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
-from algotrade.services.read.ops import backtests, configs, ingestion, quality, review, runs
+from algotrade.services.read.ops import (
+    backtests,
+    configs,
+    ingestion,
+    quality,
+    review,
+    runs,
+    usage,
+)
 from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.limits import MAX_DAYS, MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeRun
@@ -61,6 +69,7 @@ from algotrade_api.graphql.types.ops.ingestion import CellDetail, Completeness
 from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
 from algotrade_api.graphql.types.ops.review import ReviewList
 from algotrade_api.graphql.types.ops.run import NightlyRun, RunDetail, RunItem
+from algotrade_api.graphql.types.ops.usage import LlmUsage
 from algotrade_api.graphql.types.screens.document import ScreenDetail, ScreenListing, ScreenVersion
 from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
@@ -78,6 +87,7 @@ Day = Annotated[
 Ctx = Info[RequestContext, None]
 MAX_RUNS = 100  # nightlyRuns(limit)
 MAX_SESSIONS = 60  # completeness(sessions)
+MAX_CALLS = 200  # llmUsage(recent)
 MAX_SEARCH = 50  # guideSearch(limit): hits per kind
 MAX_QUERY = 200  # guideSearch(q): characters
 
@@ -86,7 +96,8 @@ MAX_QUERY = 200  # guideSearch(q): characters
 class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Who this request is for: the signed-in registry user, their role and "
-        "workspaces (ADR 0040; not session data)"
+        "workspaces (ADR 0040; not session data)",
+        metadata=INLINE,  # no I/O: never queues behind the page's reads
     )
     def viewer(self, info: Ctx) -> Viewer:
         return Viewer.of(load_viewer(info.context.viewer))
@@ -166,13 +177,9 @@ class Query:
         days: int = DEFAULT_DAYS,
         date: Day = None,
     ) -> EventCalendar | None:
-        ctx = info.context.read(date)
+        ctx = await info.context.aread(date)
         load = event_calendar.load_event_calendar  # off the event loop: one read per source
-        found = (
-            await to_thread.run_sync(load, ctx, instrument_ids, days, scope)
-            if ctx is not None
-            else None
-        )
+        found = await off_loop(load, ctx, instrument_ids, days, scope) if ctx is not None else None
         return EventCalendar.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -182,9 +189,9 @@ class Query:
         extensions=[MaxItems("limit", MAX_PAGE)],
     )
     async def ideas(self, info: Ctx, limit: int = 50, date: Day = None) -> Ideas | None:
-        ctx = info.context.read(date)
+        ctx = await info.context.aread(date)
         # Off the event loop (a whole-run read); the items' `features` loads still batch.
-        found = await to_thread.run_sync(ideas.load_ideas, ctx, limit) if ctx is not None else None
+        found = await off_loop(ideas.load_ideas, ctx, limit) if ctx is not None else None
         return Ideas.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -201,9 +208,9 @@ class Query:
         "its reason when not computed for the session (ADR 0047). Null: nothing stored"
     )
     async def regime(self, info: Ctx, date: Day = None) -> MarketRegime | None:
-        ctx = info.context.read(date)
+        ctx = await info.context.aread(date)
         # Off the event loop: the market rows and the cards file.
-        found = await to_thread.run_sync(regime.load_regime, ctx) if ctx is not None else None
+        found = await off_loop(regime.load_regime, ctx) if ctx is not None else None
         return MarketRegime.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -250,12 +257,10 @@ class Query:
     async def distribution(
         self, info: Ctx, name: FeatureName, date: Day = None
     ) -> FeatureDistribution | None:
-        ctx = info.context.read(date)
+        ctx = await info.context.aread(date)
         # Off the event loop: every instrument's value (a whole-population read).
         found = (
-            await to_thread.run_sync(distribution.load_distribution, ctx, name)
-            if ctx is not None
-            else None
+            await off_loop(distribution.load_distribution, ctx, name) if ctx is not None else None
         )
         return FeatureDistribution.of(found) if found is not None else None
 
@@ -393,13 +398,9 @@ class Query:
         description="The saved backtest run `runId`; null: no such backtest run"
     )
     async def backtest(self, info: Ctx, run_id: str) -> BacktestDetail | None:
-        ctx = info.context.stores()
+        ctx = await info.context.astores()
         # Off the event loop: the run's equity and fills are parquet reads.
-        found = (
-            await to_thread.run_sync(backtests.load_backtest, ctx, run_id)
-            if ctx is not None
-            else None
-        )
+        found = await off_loop(backtests.load_backtest, ctx, run_id) if ctx is not None else None
         return BacktestDetail.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -474,11 +475,9 @@ class Query:
         extensions=[AdminOnly()],
     )
     async def verification(self, info: Ctx, date: Day = None) -> Verification | None:
-        ctx = info.context.read(date)
+        ctx = await info.context.aread(date)
         # Off the event loop: a parquet read and a group-by.
-        found = (
-            await to_thread.run_sync(quality.load_verification, ctx) if ctx is not None else None
-        )
+        found = await off_loop(quality.load_verification, ctx) if ctx is not None else None
         return Verification.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -489,12 +488,10 @@ class Query:
     async def completeness(
         self, info: Ctx, sessions: int = 10, date: Day = None
     ) -> Completeness | None:
-        ctx = info.context.read(date)
+        ctx = await info.context.aread(date)
         # Off the event loop: one partition read per dataset and session of the window.
         found = (
-            await to_thread.run_sync(ingestion.load_completeness, ctx, sessions)
-            if ctx is not None
-            else None
+            await off_loop(ingestion.load_completeness, ctx, sessions) if ctx is not None else None
         )
         return Completeness.of(found) if found is not None else None
 
@@ -504,11 +501,9 @@ class Query:
         extensions=[AdminOnly()],
     )
     async def ingestion_cell(self, info: Ctx, dataset: str, date: dt.date) -> CellDetail | None:
-        ctx = info.context.read(date)
+        ctx = await info.context.aread(date)
         found = (
-            await to_thread.run_sync(ingestion.load_cell_detail, ctx, dataset)
-            if ctx is not None
-            else None
+            await off_loop(ingestion.load_cell_detail, ctx, dataset) if ctx is not None else None
         )
         return CellDetail.of(found) if found is not None else None
 
@@ -531,3 +526,14 @@ class Query:
         ctx = info.context.read(date)
         found = review.load_leverage_review(ctx) if ctx is not None else None
         return ReviewList.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="What the text model spent: tokens and cost against the budget, by model, "
+        "use case and user, a 30-day series and the `recent` latest calls (newest first). A "
+        "date range ending today, not one session (ADR 0058)",
+        extensions=[AdminOnly(), MaxItems("recent", MAX_CALLS)],
+    )
+    async def llm_usage(self, info: Ctx, recent: int = 50) -> LlmUsage | None:
+        ctx = await info.context.astores()
+        found = await off_loop(usage.load_llm_usage, ctx, None, recent) if ctx is not None else None
+        return LlmUsage.of(found) if found is not None else None

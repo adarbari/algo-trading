@@ -9,7 +9,6 @@ import datetime as dt
 from typing import Self
 
 import strawberry
-from anyio import to_thread
 from strawberry.scalars import JSON
 from strawberry.types import Info
 
@@ -18,6 +17,7 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.table import DEFAULT_SIZE
 from algotrade.services.read.screens import results, runs, screeners
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.availability import Unavailable
@@ -96,7 +96,7 @@ class ScreenerRun:
     )
     async def previous_session(self, info: Info) -> dt.date | None:
         # Off the event loop: the previous run's rows are read and compared (about 11k).
-        found = await to_thread.run_sync(results.load_run_changes, self.ctx, self.run)
+        found = await off_loop(results.load_run_changes, self.ctx, self.run)
         return found.previous_session
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -104,7 +104,7 @@ class ScreenerRun:
         "whole run; empty: no previous run"
     )
     async def changes(self, info: Info) -> list[ChangeCount]:
-        found = await to_thread.run_sync(results.load_run_changes, self.ctx, self.run)
+        found = await off_loop(results.load_run_changes, self.ctx, self.run)
         return [ChangeCount.of(c) for c in found.counts]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -129,7 +129,7 @@ class ScreenerRun:
     ) -> ScreenResultPage:
         query = results.ResultQuery(tuple(decisions or ()), change, q, sort)
         # Off the event loop: the whole run is filtered and sorted (about 11k rows).
-        found = await to_thread.run_sync(
+        found = await off_loop(
             results.load_result_page, self.ctx, self.run, query, columns or [], page, size
         )
         return ScreenResultPage.of(found, self.ctx)

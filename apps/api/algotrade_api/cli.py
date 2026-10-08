@@ -6,11 +6,14 @@ With ``ALGOTRADE_AUTH=off`` (no token, ADR 0040) it refuses a non-loopback ``--h
 (``make web-build`` runs it) and says when the running API is out of step with it
 (``ops/build.py``): it prints the restart command, never runs it. ``schedule --agent deploy``
 writes the auto-deploy agent; ``deploy-plan`` and ``deploy-verify`` are what
-``scripts/ops/deploy.sh`` asks (``ops/deploy.py``, ADR 0057)."""
+``scripts/ops/deploy.sh`` asks (``ops/deploy.py``, ADR 0057). Serving raises the process's
+open-files soft limit to ``OPEN_FILES`` and caps the connections served at once at
+``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08)."""
 
 import argparse
 import json
 import os
+import resource
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +31,8 @@ from algotrade_api.ops.schedule import (
     DEPLOY_LABEL,
     HOST,
     LABEL,
+    MAX_CONNECTIONS,
+    OPEN_FILES,
     api_plist,
     deploy_plist,
 )
@@ -39,6 +44,17 @@ def serve_port() -> int:
     """The port ``algotrade-api`` serves on: this worktree's block (``ALGOTRADE_PORT_BASE``, set
     by ``scripts/worktree.sh``) else 8000. The launchd agent keeps 8000 (``schedule``)."""
     return port_base(DEFAULT_PORT)
+
+
+def raise_open_files(wanted: int = OPEN_FILES) -> int:
+    """Raise this process's open-files soft limit to ``wanted`` (never above the hard limit,
+    never lowered); the soft limit it now has."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    target = wanted if hard == resource.RLIM_INFINITY else min(wanted, hard)
+    if soft != resource.RLIM_INFINITY and soft < target:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+        return target
+    return soft
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -170,4 +186,11 @@ def main(argv: list[str] | None = None) -> None:
             require_loopback(args.host)
         except ConfigurationError as exc:
             parser.error(str(exc))
-    uvicorn.run(APP, host=args.host, port=args.port, reload=args.reload)
+    raise_open_files()
+    uvicorn.run(
+        APP,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+        limit_concurrency=MAX_CONNECTIONS,
+    )

@@ -1,13 +1,15 @@
 /**
  * The screeners list's columns. Site presets: name, kind (rules or Python), universe,
- * state, Playbook (its Guide page) and Copy. Your screeners: name, state (DRAFT or vN
+ * track record (the chip of its first edge), state, Playbook (its Guide page) and Copy. Your screeners: name, state (DRAFT or vN
  * finalized, a working copy beside it), the preset it copies, universe, Edit and Delete. A row
  * click opens the screener (ScreenerList), so no row has an Open button.
  */
 import { Button, Stack, StatusBadge, TextLink, type DataTableColumn } from '@algotrade/ui';
 
+import { ScreenerTrackChip } from '@/entities/edge';
 import { playbookPath } from '@/entities/guide';
 import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
+import { GuideHelp } from '@/features/guide-help';
 
 export interface ScreenerActions {
   /** Open a screener in the Builder. */
@@ -24,6 +26,16 @@ export interface MyScreener extends ScreenerListItem {
 }
 
 const isRules = (screener: ScreenerSummary): boolean => screener.impl === 'rules';
+
+/** The chip of the screener's record under the edges that list it (blank: no edge lists it). */
+const trackRecordColumn = <Row,>(screenerId: (row: Row) => string): DataTableColumn<Row> => ({
+  id: 'trackRecord',
+  header: 'Track record',
+  headerAction: <GuideHelp entry={{ kind: 'term', id: 'edge_status' }} />,
+  value: () => null,
+  sortable: false,
+  cell: ({ row }) => <ScreenerTrackChip screenerId={screenerId(row)} />,
+});
 
 const NAME: DataTableColumn<ScreenerSummary> = {
   id: 'name',
@@ -52,6 +64,7 @@ export function presetColumns(actions: ScreenerActions): DataTableColumn<Screene
       mono: true,
       tone: 'secondary',
     },
+    trackRecordColumn<ScreenerSummary>((s) => s.configId),
     {
       id: 'actions',
       header: 'Actions',
@@ -125,6 +138,7 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
       mono: true,
       tone: 'secondary',
     },
+    trackRecordColumn<MyScreener>((s) => s.screenerId),
     {
       id: 'actions',
       header: 'Actions',

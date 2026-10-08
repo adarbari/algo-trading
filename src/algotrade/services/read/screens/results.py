@@ -176,20 +176,29 @@ def _value(row: Mapping[str, Any]) -> Scalar:
 
 
 def _values(
-    ctx: ReadContext, runs: Sequence[ScreenerRun], ids: Sequence[str] | None
+    ctx: ReadContext,
+    runs: Sequence[ScreenerRun],
+    ids: Sequence[str] | None,
+    wanted: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[ResultKey, list[Mapping[str, Any]]]:
     """The stored value rows of ``ids`` (None: every instrument) in each run, by (run id,
-    instrument id)."""
+    instrument id). ``wanted`` (``{run id: instrument ids}``): a run's rows only for the
+    instruments it is asked for (the rest are never read back, and turning them into records
+    was most of an Ideas read)."""
     stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, ids)
     if isinstance(stored, Unknown) or stored.empty:
         return {}
     out: dict[ResultKey, list[Mapping[str, Any]]] = {}
     for run in runs:
+        if wanted is not None and not wanted.get(run.run_id):
+            continue
         mine = stored[
             (stored["user_id"] == run.owner)
             & (stored["config_id"] == run.config_id)
             & (stored["run_id"] == run.run_id)
         ]
+        if wanted is not None:
+            mine = mine[mine["instrument_id"].isin(set(wanted[run.run_id]))]
         for row in _records(mine):
             out.setdefault((run.run_id, str(row["instrument_id"])), []).append(row)
     return out
@@ -252,7 +261,7 @@ def load_results(
     ids = sorted({i for found in wanted.values() for i in found})
     if not ids:
         return {}
-    values = _values(ctx, runs, ids)
+    values = _values(ctx, runs, ids, wanted)
     instruments = load_instruments(ctx, ids)
     out: dict[ResultKey, ScreenResult] = {}
     for run in runs:

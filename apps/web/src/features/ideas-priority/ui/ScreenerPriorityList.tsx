@@ -4,6 +4,7 @@
  * opens its results (its name is the keyboard's button).
  */
 import { SortableList } from '@algotrade/ui';
+import type { ReactNode } from 'react';
 
 import { ScreenerRow, type ScreenerSummary } from '@/entities/idea';
 
@@ -13,9 +14,15 @@ export interface ScreenerPriorityListProps {
   screeners: readonly ScreenerSummary[];
   /** Open a screener's results (a click on its row, or its name's button). */
   onOpenScreener?: (screenerId: string) => void;
+  /** The odds line under a screener's finds (its frozen-period record). */
+  renderOdds?: (screenerId: string) => ReactNode;
 }
 
-export function ScreenerPriorityList({ screeners, onOpenScreener }: ScreenerPriorityListProps) {
+export function ScreenerPriorityList({
+  screeners,
+  onOpenScreener,
+  renderOdds,
+}: ScreenerPriorityListProps) {
   const save = useSavePriority();
   return (
     <SortableList<ScreenerSummary>
@@ -27,6 +34,7 @@ export function ScreenerPriorityList({ screeners, onOpenScreener }: ScreenerPrio
         <ScreenerRow
           screener={screener}
           rank={index + 1}
+          {...(renderOdds ? { odds: renderOdds(screener.id) } : {})}
           {...(onOpenScreener ? { onOpen: onOpenScreener } : {})}
         />
       )}
