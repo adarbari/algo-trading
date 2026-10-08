@@ -554,7 +554,8 @@ O(universe); per-user work is O(users × configs). The nightly run ends with a `
 (universe size change, bar freshness and count drop, option chains, earnings present;
 thresholds in `config/site/sources.toml` `[quality]`); any FAIL marks the nightly `PARTIAL`.
 Option chains are judged on two separate counts: **fetch failures** (`FETCH_ERROR`, including
-an open circuit breaker, or never attempted) above `max_chain_fetch_failures` (5% of the
+an open circuit breaker, never attempted, or `STALE_CHRONIC`: stale for more than
+`max_chain_stale_sessions` sessions, ADR 0054) above `max_chain_fetch_failures` (2% of the
 universe) FAIL `chains_fetch`, because the night's data is missing; **stale chains**
 (`STALE_DATA`: the feed served an older session) are graded per tier, the tier stored with each
 status row at fetch time (`tasks/market/tiers.py`: core = S&P 500, `[cboe] priority_symbols`,

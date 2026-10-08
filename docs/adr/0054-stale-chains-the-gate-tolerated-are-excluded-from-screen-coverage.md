@@ -35,6 +35,15 @@ critical `screens` step FAILED. Two thresholds judged the same names differently
    decision is a string, so the schema does not change; the web lists EXCLUDED last in a run's
    decisions.
 
+5. **Chronic staleness is a fetch failure.** `chain_labels(status_frame, session,
+   max_chain_stale_sessions)` labels a `STALE_DATA` chain for a day more than
+   `[quality] max_chain_stale_sessions` (5) sessions before the session `STALE_CHRONIC`, one of
+   `FETCH_FAILURES`: it counts against `max_chain_fetch_failures` in `chains_fetch`, not against
+   a tier's stale share, and `tolerated_stale` never excludes it. The 2026-10-06 status held
+   chains stale since 2026-09-23 (9 sessions) that the stale share tolerated night after night;
+   a feed that is a few sessions late is still tolerated, one that has stopped serving a name
+   is not. Both sides read the one labelling, so they stay in step.
+
 ## Consequences
 - A night whose only data problem is a stale share the gate tolerated no longer FAILS the
   `screens` step; one stale name more than the gate tolerates fails the gate (as before) and

@@ -40,7 +40,7 @@ def screened(core_stale: int, rest_stale: int, sources: SourcesSettings | None =
 def test_stale_names_at_the_gates_limits_are_excluded_and_the_run_is_complete() -> None:
     reader, outcome = screened(core_stale=1, rest_stale=10)
     run = outcome.run
-    assert len(tolerated_stale(chain_status(reader, DAY), SOURCES)) == 11
+    assert len(tolerated_stale(chain_status(reader, DAY), DAY, SOURCES)) == 11
     assert run.coverage is RunCoverage.COMPLETE
     assert (run.excluded, run.processed, run.coverage_pct) == (11, 89, 1.0)
     assert outcome.audit["excluded"] == 11 and outcome.audit["skipped"] == 0
@@ -65,7 +65,7 @@ def test_one_more_stale_name_than_the_gate_tolerates_is_partial_again(
     core_stale: int, rest_stale: int
 ) -> None:
     reader, outcome = screened(core_stale, rest_stale)
-    assert tolerated_stale(chain_status(reader, DAY), SOURCES) == {}  # the gate FAILED
+    assert tolerated_stale(chain_status(reader, DAY), DAY, SOURCES) == {}  # the gate FAILED
     assert outcome.run.coverage is RunCoverage.PARTIAL
     assert outcome.run.excluded == 0 and outcome.audit["excluded"] == 0
 

@@ -7,6 +7,7 @@ Option quote rows are keyed by the contract (``instrument_id``) and carry their
 ("the chain of EQ:AAPL").
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -15,6 +16,7 @@ import pandas as pd
 
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
+from algotrade.core.time.calendar import sessions_to
 from algotrade.storage.tables.readers import StoreReader
 
 OPTION_QUOTES = "chains/option_quotes"
@@ -24,8 +26,12 @@ LIVE_OPTION_QUOTES = "live/option_quotes"
 
 # Chain statuses (``tasks/market/option_chains``) by what they say about the night's fetch: a
 # failed or missing fetch is a source problem; a stale chain is the feed serving an older session.
-FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED")  # FETCH_ERROR includes an open circuit
+# A chain stale for more than ``max_chain_stale_sessions`` is labelled CHRONIC (never stored): the
+# feed is not late for the name, it has stopped serving it, which is a fetch failure.
 STALE = "STALE_DATA"
+CHRONIC = "STALE_CHRONIC"
+FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED", CHRONIC)  # FETCH_ERROR includes an open circuit
+_CHAIN_DAY = re.compile(r"chain is for (\d{4}-\d{2}-\d{2})")  # option_chains' STALE_DATA text
 
 
 def option_quotes(
@@ -103,9 +109,15 @@ def live_option_quotes(
     return _of_underlyings(reader.table(LIVE_OPTION_QUOTES, session, as_of), underlying_ids)
 
 
-def chain_labels(status_frame: pd.DataFrame) -> pd.Series:
-    """Each status row's label (``STALE_DATA``, ``OK``, ...: the text before any ``:``)."""
-    return status_frame["status"].astype(str).str.split(":", n=1).str[0].str.strip()
+def chain_labels(status_frame: pd.DataFrame, session: date, max_stale_sessions: int) -> pd.Series:
+    """Each status row's label (``STALE_DATA``, ``OK``, ...: the text before any ``:``), with a
+    ``STALE_DATA`` chain for a day more than ``max_stale_sessions`` sessions before ``session``
+    labelled ``CHRONIC`` (a fetch failure). A stale status without a day keeps its label."""
+    status = status_frame["status"].astype(str)
+    labels = status.str.split(":", n=1).str[0].str.strip()
+    days = status.str.extract(_CHAIN_DAY, expand=False).where(labels == STALE)
+    ages = {d: sessions_to(date.fromisoformat(d), session) for d in days.dropna().unique()}
+    return labels.mask(days.map(ages).fillna(0) > max_stale_sessions, CHRONIC)
 
 
 def fetch_failure_share(labels: pd.Series) -> float:
@@ -143,17 +155,19 @@ def stale_in_tier(frame: pd.DataFrame, labels: pd.Series, tier: str) -> TierStal
 
 
 def tolerated_stale(
-    status_frame: pd.DataFrame | None, sources: SourcesSettings
+    status_frame: pd.DataFrame | None, session: date, sources: SourcesSettings
 ) -> Mapping[str, str]:
-    """The ``STALE_DATA`` underlyings of a chain status whose stale share the chains
+    """The ``STALE_DATA`` underlyings of ``session``'s chain status whose stale share the chains
     acceptance check tolerated, as instrument id -> its stored status text (the exclusion
-    reason, e.g. ``STALE_DATA: chain is for 2026-09-23``): every tier within its limit
-    (``max_chain_stale_share_core`` / ``max_chain_stale_share``), fetch failures within
-    ``max_chain_fetch_failures``. Empty otherwise (fail closed: a chains run that failed its
-    check excludes nobody). The same helpers as ``check_chains``, so gate and screens agree."""
+    reason, e.g. ``STALE_DATA: chain is for 2026-10-05``): every tier within its limit
+    (``max_chain_stale_share_core`` / ``max_chain_stale_share``), fetch failures (chronically
+    stale chains included, ``max_chain_stale_sessions``) within ``max_chain_fetch_failures``.
+    Empty otherwise (fail closed: a chains run that failed its check excludes nobody); a
+    chronically stale chain is never excluded. The same helpers as ``check_chains``, so gate and
+    screens agree."""
     if status_frame is None or status_frame.empty:
         return {}
-    labels = chain_labels(status_frame)
+    labels = chain_labels(status_frame, session, sources.max_chain_stale_sessions)
     if fetch_failure_share(labels) > sources.max_chain_fetch_failures:
         return {}
     core = stale_in_tier(status_frame, labels, "core")
