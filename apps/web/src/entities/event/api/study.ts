@@ -71,6 +71,7 @@ const InstrumentEventStudy = graphql(`
             reason
             kind
             guideTerm
+            kindText
             cause {
               links {
                 level

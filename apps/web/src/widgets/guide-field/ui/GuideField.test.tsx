@@ -407,6 +407,7 @@ describe('GuideField states', () => {
           code: 'NO_PARTITION',
           kind: 'SYSTEM',
           guideTerm: 'unavailable_system',
+          kindText: 'not available because of a system error',
           cause: null,
         },
         passing: [],

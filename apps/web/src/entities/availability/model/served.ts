@@ -4,8 +4,9 @@
  * for an admin only, the `cause` chain. The server withholds the chain from anyone else; the
  * browser never checks a role. These are the shapes every operation selects.
  */
-import type { NullReasonName, UnknownCodeName } from '@/entities/feature';
 import type { gqlTypes } from '@/shared/api';
+
+import type { NullReasonName, UnknownCodeName } from './words';
 
 export type UnavailableKindName = gqlTypes.UnavailableKind;
 export type CauseLevelName = gqlTypes.CauseLevel;
@@ -28,6 +29,8 @@ export interface ServedUnknown {
   reason?: NullReasonName | null | undefined;
   kind: UnavailableKindName;
   guideTerm: string;
+  /** The kind in the server's generic words (never a table, vendor or step). */
+  kindText: string;
   cause?: ServedCause | null | undefined;
 }
 
@@ -36,5 +39,6 @@ export interface ServedUnavailable {
   kind: UnavailableKindName;
   features: readonly string[];
   guideTerm: string;
+  kindText: string;
   cause?: ServedCause | null | undefined;
 }

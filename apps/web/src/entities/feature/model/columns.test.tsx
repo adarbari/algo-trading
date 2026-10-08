@@ -51,7 +51,12 @@ const rows: TableRow[] = [
     name: 'Marvell Technology',
     cells: {
       [CLOSE.name]: { value: 71.5, unknown: null },
-      [EARN.name]: { value: null, unknown: 'NO_PARTITION' },
+      [EARN.name]: {
+        value: null,
+        unknown: 'NO_PARTITION',
+        kind: 'SYSTEM',
+        kindText: 'not available because of a system error',
+      },
       [IV.name]: { value: 0.42, unknown: null },
     },
     rank: 1,
@@ -112,7 +117,7 @@ describe('column factories', () => {
     expect(within(grid).getByText('$71.50')).toBeInTheDocument();
     expect(within(grid).getByText('23')).toBeInTheDocument();
     const unknown = within(grid).getByText('Unknown');
-    expect(unknown).toHaveAttribute('title', 'not stored for this session');
+    expect(unknown).toHaveAttribute('title', 'not available because of a system error');
     expect(within(grid).getByText('Marvell Technology')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Earn\./ })).toBeInTheDocument();
     await expectNoA11yViolations(container);
@@ -124,8 +129,18 @@ describe('column factories', () => {
       instrumentId: 'EQ:S',
       name: 'SPDR S&P 500',
       cells: {
-        [EARN.name]: { value: null, unknown: 'NOT_APPLICABLE' },
-        [IV.name]: { value: null, unknown: 'ILLIQUID' },
+        [EARN.name]: {
+          value: null,
+          unknown: 'NOT_APPLICABLE',
+          kind: 'NOT_APPLICABLE',
+          kindText: 'does not apply to this instrument',
+        },
+        [IV.name]: {
+          value: null,
+          unknown: 'ILLIQUID',
+          kind: 'ILLIQUID',
+          kindText: 'not available: too thinly traded today',
+        },
       },
     };
     render(
@@ -144,7 +159,7 @@ describe('column factories', () => {
     );
     expect(within(grid).getByText('Illiquid')).toHaveAttribute(
       'title',
-      expect.stringMatching(/too thin/),
+      expect.stringMatching(/thinly traded/),
     );
     expect(within(grid).queryByText('Unknown')).not.toBeInTheDocument();
   });

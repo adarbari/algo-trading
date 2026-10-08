@@ -64,7 +64,13 @@ describe('EventCalendarPanel', () => {
       fakeQuery({
         screener: {
           latestRun: null,
-          notRun: { code: 'NOT_RUN', kind: 'NOT_RUN', guideTerm: 'not_run', cause: null },
+          notRun: {
+            code: 'NOT_RUN',
+            kind: 'NOT_RUN',
+            guideTerm: 'not_run',
+            kindText: 'not run for this session',
+            cause: null,
+          },
         },
       }),
     );
@@ -87,6 +93,7 @@ describe('EventCalendarPanel', () => {
               code: 'NO_PARTITION',
               kind: 'SYSTEM',
               guideTerm: 'unavailable_system',
+              kindText: 'not available because of a system error',
               cause: null,
               reason: null,
             },

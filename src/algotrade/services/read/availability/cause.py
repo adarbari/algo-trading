@@ -9,6 +9,7 @@ kind comes from the code and from whether a failure stands behind the table
 reading one is SYSTEM; a gap with none is NOT_STORED), never from the chain itself, so a
 trader's read never pays for (or leaks) the chain."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
@@ -24,9 +25,11 @@ __all__ = [
     "Cause",
     "CauseLevel",
     "CauseLink",
+    "KindText",
     "Unavailable",
     "UnavailableKind",
     "feature_cause",
+    "kind_texts",
     "names_a_table",
     "public_audit",
     "run_cause",
@@ -176,3 +179,17 @@ class Unavailable:
     @property
     def reason(self) -> str:
         return GENERIC_REASONS[self.kind]
+
+
+@dataclass(frozen=True)
+class KindText:
+    """A kind in its generic words (a table's cells are drawn by kind)."""
+
+    kind: UnavailableKind
+    text: str
+
+
+def kind_texts(kinds: Iterable[Iterable[UnavailableKind | None]]) -> tuple[KindText, ...]:
+    """The generic words of each kind ``kinds`` (a table's matrix) uses, in the enum's order."""
+    used = {k for row in kinds for k in row if k is not None}
+    return tuple(KindText(k, GENERIC_REASONS[k]) for k in UnavailableKind if k in used)

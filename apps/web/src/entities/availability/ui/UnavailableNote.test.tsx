@@ -22,18 +22,21 @@ const GAPS: ServedUnavailable[] = [
     kind: 'SYSTEM',
     features: ['rollup.ibkr_iv@v1.iv_rank', 'rollup.ibkr_iv@v1.iv30'],
     guideTerm: 'unavailable_system',
+    kindText: 'not available because of a system error',
     cause: null,
   },
   {
     kind: 'SYSTEM',
     features: ['rollup.ibkr_iv@v1.iv30', 'rollup.price_stats@v2.hv20'],
     guideTerm: 'unavailable_system',
+    kindText: 'not available because of a system error',
     cause: null,
   },
   {
     kind: 'NOT_STORED',
     features: ['rollup.earnings@v1.next_earnings_date'],
     guideTerm: 'unavailable_not_stored',
+    kindText: 'not available for this instrument',
     cause: null,
   },
 ];
@@ -78,6 +81,7 @@ describe('UnknownNote', () => {
     code: 'NO_PARTITION',
     kind: 'SYSTEM',
     guideTerm: 'unavailable_system',
+    kindText: 'not available because of a system error',
   } as const;
 
   it("says the kind's generic words to a trader, with no chain", () => {

@@ -55,20 +55,43 @@ class Cause:
         return cls(links=[CauseLink.of(link) for link in d.links])
 
 
+@strawberry.type(description="A kind in generic words: never a table, vendor or step")
+class KindText:
+    kind: domain.UnavailableKind
+    text: str
+
+    @classmethod
+    def of(cls, d: domain.KindText) -> Self:
+        return cls(kind=d.kind, text=d.text)
+
+
 @strawberry.type(
     description="Features a page cannot show, and why in public words: `kind`, the Guide "
-    "glossary term `guideTerm` that explains it. `cause` is the chain behind it: admins only "
-    "(null for anyone else)"
+    "glossary term `guideTerm` that explains it, `kindText` the kind in generic words. "
+    "`cause` is the chain behind it: admins only (null for anyone else)"
 )
 class Unavailable:
     kind: domain.UnavailableKind
     features: list[str]
     guide_term: str
     leaf: strawberry.Private[domain.Cause]
+    text: strawberry.Private[str]
 
     @classmethod
     def of(cls, d: domain.Unavailable) -> Self:
-        return cls(kind=d.kind, features=list(d.features), guide_term=d.guide_term, leaf=d.cause)
+        return cls(
+            kind=d.kind,
+            features=list(d.features),
+            guide_term=d.guide_term,
+            leaf=d.cause,
+            text=d.reason,
+        )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The kind in generic words: never a table, vendor or step"
+    )
+    def kind_text(self) -> str:
+        return self.text
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The chain behind it, source to features; null unless the caller is an admin",

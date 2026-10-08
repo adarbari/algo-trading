@@ -29,6 +29,7 @@ const ScreenerResults = graphql(`
         kind
         features
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -56,6 +57,7 @@ const ScreenerResults = graphql(`
         code
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -76,6 +78,7 @@ const ScreenerResults = graphql(`
           kind
           features
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -113,6 +116,7 @@ const ScreenerResults = graphql(`
             kind
             features
             guideTerm
+            kindText
             cause {
               links {
                 level
@@ -136,6 +140,11 @@ const ScreenerResults = graphql(`
           rows
           unknown
           reasons
+          kinds
+          kindTexts {
+            kind
+            text
+          }
           results {
             instrumentId
             rank

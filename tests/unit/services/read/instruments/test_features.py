@@ -7,7 +7,7 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.read.availability.cause import feature_cause
+from algotrade.services.read.availability.cause import UnavailableKind, feature_cause
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.services.read.instruments.catalogue import (
     FeatureFormat,
@@ -291,9 +291,10 @@ def test_cell_codes_carry_the_reason_of_explained_cells() -> None:
         )
         * 2,
     }
-    unknown, reasons = cell_codes(cells, ["A", "B", "C"])
+    unknown, reasons, kinds = cell_codes(cells, ["A", "B", "C"])
     assert unknown == ((UnknownCode.EXPLAINED, None), (UnknownCode.NULL, UnknownCode.NULL), ())
     assert reasons == ((NullReason.NEW_LISTING, None), (None, None), ())
+    assert kinds[1] == (UnavailableKind.NOT_STORED, UnavailableKind.NOT_STORED) and kinds[2] == ()
 
 
 HISTORY = "rollups/instrument/price_history@v1"

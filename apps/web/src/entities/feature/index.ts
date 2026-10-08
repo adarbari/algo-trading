@@ -73,17 +73,12 @@ export {
   type GuideTheme,
 } from './model/themes';
 export {
-  codeReason,
   isUnknown,
-  reasonLabel,
   shownValue,
-  unknownLabel,
   valueFormat,
   type FeatureFormatName,
-  type NullReasonName,
   type ServedInfo,
   type ServedValue,
-  type UnknownCodeName,
 } from './model/value';
 export {
   distributionBins,

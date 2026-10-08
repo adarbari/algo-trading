@@ -6,6 +6,7 @@ const gap = (kind: 'SYSTEM' | 'NOT_STORED', features: string[]) => ({
   kind,
   features,
   guideTerm: kind === 'SYSTEM' ? 'unavailable_system' : 'unavailable_not_stored',
+  kindText: kind === 'SYSTEM' ? 'system' : 'not stored',
   cause: null,
 });
 
@@ -48,21 +49,30 @@ describe('feature table', () => {
         [null, null],
         [null, 'NO_TRADE'],
       ],
+      kinds: [
+        [null, null],
+        ['SYSTEM', 'NOT_APPLICABLE'],
+      ],
+      kindTexts: [{ kind: 'SYSTEM' as const, text: 'system words' }],
     });
     expect(data.rows.map((r) => r.symbol)).toEqual(['AAPL', 'MRVL']);
     expect(data.rows[0]?.cells).toEqual({
-      'rollup.a@v1.x': { value: 1.5, unknown: null, reason: null },
-      'feature.y': { value: 'HIGH', unknown: null, reason: null },
+      'rollup.a@v1.x': { value: 1.5, unknown: null, reason: null, kind: null, kindText: null },
+      'feature.y': { value: 'HIGH', unknown: null, reason: null, kind: null, kindText: null },
     });
     expect(data.rows[1]?.cells['rollup.a@v1.x']).toEqual({
       value: null,
       unknown: 'NO_PARTITION',
       reason: null,
+      kind: 'SYSTEM',
+      kindText: 'system words',
     });
     expect(data.rows[1]?.cells['feature.y']).toEqual({
       value: null,
       unknown: 'EXPLAINED',
       reason: 'NO_TRADE',
+      kind: 'NOT_APPLICABLE',
+      kindText: null,
     });
     expect([data.session, data.total, data.page, data.size]).toEqual([
       '2026-10-02',

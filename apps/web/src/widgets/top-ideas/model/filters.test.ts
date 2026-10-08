@@ -23,6 +23,7 @@ const sessions = (n: number | null) => ({
           code: 'NULL' as const,
           kind: 'NOT_STORED' as const,
           guideTerm: 'unavailable_not_stored',
+          kindText: 'not available for this instrument',
           cause: null,
         }
       : null,

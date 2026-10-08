@@ -33,6 +33,10 @@ describe('algotrade-availability/reads-a-gap', () => {
     'const x = gap.cause;',
     'const x = unknown.cause.links;',
     'const x = unavailable.cause;',
+    'const { code, cause } = value.unknown;',
+    'const { code: c } = screener.notRun;',
+    'const u = value.unknown; const x = u.code;',
+    'const g = unavailable; const x = g.cause;',
   ])('reports %s', (code) => {
     const found = lint(code);
     expect(found.length).toBeGreaterThan(0);
@@ -48,6 +52,9 @@ describe('algotrade-availability/reads-a-gap', () => {
     'const x = response.code;',
     'const x = cells[name].unknown;',
     'const x = unknownText(value.unknown);',
+    'const { kind, guideTerm } = value.unknown;',
+    'const { code } = response;',
+    'const u = value.other; const x = u.code;',
   ])('accepts %s', (code) => {
     expect(lint(code)).toEqual([]);
   });

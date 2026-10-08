@@ -75,6 +75,7 @@ const FeatureDistribution = graphql(`
         code
         kind
         guideTerm
+        kindText
         cause {
           links {
             level

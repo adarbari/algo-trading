@@ -9,6 +9,7 @@ const SYSTEM_UNKNOWN = {
   code: 'NOT_IN_CATALOGUE' as const,
   kind: 'SYSTEM' as const,
   guideTerm: 'unavailable_system',
+  kindText: 'not available because of a system error',
   cause: null,
 };
 

@@ -43,6 +43,7 @@ const EventCalendar = graphql(`
           reason
           kind
           guideTerm
+          kindText
           cause {
             links {
               level

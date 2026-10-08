@@ -56,6 +56,7 @@ from algotrade.services.features import entity_field_view, field_view
 from algotrade.services.read.availability.cause import (
     Cause,
     CauseLink,
+    UnavailableKind,
     feature_cause,
     table_cause,
 )
@@ -274,10 +275,15 @@ def _absence(
 
 def cell_codes(
     cells: Mapping[str, Sequence[FeatureValue]], ids: Sequence[str]
-) -> tuple[tuple[tuple[UnknownCode | None, ...], ...], tuple[tuple[NullReason | None, ...], ...]]:
-    """A table's ``unknown`` and ``reasons`` matrices for ``ids`` (rows) from their
-    ``load_feature_values`` cells: the code of each UNKNOWN cell, and its ``NullReason`` when
-    the code is EXPLAINED (else None)."""
+) -> tuple[
+    tuple[tuple[UnknownCode | None, ...], ...],
+    tuple[tuple[NullReason | None, ...], ...],
+    tuple[tuple[UnavailableKind | None, ...], ...],
+]:
+    """A table's ``unknown``, ``reasons`` and ``kinds`` matrices for ``ids`` (rows) from their
+    ``load_feature_values`` cells: the code of each UNKNOWN cell, its ``NullReason`` when the
+    code is EXPLAINED (else None) and its public kind (SYSTEM when a failure stands behind the
+    column's table, ADR 0056: a cell is drawn by kind, never by code)."""
 
     def row(iid: str) -> tuple[Unknown | None, ...]:
         return tuple(v.unknown for v in cells.get(iid, ()))
@@ -285,6 +291,7 @@ def cell_codes(
     return (
         tuple(tuple(u.code if u else None for u in row(i)) for i in ids),
         tuple(tuple(u.reason if u else None for u in row(i)) for i in ids),
+        tuple(tuple(u.kind if u else None for u in row(i)) for i in ids),
     )
 
 

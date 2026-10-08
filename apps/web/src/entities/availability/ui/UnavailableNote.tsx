@@ -6,12 +6,16 @@
  */
 import { Banner, CauseChain, Stack } from '@algotrade/ui';
 
-import { featureTitle } from '@/entities/feature';
-
 import { useTermHelp } from '../model/help';
 import { groupByKind } from '../model/group';
 import { KIND_TITLE } from '../model/kinds';
 import type { ServedUnavailable } from '../model/served';
+
+/** `rollup.iv30@v1.iv30` -> `Iv30`: the column part of a catalogue name, in words. */
+function featureName(name: string): string {
+  const words = name.slice(name.lastIndexOf('.') + 1).replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export interface UnavailableNoteProps {
   /** The `unavailable` of a session, table, result page or run. */
@@ -27,7 +31,7 @@ export function UnavailableNote({ gaps }: UnavailableNoteProps) {
       {groups.map((group) => (
         <Stack key={group.kind} gap={1}>
           <Banner tone="warning" title={KIND_TITLE[group.kind]} actions={termHelp(group.guideTerm)}>
-            {group.features.map(featureTitle).join(', ')}
+            {group.features.map(featureName).join(', ')}
           </Banner>
           {group.causes.map((cause, index) => (
             <CauseChain key={index} links={cause.links} />

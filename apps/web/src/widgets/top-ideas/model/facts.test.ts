@@ -25,6 +25,10 @@ const unknown = (name: string, code: 'NULL' | 'NO_PARTITION'): ServedValue => ({
     code,
     kind: code === 'NO_PARTITION' ? 'SYSTEM' : 'NOT_STORED',
     guideTerm: code === 'NO_PARTITION' ? 'unavailable_system' : 'unavailable_not_stored',
+    kindText:
+      code === 'NO_PARTITION'
+        ? 'not available because of a system error'
+        : 'not available for this instrument',
     cause: null,
   },
   info: { format: 'DATE', nullMeaning: 'no report date on or after the session' },

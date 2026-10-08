@@ -16,6 +16,7 @@ const InstrumentFacts = graphql(`
         kind
         features
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -46,6 +47,7 @@ const InstrumentFacts = graphql(`
           reason
           kind
           guideTerm
+          kindText
           cause {
             links {
               level

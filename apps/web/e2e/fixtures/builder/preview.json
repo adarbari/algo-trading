@@ -83,9 +83,9 @@
     "coverage_pct": 0.425,
     "min_coverage": 0.9,
     "selection": {},
-    "missing_tables": [],
     "pre_snapshot": false,
-    "universe_snapshot": "2026-10-02"
+    "universe_snapshot": "2026-10-02",
+    "unavailable": []
   },
   "total": 4203,
   "rows": [

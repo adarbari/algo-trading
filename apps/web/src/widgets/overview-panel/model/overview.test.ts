@@ -35,6 +35,10 @@ const unknown = (
     code,
     kind: code === 'NO_PARTITION' ? ('SYSTEM' as const) : ('NOT_STORED' as const),
     guideTerm: code === 'NO_PARTITION' ? 'unavailable_system' : 'unavailable_not_stored',
+    kindText:
+      code === 'NO_PARTITION'
+        ? 'not available because of a system error'
+        : 'not available for this instrument',
     cause: null,
   },
   info: { format, unit: null, dtype: 'date', nullMeaning },

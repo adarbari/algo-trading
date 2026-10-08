@@ -92,7 +92,13 @@ describe('QualityChecksPanel', () => {
         status: null,
         finishedAt: null,
         checks: [],
-        unknown: { code: 'NOT_RUN', kind: 'NOT_RUN', guideTerm: 'not_run', cause: null },
+        unknown: {
+          code: 'NOT_RUN',
+          kind: 'NOT_RUN',
+          guideTerm: 'not_run',
+          kindText: 'not run for this session',
+          cause: null,
+        },
       },
     });
     renderWith(<QualityChecksPanel />);

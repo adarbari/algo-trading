@@ -29,7 +29,7 @@ from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.reference import load_universe
 from algotrade.features.framework.feature import NullReason
 from algotrade.services.features import field_view
-from algotrade.services.read.availability.cause import Unavailable
+from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import NotFoundError, ReadContext, catalogue_key
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
@@ -88,6 +88,7 @@ class FeatureTable:
     rows: tuple[tuple[Scalar, ...], ...]
     unknown: tuple[tuple[UnknownCode | None, ...], ...]
     reasons: tuple[tuple[NullReason | None, ...], ...]  # the NullReason of each EXPLAINED cell
+    kinds: tuple[tuple[UnavailableKind | None, ...], ...]  # the public kind of each UNKNOWN cell
     sort: str | None
     total: int
     page: int
@@ -280,6 +281,7 @@ def load_table(
         rows=tuple(tuple(v.value for v in cells.get(i, ())) for i in shown),
         unknown=codes[0],
         reasons=codes[1],
+        kinds=codes[2],
         sort=order,
         total=len(ordered),
         page=page,

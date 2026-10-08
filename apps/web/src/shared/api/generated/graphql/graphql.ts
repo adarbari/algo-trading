@@ -78,7 +78,7 @@ export type OptionChainQueryVariables = Exact<{
 }>;
 
 
-export type OptionChainQuery = { instrument: { instrumentId: string, symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, chain: { underlyingId: string, session: string, status: string | null, strikes: Array<number>, expiries: Array<{ date: string, days: number }> } | null } | null };
+export type OptionChainQuery = { instrument: { instrumentId: string, symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, chain: { underlyingId: string, session: string, status: string | null, strikes: Array<number>, expiries: Array<{ date: string, days: number }> } | null } | null };
 
 export type OptionQuotesQueryVariables = Exact<{
   key: string;
@@ -95,14 +95,14 @@ export type EventCalendarQueryVariables = Exact<{
 }>;
 
 
-export type EventCalendarQuery = { eventCalendar: { session: string, end: string, missing: Array<string>, unresolved: Array<string>, names: Array<{ instrumentId: string, symbol: string }>, days: Array<{ date: string, isSession: boolean, events: Array<{ instrumentId: string | null, symbol: string | null, event: { date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean } }> }>, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } }> } | null };
+export type EventCalendarQuery = { eventCalendar: { session: string, end: string, missing: Array<string>, unresolved: Array<string>, names: Array<{ instrumentId: string, symbol: string }>, days: Array<{ date: string, isSession: boolean, events: Array<{ instrumentId: string | null, symbol: string | null, event: { date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean } }> }>, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } }> } | null };
 
 export type InstrumentEventStudyQueryVariables = Exact<{
   key: string;
 }>;
 
 
-export type InstrumentEventStudyQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, eventStudy: { session: string, days: number, months: number, ahead: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }>, filings: Array<{ accepted: string, filingDate: string, form: string, items: Array<string>, label: string, knownFrom: string }>, ladder: Array<{ expiry: string, days: number, clear: boolean, marked: boolean, spans: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }> }>, reference: { instrumentId: string | null, symbol: string | null, kind: string, source: string | null, status: string } | null, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } }> } | null } | null };
+export type InstrumentEventStudyQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, eventStudy: { session: string, days: number, months: number, ahead: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }>, filings: Array<{ accepted: string, filingDate: string, form: string, items: Array<string>, label: string, knownFrom: string }>, ladder: Array<{ expiry: string, days: number, clear: boolean, marked: boolean, spans: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }> }>, reference: { instrumentId: string | null, symbol: string | null, kind: string, source: string | null, status: string } | null, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } }> } | null } | null };
 
 export type ComparePricesQueryVariables = Exact<{
   keys: Array<string> | string;
@@ -122,7 +122,7 @@ export type FeatureDistributionQueryVariables = Exact<{
 }>;
 
 
-export type FeatureDistributionQuery = { distribution: { name: string, session: string, count: number, nulls: number, quantiles: Array<{ q: number, value: number }>, histogram: Array<{ lo: number, hi: number, count: number }>, categories: Array<{ value: string, count: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, passing: Array<{ intent: string, count: number, bins: Array<number> }> } | null };
+export type FeatureDistributionQuery = { distribution: { name: string, session: string, count: number, nulls: number, quantiles: Array<{ q: number, value: number }>, histogram: Array<{ lo: number, hi: number, count: number }>, categories: Array<{ value: string, count: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, passing: Array<{ intent: string, count: number, bins: Array<number> }> } | null };
 
 export type FeatureTableQueryVariables = Exact<{
   columns: Array<string> | string;
@@ -139,7 +139,7 @@ export type FeatureTableQueryVariables = Exact<{
 }>;
 
 
-export type FeatureTableQuery = { table: { universeSnapshot: string | null, preSnapshot: boolean, sort: string | null, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> }, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, instruments: Array<{ instrumentId: string, symbol: string, name: string }> } | null };
+export type FeatureTableQuery = { table: { universeSnapshot: string | null, preSnapshot: boolean, sort: string | null, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> }, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, instruments: Array<{ instrumentId: string, symbol: string, name: string }>, kindTexts: Array<{ kind: UnavailableKind, text: string }> } | null };
 
 export type GuideIndexQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -209,7 +209,7 @@ export type IdeasPageQueryVariables = Exact<{
 }>;
 
 
-export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, regime: string | null, sizeMultiplier: number | null, instrument: { symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
+export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, regime: string | null, sizeMultiplier: number | null, instrument: { symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
 
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
@@ -232,7 +232,7 @@ export type InstrumentFactsQueryVariables = Exact<{
 }>;
 
 
-export type InstrumentFactsQuery = { session: { date: string, isLatest: boolean, referenceSnapshot: string | null, preSnapshot: boolean, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, instrument: { instrumentId: string, symbol: string, name: string, securityType: string | null, exchange: string | null, isEtf: boolean, description: string | null, referenceSnapshot: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null };
+export type InstrumentFactsQuery = { session: { date: string, isLatest: boolean, referenceSnapshot: string | null, preSnapshot: boolean, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, instrument: { instrumentId: string, symbol: string, name: string, securityType: string | null, exchange: string | null, isEtf: boolean, description: string | null, referenceSnapshot: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null };
 
 export type InstrumentEventsQueryVariables = Exact<{
   key: string;
@@ -256,7 +256,7 @@ export type InstrumentFeatureValuesQueryVariables = Exact<{
 }>;
 
 
-export type InstrumentFeatureValuesQuery = { session: { date: string } | null, instrument: { instrumentId: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null };
+export type InstrumentFeatureValuesQuery = { session: { date: string } | null, instrument: { instrumentId: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null };
 
 export type InstrumentHistoryQueryVariables = Exact<{
   key: string;
@@ -271,7 +271,7 @@ export type InstrumentHistoryQuery = { instrument: { instrumentId: string, serie
 export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, scores: { macroRisk: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, marketStress: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, fragility: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } }, sizing: { label: RegimeLabel, multiplier: number | null, enabled: boolean, unknownMultiplier: number, multipliers: Array<{ label: RegimeLabel, multiplier: number }>, screeners: Array<{ screenerId: string, name: string, enabled: boolean, pauseIn: Array<RegimeLabel> }> }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, feature: string, verdictFeature: string, threshold: number | null, direction: RiskDirection | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, range: { min: number, max: number }, how: Array<{ text: string, url: string | null }>, sources: Array<{ label: string, series: string | null, cadence: string, releaseLagDays: number | null, url: string | null, licence: string, terms: string | null, lastObservation: string | null, vintageDate: string | null, vintageKind: string | null, firstVintage: string | null, active: boolean }> }> } | null };
+export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, scores: { macroRisk: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, marketStress: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, fragility: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } }, sizing: { label: RegimeLabel, multiplier: number | null, enabled: boolean, unknownMultiplier: number, multipliers: Array<{ label: RegimeLabel, multiplier: number }>, screeners: Array<{ screenerId: string, name: string, enabled: boolean, pauseIn: Array<RegimeLabel> }> }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, feature: string, verdictFeature: string, threshold: number | null, direction: RiskDirection | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, range: { min: number, max: number }, how: Array<{ text: string, url: string | null }>, sources: Array<{ label: string, series: string | null, cadence: string, releaseLagDays: number | null, url: string | null, licence: string, terms: string | null, lastObservation: string | null, vintageDate: string | null, vintageKind: string | null, firstVintage: string | null, active: boolean }> }> } | null };
 
 export type RegimeBandsQueryVariables = Exact<{
   start: string;
@@ -330,7 +330,7 @@ export type RunItemsQuery = { runItems: Array<{ key: string, code: string, statu
 export type QualityChecksQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type QualityChecksQuery = { quality: { session: string, runId: string | null, status: string | null, finishedAt: string | null, checks: Array<{ name: string, status: string, detail: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
+export type QualityChecksQuery = { quality: { session: string, runId: string | null, status: string | null, finishedAt: string | null, checks: Array<{ name: string, status: string, detail: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
 
 export type InstrumentScreenerHitsQueryVariables = Exact<{
   key: string;
@@ -375,12 +375,12 @@ export type ScreenerResultsQueryVariables = Exact<{
 }>;
 
 
-export type ScreenerResultsQuery = { session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, latestRun: { runId: string, session: string, previousSession: string | null, status: string | null, coverage: string | null, regime: string | null, paused: number, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, results: Array<{ instrumentId: string, rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
+export type ScreenerResultsQuery = { session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, latestRun: { runId: string, session: string, previousSession: string | null, status: string | null, coverage: string | null, regime: string | null, paused: number, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, kindTexts: Array<{ kind: UnavailableKind, text: string }>, results: Array<{ instrumentId: string, rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type VerificationQuery = { verification: { session: string, runIds: Array<string>, instruments: number, counts: unknown, failing: Array<unknown>, byCheck: Array<{ check: string, counts: unknown }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
+export type VerificationQuery = { verification: { session: string, runIds: Array<string>, instruments: number, counts: unknown, failing: Array<unknown>, byCheck: Array<{ check: string, counts: unknown }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
 
 export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -441,6 +441,7 @@ export const OptionChainDocument = new TypedDocumentString(`
         code
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -532,6 +533,7 @@ export const EventCalendarDocument = new TypedDocumentString(`
         reason
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -611,6 +613,7 @@ export const InstrumentEventStudyDocument = new TypedDocumentString(`
           reason
           kind
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -705,6 +708,7 @@ export const FeatureDistributionDocument = new TypedDocumentString(`
       code
       kind
       guideTerm
+      kindText
       cause {
         links {
           level
@@ -744,6 +748,7 @@ export const FeatureTableDocument = new TypedDocumentString(`
         kind
         features
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -765,6 +770,7 @@ export const FeatureTableDocument = new TypedDocumentString(`
       kind
       features
       guideTerm
+      kindText
       cause {
         links {
           level
@@ -793,6 +799,11 @@ export const FeatureTableDocument = new TypedDocumentString(`
     rows
     unknown
     reasons
+    kinds
+    kindTexts {
+      kind
+      text
+    }
   }
 }
     `) as unknown as TypedDocumentString<FeatureTableQuery, FeatureTableQueryVariables>;
@@ -1184,6 +1195,7 @@ export const IdeasPageDocument = new TypedDocumentString(`
         reason
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -1217,6 +1229,7 @@ export const IdeasPageDocument = new TypedDocumentString(`
             code
             kind
             guideTerm
+            kindText
             cause {
               links {
                 level
@@ -1321,6 +1334,7 @@ export const InstrumentFactsDocument = new TypedDocumentString(`
       kind
       features
       guideTerm
+      kindText
       cause {
         links {
           level
@@ -1351,6 +1365,7 @@ export const InstrumentFactsDocument = new TypedDocumentString(`
         reason
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -1416,6 +1431,7 @@ export const InstrumentFeatureValuesDocument = new TypedDocumentString(`
         reason
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -1460,6 +1476,7 @@ export const RegimeDocument = new TypedDocumentString(`
       code
       kind
       guideTerm
+      kindText
       cause {
         links {
           level
@@ -1477,6 +1494,7 @@ export const RegimeDocument = new TypedDocumentString(`
           code
           kind
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -1497,6 +1515,7 @@ export const RegimeDocument = new TypedDocumentString(`
           code
           kind
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -1517,6 +1536,7 @@ export const RegimeDocument = new TypedDocumentString(`
           code
           kind
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -1571,6 +1591,7 @@ export const RegimeDocument = new TypedDocumentString(`
         code
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -1757,6 +1778,7 @@ export const QualityChecksDocument = new TypedDocumentString(`
       code
       kind
       guideTerm
+      kindText
       cause {
         links {
           level
@@ -1858,6 +1880,7 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
       kind
       features
       guideTerm
+      kindText
       cause {
         links {
           level
@@ -1885,6 +1908,7 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
       code
       kind
       guideTerm
+      kindText
       cause {
         links {
           level
@@ -1905,6 +1929,7 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
         kind
         features
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -1942,6 +1967,7 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
           kind
           features
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -1965,6 +1991,11 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
         rows
         unknown
         reasons
+        kinds
+        kindTexts {
+          kind
+          text
+        }
         results {
           instrumentId
           rank
@@ -2013,6 +2044,7 @@ export const VerificationDocument = new TypedDocumentString(`
       code
       kind
       guideTerm
+      kindText
       cause {
         links {
           level

@@ -1,7 +1,7 @@
 {
   "session": {
     "date": "2026-10-02",
-    "missing": []
+    "unavailable": []
   },
   "screener": {
     "id": "vrp_scanner",
@@ -36,7 +36,7 @@
       "previousSession": "2026-10-01",
       "status": "complete",
       "coverage": "COMPLETE",
-      "missingTables": [],
+      "unavailable": [],
       "decisions": [
         {
           "decision": "QUALIFIED",
@@ -74,7 +74,6 @@
         "total": 6,
         "page": 1,
         "size": 100,
-        "missing": [],
         "columns": [],
         "rows": [[], [], [], [], [], []],
         "unknown": [[], [], [], [], [], []],
@@ -344,7 +343,10 @@
               }
             ]
           }
-        ]
+        ],
+        "unavailable": [],
+        "kinds": [[], [], [], [], [], []],
+        "kindTexts": []
       },
       "regime": "CAUTION",
       "paused": 1

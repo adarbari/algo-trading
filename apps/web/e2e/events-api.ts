@@ -74,14 +74,24 @@ const FUND_STUDY = {
       part: 'ladder',
       unknown: {
         code: 'NO_PARTITION',
-        detail: 'no option chain stored for the session',
+        kind: 'SYSTEM',
+        guideTerm: 'unavailable_system',
+        kindText: 'not available because of a system error',
+        cause: null,
         reason: null,
       },
     },
     {
       instrumentId: null,
       part: 'filings',
-      unknown: { code: 'NOT_APPLICABLE', detail: 'a fund files no 8-Ks', reason: null },
+      unknown: {
+        code: 'NOT_APPLICABLE',
+        kind: 'NOT_APPLICABLE',
+        guideTerm: 'unavailable_not_applicable',
+        kindText: 'does not apply to this instrument',
+        cause: null,
+        reason: null,
+      },
     },
   ],
 };
@@ -108,7 +118,14 @@ function calendar(ids: string[], scope: boolean): unknown {
   const gap = {
     instrumentId: null,
     part: 'fund_reference',
-    unknown: { code: 'NO_PARTITION', detail: 'no fund reference stored', reason: null },
+    unknown: {
+      code: 'NO_PARTITION',
+      kind: 'SYSTEM',
+      guideTerm: 'unavailable_system',
+      kindText: 'not available because of a system error',
+      cause: null,
+      reason: null,
+    },
   };
   return {
     session: '2026-10-07',

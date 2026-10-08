@@ -228,6 +228,20 @@ def test_a_gap_behind_a_skipped_step_is_system_not_not_stored(
     assert gaps[IBKR_IV]["kind"] == "SYSTEM", gaps
 
 
+def test_a_table_cell_behind_a_skipped_step_is_drawn_by_kind_system(
+    as_role: Callable[[Role], Graph],
+) -> None:
+    """The same gap in the feature table: the code matrix says NO_ROW (or NO_PARTITION), the
+    `kinds` matrix says SYSTEM, which is what a cell is drawn by."""
+    query = """query($date: Date, $names: [FeatureName!]!) {
+      table(columns: $names, date: $date, size: 3) { unknown kinds }
+    }"""
+    body = as_role(Role.TRADER)(query, {"date": END.isoformat(), "names": [IBKR_IV]})
+    assert "errors" not in body, body
+    kinds = {k for row in body["data"]["table"]["kinds"] for k in row if k}
+    assert kinds == {"SYSTEM"}, body
+
+
 def test_an_internal_error_is_generic_for_a_trader() -> None:
     error = GraphQLError("IB Gateway refused: rollups/x", original_error=RuntimeError("boom"))
     result = ExecutionResult(data=None, errors=[error])

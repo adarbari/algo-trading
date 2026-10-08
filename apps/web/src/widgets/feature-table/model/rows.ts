@@ -15,12 +15,16 @@ export function resultRows(page: ResultsPage): TableRow[] {
     const values = page.rows[i] ?? [];
     const codes = page.unknown[i] ?? [];
     const reasons = page.reasons[i] ?? [];
+    const kinds = page.kinds[i] ?? [];
+    const texts = new Map(page.kindTexts.map((t) => [t.kind, t.text]));
     const cells: Record<string, TableCell> = {};
     page.columns.forEach((column: ColumnInfo, j) => {
       cells[column.name] = {
         value: values[j] ?? null,
         unknown: codes[j] ?? null,
         reason: reasons[j] ?? null,
+        kind: kinds[j] ?? null,
+        kindText: (kinds[j] && texts.get(kinds[j])) || null,
       };
     });
     return {

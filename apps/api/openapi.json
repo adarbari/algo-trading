@@ -1789,12 +1789,18 @@
             "description": "SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_RUN",
             "title": "Kind",
             "type": "string"
+          },
+          "kind_text": {
+            "description": "the kind in generic words",
+            "title": "Kind Text",
+            "type": "string"
           }
         },
         "required": [
           "kind",
           "features",
           "guide_term",
+          "kind_text",
           "cause"
         ],
         "title": "Unavailable",

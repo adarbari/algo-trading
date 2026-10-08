@@ -42,6 +42,7 @@ const FeatureTable = graphql(`
           kind
           features
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -63,6 +64,7 @@ const FeatureTable = graphql(`
         kind
         features
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -91,6 +93,11 @@ const FeatureTable = graphql(`
       rows
       unknown
       reasons
+      kinds
+      kindTexts {
+        kind
+        text
+      }
     }
   }
 `);

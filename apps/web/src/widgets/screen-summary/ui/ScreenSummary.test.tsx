@@ -100,6 +100,7 @@ describe('ScreenSummary', () => {
               kind: 'SYSTEM',
               features: ['rollup.iv30@v1.iv30'],
               guide_term: 'unavailable_system',
+              kind_text: 'not available because of a system error',
               cause: null,
             },
           ],

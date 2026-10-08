@@ -81,6 +81,7 @@ const QualityChecks = graphql(`
         code
         kind
         guideTerm
+        kindText
         cause {
           links {
             level

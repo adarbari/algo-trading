@@ -1112,6 +1112,11 @@ export interface components {
              * @description SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_RUN
              */
             kind: string;
+            /**
+             * Kind Text
+             * @description the kind in generic words
+             */
+            kind_text: string;
         };
         /** UserFeatureBody */
         UserFeatureBody: {

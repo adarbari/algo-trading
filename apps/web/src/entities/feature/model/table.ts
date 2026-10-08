@@ -7,8 +7,6 @@
 import type { PreviewRow } from '@/entities/screen';
 import type { gqlTypes } from '@/shared/api';
 
-import type { NullReasonName, UnknownCodeName } from './value';
-
 /** The server-side filters (catalogue fields; text matches ignore case). */
 export interface TableFilters {
   securityType?: string | undefined;
@@ -36,9 +34,13 @@ export interface FeatureTableQuery {
 /** A cell: the value the server sent, or null with the code saying why. */
 export interface TableCell {
   value: unknown;
-  unknown: UnknownCodeName | null;
+  unknown: gqlTypes.UnknownCode | null;
+  /** The public kind of the gap (ADR 0056): how the cell is drawn, never its code. */
+  kind?: gqlTypes.UnavailableKind | null;
+  /** That kind in the server's generic words. */
+  kindText?: string | null;
   /** Why the null is the fact, when `unknown` is EXPLAINED (ADR 0046). */
-  reason?: NullReasonName | null;
+  reason?: gqlTypes.NullReason | null;
 }
 
 type Served = NonNullable<gqlTypes.FeatureTableQuery['table']>;
@@ -102,12 +104,16 @@ export function toTableData(table: Served): FeatureTableData {
       const values = table.rows[i] ?? [];
       const codes = table.unknown[i] ?? [];
       const reasons = table.reasons[i] ?? [];
+      const kinds = table.kinds[i] ?? [];
+      const texts = new Map(table.kindTexts.map((t) => [t.kind, t.text]));
       const cells: Record<string, TableCell> = {};
       table.columns.forEach((column, j) => {
         cells[column.name] = {
           value: values[j] ?? null,
           unknown: codes[j] ?? null,
           reason: reasons[j] ?? null,
+          kind: kinds[j] ?? null,
+          kindText: (kinds[j] && texts.get(kinds[j])) || null,
         };
       });
       return {

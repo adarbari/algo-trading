@@ -150,7 +150,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "instrument.tracks is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "TEXT",
@@ -186,7 +189,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "instrument.listed_on is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "DATE",
@@ -200,7 +206,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "instrument.delisted_on is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "DATE",
@@ -346,7 +355,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "instrument.website is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "TEXT",
@@ -910,7 +922,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "rollup.earnings@v1.date_confirmed is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "FLAG",
@@ -924,7 +939,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "rollup.earnings@v1.last_earnings_date is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "DATE",
@@ -1092,7 +1110,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "rollup.iv_history@v2.iv_rank_252d is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "PERCENT",
@@ -1106,7 +1127,10 @@
       "value": null,
       "unknown": {
         "code": "NULL",
-        "detail": "rollup.iv_history@v2.iv_percentile_252d is null for EQ:BBG000B9XRY4 on 2026-10-02"
+        "kind": "NOT_STORED",
+        "guideTerm": "unavailable_not_stored",
+        "kindText": "not available for this instrument",
+        "cause": null
       },
       "info": {
         "format": "PERCENT",

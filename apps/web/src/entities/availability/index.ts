@@ -7,7 +7,7 @@
  */
 export { groupByKind, type KindGroup } from './model/group';
 export { TermHelpProvider, type RenderTermHelp } from './model/help';
-export { KIND_TEXT, KIND_TITLE } from './model/kinds';
+export { KIND_TITLE } from './model/kinds';
 export type {
   CauseLevelName,
   ServedCause,
@@ -18,5 +18,13 @@ export type {
 } from './model/served';
 export { fromRest, type RestUnavailable } from './model/rest';
 export { unknownText, unknownWord } from './model/unknown';
+export {
+  cellText,
+  cellWord,
+  reasonLabel,
+  reasonText,
+  type NullReasonName,
+  type UnknownCodeName,
+} from './model/words';
 export { UnavailableNote, type UnavailableNoteProps } from './ui/UnavailableNote';
 export { UnknownNote, type UnknownNoteProps } from './ui/UnknownNote';

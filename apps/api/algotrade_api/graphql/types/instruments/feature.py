@@ -26,7 +26,8 @@ strawberry.enum(catalogue.FeatureFormat, description="How a client shows a featu
 
 @strawberry.type(
     description="A value not known for the session: `code` and, in public words, `kind` (with "
-    "its Guide term `guideTerm`); `reason` is set exactly when `code` is EXPLAINED. `cause` is "
+    "its Guide term `guideTerm`, `kindText` in generic words); `reason` is set exactly when "
+    "`code` is EXPLAINED. `cause` is "
     "the chain behind it, source to table: admins only (null for anyone else)"
 )
 class Unknown:
@@ -39,6 +40,12 @@ class Unknown:
     @classmethod
     def of(cls, d: values.Unknown) -> Self:
         return cls(code=d.code, reason=d.reason, kind=d.kind, guide_term=d.guide_term, unknown=d)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The kind in generic words: never a table, vendor or step"
+    )
+    def kind_text(self) -> str:
+        return self.unknown.public_reason
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The chain behind it, source to table; null unless the caller is an admin",

@@ -18,6 +18,7 @@ export interface RestUnavailable {
   kind: string;
   features: string[];
   guide_term: string;
+  kind_text: string;
   cause?: RestLink[] | null | undefined;
 }
 
@@ -26,6 +27,7 @@ export function fromRest(gaps: readonly RestUnavailable[] | undefined): ServedUn
     kind: gap.kind as UnavailableKindName,
     features: gap.features,
     guideTerm: gap.guide_term,
+    kindText: gap.kind_text,
     cause: gap.cause
       ? {
           links: gap.cause.map((link) => ({

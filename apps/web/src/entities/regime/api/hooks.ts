@@ -28,6 +28,7 @@ const RegimeQuery = graphql(`
         code
         kind
         guideTerm
+        kindText
         cause {
           links {
             level
@@ -45,6 +46,7 @@ const RegimeQuery = graphql(`
             code
             kind
             guideTerm
+            kindText
             cause {
               links {
                 level
@@ -65,6 +67,7 @@ const RegimeQuery = graphql(`
             code
             kind
             guideTerm
+            kindText
             cause {
               links {
                 level
@@ -85,6 +88,7 @@ const RegimeQuery = graphql(`
             code
             kind
             guideTerm
+            kindText
             cause {
               links {
                 level
@@ -139,6 +143,7 @@ const RegimeQuery = graphql(`
           code
           kind
           guideTerm
+          kindText
           cause {
             links {
               level

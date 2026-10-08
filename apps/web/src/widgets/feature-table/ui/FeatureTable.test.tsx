@@ -175,6 +175,7 @@ describe('FeatureTable', () => {
               kind: 'SYSTEM',
               features: ['rollup.earnings@v1.days_to_earnings'],
               guideTerm: 'unavailable_system',
+              kindText: 'not available because of a system error',
               cause: null,
             },
           ],

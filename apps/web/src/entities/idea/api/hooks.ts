@@ -54,6 +54,7 @@ const IdeasPage = graphql(`
           reason
           kind
           guideTerm
+          kindText
           cause {
             links {
               level
@@ -87,6 +88,7 @@ const IdeasPage = graphql(`
               code
               kind
               guideTerm
+              kindText
               cause {
                 links {
                   level

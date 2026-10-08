@@ -318,7 +318,7 @@ type FeatureSeries {
 }
 
 """
-Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the filters and sort read have nothing for the session leave out (no row passes a filter on them)
+Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED; `kinds[i][j]`: its public kind, how a cell is drawn). `unavailable`: what the tables the filters and sort read have nothing for the session leave out (no row passes a filter on them)
 """
 type FeatureTable {
   session: Session!
@@ -329,11 +329,15 @@ type FeatureTable {
   rows: [[JSON]!]!
   unknown: [[UnknownCode]!]!
   reasons: [[NullReason]!]!
+  kinds: [[UnavailableKind]!]!
   sort: String
   total: Int!
   page: Int!
   size: Int!
   unavailable: [Unavailable!]!
+
+  """The words of each kind `kinds` uses: how a cell's kind reads"""
+  kindTexts: [KindText!]!
 }
 
 """
@@ -948,6 +952,12 @@ type InstrumentEvents {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""A kind in generic words: never a table, vendor or step"""
+type KindText {
+  kind: UnavailableKind!
+  text: String!
+}
 
 """New positions are sized at `multiplier` of the normal size in `label`"""
 type LabelSize {
@@ -1638,7 +1648,7 @@ type ScreenResult {
 }
 
 """
-One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the search and sort read have nothing for the session leave out
+One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED; `kinds[i][j]`: its public kind, how a cell is drawn). `unavailable`: what the tables the search and sort read have nothing for the session leave out
 """
 type ScreenResultPage {
   runId: String!
@@ -1651,7 +1661,11 @@ type ScreenResultPage {
   rows: [[JSON]!]!
   unknown: [[UnknownCode]!]!
   reasons: [[NullReason]!]!
+  kinds: [[UnavailableKind]!]!
   unavailable: [Unavailable!]!
+
+  """The words of each kind `kinds` uses: how a cell's kind reads"""
+  kindTexts: [KindText!]!
 }
 
 """A finalised (immutable) version of a screen and its document"""
@@ -1787,12 +1801,15 @@ type TextPart {
 }
 
 """
-Features a page cannot show, and why in public words: `kind`, the Guide glossary term `guideTerm` that explains it. `cause` is the chain behind it: admins only (null for anyone else)
+Features a page cannot show, and why in public words: `kind`, the Guide glossary term `guideTerm` that explains it, `kindText` the kind in generic words. `cause` is the chain behind it: admins only (null for anyone else)
 """
 type Unavailable {
   kind: UnavailableKind!
   features: [String!]!
   guideTerm: String!
+
+  """The kind in generic words: never a table, vendor or step"""
+  kindText: String!
 
   """
   The chain behind it, source to features; null unless the caller is an admin
@@ -1811,13 +1828,16 @@ enum UnavailableKind {
 }
 
 """
-A value not known for the session: `code` and, in public words, `kind` (with its Guide term `guideTerm`); `reason` is set exactly when `code` is EXPLAINED. `cause` is the chain behind it, source to table: admins only (null for anyone else)
+A value not known for the session: `code` and, in public words, `kind` (with its Guide term `guideTerm`, `kindText` in generic words); `reason` is set exactly when `code` is EXPLAINED. `cause` is the chain behind it, source to table: admins only (null for anyone else)
 """
 type Unknown {
   code: UnknownCode!
   reason: NullReason
   kind: UnavailableKind!
   guideTerm: String!
+
+  """The kind in generic words: never a table, vendor or step"""
+  kindText: String!
 
   """
   The chain behind it, source to table; null unless the caller is an admin

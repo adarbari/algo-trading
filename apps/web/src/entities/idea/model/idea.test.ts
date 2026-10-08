@@ -42,7 +42,14 @@ const screener = (id: string, name: string, notRun = false): Served['screeners']
   screener: { id, name, owner: 'abhinav', version: 3 },
   run: notRun ? null : { runId: `run-${id}`, configVersion: 2, paused: id === 'vrp' ? 1 : 0 },
   notRun: notRun
-    ? { code: 'NOT_RUN', kind: 'NOT_RUN', guideTerm: 'not_run', reason: null, cause: null }
+    ? {
+        code: 'NOT_RUN',
+        kind: 'NOT_RUN',
+        guideTerm: 'not_run',
+        kindText: 'not run for this session',
+        reason: null,
+        cause: null,
+      }
     : null,
   picked: notRun ? 0 : 7,
   top: notRun ? [] : [{ instrumentId: 'id-1', score: 84, instrument: { symbol: 'AAPL' } }],
@@ -115,7 +122,7 @@ describe('toIdeasData', () => {
     });
     expect(data.screeners[2]).toMatchObject({
       picked: 0,
-      notRun: { kind: 'NOT_RUN', guideTerm: 'not_run' },
+      notRun: { kind: 'NOT_RUN', guideTerm: 'not_run', kindText: 'not run for this session' },
       version: 3,
       top: [],
     });

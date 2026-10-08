@@ -41,6 +41,7 @@ describe('useIdeas', () => {
               code: 'NOT_RUN',
               kind: 'NOT_RUN',
               guideTerm: 'not_run',
+              kindText: 'not run for this session',
               reason: null,
               cause: null,
             },

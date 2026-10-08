@@ -7,7 +7,8 @@
  * branches on these fields would filter by role or by code in the browser.
  *
  * Found by name: a `.cause` or `.code` read off something called `unknown`, `unknownReason`,
- * `notRun`, `gap` or `unavailable`, and any `.cause.links`.
+ * `notRun`, `gap` or `unavailable` (or a variable assigned from one), a destructuring of those
+ * two keys from one, and any `.cause.links`.
  */
 import { message } from './guide.js';
 
@@ -40,14 +41,33 @@ const readsAGap = {
     messages: { gap: MESSAGE },
   },
   create(context) {
+    const aliases = new Set(); // `const u = value.unknown`: `u` is a gap too
+    const isGap = (node) => {
+      const name = lastName(node);
+      return name !== null && (GAPS.has(name) || aliases.has(name));
+    };
     return {
+      VariableDeclarator(node) {
+        if (!node.init || !isGap(node.init)) return;
+        if (node.id.type === 'Identifier') {
+          aliases.add(node.id.name);
+        } else if (node.id.type === 'ObjectPattern') {
+          // `const { code, cause } = value.unknown`
+          for (const p of node.id.properties) {
+            const key = p.type === 'Property' && !p.computed ? p.key : null;
+            if (key?.type === 'Identifier' && (key.name === 'cause' || key.name === 'code')) {
+              context.report({ node: p, messageId: 'gap' });
+            }
+          }
+        }
+      },
       MemberExpression(node) {
         if (node.computed || node.property.type !== 'Identifier') return;
         const property = node.property.name;
         const from = lastName(node.object);
         if (property === 'links' && from === 'cause') {
           context.report({ node, messageId: 'gap' });
-        } else if ((property === 'cause' || property === 'code') && GAPS.has(from)) {
+        } else if ((property === 'cause' || property === 'code') && isGap(node.object)) {
           context.report({ node, messageId: 'gap' });
         }
       },
