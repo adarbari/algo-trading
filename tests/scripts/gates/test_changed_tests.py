@@ -87,3 +87,11 @@ def test_a_site_config_change_maps_to_the_tests_that_read_the_site_config() -> N
     )
     assert found == sorted(changed_tests.SITE_CONFIG_TESTS)
     assert changed_tests.covering_tests(["config/users/u1/x.toml"], present) == []
+
+
+def test_a_feature_change_runs_the_web_catalogue_export_test() -> None:
+    present = {*changed_tests.CATALOGUE_TESTS, "tests/unit/features"}.__contains__
+    found = changed_tests.covering_tests(["src/algotrade/features/registry.py"], present)
+    assert set(changed_tests.CATALOGUE_TESTS) <= set(found)
+    found = changed_tests.covering_tests(["config/site/features/bands.toml"], present)
+    assert set(changed_tests.CATALOGUE_TESTS) <= set(found)

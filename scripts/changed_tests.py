@@ -37,6 +37,11 @@ WEB_FITNESS = "tests/architecture/test_layout_web.py"
 # tests): a site config change has no mirrored test, so these cover it.
 SITE_CONFIG_TESTS = ("tests/architecture", "tests/apps/api/graphql", "tests/unit/services/read")
 
+# The feature catalogue is exported to the web (`make features-doc` runs
+# scripts/export_catalogue.py): a new feature or expression feature changes it (#330).
+CATALOGUE_SOURCES = ("src/algotrade/features/", "config/site/features/")
+CATALOGUE_TESTS = ("tests/scripts/test_export_catalogue.py",)
+
 
 def _git(*args: str) -> list[str]:
     out = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True)
@@ -63,6 +68,8 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
             paths.add("tests/architecture")
         if name.startswith("config/site/"):
             paths.update(p for p in SITE_CONFIG_TESTS if present(p))
+        if name.startswith(CATALOGUE_SOURCES):
+            paths.update(p for p in CATALOGUE_TESTS if present(p))
         if name.startswith("apps/web/") or name.startswith("architecture/web_"):
             paths.add(WEB_FITNESS)
         if not name.endswith(".py"):
