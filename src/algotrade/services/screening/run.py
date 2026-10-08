@@ -23,6 +23,7 @@ import pandas as pd
 
 from algotrade.config.site.settings import ScreeningSettings, SourcesSettings
 from algotrade.config.strategy.resolve import ResolvedConfig
+from algotrade.config.strategy.schema import RULE_IMPLS
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status, tolerated_stale
@@ -221,7 +222,7 @@ def screen_session(
     market = session_market(reader, market_names(config), session_date)
     gate = regime_gate(config, market)
     excluded = _tolerated_stale(reader, session_date, now, sources)
-    if config.config.impl == RULES:
+    if config.config.impl in RULE_IMPLS:
         run, rules, missing_tables = screen_rules(
             reader, config, session_date, selected, features, gate, excluded
         )

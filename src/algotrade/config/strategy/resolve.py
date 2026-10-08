@@ -22,7 +22,7 @@ from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.regime import RegimeSettings
 from algotrade.config.strategy.schema import (
     EVERY_INSTRUMENT,
-    RULES_IMPL,
+    RULE_IMPLS,
     Group,
     Rule,
     Selection,
@@ -265,7 +265,7 @@ def resolve(
         layers.append("run-overrides")
     config = parse_strategy(document, "/".join(layers[-1:]) or config_id)
     selection = _selection(config.selection, user, load, layers)
-    if selection is None and config.impl == RULES_IMPL:
+    if selection is None and config.impl in RULE_IMPLS:
         selection = EVERY_INSTRUMENT
     if config.selection_overrides is not None:
         if selection is None:

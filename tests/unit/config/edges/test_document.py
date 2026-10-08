@@ -10,6 +10,7 @@ import pytest
 from algotrade.config.edges.document import QUALITY_BAR, Edge, parse_edge
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
+from tests.unit.services.evaluation.cross_section.conftest import edge
 
 WHERE = "config/site/edges/drift.toml"
 
@@ -329,3 +330,29 @@ def test_a_variant_overrides_the_strike_and_a_variant_of_another_kind_drops_the_
     assert ratio.outcome.kind == "hit_target" and ratio.outcome.structure is None
     assert ratio.outcome.iv_field == "rollup.ibkr_iv@v1.iv30_ibkr"  # shared keys survive
     assert ratio.outcome.horizon_sessions == (15, 21)
+
+
+def test_a_promoted_screener_must_be_one_the_edge_lists() -> None:
+    assert edge().promoted is None
+    ok = edge(screeners=["momo", "mod"], implementation={"promoted": "mod"})
+    assert ok.promoted == "mod"
+    with pytest.raises(ConfigurationError, match="not one of the screeners"):
+        edge(implementation={"promoted": "other"})
+    with pytest.raises(ConfigurationError, match="promoted"):
+        edge(implementation={})
+
+
+def test_the_numbers_a_promotion_rests_on_are_parsed_and_checked() -> None:
+    row = {
+        "horizon": 2, "screener": "mod", "lift": 1.3, "decile_spread": 0.02,
+        "sessions": 45, "decile_sessions": 44,
+    }  # fmt: skip
+    e = edge(
+        screeners=["momo", "mod"],
+        implementation={"promoted": "mod", "compared": [row]},
+    )
+    (c,) = e.compared
+    assert (c.horizon, c.screener, c.lift, c.sessions, c.decile_sessions) == (2, "mod", 1.3, 45, 44)
+    with pytest.raises(ConfigurationError, match="decile_sessions"):
+        bad = {k: v for k, v in row.items() if k != "decile_sessions"}
+        edge(screeners=["momo", "mod"], implementation={"promoted": "mod", "compared": [bad]})

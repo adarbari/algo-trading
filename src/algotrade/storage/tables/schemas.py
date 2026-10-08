@@ -565,7 +565,8 @@ RULE_SCREEN_VALUES = _fixed(
 # session of the test slice the run used and ``exploratory`` is true when it is not the edge's
 # ``frozen_from``: a user's split writes rows under its own key, never over the site's (ED5a).
 # Rows written before the column stay under the null key (never rewritten) beside a new run's
-# dated one; a reader picks a run by ``run_id`` (ED5c), never by key.
+# dated one; a reader picks a run by ``run_id`` (ED5c), never by key. ``in_sample`` is true on
+# a model screener's slice whose sessions its score was fitted on (ED7b): never evidence.
 EDGE_EVAL = _fixed(
     "results/edge_eval",
     "results",
@@ -581,6 +582,7 @@ EDGE_EVAL = _fixed(
     "range_to date",
     "split_from date",
     "exploratory bool",
+    "in_sample bool",
     *(f"{n} int64" for n in (
         "sessions", "picks", "hits", "eligible", "base_hits", "decile_sessions", "trials",
         "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",

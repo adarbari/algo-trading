@@ -18,9 +18,11 @@ from algotrade.core.model.predicates import (
 __all__ = [
     "EVERY_INSTRUMENT",
     "KINDS",
+    "MODEL_IMPL",
     "NO_VALUE_OPS",
     "OPS",
     "RULES_IMPL",
+    "RULE_IMPLS",
     "RULE_SCREEN_KEYS",
     "Group",
     "Rule",
@@ -36,11 +38,15 @@ __all__ = [
 
 KINDS = frozenset({"screener", "strategy"})
 RULES_IMPL = "rules"
+# A model screen (ADR 0053, ED7b) is a rule screen whose ranking is a learned score: the same
+# base gates, plus ``score = "feature.edge_score_<edge>"`` (a missing score never passes).
+MODEL_IMPL = "model"
+RULE_IMPLS = (RULES_IMPL, MODEL_IMPL)
 # The rule-screen part of a config (ADR 0029), kept raw here and parsed by
 # ``config.strategy.screen_spec`` after the layers are merged. ``tiers`` and ``classify`` are
 # legacy (ADR 0030): accepted so v1 / v2 presets parse, then ignored.
 RULE_SCREEN_KEYS = frozenset(
-    {"version", "criteria", "tiers", "flags", "classify", "columns", "rank"}
+    {"version", "criteria", "tiers", "flags", "classify", "columns", "rank", "score"}
 )
 
 
@@ -144,6 +150,23 @@ def parse_selection(raw: Mapping[str, Any], path: str) -> Selection:
     return Selection(name, parse_group(raw["where"], f"{path}.where"), limit, order_by)
 
 
+def _check_rule_keys(impl: str, rules: Mapping[str, Any], path: str) -> None:
+    if impl == RULES_IMPL and "criteria" not in rules:
+        raise _fail(path, "a rule screen (impl = 'rules') needs [criteria]")
+    if impl == RULES_IMPL and "score" in rules:
+        raise _fail(
+            path, "'score' belongs to a model screen (impl = 'model'); a rule ranks by [rank]"
+        )
+    if impl == MODEL_IMPL and "score" not in rules:
+        raise _fail(
+            path, "a model screen (impl = 'model') needs score = 'feature.edge_score_<edge>'"
+        )
+    if rules and impl not in RULE_IMPLS:
+        raise _fail(
+            path, f"{sorted(rules)} belong to rule screens (impl = 'rules' or 'model') only"
+        )
+
+
 def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
     allowed = {
         "id",
@@ -189,10 +212,7 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         raise _fail(f"{path}.exports", "expected a list of export names")
     settings = {k: raw[k] for k in ("screening", "backtest", "regime") if k in raw}
     rules = {k: raw[k] for k in sorted(RULE_SCREEN_KEYS) if k in raw}
-    if raw["impl"] == RULES_IMPL and "criteria" not in rules:
-        raise _fail(path, "a rule screen (impl = 'rules') needs [criteria]")
-    if rules and raw["impl"] != RULES_IMPL:
-        raise _fail(path, f"{sorted(rules)} belong to rule screens (impl = 'rules') only")
+    _check_rule_keys(raw["impl"], rules, path)
     return StrategyConfig(
         id=cid,
         kind=raw["kind"],

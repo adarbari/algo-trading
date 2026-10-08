@@ -41,7 +41,7 @@ from algotrade.config.edges.document import MAIN, Edge, job_name
 from algotrade.config.edges.evaluation import load_evaluation
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
-from algotrade.config.strategy.schema import Selection, parse_selection
+from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
@@ -495,7 +495,14 @@ def evaluate_edge(
                 for block in plan.blocks
                 if any(leg.entry in closed for leg in block)
             )
-            measures = tuple(slice_measures(block_stats, _slices(block_stats, split, exploratory)))
+            measures = tuple(
+                slice_measures(
+                    block_stats,
+                    _slices(block_stats, split, exploratory),
+                    variant.config.config.impl == MODEL_IMPL,
+                    edge.frozen_from,
+                )
+            )
             results.append(
                 VariantResult(
                     variant.id,

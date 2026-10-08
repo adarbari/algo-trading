@@ -7,7 +7,7 @@ from algotrade.config.env import user_id
 from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import CONFIG_KINDS, ResolvedConfig, resolve
-from algotrade.config.strategy.schema import RULES_IMPL, Selection
+from algotrade.config.strategy.schema import RULE_IMPLS, Selection
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
@@ -65,8 +65,10 @@ def resolve_rule_draft(
     Authoring validates drafts with it; the Builder's preview evaluates them with it."""
     overlay = OverlayConfigStore(store, {(user.user_id, SCREENERS, name): document})
     resolved = resolve_config(overlay, name, user)
-    if resolved.config.kind != "screener" or resolved.config.impl != RULES_IMPL:
-        raise ConfigurationError(f"{user.user_id}/{name}: not a rule screen (impl = 'rules')")
+    if resolved.config.kind != "screener" or resolved.config.impl not in RULE_IMPLS:
+        raise ConfigurationError(
+            f"{user.user_id}/{name}: not a rule screen (impl = 'rules' or 'model')"
+        )
     return resolved
 
 

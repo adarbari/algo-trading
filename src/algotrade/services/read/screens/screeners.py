@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from algotrade.config.strategy.regime import REGIME_LABELS
 from algotrade.config.strategy.resolve import ResolvedConfig
-from algotrade.config.strategy.schema import RULES_IMPL
+from algotrade.config.strategy.schema import RULE_IMPLS
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import config_ids, resolve_config
@@ -93,7 +93,7 @@ def _resolved(ctx: ReadContext, config_id: str, owner: str) -> Screener | None:
         config = resolve_config(ctx.configs, config_id, UserContext(owner))
     except ConfigurationError:
         return None
-    if config.config.kind != SCREENER or config.config.impl != RULES_IMPL:
+    if config.config.kind != SCREENER or config.config.impl not in RULE_IMPLS:
         return None
     return _screener(config)
 
