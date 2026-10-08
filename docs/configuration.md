@@ -13,11 +13,13 @@ config/site/                        L3: reviewed via PR, versioned by git
   presets/selections/<id>.toml      shared selections
   presets/strategies/<id>.toml      shared strategy / screener configs
   presets/screeners/<id>/v<N>.toml  rule-screen preset versions: immutable, hash-locked (ADR 0029)
+  edges/<id>.toml                   edge documents (ADR 0053; below)
   <name>.local.toml                 llm only: this machine's values, git-ignored (below)
 config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigStore later
   selections/<id>.toml
   strategies/<id>.toml
   features/<theme>.toml             the user's expression features (always virtual)
+  edges/<id>.toml                   the user's edge drafts, layered over the site's (ADR 0053)
   screeners/<id>/draft.toml         a rule screen's working copy (never run)
   screeners/<id>/v<N>.toml          finalised versions: immutable; the latest (max N) runs nightly
   archive/screeners/<id>-<stamp>/   a deleted screen's folder, moved whole (never run or listed)
@@ -413,6 +415,26 @@ loader checks shape and vocabulary; `tests/architecture/test_features.py` checks
 is a catalogue field and every value fits its type, categories and range. `make features-doc`
 renders [data/field-guide.md](data/field-guide.md); the drafting prompt and the Builder read
 the same files.
+
+## Edges
+
+An edge (ADR 0053, plan [edges-plan.md](edges-plan.md)) is a typed document
+`config/site/edges/<id>.toml`, loaded by `algotrade.config.edges.loading.load_edges` (the
+`edge-documents` owner): `id` (the file name), `name`, a one-sentence `thesis`, `mechanism`,
+`persistence`, `[outcome]` (`kind` `excess_return` | `hit_target`, `horizon_sessions`,
+`benchmark` `SPY` | `none`, `start_offset_sessions` (the start session S is the event's anchor
+plus this; negative only before an event announced ahead), optional `target`, `max_drawdown`,
+`cost_bps`; a `hit_target` also names its `measure` and `direction`), `schedule` (`every_session`,
+`month_end` or `on_event:<class>`), `universe` (a selection preset name, or `[universe] where`
+in the selection grammar), `top_k` (an integer or `"all"`), `screeners` and `baselines`
+(screener presets that exist), `status` (`candidate`, `evidenced`, `live`, `retired`,
+`rejected`, `blocked`), `[[sources]]` (`title`, optional `url`), `[quality_bar]` (the other
+seven of the plan's nine answers), `rejection_reason` (required when rejected or blocked) and
+`notes`. Everything fails closed with the file and key. A user's
+`config/users/<id>/edges/<id>.toml` is merged over the site document of that id (tables
+deeply, lists replaced; never `status` or `rejection_reason`) or is a new draft, always a
+`candidate`; the `site` user reads the site's only.
+`make features-doc` renders [edges.md](edges.md).
 
 ## Vendor pacing
 

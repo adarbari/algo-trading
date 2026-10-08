@@ -91,7 +91,7 @@ if the grain has one. Run `.venv/bin/python -m pytest tests/unit/services/read -
 Follow `.claude/skills/add-graphql-field` step 4: `apps/api/algotrade_api/graphql/types/<area>/<object>.py`
 with `@strawberry.type`, fields copied from the dataclass, one `of()` classmethod, resolvers that
 call one loader. Then the snapshot (`.venv/bin/python scripts/export_graphql_schema.py`) and
-`make check WORKERS=2 WEB_WORKERS=2`.
+`make changed`, then push: CI is the full gate.
 
 ## Worked example: Holdings (an ETF's top holdings)
 

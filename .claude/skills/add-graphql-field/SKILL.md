@@ -100,7 +100,7 @@ Verify: `make web-check` (or `cd apps/web && npm run check`).
 `docs/api/read-model.md`: the object row if a field was added to it. If this PR retires a REST
 GET: remove its entry from `architecture/rest_allowlist.toml`, run `make rest-allowlist-update`,
 and enable any derivation entry the plan names for the PR. Then
-`make check WORKERS=2 WEB_WORKERS=2`.
+`make changed`, then push: CI is the full gate.
 
 ## Worked example: "Overview should show the next earnings date"
 

@@ -53,4 +53,4 @@ from the API.
    then in `apps/web` run `npm run api:generate`. On a merge conflict in a generated file take
    main's and regenerate.
 7. **Docs.** The endpoint table in `docs/architecture.md` section 12.
-8. `make check WORKERS=2 WEB_WORKERS=2`.
+8. `make changed`, then push: CI is the full gate.

@@ -43,6 +43,25 @@ test('the top bar links to the Guide, and "?" opens it', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('an admin who opens the Guide from ADMIN stays in ADMIN, and the switch still works', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/admin/ingestion');
+  await expect(page.getByRole('link', { name: 'Ingestion' })).toBeVisible();
+  await page.getByRole('link', { name: /^Guide/ }).click();
+  await expect(page).toHaveURL(/\/guide$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Guide' })).toBeVisible();
+  // Still ADMIN: its sections in the bar, its radio checked in the account menu.
+  await expect(page.getByRole('link', { name: 'Ingestion' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ideas' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Abhi Admin' }).click();
+  await expect(page.getByRole('radio', { name: 'Admin' })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: 'Trader' }).click();
+  await expect(page).toHaveURL(/\/ideas$/);
+  expect(errors).toEqual([]);
+});
+
 for (const theme of ['dark', 'light'] as const) {
   test(`home to a field page: its meaning, spread, criteria and caveats (${theme})`, async ({
     page,

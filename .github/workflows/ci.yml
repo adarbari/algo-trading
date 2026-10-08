@@ -93,7 +93,7 @@ jobs:
       matrix:
         # PRs test the primary version; every push to main (and the post-merge re-test) runs both.
         python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13"]') }}
-        shard: [unit-a, unit-b, apps, rest]
+        shard: [unit-a, unit-b, unit-c, apps, rest]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7

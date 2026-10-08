@@ -3,8 +3,9 @@
  * `intent` in the search params, so every view is a link) and `/guide/fields/$name` (a field's
  * page; the name is the catalogue name), `/guide/playbooks` and `/guide/playbooks/$id` (a site
  * preset's playbook; its buttons open that screener's results and Builder) and
- * `/guide/situations` and `/guide/situations/$slug`. No role gating: it sits in the trader layout, which
- * every registered user may enter; the top bar's Guide link shows in both workspaces.
+ * `/guide/situations` and `/guide/situations/$slug`. No role gating (`viewerGuard`: any registered
+ * viewer) and no workspace: the layout shows the top bar of the workspace the user came from
+ * (`GuideLayout`), so an admin stays in ADMIN.
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
@@ -19,9 +20,16 @@ import {
   GuideSituationsPage,
 } from '@/pages/guide';
 
-import { traderRoute } from './layout-route';
+import { GuideLayout } from '../../layouts';
+import { viewerGuard } from '../../workspaces';
+import { rootRoute } from '../root';
 
-export const guideRoute = createRoute({ getParentRoute: () => traderRoute, path: 'guide' });
+export const guideRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'guide',
+  beforeLoad: viewerGuard,
+  component: GuideLayout,
+});
 
 const homeRoute = createRoute({
   getParentRoute: () => guideRoute,

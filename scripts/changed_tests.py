@@ -1,9 +1,12 @@
-"""List the test paths that cover the files changed on this branch (for `make changed`).
+"""What changed on this branch: the test paths that cover it (`make changed`) or the areas
+it touches (`--areas`, for `make check`).
 
 Tests mirror their source (CLAUDE.md "Directory layout"), so a changed module maps to its
 mirrored test file, or to the mirrored folder when the file has no test of its own. Changed
 test files map to themselves; a changed architecture registry maps to the fitness tests.
-This narrows the first check; `make check` still gates every change.
+This narrows the first check. `--areas` prints the areas the change touches, `python`, `web`
+and / or `docs`, by the same rule as CI's "Changed areas" job (.github/workflows/ci.yml), so
+`make check` runs the gates for those areas; a branch with no change (main) is every area.
 """
 
 from __future__ import annotations
@@ -66,9 +69,37 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
     return sorted(paths)
 
 
+BOTH_AREAS = (".github/workflows/ci.yml", "apps/api/openapi.json", "apps/api/schema.graphql")
+DOCS_PREFIXES = ("docs/", ".claude/")
+
+
+def changed_areas(files: list[str]) -> list[str]:
+    """The areas `files` touch: `python`, `web`, `docs` (CI's rule); nothing changed = all code."""
+    areas: set[str] = set()
+    for name in files:
+        if name in BOTH_AREAS:
+            areas |= {"python", "web"}
+        elif name.startswith("apps/web/"):
+            areas.add("web")
+        elif name.startswith(DOCS_PREFIXES) or name.endswith(".md") or name == "LICENSE":
+            areas.add("docs")
+        else:
+            areas.add("python")
+    return sorted(areas) if files else ["python", "web"]
+
+
 def main(argv: list[str]) -> int:
-    base = argv[1] if len(argv) > 1 else "origin/main"
-    print("\n".join(covering_tests(changed_files(base))))
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    base = args[0] if args else "origin/main"
+    if "--areas" in argv:
+        try:
+            files = changed_files(base)
+        except subprocess.CalledProcessError:  # no such base ref (a shallow CI checkout)
+            print(f"changed_tests: no {base} to diff against; every area", file=sys.stderr)
+            files = []
+        print(" ".join(changed_areas(files)))
+    else:
+        print("\n".join(covering_tests(changed_files(base))))
     return 0
 
 

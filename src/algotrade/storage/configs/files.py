@@ -10,11 +10,13 @@ site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
 site/guide/playbooks/<id>.toml             L3 Guide playbook prose (kind ``guide_playbooks``)
+site/edges/<id>.toml                       L3 edge documents (kind ``edges``, ADR 0053)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
 users/<user>/selections/<id>.toml
 users/<user>/features/<theme>.toml         L4 expression features (always virtual)
+users/<user>/edges/<id>.toml               L4 a user's edge drafts, layered over the site's
 users/<user>/preferences.toml              L4 the user's page preferences (ADR 0029)
 users/<user>/identity.toml                 L4 the user's sign-in email (ADR 0040; never committed)
 site/presets/screeners/<id>/v<N>.toml      L3 rule-screen preset versions: immutable (hash
@@ -47,6 +49,7 @@ SITE_FOLDERS = {
     "events": "events",
     "guide": "guide",
     "guide_playbooks": "guide/playbooks",
+    "edges": "edges",
 }
 SITE_ONLY = (  # never a user's
     "defaults", "settings", "field_guide", "regime", "events", "guide", "guide_playbooks",

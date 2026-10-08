@@ -62,7 +62,23 @@ def test_a_live_takeover_guard_refuses_a_second_taker(tmp_path: Path) -> None:
     finally:
         holder.terminate()
         holder.wait()
-    assert _lock(tmp_path, "true").returncode == 0  # the guard's PID is dead: stale, taken over
+    # The guard's PID is dead: a crashed takeover. It is never cleared by another run (two runs
+    # clearing it at once would both get inside); the operator is told the command.
+    out = _lock(tmp_path, "true")
+    assert out.returncode == 1 and "crashed takeover" in out.stderr and "rm -rf" in out.stderr
+    (guard / "pid").unlink()
+    guard.rmdir()
+    assert _lock(tmp_path, "true").returncode == 0
+
+
+def test_an_empty_leftover_guard_refuses_with_the_command(tmp_path: Path) -> None:
+    """A takeover killed before it wrote its PID leaves an empty guard: refuse, never hang."""
+    lock = tmp_path / "var" / "check.lock.d"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text("999999\n")
+    (tmp_path / "var" / "check.lock.d.takeover").mkdir()
+    out = _lock(tmp_path, "true")
+    assert out.returncode == 1 and "crashed takeover" in out.stderr
 
 
 def test_a_stale_takeover_moves_the_old_lock_aside(tmp_path: Path) -> None:

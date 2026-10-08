@@ -63,6 +63,11 @@ purpose = "configuration, split by kind; env.py (the one environment reader) and
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
+path = "src/algotrade/config/edges"
+purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, and rendered to docs/edges.md"
+contracts = ["Configs are pure: no storage I/O"]
+
+[[dir]]
 path = "src/algotrade/config/site"
 purpose = "L3 site settings: config/site/*.toml into frozen, validated dataclasses (one loader)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
@@ -750,7 +755,7 @@ purpose = "cross-source reconciliation: our features recomputed from recorded ra
 
 [[test_dir]]
 path = "tests/scripts"
-purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests, changed_web)"
+purpose = "tests for the machine and store maintenance scripts in scripts/ (doctor, status, worktree, export_catalogue, check_rest_allowlist, session_friction)"
 
 [[test_dir]]
 path = "tests/scripts/gates"
@@ -780,6 +785,10 @@ purpose = "L3 field guide, one <theme>.toml per theme plus situations.toml: how 
 [[config_dir]]
 path = "config/site/features"
 purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3)"
+
+[[config_dir]]
+path = "config/site/edges"
+purpose = "edge documents, one <id>.toml per edge: thesis, mechanism, persistence, outcome, schedule, universe, the screeners that implement it, status and the quality-bar answers (typed by src/algotrade/config/edges; ADR 0053); rendered to docs/edges.md by make features-doc"
 
 [[config_dir]]
 path = "config/site/events"

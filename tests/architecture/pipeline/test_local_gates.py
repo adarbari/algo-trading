@@ -1,7 +1,9 @@
-"""The local fast path keeps its shape: the web mapping in `make changed`, `tsc -b` as type gate."""
+"""The local fast path keeps its shape: the web mapping in `make changed`, `tsc -b` as type gate,
+`make check` scope-aware and parallel, the release on `FULL=1`."""
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -24,6 +26,48 @@ def test_the_vitest_pool_is_the_decided_one() -> None:
     assert "pool: 'vmThreads'" in (ROOT / "apps/web/vite.config.ts").read_text()
 
 
-def test_the_one_full_check_rule_is_in_claude_md() -> None:
+def test_ci_is_the_gate_and_the_machine_never_runs_the_full_check() -> None:
+    # Owner decision 2026-10-08: local = `make changed` for what changed, then push; CI gates.
     text = " ".join((ROOT / "CLAUDE.md").read_text().split())
-    assert "once before the push" in text and "never the whole `make check` again" in text
+    assert "then push; CI is the gate" in text and "never the full `make check`" in text
+    assert "When `make changed` passes, push" in text
+
+
+def test_make_check_is_scope_aware_and_the_release_runs_every_gate() -> None:
+    # docs/ci.md "Scope-aware make check": 30-40 min serial runs, 4.5 per PR in the week to
+    # 2026-10-07; a change back to one serial list needs a new measure there.
+    makefile = (ROOT / "Makefile").read_text()
+    assert "scripts/changed_tests.py --areas" in makefile
+    check = re.search(r"^check:.*?(?=^\S)", makefile, re.S | re.M)
+    assert check and "-j$(CHECK_JOBS)" in check.group(0) and "check-gates" in check.group(0)
+    assert re.search(r"^check-gates: \$\(strip \$\(CHECK_TARGETS\)\)", makefile, re.M)
+    release = (ROOT / ".github/workflows/release.yml").read_text()
+    assert "make check FULL=1" in release
+
+
+def test_the_web_gates_are_make_targets_that_build_once() -> None:
+    makefile = (ROOT / "Makefile").read_text()
+    for target in (
+        "web-generated",
+        "web-lint",
+        "web-typecheck",
+        "web-unit",
+        "web-storybook",
+        "web-e2e",
+    ):
+        assert re.search(rf"^{target}:", makefile, re.M), target
+    assert "npm run build" not in makefile.replace("$(NPM) run build --", "")
+    web_check = re.search(r"^web-check:.*?(?=^\S)", makefile, re.S | re.M)
+    assert web_check and "$(NPM) run check" not in web_check.group(0)
+
+
+def test_a_bare_make_check_refuses_with_rule_9() -> None:
+    out = subprocess.run(
+        ["make", "-n", "check", "PY=/nonexistent/python"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # Under -n the guard still runs (a shell `if` with the refusal); the sub-make is never reached.
+    assert "rule 9" in out.stdout + out.stderr and "check_lock.sh" in out.stdout
