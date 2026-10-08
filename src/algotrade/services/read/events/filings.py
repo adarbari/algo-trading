@@ -86,9 +86,11 @@ def load_filings(
 ) -> tuple[dict[str, tuple[Filing, ...]], dict[str, Unknown]]:
     """Each instrument's filings accepted in the ``months`` before the session through it,
     newest first, and the UNKNOWN of each with no filing known by the session at all: one read
-    for them all."""
+    for them all; no instruments (an ETF's event study asks for no stocks): no read."""
     day = ctx.session.date
     ids = list(dict.fromkeys(instrument_ids))
+    if not ids:
+        return {}, {}
     frame = read_events(ctx.reader, FILING_TABLE, *ALL_TIME, ids, through=day).frame
     start = months_before(day, months)
     filings: dict[str, list[Filing]] = {iid: [] for iid in ids}

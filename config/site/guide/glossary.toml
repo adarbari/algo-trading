@@ -417,3 +417,131 @@ sees the field as unavailable, and a formula over it inherits the same licence. 
 of the data, not a fault.
 """
 see_also = ["unknown"]
+
+# ---------------------------------------------------------------- how the app judges an edge (ADR 0053)
+
+[[term]]
+id = "edge"
+term = "Edge"
+short = "A written reason why some stocks should do better than others, tested on the stored history."
+body = """
+An edge is a document: the idea in one sentence, who is forced or wrong so that the pattern
+exists, why it should last once known, how a trade would be held (how long, against what, at
+what cost) and the screens that implement it. The app runs each screen on every past session
+using only what was known then, and compares what its picks did next with every other eligible
+name. An edge earns trust only from those numbers, never from the idea alone.
+"""
+see_also = ["edge_status", "base_rate", "frozen_period"]
+
+[[term]]
+id = "edge_status"
+term = "Edge status"
+short = "Where an edge stands: candidate, evidenced, live, retired, rejected or blocked."
+body = """
+Candidate: written and being tested; no claim yet. Evidenced: its picks beat the base rate and
+the baselines in the frozen period, on enough independent sessions. Live: evidenced and used to
+rank ideas. Retired: it stopped working by its own retirement rule. Rejected: checked and
+dropped, with the reason kept so it is not filed again. Blocked: worth testing but missing the
+data it needs. Only a run over the frozen period can move an edge to evidenced.
+"""
+see_also = ["edge", "frozen_period", "exploratory"]
+
+[[term]]
+id = "hit_rate"
+term = "Hit rate"
+short = "The share of an edge's picks whose outcome came true."
+body = """
+For each past session the app takes the screen's top picks and checks the edge's outcome for
+each one, for example "beat the S&P 500 over the next 20 trading days after costs" or "the
+short put expired worthless". The hit rate is hits divided by picks. A window that has not
+closed yet is left out, never counted as a miss. On its own a hit rate says little: compare it
+with the base rate.
+"""
+see_also = ["base_rate", "lift", "independent_sessions"]
+
+[[term]]
+id = "base_rate"
+term = "Base rate"
+short = "How often the same outcome came true for every eligible name, picked or not."
+body = """
+The base rate is the hit rate of doing nothing clever: every name the edge could have picked on
+the same sessions, judged by the same outcome. If 55% of picks beat the market but 54% of all
+names did too, the screen added almost nothing. Every hit rate in the app is shown beside its
+base rate for that reason.
+"""
+see_also = ["hit_rate", "lift"]
+
+[[term]]
+id = "lift"
+term = "Lift"
+short = "The hit rate divided by the base rate: above 1 means the picks did better than the field."
+body = """
+A lift of 1.0 means the picks did exactly as well as every eligible name; 1.2 means their
+outcome came true 20% more often. Lift on a handful of sessions is noise: read it with the
+number of independent sessions beside it, and prefer the frozen period's lift to the whole
+history's.
+"""
+see_also = ["base_rate", "independent_sessions", "frozen_period"]
+
+[[term]]
+id = "independent_sessions"
+term = "Independent sessions"
+short = "How many non-overlapping test dates a number rests on: the real sample size."
+body = """
+Picks made on the same day share that day's market, so they are not independent: fifty picks
+on one session are one test, not fifty. The app spaces test sessions at least one holding
+period apart (and pools overlapping events into one block) so that no two windows overlap, and
+shows the count beside every number. Fewer than about 40 cannot tell a real edge from luck;
+the decile spread's t statistic says the same thing in another way.
+"""
+see_also = ["lift", "decile_spread"]
+
+[[term]]
+id = "decile_spread"
+term = "Decile spread"
+short = "The return of the best-ranked tenth of names minus the worst-ranked tenth."
+body = """
+On each test session every eligible name is ranked by the edge's own score (for example its
+12-1 momentum) and cut into ten equal groups. The spread is the average outcome of the top
+group minus the bottom group. A positive spread says the ranking itself carries information,
+beyond the few names a screen picks. Sessions where too few names have a score are left out of
+the deciles and counted.
+"""
+see_also = ["independent_sessions", "base_rate"]
+
+[[term]]
+id = "frozen_period"
+term = "Frozen period"
+short = "Recent history held back from tuning: an edge must also work there to be trusted."
+body = """
+While an edge is built and compared, many versions get tried, and some will fit the past by
+luck. The frozen period, from 2026-04-01 on, is kept apart: it is reported on its own, and an
+edge counts as evidenced only if it beats the base rate and the baselines there too. The date
+is fixed and moves only by a recorded decision, so the test cannot be quietly shifted.
+"""
+see_also = ["exploratory", "edge_status", "trial_log"]
+
+[[term]]
+id = "exploratory"
+term = "Exploratory"
+short = "A result over a train / test split you chose, not the site's frozen period."
+body = """
+You can evaluate an edge with your own split date to explore. Such numbers are labelled
+EXPLORATORY: they never feed the track record shown on screeners and never change an edge's
+status, because a split chosen after seeing results is no longer a fair test. The site's frozen
+period is the one that counts.
+"""
+see_also = ["frozen_period", "edge_status"]
+
+[[term]]
+id = "trial_log"
+term = "Trial log"
+short = "Every version of an edge that was ever tested, so luck from many tries is discounted."
+body = """
+Each variant, setting and holding period tried on an edge is logged. The more versions tried,
+the more likely the best one looks good by chance; the deflated Sharpe ratio uses the count to
+discount it, and the probability of backtest overfitting estimates how often the best version
+in one half of history fails in the other. A result shown without its trial count is not
+comparable.
+"""
+see_also = ["frozen_period", "independent_sessions"]

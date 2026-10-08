@@ -10,6 +10,11 @@
 #   OpenRouter (:free):     base_url = "https://openrouter.ai/api/v1",               model = "<id>:free"
 #   Anthropic:              base_url = "https://api.anthropic.com/v1",               model = "claude-haiku-4-5"
 
+# No model call from tests, local gates, the real-app smoke or CI: `ALGOTRADE_LLM=off` in the
+# environment forces the text model off whatever this file or a machine's llm.local.toml say
+# (tests/conftest.py, the Makefile test and smoke targets, playwright.real.config.ts and the CI
+# workflows set it; the owner's API and the nightly never do). ADR 0041, amended 2026-10-08.
+
 enabled = false
 # The single-provider form: these two are the defaults (a local Ollama). A machine file
 # llm.local.toml that adds [[provider]] tables must not set them (see the chain below).

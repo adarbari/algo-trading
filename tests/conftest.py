@@ -1,7 +1,9 @@
 import ipaddress
 import os
 import socket
+import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hypothesis import HealthCheck, settings
@@ -73,6 +75,32 @@ def _no_live_vendor_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ALGOTRADE_SEC_CONTACT", "")
     monkeypatch.setenv("ALGOTRADE_FRED_API_KEY", "")
     monkeypatch.setenv("ALGOTRADE_TIINGO_API_KEY", "")
+
+
+os.environ["ALGOTRADE_LLM"] = "off"  # the whole run, before any fixture: no real model call
+
+
+@pytest.fixture(autouse=True)
+def _no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No real model call in a test, ever (owner rule 2026-10-08; ADR 0041 amendment). Two
+    layers: ``ALGOTRADE_LLM=off`` makes ``open_text_model`` return ``None`` whatever a
+    ``llm.local.toml`` or ``.env`` holds, and starting any process whose program is ``claude``
+    (the ``claude-cli`` provider's child, which does its own networking and so escapes the socket
+    guard) raises. Tests of the adapter inject a fake runner."""
+    monkeypatch.setenv("ALGOTRADE_LLM", "off")
+    real_init = subprocess.Popen.__init__
+
+    def init(self: "subprocess.Popen[Any]", args: Any, *a: Any, **kw: Any) -> None:
+        first = args if isinstance(args, str | bytes | os.PathLike) else (list(args) or [""])[0]
+        words = os.fsdecode(first).split() if kw.get("shell") else [os.fsdecode(first)]
+        if words and Path(words[0]).name == "claude":
+            raise RuntimeError(
+                "a real Claude CLI call is refused in tests (owner rule 2026-10-08): "
+                "inject a fake runner into ClaudeCli"
+            )
+        real_init(self, args, *a, **kw)
+
+    monkeypatch.setattr(subprocess.Popen, "__init__", init)
 
 
 def _is_loopback(host: object) -> bool:

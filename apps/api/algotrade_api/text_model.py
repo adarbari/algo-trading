@@ -5,7 +5,8 @@ the API imports no vendor module, as ``live.py`` does for quotes). One adapter p
 ``[[provider]]`` is one provider with ``$ALGOTRADE_LLM_API_KEY``), chained by
 ``FallbackTextModel``: the first provider that answers wins. A remote provider whose key is not
 set is left out of the chain with a WARNING (a request to it could only be refused). Off
-(``enabled = false`` or no file): ``None``, and the routes that need it answer 503 with the
+(``$ALGOTRADE_LLM=off``, the switch of tests, smoke and CI, which wins over every file;
+``enabled = false`` or no file): ``None``, and the routes that need it answer 503 with the
 reason. A ``llm.toml`` that does not load, or a chain with no usable provider, is the same:
 logged at ERROR, the text model off with the message as the reason, and the rest of the API
 starts. A ``claude-cli`` provider (the owner's own Claude Code login, run headless) needs no
@@ -17,7 +18,14 @@ at startup; so even a single provider is wrapped in the chain."""
 
 import logging
 
-from algotrade.config.env import LLM_API_KEY, claude_cli_env, credential, llm_key
+from algotrade.config.env import (
+    LLM_API_KEY,
+    LLM_SWITCH,
+    claude_cli_env,
+    credential,
+    llm_key,
+    llm_off,
+)
 from algotrade.config.site.llm import CLAUDE_CLI, LlmSettings, ProviderSettings
 from algotrade.config.site.settings import SiteDocuments, load_llm, load_users
 from algotrade.core.model.errors import ConfigurationError
@@ -30,6 +38,7 @@ from algotrade_sources.framework.registry import build_claude_cli, build_text_mo
 log = logging.getLogger(__name__)
 
 OFF = "the text model is off: enable it in config/site/llm.toml (ADR 0041)"
+FORCED_OFF = f"the text model is forced off by ${LLM_SWITCH}=off (tests, smoke, CI)"
 
 
 def open_text_model(
@@ -39,6 +48,8 @@ def open_text_model(
     ``None`` when off or when the file is wrong; the reason is what the route answers 503 with.
     ``data_url``: the store the usage is recorded to and the budget counters are seeded from
     (``None``: counted in memory only, as tests do)."""
+    if llm_off():  # before anything is read: no file, key or login can turn it on
+        return None, FORCED_OFF
     try:
         settings = load_llm(configs)
         if not settings.enabled:

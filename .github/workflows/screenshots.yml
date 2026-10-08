@@ -25,6 +25,7 @@ concurrency:
 
 env:
   PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+  ALGOTRADE_LLM: "off" # no real model call (ADR 0041 amendment 2026-10-08)
 
 jobs:
   update:

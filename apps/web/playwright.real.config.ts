@@ -58,6 +58,7 @@ export default defineConfig({
         ALGOTRADE_CONFIG_DIR: resolve(root, 'config'),
         ALGOTRADE_USER: 'smoke',
         ALGOTRADE_AUTH: 'off', // no Supabase here: the API serves the smoke user on loopback
+        ALGOTRADE_LLM: 'off', // the smoke calls no model, whatever llm.local.toml or .env hold (ADR 0041)
         ALGOTRADE_IBKR_PORT: '1', // no broker here: live quotes must degrade, not hang
       },
     },

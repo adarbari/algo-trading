@@ -15,6 +15,7 @@ permissions:
 
 env:
   HYPOTHESIS_PROFILE: ci
+  ALGOTRADE_LLM: "off" # no real model call in CI (ADR 0041 amendment 2026-10-08; a fitness test pins it)
   # The official Playwright image: browsers and fonts identical to the screenshot baselines
   # (apps/web/scripts/in-playwright-docker.sh uses the same image locally). Its tag must match
   # @playwright/test in apps/web/package-lock.json (checked in the screenshots job).

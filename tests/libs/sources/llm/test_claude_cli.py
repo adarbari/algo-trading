@@ -127,6 +127,19 @@ def test_the_real_runner_kills_a_child_that_outlives_the_timeout(tmp_path: Path)
         run_process(["/bin/sleep", "30"], "", tmp_path, {"PATH": "/bin"}, 0.2)
 
 
+def test_the_root_guard_refuses_to_start_the_claude_cli(tmp_path: Path) -> None:
+    """A test can never start a real ``claude`` (the child does its own networking, so the socket
+    guard would not stop it): the default runner, Popen and a shell string all raise."""
+    for argv in (["claude", "-p"], ["/Users/x/.local/bin/claude", "-p"]):
+        with pytest.raises(RuntimeError, match="real Claude CLI call is refused"):
+            run_process(argv, "", tmp_path, {"PATH": "/bin"}, 5)
+        with pytest.raises(RuntimeError, match="real Claude CLI call is refused"):
+            subprocess.run(argv, check=False)
+    with pytest.raises(RuntimeError, match="real Claude CLI call is refused"):
+        subprocess.Popen("claude -p", shell=True)
+    assert subprocess.run(["/bin/echo", "claude"], capture_output=True, check=True).returncode == 0
+
+
 def test_a_command_that_cannot_start_is_unavailable() -> None:
     runner = Runner(raises=FileNotFoundError(2, "No such file or directory"))
     with pytest.raises(ModelUnavailableError, match=r"cannot run /Users/o/\.local/bin/claude"):
