@@ -4,7 +4,7 @@ import os
 import subprocess
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "merge_main.sh"
+SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "merge_main.sh"
 ENV = {
     "GIT_AUTHOR_NAME": "t",
     "GIT_AUTHOR_EMAIL": "t@example.com",

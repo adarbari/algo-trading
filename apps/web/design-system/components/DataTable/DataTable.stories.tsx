@@ -333,8 +333,9 @@ export const Dense: Story = {
 };
 
 /**
- * On a phone (a 375 px container), scrolled sideways: the checkbox and ticker columns stay pinned
- * at the start, over the row's background, with an end border; the other columns slide under them.
+ * On a phone (a 375 px container): only the essential columns (here the ticker, the name and
+ * the close: none is marked, so the first three) with the checkbox and ticker columns pinned at
+ * the start; the column picker lists the rest, so the user adds what they need.
  */
 export const Narrow: Story = {
   render: () => (
@@ -348,8 +349,7 @@ export const Narrow: Story = {
   decorators: [narrow],
   play: async ({ canvasElement }) => {
     const grid = within(canvasElement).getByRole('grid');
-    grid.scrollLeft = grid.scrollWidth;
-    grid.dispatchEvent(new Event('scroll'));
+    await expect(within(canvasElement).getByRole('button', { name: /Columns/ })).toBeVisible();
     await expect(grid.querySelector('[data-pinned="first"]')).not.toBeNull();
   },
 };

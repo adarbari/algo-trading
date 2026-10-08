@@ -48,13 +48,15 @@ test('a trader signs in, lands on Ideas, has no Admin workspace, and signs out',
   await signIn(page);
   await expect(page).toHaveURL(/\/ideas$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Ideas' })).toBeVisible();
-  await expect(page.getByText('Tess Trader')).toBeVisible();
-  await expect(page.getByRole('radio', { name: 'Trader' })).toBeVisible();
+  await page.getByRole('button', { name: 'Tess Trader' }).click();
+  await expect(page.getByText('Signed in as Tess Trader')).toBeVisible();
   await expect(page.getByRole('radio', { name: 'Admin' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
   await page.goto('/admin/ingestion');
   await expect(page).toHaveURL(/\/ideas$/);
 
+  await page.getByRole('button', { name: 'Tess Trader' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/ideas');
@@ -66,7 +68,9 @@ test('an admin signs in and reaches the Admin workspace', async ({ page }) => {
   await page.goto('/login');
   await signIn(page);
   await expect(page).toHaveURL(/\/ideas$/);
+  await page.getByRole('button', { name: 'Abhi Admin' }).click();
   await expect(page.getByRole('radio', { name: 'Admin' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.goto('/admin/ingestion');
   await expect(page.getByRole('heading', { level: 1, name: 'Ingestion' })).toBeVisible();
 });

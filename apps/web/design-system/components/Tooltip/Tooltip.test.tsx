@@ -42,6 +42,24 @@ describe('Tooltip', () => {
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
+  it('opens on a tap (touch) and closes on a tap outside', async () => {
+    render(
+      <>
+        <Example />
+        <p>Elsewhere</p>
+      </>,
+    );
+    const user = userEvent.setup();
+    const button = screen.getByRole('button', { name: 'Re-run' });
+    await user.pointer({ keys: '[TouchA]', target: button });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Re-run the preview');
+    await user.pointer({ keys: '[TouchA]', target: screen.getByText('Elsewhere') });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<Example />);
     await expectNoA11yViolations(container);

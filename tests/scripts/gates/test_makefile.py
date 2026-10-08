@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-MAKEFILE = Path(__file__).resolve().parents[2] / "Makefile"
+MAKEFILE = Path(__file__).resolve().parents[3] / "Makefile"
 
 
 def _install(cwd: Path) -> subprocess.CompletedProcess[str]:

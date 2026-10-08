@@ -182,7 +182,7 @@ tokens.
 
 | Group | Components |
 |---|---|
-| Shell & navigation | `AppShell` (skip link, top bar, `main`; `page` or `full` layout), `TopBar` (brand, workspace, nav, end slots; wraps on phones), `NavTabs` (router-agnostic via `renderLink`, `aria-current`), `WorkspaceSwitch` (a SegmentedControl named "Workspace") |
+| Shell & navigation | `AppShell` (skip link, top bar, `main`; `page` or `full` layout), `TopBar` (brand, nav, utility and end slots; a two-row grid on phones), `NavTabs` (router-agnostic via `renderLink`, `aria-current`), `AccountMenu` (the viewer's name opens the workspace choice and Sign out), `WorkspaceSwitch` (a SegmentedControl named "Workspace", inside the AccountMenu), `KeyHints` (shortcut hints, hidden under a coarse pointer) |
 | Actions & inputs | `Button` (primary, secondary, ghost, dashed; sm / md; icons; loading), `IconButton` (label required), `SegmentedControl` (radio group, arrow keys), `Checkbox` (mixed state, hidden label), `Input` (adornments), `SearchInput` (clear, Escape, loading), `NumberInput` (units, min / max / step, spinbutton), `Select` (native), `Combobox` (descriptions, kind badges, groups, async, ARIA combobox keyboard), `Field` (label, hint, error wired to the control) |
 | Labels | `StatusBadge` (positive, warning, negative, neutral, info, accent), `Chip` (static, toggle, removable, dashed add), `TickerTag` (series s1-s6) |
 | Surfaces | `Panel` (on Surface: title, description, actions, footer; loading / empty / error states with Retry; `flush` body), `Icon` (stroke set: close, plus, minus, search, chevrons, check, alert, info, external, drag-handle, refresh, filter, columns, spinner) |
