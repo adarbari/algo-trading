@@ -43,6 +43,13 @@ critical `screens` step FAILED. Two thresholds judged the same names differently
    chains stale since 2026-09-23 (9 sessions) that the stale share tolerated night after night;
    a feed that is a few sessions late is still tolerated, one that has stopped serving a name
    is not. Both sides read the one labelling, so they stay in step.
+   Retries do not clear a name the feed has stopped serving: it stays a fetch failure until the
+   feed serves it again or it leaves the optionable universe; above `max_chain_fetch_failures`
+   the `chains` step FAILS every night and holds back later sessions until fixed or waived by
+   hand (`--waive`, ADR 0039). Measured on the store at N = 5: 26 of 4,205 chains on 2026-10-05
+   and 28 of 4,202 on 2026-10-06 (0.67%, under the 2% limit), names the screens no longer
+   exclude and that now count against their coverage. The stored text `STALE_DATA: chain is
+   for <day>` is pinned to the parser by a test of the chains task.
 
 ## Consequences
 - A night whose only data problem is a stale share the gate tolerated no longer FAILS the
