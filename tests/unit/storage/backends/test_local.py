@@ -80,10 +80,28 @@ def test_read_file_decodes_what_read_table_did(
     assert _read_file(path, instruments, columns).equals(expected, check_metadata=True)
 
 
-def test_no_instruments_still_raise(store: Path) -> None:
-    """``read_table`` failed on an empty "in" list (a null-typed set); so does the reader."""
-    with pytest.raises(pa.ArrowTypeError):
-        _read_file(_first_file(store), [], None)
+def test_no_instruments_select_no_rows(store: Path) -> None:
+    """An empty "in" list once raised ``ArrowTypeError`` (a null-typed set against a
+    ``large_string`` id column) and failed every ETF event study in the API."""
+    path = _first_file(store)
+    out = _read_file(path, [], None)
+    assert out.num_rows == 0
+    assert out.schema.equals(_read_file(path, None, None).schema)
+
+
+@pytest.mark.parametrize("id_type", [pa.string(), pa.large_string()])
+@pytest.mark.parametrize(("instruments", "kept"), [([], []), (["EQ:B"], ["EQ:B"])])
+def test_the_value_set_takes_the_id_column_type(
+    tmp_path: Path, id_type: pa.DataType, instruments: list[str], kept: list[str]
+) -> None:
+    """Files written before the schemas were typed hold ``string`` ids, newer ones
+    ``large_string``: an instrument filter (empty included) reads both."""
+    path = tmp_path / "v.parquet"
+    ids = pa.array(["EQ:A", "EQ:B"], type=id_type)
+    pq.write_table(pa.table({"instrument_id": ids, "value": [1.0, 2.0]}), path)
+    out = _read_file(path, instruments, None)
+    assert out.column("instrument_id").to_pylist() == kept
+    assert out.schema.field("instrument_id").type == id_type
 
 
 @pytest.mark.parametrize(

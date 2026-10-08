@@ -48,6 +48,16 @@ def test_round_trip_and_instrument_filter(backend: Backend) -> None:
     assert backend.tables.dates("rollups/instrument/none@v1") == []
 
 
+def test_an_empty_instrument_filter_selects_no_rows(backend: Backend) -> None:
+    """An empty filter (an ETF-only event study asks filings for no stocks) reads nothing on
+    every backend; the local one raised ``ArrowTypeError`` on its null-typed value set."""
+    backend.tables.write(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0, "EQ:B": 2.0}), D1, "r1"))
+    one = backend.tables.read(TABLE, D1, instruments=[])
+    assert one is not None and one.empty
+    assert backend.tables.read_range(TABLE, D1, D2, instruments=[]) is None
+    assert backend.tables.read_range(TABLE, D1, D2, instruments=[], columns=["value"]) is None
+
+
 def test_point_in_time_selection(backend: Backend) -> None:
     later = T0 + timedelta(hours=5)
     backend.tables.write(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1", T0))
