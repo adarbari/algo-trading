@@ -3,8 +3,8 @@
  * top bar's Guide link and the "?" key, the home with its theme groups, the field index, a
  * field's page (what it means, its spread, criteria, when it lies, related, a ticker), the rail's
  * search, the playbook and situation pages reached from the home (a linked field and back, the two
- * buttons, the linked prose), and the market regime pages (the index, an indicator, an episode); accessible in dark and
- * light.
+ * buttons, the linked prose), and the market regime pages (the index, an indicator, an episode);
+ * accessible in dark and light.
  */
 import { expect, test, type Page } from '@playwright/test';
 
