@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
+.PHONY: check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -79,6 +79,9 @@ features-doc:    ## regenerate docs/data/features.md (catalogue) and docs/data/f
 filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
 
+numbering:       ## ADR numbers not taken on origin/main; web rule numbers 1..n and cited ones exist
+	$(PY) scripts/check_numbering.py
+
 unit:
 	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/libs tests/apps tests/scripts
 
@@ -94,6 +97,7 @@ e2e:
 changed:         ## narrow first check: mirrored tests of files changed vs origin/main (BASE=...), then the fast gates; `make check` still gates
 	@paths="$$($(PY) scripts/changed_tests.py $(BASE))"; \
 	if [ -n "$$paths" ]; then $(PY) -m pytest -q -x --no-header --tb=short $$paths; else echo "no covering tests changed"; fi
+	@$(PY) scripts/changed_web.py $(BASE)
 	@$(MAKE) --no-print-directory arch layout ownership
 
 test:            ## everything, with the coverage gate, one worker per CPU (WORKERS=0 runs serially)
@@ -153,7 +157,7 @@ web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build t
 check:
 	scripts/ops/check_lock.sh $(MAKE) check-gates
 
-check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen datasets-verify test evaluate web-check web-real
+check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering datasets-verify test evaluate web-check web-real
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

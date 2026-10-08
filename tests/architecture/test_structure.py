@@ -101,6 +101,25 @@ def test_generated_files_are_exempt_from_the_length_limit(tmp_path: Path) -> Non
     assert proc.returncode == 0, proc.stdout
 
 
+def test_generated_web_client_folder_is_exempt_by_path(tmp_path: Path) -> None:
+    # a regenerated file in a merge may lose its first-line marker; the folder is exempt anyway
+    folder = tmp_path / "apps/web/src/shared/api/generated"
+    folder.mkdir(parents=True)
+    (folder / "graphql.ts").write_text("x;\n" * 1001)
+    other = tmp_path / "apps/web/src/shared/api/hand.ts"
+    other.write_text("x;\n" * 1001)
+    script = REPO_ROOT / "scripts" / "check_file_length.py"
+    run = lambda rel: subprocess.run(  # noqa: E731
+        [sys.executable, str(script), rel],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert run("apps/web/src/shared/api/generated/graphql.ts").returncode == 0
+    assert run("apps/web/src/shared/api/hand.ts").returncode == 1
+
+
 # ----------------------------------------------------------------------------- preset versions
 PRESETS = Path("config/site/presets/screeners")
 PRESET_LOCK = Path("architecture/preset_versions.toml")

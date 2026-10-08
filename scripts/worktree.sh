@@ -144,6 +144,8 @@ fi
 [ ! -e "$wt" ] || { echo "already exists: $wt" >&2; exit 1; }
 run git -C "$main" fetch -q origin "$base"
 run git -C "$main" worktree add -b "$branch" "$wt" "origin/$base"
+# a reused stale resolution dropped two changes on 2026-10-07: never replay recorded conflicts
+run git -C "$wt" config rerere.enabled false
 run ln -s "$main/.venv" "$wt/.venv"
 
 pp="$wt/src:$wt/libs/sources:$wt/apps/ingestion:$wt/apps/api:$wt/apps/backtest"
