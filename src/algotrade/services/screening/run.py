@@ -168,7 +168,7 @@ def _tolerated_stale(
     (``as_of`` its time; nothing without ``sources``: fail closed)."""
     if sources is None:
         return {}
-    return tolerated_stale(chain_status(reader, session_date, as_of=now), sources)
+    return tolerated_stale(chain_status(reader, session_date, as_of=now), session_date, sources)
 
 
 def run_screener(

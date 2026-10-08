@@ -32,15 +32,21 @@ def preset() -> ResolvedConfig:
     return resolve_config(SITE_CONFIGS, "short_premium_liquidity", UserContext(SITE_USER))
 
 
-def screened(core_stale: int, rest_stale: int, sources: SourcesSettings | None = SOURCES):
-    reader, writer = seed_chain_screen(DAY, chain_status_rows(50, core_stale, 50, rest_stale))
+def screened(
+    core_stale: int,
+    rest_stale: int,
+    sources: SourcesSettings | None = SOURCES,
+    chain_day: str = "2026-10-01",
+):
+    rows = chain_status_rows(50, core_stale, 50, rest_stale, chain_day=chain_day)
+    reader, writer = seed_chain_screen(DAY, rows)
     return reader, run_screener(reader, writer, preset(), DAY, now=T0, sources=sources)
 
 
 def test_stale_names_at_the_gates_limits_are_excluded_and_the_run_is_complete() -> None:
     reader, outcome = screened(core_stale=1, rest_stale=10)
     run = outcome.run
-    assert len(tolerated_stale(chain_status(reader, DAY), SOURCES)) == 11
+    assert len(tolerated_stale(chain_status(reader, DAY), DAY, SOURCES)) == 11
     assert run.coverage is RunCoverage.COMPLETE
     assert (run.excluded, run.processed, run.coverage_pct) == (11, 89, 1.0)
     assert outcome.audit["excluded"] == 11 and outcome.audit["skipped"] == 0
@@ -65,9 +71,17 @@ def test_one_more_stale_name_than_the_gate_tolerates_is_partial_again(
     core_stale: int, rest_stale: int
 ) -> None:
     reader, outcome = screened(core_stale, rest_stale)
-    assert tolerated_stale(chain_status(reader, DAY), SOURCES) == {}  # the gate FAILED
+    assert tolerated_stale(chain_status(reader, DAY), DAY, SOURCES) == {}  # the gate FAILED
     assert outcome.run.coverage is RunCoverage.PARTIAL
     assert outcome.run.excluded == 0 and outcome.audit["excluded"] == 0
+
+
+def test_chronically_stale_chains_are_never_excluded() -> None:
+    """Stale for more than ``max_chain_stale_sessions`` (5): fetch failures, 11 of 100 over the
+    2% limit, so the gate FAILS and the screen is PARTIAL with nothing excluded."""
+    reader, outcome = screened(core_stale=1, rest_stale=10, chain_day="2026-09-24")
+    assert tolerated_stale(chain_status(reader, DAY), DAY, SOURCES) == {}
+    assert outcome.run.coverage is RunCoverage.PARTIAL and outcome.run.excluded == 0
 
 
 def test_without_the_sources_nothing_is_excluded() -> None:

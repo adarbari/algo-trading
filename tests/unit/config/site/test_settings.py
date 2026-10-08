@@ -86,6 +86,7 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"quality": {"max_chain_fetch_failures": 1.5}}, "a fraction between 0 and 1"),
         ({"quality": {"max_chain_stale_share": -0.1}}, "max_chain_stale_share: expected a number"),
         ({"quality": {"max_chain_stale_share_core": 2}}, "a fraction between 0 and 1"),
+        ({"quality": {"max_chain_stale_sessions": 0}}, "max_chain_stale_sessions: expected an"),
         ({"quality": {"min_chain_coverage": 0.95}}, r"\[quality\]: unknown keys"),
         ({"quality": {"min_calendar_future_dates": -1}}, r"min_calendar_future_dates: expected an"),
         ({"quality": {"max_filings_failed": 2}}, "a fraction between 0 and 1"),
@@ -349,6 +350,12 @@ def test_the_filings_threshold_loads() -> None:
     assert SourcesSettings.from_document(site("sources")).max_filings_failed == 0.05
     document = {"quality": {"max_filings_failed": 0.2}}
     assert SourcesSettings.from_document(document).max_filings_failed == 0.2
+
+
+def test_the_chronic_stale_chain_limit_loads() -> None:
+    assert SourcesSettings.from_document(site("sources")).max_chain_stale_sessions == 5
+    document = {"quality": {"max_chain_stale_sessions": 3}}
+    assert SourcesSettings.from_document(document).max_chain_stale_sessions == 3
 
 
 def test_the_filings_backfill_cap_loads() -> None:

@@ -382,8 +382,10 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
         (
             r"^chains_fetch",
             "chains_fetch: too many chains failed to fetch (FETCH_ERROR incl. an open circuit, "
-            "or NOT_ATTEMPTED) above [quality] max_chain_fetch_failures. Check the Cboe circuit "
-            "and pacing, then re-run `algotrade-ingest chains --date D` (it resumes).",
+            "NOT_ATTEMPTED, or STALE_CHRONIC: STALE_DATA for over [quality] "
+            "max_chain_stale_sessions sessions) above [quality] max_chain_fetch_failures. Check "
+            "the Cboe circuit and pacing, then re-run `algotrade-ingest chains --date D` (it "
+            "resumes); STALE_CHRONIC names the feed no longer serves.",
         ),
         (
             r"^chains_stale",
