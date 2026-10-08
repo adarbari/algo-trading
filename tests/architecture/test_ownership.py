@@ -244,3 +244,17 @@ def test_web_responsibilities_name_existing_owners_and_sections() -> None:
             assert (REPO_ROOT / base).exists(), f"{entry['id']}: owner {pattern} does not exist"
         doc, _, anchor = entry["section"].partition("#")
         assert anchor in _slugs((REPO_ROOT / doc).read_text()), f"{entry['id']}: {entry['section']}"
+
+
+# Fitness (ADR 0053 amendment, Report containment): the real report date is a diagnostic only.
+
+_CROSS_SECTION = Path(__file__).parents[2] / "src/algotrade/services/evaluation/cross_section"
+
+
+def test_only_report_containment_calls_stored_events() -> None:
+    callers = {
+        p.name
+        for p in _CROSS_SECTION.glob("*.py")
+        if re.search(r"\bstored_events\b", p.read_text())
+    }
+    assert callers == {"report_containment.py"}

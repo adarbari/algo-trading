@@ -297,3 +297,14 @@ probit is the same model class with the precedent already in place. LightGBM (AD
    compared numbers (`[[implementation.compared]]`) and a fitness test runs the comparison over
    them; and the reader (`load_promotion`) honours `promoted` only when the same comparison over
    the cited run's stored rows is clean, else the edge is reported NOT promoted with the reasons.
+
+
+## Amendment 2026-10-08: Report containment (diagnostic)
+
+For an `on_event:earnings_expected` edge, the harness may read `events/earnings` rows known after
+D (as of the run's `as_of`, through `data.events.stored_events` and `earnings.valid_events`) only
+to count how many closed windows contained the real report (`cross_section/report_containment.py`).
+It is a diagnostic: never a pick, filter, weight, hit or status input; it is reported only (run
+record trial log, job result, CLI report). It is an allowed reuse under `feature-input-loading`,
+like the forward outcomes' bar read. A fitness test keeps `stored_events` out of every other
+module of `services/evaluation/cross_section/`.

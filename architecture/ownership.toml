@@ -163,7 +163,7 @@ allowed = [
     # ADR 0053 amendment: forward outcomes read each window's bars split-adjusted as of its end
     # session, the one per-session-window bar read rollups use; reused, not re-implemented
     "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py",
-    # ADR 0053: a diagnostic reads the real report date of a closed event window (never a pick input)
+    # ADR 0053, amendment "Report containment (diagnostic)": reads the real report date, never a pick input
     "src/algotrade/services/evaluation/cross_section/report_containment.py",
 ]
 section = "docs/adr/0023-feature-store.md#step-2-inputs-through-data"

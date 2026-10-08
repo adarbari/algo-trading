@@ -3,8 +3,8 @@
 An edge on ``on_event:earnings_expected`` builds each window from the EXPECTED report date known
 at D (SCHEDULED, or PRIOR_YEAR: the year-ago date plus 364 days), which can miss the real
 report. This module counts, per edge variant and horizon, the share of the measured windows
-(a name's event at D, entry session S, closing h sessions later) whose real report date fell in
-``S..S+h``.
+(a name's event at D with an outcome row at the entry session S, closing h sessions later)
+whose real report date fell in ``S..S+h``.
 
 The real date is known only afterwards: it is read from the stored earnings events whose
 ``known_from`` is later than D, as of the run's ``as_of``. That read is legitimate here because

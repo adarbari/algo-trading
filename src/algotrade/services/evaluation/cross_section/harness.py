@@ -505,6 +505,7 @@ def evaluate_edge(
                     for leg in b
                     if leg.entry in closed
                     for i in sorted(schedules[scope.key].names[leg.decision])
+                    if i in stats.stored[horizon, leg.entry]  # measured: has an entry bar
                 ],
                 horizon,
                 reports,
@@ -589,6 +590,7 @@ class _Measured:
     legs: dict[tuple[tuple[str, int], str], dict[date, SessionStat]]
     lost: dict[tuple[tuple[str, int], str], dict[date, str]]
     closed: dict[int, set[date]]
+    stored: dict[tuple[int, date], frozenset[str]]  # (horizon, S) -> names with an outcome row
 
 
 def _measure(
@@ -602,7 +604,7 @@ def _measure(
     """One statistic per (plan, variant, leg), over chunks of ``CHUNK_SESSIONS`` decision
     sessions: each chunk reads the outcomes of its entry sessions, screens its sessions and
     keeps only the statistics, so peak memory does not grow with the range."""
-    out = _Measured({}, {}, {})
+    out = _Measured({}, {}, {}, {})
     days = sorted({leg.decision for p in plans for b in p.blocks for leg in b})
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set() for p in plans})
@@ -652,6 +654,8 @@ def _read_closed(
         kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
         out.closed[horizon] |= set(closed[horizon])
+        for entry, rows in closed[horizon].items():
+            out.stored[horizon, entry] = frozenset(rows["instrument_id"])
     return closed
 
 
