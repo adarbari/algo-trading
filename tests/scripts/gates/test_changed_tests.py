@@ -3,6 +3,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "changed_tests.py"
 _spec = importlib.util.spec_from_file_location("changed_tests", SCRIPT)
 assert _spec and _spec.loader
@@ -59,3 +61,12 @@ def test_changed_areas_follow_the_ci_rule() -> None:
 
 def test_nothing_changed_means_every_code_area() -> None:
     assert changed_tests.changed_areas([]) == ["python", "web"]
+
+
+def test_areas_without_the_base_ref_are_every_code_area(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # CI checks out one commit: no origin/main to diff against, so the gate runs everything.
+    assert changed_tests.main(["changed_tests.py", "--areas", "no/such/ref"]) == 0
+    out = capsys.readouterr()
+    assert out.out.strip() == "python web" and "every area" in out.err

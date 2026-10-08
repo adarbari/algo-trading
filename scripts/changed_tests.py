@@ -91,11 +91,15 @@ def changed_areas(files: list[str]) -> list[str]:
 def main(argv: list[str]) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     base = args[0] if args else "origin/main"
-    files = changed_files(base)
     if "--areas" in argv:
+        try:
+            files = changed_files(base)
+        except subprocess.CalledProcessError:  # no such base ref (a shallow CI checkout)
+            print(f"changed_tests: no {base} to diff against; every area", file=sys.stderr)
+            files = []
         print(" ".join(changed_areas(files)))
     else:
-        print("\n".join(covering_tests(files)))
+        print("\n".join(covering_tests(changed_files(base))))
     return 0
 
 

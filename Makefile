@@ -226,7 +226,7 @@ fitness:         ## the architecture fitness tests only (what CI runs for a docs
 check:           ## refuses by default (rule 9: `make changed`, push, CI gates); SCOPED=1 = the gates of the areas changed vs BASE in parallel, FULL=1 = every gate (the release); one run per worktree
 	@if [ -z "$(FULL)$(SCOPED)" ]; then \
 	  echo "refusing: rule 9 (CLAUDE.md, owner decision 2026-10-08): run \`make changed\` for what changed, push, and let CI gate; the machine never runs the full check." >&2; \
-	  echo "  a deliberate run: \`make check SCOPED=1\` (the areas changed vs $(BASE): $(strip $(CHECK_SCOPE))) or \`make check FULL=1\` (every gate, the release)." >&2; \
+	  echo "  a deliberate run: \`make check SCOPED=1\` (the areas changed vs $(BASE); \`make check-scope\` lists them) or \`make check FULL=1\` (every gate, the release)." >&2; \
 	  exit 1; \
 	fi
 	scripts/ops/check_lock.sh $(MAKE) --no-print-directory -j$(CHECK_JOBS) check-gates
