@@ -48,7 +48,7 @@ KEYS = (
     "notes",
 )
 RECESSION_KEYS = ("start", "end", "announced_start", "announced_end")
-TIMELINE_KEYS = ("lookback_sessions", "clear_horizon_sessions", "gate_labels")
+TIMELINE_KEYS = ("lookback_sessions", "clear_horizon_sessions", "gate_labels", "min_coverage")
 GATE_LABELS = ("CALM", "CAUTION", "STRESS", "CRISIS")
 
 
@@ -97,11 +97,14 @@ class Recession:
 class Timeline:
     """The signal-timing window: ``lookback_sessions`` before an episode's peak and
     ``clear_horizon_sessions`` after its trough (to see when a signal cleared), and the regime
-    ``gate_labels`` at which the screener gate counts as flagged."""
+    ``gate_labels`` at which the screener gate counts as flagged; ``min_coverage``: the share of
+    the sessions up to the trough that must have a stored verdict before a signal with no ON run
+    counts as never fired (below it: unknown)."""
 
     lookback_sessions: int = 260
     clear_horizon_sessions: int = 260
     gate_labels: tuple[str, ...] = ("STRESS", "CRISIS")
+    min_coverage: float = 0.8
 
 
 @dataclass(frozen=True)
@@ -228,6 +231,7 @@ def _timeline(t: Table) -> Timeline:
         t.integer("lookback_sessions", default.lookback_sessions, 1),
         t.integer("clear_horizon_sessions", default.clear_horizon_sessions, 1),
         labels,
+        t.fraction("min_coverage", default.min_coverage),
     )
 
 

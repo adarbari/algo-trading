@@ -13,20 +13,26 @@ ON at the window's first stored session starts there (``first_known_day`` says w
 ``cleared_day`` is ``None`` while the signal is still ON at the window's end (the session or
 ``trough + clear_horizon``).
 
-``state``: ``NEVER_FIRED`` when verdicts are stored up to the trough and every one in the window
-is false; ``UNKNOWN`` (with a reason: field not in the catalogue, or no verdict stored up to
-the trough) is never ``NEVER_FIRED``; ``LATE`` is a first ON only after the trough.
+``state``: ``NEVER_FIRED`` when verdicts are stored up to the trough, every one in the window is
+false and they cover at least ``min_coverage`` of the sessions up to the trough; ``UNKNOWN``
+(a reason: field not in the catalogue, no verdict stored up to the trough, or too few to tell)
+is never ``NEVER_FIRED``; ``LATE`` is a first ON only after the trough.
 Windows, labels and the episode come from ``episodes.toml``; the cards from ``cards.toml``."""
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
 
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.core.model.instruments import market_id
-from algotrade.core.time.calendar import next_session, session_offset, sessions_ending
+from algotrade.core.time.calendar import (
+    next_session,
+    session_offset,
+    sessions_between,
+    sessions_ending,
+)
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.services.read.availability.cause import feature_cause
 from algotrade.services.read.context import ReadContext
@@ -65,7 +71,8 @@ class SignalTiming:
     ``LATE``);
     ``first_known_day``: the first stored verdict's session from the peak, set only when it is
     after the window's start (``flagged_day`` is then not the true start); ``unknown_reason``
-    exactly when ``state`` is ``UNKNOWN``."""
+    exactly when ``state`` is ``UNKNOWN``; ``verdict_sessions`` of ``window_sessions`` (the
+    sessions from the window's start to the trough) have a stored verdict."""
 
     indicator: str
     kind: SignalKind
@@ -76,6 +83,8 @@ class SignalTiming:
     never_fired: bool
     unknown_reason: Unknown | None
     flagged_day_from_trough: int | None
+    verdict_sessions: int
+    window_sessions: int
 
 
 @dataclass(frozen=True)
@@ -100,33 +109,36 @@ def _timing(
     kind: SignalKind,
     verdicts: Verdicts,
     window: tuple[date, date, date],
-    unknown: Unknown | None,
+    min_coverage: float,
+    unknown: Callable[[str | None], Unknown],
 ) -> SignalTiming:
     start, peak, trough = window
-    known = [(d, v) for d, v in sorted(verdicts.items()) if v is not None and d <= trough]
+    ordered = [(d, v) for d, v in sorted(verdicts.items()) if v is not None]
+    known = [(d, v) for d, v in ordered if d <= trough]
+    after = [(d, v) for d, v in ordered if d > trough]
+    total = len(sessions_between(start, trough))
+    base = SignalTiming(indicator, kind, SignalState.UNKNOWN, None, None, None, False, None, None,
+                        len(known), total)  # fmt: skip
     if not known:  # nothing stored up to the trough: a later verdict says nothing about it
-        return SignalTiming(indicator, kind, SignalState.UNKNOWN, None, None, None, False,
-                            unknown, None)  # fmt: skip
+        return replace(base, unknown_reason=unknown(None))
     first_known = None if known[0][0] <= start else session_offset(peak, known[0][0])
-    after = [(d, v) for d, v in sorted(verdicts.items()) if v is not None and d > trough]
-    flagged = next((d for d, v in known if v), None)
-    state = SignalState.LED
+    state, flagged = SignalState.LED, next((d for d, v in known if v), None)
     if flagged is None:
         flagged = next((d for d, v in after if v), None)
         state = SignalState.NEVER_FIRED if flagged is None else SignalState.LATE
     if flagged is None:
-        return SignalTiming(indicator, kind, state, None, None, first_known, True, None, None)
+        if len(known) < min_coverage * total:  # too thin to say it never fired
+            why = f"verdicts stored for {len(known)} of {total} sessions before the trough"
+            return replace(base, first_known_day=first_known, unknown_reason=unknown(why))
+        return replace(base, state=state, first_known_day=first_known, never_fired=True)
     cleared = next((d for d, v in [*known, *after] if d > flagged and not v), None)
-    return SignalTiming(
-        indicator,
-        kind,
-        state,
-        session_offset(peak, flagged),
-        None if cleared is None else session_offset(peak, cleared),
-        first_known,
-        False,
-        None,
-        session_offset(trough, flagged),
+    return replace(
+        base,
+        state=state,
+        flagged_day=session_offset(peak, flagged),
+        cleared_day=None if cleared is None else session_offset(peak, cleared),
+        first_known_day=first_known,
+        flagged_day_from_trough=session_offset(trough, flagged),
     )
 
 
@@ -165,24 +177,29 @@ def load_episode_signals(ctx: ReadContext, episode_key: str) -> EpisodeSignals |
             return {}
         return {p.session: p.values[index[name]] for p in points}
 
-    def unknown(name: str) -> Unknown:
-        if name not in catalogue:
-            return _gap(ctx, name, UnknownCode.NOT_IN_CATALOGUE, f"{name} is not in the catalogue")
-        return _gap(
-            ctx, name, UnknownCode.NO_ROW, f"{name} has no verdict stored before the trough"
-        )
+    def unknown(name: str) -> Callable[[str | None], Unknown]:
+        def gap(why: str | None) -> Unknown:
+            if name not in catalogue:
+                return _gap(
+                    ctx, name, UnknownCode.NOT_IN_CATALOGUE, f"{name} is not in the catalogue"
+                )
+            detail = why or "no verdict stored before the trough"
+            return _gap(ctx, name, UnknownCode.NO_ROW, f"{name}: {detail}")
+
+        return gap
 
     labels = read(LABEL)
     gate = {d: _gate_verdict(v, window.gate_labels) for d, v in labels.items()}
-    peak, trough = found.peak, found.trough
+    peak, trough, cover = found.peak, found.trough, window.min_coverage
     return EpisodeSignals(
-        _timing(GATE, SignalKind.GATE, gate, (start, peak, trough), unknown(LABEL)),
+        _timing(GATE, SignalKind.GATE, gate, (start, peak, trough), cover, unknown(LABEL)),
         tuple(
             _timing(
                 c.key,
                 SignalKind(c.pace.upper()),
                 {d: v if isinstance(v, bool) else None for d, v in read(c.feature + ON).items()},
                 (start, peak, trough),
+                cover,
                 unknown(c.feature + ON),
             )
             for c in cards

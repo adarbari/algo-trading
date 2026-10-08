@@ -183,3 +183,21 @@ def test_first_known_day_says_when_stored_verdicts_start_mid_window() -> None:
     rows = {d: v for d, v in ROWS.items() if d >= SEP21}
     curve = timing(signals(rows), "curve")
     assert (curve.flagged_day, curve.first_known_day) == (-1, -1)  # on from the first stored day
+
+
+def test_coverage_decides_whether_all_false_is_never_fired() -> None:
+    full = timing(signals(ROWS), "trend")  # 8 of the 8 sessions up to the trough
+    assert (full.state, full.verdict_sessions, full.window_sessions) == (
+        SignalState.NEVER_FIRED, 8, 8
+    )  # fmt: skip
+    sparse = timing(signals({SEP17: {"trend_on": False}, SEP18: {"trend_on": False}}), "trend")
+    assert (sparse.state, sparse.never_fired) == (SignalState.UNKNOWN, False)
+    assert (sparse.verdict_sessions, sparse.window_sessions) == (2, 8)
+    assert sparse.unknown_reason is not None and sparse.unknown_reason.code is UnknownCode.NO_ROW
+    assert "2 of 8 sessions" in sparse.unknown_reason.cause.links[0].message
+
+
+def test_a_sparse_signal_with_an_on_run_is_still_led() -> None:
+    led = timing(signals({SEP24: {"trend_on": True}}), "trend")
+    assert (led.state, led.flagged_day, led.unknown_reason) == (SignalState.LED, 2, None)
+    assert led.verdict_sessions == 1

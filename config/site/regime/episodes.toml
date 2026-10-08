@@ -259,8 +259,11 @@ announced_end = 2021-07-19
 #   when the fall began without reaching into an unrelated earlier regime).
 # - clear_horizon_sessions: sessions after the trough the read still looks for a signal to
 #   clear (never past the session asked for).
+# - min_coverage: the share of sessions up to the trough that must have a stored verdict before a
+#   signal that never turned ON counts as "never fired" (below it: unknown, partial coverage).
 # - gate_labels: the regime labels at which the screener gate counts as shut.
 [timeline]
 lookback_sessions = 260
 clear_horizon_sessions = 260
 gate_labels = ["STRESS", "CRISIS"]
+min_coverage = 0.8

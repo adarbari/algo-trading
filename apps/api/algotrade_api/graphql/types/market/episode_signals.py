@@ -31,7 +31,9 @@ strawberry.enum(
     "ON, null while it is still ON at the session or at the trough plus the clear horizon. "
     "`firstKnownDay`: set when the stored verdicts start after the window's start (sessions "
     "from the peak), so `flaggedDay` is not the true start of a run already ON then. "
-    "`unknownReason` is set exactly when `state` is UNKNOWN (never `neverFired` then)"
+    "`unknownReason` is set exactly when `state` is UNKNOWN (never `neverFired` then; also when "
+    "too few sessions have a verdict to say it never fired). `verdictSessions` of "
+    "`windowSessions` (window start to the trough) have a stored verdict"
 )
 class SignalTiming:
     indicator: str
@@ -43,6 +45,8 @@ class SignalTiming:
     never_fired: bool
     unknown_reason: Unknown | None
     flagged_day_from_trough: int | None
+    verdict_sessions: int
+    window_sessions: int
 
     @classmethod
     def of(cls, d: timeline.SignalTiming) -> Self:
@@ -56,6 +60,8 @@ class SignalTiming:
             never_fired=d.never_fired,
             unknown_reason=Unknown.of(d.unknown_reason) if d.unknown_reason else None,
             flagged_day_from_trough=d.flagged_day_from_trough,
+            verdict_sessions=d.verdict_sessions,
+            window_sessions=d.window_sessions,
         )
 
 

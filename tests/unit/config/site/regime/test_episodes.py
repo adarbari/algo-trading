@@ -137,7 +137,7 @@ def test_bad_recessions_fail_naming_the_recession(
 def test_the_shipped_timeline_window_and_gate_labels() -> None:
     timeline = load_episodes(FileConfigStore(REPO_ROOT / "config")).timeline
     assert (timeline.lookback_sessions, timeline.clear_horizon_sessions) == (260, 260)
-    assert timeline.gate_labels == ("STRESS", "CRISIS")
+    assert timeline.gate_labels == ("STRESS", "CRISIS") and timeline.min_coverage == 0.8
     assert Episodes.from_document({}).timeline == Timeline()  # no table: the defaults
 
 
@@ -147,6 +147,7 @@ def test_the_shipped_timeline_window_and_gate_labels() -> None:
         ({"lookback_sessions": 0}, "lookback_sessions: expected an integer >= 1"),
         ({"gate_labels": ["SUNNY"]}, "gate_labels: expected one or more of"),
         ({"gate_labels": []}, "gate_labels: expected one or more of"),
+        ({"min_coverage": 1.5}, "min_coverage: expected a fraction"),
         ({"horizon": 5}, "unknown keys"),
     ],
 )
