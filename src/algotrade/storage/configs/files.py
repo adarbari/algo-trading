@@ -2,6 +2,8 @@
 
 site/defaults.toml                         L3 defaults (screening, backtest)
 site/<name>.toml                           L3 site settings (kind ``settings``)
+site/<name>.local.toml                     this machine's values over site/<name>.toml
+                                           (git-ignored; merged key by key, tables merged)
 site/features/<theme>.toml                 L3 expression features (kind ``features``)
 site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``, ADR 0041)
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
@@ -74,6 +76,20 @@ def read_toml(path: Path) -> dict[str, Any] | None:
         return tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
         raise ConfigurationError(f"{path}: invalid TOML: {exc}") from exc
+
+
+LOCAL_SUFFIX = ".local"  # site/<name>.local.toml: git-ignored, this machine's site values
+
+
+def merge_local(base: Mapping[str, Any], local: Mapping[str, Any]) -> dict[str, Any]:
+    """``base`` with ``local``'s keys over it; a table in both is merged, not replaced."""
+    out = dict(base)
+    for key, value in local.items():
+        if isinstance(value, Mapping) and isinstance(out.get(key), Mapping):
+            out[key] = merge_local(out[key], value)
+        else:
+            out[key] = value
+    return out
 
 
 class FileConfigStore:
@@ -150,13 +166,22 @@ class FileConfigStore:
             return None
         if kind == SCREENERS:
             return self._screen(scope, name)
-        return read_toml(self._path(scope, kind, name))
+        document = read_toml(self._path(scope, kind, name))
+        if scope == SITE and kind == "settings":  # this machine's values (git-ignored)
+            local = read_toml(self._path(scope, kind, name).with_suffix(f"{LOCAL_SUFFIX}.toml"))
+            if local is not None:
+                return merge_local(document or {}, local)
+        return document
 
     def names(self, scope: str, kind: str) -> list[str]:
         if kind == "settings":
             if scope != SITE:
                 return []
-            return sorted(p.stem for p in (self.root / SITE).glob("*.toml") if p.stem != "defaults")
+            return sorted(
+                p.stem
+                for p in (self.root / SITE).glob("*.toml")
+                if p.stem != "defaults" and not p.stem.endswith(LOCAL_SUFFIX)
+            )
         if kind == "defaults":
             return ["defaults"] if scope == SITE and self._path(SITE, kind, "x").exists() else []
         if kind == SCREENERS:

@@ -18,6 +18,11 @@ const quarantine = JSON.parse(
 const quarantined = quarantine.skipped.filter((q) => q.kind === 'e2e').map((q) => escape(q.title));
 const quarantinePattern = quarantined.length > 0 ? new RegExp(quarantined.join('|')) : undefined;
 
+const previewPort =
+  process.env['ALGOTRADE_PORT_BASE'] === undefined
+    ? 4173
+    : Number(process.env['ALGOTRADE_PORT_BASE']) + 7; // vite.config.ts
+
 export default defineConfig({
   testDir: './e2e',
   forbidOnly: Boolean(process.env['CI']),
@@ -26,7 +31,7 @@ export default defineConfig({
     ? { grep: quarantinePattern ?? /$^/ }
     : quarantinePattern && { grepInvert: quarantinePattern }),
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
-  use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure' },
+  use: { baseURL: `http://127.0.0.1:${String(previewPort)}`, trace: 'retain-on-failure' },
   projects: [
     // Desktop: every spec but the phone one.
     { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /phone\.spec\.ts/ },
@@ -39,7 +44,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npx vite build && npx vite preview --host 127.0.0.1',
-    url: 'http://127.0.0.1:4173',
+    url: `http://127.0.0.1:${String(previewPort)}`,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,
     // The build needs the Supabase keys (login.spec.ts mocks that host); e2e/auth-api.ts.

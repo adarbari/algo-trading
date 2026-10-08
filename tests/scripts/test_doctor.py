@@ -225,7 +225,7 @@ def test_a_wrong_llm_toml_is_a_warning_with_the_message(tmp_path: Path) -> None:
             llm_error=lambda main: "llm.toml: unknown keys ['request_']",
         )
     )
-    assert bad.level == doctor.WARN and "unknown keys" in bad.detail and "llm.toml" in bad.fix
+    assert bad.level == doctor.WARN and "unknown keys" in bad.detail and "llm.local.toml" in bad.fix
 
 
 def test_llm_error_reads_the_main_checkouts_file(tmp_path: Path) -> None:
@@ -293,3 +293,42 @@ def test_many_merged_worktrees_warn_with_the_prune_fix(tmp_path: Path) -> None:
 
 def test_worktree_check_is_skipped_without_gh(tmp_path: Path) -> None:
     assert _worktrees(tmp_path, 1, 50).level == doctor.INFO
+
+
+def _git_probe(branch: str, head: str, origin: str, dirty: str):
+    def run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
+        if "--abbrev-ref" in cmd:
+            return 0, branch
+        if cmd[-1] == "HEAD":
+            return 0, head
+        if cmd[-1] == "origin/main":
+            return 0, origin
+        return 0, dirty
+
+    return run
+
+
+def test_main_checkout_warns_off_main_behind_or_dirty_site_config(tmp_path: Path) -> None:
+    def levels(branch: str, head: str, dirty: str = "") -> list[tuple[str, str]]:
+        p = probes(tmp_path, {}, main=lambda: tmp_path, run=_git_probe(branch, head, "a", dirty))
+        return [(r.name, r.level) for r in doctor.check_main_checkout(p)]
+
+    assert levels("main", "a") == [("main checkout", "ok")]
+    assert levels("feat/x", "a") == [("main checkout", "warn")]
+    assert levels("main", "b") == [("main checkout", "warn")]
+    assert levels("main", "a", " M config/site/llm.toml") == [
+        ("main checkout", "ok"),
+        ("site config", "warn"),
+    ]
+
+
+def test_running_checks_lists_other_runs_with_their_directory(tmp_path: Path) -> None:
+    def run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
+        if cmd[0] == "pgrep":
+            return 0, f"{doctor.os.getpid()}\n4242"
+        return 0, "p4242\nfcwd\nn/work/algo-trading-x"
+
+    r = doctor.check_running_checks(probes(tmp_path, {}, run=run))
+    assert r.level == doctor.INFO and "4242 in /work/algo-trading-x" in r.detail
+    none = doctor.check_running_checks(probes(tmp_path, {}, run=lambda cmd, cwd=None: (1, "")))
+    assert none.level == doctor.OK

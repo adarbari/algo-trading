@@ -46,12 +46,18 @@ Run the `install` commands it prints (`launchctl load ~/Library/LaunchAgents/com
 after copying it there). The agent starts the API at login and restarts it whenever it exits;
 it reads this checkout's `.env` as the nightly does; logs are `var/logs/api.log` and
 `var/logs/api.err.log`. After a change to `.env`, `config/site/users.toml` or an
-`identity.toml` (read at startup), or after pulling API code, restart it:
+`identity.toml` (read at startup), or after pulling API code, restart it. After a change to the code, `scripts/ops/deploy.sh`
+does it all (main checkout on `main` and clean: `git pull --ff-only`, `make web-build`,
+restart, health; `--dry-run` prints the plan). After only a config change:
 
 ```bash
 launchctl kickstart -k gui/$(id -u)/com.algotrade.api
 curl -s http://127.0.0.1:8000/health
 ```
+
+This machine's own site values (the LLM provider, `enabled = true`) live in the git-ignored
+`config/site/llm.local.toml`, merged over the committed `llm.toml`
+([configuration.md](configuration.md)): the main checkout stays clean and `deploy.sh` runs.
 
 The agent binds `127.0.0.1` only; Funnel is the one way in from outside. Without the agent,
 `.venv/bin/algotrade-api` in a terminal serves the same.
@@ -139,7 +145,7 @@ off, confirm email on, anonymous off).
    ```
 3. Their git-ignored `config/users/alice/identity.toml`: `email = "alice@example.com"`, and after
    their first sign-in optionally `subject = "<UID>"` from Authentication -> Users.
-4. Restart the API (`launchctl kickstart -k gui/$(id -u)/com.algotrade.api`).
+4. Restart the API (`scripts/ops/deploy.sh`, or `launchctl kickstart -k gui/$(id -u)/com.algotrade.api` for config only).
 
 ## The Mac
 

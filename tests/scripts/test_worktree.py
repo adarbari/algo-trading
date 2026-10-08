@@ -161,3 +161,13 @@ def test_prune_merged_never_touches_the_current_worktree(prune_repo: dict[str, P
 
 def test_prune_merged_takes_no_branch() -> None:
     assert _run("--prune-merged", "feat/x").returncode == 2
+
+
+def test_create_plan_gives_each_worktree_its_own_port_block() -> None:
+    def base(branch: str) -> int:
+        line = next(x for x in _run(branch).stdout.splitlines() if "ALGOTRADE_PORT_BASE=" in x)
+        return int(line.rsplit("=", 1)[1])
+
+    one, same, other = base("feat/a"), base("feat/a"), base("feat/b")
+    assert one == same and 10000 <= one < 15000 and one % 10 == 0
+    assert one != other

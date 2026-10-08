@@ -18,9 +18,21 @@ const emptyStore = resolve(import.meta.dirname, 'test-results/real-empty-store')
 rmSync(emptyStore, { recursive: true, force: true });
 mkdirSync(emptyStore, { recursive: true });
 
+const base =
+  process.env['ALGOTRADE_PORT_BASE'] === undefined
+    ? undefined
+    : Number(process.env['ALGOTRADE_PORT_BASE']);
+const at = (offset: number, fallback: number): number =>
+  base === undefined ? fallback : base + offset;
+
 const stores = [
-  { name: 'empty', url: `file://${emptyStore}`, api: 8801, web: 5801 },
-  { name: 'golden', url: `file://${resolve(root, 'datasets/golden/store')}`, api: 8802, web: 5802 },
+  { name: 'empty', url: `file://${emptyStore}`, api: at(2, 8801), web: at(4, 5801) },
+  {
+    name: 'golden',
+    url: `file://${resolve(root, 'datasets/golden/store')}`,
+    api: at(3, 8802),
+    web: at(5, 5802),
+  },
 ] as const;
 
 export default defineConfig({
