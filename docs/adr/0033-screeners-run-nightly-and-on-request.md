@@ -21,7 +21,8 @@ that was never run, or changed since it last ran, can only be run from the CLI.
 2. **A screener can be run on request** from the API (`POST /screens/{id}/run`):
    for the latest session with data, unless results for this screener version (config hash)
    and session are already stored, in which case nothing runs and the stored ones are
-   reported. The request returns a job id; the page polls `GET /jobs/{id}` (ADR 0010).
+   reported. (Amended 2026-10-07: only COMPLETE results count; a PARTIAL run read a table
+   with no rows for the session, which may have landed since, so a request runs it again.) The request returns a job id; the page polls `GET /jobs/{id}` (ADR 0010).
 3. **Results of an on-request run are stored like the nightly's**: the same `screen` job
    writes `results/rule_screen*` atomically (ADR 0022) and a run record, so the next view,
    the Ideas list and the nightly's "new / dropped" comparison all see it.
