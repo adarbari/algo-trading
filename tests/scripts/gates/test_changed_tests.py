@@ -39,6 +39,14 @@ def test_a_module_without_its_own_test_maps_to_the_mirrored_folder() -> None:
     ]
 
 
+def test_any_web_change_maps_to_the_web_fitness_tests() -> None:
+    # #319: a .tsx string and an 11-module apps/web/e2e passed `make changed`, failed CI.
+    web = "tests/architecture/test_layout_web.py"
+    assert covering("apps/web/src/pages/ideas/ui/IdeasPage.tsx") == [web]
+    assert covering("apps/web/e2e/screeners.spec.ts") == [web]
+    assert covering("architecture/web_prose.toml") == ["tests/architecture"]
+
+
 def test_changed_tests_and_registries_map_to_themselves_and_fitness_tests() -> None:
     assert covering("tests/apps/api/test_main.py", "architecture/layout.toml") == [
         "tests/apps/api/test_main.py",
