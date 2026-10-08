@@ -2,8 +2,7 @@
 ``InstrumentEvents`` and the ``EventCalendar``): the dated events from the session through an
 end date, each an ``AheadEvent`` with its label, time, source and ``known_from``.
 
-- ``own_earnings``: (stocks only: a fund is never asked, its exposure is ``reference_earnings``)
-  the next report date, its time and whether it is confirmed, read by
+- ``own_earnings``: the next report date, its time and whether it is confirmed, read by
   catalogue name (``rollup.earnings@v1.*`` through ``load_feature_values``, ADR 0038; exactly
   the session's partition, ADR 0036), never from ``events/earnings`` directly;
 - ``reference_earnings``: the same for the stock a leveraged or inverse fund tracks
@@ -184,14 +183,13 @@ def load_ahead(ctx: ReadContext, instrument_ids: Sequence[str], end: date) -> Ah
     references, reference_gaps = load_fund_references(ctx, funds) if funds else ({}, {})
     linked = {f: r.instrument_id for f, r in references.items() if r.instrument_id is not None}
     symbols = {f: r.symbol for f, r in references.items() if r.symbol is not None}
-    own = [i for i in ids if i not in funds]  # a fund has no earnings of its own
-    stocks = list(dict.fromkeys([*own, *linked.values()]))
+    stocks = list(dict.fromkeys([*ids, *linked.values()]))
     earnings = load_feature_values(ctx, stocks, EARNINGS) if stocks else {}
     by_name: dict[str, list[AheadEvent]] = {iid: [] for iid in ids}
     gaps: dict[str, list[EventGap]] = {iid: [] for iid in ids}
     for iid, unknown in reference_gaps.items():
         gaps[iid].append(EventGap(iid, REFERENCE, unknown))
-    asked: list[tuple[str, str, str, str | None]] = [(i, i, OWN_EARNINGS, None) for i in own]
+    asked: list[tuple[str, str, str, str | None]] = [(i, i, OWN_EARNINGS, None) for i in ids]
     asked += [
         (fund, stock, REFERENCE_EARNINGS, symbols.get(fund, stock))
         for fund, stock in linked.items()
