@@ -3,8 +3,7 @@
  * top bar's Guide link and the "?" key, the home with its theme groups, the field index, a
  * field's page (what it means, its spread, criteria, when it lies, related, a ticker), the rail's
  * search, the playbook and situation pages reached from the home (a linked field and back, the two
- * buttons, the linked prose), and Explore's retired Field guide tab redirecting here; accessible
- * in dark and light.
+ * buttons, the linked prose); accessible in dark and light.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -232,16 +231,4 @@ test('the rail searches the fields and the index has three views', async ({ page
 test('an unknown field says so instead of loading for good', async ({ page }) => {
   await page.goto('/guide/fields/feature.nope');
   await expect(page.getByText('No such field')).toBeVisible();
-});
-
-test('the Explore Field guide tab redirects to the Guide, keeping the field', async ({ page }) => {
-  const errors = collectErrors(page);
-  await page.goto('/explore?sel=AAPL');
-  await page.getByRole('tab', { name: 'Field guide' }).click();
-  await expect(page).toHaveURL(/\/guide\/fields$/);
-  await page.goto(`/explore?tab=guide&field=${IV30}&symbol=AAPL`);
-  await expect(page).toHaveURL(/\/guide\/fields\/rollup\.iv30(%40|@)v1\.iv30$/);
-  await page.goto('/explore?tab=guide&theme=volatility');
-  await expect(page).toHaveURL(/\/guide\/fields\?theme=volatility$/);
-  expect(errors).toEqual([]);
 });
