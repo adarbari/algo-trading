@@ -3,7 +3,10 @@
  * (pointer) or from the keyboard: focus the handle, Space to grab, Up / Down to move, Space to
  * drop, Escape to cancel. Every move is announced through a live region. Controlled: `items`
  * in, `onReorder(newOrder)` out when a move is dropped. Items render arbitrary content through
- * `renderItem`. Use it for a priority order the user owns (rule priority, column order).
+ * `renderItem`. Use it for a priority order the user owns (rule priority, column order). With
+ * `onActivate`, a click anywhere on an item (not its handle, nor a button or link inside it)
+ * opens it, and the item shows the pointer and the hover; the keyboard reaches the same action
+ * through the button or link the item renders (its name).
  */
 import {
   useCallback,
@@ -13,6 +16,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
@@ -48,6 +52,11 @@ export interface SortableListProps<T> {
   disabled?: boolean;
   /** Shown instead of the list when `items` is empty (an `EmptyState`). */
   empty?: ReactNode;
+  /**
+   * A click on an item opens it (its page). Pair it with a button or link inside `renderItem`
+   * doing the same, the keyboard's way in.
+   */
+  onActivate?: (item: T) => void;
 }
 
 type Mode = 'pointer' | 'keyboard';
@@ -75,6 +84,7 @@ export function SortableList<T>({
   label,
   disabled = false,
   empty,
+  onActivate,
 }: SortableListProps<T>) {
   const hintId = useId();
   const [move, setMove] = useState<Move<T> | null>(null);
@@ -203,6 +213,13 @@ export function SortableList<T>({
     }
   };
 
+  /** A click on an item, outside its handle and its own controls, activates it. */
+  const onItemClick = (event: MouseEvent<HTMLLIElement>, item: T) => {
+    if (!onActivate || moveRef.current) return;
+    if ((event.target as Element).closest('button, a, input, label, select, textarea')) return;
+    onActivate(item);
+  };
+
   if (items.length === 0 && empty !== undefined) return <>{empty}</>;
 
   return (
@@ -212,6 +229,9 @@ export function SortableList<T>({
           const key = getKey(item);
           const active = move?.key === key;
           return (
+            // A row click is the pointer's shortcut; the keyboard opens the item through the
+            // button or link it renders (onActivate's contract), so the li needs no key handler.
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
             <li
               key={key}
               className={styles.item}
@@ -219,6 +239,14 @@ export function SortableList<T>({
               data-dragging={(active && move.mode === 'pointer') || undefined}
               data-grabbed={(active && move.mode === 'keyboard') || undefined}
               data-disabled={disabled || undefined}
+              data-clickable={onActivate ? true : undefined}
+              onClick={
+                onActivate
+                  ? (event) => {
+                      onItemClick(event, item);
+                    }
+                  : undefined
+              }
             >
               <button
                 type="button"

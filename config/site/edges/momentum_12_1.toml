@@ -11,7 +11,7 @@ persistence = """The premium is large, old and widely known, and has survived tw
 publication in most markets, but it crashes in sharp market rebounds (Daniel and Moskowitz 2016):
 the risk that keeps arbitrageurs from removing it."""
 schedule = "month_end"
-universe = "liquid_optionable"
+universe = "liquid_common_stocks"
 top_k = 50
 screeners = ["momentum_12_1"]
 status = "candidate"
@@ -31,10 +31,11 @@ cost_bps = 10
 outcome = """Excess return over SPY over the 20 sessions after a month-end close, net of 10 bps a
 round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions)."""
 trigger_timing = """mom_12_1 is computed from the close of S (rollups, nightly), so the first session
-we act is S+1; the window starts at S's close, before the trade, a slight overstatement the
-cost assumption absorbs."""
+we act is S+1; the window starts at S+1's close (decision session D, entry S = D + 1, ADR 0053
+amendment of 2026-10-08), once ED4-1 sets the offset; until then the window starts at S's
+close, a slight overstatement."""
 replication = """The published rule: rank by the return from 12 months to 1 month back and hold
-the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid optionable universe."""
+the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid common stocks (liquid_common_stocks)."""
 expected_size = """Historically about 1% a month for the winner-minus-loser decile spread in large
 US stocks, smaller since 2000 (Daniel and Moskowitz 2016). Ten independent sessions cannot
 distinguish that from zero: the harness reports the t statistic and the sessions beside it."""

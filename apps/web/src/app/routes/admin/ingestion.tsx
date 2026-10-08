@@ -1,6 +1,7 @@
 /**
  * `/admin/ingestion`: the Admin › Ingestion page. The drilled-into cell lives in the URL
- * (`?dataset=bars/1d&session=2026-10-02`) so a drill-down can be shared; both or neither.
+ * (`?dataset=bars/1d&session=2026-10-02`) so a drill-down can be shared; both or neither. A
+ * ticker row (verification, review items) opens the ticker in Explore.
  */
 import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/react-router';
 
@@ -39,6 +40,9 @@ function IngestionRoute() {
       }}
       onClearCell={() => {
         void navigate({ to: '/admin/ingestion', search: {}, replace: true });
+      }}
+      onOpenTicker={(symbol) => {
+        void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } });
       }}
     />
   );

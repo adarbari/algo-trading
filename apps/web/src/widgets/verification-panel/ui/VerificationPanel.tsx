@@ -1,6 +1,7 @@
 /**
  * The latest session's live verification vs IBKR: checks by status (a StackedBar), the failing checks
- * (ours vs IBKR's value, the difference and tolerance), and the counts per check on demand.
+ * (ours vs IBKR's value, the difference and tolerance; a row opens its ticker in Explore), and
+ * the counts per check on demand.
  */
 import {
   DataTable,
@@ -76,7 +77,12 @@ const BY_CHECK: DataTableColumn<CheckCounts>[] = [
   })),
 ];
 
-export function VerificationPanel() {
+export interface VerificationPanelProps {
+  /** Open a ticker in Explore (a click on a failing check's row). */
+  onOpen?: (symbol: string) => void;
+}
+
+export function VerificationPanel({ onOpen }: VerificationPanelProps) {
   const verification = useVerification();
   const served = verification.data;
   const v = served && !served.unknown ? served : null;
@@ -134,6 +140,13 @@ export function VerificationPanel() {
               rows={failingChecks(v)}
               getRowId={(r) => `${r.instrumentId}|${r.check}`}
               visibleRows={Math.min(v.failing.length, 8)}
+              {...(onOpen
+                ? {
+                    onRowActivate: (r: FailingCheck) => {
+                      onOpen(r.symbol);
+                    },
+                  }
+                : {})}
             />
           )}
           <Disclosure

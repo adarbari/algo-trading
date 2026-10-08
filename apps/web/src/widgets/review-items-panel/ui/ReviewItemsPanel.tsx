@@ -1,6 +1,7 @@
 /**
  * The owner's open review items: FIGI conflicts from the universe build and leveraged / inverse
- * ETFs whose leverage needs curating. Each list is a Disclosure with its count and the items.
+ * ETFs whose leverage needs curating. Each list is a Disclosure with its count and the items;
+ * a row opens its ticker in Explore.
  */
 import {
   DataTable,
@@ -23,7 +24,14 @@ const COLUMNS: DataTableColumn<ReviewItem>[] = [
 
 type ReviewQuery = ReturnType<typeof useFigiReview>;
 
-function ReviewList({ title, hint, query }: { title: string; hint: string; query: ReviewQuery }) {
+interface ReviewListProps {
+  title: string;
+  hint: string;
+  query: ReviewQuery;
+  onOpen?: ((symbol: string) => void) | undefined;
+}
+
+function ReviewList({ title, hint, query, onOpen }: ReviewListProps) {
   if (query.isPending) return <Skeleton lines={2} label={`Loading ${title}…`} />;
   if (query.isError) {
     return (
@@ -54,6 +62,13 @@ function ReviewList({ title, hint, query }: { title: string; hint: string; query
             rows={items}
             getRowId={(i) => i.symbol}
             visibleRows={Math.min(items.length, 8)}
+            {...(onOpen
+              ? {
+                  onRowActivate: (i: ReviewItem) => {
+                    onOpen(i.symbol);
+                  },
+                }
+              : {})}
           />
         )}
       </Stack>
@@ -61,7 +76,12 @@ function ReviewList({ title, hint, query }: { title: string; hint: string; query
   );
 }
 
-export function ReviewItemsPanel() {
+export interface ReviewItemsPanelProps {
+  /** Open a ticker in Explore (a click on its row). */
+  onOpen?: (symbol: string) => void;
+}
+
+export function ReviewItemsPanel({ onOpen }: ReviewItemsPanelProps) {
   const figi = useFigiReview();
   const leveraged = useLeveragedReview();
   const session = figi.data?.session ?? leveraged.data?.session;
@@ -79,11 +99,13 @@ export function ReviewItemsPanel() {
           title="FIGI reviews"
           hint="Symbols whose FIGI is shared or changed: decide which instrument keeps the id."
           query={figi}
+          onOpen={onOpen}
         />
         <ReviewList
           title="Leveraged ETFs to curate"
           hint="Leveraged or inverse funds whose leverage the name rules could not settle."
           query={leveraged}
+          onOpen={onOpen}
         />
       </Stack>
     </Panel>

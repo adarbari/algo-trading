@@ -116,6 +116,7 @@ export function TopIdeas({ onCompare, onOpen, onOpenScreener, onScreeners }: Top
         onRowActivate={(idea) => {
           if (idea.symbol) onOpen(idea.symbol);
         }}
+        canActivate={(idea) => Boolean(idea.symbol)}
         emptyMessage={
           all.length === 0
             ? 'No screener picked anything in this session.'

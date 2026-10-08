@@ -4,8 +4,11 @@ session (the tie-break order, QUALIFIED only), the edge's universe, the survivor
 
 from datetime import timedelta
 
+import pytest
+
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.config.user import UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.picks import eligible, screen_variant
 from algotrade.services.screening.run import screen_session
@@ -62,3 +65,20 @@ def test_screen_session_writes_no_result_and_no_run_record(world: World) -> None
     assert world.backend.runs.find("screen-momo-site", None) == []
     assert world.reader.table_names().count("results/rule_screen") == 0
     assert screened.universe.snapshot_date == DAYS[0] - timedelta(days=3)
+
+
+def test_rule_scores_are_tie_break_oriented(world: World) -> None:
+    desc = screen_variant(world.reader, resolve_config(world.configs, "momo", USER), DAYS[0])
+    assert desc.scores[IDS[3]] == 130.0  # higher is better
+    asc_rule = screen("asc")
+    configs = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "momo"): asc_rule}
+    )
+    asc = screen_variant(world.reader, resolve_config(configs, "momo", USER), DAYS[0])
+    assert asc.scores[IDS[3]] == -130.0  # ascending: the cheapest scores best
+    bare = {k: v for k, v in screen().items() if k != "rank"}
+    configs = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "momo"): bare}
+    )
+    with pytest.raises(ConfigurationError, match="tie_break"):
+        screen_variant(world.reader, resolve_config(configs, "momo", USER), DAYS[0])

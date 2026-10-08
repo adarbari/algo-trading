@@ -105,7 +105,12 @@
   cursor: default;
 }
 
-.row[data-virtual]:hover {
+/* Only a row a click acts on looks clickable (DataTable.tsx `clickable`). */
+.row[data-clickable] {
+  cursor: pointer;
+}
+
+.row[data-clickable]:hover {
   --dt-row-bg: var(--color-row);
 
   background: var(--dt-row-bg);
