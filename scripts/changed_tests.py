@@ -3,7 +3,10 @@ it touches (`--areas`, for `make check`).
 
 Tests mirror their source (CLAUDE.md "Directory layout"), so a changed module maps to its
 mirrored test file, or to the mirrored folder when the file has no test of its own. Changed
-test files map to themselves; a changed architecture registry maps to the fitness tests.
+test files map to themselves; a changed architecture registry maps to the fitness tests, and
+any change under `apps/web/` maps to the Python fitness tests over the web code
+(`WEB_FITNESS`: prose baseline, folder caps, forbidden derivations; #319 passed `make
+changed` and failed CI on them).
 This narrows the first check. `--areas` prints the areas the change touches, `python`, `web`
 and / or `docs`, by the same rule as CI's "Changed areas" job (.github/workflows/ci.yml), so
 `make check` runs the gates for those areas; a branch with no change (main) is every area.
@@ -26,6 +29,9 @@ MIRRORS = (
     ("apps/backtest/algotrade_backtest/", "tests/apps/backtest/"),
     ("apps/api/algotrade_api/", "tests/apps/api/"),
 )
+
+# The Python fitness tests that read apps/web (and architecture/web_*.toml); a few seconds.
+WEB_FITNESS = "tests/architecture/test_layout_web.py"
 
 
 def _git(*args: str) -> list[str]:
@@ -51,6 +57,8 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
     for name in files:
         if name.startswith("architecture/"):
             paths.add("tests/architecture")
+        if name.startswith("apps/web/") or name.startswith("architecture/web_"):
+            paths.add(WEB_FITNESS)
         if not name.endswith(".py"):
             continue
         if name.startswith("tests/"):
@@ -66,7 +74,8 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
                 elif present(str(rel.parent)):
                     paths.add(str(rel.parent))
                 break
-    return sorted(paths)
+    # a path inside another one already listed would run twice
+    return sorted(p for p in paths if not any(p.startswith(f"{q}/") for q in paths))
 
 
 BOTH_AREAS = (".github/workflows/ci.yml", "apps/api/openapi.json", "apps/api/schema.graphql")
