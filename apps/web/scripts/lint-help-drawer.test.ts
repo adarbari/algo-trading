@@ -33,18 +33,26 @@ describe('help drawer import restriction', () => {
     'src/features/screener-builder/ui/Example.test.tsx',
     'src/entities/feature/ui/Example.tsx',
     'src/shared/lib/Example.ts',
-  ])('forbids the three components in %s, naming ADR 0051 and the skill', async (file) => {
-    const found = await drawerRestriction(file);
-    expect(found?.importNames).toEqual(['HelpDrawer', 'HelpLead', 'HelpSection']);
-    expect(found?.message).toContain('ADR 0051');
-    expect(found?.message).toContain('.claude/skills/add-guide-content');
-  }, TIMEOUT_MS);
+  ])(
+    'forbids the three components in %s, naming ADR 0051 and the skill',
+    async (file) => {
+      const found = await drawerRestriction(file);
+      expect(found?.importNames).toEqual(['HelpDrawer', 'HelpLead', 'HelpSection']);
+      expect(found?.message).toContain('ADR 0051');
+      expect(found?.message).toContain('.claude/skills/add-guide-content');
+    },
+    TIMEOUT_MS,
+  );
 
   it.each([
     'src/features/guide-help/ui/Example.tsx',
     'src/features/guide-help/ui/Example.test.tsx',
     'src/features/guide-help/model/Example.ts',
-  ])('allows them in %s', async (file) => {
-    expect(await drawerRestriction(file)).toBeUndefined();
-  }, TIMEOUT_MS);
+  ])(
+    'allows them in %s',
+    async (file) => {
+      expect(await drawerRestriction(file)).toBeUndefined();
+    },
+    TIMEOUT_MS,
+  );
 });
