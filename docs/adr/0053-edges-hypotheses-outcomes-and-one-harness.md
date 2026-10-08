@@ -214,7 +214,7 @@ corrected it on point-in-time grounds.
      left tail). `realised_to_implied_vol < 1` stays as a second row.
 5. **Edge variants.** Cap buckets, structure, delta, the earnings exclusion, Savor and Wilson's
    [-1, +1] window and the realised-to-implied row are `[[variants]]` in the document, with
-   outcome and universe overrides. They are not session slices. Each variant is a trial in the
+   outcome, universe, base and picks overrides. They are not session slices. Each variant is a trial in the
    deflated Sharpe ratio. `results/edge_eval` gains the key column `edge_variant` (null read as
    "main") and the columns `iv_source`, `licence`, `reference_rate` and `touch_rate`.
 6. **One IV field per variant row** (`iv_field` on the outcome; a run parameter is the default):
@@ -236,7 +236,7 @@ corrected it on point-in-time grounds.
    h - 1 sessions, the price of keeping every event; with dense events only common moves carry
    it (a lag-1 correlation of at most about 0.17), so t statistics and the deflated Sharpe ratio
    are overstated by at most about 15% on event edges; plain schedules have no overlap. The picks are the screener's
-   qualified names within the event names. The base (`base = "event" | "universe"`) is the
+   qualified names within the event names (`picks = "event"`, the default; `picks = "universe"`, settable per variant, takes them from every eligible name on the event sessions: a decoy). The base (`base = "event" | "universe"`) is the
    event names, or the universe for the announcement premium. A name eligible at D with no row
    at S is excluded as `no_entry_bar`.
 8. **Train and test split in the UI** (ED5). The site `frozen_from` stays the only evidence
