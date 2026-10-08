@@ -36,6 +36,12 @@ export const TRADER: Workspace = {
         'Builder: criteria with hard, soft or score mode, thresholds and tolerances, live preview, save and finalize.',
     },
     {
+      path: '/edges',
+      label: 'Edges',
+      summary:
+        'Each edge, a written reason a pattern should last, with its status, frozen period and the odds of its screeners.',
+    },
+    {
       path: '/explore',
       label: 'Explore',
       summary:
