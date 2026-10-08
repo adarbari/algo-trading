@@ -33,7 +33,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.engines.screening.runner import RunCoverage
+from algotrade.engines.screening.runner import DEFAULT_MIN_COVERAGE, RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.hit import (
@@ -191,6 +191,9 @@ def _stat(
     run, ids = session.run(variant, day), session.eligible(day)
     if run.coverage not in MEASURED_COVERAGE:  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
+    scored = {i: v for i, v in run.scores.items() if i in ids and v is not None}
+    if len(scored) < DEFAULT_MIN_COVERAGE * len(ids):  # no score to rank by: never ranked
+        return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     inside = rows[rows["instrument_id"].isin(ids)]
     implied = session.implied(day) if needs_implied_vol(edge) else None
     res = apply_outcome(edge, inside, implied).set_index("instrument_id")
@@ -200,7 +203,7 @@ def _stat(
     pick_set = set(picks)
     have = set(res.index)
     got = [i for i in picks if i in counted.index]
-    ranked = [i for i in run.ranking if i in counted.index]
+    ranked = sorted((i for i in scored if i in counted.index), key=lambda i: (-scored[i], i))
     deciles = decile_means(counted.loc[ranked, "oriented"].to_list()) if ranked else None
     return SessionStat(
         session=day,
@@ -212,6 +215,7 @@ def _stat(
         top_decile=deciles[0] if deciles else None,
         spread=deciles[1] if deciles else None,
         ranked=len(ranked),
+        unscored=len(ids) - len(scored),
         excluded_unclosed=sum(1 for i in picks if i not in have),
         excluded_missing=sum(1 for i in picks if i in have and i not in counted.index),
         delisted=int(counted.loc[got, "delisted"].sum()),

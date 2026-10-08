@@ -24,7 +24,7 @@ MEASURE_COLUMNS = (
     "sessions", "picks", "hits", "hit_rate", "eligible", "base_hits", "base_rate", "lift",
     "mean_excess_picks", "bh_mean", "top_decile_mean", "decile_spread", "decile_t",
     "decile_sessions", "effect_size", "sharpe", "deflated_sharpe", "trials", "pbo",
-    "excluded_unclosed", "excluded_missing", "excluded_coverage", "delisted",
+    "unscored", "excluded_unclosed", "excluded_missing", "excluded_coverage", "delisted",
     "pre_snapshot_sessions",
 )  # fmt: skip
 

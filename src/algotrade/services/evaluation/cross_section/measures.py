@@ -39,6 +39,7 @@ class SessionStat:
     top_decile: float | None = None  # mean of the best-ranked tenth of the ranked eligible
     spread: float | None = None  # top tenth minus bottom tenth
     ranked: int = 0  # eligible names with a rank and a counted outcome
+    unscored: int = 0  # eligible names with no score to rank by (outside the deciles)
     excluded_unclosed: int = 0
     excluded_missing: int = 0
     excluded_coverage: int = (
@@ -86,6 +87,7 @@ class SliceMeasure:
     decile_sessions: int
     effect_size: float | None
     sharpe: float | None  # of the per-session mean of the picks, not annualised
+    unscored: int
     excluded_unclosed: int
     excluded_missing: int
     excluded_coverage: int  # sessions left out: the screen read incomplete data
@@ -145,6 +147,7 @@ def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
         decile_sessions=spread_n,
         effect_size=standardised_effect(pick_values, rest_values),
         sharpe=sharpe(means),
+        unscored=sum(r.unscored for r in rows),
         excluded_unclosed=sum(r.excluded_unclosed for r in rows),
         excluded_missing=sum(r.excluded_missing for r in rows),
         excluded_coverage=sum(r.excluded_coverage for r in kept),

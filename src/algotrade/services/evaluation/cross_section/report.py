@@ -11,7 +11,9 @@ COLUMNS = (
     ("base_rate", "base", "{:.1%}"), ("lift", "lift", "{:.2f}"),
     ("mean_excess_picks", "picks mean", "{:+.4f}"), ("bh_mean", "buy&hold", "{:+.4f}"),
     ("top_decile_mean", "top decile", "{:+.4f}"), ("decile_spread", "spread", "{:+.4f}"),
-    ("decile_t", "t", "{:.2f}"), ("deflated_sharpe", "DSR", "{:.2f}"), ("pbo", "PBO", "{:.2f}"),
+    ("decile_t", "t", "{:.2f}"), ("decile_sessions", "dec. sessions", "{}"),
+    ("unscored", "unscored", "{}"), ("excluded_coverage", "unmeasured", "{}"),
+    ("deflated_sharpe", "DSR", "{:.2f}"), ("pbo", "PBO", "{:.2f}"),
 )  # fmt: skip
 
 
