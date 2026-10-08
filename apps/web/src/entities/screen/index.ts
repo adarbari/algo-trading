@@ -13,6 +13,7 @@ export {
   useScreenPreview,
   useScreeners,
 } from './api/hooks';
+export { useScreenerRuns, type ScreenerRunSummary } from './api/runs';
 export { useScreenerHits, type ScreenerHitsResponse } from './api/hits';
 export {
   SCREENER_RESULTS_OPERATION,

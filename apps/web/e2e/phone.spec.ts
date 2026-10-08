@@ -142,10 +142,17 @@ test('Regime: a tapped card help button opens the indicator drawer as a sheet', 
   await expectAccessible(page);
 });
 
-test('Screeners: a tapped row opens the screener', async ({ page }) => {
+test('Screeners: a tapped row opens in place and its hits button opens the results', async ({
+  page,
+}) => {
   await page.goto('/screeners');
-  const presets = page.getByRole('grid', { name: 'Site presets' });
-  await presets.getByRole('gridcell', { name: 'vrp_scanner' }).first().tap();
+  const row = page.getByRole('button', { name: /^vrp_scanner Preset/ });
+  // On a phone the row keeps the name, the type pill and the hits only.
+  await expect(row.getByText('Run 2026-10-07')).toBeHidden();
+  await row.tap();
+  await expect(row).toHaveAttribute('aria-expanded', 'true');
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'View 12 hits' }).tap();
   await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
 });
 
