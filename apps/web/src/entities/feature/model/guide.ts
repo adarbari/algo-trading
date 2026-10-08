@@ -3,9 +3,9 @@
  * amended): how to read the field, the criterion per intent (as a rule screen takes it), the
  * caveats and sources. Pure readers of a use's JSON parts (its value, its tolerance).
  */
-import type { CatalogueFeature } from './catalogue';
+import type { DetailedFeature } from './catalogue';
 
-export type FieldGuide = NonNullable<CatalogueFeature['guide']>;
+export type FieldGuide = NonNullable<DetailedFeature['guide']>;
 export type GuideUse = FieldGuide['uses'][number];
 
 /** A use's tolerance: a number in the field's unit, or a share of the threshold; undefined for none. */

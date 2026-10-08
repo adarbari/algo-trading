@@ -4,14 +4,13 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
-import {
-  ExplorePage,
-  parseExploreSearch,
-  type ExploreSearch,
-  type SearchPatch,
-} from '@/pages/trader-explore';
+import { parseExploreSearch, type ExploreSearch } from '@/entities/explore';
+import type { SearchPatch } from '@/pages/trader-explore';
 
 import { traderRoute } from './layout-route';
+import { lazyPage } from '../lazy-page';
+
+const ExplorePage = lazyPage(() => import('@/pages/trader-explore'), 'ExplorePage');
 
 /** The search params after a patch: `undefined` removes a key. */
 function patched(previous: ExploreSearch, patch: SearchPatch): ExploreSearch {

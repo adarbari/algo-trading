@@ -130,7 +130,12 @@ export type ComparePricesQuery = { table: { instruments: Array<{ instrumentId: s
 export type FeatureCatalogueQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type FeatureCatalogueQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string, guide: { theme: string, reads: string, summary: string, caveats: Array<string>, sources: Array<string>, uses: Array<{ intent: string, op: string, value: unknown, mode: string, tolerance: unknown, onMiss: string | null, note: string }> } | null }> };
+export type FeatureCatalogueQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string, guide: { theme: string, reads: string, summary: string } | null }> };
+
+export type FeatureCatalogueDetailQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type FeatureCatalogueDetailQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string, guide: { theme: string, reads: string, summary: string, caveats: Array<string>, sources: Array<string>, uses: Array<{ intent: string, op: string, value: unknown, mode: string, tolerance: unknown, onMiss: string | null, note: string }> } | null }> };
 
 export type FeatureDistributionQueryVariables = Exact<{
   name: string;
@@ -209,6 +214,20 @@ export type GuideEpisodeQueryVariables = Exact<{
 
 
 export type GuideEpisodeQuery = { guideEpisode: { episode: { key: string, name: string, kind: string, peak: string, trough: string, recovered: string | null, spxDrawdown: number, nasdaqDrawdown: number, recession: boolean, nberStart: string | null, nberEnd: string | null, knownFrom: string }, cause: { segments: Array<{ text: string, field: string | null }> }, notes: { segments: Array<{ text: string, field: string | null }> }, indicators: Array<{ key: string, plainName: string, label: string, line: { segments: Array<{ text: string, field: string | null }> } }> } | null };
+
+export type HarnessRunsQueryVariables = Exact<{
+  limit: number;
+}>;
+
+
+export type HarnessRunsQuery = { harnessRuns: Array<{ runId: string, edgeId: string, user: string, status: string, startedAt: string, finishedAt: string | null, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, variants: Array<string>, horizons: Array<number>, sessions: number | null, unclosed: number | null, excludedCoverage: number | null, scoreCoverage: number | null, noEntryBar: number | null, trials: number | null, knowledgeTs: string, asOf: string | null }> };
+
+export type HarnessRunQueryVariables = Exact<{
+  runId: string;
+}>;
+
+
+export type HarnessRunQuery = { harnessRun: { runId: string, rows: Array<{ edgeVariant: string, variant: string, role: string, horizonSessions: number, sliceKind: string, sliceValue: string, sessions: number | null, picks: number | null, hits: number | null, trials: number | null, hitRate: number | null, baseRate: number | null, lift: number | null, decileSpread: number | null, exploratory: boolean }> } | null };
 
 export type EtfHoldingsQueryVariables = Exact<{
   key: string;
@@ -817,6 +836,34 @@ export const FeatureCatalogueDocument = new TypedDocumentString(`
       theme
       reads
       summary
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<FeatureCatalogueQuery, FeatureCatalogueQueryVariables>;
+export const FeatureCatalogueDetailDocument = new TypedDocumentString(`
+    query FeatureCatalogueDetail {
+  catalogue {
+    name
+    kind
+    source
+    dtype
+    format
+    description
+    nullMeaning
+    version
+    group
+    key
+    inputs
+    unit
+    range
+    categories
+    scope
+    owner
+    licence
+    guide {
+      theme
+      reads
+      summary
       caveats
       sources
       uses {
@@ -831,7 +878,7 @@ export const FeatureCatalogueDocument = new TypedDocumentString(`
     }
   }
 }
-    `) as unknown as TypedDocumentString<FeatureCatalogueQuery, FeatureCatalogueQueryVariables>;
+    `) as unknown as TypedDocumentString<FeatureCatalogueDetailQuery, FeatureCatalogueDetailQueryVariables>;
 export const FeatureDistributionDocument = new TypedDocumentString(`
     query FeatureDistribution($name: FeatureName!) {
   distribution(name: $name) {
@@ -1284,6 +1331,56 @@ export const GuideEpisodeDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideEpisodeQuery, GuideEpisodeQueryVariables>;
+export const HarnessRunsDocument = new TypedDocumentString(`
+    query HarnessRuns($limit: Int!) {
+  harnessRuns(limit: $limit) {
+    runId
+    edgeId
+    user
+    status
+    startedAt
+    finishedAt
+    rangeFrom
+    rangeTo
+    splitFrom
+    exploratory
+    variants
+    horizons
+    sessions
+    unclosed
+    excludedCoverage
+    scoreCoverage
+    noEntryBar
+    trials
+    knowledgeTs
+    asOf
+  }
+}
+    `) as unknown as TypedDocumentString<HarnessRunsQuery, HarnessRunsQueryVariables>;
+export const HarnessRunDocument = new TypedDocumentString(`
+    query HarnessRun($runId: String!) {
+  harnessRun(runId: $runId) {
+    runId
+    rows {
+      edgeVariant
+      variant
+      role
+      horizonSessions
+      sliceKind
+      sliceValue
+      sessions
+      picks
+      hits
+      trials
+      hitRate
+      baseRate
+      lift
+      decileSpread
+      exploratory
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<HarnessRunQuery, HarnessRunQueryVariables>;
 export const EtfHoldingsDocument = new TypedDocumentString(`
     query EtfHoldings($key: String!, $top: Int!) {
   instrument(key: $key) {

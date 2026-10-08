@@ -6,11 +6,19 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { compareSearch } from '@/features/idea-compare';
-import { NewScreenerPage, ScreenerBuilderPage } from '@/pages/screener-builder';
-import { ScreenerResultsPage } from '@/pages/screener-results';
-import { ScreenersPage } from '@/pages/trader-screeners';
-
 import { traderRoute } from './layout-route';
+import { lazyPage } from '../lazy-page';
+
+const NewScreenerPage = lazyPage(() => import('@/pages/screener-builder'), 'NewScreenerPage');
+const ScreenerBuilderPage = lazyPage(
+  () => import('@/pages/screener-builder'),
+  'ScreenerBuilderPage',
+);
+const ScreenerResultsPage = lazyPage(
+  () => import('@/pages/screener-results'),
+  'ScreenerResultsPage',
+);
+const ScreenersPage = lazyPage(() => import('@/pages/trader-screeners'), 'ScreenersPage');
 
 export const screenersRoute = createRoute({ getParentRoute: () => traderRoute, path: 'screeners' });
 

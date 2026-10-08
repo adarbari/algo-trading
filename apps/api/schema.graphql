@@ -854,6 +854,37 @@ type GuideUse {
   note: String!
 }
 
+"""
+One edge evaluation run of any status: `user` whose run (`site`: the shared one), `splitFrom` and `exploratory`, `variants` and `horizons` measured, `sessions` the most any variant measured, the left-out counts `unclosed`, `excludedCoverage` (no screen run or input tables), `scoreCoverage` (lowest share of eligible names scored) and `noEntryBar`, `trials` counted and `knowledgeTs` (null counts: not recorded)
+"""
+type HarnessRun {
+  runId: String!
+  edgeId: String!
+  user: String!
+  status: String!
+  startedAt: DateTime!
+  finishedAt: DateTime
+  rangeFrom: Date
+  rangeTo: Date!
+  splitFrom: Date
+  exploratory: Boolean!
+  variants: [String!]!
+  horizons: [Int!]!
+  sessions: Int
+  unclosed: Int
+  excludedCoverage: Int
+  scoreCoverage: Float
+  noEntryBar: Int
+  trials: Int
+  knowledgeTs: DateTime!
+  asOf: String
+
+  """
+  The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none
+  """
+  rows: [EdgeRow!]!
+}
+
 """One point of a numeric history; `value` null is a gap"""
 type HistoryPoint {
   session: Date!
@@ -1575,6 +1606,14 @@ type Query {
   What the text model spent: tokens and cost against the budget, by model, use case and user, a 30-day series and the `recent` latest calls (newest first). A date range ending today, not one session (ADR 0058)
   """
   llmUsage(recent: Int! = 50): LlmUsage
+
+  """
+  The `limit` most recent edge evaluation runs of any status, newest first: every edge the user sees, for the site and every declared user
+  """
+  harnessRuns(limit: Int! = 50): [HarnessRun!]!
+
+  """The edge evaluation run `runId`, with its rows; null: no such run"""
+  harnessRun(runId: String!): HarnessRun
 }
 
 """

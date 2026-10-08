@@ -10,7 +10,7 @@
 import { DocSection, EmptyState, ErrorState, Skeleton, Stack } from '@algotrade/ui';
 import { useState } from 'react';
 
-import { byName, useFeatureCatalogue, type CatalogueFeature } from '@/entities/feature';
+import { byName, useFeatureCatalogueDetail, type DetailedFeature } from '@/entities/feature';
 import { useGuideField } from '@/entities/guide';
 
 import { CaveatsPanel } from './CaveatsPanel';
@@ -34,7 +34,7 @@ function FieldSections({
   feature,
   onAddToBuilder,
 }: {
-  feature: CatalogueFeature;
+  feature: DetailedFeature;
   onAddToBuilder: () => void;
 }) {
   const [useIndex, setUseIndex] = useState(0);
@@ -86,7 +86,7 @@ function FieldSections({
 }
 
 export function GuideField({ name, onAddToBuilder }: GuideFieldProps) {
-  const catalogue = useFeatureCatalogue();
+  const catalogue = useFeatureCatalogueDetail();
   if (catalogue.isError) {
     return (
       <ErrorState

@@ -546,6 +546,20 @@ comparable.
 """
 see_also = ["frozen_period", "independent_sessions"]
 
+[[term]]
+id = "harness_exclusions"
+term = "What a run left out"
+short = "The sessions and names an evaluation run could not measure, counted so none is quietly dropped."
+body = """
+A run counts what it set aside instead of ignoring it. Unclosed: decision sessions whose
+holding window had not finished by the run's end. Coverage: sessions with no screen run, or a
+screen run that lacked an input table. Score coverage: the lowest share of eligible names that
+had a score to rank; below the minimum the deciles are skipped. No entry bar: names with no
+price on the session they would have been bought. A figure shown as unknown was not recorded by
+the run, which is different from none.
+"""
+see_also = ["trial_log", "exploratory", "independent_sessions"]
+
 # ---------------------------------------------------------------- the text model's cost (ADR 0058)
 
 [[term]]
