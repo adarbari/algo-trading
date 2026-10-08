@@ -562,6 +562,22 @@ Source: `design-system/components/EventTimeline`
 | `onRetry` | `() => void` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when no event falls in the window. |
 
+### ExpandableRow
+
+ExpandableRow: one row of a list that opens its detail in place (a screener with its criteria, hits and actions). The summary is a button with `aria-expanded` controlling the detail region; it shows a title, an optional badge, a figure that stays on a phone (`essential`) and further cells (`secondary`) that drop out in a narrow container. Controlled by the caller, so a list keeps one row open at a time. For a labelled count with hidden detail use Disclosure.
+
+Source: `design-system/components/ExpandableRow`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The row's name. |
+| `badge` | `ReactNode` | no | A small pill beside the title (Mine / Preset). |
+| `essential` | `ReactNode` | no | The figure a phone keeps (hits today). |
+| `secondary` | `ReactNode` | no | Cells shown beside the essential one only when the container is wide enough. |
+| `open` | `boolean` | yes | Whether the detail is shown. |
+| `onOpenChange` | `(open: boolean) => void` | yes |  |
+| `children` | `ReactNode` | yes | The detail; rendered only while open, so it can load lazily. |
+
 ### ExpiryLadder
 
 ExpiryLadder: the listed option expiries from near to far, one row each: the expiry date, its days to expiry, and the events the expiry spans (an event on or before the expiry date, after the close included) as EventChips with their days, or a "Clear" badge when it spans none. The first clear row is marked ("First clear", an accent rule) so the first expiry that holds no event is easy to find. The rows, the flags and the mark come from the caller (the API decides what a row spans); the ladder draws them. A real table (caption = `label`), so it reads row by row with a screen reader and wraps at phone width. Loading, empty and error states.
