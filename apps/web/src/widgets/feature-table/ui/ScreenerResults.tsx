@@ -242,6 +242,10 @@ export function ScreenerResults({
         visibleRows: 14,
         sort,
         sortMode: 'server',
+        narrowColumns: view.narrowColumns,
+        onNarrowColumnsChange: (next) => {
+          view.change({ narrowColumns: next });
+        },
         onSortChange: (next) => {
           view.change({ sort: formatSort(next, DEFAULT_SORT) });
         },

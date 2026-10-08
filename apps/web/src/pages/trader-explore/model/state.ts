@@ -23,6 +23,8 @@ export interface ExploreState {
   focused: string | null;
   tab: ExploreTab;
   columns: readonly string[];
+  /** Columns added back on a narrow table (none by default). */
+  narrowColumns: readonly string[];
   dimensions: readonly string[];
   sort: DataTableSort | null;
   range: ChartRange;
@@ -35,6 +37,7 @@ export function exploreState(search: ExploreSearch): ExploreState {
     focused: search.focus ?? selected[0] ?? null,
     tab: search.tab ?? defaultTab(selected.length),
     columns: search.cols === undefined ? DEFAULT_COLUMNS : splitList(search.cols),
+    narrowColumns: splitList(search.ncols),
     dimensions: search.dims === undefined ? DEFAULT_DIMENSIONS : splitList(search.dims),
     sort: parseSort(search.sort),
     range: search.range ?? '1Y',

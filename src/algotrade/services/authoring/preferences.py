@@ -1,6 +1,7 @@
 """Save a user's preferences (``config/users/<u>/preferences.toml``; ADR 0029, 0032): the
 Ideas screener priority, ``ideas.priority`` (screener ids, best first), and the user's views of
-a table, ``views.<scope>.view`` (columns, sort, decisions shown) and any named ones,
+a table, ``views.<scope>.view`` (columns, sort, decisions shown, and ``narrow_columns``: the
+table column ids added back on a phone, checked by shape only) and any named ones,
 ``views.<scope>.views.<name>`` (a scope names a table: ``screener:<id>`` is a screener's
 results; ``services.read.screens.views``). Every id must be a screen the user can run (their
 own or a site preset) and listed once, and every column a feature of the user's catalogue, so a
@@ -93,7 +94,7 @@ DECISION = re.compile(r"[A-Z][A-Z_]*")
 
 def _checked_view(
     writer: ConfigWriter, who: str, columns: Sequence[str], sort: str | None,
-    decisions: Sequence[str],
+    decisions: Sequence[str], narrow_columns: Sequence[str] = (),
 ) -> dict[str, Any]:  # fmt: skip
     if len(set(columns)) != len(columns) or len(columns) > MAX_COLUMNS:
         raise ConfigurationError(f"view.columns: each column once, at most {MAX_COLUMNS}")
@@ -107,7 +108,18 @@ def _checked_view(
         raise ConfigurationError(f"view.decisions: not decisions: {bad}")
     if sort is not None and (not sort.strip() or len(sort) > 200 or sort != sort.strip()):
         raise ConfigurationError("view.sort: a column name, with '-' in front for descending")
-    view: dict[str, Any] = {"columns": list(columns), "decisions": list(decisions)}
+    if len(set(narrow_columns)) != len(narrow_columns) or len(narrow_columns) > MAX_COLUMNS:
+        raise ConfigurationError(f"view.narrow_columns: each column once, at most {MAX_COLUMNS}")
+    for cid in narrow_columns:  # table column ids (not only catalogue fields): shape only
+        if not cid or len(cid) > 200 or cid != cid.strip() or not cid.isprintable():
+            raise ConfigurationError(
+                "view.narrow_columns: 1 to 200 printable characters, no space at either end"
+            )
+    view: dict[str, Any] = {
+        "columns": list(columns),
+        "decisions": list(decisions),
+        "narrow_columns": list(narrow_columns),
+    }
     if sort is not None:  # the read side validates it against the table's columns
         view["sort"] = sort
     return view
@@ -143,17 +155,21 @@ def view_scope(writer: ConfigWriter, who: str, scope: str) -> str:
 def save_view(
     writer: ConfigWriter, user: str, scope: str, columns: Sequence[str], sort: str | None,
     decisions: Sequence[str], name: str | None = None,
+    narrow_columns: Sequence[str] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:  # fmt: skip
     """Replace ``user``'s view of the table ``scope``: the default one, or the one called
     ``name`` (other views and preferences are kept); returns it and the names of the named
-    views."""
+    views. ``narrow_columns`` None (a client from before the field): the saved ones are kept."""
     who = author(user).user_id
     key = view_scope(writer, who, scope)
     named = view_name(name)
-    view = _checked_view(writer, who, columns, sort, decisions)
     current = _load(writer, who)
     views = dict(current.get(VIEWS) or {})
     entry = dict(views.get(key) or {})
+    if narrow_columns is None:
+        before = entry.get("view") if named is None else dict(entry.get("views") or {}).get(named)
+        narrow_columns = [str(c) for c in (before or {}).get("narrow_columns") or []]
+    view = _checked_view(writer, who, columns, sort, decisions, narrow_columns)
     if named is None:
         entry["view"] = view
     else:

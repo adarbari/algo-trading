@@ -308,6 +308,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Build */
+        Build: {
+            api: components["schemas"]["BuildStamp"];
+            checkout: components["schemas"]["BuildStamp"] | null;
+            /** Mismatches */
+            mismatches: string[];
+            /** Stale */
+            stale: boolean;
+            web: components["schemas"]["BuildStamp"] | null;
+        };
+        /** BuildStamp */
+        BuildStamp: {
+            /** At */
+            at: string | null;
+            /** Git Sha */
+            git_sha: string;
+            /** Schema Hash */
+            schema_hash: string;
+        };
         /** CheckBody */
         CheckBody: {
             /**
@@ -492,6 +511,7 @@ export interface components {
         };
         /** Health */
         Health: {
+            build: components["schemas"]["Build"];
             /** Latest Session */
             latest_session: string | null;
             /**
@@ -1009,6 +1029,11 @@ export interface components {
              */
             names: string[];
             /**
+             * Narrow Columns
+             * @description table column ids added back on a narrow (phone) table
+             */
+            narrow_columns: string[];
+            /**
              * Saved
              * @description false: this view is not saved yet (the page uses defaults)
              */
@@ -1036,6 +1061,11 @@ export interface components {
              * @description decisions shown (empty: the page's default)
              */
             decisions: string[];
+            /**
+             * Narrow Columns
+             * @description table column ids added back on a narrow (phone) table; absent: kept as saved
+             */
+            narrow_columns?: string[] | null;
             /**
              * Sort
              * @description a column id ('-' prefix: descending); null: the table's default

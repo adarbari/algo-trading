@@ -22,6 +22,8 @@ export interface TableViewState {
   /** The saved view has been read (the table can ask for its rows). */
   ready: boolean;
   columns: readonly string[];
+  /** The columns added back on a narrow table. */
+  narrowColumns: readonly string[];
   sort: string | null;
   /** The decisions shown; null: none chosen (the table's default). */
   decisions: readonly string[] | null;
@@ -48,6 +50,7 @@ export function useTableView(scope: string): TableViewState {
   const view = saved.data;
   const current: ViewContent = {
     columns: edits.columns ?? view?.columns ?? [],
+    narrowColumns: edits.narrowColumns ?? view?.narrowColumns ?? [],
     sort: edits.sort !== undefined ? edits.sort : (view?.sort ?? null),
     decisions: edits.decisions ?? (view?.saved ? view.decisions : []),
   };
@@ -61,6 +64,7 @@ export function useTableView(scope: string): TableViewState {
     names: view?.names ?? [],
     ready: !saved.isPending,
     columns: current.columns,
+    narrowColumns: current.narrowColumns,
     sort: current.sort,
     decisions:
       edits.decisions ?? (view?.saved && view.decisions.length > 0 ? view.decisions : null),

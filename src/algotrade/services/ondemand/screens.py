@@ -12,9 +12,11 @@ queued or running by a stopped API process are marked failed on the next start, 
 for the same work runs again instead of waiting on a job that is gone.
 
 A request resolves the screener for the user (their own finalised screen, else a site preset),
-picks the session (``on``, else the latest with bars), and answers ``ready`` at once when a run
-of this config hash for that session is stored (COMPLETE or PARTIAL); otherwise it submits the
-job (the same work already in flight is the same job) and answers its state.
+picks the session (``on``, else the latest with bars), and answers ``ready`` at once when a
+COMPLETE run of this config hash for that session is stored; otherwise it submits the job (the
+same work already in flight is the same job) and answers its state. A stored PARTIAL run is run
+again: it read a table that had no rows for the session, which may have landed since (a rollup
+backfilled after the screen ran rejected every row as missing data, 2026-10-07).
 """
 
 from dataclasses import dataclass
@@ -36,8 +38,8 @@ from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
 
 KIND = "screen"
-READY = "ready"  # results for this version and session are already stored
-STORED = (JobStatus.COMPLETE, JobStatus.PARTIAL)
+READY = "ready"  # complete results for this version and session are already stored
+STORED = (JobStatus.COMPLETE, JobStatus.PARTIAL)  # a job that stored results
 STALE = timedelta(minutes=30)  # a screen takes minutes: older, still "running", is a dead job
 
 
@@ -71,7 +73,7 @@ class OnDemandScreens:
     def _stored(
         self, config_id: str, owner: UserContext, config_hash: str, session: date
     ) -> RunRecord | None:
-        """The stored run of this config version for ``session`` (None: not run yet)."""
+        """The latest stored run of this config version for ``session`` (None: not run yet)."""
         found = [
             r
             for r in self._runs.runs_for(run_job_name(config_id, owner.user_id), session)
@@ -95,10 +97,11 @@ class OnDemandScreens:
         owner = self._owner(config_id, user)
         config = resolve_config(self._configs, config_id, owner)
         stored = self._stored(config_id, owner, config.hash, session)
-        if stored is not None:
+        if stored is not None and stored.status == JobStatus.COMPLETE:
             return RunRequest(READY, config_id, session, None, stored.run_id, None)
         params = {"config": config_id, "session": session.isoformat(), "export_dir": None}
-        job_id = self._jobs.submit(KIND, params, owner)
+        # a PARTIAL run is the same job identity: force it to run again (in flight stays one job)
+        job_id = self._jobs.submit(KIND, params, owner, force=stored is not None)
         return self._view(config_id, session, self._jobs.status(job_id))
 
     def status(

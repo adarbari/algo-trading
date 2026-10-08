@@ -24,6 +24,8 @@
 }
 
 .scroller {
+  /* Positioned: the hidden caption text is absolute and must not widen the page. */
+  position: relative;
   overflow: auto;
   max-width: 100%;
   border: var(--border-width-thin) solid var(--color-border);

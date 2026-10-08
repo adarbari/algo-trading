@@ -19,6 +19,7 @@ const TableView = graphql(`
       name
       saved
       columns
+      narrowColumns
       sort
       decisions
       names
@@ -56,11 +57,19 @@ export function useSaveView(scope: string) {
       unwrap(
         api.PUT('/preferences/views/{scope}/view', {
           params: { path: { scope }, query: { name } },
-          body: { columns: [...view.columns], sort: view.sort, decisions: [...view.decisions] },
+          body: {
+            columns: [...view.columns],
+            narrow_columns: [...view.narrowColumns],
+            sort: view.sort,
+            decisions: [...view.decisions],
+          },
         }),
       ),
     onSuccess: (saved, { name }) => {
-      client.setQueryData<gqlTypes.TableViewQuery>(keyOf(scope, name), { view: saved });
+      const { narrow_columns: narrowColumns, ...rest } = saved;
+      client.setQueryData<gqlTypes.TableViewQuery>(keyOf(scope, name), {
+        view: { ...rest, narrowColumns },
+      });
       void client.invalidateQueries({
         queryKey: queryKeys.gqlAll(TABLE_VIEW_OPERATION),
         predicate: viewsOf(scope, name),

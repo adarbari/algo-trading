@@ -10,7 +10,8 @@ PREFS = {
         "views": {
             "screener:alpha": {
                 "view": {"columns": ["rollup.iv30@v1.iv30"], "sort": "-score",
-                         "decisions": ["QUALIFIED"]},
+                         "decisions": ["QUALIFIED"],
+                         "narrow_columns": ["name", "criterion:a"]},
                 "views": {"Earnings": {"columns": ["feature.earnings_before_expiry"]}},
             }
         }
@@ -22,13 +23,14 @@ def test_the_default_and_a_named_view(reader: StoreReader) -> None:
     ctx = context(reader, PREFS)
     assert load_view(ctx, "screener:alpha") == TableView(
         "screener:alpha", None, True, ("rollup.iv30@v1.iv30",), "-score", ("QUALIFIED",),
-        ("Earnings",),
+        ("Earnings",), ("name", "criterion:a"),
     )  # fmt: skip
     named = load_view(ctx, "screener:alpha", "Earnings")
     assert named is not None
     assert (named.saved, named.columns, named.sort) == (
         True, ("feature.earnings_before_expiry",), None
     )  # fmt: skip
+    assert named.narrow_columns == ()  # a document without the key
 
 
 def test_a_view_saved_before_views_were_scoped_is_still_read(reader: StoreReader) -> None:

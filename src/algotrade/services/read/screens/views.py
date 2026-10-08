@@ -28,7 +28,8 @@ LEGACY_SCREENERS = "screeners"  # where PR 5-7 saved a screener's views (``scree
 class TableView:
     """``scope``: the table the view is of (``screener:<id>``); ``name``: None for the default
     view; ``names``: the user's named views of the scope, sorted; ``sort``: a column id, ``-``
-    first for descending (None: the table's default)."""
+    first for descending (None: the table's default); ``narrow_columns``: the table column ids
+    the user added back on a narrow (phone) table."""
 
     scope: str
     name: str | None
@@ -37,6 +38,7 @@ class TableView:
     sort: str | None
     decisions: tuple[str, ...]
     names: tuple[str, ...]
+    narrow_columns: tuple[str, ...] = ()
 
 
 def scope_parts(scope: str) -> tuple[str, str]:
@@ -77,6 +79,7 @@ def table_view(configs: ConfigStore, user: str, scope: str, name: str | None = N
         sort=None if sort is None else str(sort),
         decisions=tuple(str(d) for d in view.get("decisions") or []),
         names=names,
+        narrow_columns=tuple(str(c) for c in view.get("narrow_columns") or []),
     )
 
 
