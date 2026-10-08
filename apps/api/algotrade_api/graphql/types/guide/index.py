@@ -55,14 +55,17 @@ class GuideIntent:
         return cls(intent=d.intent, fields=d.fields)
 
 
-@strawberry.type(description="A situation and the number of fields it fools")
+@strawberry.type(
+    description="A situation, the number of fields it fools and `slug`, its page's key"
+)
 class GuideSituationEntry:
     name: str
     fields: int
+    slug: str
 
     @classmethod
     def of(cls, d: index.GuideSituationEntry) -> Self:
-        return cls(name=d.name, fields=d.fields)
+        return cls(name=d.name, fields=d.fields, slug=d.slug)
 
 
 @strawberry.type(description="A playbook: a site rule-screen preset's id and name")

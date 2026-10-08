@@ -16,6 +16,7 @@ KINDS = (
     "field_guide",
     "regime",
     "guide",
+    "guide_playbooks",
     "events",
     "screeners",
     "preferences",
@@ -32,7 +33,8 @@ class ConfigStore(Protocol):
         (``site/field_guide/<theme>.toml``, site-only); ``regime`` the site's regime reference
         files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only); ``events`` the site's
         event-sensitivity files (``site/events/{scope,releases}.toml``, ADR 0050, site-only);
-        ``guide`` the Guide's own files (``site/guide/sections.toml``, ADR 0051, site-only).
+        ``guide`` the Guide's own files (``site/guide/sections.toml``, ADR 0051, site-only);
+        ``guide_playbooks`` its playbook prose (``site/guide/playbooks/<id>.toml``, site-only).
         ``preferences`` and
         ``identity`` are one file per user (``users/<id>/<kind>.toml``; identity holds the
         sign-in email, ADR 0040), never the site's. ``screeners`` are versioned rule screens:

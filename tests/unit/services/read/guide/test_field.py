@@ -55,6 +55,25 @@ def test_situations_that_fool_the_field(ctx: StoreContext) -> None:
     assert [s.name for s in load_guide_field(ctx, REL_VOLUME).situations] == ["takeover"]
 
 
+def test_the_entrys_prose_is_linked_at_catalogue_names(ctx: StoreContext) -> None:
+    page = load_guide_field(ctx, ADV)
+    assert page.reads_linked is not None and page.info.guide is not None
+    assert page.reads_linked.text == page.info.guide.reads
+    # itself is linked too (the prose names it); an unknown name stays text
+    assert page.reads_linked.fields == (REL_VOLUME, "feature.atr_pct", ADV)
+    (caveat,) = page.caveats_linked
+    assert caveat.fields == ("feature.atr_pct", "instrument.symbol")
+    (thin,) = load_guide_field(ctx, CLOSE).situations
+    assert (thin.slug, thin.signs_linked.text, thin.do_linked.fields) == (
+        "thin-name", "Few trades.", (),
+    )  # fmt: skip
+
+
+def test_a_field_without_an_entry_has_no_linked_prose(ctx: StoreContext) -> None:
+    page = load_guide_field(ctx, "feature.atr_pct")
+    assert page.reads_linked is None and page.caveats_linked == ()
+
+
 def test_a_name_outside_the_catalogue_is_an_error(ctx: StoreContext) -> None:
     with pytest.raises(UnknownFeatureError):
         load_guide_field(ctx, "rollup.nope@v1.x")

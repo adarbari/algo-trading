@@ -1,0 +1,46 @@
+# L3 site setting: the Guide's playbook for the site preset support_reversal (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "support_reversal"
+version = 2  # the preset version this prose was written for
+summary = "Finds shares that fell this week and stopped at a price level that has held before, and today printed the first up close with volume behind it. The owner uses it to pick names for selling puts under that level, so it also requires options that can be traded."
+hit = "The nearest support below is within half an ATR of the close and has been tested at least twice in the last year; the week is down but this week's return beat last week's; today closed up, in the top 40% of its range, on at least average volume; relative strength against SPY has improved over the last month. The options must be usable: chain volume of at least 1,000 contracts a day (500 to 1,000 is flagged LIQUIDITY_RISK) and an execution tier of A or B, which is a hard gate. For ranking only, the best put's strike is scored on how far below support it sits: full points at 1 ATR of cushion, none at zero."
+not_checked = "It does not ask why the share fell (news, earnings) or whether the 'support' is a single spike low; read the touches count and the chart. Nothing here checks the implied volatility being sold: vrp_scanner does that."
+before_acting = [
+  "A floor that held twice has not been broken yet, which is all rollup.pivot_strength@v1.support_touches says; a third test can fail, and support in a downtrend breaks more than it holds. Check feature.trend_state and rollup.pivot_strength@v1.support_age.",
+  "rollup.relative_strength@v1.rs_spy_trend_20d turns positive when a laggard merely stops falling; pair it with rollup.relative_strength@v1.rs_spy_63d above 0 for improving and ahead.",
+  "An earnings or ex-dividend day moves the close for reasons the chart does not show; check rollup.earnings@v1.last_earnings_date and rollup.dividends@v2.last_ex_date before trusting rollup.trend_stats@v2.ret_1d.",
+  "feature.option_tier is null when the session's chain run failed for the name, which is not the same as untradeable but rejects it that day; feature.put_support_cushion_atr is measured on today's ATR and shrinks after a shock without the strike moving.",
+]
+sources = [
+  "Edwards and Magee, Technical Analysis of Stock Trends (support and resistance, tested levels)",
+  "McMillan, Options as a Strategic Investment (cash-secured puts struck below support)",
+  "Raschke and Connors, Street Smarts (buying the first up close after a decline)",
+]
+related = [
+  { id = "oversold_reversal", reason = "a deeper washout, no level required" },
+  { id = "pullback", reason = "the same dip inside a stronger trend" },
+  { id = "vrp_scanner", reason = "whether the puts are rich enough" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+option_volume = "Options trade 1,000 contracts a day"
+execution = "Option execution tier A or B"
+support_near = "Within half an ATR of support"
+support_touches = "Support tested at least twice"
+ret_5d = "Down over the week"
+momentum_improving = "This week beat last week"
+up_close = "Closed up today"
+close_location = "Closed in the top 40% of the day's range"
+rel_volume = "At least normal volume"
+rs_improving = "Strength against SPY improving"
+put_cushion = "A put strike well under support"
