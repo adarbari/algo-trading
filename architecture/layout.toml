@@ -315,6 +315,11 @@ purpose = "the read model (ADR 0037): session resolution (ADR 0036), UNKNOWN val
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/availability"
+purpose = "why a fact is not available, and who may know (ADR 0056): the public UnavailableKind / Unavailable (kind, features, Guide term) and the admin-only Cause chain (source -> step -> table -> features) with explain(), which expands a leaf from the nightly run record's recorded step tables; served only to admins by the GraphQL AdminCause and the REST redact"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/events"
 purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -453,7 +458,7 @@ contracts = ["Layout: vendors never import each other (one folder per vendor)"]
 
 [[dir]]
 path = "apps/api/algotrade_api"
-purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the text model behind screener drafts and regime explanations (text_model, ADR 0041), the built web app on the API's origin (web, ADR 0044), the ASGI app and the algotrade-api CLI"
+purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the role-scoped REST responses (redact, ADR 0056), the text model behind screener drafts and regime explanations (text_model, ADR 0041), the built web app on the API's origin (web, ADR 0044), the ASGI app and the algotrade-api CLI"
 contracts = [
     "API: routes reach the library only through services.read, services.preview, services.drafting, services.explaining, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)",
     "Apps never import each other (ADR 0004)",
@@ -471,7 +476,7 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types"
-purpose = "GraphQL object types, one module per domain read object, split by area (instruments/, events/, screens/, ops/); here only the Query root and Session: fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+purpose = "GraphQL object types, one module per domain read object, split by area (instruments/, events/, screens/, ops/); here only the Query root, Session and the shared Unavailable / Cause (availability.py, ADR 0056): fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]

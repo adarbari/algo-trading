@@ -47,6 +47,12 @@ from the API.
    `architecture/rest_allowlist.toml` with `keep = true` and its `reason`, raise
    `max_get_routes` by one, and amend ADR 0037 (decision 4) in the same PR: raising the count
    without the ADR amendment is gaming the ratchet. A page read is never this case.
+   **A response that says why something is not available** (an error text, a table list, a
+   cause) declares the field `json_schema_extra={ADMIN_CAUSE: <fallback>}` (null, `[]`,
+   `GENERIC` or `AUDIT`; ADR 0056) and the route returns `redact(model, caller.role)`
+   (`algotrade_api/redact.py`); a gap in public words is `unavailable_for(...)`. A text field
+   named detail / error / message / problems / missing* that is neither marked nor listed with its
+   reason in `architecture/cause_fields.toml` fails `tests/architecture/api/test_rest_causes.py`.
 5. **Tests** (`tests/apps/api/routes/<area>/test_<x>.py`, the `client` / `user_client`
    fixtures): success, 400 / 404 / 409 paths, the write landing where the use case says.
 6. **OpenAPI.** `.venv/bin/python scripts/export_openapi.py`, commit `apps/api/openapi.json`,

@@ -17,7 +17,16 @@ const pick = (decision: string): IdeaPick => ({
 const sessions = (n: number | null) => ({
   name: IDEA_FACTS.sessionsToEarnings,
   value: n,
-  unknown: n === null ? { code: 'NULL' as const, detail: 'no report date' } : null,
+  unknown:
+    n === null
+      ? {
+          code: 'NULL' as const,
+          kind: 'NOT_STORED' as const,
+          guideTerm: 'unavailable_not_stored',
+          kindText: 'not available for this instrument',
+          cause: null,
+        }
+      : null,
   info: { format: 'NUMBER' as const },
 });
 const idea = (symbol: string, decision: string, days: number | null): Idea => ({

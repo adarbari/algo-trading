@@ -2,12 +2,14 @@
 selection audit, data versions, rebalances, equity curve and fills)."""
 
 import datetime as dt
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from strawberry.scalars import JSON
 
+from algotrade.services.read.availability.cause import public_audit
 from algotrade.services.read.ops import backtests
+from algotrade_api.graphql.permissions import AdminCause
 
 
 @strawberry.type(
@@ -74,6 +76,11 @@ class Fill:
         )
 
 
+def _public(_: object, document: Any) -> JSON:
+    """A trader's copy of a stored document: without the tables a run went without (ADR 0056)."""
+    return JSON(public_audit(document))
+
+
 @strawberry.type(
     description="A saved run with its config hash, selection audit, `data` (as_of, "
     "data_versions, reference_snapshot, survivorship_bias), rebalance evaluations, equity "
@@ -82,9 +89,11 @@ class Fill:
 class BacktestDetail:
     summary: Backtest
     config_hash: str | None
-    selection: JSON
-    data: JSON
-    rebalances: list[JSON]
+    selection: JSON = strawberry.field(extensions=[AdminCause(public=_public)])
+    data: JSON = strawberry.field(extensions=[AdminCause(public=_public)])
+    rebalances: list[JSON] = strawberry.field(
+        extensions=[AdminCause(public=lambda _, found: [_public(_, r) for r in found])]
+    )
     equity: list[EquityPoint]
     fills: list[Fill]
 

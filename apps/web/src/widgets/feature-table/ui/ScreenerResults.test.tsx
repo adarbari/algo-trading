@@ -6,6 +6,13 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { ScreenerResults, type ScreenerResultsProps } from './ScreenerResults';
 
+type Gap = {
+  kind: 'SYSTEM' | 'NOT_STORED';
+  features: string[];
+  guideTerm: string;
+  cause: null;
+};
+
 const hooks = vi.hoisted(() => ({
   useScreenerResults: vi.fn(),
   useTableView: vi.fn(),
@@ -74,7 +81,7 @@ const result = (rank: number, symbol: string, decision: string, change: string |
 
 function served(total = 2) {
   return {
-    session: { date: '2026-10-02', missing: [] },
+    session: { date: '2026-10-02', unavailable: [] },
     screener: {
       id: 'vrp',
       name: 'VRP',
@@ -90,8 +97,7 @@ function served(total = 2) {
         previousSession: '2026-10-01',
         status: 'complete',
         coverage: 'COMPLETE',
-        missingTables: [] as string[],
-        missingOptionalTables: [] as string[],
+        unavailable: [] as Gap[],
         regime: 'STRESS',
         paused: 1,
         decisions: [
@@ -109,7 +115,7 @@ function served(total = 2) {
           total,
           page: 1,
           size: 100,
-          missing: [],
+          unavailable: [] as Gap[],
           columns: [
             {
               name: CLOSE,
@@ -125,6 +131,8 @@ function served(total = 2) {
           rows: [[71.5], [null]],
           unknown: [[null], ['NO_ROW']],
           reasons: [[null], [null]],
+          kinds: [[null], ['NOT_STORED']],
+          kindTexts: [{ kind: 'NOT_STORED' as const, text: 'not available for this instrument' }],
           results: [result(1, 'AAPL', 'QUALIFIED', 'new'), result(2, 'KO', 'WATCH')],
         },
       },
@@ -229,36 +237,55 @@ describe('ScreenerResults', () => {
     expect(screen.getByText('Regime: not recorded for this run')).toBeVisible();
   });
 
-  // 2026-10-07: breakout's PARTIAL run lacked trend_stats, relative_strength and vol_stats when
-  // it ran; the banner named only the session's missing tables read now (fund_reference, ibkr_iv).
-  it("names a PARTIAL run's own missing tables apart from the session's", () => {
+  // 2026-10-07: breakout's PARTIAL run lacked trend_stats and vol_stats when it ran; the note
+  // named only what the session lacks as read now. Now each is told by kind, never by table.
+  it("tells a PARTIAL run's own gaps apart from the session's, by kind", () => {
     const base = served();
     hooks.useScreenerResults.mockReturnValue(
       fakeQuery({
         ...base,
-        session: { date: '2026-10-02', missing: ['fund_reference@v1'] },
+        session: {
+          date: '2026-10-02',
+          unavailable: [
+            {
+              kind: 'NOT_STORED' as const,
+              features: ['rollup.fund_reference@v1.aum'],
+              guideTerm: 'unavailable_not_stored',
+              kindText: 'not available for this instrument',
+              cause: null,
+            },
+          ],
+        },
         screener: {
           ...base.screener,
           latestRun: {
             ...base.screener.latestRun,
             status: 'partial',
             coverage: 'PARTIAL',
-            missingTables: ['rollups/instrument/trend_stats@v2', 'rollups/instrument/vol_stats@v1'],
+            unavailable: [
+              {
+                kind: 'SYSTEM' as const,
+                features: ['rollup.trend_stats@v2.trend', 'rollup.vol_stats@v1.vol'],
+                guideTerm: 'unavailable_system',
+                kindText: 'not available because of a system error',
+                cause: null,
+              },
+            ],
           },
         },
       }),
     );
     setup();
     expect(
-      screen.getByText(
-        'The run for 2026-10-02 is PARTIAL, run without trend_stats@v2, vol_stats@v1; Run now re-runs it.',
-      ),
+      screen.getByText('The run for 2026-10-02 is PARTIAL; Run now re-runs it.'),
     ).toBeVisible();
-    expect(screen.getByText(/Not stored for 2026-10-02: fund_reference@v1\./)).toBeVisible();
+    expect(screen.getByText('Not available: system error')).toBeVisible();
+    expect(screen.getByText('Not available for this instrument')).toBeVisible();
+    expect(screen.queryByText(/rollups\//)).toBeNull();
   });
 
   // ADR 0055: a COMPLETE run without ibkr_iv (IB Gateway down) looked clean on the page.
-  it('warns that a COMPLETE run ran without an optional source table', () => {
+  it('warns, by kind, that a COMPLETE run ran without an optional source', () => {
     const base = served();
     hooks.useScreenerResults.mockReturnValue(
       fakeQuery({
@@ -267,14 +294,21 @@ describe('ScreenerResults', () => {
           ...base.screener,
           latestRun: {
             ...base.screener.latestRun,
-            missingOptionalTables: ['rollups/instrument/ibkr_iv@v1'],
+            unavailable: [
+              {
+                kind: 'SYSTEM' as const,
+                features: ['rollup.ibkr_iv@v1.iv_rank'],
+                guideTerm: 'unavailable_system',
+                kindText: 'not available because of a system error',
+                cause: null,
+              },
+            ],
           },
         },
       }),
     );
     setup();
-    expect(screen.getByText('Optional data missing')).toBeVisible();
-    expect(screen.getByText('The run for 2026-10-02 had no ibkr_iv@v1.')).toBeVisible();
+    expect(screen.getByText('Not available: system error')).toBeVisible();
     expect(screen.queryByText('Partial run')).toBeNull();
   });
 

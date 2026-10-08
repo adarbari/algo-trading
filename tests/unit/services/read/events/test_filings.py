@@ -27,7 +27,7 @@ def test_a_company_with_no_filing_known_is_unknown() -> None:
     found, gaps = load_filings(context(store_with()), ["EQ:AAA", "EQ:BBB"], 24)
     assert found["EQ:BBB"] == ()
     assert gaps["EQ:BBB"].code is UnknownCode.NO_ROW
-    assert "event-study scope only" in gaps["EQ:BBB"].detail
+    assert "event-study scope only" in gaps["EQ:BBB"].cause.text
     assert "EQ:AAA" not in gaps
 
 

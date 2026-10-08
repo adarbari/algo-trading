@@ -130,7 +130,17 @@ export async function mockBuilderApi(
         ? { ...results, screener }
         : {
             ...results,
-            screener: { ...screener, latestRun: null, notRun: { code: 'NOT_RUN', detail: '' } },
+            screener: {
+              ...screener,
+              latestRun: null,
+              notRun: {
+                code: 'NOT_RUN',
+                kind: 'NOT_RUN',
+                guideTerm: 'not_run',
+                kindText: 'not run for this session',
+                cause: null,
+              },
+            },
           };
     }
     if (name === 'TableView') {

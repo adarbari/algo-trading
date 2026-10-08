@@ -33,6 +33,11 @@ from algotrade.services.explaining.cache import open_text_cache
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
+from algotrade.services.read.availability.cause import (
+    GENERIC_REASONS,
+    UnavailableKind,
+    names_a_table,
+)
 from algotrade.services.read.context import (
     NotFoundError,
     ReadContext,
@@ -46,7 +51,7 @@ from algotrade_api import __version__
 from algotrade_api.auth.local import LocalAuthenticator
 from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
-from algotrade_api.deps import ApiSettings, ReadStore, get_caller
+from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.graphql.schema import graphql_router, sdl
 from algotrade_api.live import no_live, open_live
 from algotrade_api.ops.build import api_stamp
@@ -59,11 +64,19 @@ TITLE = "algotrade API"
 
 
 def _not_found(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
+    """404 with the text for an admin; for anyone else the data behind a missing table or a
+    stored table's path is "not available because of a system error" (ADR 0056)."""
+    text = str(exc)
+    if (isinstance(exc, MissingDataError) or names_a_table(text)) and not is_admin_request(request):
+        text = GENERIC_REASONS[UnavailableKind.SYSTEM]
+    return JSONResponse(status_code=404, content={"detail": text})
 
 
 def _bad_request(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    text = str(exc)
+    if names_a_table(text) and not is_admin_request(request):
+        text = GENERIC_REASONS[UnavailableKind.SYSTEM]
+    return JSONResponse(status_code=400, content={"detail": text})
 
 
 def _conflict(request: Request, exc: Exception) -> JSONResponse:

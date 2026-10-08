@@ -29,6 +29,8 @@ from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.reference import load_universe
 from algotrade.features.framework.feature import NullReason
 from algotrade.services.features import field_view
+from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
+from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import NotFoundError, ReadContext, catalogue_key
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import cell_codes, load_feature_values
@@ -75,7 +77,8 @@ class FeatureTable:
     rows come from (None with ``keys`` or when none is stored; ``pre_snapshot``: one taken after
     the session). ``missing``: the tables the filters and the sort read that have nothing
     for the session (their fields are unknown, so no row passes a filter on them and the sort
-    puts every row last); the nightly tables missing for it: ``session.missing``."""
+    puts every row last), and ``unavailable`` what they leave out in public words (ADR 0056); the
+    nightly tables missing for the session: ``session.unavailable``."""
 
     session: Session
     universe_snapshot: date | None
@@ -85,11 +88,13 @@ class FeatureTable:
     rows: tuple[tuple[Scalar, ...], ...]
     unknown: tuple[tuple[UnknownCode | None, ...], ...]
     reasons: tuple[tuple[NullReason | None, ...], ...]  # the NullReason of each EXPLAINED cell
+    kinds: tuple[tuple[UnavailableKind | None, ...], ...]  # the public kind of each UNKNOWN cell
     sort: str | None
     total: int
     page: int
     size: int
     missing: tuple[str, ...]
+    unavailable: tuple[Unavailable, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -276,9 +281,11 @@ def load_table(
         rows=tuple(tuple(v.value for v in cells.get(i, ())) for i in shown),
         unknown=codes[0],
         reasons=codes[1],
+        kinds=codes[2],
         sort=order,
         total=len(ordered),
         page=page,
         size=size,
         missing=order_.missing,
+        unavailable=unavailable_tables(order_.missing, ctx.session.date),
     )

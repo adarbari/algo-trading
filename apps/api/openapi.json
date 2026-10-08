@@ -79,6 +79,60 @@
         "title": "BuildStamp",
         "type": "object"
       },
+      "CauseLink": {
+        "properties": {
+          "level": {
+            "description": "SOURCE, STEP, TABLE, FEATURE or RUN",
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "subject",
+          "status",
+          "message",
+          "run_id",
+          "session"
+        ],
+        "title": "CauseLink",
+        "type": "object"
+      },
       "CheckBody": {
         "properties": {
           "expr": {
@@ -360,14 +414,6 @@
             "title": "Licence",
             "type": "string"
           },
-          "missing": {
-            "description": "the inputs' tables with no partition for the session (their values UNKNOWN)",
-            "items": {
-              "type": "string"
-            },
-            "title": "Missing",
-            "type": "array"
-          },
           "non_null": {
             "title": "Non Null",
             "type": "integer"
@@ -400,6 +446,14 @@
             "description": "num, bool, str or date",
             "title": "Type",
             "type": "string"
+          },
+          "unavailable": {
+            "description": "what the inputs' tables with no partition for the session leave out",
+            "items": {
+              "$ref": "#/components/schemas/Unavailable"
+            },
+            "title": "Unavailable",
+            "type": "array"
           }
         },
         "required": [
@@ -410,7 +464,6 @@
           "inputs",
           "licence",
           "session",
-          "missing",
           "rows",
           "non_null",
           "sample"
@@ -536,6 +589,8 @@
             "type": "string"
           },
           "tables": {
+            "admin_cause": [],
+            "description": "the stored tables (admins only: empty for anyone else, ADR 0056)",
             "items": {
               "type": "string"
             },
@@ -614,6 +669,7 @@
             "type": "boolean"
           },
           "detail": {
+            "admin_cause": "generic",
             "anyOf": [
               {
                 "type": "string"
@@ -622,7 +678,7 @@
                 "type": "null"
               }
             ],
-            "description": "why the stored chain was served",
+            "description": "why the stored chain was served (admins; anyone else: generic words)",
             "title": "Detail"
           },
           "expiry": {
@@ -1017,14 +1073,6 @@
             "title": "Min Coverage",
             "type": "number"
           },
-          "missing_tables": {
-            "description": "tables with no rows for the session",
-            "items": {
-              "type": "string"
-            },
-            "title": "Missing Tables",
-            "type": "array"
-          },
           "pre_snapshot": {
             "description": "the reference snapshot is after the session",
             "title": "Pre Snapshot",
@@ -1041,7 +1089,8 @@
           },
           "selection": {
             "additionalProperties": true,
-            "description": "the selection's audit",
+            "admin_cause": "audit",
+            "description": "the selection's audit (without the tables it went without, unless an admin)",
             "title": "Selection",
             "type": "object"
           },
@@ -1049,6 +1098,14 @@
             "description": "always 0 for a rule screen; kept for stored runs",
             "title": "Skipped",
             "type": "integer"
+          },
+          "unavailable": {
+            "description": "what the tables with no rows for the session leave out, in public words",
+            "items": {
+              "$ref": "#/components/schemas/Unavailable"
+            },
+            "title": "Unavailable",
+            "type": "array"
           },
           "universe_snapshot": {
             "format": "date",
@@ -1065,7 +1122,6 @@
           "coverage_pct",
           "min_coverage",
           "selection",
-          "missing_tables",
           "pre_snapshot",
           "universe_snapshot"
         ],
@@ -1698,6 +1754,56 @@
           "decisions"
         ],
         "title": "TableViewBody",
+        "type": "object"
+      },
+      "Unavailable": {
+        "properties": {
+          "cause": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CauseLink"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the chain behind it, root cause first (admins only: null for anyone else)",
+            "title": "Cause"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "guide_term": {
+            "description": "the Guide glossary term that explains the kind",
+            "title": "Guide Term",
+            "type": "string"
+          },
+          "kind": {
+            "description": "SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_RUN",
+            "title": "Kind",
+            "type": "string"
+          },
+          "kind_text": {
+            "description": "the kind in generic words",
+            "title": "Kind Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "features",
+          "guide_term",
+          "kind_text",
+          "cause"
+        ],
+        "title": "Unavailable",
         "type": "object"
       },
       "UserFeatureBody": {

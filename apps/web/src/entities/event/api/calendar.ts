@@ -40,8 +40,19 @@ const EventCalendar = graphql(`
         part
         unknown {
           code
-          detail
           reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
       }
       missing

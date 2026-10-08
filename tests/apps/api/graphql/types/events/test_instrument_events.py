@@ -11,7 +11,7 @@ STUDY = """query($key: String!, $days: Int) {
     filings { accepted form items label }
     ladder { expiry days clear marked spans { date kind label } }
     reference { instrumentId symbol kind source status }
-    gaps { instrumentId part unknown { code detail } }
+    gaps { instrumentId part unknown { code kind } }
   } }
 }"""
 

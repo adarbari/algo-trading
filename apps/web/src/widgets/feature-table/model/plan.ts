@@ -79,8 +79,3 @@ export function resultsPlan({
 export function pageCount(total: number, size: number): number {
   return Math.max(1, Math.ceil(total / Math.max(1, size)));
 }
-
-/** The tables named in the session's `missing`, without the rollup prefix. */
-export function missingTables(missing: readonly string[]): string[] {
-  return missing.map((table) => table.replace(/^rollups\/instrument\//, ''));
-}

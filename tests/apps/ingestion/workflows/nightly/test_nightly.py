@@ -160,6 +160,7 @@ def test_a_failed_critical_step_holds_back_its_dependents_only(
         "critical": True,
         "duration_s": 0.0,
         "reason": "needs earnings (FAILED)",
+        "tables": list(registry.TASKS["rollups"].tables),  # a held step still names what it writes
     }
     assert steps["screens"]["status"] == "NOT_RUN"
     assert calls.sessions("rollups") == [] and calls.sessions("purge-raw") == [D]
@@ -168,6 +169,17 @@ def test_a_failed_critical_step_holds_back_its_dependents_only(
     assert record.status is RunStatus.FAILED and record.items["rollups"] == "NOT_RUN"
     assert "earnings: RuntimeError: earnings broke" in record.stats["failed_because"][0]
     assert last_done(writer) is None  # a FAILED session is retried
+
+
+def test_every_recorded_step_names_the_tables_its_task_writes(fake: Callable[..., Calls]) -> None:
+    """The record's ``tables`` is what ``availability.explain`` follows from a table with no
+    rows to the step behind it (ADR 0056); a step that is not a registry task records none."""
+    fake()
+    steps = steps_of(run_nightly(task_ctx(store()), Plan([D])))
+    for name, step in steps.items():
+        spec = registry.TASKS.get(name)
+        assert step.get("tables", []) == (list(spec.tables) if spec else [])
+    assert steps["rollups"]["tables"] and "tables" not in steps[SCREENS]
 
 
 def test_an_optional_step_failing_is_a_warning(fake: Callable[..., Calls]) -> None:

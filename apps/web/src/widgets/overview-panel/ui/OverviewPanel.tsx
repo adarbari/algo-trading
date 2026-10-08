@@ -4,11 +4,10 @@
  * and grouped key facts (size, price range, dividends, options, earnings dates), all from one
  * GraphQL read (`useInstrumentFacts`), then "In rough markets": beta to SPY and the drawdown
  * in each reference episode (`model/rough-markets.ts`). A value the session does not have says
- * why (UNKNOWN and its reason); the nightly tables missing for the session are named in a
+ * why (UNKNOWN and its reason); what the nightly tables missing for the session leave out is told by kind in a
  * banner. An ETF also shows the `fund` section the page passes in (its holdings).
  */
 import {
-  Banner,
   Chip,
   formatValue,
   Grid,
@@ -22,6 +21,8 @@ import {
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 
+import { featureTitle } from '@/entities/feature';
+import { UnavailableNote } from '@/entities/availability';
 import { useInstrumentEvents, useInstrumentFacts } from '@/entities/instrument';
 import { useRegimeEpisodes } from '@/entities/regime';
 
@@ -29,7 +30,6 @@ import {
   earningsGroup,
   factGroups,
   headlineStats,
-  missingTables,
   OVERVIEW_FEATURES,
   profileOf,
   valuesOf,
@@ -69,7 +69,6 @@ export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
   }, [facts.data, events.data, episodes.data, episodes.isPending]);
   const session = facts.data?.session;
   const profile = view?.profile;
-  const missing = missingTables(session?.missing ?? []);
   const day = session ? formatValue(session.date, { kind: 'date' }).text : '';
   const state = facts.isError
     ? 'error'
@@ -92,11 +91,7 @@ export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
       >
         {view && profile && (
           <Stack gap={4}>
-            {missing.length > 0 && (
-              <Banner tone="warning" title="Partial session">
-                Not stored for {day}: {missing.join(', ')}. Values from these tables read Unknown.
-              </Banner>
-            )}
+            <UnavailableNote gaps={session?.unavailable ?? []} titleOf={featureTitle} />
             <Stack gap={2}>
               <Stack direction="row" gap={2} wrap>
                 <Chip label={profile.kind} />

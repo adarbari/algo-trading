@@ -46,7 +46,7 @@ const value = (name: string, v: unknown, format: string, unit: string | null = n
 const session = {
   date: '2026-10-02',
   isLatest: true,
-  missing: [],
+  unavailable: [],
   referenceSnapshot: '2026-10-02',
   preSnapshot: false,
 };
@@ -71,7 +71,13 @@ const stock = {
     {
       name: 'rollup.earnings@v1.next_earnings_date',
       value: null,
-      unknown: { code: 'NULL', detail: 'null for EQ:KO on 2026-10-02' },
+      unknown: {
+        code: 'NULL',
+        kind: 'NOT_STORED',
+        guideTerm: 'unavailable_not_stored',
+        kindText: 'not available for this instrument',
+        cause: null,
+      },
       info: info('DATE'),
     },
     value('rollup.earnings@v1.last_earnings_date', '2026-08-27', 'DATE'),
@@ -82,7 +88,13 @@ const stock = {
     {
       name: 'rollup.episode_behaviour@v1.dd_covid_2020',
       value: null,
-      unknown: { code: 'NO_PARTITION', detail: 'rollups/instrument/episode_behaviour@v1' },
+      unknown: {
+        code: 'NO_PARTITION',
+        kind: 'SYSTEM',
+        guideTerm: 'unavailable_system',
+        kindText: 'not available because of a system error',
+        cause: null,
+      },
       info: info('PERCENT', 'decimal'),
     },
   ],
@@ -164,7 +176,9 @@ describe('OverviewPanel', () => {
   it('reads Unknown with the reason for an episode the session has no partition for', () => {
     render(<OverviewPanel symbol="KO" />);
     const rough = screen.getByLabelText('In rough markets');
-    expect(rough).toHaveTextContent('Covid crash, early 2020not stored for this session');
+    expect(rough).toHaveTextContent(
+      'Covid crash, early 2020not available because of a system error',
+    );
     expect(rough).toHaveTextContent('Unknown');
   });
 
@@ -182,15 +196,26 @@ describe('OverviewPanel', () => {
     expect(screen.queryByText('In rough markets')).not.toBeInTheDocument();
   });
 
-  it('names the nightly tables the session is missing', () => {
+  it('tells what the session is missing, by kind', () => {
     hooks.useInstrumentFacts.mockReturnValue(
       fakeQuery({
-        session: { ...session, missing: ['rollups/instrument/earnings@v1'] },
+        session: {
+          ...session,
+          unavailable: [
+            {
+              kind: 'SYSTEM',
+              features: ['rollup.earnings@v1.next_earnings_date'],
+              guideTerm: 'unavailable_system',
+              kindText: 'not available because of a system error',
+              cause: null,
+            },
+          ],
+        },
         instrument: stock,
       }),
     );
     render(<OverviewPanel symbol="KO" />);
-    expect(screen.getByText(/Not stored for 2 Oct 2026: earnings@v1/)).toBeInTheDocument();
+    expect(screen.getByText('Not available: system error')).toBeInTheDocument();
   });
 
   it('says so when there is no description, and shows no fund section for a stock', () => {

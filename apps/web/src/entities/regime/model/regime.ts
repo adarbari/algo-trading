@@ -4,6 +4,8 @@
  * `bands` prop. The browser derives nothing: the label, the sentence, the scores and each
  * indicator's verdict come from the server; this file only chooses words and tones for them.
  */
+import type { ServedUnknown } from '@/entities/availability';
+
 import {
   formatValue,
   type ChartBand,
@@ -16,11 +18,8 @@ import type { gqlTypes } from '@/shared/api';
 
 export type RegimeLabel = gqlTypes.RegimeLabel;
 
-/** A value the server could not give for the session, with its reason. */
-export interface RegimeUnknown {
-  code: string;
-  detail: string;
-}
+/** A value the server could not give for the session: its public kind and, for an admin, the cause. */
+export type RegimeUnknown = ServedUnknown;
 
 export interface RegimeScore {
   value: number | null;

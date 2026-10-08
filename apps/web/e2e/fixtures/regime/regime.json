@@ -6,14 +6,20 @@
       "headline": "Not computed yet",
       "unknownReason": {
         "code": "NO_PARTITION",
-        "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
+        "kind": "SYSTEM",
+        "guideTerm": "unavailable_system",
+        "kindText": "not available because of a system error",
+        "cause": null
       },
       "scores": {
         "macroRisk": {
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "feature": "market.regime@v3.macro_risk",
           "coverageFeature": "market.regime@v3.macro_coverage",
@@ -23,7 +29,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "feature": "market.regime@v3.market_stress",
           "coverageFeature": "market.regime@v3.market_coverage",
@@ -33,7 +42,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "feature": "market.regime@v3.fragility",
           "coverageFeature": null,
@@ -118,7 +130,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "PERCENT",
           "status": "UNKNOWN",
@@ -225,7 +240,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "PERCENT",
           "status": "UNKNOWN",
@@ -310,7 +328,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "PERCENT",
           "status": "UNKNOWN",
@@ -395,7 +416,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "PERCENT",
           "status": "UNKNOWN",
@@ -488,7 +512,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "NUMBER",
           "status": "UNKNOWN",
@@ -569,7 +596,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "PERCENT",
           "status": "UNKNOWN",
@@ -682,7 +712,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "NUMBER",
           "status": "UNKNOWN",
@@ -781,7 +814,10 @@
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
           },
           "format": "PERCENT",
           "status": "UNKNOWN",

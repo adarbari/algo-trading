@@ -17,12 +17,13 @@ import {
   type DataTableColumn,
 } from '@algotrade/ui';
 
+import { cellText, cellWord } from '@/entities/availability';
 import { DecisionBadge, OUTCOME_FILL, ScoreBreakdown, decisionLabel } from '@/entities/screen';
 import { feature } from '@/shared/api';
 
 import { featureLabel, featureMarks, unitLabel } from './catalogue';
 import type { ColumnInfo, TableRow } from './table';
-import { codeReason, shownValue, unknownLabel, valueFormat } from './value';
+import { shownValue, valueFormat } from './value';
 
 /**
  * What a field column's help button opens: the field's Guide entry. The widget that renders the
@@ -111,9 +112,15 @@ export function featureColumn(
         return (
           <Text
             tone="muted"
-            title={codeReason(cell?.unknown ?? null, info.nullMeaning, cell?.reason)}
+            title={cellText(
+              cell?.kind,
+              cell?.unknown,
+              cell?.kindText,
+              info.nullMeaning,
+              cell?.reason,
+            )}
           >
-            {unknownLabel(cell?.unknown ?? null, cell?.reason)}
+            {cellWord(cell?.kind, cell?.unknown, cell?.reason)}
           </Text>
         );
       }

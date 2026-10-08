@@ -3,9 +3,9 @@
     "session": {
       "date": "2026-10-02",
       "isLatest": true,
-      "missing": [],
       "referenceSnapshot": "2026-10-02",
-      "preSnapshot": false
+      "preSnapshot": false,
+      "unavailable": []
     },
     "instrument": {
       "instrumentId": "EQ:BBG000B9XRY4",
@@ -44,7 +44,10 @@
           "value": null,
           "unknown": {
             "code": "NULL",
-            "detail": "instrument.website is null for EQ:BBG000B9XRY4 on 2026-10-02"
+            "kind": "NOT_STORED",
+            "guideTerm": "unavailable_not_stored",
+            "kindText": "not available for this instrument",
+            "cause": null
           },
           "info": {
             "format": "TEXT",
@@ -113,7 +116,10 @@
           "value": null,
           "unknown": {
             "code": "NULL",
-            "detail": "instrument.tracks is null for EQ:BBG000B9XRY4 on 2026-10-02"
+            "kind": "NOT_STORED",
+            "guideTerm": "unavailable_not_stored",
+            "kindText": "not available for this instrument",
+            "cause": null
           },
           "info": {
             "format": "TEXT",

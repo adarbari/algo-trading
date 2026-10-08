@@ -22,7 +22,7 @@ IDEAS = """query Ideas($limit: Int!, $names: [FeatureName!]!, $date: Date) {
     screeners {
       screener { id owner scope name version latestRun { runId } notRun { code } }
       run { runId status configVersion picked paused regime decisions { decision count } }
-      notRun { code detail }
+      notRun { code kind }
       picked
       top { rank instrumentId instrument { symbol } }
     }

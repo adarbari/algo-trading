@@ -27,9 +27,11 @@ describe('RegimeHeadline', () => {
   it('shows why each score and the regime are unknown instead of a number', () => {
     render(<RegimeHeadline regime={unknownRegimeFixture()} />);
     expect(screen.getByRole('heading', { level: 3, name: 'Not computed' })).toBeVisible();
-    expect(screen.getByText('The regime is not in the catalogue yet.')).toBeVisible();
+    expect(screen.getAllByText('not available because of a system error')[0]).toBeVisible();
     expect(
-      screen.getByRole('img', { name: /Slow-warning score: unknown. regime not built/ }),
+      screen.getByRole('img', {
+        name: /Slow-warning score: unknown. not available because of a system error/,
+      }),
     ).toBeVisible();
     expect(screen.queryByRole('meter')).toBeNull();
   });

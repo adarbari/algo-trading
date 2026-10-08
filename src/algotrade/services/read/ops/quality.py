@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext, partition
 from algotrade.services.read.values import Unknown, UnknownCode, stored_values
 
@@ -49,7 +50,8 @@ def load_quality(ctx: ReadContext) -> QualityReport:
     day = ctx.session.date
     found = ctx.reader.runs(QUALITY, day)
     if not found:
-        absent = Unknown(UnknownCode.NOT_RUN, f"no {QUALITY} run for {day.isoformat()}")
+        message = f"no {QUALITY} run for {day.isoformat()}"
+        absent = Unknown(UnknownCode.NOT_RUN, run_cause(QUALITY, message, day))
         return QualityReport(day, None, None, None, (), absent)
     run = max(found, key=lambda r: r.started_at)
     stored = run.stats.get("checks")

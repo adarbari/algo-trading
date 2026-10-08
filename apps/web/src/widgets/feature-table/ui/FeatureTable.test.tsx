@@ -33,7 +33,7 @@ const EARN = 'rollup.earnings@v1.days_to_earnings';
 function served(patch: Partial<FeatureTableData> = {}): FeatureTableData {
   return {
     session: '2026-10-02',
-    missing: [],
+    unavailable: [],
     preSnapshot: false,
     columns: [
       {
@@ -166,9 +166,22 @@ describe('FeatureTable', () => {
     expect(screen.getAllByText(/Nothing stored yet/).length).toBeGreaterThan(0);
   });
 
-  it('names the tables the session is missing', () => {
+  it('tells what the session is missing, by kind', () => {
     hooks.useFeatureTable.mockReturnValue(
-      fakeQuery(served({ missing: ['rollups/instrument/earnings@v1'], preSnapshot: true })),
+      fakeQuery(
+        served({
+          unavailable: [
+            {
+              kind: 'SYSTEM',
+              features: ['rollup.earnings@v1.days_to_earnings'],
+              guideTerm: 'unavailable_system',
+              kindText: 'not available because of a system error',
+              cause: null,
+            },
+          ],
+          preSnapshot: true,
+        }),
+      ),
     );
     render(
       <FeatureTable
@@ -179,7 +192,8 @@ describe('FeatureTable', () => {
         emptyMessage="none"
       />,
     );
-    expect(screen.getByText(/Not stored for 2026-10-02: earnings@v1/)).toBeInTheDocument();
+    expect(screen.getByText('Not available: system error')).toBeInTheDocument();
+    expect(screen.queryByText(/rollups\//)).toBeNull();
     expect(screen.getByText(/universe snapshot is from after this session/)).toBeInTheDocument();
   });
 });

@@ -13,12 +13,12 @@ RESULTS = """query Results($id: String!, $decisions: [String!], $change: String,
   screener(id: $id, date: $date) {
     id criteria { id field mode } displayColumns { name field }
     latestRun {
-      runId session previousSession audit paused regime coverage missingTables missingOptionalTables
+      runId session previousSession audit paused regime coverage
       decisions { decision count }
       changes { change count }
       results(decisions: $decisions, change: $change, q: $q, sort: $sort, columns: $columns,
               page: $page, size: $size) {
-        runId sort total page size missing
+        runId sort total page size
         columns { name format }
         rows unknown
         results {
@@ -54,11 +54,10 @@ def test_the_run_as_a_review_table(graph: Graph) -> None:
         "QUALIFIED": 1, "WATCH": 1, "PAUSED": 1
     }  # fmt: skip
     assert (run["paused"], run["regime"]) == (1, "CAUTION")
-    assert (run["coverage"], run["missingTables"]) == (run["audit"].get("coverage"), [])
-    assert run["missingOptionalTables"] == []
+    assert run["coverage"] == run["audit"].get("coverage")
     assert run["changes"] == [{"change": "new", "count": 1}, {"change": "dropped", "count": 1}]
     page = run["results"]
-    assert (page["sort"], page["total"], page["page"], page["missing"]) == ("rank", 3, 1, [])
+    assert (page["sort"], page["total"], page["page"]) == ("rank", 3, 1)
     aaa, bbb, ccc = page["results"]
     assert (aaa["rank"], aaa["instrument"]["symbol"], aaa["decision"]) == (1, "AAA", "QUALIFIED")
     assert aaa["flags"] == ["leveraged_inverse"]

@@ -62,7 +62,9 @@ def test_a_session_without_a_partition_is_unknown() -> None:
     [value] = load_market_feature_values(_with_market(context(store_with(only_d0))), [NAMES])
     assert value.value is None and value.unknown is not None
     assert value.unknown.code is UnknownCode.NO_PARTITION
-    assert value.unknown.detail == f"{MARKET_COUNTS.table} has no partition for {D1.isoformat()}"
+    assert (
+        value.unknown.cause.text == f"{MARKET_COUNTS.table} has no partition for {D1.isoformat()}"
+    )
 
 
 def test_names_outside_the_entitys_catalogue_are_refused() -> None:

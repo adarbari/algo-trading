@@ -24,6 +24,7 @@ from algotrade.config.site.field_guide import GuideUse
 from algotrade.config.site.settings import load_field_guide
 from algotrade.core.model.fields import NUMERIC_TYPES, REFERENCE_TABLE
 from algotrade.core.model.predicates import Rule, passing
+from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
@@ -145,7 +146,9 @@ def load_distribution(ctx: ReadContext, name: str) -> FeatureDistribution:
     absent = _absent(found)
     if absent is not None or not found:
         nothing = f"{REFERENCE_TABLE} has no snapshot on or before {ctx.session.date.isoformat()}"
-        detail = absent or Unknown(UnknownCode.NO_PARTITION, nothing)
+        day = ctx.session.date
+        cause = table_cause(REFERENCE_TABLE, nothing, session=day)
+        detail = absent or Unknown(UnknownCode.NO_PARTITION, cause)
         return FeatureDistribution(name, ctx.session.date, info, 0, 0, (), (), (), detail)
     rows = [v for v in found if v.unknown is None or v.unknown.code is UnknownCode.NULL]
     present = [v.value for v in rows if v.unknown is None]

@@ -21,6 +21,7 @@ from typing import Any
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.tasks.framework.run import FAILURES, TaskContext, status_label
 from algotrade_ingestion.tasks.maintenance.quality import Check
 from algotrade_ingestion.workflows.nightly.timing import observe
@@ -113,12 +114,21 @@ class StepResult:
     task_run: str | None = None  # the registry task's run id (its staging, for a resume)
     origin: str | None = None  # the nightly attempt that produced a reused result
 
+    @property
+    def tables(self) -> tuple[str, ...]:
+        """The tables the step's registry task writes (none: not a registry task), recorded so
+        a read can say which step stands behind a table with no rows (ADR 0056)."""
+        spec = TASKS.get(self.name)
+        return spec.tables if spec is not None else ()
+
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
             "status": self.status.value,
             "critical": self.critical,
             "duration_s": self.duration_s,
         }
+        if self.tables:
+            out["tables"] = list(self.tables)
         for key in ("result", "reason", "error", "task_run", "origin"):
             if getattr(self, key) is not None:
                 out[key] = getattr(self, key)

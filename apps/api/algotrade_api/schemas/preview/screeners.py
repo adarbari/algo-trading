@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from algotrade.services.read.availability.cause import ADMIN_CAUSE, AUDIT
+from algotrade_api.schemas.availability import Unavailable
 from algotrade_api.schemas.health import Schema
 
 
@@ -90,8 +92,14 @@ class PreviewCoverage(Schema):
     skipped: int = Field(description="always 0 for a rule screen; kept for stored runs")
     coverage_pct: float = Field(description="processed / selected")
     min_coverage: float = Field(description="below this the run is PARTIAL")
-    selection: dict[str, Any] = Field(description="the selection's audit")
-    missing_tables: list[str] = Field(description="tables with no rows for the session")
+    selection: dict[str, Any] = Field(
+        description="the selection's audit (without the tables it went without, unless an admin)",
+        json_schema_extra={ADMIN_CAUSE: AUDIT},
+    )
+    unavailable: list[Unavailable] = Field(
+        default_factory=list,
+        description="what the tables with no rows for the session leave out, in public words",
+    )
     pre_snapshot: bool = Field(description="the reference snapshot is after the session")
     universe_snapshot: date
 

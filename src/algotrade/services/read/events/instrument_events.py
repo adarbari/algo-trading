@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from algotrade.data.chains import OPTION_QUOTES
+from algotrade.services.read.availability.cause import feature_cause, table_cause
 from algotrade.services.read.context import ReadContext, partition
 from algotrade.services.read.events.ahead import AheadEvent, EventGap, load_ahead, order
 from algotrade.services.read.events.filings import Filing, load_filings
@@ -58,9 +59,9 @@ def _no_chain(ctx: ReadContext, underlying_id: str) -> Unknown:
     if isinstance(found, Unknown):
         return found
     day = ctx.session.date.isoformat()
-    return Unknown(
-        UnknownCode.NO_ROW, f"{OPTION_QUOTES} has no quotes of {underlying_id} for {day}"
-    )
+    message = f"{OPTION_QUOTES} has no quotes of {underlying_id} for {day}"
+    cause = table_cause(OPTION_QUOTES, message, "NO_ROW", ctx.session.date)
+    return Unknown(UnknownCode.NO_ROW, cause, None, ctx.kind_of(UnknownCode.NO_ROW, OPTION_QUOTES))
 
 
 def load_instrument_events(
@@ -88,7 +89,8 @@ def load_instrument_events(
         gaps = [*ahead.gaps[iid], *ahead.market_gaps]
         if known[iid].is_etf:
             detail = f"{iid} is a fund: funds file no 8-Ks"
-            gaps.append(EventGap(iid, FILINGS, Unknown(UnknownCode.NOT_APPLICABLE, detail)))
+            cause = feature_cause(FILINGS, detail, "NOT_APPLICABLE", day)
+            gaps.append(EventGap(iid, FILINGS, Unknown(UnknownCode.NOT_APPLICABLE, cause)))
         elif iid in no_filings:
             gaps.append(EventGap(iid, FILINGS, no_filings[iid]))
         chain = chains.get(iid)

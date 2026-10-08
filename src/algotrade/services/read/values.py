@@ -2,11 +2,12 @@
 the UNKNOWN vocabulary a value missing for the session carries (ADR 0036, ADR 0037).
 
 A value that is not there is never silently ``None``: it comes with an ``Unknown`` saying why
-(``UnknownCode``) and where (``detail`` names the table and the session)."""
+(``UnknownCode``, whose public ``kind`` a trader reads) and where (``cause`` names the table
+and the session: admin-only, ADR 0056)."""
 
 import math
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
@@ -15,9 +16,23 @@ import pandas as pd
 
 from algotrade.core.views.feature_view import FeatureValue
 from algotrade.features.framework.feature import NullReason
+from algotrade.services.read.availability.cause import (
+    GENERIC_REASONS,
+    GUIDE_TERMS,
+    Cause,
+    UnavailableKind,
+)
 from algotrade.storage.tables.schemas import COMMON
 
-__all__ = ["NullReason", "Unknown", "UnknownCode", "records", "stored_values", "to_scalar"]
+__all__ = [
+    "KIND_OF_CODE",
+    "NullReason",
+    "Unknown",
+    "UnknownCode",
+    "records",
+    "stored_values",
+    "to_scalar",
+]
 
 
 class UnknownCode(StrEnum):
@@ -35,15 +50,46 @@ class UnknownCode(StrEnum):
     EXPLAINED = "EXPLAINED"  # the null is a fact: ``Unknown.reason`` says which (ADR 0046)
 
 
+# The public kind of each code: all a trader is told (ADR 0056); the chain is ``Unknown.cause``.
+KIND_OF_CODE: dict[UnknownCode, UnavailableKind] = {
+    UnknownCode.NO_PARTITION: UnavailableKind.SYSTEM,
+    UnknownCode.NO_ROW: UnavailableKind.NOT_STORED,
+    UnknownCode.NULL: UnavailableKind.NOT_STORED,
+    UnknownCode.NOT_IN_CATALOGUE: UnavailableKind.NOT_STORED,
+    UnknownCode.LICENCE: UnavailableKind.LICENCE,
+    UnknownCode.NOT_RUN: UnavailableKind.NOT_RUN,
+    UnknownCode.PRE_SNAPSHOT: UnavailableKind.NOT_STORED,
+    UnknownCode.NOT_APPLICABLE: UnavailableKind.NOT_APPLICABLE,
+    UnknownCode.ILLIQUID: UnavailableKind.ILLIQUID,
+    UnknownCode.EXPLAINED: UnavailableKind.NOT_APPLICABLE,
+}
+
+
 @dataclass(frozen=True)
 class Unknown:
-    """A value that is not known for the session, with the reason and where it was looked for
-    (``"rollups/instrument/earnings@v1 has no partition for 2026-10-03"``). ``reason`` is set
-    exactly when ``code`` is EXPLAINED."""
+    """A value that is not known for the session, with the reason and, for an admin, where it
+    was looked for (``cause``: the leaf, e.g. a TABLE link "rollups/instrument/earnings@v1 has
+    no partition for 2026-10-03"; ``explain`` expands it). ``reason`` is set exactly when
+    ``code`` is EXPLAINED."""
 
     code: UnknownCode
-    detail: str
+    cause: Cause
     reason: NullReason | None = None
+    # The public kind of the gap and its Guide term: all a trader is told. ``kind`` defaults to
+    # the code's (``KIND_OF_CODE``); a site that knows the table passes ``ctx.kind_of(...)``,
+    # which makes a gap behind a failed or missing table SYSTEM (ADR 0056).
+    kind: UnavailableKind = field(default=None)  # type: ignore[assignment]
+    guide_term: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if self.kind is None:
+            object.__setattr__(self, "kind", KIND_OF_CODE[self.code])  # type: ignore[unreachable]
+        object.__setattr__(self, "guide_term", GUIDE_TERMS[self.kind])
+
+    @property
+    def public_reason(self) -> str:
+        """The generic words for ``kind``: never a table, vendor, step or error text."""
+        return GENERIC_REASONS[self.kind]
 
 
 def to_scalar(value: Any) -> FeatureValue:

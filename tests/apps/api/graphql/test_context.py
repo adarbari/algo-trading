@@ -4,6 +4,8 @@ resolve a session from."""
 
 from datetime import date
 
+from fastapi import Request
+
 from algotrade.config.site.users import Role, UserRecord
 from algotrade.config.user import UserContext
 from algotrade.services.read.context import NotFoundError, ReadContext, StoreContext
@@ -26,7 +28,10 @@ def test_one_read_context_per_date_per_request(ctx: ReadContext) -> None:
     assert request.read(None) is first and request.viewer == ANA
     request.read(date(2022, 11, 22))
     assert opened == [("ana", None), ("ana", date(2022, 11, 22))]  # always as the caller
-    assert context_getter(opener)(ANA) is not context_getter(opener)(ANA)  # fresh per request
+    get = context_getter(opener)
+    asked = Request({"type": "http", "headers": []})
+    assert get(ANA, asked) is not get(ANA, asked)  # fresh per request
+    assert asked.state.viewer == ANA  # the error words read the role from here
 
 
 def test_nothing_stored_is_none() -> None:

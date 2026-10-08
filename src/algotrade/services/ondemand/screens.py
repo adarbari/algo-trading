@@ -19,7 +19,7 @@ again: it read a table that had no rows for the session, which may have landed s
 backfilled after the screen ran rejected every row as missing data, 2026-10-07).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from algotrade.config.user import SITE_USER, UserContext
@@ -29,6 +29,7 @@ from algotrade.services.configs import config_ids, resolve_config
 from algotrade.services.jobs.api import open_runner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
+from algotrade.services.read.availability.cause import ADMIN_CAUSE, GENERIC
 from algotrade.services.read.session import NotFoundError, latest_session
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.configs.store import ConfigStore
@@ -50,7 +51,8 @@ class RunRequest:
     session: date
     job_id: str | None  # None when the results were already stored
     run_id: str | None  # the stored run (when ready, complete or partial)
-    error: str | None  # why a failed run failed
+    # why a failed run failed: the error text is for admins, anyone else is told it failed
+    error: str | None = field(metadata={ADMIN_CAUSE: GENERIC})
 
 
 class OnDemandScreens:

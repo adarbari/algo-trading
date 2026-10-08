@@ -14,11 +14,11 @@ from algotrade_api.deps import ReadStore
 Graph = Callable[..., dict[str, Any]]
 
 FACTS = """query Facts($key: String!, $names: [FeatureName!]!, $date: Date) {
-  session(date: $date) { date isLatest missing referenceSnapshot preSnapshot }
+  session(date: $date) { date isLatest referenceSnapshot preSnapshot unavailable { kind } }
   instrument(key: $key, date: $date) {
     instrumentId symbol name securityType assetClass exchange isEtf description
     referenceSnapshot
-    features(names: $names) { name value unknown { code detail } info { format unit } }
+    features(names: $names) { name value unknown { code kind } info { format unit } }
   }
 }"""
 

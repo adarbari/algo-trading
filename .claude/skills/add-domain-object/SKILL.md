@@ -71,6 +71,15 @@ no partition for the session), `NO_ROW` (partition but no row), `NULL` (stored n
 "Nothing stored" is never an exception: return the object with `Unknown` / empty lists.
 `NotFoundError` only for an identity that does not exist.
 
+An `Unknown` carries `cause`, not text (ADR 0056): build the leaf you know with
+`table_cause(table, message, status, session)` (a table with nothing for the session),
+`feature_cause(...)` (a null for a reason about the field) or `run_cause(...)` (no run); the
+chain upstream of it is `availability.explain`'s job, served to admins only. Its public `kind`
+comes from the code. A list of tables a page would show ("missing") is
+`unavailable_tables(tables, session)`: `Unavailable` objects (kind, the features the table
+hides, a Guide term), never the names. Never put a table, vendor or error text in a field a
+trader reads.
+
 ## Step 5: tests
 
 `tests/unit/services/read/<area>/test_<object>.py` (mirror; layout tests fail otherwise),

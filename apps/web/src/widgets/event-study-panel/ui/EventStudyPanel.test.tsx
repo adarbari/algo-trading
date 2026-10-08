@@ -67,23 +67,33 @@ describe('EventStudyPanel', () => {
             part: 'ladder',
             unknown: {
               code: 'NO_PARTITION',
-              detail: 'no chain stored for the session',
+              kind: 'SYSTEM',
+              guideTerm: 'unavailable_system',
+              kindText: 'not available because of a system error',
+              cause: null,
               reason: null,
             },
           },
           {
             instrumentId: 'EQ:A',
             part: 'filings',
-            unknown: { code: 'NOT_APPLICABLE', detail: '', reason: null },
+            unknown: {
+              code: 'NOT_APPLICABLE',
+              kind: 'NOT_APPLICABLE',
+              guideTerm: 'unavailable_not_applicable',
+              kindText: 'does not apply to this instrument',
+              cause: null,
+              reason: null,
+            },
           },
         ],
       }),
     );
     render(<EventStudyPanel symbol="SPY" />);
     expect(
-      screen.getByText('Expiry ladder: Unknown (no chain stored for the session)'),
+      screen.getByText('Expiry ladder: not available because of a system error'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Filings: n/a')).toBeInTheDocument();
+    expect(screen.getByText('Filings: does not apply to this instrument')).toBeInTheDocument();
     expect(screen.getByText('No dated events ahead for SPY.')).toBeInTheDocument();
   });
 

@@ -53,6 +53,13 @@ from algotrade.features.framework.feature import (
     not_applicable,
 )
 from algotrade.services.features import entity_field_view, field_view
+from algotrade.services.read.availability.cause import (
+    Cause,
+    CauseLink,
+    UnavailableKind,
+    feature_cause,
+    table_cause,
+)
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.session import Grain, grain_of
@@ -109,13 +116,17 @@ def _marker(table: str) -> str:
     return table_field(table, _ROW)
 
 
-def _absent(tables: Sequence[str], day: date) -> str:
-    def why(table: str) -> str:
-        if grain_of(table) is Grain.SESSION:
-            return f"{table} has no partition for {day.isoformat()}"
-        return f"{table} has no snapshot on or before {day.isoformat()}"
+def _absent(tables: Sequence[str], day: date) -> Cause:
+    """One TABLE link per table with nothing for the session (no partition, or no snapshot)."""
 
-    return "; ".join(why(t) for t in tables)
+    def why(table: str) -> CauseLink:
+        if grain_of(table) is Grain.SESSION:
+            message = f"{table} has no partition for {day.isoformat()}"
+        else:
+            message = f"{table} has no snapshot on or before {day.isoformat()}"
+        return table_cause(table, message, session=day).leaf
+
+    return Cause(tuple(why(t) for t in tables))
 
 
 def _flag(value: Any) -> bool | None:
@@ -194,7 +205,8 @@ def _explained(
         f"{field.rpartition('.')[2]} is {status} for {iid} on {day.isoformat()}: "
         f"{_EXPLAINED[reason]}"
     )
-    return Unknown(UnknownCode.EXPLAINED, detail, reason)
+    cause = feature_cause(field.rpartition(".")[2], detail, status, day)
+    return Unknown(UnknownCode.EXPLAINED, cause, reason)
 
 
 def _value(
@@ -214,7 +226,9 @@ def _value(
         )
     if row is None:
         detail = f"{iid} is not in {REFERENCE_TABLE} (snapshot {ctx.session.reference_snapshot})"
-        return FeatureValue(info.name, None, Unknown(UnknownCode.NO_ROW, detail), info)
+        cause = table_cause(REFERENCE_TABLE, detail, "NO_ROW", day)
+        kind = ctx.kind_of(UnknownCode.NO_ROW, REFERENCE_TABLE)
+        return FeatureValue(info.name, None, Unknown(UnknownCode.NO_ROW, cause, None, kind), info)
     value = to_scalar(row.get(info.name))
     if value is not None:  # a formula may give a value without every input row (exists())
         return FeatureValue(info.name, value, None, info)
@@ -234,10 +248,12 @@ def _absence(
     day = ctx.session.date
     why = _not_applicable(reasons[0], row, ctx, iid)
     if why:
-        return Unknown(UnknownCode.NOT_APPLICABLE, why)
+        return Unknown(
+            UnknownCode.NOT_APPLICABLE, feature_cause(info.name, why, "NOT_APPLICABLE", day)
+        )
     why = _illiquid(reasons[1], row, iid, day)
     if why:
-        return Unknown(UnknownCode.ILLIQUID, why)
+        return Unknown(UnknownCode.ILLIQUID, feature_cause(info.name, why, "ILLIQUID", day))
     rowless = [
         t
         for t in tables
@@ -248,16 +264,26 @@ def _absence(
         return explained
     if rowless:
         detail = f"{' / '.join(rowless)} has no row for {iid} on {day.isoformat()}"
-        return Unknown(UnknownCode.NO_ROW, detail)
-    return Unknown(UnknownCode.NULL, f"{info.name} is null for {iid} on {day.isoformat()}")
+        links = tuple(table_cause(t, detail, "NO_ROW", day).leaf for t in rowless)
+        return Unknown(
+            UnknownCode.NO_ROW, Cause(links), None, ctx.kind_of(UnknownCode.NO_ROW, *rowless)
+        )
+    detail = f"{info.name} is null for {iid} on {day.isoformat()}"
+    kind = ctx.kind_of(UnknownCode.NULL, *tables)
+    return Unknown(UnknownCode.NULL, feature_cause(info.name, detail, "NULL", day), None, kind)
 
 
 def cell_codes(
     cells: Mapping[str, Sequence[FeatureValue]], ids: Sequence[str]
-) -> tuple[tuple[tuple[UnknownCode | None, ...], ...], tuple[tuple[NullReason | None, ...], ...]]:
-    """A table's ``unknown`` and ``reasons`` matrices for ``ids`` (rows) from their
-    ``load_feature_values`` cells: the code of each UNKNOWN cell, and its ``NullReason`` when
-    the code is EXPLAINED (else None)."""
+) -> tuple[
+    tuple[tuple[UnknownCode | None, ...], ...],
+    tuple[tuple[NullReason | None, ...], ...],
+    tuple[tuple[UnavailableKind | None, ...], ...],
+]:
+    """A table's ``unknown``, ``reasons`` and ``kinds`` matrices for ``ids`` (rows) from their
+    ``load_feature_values`` cells: the code of each UNKNOWN cell, its ``NullReason`` when the
+    code is EXPLAINED (else None) and its public kind (SYSTEM when a failure stands behind the
+    column's table, ADR 0056: a cell is drawn by kind, never by code)."""
 
     def row(iid: str) -> tuple[Unknown | None, ...]:
         return tuple(v.unknown for v in cells.get(iid, ()))
@@ -265,6 +291,7 @@ def cell_codes(
     return (
         tuple(tuple(u.code if u else None for u in row(i)) for i in ids),
         tuple(tuple(u.reason if u else None for u in row(i)) for i in ids),
+        tuple(tuple(u.kind if u else None for u in row(i)) for i in ids),
     )
 
 

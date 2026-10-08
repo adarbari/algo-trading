@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from algotrade.services import views
+from algotrade.services.read.availability.cause import UnavailableKind, table_cause
 from algotrade.services.read.values import Unknown, UnknownCode, records, to_scalar
 
 
@@ -52,8 +53,14 @@ def test_records_are_json_safe_without_stamps() -> None:
 
 
 def test_unknown_names_its_reason_and_where() -> None:
-    unknown = Unknown(UnknownCode.NO_PARTITION, "rollups/instrument/earnings@v1 has no partition")
+    cause = table_cause(
+        "rollups/instrument/earnings@v1", "rollups/instrument/earnings@v1 has no partition"
+    )
+    unknown = Unknown(UnknownCode.NO_PARTITION, cause)
     assert unknown.code == "NO_PARTITION"
+    assert unknown.cause.text == "rollups/instrument/earnings@v1 has no partition"
+    assert unknown.kind is UnavailableKind.SYSTEM
+    assert "rollups/" not in unknown.public_reason
     assert [c.value for c in UnknownCode] == [
         "NO_PARTITION", "NO_ROW", "NULL", "NOT_IN_CATALOGUE", "LICENCE", "NOT_RUN", "PRE_SNAPSHOT",
         "NOT_APPLICABLE", "ILLIQUID", "EXPLAINED",

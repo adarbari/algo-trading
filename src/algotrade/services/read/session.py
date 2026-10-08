@@ -20,6 +20,8 @@ from algotrade.core.model.fields import COMPANY_TABLE, DESCRIPTION_TABLE, REFERE
 from algotrade.data import StoreReader
 from algotrade.data.funds.holdings import TABLE as HOLDINGS_TABLE
 from algotrade.data.reference import IBKR_CONTRACTS, UNIVERSE_TABLE, snapshot
+from algotrade.services.read.availability.cause import Unavailable
+from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.storage.tables.schemas import SCHEMA_VERSION
 
 BARS = "bars/1d"
@@ -104,7 +106,8 @@ class Session:
     date resolves to. ``reference_snapshot`` is the ``instruments/reference`` partition identity
     is read from (None: none stored) and ``pre_snapshot`` whether it is later than ``date``
     (survivorship, ADR 0007). ``present`` / ``missing``: the expected session-grain tables with
-    and without a partition for ``date``."""
+    and without a partition for ``date``; ``unavailable``: what the ``missing`` ones leave out,
+    in public words (ADR 0056)."""
 
     date: dt.date
     requested: dt.date | None
@@ -114,6 +117,7 @@ class Session:
     pre_snapshot: bool
     present: tuple[str, ...]
     missing: tuple[str, ...]
+    unavailable: tuple[Unavailable, ...] = ()
 
 
 def latest_session(reader: StoreReader) -> dt.date | None:
@@ -155,6 +159,7 @@ def resolve_session(
         raise NotFoundError("nothing stored: no bars/1d and no instruments/reference partition")
     reference = snapshot(reader, REFERENCE_TABLE, day)
     present = tuple(t for t in expected if day in reader.dates(t))
+    missing = tuple(t for t in expected if t not in present)
     return Session(
         date=day,
         requested=requested,
@@ -163,5 +168,6 @@ def resolve_session(
         reference_snapshot=reference.snapshot_date if reference else None,
         pre_snapshot=reference.pre_snapshot if reference else False,
         present=present,
-        missing=tuple(t for t in expected if t not in present),
+        missing=missing,
+        unavailable=unavailable_tables(missing, day),
     )

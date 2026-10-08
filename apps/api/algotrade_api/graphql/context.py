@@ -14,10 +14,15 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import date
 
+from anyio import to_thread
+from fastapi import Request
+from strawberry.dataloader import DataLoader
 from strawberry.fastapi import BaseContext
 
 from algotrade.config.site.users import UserRecord
 from algotrade.config.user import UserContext
+from algotrade.services.read.availability.cause import Cause
+from algotrade.services.read.availability.explain import explain
 from algotrade.services.read.context import NotFoundError, ReadContext, Stores
 from algotrade_api.deps import Caller
 from algotrade_api.graphql.loaders import Loaders
@@ -43,6 +48,19 @@ class RequestContext(BaseContext):
         self._open_stores = stores
         self._contexts: dict[date | None, ReadContext | None] = {}
         self._stores: Stores | None = None
+        self._causes: DataLoader[Cause, Cause] = DataLoader(load_fn=self._explain_all)
+
+    async def _explain_all(self, leaves: list[Cause]) -> list[Cause]:
+        """``explain`` of each distinct leaf: one read of the run records each, off the loop."""
+        stores = self.stores()
+        if stores is None:
+            return leaves
+        return [await to_thread.run_sync(explain, stores, leaf) for leaf in leaves]
+
+    async def cause_of(self, leaf: Cause) -> Cause:
+        """The chain behind ``leaf`` (ADR 0056): batched and cached per request, and called
+        only behind ``AdminCause``, so a trader's request never reads a run record for it."""
+        return await self._causes.load(leaf)
 
     def read(self, requested: date | None) -> ReadContext | None:
         """The read context for ``requested`` (None: the latest session), with this request's
@@ -69,11 +87,12 @@ class RequestContext(BaseContext):
 
 def context_getter(
     opener: Opener, stores: StoresOpener | None = None
-) -> Callable[[UserRecord], RequestContext]:
+) -> Callable[[UserRecord, Request], RequestContext]:
     """The router's ``context_getter``: a fresh ``RequestContext`` per request, for the caller
     (a FastAPI dependency: Strawberry resolves it, sharing the request's one resolution)."""
 
-    def get_context(caller: Caller) -> RequestContext:
+    def get_context(caller: Caller, request: Request) -> RequestContext:
+        request.state.viewer = caller  # ``errors.response_of`` words an error by the role
         return RequestContext(opener, caller, stores)
 
     return get_context

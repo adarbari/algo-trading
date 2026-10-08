@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 
 from algotrade.services.read.session import store_info
 from algotrade_api import __version__
-from algotrade_api.deps import Store
+from algotrade_api.deps import Store, is_admin_request
 from algotrade_api.ops.build import build_status
 from algotrade_api.schemas.health import Build, Health
 
@@ -28,7 +28,7 @@ def health(store: Store, request: Request) -> Health:
     return Health(
         storage=store.kind,
         latest_session=info.latest_session,
-        tables=list(info.tables),
+        tables=list(info.tables) if is_admin_request(request) else [],
         versions={
             "algotrade": _version("algotrade"),
             "schema": info.schema_version,

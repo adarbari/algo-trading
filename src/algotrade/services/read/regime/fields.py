@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from algotrade.core.views.feature_view import FeatureValue as Scalar
+from algotrade.services.read.availability.cause import feature_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.market.features import load_market_feature_values
@@ -55,5 +56,6 @@ def read_fields(ctx: ReadContext, names: Sequence[str]) -> dict[str, Reading]:
             out[name] = Reading(v.value, v.unknown, v.info.format)
         else:
             detail = f"{name} is not in the market catalogue: the regime has not been computed yet"
-            out[name] = Reading(None, Unknown(UnknownCode.NOT_IN_CATALOGUE, detail))
+            cause = feature_cause(name, detail, "NOT_IN_CATALOGUE", ctx.session.date)
+            out[name] = Reading(None, Unknown(UnknownCode.NOT_IN_CATALOGUE, cause))
     return out

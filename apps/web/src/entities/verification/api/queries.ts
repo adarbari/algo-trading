@@ -23,7 +23,18 @@ const Verification = graphql(`
       failing
       unknown {
         code
-        detail
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
     }
   }

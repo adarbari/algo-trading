@@ -10,8 +10,10 @@ import strawberry
 from strawberry.scalars import JSON
 
 from algotrade.services.read import values
+from algotrade.services.read.availability.cause import UnavailableKind, kind_texts
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import results as stored
+from algotrade_api.graphql.types.availability import KindText, Unavailable
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 
@@ -111,9 +113,10 @@ class ChangeCount:
 @strawberry.type(
     description="One page of a run's rows matching the filters, in the sort order (`total`: "
     "every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null "
-    "exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). "
-    "`missing`: tables the search and sort read with "
-    "nothing for the session"
+    "exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED; "
+    "`kinds[i][j]`: its public kind, how a cell is drawn). "
+    "`unavailable`: what the tables the search and sort read have nothing for the session "
+    "leave out"
 )
 class ScreenResultPage:
     run_id: str
@@ -126,7 +129,8 @@ class ScreenResultPage:
     rows: list[list[JSON | None]]
     unknown: list[list[values.UnknownCode | None]]
     reasons: list[list[values.NullReason | None]]
-    missing: list[str]
+    kinds: list[list[UnavailableKind | None]]
+    unavailable: list[Unavailable]
 
     @classmethod
     def of(cls, d: stored.ResultPage, ctx: ReadContext) -> Self:
@@ -141,5 +145,12 @@ class ScreenResultPage:
             rows=[[JSON(v) for v in row] for row in d.rows],
             unknown=[list(row) for row in d.unknown],
             reasons=[list(row) for row in d.reasons],
-            missing=list(d.missing),
+            kinds=[list(row) for row in d.kinds],
+            unavailable=[Unavailable.of(u) for u in d.unavailable],
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The words of each kind `kinds` uses: how a cell's kind reads"
+    )
+    def kind_texts(self) -> list[KindText]:
+        return [KindText.of(t) for t in kind_texts(self.kinds)]

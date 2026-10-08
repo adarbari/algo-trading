@@ -159,7 +159,7 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 
 | Object | Identity | Typed fields | Backing tables | Loader module | Replaces |
 |---|---|---|---|---|---|
-| Session | `date` | `date, requested, isLatest, latestWithBars, referenceSnapshot, preSnapshot, present, missing` | `bars/1d` (latest), partition lists | `read/session.py` | `explore/store.partition_for`, `latest_session`, preview's store half, ranking's `max(...)` |
+| Session | `date` | `date, requested, isLatest, latestWithBars, referenceSnapshot, preSnapshot, present, missing, unavailable` | `bars/1d` (latest), partition lists | `read/session.py` | `explore/store.partition_for`, `latest_session`, preview's store half, ranking's `max(...)` |
 | Instrument | `instrumentId` | `symbol, name, securityType, assetClass, exchange, isEtf, description, referenceSnapshot` | `instruments/reference`, `company`, `description` | `read/instruments/identity.py` | `explore/instruments.resolve_key`, `description_of`; the symbol lookups in results, table, ranking, preview |
 | FeatureValue | (`instrumentId`, `name`, `session`) | `name, value: JSON?, unknown?, info` | `rollups/instrument/*`, expressions, reference columns | `read/instruments/features.py` (wraps `services.features.field_view`) | the features bag, `rollup_row` in chains, `VIEW_FIELDS`, `ticker_columns`, `ranking._earnings` |
 | FeatureInfo | `name` | `kind, source, dtype, format, description, nullMeaning, version, group, key, inputs, unit, range, categories, scope, owner, licence, guide` (the site field guide's entry on the catalogue read: `theme, reads, uses[{intent, op, value, mode, tolerance, onMiss, note}], caveats, sources`; ADR 0041 amended) | registry + user `FeatureSet` + `config/site/field_guide/` | `read/instruments/catalogue.py` (PR 4; `Query.catalogue` PR 9) | `explore/features.feature_catalogue` (deleted) |
@@ -230,8 +230,15 @@ there are any). Identity is disclosed, not blanked: `PRE_SNAPSHOT` is reserved f
 universe (PR 5); `instrument.*` values and `Instrument` say which snapshot through
 `Session.preSnapshot` / `referenceSnapshot`.
 
-`Unknown(code, detail)`: `detail` names the table and session
-(`"rollups/instrument/earnings@v1 has no partition for 2026-10-03"`). `to_scalar(value)` is
+`Unknown(code, cause, reason)`: `cause` is the leaf the construction site knows, a `CauseLink`
+naming the table and session (`"rollups/instrument/earnings@v1 has no partition for
+2026-10-03"`; ADR 0056). Every `Unknown` also has a public `kind` (`SYSTEM`, `NOT_STORED`,
+`NOT_APPLICABLE`, `ILLIQUID`, `LICENCE`, `NOT_RUN`: from the code alone) and the `guide_term`
+that explains it; a table list a page would show is `Unavailable(kind, features, guide_term)`
+(`services/read/availability/`). The chain behind a gap (`explain`: source -> step -> table ->
+features, from the nightly run record's recorded step tables) is served only to admins:
+`Unknown.cause` / `Unavailable.cause` behind `AdminCause` (null for anyone else), REST fields
+behind `redact`. `to_scalar(value)` is
 today's `services/views.to_value`, moved; `views.py` imports it back so runs and reads agree.
 
 ## Session resolution
