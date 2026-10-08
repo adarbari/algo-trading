@@ -1,9 +1,10 @@
-"""The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v<N>.toml``): v1
-and v2 (pinned, ``extends = "vrp_scanner@N"``) and v3 (the latest) resolve and validate against
+"""The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v<N>.toml``): v1,
+v2 and v3 (pinned, ``extends = "vrp_scanner@N"``) and v4 (the latest) resolve and validate against
 the catalogue, and on a
 fixed fixture of rows gives the owner-decided outcomes (docs/screeners/vrp-scanner.md): the
 hard gates reject (a missing value too), liquidity misses are LIQUIDITY_RISK near misses,
-IBKR IV rank only lowers the score, leveraged / inverse flag, ties by the IV-HV spread."""
+IV rank only lowers the score (v4: IBKR's, else ours), leveraged / inverse flag, ties by the
+IV-HV spread."""
 
 from datetime import date
 from typing import Any
@@ -87,6 +88,12 @@ def preset_v2() -> ResolvedConfig:
 
 @pytest.fixture(scope="module")
 def preset_v3() -> ResolvedConfig:
+    pinned = {"id": "pinned_v3", "extends": "vrp_scanner@3"}
+    return resolve_rule_draft(STORE, "pinned_v3", UserContext("tester"), pinned)
+
+
+@pytest.fixture(scope="module")
+def preset_v4() -> ResolvedConfig:
     """The bare id resolves the latest version."""
     return resolve_config(STORE, "vrp_scanner", UserContext("site"))
 
@@ -269,3 +276,58 @@ def test_v3_fixture_outcomes(preset_v3: ResolvedConfig) -> None:
     assert rows["EQ:NOIV"].reasons == ("no feature.vrp_iv30",)
     assert result.summary.passed == 4
     assert dict(result.summary.decisions) == {"QUALIFIED": 4, "REJECT": 6}
+
+
+# ---------------------------------------------------------------------------------------- v4
+RAW_RANK = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"
+BASE_V4: dict[str, Any] = {
+    **{k: v for k, v in BASE_V3.items() if k != RAW_RANK},
+    "feature.iv_rank": 0.8,
+    "feature.iv_rank_source": "ibkr",
+}
+FIXTURE_V4: dict[str, dict[str, Any]] = {
+    "EQ:IBKR": BASE_V4,
+    "EQ:OURS": {**BASE_V4, "feature.iv_rank_source": "ours"},  # no IBKR history: ours counts
+    "EQ:LOWRANK": {**BASE_V4, "feature.iv_rank": 0.25},  # half the tolerance off
+    "EQ:NORANK": {**BASE_V4, "feature.iv_rank": None, "feature.iv_rank_source": None},
+}
+
+
+def test_v4_reads_iv_rank_through_the_coalescing_feature(preset_v4: ResolvedConfig) -> None:
+    spec = preset_v4.screen_spec
+    assert spec.version == 4
+    rank = next(c for c in spec.criteria if c.id == "iv_rank")
+    assert (rank.field, rank.mode.value, rank.rule.op, rank.rule.value) == (
+        "feature.iv_rank",
+        "score",
+        "gte",
+        0.5,
+    )
+    columns = dict(spec.columns)
+    assert (columns["iv_rank"], columns["iv_rank_source"]) == (
+        "feature.iv_rank",
+        "feature.iv_rank_source",
+    )
+    assert "iv_rank_ibkr" not in columns
+    fields = [c.field for c in spec.criteria] + list(columns.values())
+    assert not any("ibkr_iv" in f for f in fields)
+    v3 = [(c.id, c.field) for c in spec.criteria if c.id != "iv_rank"]
+    assert v3[:8] == [
+        ("security_type", "instrument.security_type"),
+        ("status", "instrument.status"),
+        ("optionable", "instrument.optionable"),
+        ("iv30", "feature.vrp_iv30"),
+        ("price", "rollup.price_stats@v2.close"),
+        ("iv_hv_spread", "feature.vrp_iv_hv_spread"),
+        ("iv_hv_ratio", "feature.vrp_iv_hv_ratio"),
+        ("near_52w", "feature.dist_52w"),
+    ]
+
+
+def test_v4_scores_our_rank_where_ibkr_has_none(preset_v4: ResolvedConfig) -> None:
+    result = evaluate_screen(preset_v4.screen_spec, FeatureView(DAY, FIXTURE_V4))
+    rows = {r.instrument_id: r for r in result.rows}
+    assert all(r.decision is Decision.QUALIFIED for r in rows.values())
+    assert rows["EQ:IBKR"].score == rows["EQ:OURS"].score == 100.0
+    assert rows["EQ:LOWRANK"].score == pytest.approx(95.0)
+    assert rows["EQ:NORANK"].score == pytest.approx(90.0)  # neither source: points off only

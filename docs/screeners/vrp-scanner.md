@@ -4,9 +4,14 @@
 > preview or as a `screen` job), over the expression features in `config/site/features/vrp.toml`
 > (`vrp_iv30`, `vrp_iv30_source`, `vrp_iv_hv_spread`, `vrp_iv_hv_ratio`) and `price.toml`
 > (`dist_52w`, `pct_vs_sma_20/50/200`). The latest version is
-> `config/site/presets/screeners/vrp_scanner/v3.toml`; `v1.toml` and `v2.toml` stay as they were
-> (immutable; user copies pinned to `vrp_scanner@1` or `@2` keep computing them).
+> `config/site/presets/screeners/vrp_scanner/v4.toml`; `v1.toml` to `v3.toml` stay as they were
+> (immutable; user copies pinned to `vrp_scanner@1`, `@2` or `@3` keep computing them).
 >
+> - **v4** (owner 2026-10-08) is v3 with the IV rank score criterion over `feature.iv_rank`
+>   (IBKR's rank where it has one, else ours from Cboe chains; `config/site/features/volatility.toml`)
+>   instead of IBKR's only, and an `iv_rank_source` column (`ibkr` / `ours`) in place of
+>   `iv_rank_ibkr`. The latest version of a site preset never reads `rollup.ibkr_iv@v1.*`
+>   directly (`tests/architecture/test_structure.py`).
 > - **v3** ([ADR 0030](../adr/0030-rule-screener-simplification.md)) is v2 with the rule-screen
 >   simplification: who is screened is three HARD criteria (`instrument.security_type in
 >   [COMMON_STOCK, ADR, ETF]`, `status = ACTIVE`, `optionable = true`) instead of a selection,
@@ -64,7 +69,7 @@ mapping follows.
 | Scoring | 100 when every threshold is met, minus each miss's normalised distance (no 0-30 / 0-20 weights); ties by the IV−HV spread |
 | Preset | a site preset visible in the Builder; users change it, re-run and see results; their copies pin the preset version |
 | IV30 source for the gate | the **lower** of IBKR's and Cboe's IV30 when both exist, else whichever exists, else UNKNOWN; our own IV30 is not used for the gate |
-| IV rank | IBKR's only; a SCORE criterion (missing lowers the score, never blocks) |
+| IV rank | v1-v3: IBKR's only; v4 (owner 2026-10-08): IBKR's, else ours (`iv_rank_source` says which); a SCORE criterion (missing lowers the score, never blocks) |
 | ROC | premium / (strike × 100), cash-secured |
 | Portfolio correlation | no correlation penalty |
 | Leveraged / inverse ETFs | included and flagged |
@@ -81,7 +86,7 @@ mapping follows.
 | IV-HV >= 10 pts, IV/HV >= 1.25 | hard `feature.vrp_iv_hv_spread gte 0.10`, hard `feature.vrp_iv_hv_ratio gte 1.25`; new site features over `vrp_iv30` and `price_stats.hv30` (ratio = `vrp_iv30 / hv30`, no floor; HV30 missing or 0 → missing → REJECT in v3, SKIPPED before); `[rank] tie_break = "feature.vrp_iv_hv_spread"` |
 | Stronger tier 15 pts / 1.30 | v1 / v2: `tiers.STRONG` (a display label); v3: dropped (read the spread and ratio columns) |
 | Within 10% of the 52W high / low; NEAR_HIGH / NEAR_LOW / BOTH | v1 / v2: hard `feature.near_52w in [HIGH, LOW, BOTH]`, `classify`; v3: hard `feature.dist_52w lte 0.10`, the side in the `near_52w` column |
-| IV rank (0-10) | score `rollup.ibkr_iv@v1.iv_rank_252d_ibkr` with a tolerance; a miss or missing value lowers the score |
+| IV rank (0-10) | v1-v3: score `rollup.ibkr_iv@v1.iv_rank_252d_ibkr`; v4: score `feature.iv_rank` (IBKR's, else ours), with the `iv_rank_source` column; with a tolerance, a miss or missing value lowers the score |
 | Price > $5 | hard `rollup.price_stats@v2.close gt 5` |
 | ADV > $50M, option volume / OI > 1,000, spread < 15% ("flag, don't reject") | soft with a tolerance band: a near miss is WATCH (options too thin: `on_miss = LIQUIDITY_RISK`), beyond the band REJECT |
 | Earnings < 14 days, event risk (0-5) | **dropped** (owner decision); `columns`: `rollup.earnings@v1.next_earnings_date` and a new feature, the closest option expiry's DTE |
