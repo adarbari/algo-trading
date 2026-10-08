@@ -8,7 +8,9 @@ Extends [0005](0005-ingestion-is-the-only-writer.md) (ingestion writes the outco
 [0015](0015-configs-selections-users.md) (the edge document is a layered settings file),
 [0021](0021-option-pricing-conventions.md) (the statistics live in `quant/`) and
 [0033](0033-screeners-run-nightly-and-on-request.md) (a screener run for a past session). Makes
-one confined exception to [0036](0036-session-strictness-for-reads.md).
+one confined exception to [0036](0036-session-strictness-for-reads.md). The winners study's
+historic listings (ED6) get ids by the amendment to [0018](0018-figi-instrument-ids.md)
+(`EQ:TIINGO:<permaTicker>`).
 
 ## Context
 The platform screens: a rule screen or a Python `Screener` picks names for a session from stored

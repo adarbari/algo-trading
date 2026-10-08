@@ -47,6 +47,7 @@ from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,
     ibkr_contracts,
+    listing_history,
     shares,
     universe_build,
     universe_import,
@@ -148,6 +149,12 @@ def _company_details(ctx: TaskContext, p: Params) -> RunRecord:
     )
     return company_details.ingest_company_details(
         ctx, sources, session_of(p), bool(p.get("force")), p.get("limit")
+    )
+
+
+def _listing_history(ctx: TaskContext, p: Params) -> RunRecord:
+    return listing_history.ingest_listing_history(
+        ctx, ctx.sources["tiingo_listings"], session_of(p)
     )
 
 
@@ -484,6 +491,18 @@ TASKS: dict[str, Task] = {
                 Param("force", ("--force",), None, "refetch every company"),
                 Param("limit", ("--limit",), int, "fetch at most N companies this run"),
             ),
+        ),
+        Task(
+            "listing-history",
+            "every US stock / ETF Tiingo ever listed, with its dates "
+            "(instruments/listing_history); in no workflow until a real recording replaces the "
+            "synthetic test payload",
+            listing_history,
+            ("instruments/listing_history",),
+            _listing_history,
+            sources=("tiingo_listings",),
+            settings="sources.toml [tiingo]",
+            params=(SESSION,),
         ),
         Task(
             "shares",

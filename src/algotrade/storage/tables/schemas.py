@@ -218,6 +218,23 @@ ID_MAP = _fixed(
     runs="merge",
     key=("old_id", "new_id"),
 )
+# L1: every US-listed stock / ETF a vendor ever listed, with its listing dates (ADR 0018
+# amendment, 2026-10-08; edges ED6): the universe as it was, for the winners study. One full
+# copy per pull session (snapshot). ``instrument_id`` is null until a trusted id exists (a
+# symbol_history match or a permaTicker); ``end_date`` is the vendor's last trading day and is
+# read only by ``data.listings.universe_asof``. knowledge_ts is the pull time (2026 for a
+# 2010 listing), so only the identity reads (resolver, universe_asof) may use it for an old S.
+LISTING_HISTORY = _fixed(
+    "instruments/listing_history",
+    "reference",
+    ("ticker", "start_date", "ts"),
+    "instrument_id string",
+    "ts timestamp_utc!",
+    *_strings("ticker", "exchange", "asset_type", "price_currency", "perma_ticker"),
+    "start_date date!",
+    "end_date date",
+    key=("source", "ticker", "start_date"),
+)
 # L1: company details from SEC EDGAR, per instrument (one full snapshot per date).
 INSTRUMENT_COMPANY = _fixed(
     "instruments/company",
@@ -620,6 +637,7 @@ KNOWN: dict[str, TableSpec] = {
         INSTRUMENT_REFERENCE,
         SYMBOL_HISTORY,
         ID_MAP,
+        LISTING_HISTORY,
         INSTRUMENT_COMPANY,
         INSTRUMENT_SHARES,
         INSTRUMENT_DESCRIPTION,

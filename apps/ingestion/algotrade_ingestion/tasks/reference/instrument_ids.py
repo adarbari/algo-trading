@@ -15,6 +15,9 @@
 - A previous symbol id whose symbol now has a FIGI id (and no different FIGI before) is an
   **upgrade**: recorded in ``instruments/id_map``; ``rename_ids`` applies it to the previous
   snapshot, so the diff sees the same instrument rather than a delisting plus a listing.
+- A vendor listing with no snapshot row (``assign_listing_ids``, ``instruments/listing_history``,
+  ADR 0018 amendment 2026-10-08): the overlapping ``symbol_history`` row's id, else
+  ``EQ:TIINGO:<permaTicker>``, else none; never ``EQ:<symbol>``.
 
 Review state lives on the reference row: ``vendor_figi`` (the vendor's FIGI when the build
 did not use it as the listing's own: a different FIGI than the one held, or one several
@@ -312,3 +315,48 @@ def cumulative_map(
     merged["known_at"] = pd.to_datetime(merged["known_at"], utc=True)
     merged = merged.drop_duplicates(["old_id", "new_id"], keep="first")
     return merged.sort_values(["effective", "old_id"]).reset_index(drop=True)
+
+
+def _history_ids(history: pd.DataFrame | None) -> dict[str, list[tuple[date, date | None, str]]]:
+    """symbol -> (valid_from, valid_to or None, instrument_id) of its symbol_history rows."""
+    out: dict[str, list[tuple[date, date | None, str]]] = {}
+    if history is None or history.empty:
+        return out
+    start = pd.to_datetime(history["valid_from"]).dt.date
+    end = pd.to_datetime(history["valid_to"]).dt.date
+    for symbol, s, e, i in zip(
+        history["symbol"], start, end, history["instrument_id"], strict=True
+    ):
+        out.setdefault(str(symbol).strip().upper(), []).append(
+            (s, None if pd.isna(e) else e, str(i))
+        )
+    return out
+
+
+def assign_listing_ids(listings: pd.DataFrame, history: pd.DataFrame | None) -> pd.DataFrame:
+    """Ids of vendor listing rows (``instruments/listing_history``, ADR 0018 amendment
+    2026-10-08): the overlapping ``symbol_history`` row's id, else ``EQ:TIINGO:<permaTicker>``
+    once the listing has a ``perma_ticker``, else null; never ``EQ:<symbol>``. ``listings`` +
+    ``instrument_id``."""
+    known = _history_ids(history)
+    ids: list[str | None] = []
+    for ticker, start, end, perma in zip(
+        listings["ticker"],
+        listings["start_date"],
+        listings["end_date"],
+        listings["perma_ticker"],
+        strict=True,
+    ):
+        last = None if pd.isna(end) else end
+        found = next(
+            (
+                i
+                for s, e, i in known.get(str(ticker), [])
+                if (e is None or e >= start) and (last is None or s <= last)
+            ),
+            None,
+        )
+        if found is None and str(perma).strip():
+            found = equity_id(str(ticker), perma_ticker=str(perma))
+        ids.append(found)
+    return listings.assign(instrument_id=pd.Series(ids, index=listings.index, dtype=object))

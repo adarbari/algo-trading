@@ -38,6 +38,10 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
 
 [[table]]
+name = "instruments/listing_history"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/listing_history.py"
+
+[[table]]
 name = "instruments/company"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/company_details.py"
 

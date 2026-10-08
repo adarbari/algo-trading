@@ -118,6 +118,18 @@ tier ($10 a month) lifts the symbol cap (5,000 requests an hour) for the full ti
 Why Tiingo: Stooq's daily CSV now answers with a browser-verification page, and Massive's free
 tier stops at two years.
 
+### Tiingo supported tickers (adapter implemented, payload SYNTHETIC; ADR 0018 amendment)
+
+`https://apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip`: one public ZIP with one
+CSV (`ticker, exchange, assetType, priceCurrency, startDate, endDate`: the first and last day
+Tiingo has prices). The `listing-history` task (in no workflow) keeps USD, NYSE / NASDAQ /
+AMEX / ARCA / BATS, Stock or ETF, and writes `instruments/listing_history`; ids come from
+`instruments/symbol_history` overlap or, once a meta pull fills `perma_ticker`,
+`EQ:TIINGO:<permaTicker>` (never `EQ:<symbol>`). The adapter is tested on a payload built from
+the documentation (`tests/helpers/payloads/tiingo.py`, labelled SYNTHETIC); a real recording
+replaces it before the task joins a workflow. Gate: if `permaTicker` needs a paid fundamentals
+plan, edges ED6b returns to ADR 0018.
+
 ## Company and fund descriptions (implemented, ADR 0034)
 
 One table, `instruments/description` (columns in [layers.md](layers.md)), written by the
