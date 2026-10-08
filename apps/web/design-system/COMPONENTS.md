@@ -270,6 +270,16 @@ Source: `design-system/components/CalendarGrid`
 | `onRetry` | `() => void` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when no day has an event. |
 
+### CauseChain
+
+CauseChain: why something is not available, as an ordered chain read root to leaf: the source that failed, the step that depended on it, the table left without rows, the features lost, the run affected. Each link names its level, its subject (a code), an optional state as a StatusBadge and an optional message; an arrow connects it to the next. Admin-only content: the server sends a chain only to a role that may see it, and this component only draws it.
+
+Source: `design-system/components/CauseChain`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `links` | `readonly CauseLink[]` | yes | The links in reading order, root cause first. An empty list renders nothing. |
+
 ### Chart
 
 Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings, filings, macro releases) with a shape and letter each plus a key, and the marker's text in the crosshair read-out and the table; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; optional horizontal reference lines (a threshold, a target) with an end label, also listed for assistive technology; optional lanes (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation. Inside the window, Zoom in / Zoom out / Reset zoom buttons (and, on touch, a horizontal drag and a pinch) move and scale the view; the mouse wheel scrolls the page, never the chart. Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
