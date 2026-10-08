@@ -40,6 +40,10 @@ correct without IBKR.
   `screens` (and on the `ibkr-iv` step, already SKIPPED with a WARN).
 - A new optional source is one flag on its group; the fitness tests then check every formula
   and site criterion over it.
+- Only screen coverage changes. The selection audit and the Builder preview still list the
+  optional table among the session's missing tables (neither grades a run), and a backtest
+  over a session without it still raises (ADR 0008: missing data is an error). The typed read
+  model shows only the required `missing_tables`; the optional ones are in the run's audit.
 - A user's own screen with a HARD criterion directly on an optional field is not checked by the
   fitness test: on a session without the source it rejects every row and says why per row
   (`no <field>`), but the run is COMPLETE. The Builder may warn about it later.
