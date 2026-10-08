@@ -27,6 +27,7 @@ EXPLORATORY: its rows carry its split in their key and the flag, and the split j
 
 import hashlib
 import json
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
@@ -42,7 +43,7 @@ from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes
@@ -93,6 +94,7 @@ MIN_SCORE_COVERAGE = 0.8
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
+CHUNK_SESSIONS = 20  # decision sessions screened and measured before the frames are dropped
 OUTCOME_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS)  # kept per entry session
 
 
@@ -114,6 +116,7 @@ class VariantResult:
     edge_variant: str = MAIN  # the edge's own ``[[variants]]`` id, "main" for the edge itself
     iv_source: str | None = None  # the run's iv_field when the outcome reads an implied vol
     licence: str | None = None  # that field's catalogue licence
+    lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
 
 
 @dataclass(frozen=True)
@@ -182,20 +185,35 @@ def edge_universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Select
 class _Session:
     """What is read once per decision session, whatever the horizon or the edge variant: each
     screener's run and the regime label; per edge variant (``key``) the eligible names and, when
-    the measure needs it, the implied vol (the scope's one ``iv_field``) at D."""
+    the measure needs it, the implied vol (the scope's one ``iv_field``) at D. ``release``
+    drops all of it (after a chunk of sessions): only the universe snapshot dates and the
+    sessions a screener could not be run on (``lost``: its missing table) are kept."""
 
     def __init__(self, reader: StoreReader, label_field: str):
         self._reader, self._label_field = reader, label_field
         self._selections = SelectionReads(reader)
-        self._runs: dict[tuple[str, date], RankedRun] = {}
+        self._runs: dict[tuple[str, date], RankedRun | None] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}
         self._labels: dict[date, str] = {}
         self._implied: dict[tuple[str, date], dict[str, float | None]] = {}
+        self._snapshots: set[date] = set()
+        self.lost: dict[tuple[str, date], str] = {}  # (variant, D) -> the table it had no data in
 
-    def run(self, variant: Variant, day: date) -> RankedRun:
+    def run(self, variant: Variant, day: date) -> RankedRun | None:
+        """The screener's run at ``day``; None when an input table has no data for it (the
+        session is lost to this screener, counted, never a miss)."""
         if (variant.id, day) not in self._runs:
-            self._runs[variant.id, day] = screen_variant(self._reader, variant.config, day)
+            self._runs[variant.id, day] = self._screen(variant, day)
         return self._runs[variant.id, day]
+
+    def _screen(self, variant: Variant, day: date) -> RankedRun | None:
+        try:
+            found = screen_variant(self._reader, variant.config, day)
+        except MissingDataError as error:
+            self.lost[variant.id, day] = error.dataset
+            return None
+        self._snapshots.add(found.snapshot)
+        return found
 
     def eligible(self, key: str, universe: Selection, day: date) -> frozenset[str]:
         if (key, day) not in self._eligible:
@@ -204,7 +222,14 @@ class _Session:
 
     def snapshots(self) -> list[date]:
         """The universe snapshot dates the screens read."""
-        return [run.snapshot for run in self._runs.values()]
+        return sorted(self._snapshots)
+
+    def release(self) -> None:
+        """Forget what was read for the sessions done (memory stays flat in the sessions)."""
+        self._runs.clear()
+        self._eligible.clear()
+        self._labels.clear()
+        self._implied.clear()
 
     def label(self, day: date) -> str:
         if day not in self._labels:
@@ -260,7 +285,9 @@ def _stat(
     (``base = "event"``) or every eligible name."""
     edge, day = scope.edge, leg.decision
     run, eligible = session.run(variant, day), session.eligible(scope.key, scope.universe, day)
-    if run.coverage not in MEASURED_COVERAGE:  # read incomplete data: not measured, counted
+    if (
+        run is None or run.coverage not in MEASURED_COVERAGE
+    ):  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     pickable = eligible if event_names is None else event_names & eligible
     ids = pickable if edge.base == "event" else eligible
@@ -422,55 +449,62 @@ def evaluate_edge(
     label = site_regime(configs.load).label  # the site's, not a user's
     session = _Session(reader, label)
     days = sessions_between(start, end)
-    results: list[VariantResult] = []
-    starts: dict[int, int] = {}
-    unclosed: dict[int, int] = {}
-    unknown: dict[str, int] = {}
-    outcomes_of: dict[tuple[int, tuple[date, ...]], dict[date, pd.DataFrame]] = {}
     scopes = _scopes(configs, user, edge, iv_field)
-    schedules = _events(reader, session, scopes, days)
+    licences: dict[str, str | None] = {}
     for scope in scopes:
-        o = scope.edge.outcome
-        needs_iv = needs_implied_vol(scope.edge)
         if scope.iv_field in MIXED_SOURCE_IV:
             raise ConfigurationError(
                 f"iv_field {scope.iv_field!r} mixes sources: name one vendor's field"
             )
-        licence = _licence(configs, user, scope.iv_field) if needs_iv else None
-        events = schedules.get(scope.key)
-        for horizon in o.horizon_sessions:
-            blocks = _blocks(scope.edge, events, days, horizon)
-            entries = tuple(sorted({leg.entry for block in blocks for leg in block}))
-            if (horizon, entries) not in outcomes_of:
-                frame = read_outcomes(reader, horizon, entries, BENCHMARK, as_of=as_of)
-                kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
-                outcomes_of[horizon, entries] = dict(
-                    tuple(kept.groupby(frame["session_date"].map(_day)))
-                )
-            closed = outcomes_of[horizon, entries]
-            starts.setdefault(horizon, len(blocks))  # the edge's own count, then its variants'
-            unclosed.setdefault(
-                horizon, sum(all(leg.entry not in closed for leg in block) for block in blocks)
+        licences[scope.key] = (
+            _licence(configs, user, scope.iv_field) if needs_implied_vol(scope.edge) else None
+        )
+    schedules = _events(reader, session, scopes, days)
+    plans = [
+        _Plan(scope, horizon, _blocks(scope.edge, schedules.get(scope.key), days, horizon))
+        for scope in scopes
+        for horizon in scope.edge.outcome.horizon_sessions
+    ]
+    stats = _measure(reader, session, plans, variants, schedules, as_of)
+    results: list[VariantResult] = []
+    starts: dict[int, int] = {}
+    unclosed: dict[int, int] = {}
+    for plan in plans:
+        scope, horizon = plan.scope, plan.horizon
+        needs_iv = needs_implied_vol(scope.edge)
+        closed = stats.closed[horizon]
+        starts.setdefault(horizon, len(plan.blocks))  # the edge's own count, then its variants'
+        unclosed.setdefault(
+            horizon, sum(all(leg.entry not in closed for leg in b) for b in plan.blocks)
+        )
+        for variant in variants:
+            found = stats.legs.get((plan.key, variant.id), {})
+            block_stats = tuple(
+                pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
+                for block in plan.blocks
+                if any(leg.entry in closed for leg in block)
             )
-            for variant in variants:
-                stats = _block_stats(scope, session, variant, blocks, closed, events)
-                measures = tuple(slice_measures(stats, _slices(stats, split, exploratory)))
-                results.append(
-                    VariantResult(
-                        variant.id,
-                        variant.role,
-                        _trial_hash(scope, variant),
-                        horizon,
-                        stats,
-                        measures,
-                        edge_variant=scope.key,
-                        iv_source=scope.iv_field if needs_iv else None,
-                        licence=licence,
-                    )
+            measures = tuple(slice_measures(block_stats, _slices(block_stats, split, exploratory)))
+            results.append(
+                VariantResult(
+                    variant.id,
+                    variant.role,
+                    _trial_hash(scope, variant),
+                    horizon,
+                    block_stats,
+                    measures,
+                    edge_variant=scope.key,
+                    iv_source=scope.iv_field if needs_iv else None,
+                    licence=licences[scope.key],
+                    lost_sessions=dict(
+                        Counter(stats.lost.get((plan.key, variant.id), {}).values())
+                    ),
                 )
-        if events is not None:
-            for reason, n in events.unknown_total().items():
-                unknown[reason] = unknown.get(reason, 0) + n
+            )
+    unknown: dict[str, int] = {}
+    for events in schedules.values():
+        for reason, n in events.unknown_total().items():
+            unknown[reason] = unknown.get(reason, 0) + n
     tried = {(r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results}
     trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
     snapshot = min(session.snapshots(), default=None)
@@ -493,29 +527,112 @@ def evaluate_edge(
     )
 
 
-def _block_stats(
-    scope: _Scope,
+@dataclass(frozen=True)
+class _Plan:
+    """One scope at one horizon: its blocks of decision legs."""
+
+    scope: _Scope
+    horizon: int
+    blocks: Sequence[Sequence[_Leg]]
+
+    @property
+    def key(self) -> tuple[str, int]:
+        return self.scope.key, self.horizon
+
+
+@dataclass
+class _Measured:
+    """What the chunks left: per plan and variant the statistic of each leg (by decision
+    session) and the legs lost to a missing table (with it); per horizon the entry sessions
+    with a closed window. Frames and screens are gone."""
+
+    legs: dict[tuple[tuple[str, int], str], dict[date, SessionStat]]
+    lost: dict[tuple[tuple[str, int], str], dict[date, str]]
+    closed: dict[int, set[date]]
+
+
+def _measure(
+    reader: StoreReader,
     session: _Session,
+    plans: Sequence[_Plan],
+    variants: Sequence[Variant],
+    schedules: Mapping[str, EventSchedule],
+    as_of: datetime,
+) -> _Measured:
+    """One statistic per (plan, variant, leg), over chunks of ``CHUNK_SESSIONS`` decision
+    sessions: each chunk reads the outcomes of its entry sessions, screens its sessions and
+    keeps only the statistics, so peak memory does not grow with the range."""
+    out = _Measured({}, {}, {})
+    days = sorted({leg.decision for p in plans for b in p.blocks for leg in b})
+    failed: dict[int, MissingDataError] = {}
+    out.closed.update({p.horizon: set() for p in plans})
+    for at in range(0, len(days), CHUNK_SESSIONS):
+        chunk = set(days[at : at + CHUNK_SESSIONS])
+        closed = _read_closed(reader, plans, chunk, as_of, out, failed)
+        for day in sorted(chunk):  # lockstep over the scopes: one selection read per session
+            for p in plans:
+                if any(leg.decision == day for b in p.blocks for leg in b):
+                    session.eligible(p.scope.key, p.scope.universe, day)
+        for p in plans:
+            for variant in variants:
+                _measure_plan(p, variant, session, schedules.get(p.scope.key), chunk, closed, out)
+        session.release()
+    for horizon, missing in failed.items():
+        if not out.closed[horizon]:  # nothing stored for any session of the range
+            raise missing
+    return out
+
+
+def _read_closed(
+    reader: StoreReader,
+    plans: Sequence[_Plan],
+    chunk: set[date],
+    as_of: datetime,
+    out: _Measured,
+    failed: dict[int, MissingDataError],
+) -> dict[int, dict[date, pd.DataFrame]]:
+    """The outcome rows of the chunk's entry sessions by horizon and entry session."""
+    closed: dict[int, dict[date, pd.DataFrame]] = {}
+    for horizon in sorted({p.horizon for p in plans}):
+        closed[horizon] = {}
+        entries = sorted(
+            {leg.entry for p in plans if p.horizon == horizon for b in p.blocks for leg in b
+             if leg.decision in chunk}
+        )  # fmt: skip
+        if not entries:
+            continue
+        try:
+            frame = read_outcomes(reader, horizon, entries, BENCHMARK, as_of=as_of)
+        except MissingDataError as missing:
+            failed.setdefault(horizon, missing)
+            continue
+        kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
+        closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
+        out.closed[horizon] |= set(closed[horizon])
+    return closed
+
+
+def _measure_plan(
+    p: _Plan,
     variant: Variant,
-    blocks: Sequence[Sequence[_Leg]],
-    closed: Mapping[date, pd.DataFrame],
+    session: _Session,
     events: EventSchedule | None,
-) -> tuple[SessionStat, ...]:
-    """One statistic per block with at least one closed leg: its closed legs, pooled."""
-    out = []
-    for block in blocks:
-        legs = [leg for leg in block if leg.entry in closed]
-        if legs:
-            names = (None if events is None else events.names[leg.decision] for leg in legs)
-            out.append(
-                pool_stats(
-                    [
-                        _stat(scope, session, variant, leg, closed[leg.entry], n)
-                        for leg, n in zip(legs, names, strict=True)
-                    ]
-                )
-            )
-    return tuple(out)
+    chunk: set[date],
+    closed: Mapping[int, Mapping[date, pd.DataFrame]],
+    out: _Measured,
+) -> None:
+    """The statistic of each of ``p``'s legs in the chunk whose window closed."""
+    mine = out.legs.setdefault((p.key, variant.id), {})
+    lost = out.lost.setdefault((p.key, variant.id), {})
+    for block in p.blocks:
+        for leg in block:
+            if leg.decision not in chunk or leg.entry not in closed[p.horizon]:
+                continue
+            names = None if events is None else events.names[leg.decision]
+            rows = closed[p.horizon][leg.entry]
+            mine[leg.decision] = _stat(p.scope, session, variant, leg, rows, names)
+            if (variant.id, leg.decision) in session.lost:
+                lost[leg.decision] = session.lost[variant.id, leg.decision]
 
 
 def _trial_hash(scope: _Scope, variant: Variant) -> str:

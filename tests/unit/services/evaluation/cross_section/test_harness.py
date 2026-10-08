@@ -20,7 +20,12 @@ from algotrade.services.evaluation.cross_section.harness import (
     evaluate_edge,
 )
 from algotrade.services.evaluation.cross_section.picks import screen_variant
-from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
+from algotrade.services.evaluation.cross_section.report import render_edge_report
+from algotrade.services.evaluation.cross_section.results import (
+    edge_eval_frame,
+    lost_sessions,
+    write_edge_eval,
+)
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -692,3 +697,45 @@ def test_an_event_edge_screens_each_session_once_per_screener_whatever_its_varia
     assert [m.hits for r in main for m in r.measures] == [
         m.hits for r in alone.results for m in r.measures
     ]
+
+
+def test_the_result_is_the_same_whatever_the_chunk_of_sessions_held_in_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Peak memory is flat in the sessions because chunks are measured and dropped; the rows
+    must not depend on where the chunks fall."""
+    whole = run(event_world(EVENTS), event_edge(2))
+    plain = run(build_world())
+    monkeypatch.setattr(harness, "CHUNK_SESSIONS", 2)
+    assert run(event_world(EVENTS), event_edge(2)).results == whole.results
+    assert run(build_world()).results == plain.results
+
+
+def test_a_screener_with_no_data_for_a_session_loses_it_counted_and_the_run_continues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = harness.screen_variant
+
+    def missing_on_third(reader: Any, config: Any, day: date) -> Any:
+        if day == DAYS[2]:
+            raise MissingDataError("rollups/instrument/option_liquidity@v1", "no rows", "ingest")
+        return real(reader, config, day)
+
+    monkeypatch.setattr(harness, "screen_variant", missing_on_third)
+    ev = run(build_world())
+    (r,) = ev.results
+    m = r.measures[0]
+    assert (m.sessions, m.excluded_coverage) == (3, 1)  # never a miss or a zero pick set
+    assert m.picks == 15
+    assert r.lost_sessions == {"rollups/instrument/option_liquidity@v1": 1}
+    (lost,) = lost_sessions(ev)
+    assert (lost["variant"], lost["sessions"]) == ("main/momo", 1)
+    text = render_edge_report({**_report_stub(), "lost_sessions": [lost]})
+    assert "LOST: main/momo" in text and "option_liquidity@v1" in text
+
+
+def _report_stub() -> dict[str, Any]:
+    return {
+        "edge": "drift", "run_id": "r", "trials": 1, "survivorship": {},
+        "unclosed_sessions": {}, "rows": [],
+    }  # fmt: skip
