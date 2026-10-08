@@ -700,6 +700,8 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
         asdict(scope.edge.outcome),
         scope.edge.universe,
     ]
+    if scope.edge.picks != "event":
+        payload.append(f"picks={scope.edge.picks}")
     if scope.overrides:  # a main or plain variant keeps its earlier key
         payload.append(scope.overrides)
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()

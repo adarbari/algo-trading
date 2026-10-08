@@ -254,6 +254,8 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     schedule = _schedule(t)
     outcome = _outcome(t, schedule)
     universe = _universe(t, edge_id)
+    base = _base(t, schedule)
+    picks = _picks(t, schedule, base)
     edge = Edge(
         id=edge_id,
         name=_required(t, "name"),
@@ -272,9 +274,9 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         rejection_reason=_prose(t, "rejection_reason"),
         notes=_prose(t, "notes"),
         frozen_from=_frozen_from(t),
-        base=_base(t, schedule),
-        picks=t.choice("picks", "event", PICKS),
-        variants=_variants(t, schedule, edge_id, universe),
+        base=base,
+        picks=picks,
+        variants=_variants(t, schedule, edge_id, universe, base, picks),
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
         promoted=_promoted(t),
@@ -366,6 +368,17 @@ def _base(t: Table, schedule: str, default: str | None = None) -> str:
     if base == "event" and not event:
         raise ConfigurationError(f"{t.where} base: 'event' needs an on_event schedule")
     return base
+
+
+def _picks(t: Table, schedule: str, base: str, default: str = "event") -> str:
+    """The table's ``picks`` (else ``default``): only an event schedule has picks to widen, and
+    picks outside the event names need the universe as the base rate (else they are dropped)."""
+    picks = t.choice("picks", default, PICKS)
+    if "picks" in t.names() and event_class(schedule) is None:
+        raise ConfigurationError(f"{t.where} picks: needs an on_event schedule")
+    if picks == "universe" and base != "universe":
+        raise ConfigurationError(f"{t.where} picks: 'universe' needs base = \"universe\"")
+    return picks
 
 
 def _outcome(t: Table, schedule: str) -> Outcome:
@@ -477,7 +490,12 @@ def _universe(t: Table, edge_id: str) -> str | Selection:
 
 
 def _variants(
-    t: Table, schedule: str, edge_id: str, universe: str | Selection
+    t: Table,
+    schedule: str,
+    edge_id: str,
+    universe: str | Selection,
+    edge_base: str,
+    edge_picks: str,
 ) -> tuple[EdgeVariant, ...]:
     raw = t.raw("variants")
     if raw is None:
@@ -499,12 +517,14 @@ def _variants(
             else {k: x for k, x in base.items() if k in SHARED_KEYS}
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
+        v_base = _base(v, schedule) if "base" in v.names() else None
+        _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(
                 id=vid,
                 outcome=_outcome_of(merged, schedule),
                 universe=_universe(v, f"{edge_id}-{vid}") if "universe" in v.names() else universe,
-                base=_base(v, schedule) if "base" in v.names() else None,
+                base=v_base,
                 picks=v.choice("picks", "event", PICKS) if "picks" in v.names() else None,
             )
         )

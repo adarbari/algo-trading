@@ -512,12 +512,21 @@ def test_a_picks_universe_variant_picks_outside_the_event_names_and_is_its_own_t
         for d, m in zip(decoy.stats, main.stats, strict=True)
     )
     assert [s.eligible for s in decoy.stats] == [N * 2, N]  # the universe is the base
+    assert [len(s.pick_values) for s in decoy.stats] == [N * 2, N]  # non-event names are picked
     assert ev.trials == 2
     write_edge_eval(w.results, ev, AS_OF)
     again = run(
         w, event_edge(2, variants=[{"id": "decoy", "base": "universe", "picks": "universe"}])
     )
-    changed = run(w, event_edge(2, variants=[{"id": "decoy", "picks": "universe"}]))
+    changed = run(
+        w,
+        event_edge(
+            2,
+            variants=[
+                {"id": "decoy", "base": "universe", "picks": "universe", "outcome": {"cost_bps": 5}}
+            ],
+        ),
+    )
     assert again.trials == 2 and changed.trials == 3  # an override is part of the trial key
     assert [m.hit_rate for m in again.results[0].measures] == [m.hit_rate for m in main.measures]
 

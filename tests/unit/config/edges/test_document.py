@@ -287,6 +287,29 @@ def test_a_variant_may_override_base_and_picks_each_checked_like_the_edges() -> 
         parse(schedule="month_end", variants=[{"id": "x", "base": "event"}])
 
 
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"picks": "universe", "base": "event"}, "needs base"),
+        ({"picks": "universe", "variants": [{"id": "x", "base": "event"}]}, "needs base"),
+        (
+            {"base": "universe", "variants": [{"id": "x", "picks": "universe", "base": "event"}]},
+            "needs base",
+        ),
+        ({"schedule": "month_end", "picks": "universe", "base": "universe"}, "needs an on_event"),
+        (
+            {"schedule": "month_end", "variants": [{"id": "x", "picks": "event"}]},
+            "needs an on_event",
+        ),
+    ],
+)
+def test_picks_from_the_universe_need_the_universe_base_and_an_event_schedule(
+    changes: Any, message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(**changes)
+
+
 # ---- expires_otm and kind-changing variants (ED4a) --------------------------------------
 
 OTM = {
