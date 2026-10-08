@@ -49,6 +49,7 @@ from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
+from algotrade_sources.vendors.tiingo.listings import TiingoSupportedTickers
 from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
@@ -153,6 +154,11 @@ def tiingo_prices() -> Adapter:
     return source, FetchRequest("AAPL:2020-08-27:2020-11-06")
 
 
+def tiingo_listings() -> Adapter:
+    source = TiingoSupportedTickers(http_for(lambda url: tiingo_payloads.supported_tickers_zip()))
+    return source, FetchRequest("supported_tickers")
+
+
 def massive_actions() -> Adapter:
     payload = massive_payloads.page(
         [{"ticker": "NVDA", "execution_date": "2026-09-30", "split_from": 1, "split_to": 10}]
@@ -254,6 +260,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "sec_company_facts": sec_company_facts,
     "massive_bars": massive_bars,
     "tiingo_prices": tiingo_prices,
+    "tiingo_listings": tiingo_listings,
     "massive_actions": massive_actions,
     "nasdaq_earnings": nasdaq_earnings,
     "cboe": cboe,

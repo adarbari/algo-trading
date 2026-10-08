@@ -1,7 +1,9 @@
 """Instrument identifiers (ADR 0009, ADR 0018).
 
 - Equities and ETFs: ``EQ:<composite FIGI>`` (``EQ:BBG000B9XRY4``) when the FIGI is known,
-  else the symbol id ``EQ:<SYMBOL>``. A FIGI id never changes, whatever the ticker does.
+  else, for a historic listing with a vendor permanent id, ``EQ:TIINGO:<permaTicker>``
+  (ADR 0018 amendment 2026-10-08), else the symbol id ``EQ:<SYMBOL>``. A FIGI id never
+  changes, whatever the ticker does.
 - Options: ``OPT:<OCC symbol>`` (``OPT:SPY261231C00586000``).
 - Index levels and macro series (ADR 0048): ``IDX:<KEY>`` (``IDX:SPX``) and ``MACRO:<KEY>``
   (``MACRO:T10Y3M``), not tradable; the keys come from ``config/site/macro.toml``.
@@ -36,10 +38,24 @@ def instrument_id(asset_class: AssetClass, symbol: str) -> str:
     return f"{asset_class.value}:{cleaned}"
 
 
-def equity_id(symbol: str, figi: str | None = None) -> str:
-    """The id rule for equities and ETFs: FIGI-based when a composite FIGI is known."""
-    has_figi = figi is not None and bool(str(figi).strip())
-    return instrument_id(AssetClass.EQUITY, str(figi) if has_figi else symbol)
+PERMA_NAMESPACE = "TIINGO"
+
+
+def _given(value: str | None) -> bool:
+    return value is not None and bool(str(value).strip())
+
+
+def equity_id(symbol: str, figi: str | None = None, perma_ticker: str | None = None) -> str:
+    """The id rule for equities and ETFs: FIGI-based when a composite FIGI is known, else
+    ``EQ:TIINGO:<permaTicker>`` when the vendor's permanent id is, else the symbol id.
+    A symbol never contains ``:`` (the namespaced key cannot collide with one)."""
+    if _given(figi):
+        return instrument_id(AssetClass.EQUITY, str(figi))
+    if _given(perma_ticker):
+        return instrument_id(AssetClass.EQUITY, f"{PERMA_NAMESPACE}:{str(perma_ticker).strip()}")
+    if ":" in symbol:
+        raise ValueError(f"a symbol never contains ':': {symbol!r}")
+    return instrument_id(AssetClass.EQUITY, symbol)
 
 
 def market_id(market: str) -> str:

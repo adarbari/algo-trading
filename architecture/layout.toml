@@ -134,6 +134,10 @@ path = "src/algotrade/data/funds"
 purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge"
 
 [[dir]]
+path = "src/algotrade/data/listings"
+purpose = "reads of instruments/listing_history (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing snapshot, which it names"
+
+[[dir]]
 path = "src/algotrade/data/macro"
 purpose = "reads of macro series and index levels (macro/series, ADR 0048): each observation's latest vintage a session knew, and the pit = lag vintage rule"
 
@@ -639,7 +643,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/reference"
-purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids"
+purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids, the vendor listing history"
 kind = "task-domain"
 
 [[dir]]
