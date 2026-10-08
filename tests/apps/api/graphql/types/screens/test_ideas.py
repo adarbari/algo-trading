@@ -48,7 +48,7 @@ def test_ideas_rank_the_runs_of_the_session_with_every_pick(graph: Graph) -> Non
     [screener] = [s for s in ideas["screeners"] if s["screener"]["id"] == "vrp_scanner"]
     assert len(ideas["screeners"]) == 9  # the other eight site presets have no run: NOT_RUN
     assert screener["screener"] == {
-        "id": "vrp_scanner", "owner": "site", "scope": "site", "name": "VRP", "version": 3,
+        "id": "vrp_scanner", "owner": "site", "scope": "site", "name": "VRP", "version": 4,
         "latestRun": {"runId": screener["run"]["runId"]}, "notRun": None,
     }  # fmt: skip
     run = screener["run"]
