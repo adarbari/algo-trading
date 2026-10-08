@@ -170,19 +170,23 @@ IV for a private evaluation. The research (with sources) is in the ED4 PR descri
 corrected it on point-in-time grounds.
 
 1. **Decision and entry sessions.** A harness row has a decision session D and an entry session
-   S = D + `start_offset_sessions`. The screen, eligibility, IV and the event set are read at D.
-   The outcome is the partition at S. An event counts only when `known_from <= D`.
-   - Schedules that are not event schedules need an offset of at least 1: the screen runs after
-     D's close, so the first fill is at S's close. The same holds for an event class not
-     announced ahead.
-   - A negative offset is allowed only for an event announced ahead (the earnings announcement
-     premium: -5 means D = A - 6).
+   S, always with S > D. The screen, eligibility, IV and the event set are read at D. The
+   outcome is the partition at S. An event counts only when `known_from <= D`.
+   - Non-event schedules: S = D + `start_offset_sessions`, with an offset of at least 1. The
+     screen runs after D's close, so the first fill is at S's close.
+   - Event schedules: the offset places the entry relative to the event's anchor session,
+     S = anchor + offset and D = S - 1.
+     - Post-earnings drift: anchor E+1 (the reaction's end), offset 1, so S = E+2 and D = E+1.
+     - Earnings announcement premium: anchor A (the expected report), offset -5, so S = A - 5
+       and D = A - 6.
+     - A negative offset is allowed only for an event announced ahead. An event class not
+       announced ahead needs an offset of at least 1.
    - The offset lives in the documents and the harness, never in the grain. Only a new horizon
      needs an outcomes backfill.
 2. **Expected report dates, never actual dates.** The stored history knows a report date only
    from that day (`known_from` = the report date before 2026-10-13). So the pre-announcement
    window reads `earnings_expected@v1`, whose `expected_basis` is one of:
-   - SCHEDULED: a date known by S;
+   - SCHEDULED: a date known by D;
    - PRIOR_YEAR: the year-ago same-quarter report + 364 days, known from that report
      (Frazzini and Lamont's method);
    - UNKNOWN: excluded with a reason, never read as "no earnings".
@@ -196,7 +200,8 @@ corrected it on point-in-time grounds.
    of the money.
    - Structure: `put` | `call` | `strangle`.
    - The strike comes from an exact Black-Scholes delta with r = q = 0,
-     K = S·exp(∓zσ√T + σ²T/2), z = N⁻¹(δ), with σ the run's `iv_field` at D (or `otm_pct`).
+     K = S·exp(∓zσ√T + σ²T/2), - for the put and + for the call, with δ = |delta| and
+     z = N⁻¹(1 - δ) > 0, and σ the run's `iv_field` at D (or `otm_pct`).
    - The hit compares `fwd_return` with K/S - 1.
    - The reference rate is the mean risk-neutral N(d2) per name (the joint form for a
      strangle), not 1 - δ.
@@ -216,6 +221,9 @@ corrected it on point-in-time grounds.
    class:
    - `earnings_reaction@v1.sessions_since_reaction == offset - 1`;
    - `earnings_expected@v1.sessions_to_expected_report == 1 - offset`.
+   Both read at D = S - 1, consistent with item 1. Events are deduplicated by (name, quarter)
+   when a PRIOR_YEAR expectation turns SCHEDULED. A name with no row is UNKNOWN (excluded with
+   a reason), never "no earnings" (the VRP earnings exclusion included).
    Event days are pooled into blocks of h sessions, one statistic per block, so overlapping
    windows never inflate the count of independent sessions. The picks are the screener's
    qualified names within the event names. The base (`base = "event" | "universe"`) is the
