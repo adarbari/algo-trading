@@ -8,11 +8,12 @@ its code on that machine.
 |---|---|
 | CI: changed areas | every run (seconds): decides which jobs a pull request needs |
 | CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Python changes |
-| CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests, three shards (`unit`; `apps`, `libs`, `contract`, `architecture`; the slow rest: property, integration, e2e, scripts, reconciliation) per Python version (3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests (the gate: fails on a failed shard; combines the shards' coverage, 90 %) | every run |
 | CI: web static (generated files fresh, ds:check, lint, types, unit) | web changes |
 | CI: web e2e (production build, Playwright, in the Playwright image) | web changes |
 | CI: web Storybook build (uploaded as the `storybook-static` artifact) | web changes |
-| CI: web screenshots + axe, two shards over the artifact, in the Playwright image | web changes |
+| CI: web screenshots + axe, four shards over the artifact, in the Playwright image | web changes |
 | CI: web (the gate: passes when the four web jobs passed or were skipped) | every run |
 | CI: real app smoke (Vite dev server + the real API, empty and golden stores) | Python or web changes |
 | Auto-merge sweeps | after every CI run and every 30 minutes |
@@ -42,10 +43,12 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 
 | Measure | Before (2026-10-07) | After |
 |---|---|---|
-| CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | the longest of four parallel web jobs: Storybook build (~2 min) then two screenshot shards (~3 min each); target 5–6 min; measured on the first PRs after this change |
+| CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | #280: 6.0 min (Storybook 30 s, then two screenshot shards of 5.3 min); P1b: four shards, each ~3 min, target under 4 min |
+| CI critical path on a Python PR | 12 min (the Web job; the tests job 5 min) | #280: 9.0 min, all of it the one pytest job (5 142 tests with branch coverage, 8 min 34 s); P1b: three shards + a combine job, target 4–5 min |
 | CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | the tests job runs `tests/architecture` only (~1 min) |
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR | narrowed by `make changed` (Local fast path below); the full pass still runs once per PR |
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
+| Several sessions on one machine | web servers fought over 8000 / 5173 / 4173 / 5801-5802 / 8801-8802 / 6007; two `make check` runs timed each other out; `pkill -f node` killed other sessions' runs | each worktree has its own port block (`ALGOTRADE_PORT_BASE` in `worktree.env`); `make check` refuses a second run in a worktree; `make doctor` lists the other runs and warns when the main checkout is off `main` or has local `config/site` edits |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
 | Merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push; `architecture/ownership.toml`, `layout.toml` and `web_layout.toml` entries are id-ordered inside each section (fitness test), so two PRs adding an entry stop colliding at the end of the file; screenshot baselines regenerate in CI on the `update-screenshots` label (below) instead of Docker; the roadmap's Now / Next is one line per track (details under "Track details"), so two PRs rarely edit the same line |
 
@@ -59,6 +62,28 @@ fast gates. Run the full `make check WORKERS=2 WEB_WORKERS=2` once before the pu
 failure rerun only the failed gate. The vitest pool is `vmThreads`: jsdom is created once per
 worker instead of once per file.
 
+Shared machine (several sessions, one Mac):
+
+- **Ports.** `scripts/worktree.sh` writes `ALGOTRADE_PORT_BASE = 10000 + cksum(path) % 500 * 10`
+  into `worktree.env`: API +0, Vite dev +1, real-app api/web pairs +2..+5, Storybook preview
+  +6, vite preview +7 (`vite.config.ts`, `playwright*.config.ts`). Unset (CI, the main
+  checkout) the usual numbers apply. Two worktrees can hash to one block (1 in 500): re-create one.
+- **`make check` lock.** `make check` is `scripts/ops/check_lock.sh make check-gates`: a
+  `mkdir` lock `var/check.lock.d` with the PID, stale when the PID is dead, released on exit.
+  A second `make check` in the same worktree refuses and names the first run's PID and start.
+  Stop a run by its PID, never `pkill -f make|node|vite|playwright` (a rule in CLAUDE.md).
+- **Deploy.** `scripts/ops/deploy.sh [--dry-run]` updates the running site from the main
+  checkout (must be on `main`, clean): pull, `make web-build`, restart the API agent, health.
+- **Machine-local site config.** `config/site/<name>.local.toml` (git-ignored) is merged over
+  `<name>.toml` (docs/configuration.md), so the main checkout stays clean for `deploy.sh`.
+
+### Permission prompts
+
+Commands the owner approves once in `.claude/settings.json` `permissions.allow` stop the
+prompts for the pipeline's own scripts: `launchctl kickstart`, `scripts/worktree.sh`,
+`scripts/ops/deploy.sh`, `scripts/merge_main.sh`, `gh pr ready`, `gh pr edit` (the proposed list
+is in the PR that added this note). Agents never edit `settings.json` themselves.
+
 How the web jobs are cut:
 
 - **web-static** (plain Node): `generated:check`, `ds:check`, lint, `npm run typecheck` (`tsc -b`,
@@ -71,7 +96,18 @@ How the web jobs are cut:
   the image tag matches the locked `@playwright/test`, screenshots + axe. Adding a shard is one
   matrix entry plus the `/2` in the command.
 - All four share one `apps/web/node_modules` cache keyed on the lockfile (`npm ci` only on a
-  miss); the real-app job uses the same cache.
+  miss); the real-app job uses the same cache. `npm audit` (44 s) runs only when a package
+  file changed (`changes.web_deps`): nothing else can alter its answer.
+
+How the Python tests are cut (`make test` locally is unchanged):
+
+- **test** runs three shards in parallel, `make test-shard SHARD=unit|apps|rest` (the folders
+  in the Makefile's `TEST_SHARD_*`; a fitness test keeps them covering every `tests/` folder),
+  each writing `.coverage.<shard>` with the gate off, uploaded as an artifact.
+- **tests** is the protected check `Tests (py3.12)`: it fails when a shard failed, then
+  downloads the three data files and runs `make coverage-combine` (`coverage combine`, the
+  90 % gate, `coverage.xml`). A web-only or docs-only PR runs `tests/architecture` in the
+  `rest` shard and the gate passes without coverage.
 
 ### Screenshot baselines from CI
 

@@ -8,7 +8,7 @@ description: End a session - propose harness learnings, update the roadmap's Now
 2. Update the "Now / Next" section of `docs/roadmap.md` for anything this session opened,
    closed or left running (PR numbers, detached jobs and their status files).
 3. If `wc -l CLAUDE.md` is 290 or more, run `.claude/skills/audit-harness` (report to the owner first).
-4. Run `scripts/worktree.sh --prune-merged --dry-run`; prune (without `--dry-run`) once this
-   session's PRs have merged.
+4. Run `scripts/worktree.sh --prune-merged --dry-run` and list what it would remove, then run
+   `scripts/worktree.sh --prune-merged` (it keeps every worktree whose PR is open or unmerged).
 5. Summarise in at most 8 lines: what merged, what is open, what is running, what the next
    session should pick up.

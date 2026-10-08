@@ -50,12 +50,43 @@ def test_storybook_is_built_once_and_handed_to_the_screenshot_shards() -> None:
     uploads = [s for s in jobs["web-storybook"]["steps"] if "upload-artifact" in str(s.get("uses"))]
     assert uploads and uploads[0]["with"]["name"] == "storybook-static"
     shards = jobs["web-screenshots"]
-    assert shards["strategy"]["matrix"]["shard"] == [1, 2]
+    count = len(shards["strategy"]["matrix"]["shard"])
+    assert shards["strategy"]["matrix"]["shard"] == list(range(1, count + 1)) and count >= 4
     steps = shards["steps"]
     assert any("download-artifact" in str(s.get("uses")) for s in steps)
     assert not any("storybook:build" in str(s.get("run", "")) for s in steps)
     visual = next(s["run"] for s in steps if "npm run visual" in str(s.get("run", "")))
-    assert "--shard=${{ matrix.shard }}/2" in visual
+    assert f"--shard=${{{{ matrix.shard }}}}/{count}" in visual
+    assert f"of {count})" in shards["name"]
+
+
+def test_pytest_shards_cover_every_test_folder_and_combine_under_the_protected_name() -> None:
+    makefile = (REPO / "Makefile").read_text()
+    shards = re.findall(r"^TEST_SHARD_(\w+) = (.+)$", makefile, flags=re.MULTILINE)
+    assert [name for name, _ in shards] == ["unit", "apps", "rest"]
+    covered = {folder for _, folders in shards for folder in folders.split()}
+    with_tests = {
+        f"tests/{d.name}"
+        for d in (REPO / "tests").iterdir()
+        if d.is_dir() and any(d.rglob("test_*.py"))
+    }
+    assert covered == with_tests, f"shards vs folders: {covered ^ with_tests}"
+    jobs = _jobs()
+    assert jobs["test"]["strategy"]["matrix"]["shard"] == [name for name, _ in shards]
+    assert "make test-shard SHARD=${{ matrix.shard }}" in str(jobs["test"]["steps"])
+    gate = jobs["tests"]
+    assert gate["name"] == "Tests (py${{ matrix.python }})"
+    assert set(gate["needs"]) == {"changes", "test"}
+    assert gate["if"].strip() == "${{ !cancelled() }}"
+    assert "make coverage-combine" in str(gate["steps"])
+    assert "--cov-fail-under=0" in makefile and "--fail-under=90" in makefile
+
+
+def test_npm_audit_runs_only_on_a_dependency_change() -> None:
+    jobs = _jobs()
+    audit = next(s for s in jobs["web-static"]["steps"] if "npm audit" in str(s.get("run", "")))
+    assert audit["if"].startswith("needs.changes.outputs.web_deps == 'true'")
+    assert "apps/web/package-lock.json" in jobs["changes"]["steps"][-1]["run"]
 
 
 def test_the_web_gate_waits_for_every_web_job_and_tolerates_skips() -> None:
@@ -73,7 +104,7 @@ def test_python_jobs_skip_web_only_and_docs_only_changes() -> None:
     full = next(s for n, s in steps.items() if n and n.startswith("Unit + architecture"))
     assert full["if"] == "needs.changes.outputs.python == 'true'"
     arch = next(s for n, s in steps.items() if n and n.startswith("Architecture tests only"))
-    assert arch["if"] == "needs.changes.outputs.python != 'true'"
+    assert arch["if"] == "needs.changes.outputs.python != 'true' && matrix.shard == 'rest'"
     assert "tests/architecture" in arch["run"]
     classify = jobs["changes"]["steps"][-1]["run"]
     assert "docs/* | .claude/* | *.md" in classify, "docs-only PRs run the architecture tests only"
@@ -84,7 +115,8 @@ def test_a_matrix_job_with_a_protected_name_has_no_job_level_if() -> None:
     name "Tests (py${{ matrix.python }})" and the protected "Tests (py3.12)" never appears."""
     for name, job in _jobs().items():
         if "matrix" in job.get("strategy", {}) and job["name"] in PROTECTED_CHECKS:
-            assert "if" not in job, f"{name}: put the condition on its steps, not the job"
+            condition = str(job.get("if", "")).strip()
+            assert condition in ("", "${{ !cancelled() }}"), f"{name}: condition the steps"
 
 
 def test_playwright_image_is_one_string_matching_the_lockfile() -> None:

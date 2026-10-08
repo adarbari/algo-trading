@@ -230,3 +230,6 @@ config/users/
 
 # per-worktree PYTHONPATH written by scripts/worktree.sh
 worktree.env
+
+# this machine's site values over config/site/<name>.toml (ADR 0015; docs/configuration.md)
+config/site/*.local.toml

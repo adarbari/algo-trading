@@ -216,6 +216,9 @@ The owner and CI use the defaults (`WORKERS=auto`).
 
 Token habits (every session):
 
+- **Never `pkill -f make`, `pkill -f node`, `pkill -f vite` or `pkill -f playwright`**: it kills
+  another session's 30-40 min run. Stop your own run by its PID or job; `make check` holds a
+  per-worktree lock (`scripts/ops/check_lock.sh`) and `make doctor` lists the other runs.
 - **One fresh session per work item**; batch related bugs into it. Sonnet for scoped fixes,
   Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
   Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
