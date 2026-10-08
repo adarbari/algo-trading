@@ -21,7 +21,7 @@ from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.derived import market_rollups, rollups
+from algotrade_ingestion.tasks.derived import market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
@@ -291,6 +291,10 @@ def _market_rollups(ctx: TaskContext, p: Params) -> RunRecord:
     return market_rollups.compute_market_rollups(
         ctx, session_of(p), p.get("start"), p.get("end"), _only(p)
     )
+
+
+def _outcomes(ctx: TaskContext, p: Params) -> RunRecord:
+    return outcomes.compute_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
 
 
 def _only(p: Params) -> list[str]:
@@ -707,6 +711,15 @@ TASKS: dict[str, Task] = {
                     "only", ("--only",), str, "comma-separated market rollups, e.g. market_trend@v2"
                 ),
             ),
+        ),
+        Task(
+            "outcomes",
+            "forward outcomes of the windows a session closes (ADR 0053); --from/--to: window ends",
+            outcomes,
+            outcomes.TABLES,
+            _outcomes,
+            settings="edges/*.toml (horizons, benchmarks)",
+            params=(SESSION, FROM, TO),
         ),
         Task(
             "verify",

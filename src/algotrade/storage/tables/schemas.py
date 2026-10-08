@@ -579,6 +579,38 @@ OPEN_PREFIXES = {
 }
 
 
+# Outcomes (ADR 0053): what happened after a start session S, read only by the harness
+# (``algotrade.data.outcomes``). One family of fixed tables ``outcomes/instrument/<name>@v<N>``;
+# the partition is S. Each night T writes the windows it closes (S = T - h sessions), so one
+# partition receives one run per horizon on different nights: runs merge, the latest run's row
+# winning per (instrument, horizon, benchmark). ``knowledge_ts`` is the write time, never before
+# the close of ``window_end`` (the writer refuses a window that has not closed).
+OUTCOMES_PREFIX = "outcomes/instrument/"
+FORWARD_RETURNS = f"{OUTCOMES_PREFIX}forward_returns@v1"  # the outcomes task's table
+OUTCOME_STATUSES = frozenset({"COMPLETE", "DELISTED"})
+_OUTCOME_TYPES = (
+    "instrument_id string!",
+    "ts timestamp_utc!",  # the close of S
+    "horizon_sessions int64!",
+    "window_end date!",  # T: the h-th exchange session after S
+    "benchmark string!",  # the benchmark ticker of fwd_excess_return
+    "fwd_return float64!",  # close(T) / close(S) - 1, split-adjusted as of T, price return
+    "fwd_excess_return float64",  # fwd_return - the benchmark's (null: no benchmark bar)
+    "fwd_max_return float64!",  # max high over (S, T] / close(S) - 1 (favourable excursion)
+    "fwd_max_drawdown float64!",  # 1 - min low over (S, T] / close(S), floored at 0 (adverse)
+    "fwd_realised_vol float64",  # annualised stdev of daily log close returns over (S, T]
+    "outcome_status string!",  # OUTCOME_STATUSES; DELISTED: measured to the last bar
+)
+
+
+def outcomes_spec(table: str) -> TableSpec:
+    """The spec of one ``outcomes/instrument/`` table (they share one schema)."""
+    return _fixed(
+        table, "outcome", ("instrument_id", "ts", "horizon_sessions", "window_end", "benchmark"),
+        *_OUTCOME_TYPES, runs="merge", key=("instrument_id", "horizon_sessions", "benchmark"),
+    )  # fmt: skip
+
+
 def result_table(name: str) -> str:
     """The table a result named ``name`` (a screener, a backtest output) is stored in."""
     return f"results/{name}"
@@ -592,6 +624,8 @@ def spec_for(table: str) -> TableSpec:
         if interval not in BAR_INTERVALS:
             raise DataValidationError(table, [f"unknown bar interval {interval!r}"])
         return _fixed(table, "bar", BAR_COLUMNS, *_BAR_TYPES)
+    if table.startswith(OUTCOMES_PREFIX) and len(table) > len(OUTCOMES_PREFIX):
+        return outcomes_spec(table)
     for prefix, grain in OPEN_PREFIXES.items():
         if table.startswith(prefix) and len(table) > len(prefix):
             required = ("instrument_id", "ts") if grain == "event" else ("instrument_id",)
@@ -630,6 +664,10 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
             problems.extend(vintage_problems(frame))
         if spec is MACRO_RELEASE_EVENTS:
             problems.extend(release_status_problems(frame))
+        if spec.grain == "outcome":
+            bad = sorted({str(v) for v in frame["outcome_status"]} - OUTCOME_STATUSES)
+            if bad:
+                problems.append(f"outcome_status must be one of {sorted(OUTCOME_STATUSES)}: {bad}")
     if problems:
         raise DataValidationError(table, problems)
 

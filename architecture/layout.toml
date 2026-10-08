@@ -138,6 +138,11 @@ path = "src/algotrade/data/macro"
 purpose = "reads of macro series and index levels (macro/series, ADR 0048): each observation's latest vintage a session knew, and the pit = lag vintage rule"
 
 [[dir]]
+path = "src/algotrade/data/outcomes"
+purpose = "reads of the outcomes grain (outcomes/instrument/, ADR 0053): what happened after a start session, the one table read across sessions, only by the edge harness"
+contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
+
+[[dir]]
 path = "src/algotrade/engines"
 purpose = "engines that run strategies or screeners over data views"
 contracts = ["Engines are independent of each other"]
@@ -645,6 +650,10 @@ reason = "the one core / rest tier rule (ADR 0043): the chain fetch order, the c
 module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"
 reason = "the coverage check is the rollups step's acceptance check (ADR 0043): the workflow declares which check accepts which step and runs it right after the step"
 
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
+reason = "`check_outcomes` is the outcomes step's acceptance check (ADR 0053 amendment, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
 # The web app's folders (the [web] settings and every [[web_dir]], ADR 0025) are in architecture/web_layout.toml.
 
 # --------------------------------------------------------------------------- tests (tests/)
@@ -685,6 +694,10 @@ purpose = "fitness tests: layout, ownership, structure, docs, registries"
 [[test_dir]]
 path = "tests/architecture/api"
 purpose = "fitness tests for the API surface and the read model"
+
+[[test_dir]]
+path = "tests/architecture/data"
+purpose = "fitness tests over the data layer's boundaries: which modules may import a quarantined reader (algotrade.data.outcomes, ADR 0053)"
 
 [[test_dir]]
 path = "tests/architecture/pipeline"

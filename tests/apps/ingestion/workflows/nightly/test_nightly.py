@@ -687,7 +687,9 @@ def test_notifies_on_failure_and_always_writes_the_summary(
     assert summary["status"] == "FAILED" and summary["sessions"] == [D.isoformat()]
     # The notice carries the full report (the email body): subject, text and HTML.
     (note,) = notifier.notices
-    assert note.subject == f"[algotrade] {D} nightly: FAILED · 4 steps with failures"
+    assert (
+        note.subject == f"[algotrade] {D} nightly: FAILED · 5 steps with failures"
+    )  # outcomes needs bars
     assert "bars FAILED: RuntimeError: bars broke" in note.text
     assert note.html.startswith("<!doctype html>") and "bars broke" in note.html
     assert summary["started_at"] <= summary["finished_at"]

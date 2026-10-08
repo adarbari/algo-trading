@@ -40,6 +40,7 @@ from algotrade.config.site.settings import NightlySettings, SourcesSettings, loa
 from algotrade.core.time.calendar import close_time, last_closed_session, local_deadline
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
+from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
 from algotrade_ingestion.tasks.framework.run import (
     RETRYABLE,
@@ -176,6 +177,9 @@ NIGHTLY: tuple[Step, ...] = (
     # the regime back (ADR 0039), while its groups read whatever macro/series holds, each value
     # point in time by vintage, and say UNKNOWN for what is missing.
     Step("market-rollups", needs=("rollups",), critical=False, accept=(check_market_rollups,)),
+    # Forward outcomes of the windows the session closes (ADR 0053), read only by the edge
+    # harness: bars and the splits that adjust them. Optional: never holds back the screens.
+    Step("outcomes", needs=("bars", "corporate-actions"), critical=False, accept=(check_outcomes,)),
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.

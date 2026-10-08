@@ -354,3 +354,8 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
 # `algotrade-ingest retire-features` (tasks/maintenance/retire_features.py) deletes them.
 # Every table may additionally be rewritten by the one-off id migration (ADR 0018):
 # apps/ingestion/algotrade_ingestion/tasks/maintenance/migrate_ids.py (an admin command, not a producer).
+
+[[table]]
+name = "outcomes/instrument/forward_returns@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
+note = "ADR 0053: forward outcomes per (instrument, start session, horizon, benchmark); read only by the edge harness through algotrade.data.outcomes"

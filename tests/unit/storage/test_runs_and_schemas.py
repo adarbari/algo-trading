@@ -4,7 +4,13 @@ import pytest
 
 from algotrade.core.model.errors import DataValidationError
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id, run_session
-from algotrade.storage.tables.schemas import TableSpec, spec_for, table_key, validate_frame
+from algotrade.storage.tables.schemas import (
+    FORWARD_RETURNS,
+    TableSpec,
+    spec_for,
+    table_key,
+    validate_frame,
+)
 from tests.helpers.stored_frames import stamped
 
 
@@ -130,3 +136,20 @@ def test_filing_rows_key_on_the_accession_and_require_known_from() -> None:
         validate_frame(
             "events/filing", stamped([{k: v for k, v in row.items() if k != "items"}], day, "r")
         )
+
+
+def test_outcome_tables_are_fixed_merge_tables_keyed_by_horizon_and_benchmark() -> None:
+    spec = spec_for(FORWARD_RETURNS)
+    assert (spec.grain, spec.runs, spec.open_ended) == ("outcome", "merge", False)
+    assert table_key(spec, []) == ["instrument_id", "horizon_sessions", "benchmark"]
+    row = {
+        "instrument_id": "EQ:A", "ts": datetime(2026, 9, 1, 20, tzinfo=UTC),
+        "horizon_sessions": 20, "window_end": date(2026, 9, 29), "benchmark": "SPY",
+        "fwd_return": 0.1, "fwd_max_return": 0.2, "fwd_max_drawdown": 0.05,
+        "outcome_status": "PENDING",
+    }  # fmt: skip
+    with pytest.raises(DataValidationError, match="outcome_status"):
+        validate_frame(FORWARD_RETURNS, stamped([row], date(2026, 9, 1), "r"))
+    validate_frame(
+        FORWARD_RETURNS, stamped([{**row, "outcome_status": "COMPLETE"}], date(2026, 9, 1), "r")
+    )
