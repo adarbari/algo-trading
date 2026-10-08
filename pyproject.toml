@@ -384,6 +384,12 @@ forbidden_modules = [
 allow_indirect_imports = true  # as for preview: the use cases' naming helpers sit beside their writers
 
 [[tool.importlinter.contracts]]
+name = "The read model never reaches the edge harness or the outcomes, even indirectly (ADR 0053)"
+type = "forbidden"
+source_modules = ["algotrade.services.read"]
+forbidden_modules = ["algotrade.services.evaluation", "algotrade.data.outcomes"]
+
+[[tool.importlinter.contracts]]
 name = "GraphQL types are thin: only services.read, config, core (ADR 0037)"
 type = "forbidden"
 source_modules = ["algotrade_api.graphql"]
@@ -416,6 +422,22 @@ source_modules = ["algotrade", "algotrade_api", "algotrade_ingestion", "algotrad
 forbidden_modules = ["algotrade.storage.tables.live_writer"]
 ignore_imports = ["algotrade.services.live.recorder -> algotrade.storage.tables.live_writer"]
 allow_indirect_imports = true  # the API reaches it only through services.live
+
+# ---- ADR 0058: the text model's usage log writes only usage/* tables, only through the usage writer.
+
+[[tool.importlinter.contracts]]
+name = "Text-model usage writes only usage/* tables: no market-data writer, no jobs (ADR 0058)"
+type = "forbidden"
+source_modules = ["algotrade.services.text_model"]
+forbidden_modules = ["algotrade.storage.tables.writers", "algotrade.services.jobs"]
+
+[[tool.importlinter.contracts]]
+name = "Only the text-model usage recorder imports the usage writer (ADR 0058)"
+type = "forbidden"
+source_modules = ["algotrade", "algotrade_api", "algotrade_ingestion", "algotrade_backtest"]
+forbidden_modules = ["algotrade.storage.tables.usage_writer"]
+ignore_imports = ["algotrade.services.text_model.usage -> algotrade.storage.tables.usage_writer"]
+allow_indirect_imports = true  # the API reaches it only through services.text_model
 
 # ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
 # (no `pending_contract` remains in architecture/ownership.toml; a fitness test keeps it so).

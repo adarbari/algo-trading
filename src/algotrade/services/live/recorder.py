@@ -10,27 +10,21 @@ taken in (the last session before it, outside one), ``knowledge_ts`` the time it
 ``source`` ``ibkr``. Only ``live/*`` tables, only through ``LiveWriter`` (ADR 0028).
 """
 
-import logging
-import queue
-import threading
 from collections.abc import Callable
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from typing import Protocol, cast
 
 import pandas as pd
 
 from algotrade.core.time.calendar import exchange_date, is_session, previous_session
 from algotrade.storage.factory import open_backend
-from algotrade.storage.runs import start_run
+from algotrade.storage.recording import BatchRecorder
 from algotrade.storage.tables.live_writer import LiveWriter
-
-log = logging.getLogger(__name__)
 
 TABLE = "live/option_quotes"
 JOB = "live_quotes"
 SOURCE = "ibkr"
 BATCH = 50  # snapshots per run at most
-_STOP = None
 
 
 class Recorder(Protocol):
@@ -45,7 +39,7 @@ def quote_session(at: datetime) -> date:
     return day if is_session(day) else previous_session(day)
 
 
-class LiveRecorder:
+class LiveRecorder(BatchRecorder[pd.DataFrame]):
     """Writes submitted snapshots (rows with ``ts``) to ``live/option_quotes`` on its thread."""
 
     def __init__(
@@ -54,58 +48,15 @@ class LiveRecorder:
         maxsize: int = 200,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
-        self._writer, self._clock = writer, clock
-        self._queue: queue.Queue[pd.DataFrame | None] = queue.Queue(maxsize)
-        self._last_run = ""
-        self.written = 0  # runs committed
-        self._thread = threading.Thread(target=self._drain, name="live-recorder", daemon=True)
-        self._thread.start()
+        self._writer = writer
+        super().__init__(JOB, "quotes", BATCH, maxsize, clock)
 
     def submit(self, rows: pd.DataFrame) -> bool:
         """Queue ``rows`` for writing; ``False`` (dropped) when empty or the queue is full."""
-        if rows.empty:
-            return False
-        try:
-            self._queue.put_nowait(rows)
-        except queue.Full:
-            log.warning("live recorder queue full: %d quotes not recorded", len(rows))
-            return False
-        return True
+        return not rows.empty and self._put(rows, len(rows))
 
-    def flush(self) -> None:
-        """Wait until everything submitted so far is written (tests, shutdown)."""
-        self._queue.join()
-
-    def close(self, timeout_s: float = 10.0) -> None:
-        """Write what is queued, then stop the thread."""
-        self._queue.put(_STOP)
-        self._thread.join(timeout_s)
-
-    # ------------------------------------------------------------------ on the thread
-
-    def _drain(self) -> None:
-        while True:
-            first = self._queue.get()
-            batch = [first]
-            while first is not None and len(batch) < BATCH:
-                try:
-                    batch.append(self._queue.get_nowait())
-                except queue.Empty:
-                    break
-            frames = [b for b in batch if b is not None]
-            try:
-                if frames:
-                    self._write(pd.concat(frames, ignore_index=True))
-            except Exception:
-                log.exception("live quotes not recorded (%d snapshots)", len(frames))
-            finally:
-                for _ in batch:
-                    self._queue.task_done()
-            if any(b is None for b in batch):
-                return
-
-    def _write(self, rows: pd.DataFrame) -> None:
-        now = self._clock()
+    def _write(self, items: list[pd.DataFrame], now: datetime) -> None:
+        rows = pd.concat(items, ignore_index=True)
         ts = pd.to_datetime(rows["ts"], utc=True)
         rows = rows.assign(
             ts=ts,
@@ -113,22 +64,11 @@ class LiveRecorder:
             knowledge_ts=ts,
             source=SOURCE,
         ).drop_duplicates(["instrument_id", "ts"], keep="last")
-        run_id = self._run_id(rows["session_date"].max(), now)
+        run_id = self.run_id(rows["session_date"].max(), now)
         with self._writer.publishing(run_id, now):
             for session, part in rows.groupby("session_date", sort=True):
                 frame = part.assign(run_id=run_id).reset_index(drop=True)
                 self._writer.write_live(TABLE, cast(date, session), run_id, frame)
-        self.written += 1
-
-    def _run_id(self, session: date, now: datetime) -> str:
-        """A fresh run id (ids have one-second resolution: a second run in the same second
-        takes the next second)."""
-        run_id = start_run(JOB, session, now).run_id
-        while run_id <= self._last_run:
-            now += timedelta(seconds=1)
-            run_id = start_run(JOB, session, now).run_id
-        self._last_run = run_id
-        return run_id
 
 
 def open_recorder(data_url: str) -> LiveRecorder:

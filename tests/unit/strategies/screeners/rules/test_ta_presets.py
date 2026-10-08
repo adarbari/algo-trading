@@ -164,3 +164,38 @@ def test_pead_small_cap_needs_a_reaction_of_five_percent_and_ranks_the_largest_f
         decisions[i] is Decision.REJECT
         for i in ("EQ:FLAT", "EQ:THIN", "EQ:CAP", "EQ:INCOMPLETE", "EQ:NONE")
     )
+
+
+def test_eap_presets_take_an_expected_date_never_unknown_and_eap_volume_ranks_by_volume() -> None:
+    """The earnings announcement premium screens (ADR 0053, ED4c): liquid common stock or ADR
+    with a SCHEDULED or PRIOR_YEAR expected report (UNKNOWN never passes); eap_volume also needs
+    the earnings volume ratio and ranks by it, largest first."""
+    basis = "rollup.earnings_expected@v1.expected_basis"
+    ratio = "rollup.earnings_reaction@v1.earnings_volume_ratio"
+    for preset, signal in (("eap_all", None), ("eap_volume", ratio)):
+        spec = resolve_config(STORE, preset, UserContext("site")).screen_spec
+        assert tuple(c.id for c in spec.criteria)[:4] == BASE
+        base = {c.rule.field: _passing(c) for c in spec.criteria}
+        view = FeatureView(
+            DAY,
+            {
+                "EQ:SCHED": {**base, basis: "SCHEDULED", **({ratio: 3.0} if signal else {})},
+                "EQ:LOW": {**base, basis: "SCHEDULED", **({ratio: 1.5} if signal else {})},
+                "EQ:PRIOR": {**base, basis: "PRIOR_YEAR", **({ratio: 5.0} if signal else {})},
+                "EQ:UNKNOWN": {**base, basis: "UNKNOWN"},
+                "EQ:THIN": {**base, "rollup.price_stats@v2.adv_usd_20d": 1e6},
+                "EQ:NORATIO": {k: v for k, v in base.items() if k != ratio},
+            },
+        )
+        rows = evaluate_screen(spec, view).rows
+        decisions = {r.instrument_id: r.decision for r in rows}
+        assert decisions["EQ:UNKNOWN"] is Decision.REJECT
+        assert decisions["EQ:THIN"] is Decision.REJECT
+        qualified = [r.instrument_id for r in rows if r.decision is Decision.QUALIFIED]
+        if signal:
+            assert decisions["EQ:NORATIO"] is Decision.REJECT
+            assert decisions["EQ:LOW"] is Decision.REJECT  # under the cut of 2
+            assert qualified == ["EQ:PRIOR", "EQ:SCHED"]  # the larger ratio first
+            assert spec.tie_break == ratio and spec.tie_break_descending
+        else:
+            assert set(qualified) >= {"EQ:SCHED", "EQ:PRIOR"}

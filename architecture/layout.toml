@@ -143,6 +143,10 @@ purpose = "reads of the outcomes grain (outcomes/instrument/, ADR 0053): what ha
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
 
 [[dir]]
+path = "src/algotrade/data/usage"
+purpose = "reads of the usage grain (usage/, ADR 0058): what the API's text model spent, over a date range; seeds the budget ledger and feeds the Admin usage page"
+
+[[dir]]
 path = "src/algotrade/engines"
 purpose = "engines that run strategies or screeners over data views"
 contracts = ["Engines are independent of each other"]
@@ -324,6 +328,11 @@ purpose = "why a fact is not available, and who may know (ADR 0056): the public 
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/evaluation"
+purpose = "read objects over the edge evaluation (ADR 0053): the edge documents with their status, an edge's committed evaluation runs and their rows (read by run: results/edge_eval is partitioned by the range end), and a screener's track record from the canonical run's frozen slice"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/events"
 purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -370,7 +379,11 @@ contracts = ["Layout: use-case packages are independent (backtests, screening, a
 
 [[dir]]
 path = "src/algotrade/services/text_model"
-purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08); no vendor, no storage"
+purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08), with the usage ledger (prices, budget) and the background recorder of usage/llm_calls (ADR 0058); no vendor, no market-data writer, no jobs"
+contracts = [
+    "Text-model usage writes only usage/* tables: no market-data writer, no jobs (ADR 0058)",
+    "Only the text-model usage recorder imports the usage writer (ADR 0058)",
+]
 
 [[dir]]
 path = "src/algotrade/storage"
@@ -481,6 +494,11 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types"
 purpose = "GraphQL object types, one module per domain read object, split by area (instruments/, events/, screens/, ops/); here only the Query root, Session and the shared Unavailable / Cause (availability.py, ADR 0056): fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/evaluation"
+purpose = "GraphQL types over the edge evaluation (mirrors services/read/evaluation): Edge, EdgeRun, EdgeRow, TrackRecord"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
@@ -826,7 +844,27 @@ purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, fiel
 
 [[config_dir]]
 path = "config/site/guide/playbooks"
-purpose = "the Guide's playbook prose (ADR 0051), one <id>.toml per site rule-screen preset: summary, what a hit looks like, what it does not check, the caveats before acting, related playbooks, sources and what each criterion asks (loaded by config/site/guide/playbooks.py; fitness tests: one per preset, asks match the latest version)"
+purpose = "the Guide's playbook prose (ADR 0051), one subfolder per playbook family of config/site/guide/sections.toml (the 12-file cap per folder), one <id>.toml per site rule-screen preset in its family's folder: summary, what a hit looks like, what it does not check, the caveats before acting, related playbooks, sources and what each criterion asks (loaded by config/site/guide/playbooks.py, one level of subfolders; fitness tests: one per preset, in its family's folder, asks match the latest version)"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/trend"
+purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/breakouts"
+purpose = "the Guide's playbooks of the breakout family (range breakout, breakout, failed breakout): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/reversals"
+purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/income"
+purpose = "the Guide's playbooks of the option income family (VRP scanner): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/events"
+purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/regime"

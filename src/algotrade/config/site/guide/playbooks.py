@@ -1,4 +1,4 @@
-"""The Guide's playbook prose (``config/site/guide/playbooks/<id>.toml``, ADR 0051; spec
+"""The Guide's playbook prose (``config/site/guide/playbooks/<family>/<id>.toml``, ADR 0051; spec
 ``docs/ui/guide.md`` "The playbook page"): one file per site rule-screen preset, kept apart
 from the preset because a preset version is immutable and its explanation is not. Keys:
 ``id`` (the file's name), ``version`` (the preset version the prose was written for: a new
@@ -21,7 +21,7 @@ from typing import Any, Protocol
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.core.model.errors import ConfigurationError
 
-FOLDER = "guide_playbooks"  # the config store's kind: site/guide/playbooks/<id>.toml
+FOLDER = "guide_playbooks"  # the config store's kind: site/guide/playbooks/<family>/<id>.toml
 KEYS = (
     "id",
     "version",
@@ -73,7 +73,7 @@ class PlaybookProse:
 
     @classmethod
     def from_document(cls, name: str, doc: Mapping[str, Any] | None) -> "PlaybookProse":
-        where = f"guide/playbooks/{name}.toml"
+        where = f"guide/playbooks/<family>/{name}.toml"
         reject_secrets(doc or {}, where)
         t = Table(doc, where)
         t.only(KEYS)
@@ -111,7 +111,7 @@ class GuidePlaybooks:
 
 
 def load_guide_playbooks(configs: Documents) -> GuidePlaybooks:
-    """``config/site/guide/playbooks/*.toml`` in file-name order."""
+    """``config/site/guide/playbooks/<family>/*.toml`` in file-name order."""
     names = configs.names("site", FOLDER)
     return GuidePlaybooks(
         tuple(PlaybookProse.from_document(n, configs.load("site", FOLDER, n)) for n in names)

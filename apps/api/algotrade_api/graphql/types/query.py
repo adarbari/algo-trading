@@ -16,6 +16,8 @@ import strawberry
 from anyio import to_thread
 from strawberry.types import Info
 
+from algotrade.services.read.evaluation import edges as edge_reads
+from algotrade.services.read.evaluation import runs as edge_runs
 from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
 from algotrade.services.read.guide import episode as episode_page
@@ -37,6 +39,7 @@ from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.limits import MAX_DAYS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
+from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeRun
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
 from algotrade_api.graphql.types.guide.field import GuideField
@@ -358,6 +361,33 @@ class Query:
         ctx = info.context.stores()
         found = backtests.load_backtests(ctx) if ctx is not None else ()
         return [Backtest.of(b) for b in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Every edge the user sees (ADR 0053), by id: status, thesis, the screeners "
+        "that implement it and its evaluation runs; not session data"
+    )
+    def edges(self, info: Ctx) -> list[Edge]:
+        ctx = info.context.stores()
+        found = edge_reads.load_edges(ctx) if ctx is not None else ()
+        return [Edge.of(e, ctx) for e in found] if ctx is not None else []
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The edge `id`; null: the user has no such edge"
+    )
+    def edge(self, info: Ctx, id: str) -> Edge | None:
+        ctx = info.context.stores()
+        found = edge_reads.load_edge(ctx, id) if ctx is not None else None
+        return Edge.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Every committed evaluation run of the edge `edgeId` the user sees (theirs, "
+        "then the site's), newest first; empty: no such edge or no run. Read by run, as the "
+        "run left it (never by session)"
+    )
+    def edge_runs(self, info: Ctx, edge_id: str) -> list[EdgeRun]:
+        ctx = info.context.stores()
+        found = edge_runs.load_runs_of(ctx, edge_id) if ctx is not None else ()
+        return [EdgeRun.of(r, ctx) for r in found] if ctx is not None else []
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The saved backtest run `runId`; null: no such backtest run"
