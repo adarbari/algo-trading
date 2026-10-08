@@ -87,6 +87,7 @@ def test_a_leveraged_fund_inherits_its_references_earnings() -> None:
     assert report.name == "AAA reports after the close (confirmed)"
     assert found.filings == ()
     assert _gaps(found) == {
+        OWN_EARNINGS: UnknownCode.NOT_APPLICABLE,  # a fund has no earnings of its own
         "filings": UnknownCode.NOT_APPLICABLE,
         "ladder": UnknownCode.NO_ROW,  # the session's chain has no AAAU quotes
     }
@@ -113,6 +114,7 @@ def test_an_etf_and_an_unknown_instrument() -> None:
     etf = found["EQ:ETFX"]
     assert etf.reference is None
     assert _gaps(etf) == {
+        OWN_EARNINGS: UnknownCode.NOT_APPLICABLE,
         "filings": UnknownCode.NOT_APPLICABLE,
         "ladder": UnknownCode.NO_ROW,
     }

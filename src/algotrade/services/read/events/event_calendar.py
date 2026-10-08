@@ -17,7 +17,7 @@ from datetime import date, timedelta
 from algotrade.core.time.calendar import is_session, sessions_between
 from algotrade.services.events.scope import LIST, scoped_instruments
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.events.ahead import AheadEvent, EventGap, load_ahead
+from algotrade.services.read.events.ahead import OWN_EARNINGS, AheadEvent, EventGap, load_ahead
 from algotrade.services.read.instruments.identity import load_instruments
 
 
@@ -63,6 +63,12 @@ class EventCalendar:
     unresolved: tuple[str, ...]
 
 
+def _fund_own(gap: EventGap, funds: set[str]) -> bool:
+    """A fund's own-earnings gap: an ETF never reports, so the calendar banner skips it (the
+    instrument page keeps it, its reference earnings being the fund's exposure)."""
+    return gap.part == OWN_EARNINGS and gap.instrument_id in funds
+
+
 def load_event_calendar(
     ctx: ReadContext, instrument_ids: Sequence[str], days: int, scope: bool = False
 ) -> EventCalendar:
@@ -79,6 +85,7 @@ def load_event_calendar(
     known = load_instruments(ctx, wanted)
     names = tuple(CalendarName(i, known[i].symbol) for i in wanted if i in known)
     ahead = load_ahead(ctx, [n.instrument_id for n in names], end)
+    funds = {i for i in wanted if i in known and known[i].is_etf}
     entries = [
         CalendarEvent(n.instrument_id, n.symbol, e)
         for n in names
@@ -95,7 +102,10 @@ def load_event_calendar(
         days=tuple(
             CalendarDay(d, is_session(d), tuple(found)) for d, found in sorted(by_day.items())
         ),
-        gaps=(*(g for n in names for g in ahead.gaps[n.instrument_id]), *ahead.market_gaps),
+        gaps=(
+            *(g for n in names for g in ahead.gaps[n.instrument_id] if not _fund_own(g, funds)),
+            *ahead.market_gaps,
+        ),
         missing=tuple(i for i in wanted if i not in known),
         unresolved=tuple(unresolved),
     )
