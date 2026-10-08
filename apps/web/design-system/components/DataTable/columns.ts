@@ -51,7 +51,7 @@ export interface DataTableColumn<TRow> {
   /** Can be hidden from the column picker (default true). */
   hideable?: boolean;
   /**
-   * Shown on a narrow table (a phone) by default; the rest wait in the column picker. When no
+   * Shown on a narrow table (under `sm`: a phone) by default; the rest wait in the column picker. When no
    * column of a table is marked, its first `NARROW_COLUMNS` columns are. Columns that cannot
    * be hidden always show.
    */

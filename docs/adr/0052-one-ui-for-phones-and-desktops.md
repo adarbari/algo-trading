@@ -58,7 +58,8 @@ to the space and the pointer it has.
   more than one workspace; the bar is brand, sections, the Guide, the status chips and the
   name, a two-row grid under 720 px (about 100 px on a phone; the phone e2e bounds it at 112 px).
   ADR 0025's "switched in a horizontal top bar" reads with this amendment.
-- **Narrow tables show their `essential` columns** (else the first three) and the column picker,
+- **Narrow tables (under `sm`, 480 px: a phone, not a desktop's aside column) show their
+  `essential` columns** (else the first three) and the column picker,
   so the user adds the rest; the catalogue columns are hideable there.
 - **Tooltips open on a tap** under a coarse pointer; **keyboard hints** are a `KeyHints` row the
   design system hides under a coarse pointer; a table row that opens something takes a tap

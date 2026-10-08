@@ -10,9 +10,9 @@
  * Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the
  * caller's own `rowKeys` act on it); the active row can be controlled; horizontal
  * scrolling on narrow widths, with the checkbox column and the first column pinned at the start
- * (the row's key stays in view; `pinFirst`). Under the `md` breakpoint (its own width: a phone)
- * only the `essential` columns show by default (else the first three) and the column picker
- * appears so the user adds the rest back. Built on TanStack Table + Virtual, which stay internal.
+ * (the row's key stays in view; `pinFirst`). Under the `sm` breakpoint (its own width: a phone,
+ * not a desktop's aside column) only the `essential` columns show by default (else the first
+ * three) and the column picker appears so the user adds the rest back. Built on TanStack Table + Virtual, which stay internal.
  */
 import {
   useTable,
@@ -154,7 +154,7 @@ export function DataTable<TRow extends RowData>({
 }: DataTableProps<TRow>) {
   const id = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [rootRef, narrow] = useNarrow('md');
+  const [rootRef, narrow] = useNarrow('sm');
   // Scrolled sideways: the pinned column shows its end border over the cells sliding under it.
   const [scrolledX, setScrolledX] = useState(false);
   const { base: baseHeight, row: rowHeight } = useRowHeight(scrollRef, rowLines);

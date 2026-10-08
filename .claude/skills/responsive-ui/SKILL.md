@@ -32,7 +32,8 @@ Never a mobile page, route, widget or component variant: adapt the one component
    action (a button exists too). Shortcut hints are a `KeyHints` row (hidden under a coarse
    pointer by the design system), never Kbd + Text in page code.
 5. **Tables** are `DataTable` with the key column pinned (`pinFirst`, default on) and
-   sideways scroll; never a second "cards" table. Under `md` the table shows only its
+   sideways scroll; never a second "cards" table. Under `sm` (480: a phone, not a desktop's
+   aside column, which is about 600 px) the table shows only its
    `essential` columns (else the first three; a column with `hideable: false` always) and its
    column picker, so the user adds the rest: mark the columns a phone needs `essential` in the
    column factory. A row that opens something passes `onRowActivate` (a tap is a click).
