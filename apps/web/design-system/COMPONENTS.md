@@ -929,6 +929,15 @@ Source: `design-system/components/NumberInput`
 | `readOnly` | `boolean` | no |  |
 | `name` | `string` | no |  |
 
+### OddsLine
+
+OddsLine: an edge's evidence for a pick in one line: hit rate against the base rate, the lift, the independent sessions behind them, optionally the picks and the run it came from. The hit rate, base rate and sessions are required together, so a bare hit rate cannot be shown. An exploratory run (read outside the frozen period) carries a visible EXPLORATORY badge. States: loading (placeholder), empty (no run yet) and error (the evidence failed to load). Explanations are not written here: the `info` slot takes an InfoButton given a Guide entry. It wraps in a narrow container.
+
+Source: `design-system/components/OddsLine`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+
 ### OptionList
 
 OptionList: a scrolling list of choices, each a short name (optionally monospace, for field and symbol names) over a one-line description, one of them the current choice. A choice is a button; the current one carries `aria-current` and the accent tint, so colour is never the only signal (the selected row is also announced). Controlled: `value` in, `onSelect(id)` out. Taller than `maxHeight` it scrolls inside itself, so it never grows a page; loading shows placeholders, an empty list shows the empty message. For a choice made once and closed use Select; for many choices to filter use Combobox.
@@ -1296,6 +1305,18 @@ Source: `design-system/components/TopBar`
 | `nav` | `ReactNode` | no | The workspace's section links (NavTabs). |
 | `utility` | `ReactNode` | no | A utility link on the far side, before `end` (a TextLink to the Guide), in every workspace. |
 | `end` | `ReactNode` | no | Content at the far end: a SearchInput, an as-of date, a status note. |
+
+### TrackRecordChip
+
+TrackRecordChip: a screener's track record in one small badge: `evidenced` (an edge passed the frozen period), `candidate` with the independent sessions so far, or `not-run`. A figure from an exploratory run never feeds it: `exploratory` renders nothing at all. The state is always in words; colour only reinforces it. Not interactive.
+
+Source: `design-system/components/TrackRecordChip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `status` | `TrackRecordStatus` | yes | `evidenced`, `candidate` or `not-run`. |
+| `sessions` | `number` | no | Independent sessions behind a `candidate` (written as "Candidate · 42 sessions"). |
+| `exploratory` | `boolean` | no | The record comes from an exploratory run: nothing is rendered. |
 
 ### WorkspaceSwitch
 
