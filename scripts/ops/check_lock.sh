@@ -32,9 +32,12 @@ if ! take; then
       "never with pkill. Lock: $lock" >&2
     exit 1
   fi
-  rm -rf "$lock"  # stale: its process is gone
+  # stale: its process is gone. Move it aside atomically (only one racer wins the mv), so a
+  # run that took the lock meanwhile is never deleted, then take it and re-check we hold it.
+  if mv "$lock" "$lock.stale.$$" 2>/dev/null; then rm -rf "$lock.stale.$$"; fi
   take || { echo "refusing: lost the race for $lock to another run" >&2; exit 1; }
 fi
+[ "$(cat "$lock/pid" 2>/dev/null)" = "$$" ] || { echo "refusing: lost $lock" >&2; exit 1; }
 trap 'rm -rf "$lock"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM

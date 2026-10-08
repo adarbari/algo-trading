@@ -163,6 +163,17 @@ def test_a_local_site_file_overlays_the_committed_one(tmp_path: Path) -> None:
     assert store.load("site", "settings", "llm") == {
         "enabled": True, "model": "a", "request": {"x": 1, "y": 3},
     }  # fmt: skip
-    (site / "nightly.local.toml").write_text("a = 1\n")  # a local file alone still loads
-    assert store.load("site", "settings", "nightly") == {"a": 1}
     assert store.names("site", "settings") == ["llm"]  # never ``llm.local``
+    assert FileConfigStore(tmp_path, local=False).load("site", "settings", "llm") == {
+        "enabled": False, "model": "a", "request": {"x": 1, "y": 2},
+    }  # fmt: skip
+
+
+def test_only_allowlisted_settings_take_a_local_file(tmp_path: Path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "users.toml").write_text('[[user]]\nid = "a"\nrole = "trader"\n')
+    (site / "users.local.toml").write_text('[[user]]\nid = "root"\nrole = "admin"\n')
+    assert FileConfigStore(tmp_path).load("site", "settings", "users") == {
+        "user": [{"id": "a", "role": "trader"}]
+    }

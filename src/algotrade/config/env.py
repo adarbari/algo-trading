@@ -15,6 +15,7 @@ CONFIG_DIR = "ALGOTRADE_CONFIG_DIR"
 DEFAULT_CONFIG_DIR = "config"
 USER = "ALGOTRADE_USER"
 API_DEBUG = "ALGOTRADE_API_DEBUG"  # "1": the API serves the GraphiQL IDE (local development)
+PORT_BASE = "ALGOTRADE_PORT_BASE"  # first of a worktree's ports: the API serves on it
 CORS_ORIGINS = "ALGOTRADE_CORS_ORIGINS"  # comma-separated web origins the API allows (hosting)
 # The built web app the API serves on its own origin (ADR 0044): `var/web` after
 # `make web-build`; unset: the API serves no files (development runs the Vite dev server).
@@ -88,6 +89,12 @@ def load_dotenv(path: Path = Path(".env")) -> None:
             continue
         key, _, value = line.partition("=")
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def port_base(default: int) -> int:
+    """``$ALGOTRADE_PORT_BASE`` (a worktree's ports, ``scripts/worktree.sh``), else ``default``."""
+    raw = credential(PORT_BASE) or ""
+    return int(raw) if raw.isdigit() else default
 
 
 def credential(name: str) -> str | None:

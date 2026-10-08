@@ -79,6 +79,9 @@ def read_toml(path: Path) -> dict[str, Any] | None:
 
 
 LOCAL_SUFFIX = ".local"  # site/<name>.local.toml: git-ignored, this machine's site values
+# The settings a machine may override. users.toml (roles), rollups, universe and the rest decide
+# stored values or access, which a git-ignored file would change untraced: never overlaid.
+LOCAL_SETTINGS = ("llm",)
 
 
 def merge_local(base: Mapping[str, Any], local: Mapping[str, Any]) -> dict[str, Any]:
@@ -93,8 +96,10 @@ def merge_local(base: Mapping[str, Any], local: Mapping[str, Any]) -> dict[str, 
 
 
 class FileConfigStore:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, local: bool = True) -> None:
+        """``local=False`` ignores ``site/<name>.local.toml`` (tests over the repo's config)."""
         self.root = root
+        self.local = local
 
     def _path(self, scope: str, kind: str, name: str) -> Path:
         if kind not in KINDS:
@@ -167,7 +172,7 @@ class FileConfigStore:
         if kind == SCREENERS:
             return self._screen(scope, name)
         document = read_toml(self._path(scope, kind, name))
-        if scope == SITE and kind == "settings":  # this machine's values (git-ignored)
+        if self.local and scope == SITE and kind == "settings" and name in LOCAL_SETTINGS:
             local = read_toml(self._path(scope, kind, name).with_suffix(f"{LOCAL_SUFFIX}.toml"))
             if local is not None:
                 return merge_local(document or {}, local)

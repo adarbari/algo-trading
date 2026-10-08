@@ -9,7 +9,7 @@ from pathlib import Path
 
 import uvicorn
 
-from algotrade.config.env import auth_mode, load_dotenv
+from algotrade.config.env import auth_mode, load_dotenv, port_base
 from algotrade.core.model.errors import ConfigurationError
 from algotrade_api.auth.local import require_loopback
 from algotrade_api.auth.mode import AuthMode
@@ -18,10 +18,16 @@ from algotrade_api.ops.schedule import DEFAULT_PORT, HOST, LABEL, api_plist
 APP = "algotrade_api.app:app"
 
 
+def serve_port() -> int:
+    """The port ``algotrade-api`` serves on: this worktree's block (``ALGOTRADE_PORT_BASE``, set
+    by ``scripts/worktree.sh``) else 8000. The launchd agent keeps 8000 (``schedule``)."""
+    return port_base(DEFAULT_PORT)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="algotrade-api", description=__doc__)
     parser.add_argument("--host", default=HOST)
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--port", type=int, default=serve_port())
     parser.add_argument("--reload", action="store_true", help="restart on code changes (dev)")
     sub = parser.add_subparsers(dest="command")
     sc = sub.add_parser(
