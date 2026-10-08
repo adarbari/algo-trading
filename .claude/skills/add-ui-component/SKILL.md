@@ -33,6 +33,10 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
      prop), `Name.module.css` (tokens only: `var(--color-*)`, `var(--space-*)`, ...; variants
      as data attributes; no hex, px, gradients, shadows), `index.ts`
    - light and dark, compact and comfortable density, keyboard and screen-reader accessible
+   - phones and desktops from the one component (`.claude/skills/responsive-ui`, ADR 0052):
+     container queries for layout, touch sizing under a coarse pointer, nothing hover-only;
+     a `Narrow` story (the `narrow` decorator in `design-system/testing`) when it has a
+     container or coarse-pointer rule
    - `Name.stories.tsx`: `Default`, `Loading`, `Empty`, `Error`, `Dense` (or the reason one
      does not apply in `parameters.states.notApplicable`)
    - `Name.test.tsx` with `expectNoA11yViolations` (from `../../testing`)

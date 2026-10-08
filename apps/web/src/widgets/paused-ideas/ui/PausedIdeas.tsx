@@ -12,9 +12,11 @@ import { useIdeas, type PausedIdea } from '@/entities/idea';
 export interface PausedIdeasProps {
   /** Open one ticker in Explore. */
   onOpen: (symbol: string) => void;
+  /** Open the screener that paused a pick (its name). */
+  onOpenScreener: (screenerId: string) => void;
 }
 
-function PausedRow({ idea, onOpen }: { idea: PausedIdea; onOpen: (symbol: string) => void }) {
+function PausedRow({ idea, onOpen, onOpenScreener }: { idea: PausedIdea } & PausedIdeasProps) {
   const { symbol } = idea;
   return (
     <Stack direction="row" gap={2} align="center" wrap>
@@ -31,7 +33,15 @@ function PausedRow({ idea, onOpen }: { idea: PausedIdea; onOpen: (symbol: string
       ) : (
         <Text size="sm">{idea.instrumentId}</Text>
       )}
-      <Text size="sm">{idea.screenerName}</Text>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          onOpenScreener(idea.screenerId);
+        }}
+      >
+        {idea.screenerName}
+      </Button>
       <Text size="sm" tone="muted">
         {idea.reason || 'Paused by the regime gate'}
       </Text>
@@ -39,7 +49,7 @@ function PausedRow({ idea, onOpen }: { idea: PausedIdea; onOpen: (symbol: string
   );
 }
 
-export function PausedIdeas({ onOpen }: PausedIdeasProps) {
+export function PausedIdeas({ onOpen, onOpenScreener }: PausedIdeasProps) {
   const ideas = useIdeas();
   if (ideas.isError && !ideas.data) {
     return (
@@ -63,7 +73,12 @@ export function PausedIdeas({ onOpen }: PausedIdeasProps) {
           the rule that paused them.
         </Text>
         {data.paused.map((idea) => (
-          <PausedRow key={`${idea.screenerId}:${idea.instrumentId}`} idea={idea} onOpen={onOpen} />
+          <PausedRow
+            key={`${idea.screenerId}:${idea.instrumentId}`}
+            idea={idea}
+            onOpen={onOpen}
+            onOpenScreener={onOpenScreener}
+          />
         ))}
         {hidden > 0 ? (
           <Text size="sm" tone="muted">{`${String(hidden)} more not listed here`}</Text>

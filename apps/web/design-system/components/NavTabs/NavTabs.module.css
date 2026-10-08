@@ -1,10 +1,12 @@
-/* NavTabs: quiet links; the current section in the accent tint (mockups' top bar). */
+/* NavTabs: one scrolling row of quiet links; the current section in the accent tint (mockups' top bar). */
 .nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: var(--space-1);
   align-items: center;
   min-width: 0;
+  scrollbar-width: none;
 }
 
 .item {
@@ -36,4 +38,10 @@
   background: var(--color-accent-soft);
   color: var(--color-accent-strong);
   font-weight: var(--font-weight-medium);
+}
+
+@media (pointer: coarse) {
+  .link {
+    min-height: var(--density-control-height);
+  }
 }

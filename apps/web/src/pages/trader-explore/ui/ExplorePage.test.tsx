@@ -65,6 +65,7 @@ describe('ExplorePage', () => {
       <ExplorePage
         search={{ sel: 'AAPL,MSFT', sort: '-feature.market_cap', lev: true }}
         onSearchChange={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Explore' })).toBeInTheDocument();
@@ -93,7 +94,13 @@ describe('ExplorePage', () => {
   it('opens one ticker on its overview and goes back to the default in the URL', async () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
-    render(<ExplorePage search={{ sel: 'AAPL' }} onSearchChange={onSearchChange} />);
+    render(
+      <ExplorePage
+        search={{ sel: 'AAPL' }}
+        onSearchChange={onSearchChange}
+        onOpenScreener={vi.fn()}
+      />,
+    );
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
     expect(widgets.overview).toHaveBeenLastCalledWith(
       expect.objectContaining({ symbol: 'AAPL', fund: expect.anything() as unknown }),
@@ -106,7 +113,11 @@ describe('ExplorePage', () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
     render(
-      <ExplorePage search={{ sel: 'AAPL', tab: 'options' }} onSearchChange={onSearchChange} />,
+      <ExplorePage
+        search={{ sel: 'AAPL', tab: 'options' }}
+        onSearchChange={onSearchChange}
+        onOpenScreener={vi.fn()}
+      />,
     );
     await user.click(screen.getByRole('tab', { name: 'Overview' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: undefined });
@@ -116,7 +127,11 @@ describe('ExplorePage', () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
     render(
-      <ExplorePage search={{ sel: 'AAPL,MSFT', focus: 'MSFT' }} onSearchChange={onSearchChange} />,
+      <ExplorePage
+        search={{ sel: 'AAPL,MSFT', focus: 'MSFT' }}
+        onSearchChange={onSearchChange}
+        onOpenScreener={vi.fn()}
+      />,
     );
     await user.click(screen.getByRole('tab', { name: 'Options' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'options' });
@@ -141,26 +156,77 @@ describe('ExplorePage', () => {
 
   it('shows the focused ticker in the detail tabs, and its screener hits', () => {
     const { rerender } = render(
-      <ExplorePage search={{ tab: 'options', focus: 'NVDA' }} onSearchChange={vi.fn()} />,
+      <ExplorePage
+        search={{ tab: 'options', focus: 'NVDA' }}
+        onSearchChange={vi.fn()}
+        onOpenScreener={vi.fn()}
+      />,
     );
     expect(widgets.options).toHaveBeenLastCalledWith(
       expect.objectContaining({ symbol: 'NVDA', view: 'simple', right: 'P', allStrikes: false }),
     );
-    rerender(<ExplorePage search={{ tab: 'chart' }} onSearchChange={vi.fn()} />);
+    rerender(
+      <ExplorePage search={{ tab: 'chart' }} onSearchChange={vi.fn()} onOpenScreener={vi.fn()} />,
+    );
     expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
-    rerender(<ExplorePage search={{ tab: 'hits' }} onSearchChange={vi.fn()} />);
+    rerender(
+      <ExplorePage search={{ tab: 'hits' }} onSearchChange={vi.fn()} onOpenScreener={vi.fn()} />,
+    );
     expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
-    rerender(<ExplorePage search={{ tab: 'hits', focus: 'NVDA' }} onSearchChange={vi.fn()} />);
-    expect(widgets.hits).toHaveBeenLastCalledWith({ symbol: 'NVDA' });
+    rerender(
+      <ExplorePage
+        search={{ tab: 'hits', focus: 'NVDA' }}
+        onSearchChange={vi.fn()}
+        onOpenScreener={vi.fn()}
+      />,
+    );
+    expect(widgets.hits).toHaveBeenLastCalledWith(
+      expect.objectContaining({ symbol: 'NVDA', onOpenScreener: expect.any(Function) as unknown }),
+    );
   });
 
   it('keeps the Field guide as the last tab; choosing it only sets the tab (the route redirects)', async () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
-    render(<ExplorePage search={{ sel: 'AAPL' }} onSearchChange={onSearchChange} />);
+    render(
+      <ExplorePage
+        search={{ sel: 'AAPL' }}
+        onSearchChange={onSearchChange}
+        onOpenScreener={vi.fn()}
+      />,
+    );
     const tabs = screen.getAllByRole('tab').map((t) => t.textContent);
     expect(tabs.at(-1)).toBe('Field guide');
     await user.click(screen.getByRole('tab', { name: 'Field guide' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'guide' });
+  });
+
+  it('on a phone opens the focused ticker in a sheet and clears the focus on close', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    const onSearchChange = vi.fn();
+    try {
+      const { rerender } = render(
+        <ExplorePage
+          search={{ sel: 'AAPL,MSFT' }}
+          onSearchChange={onSearchChange}
+          onOpenScreener={vi.fn()}
+        />,
+      );
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Remove MSFT from compare' })).toBeInTheDocument();
+      rerender(
+        <ExplorePage
+          search={{ sel: 'AAPL,MSFT', focus: 'NVDA', tab: 'hits' }}
+          onSearchChange={onSearchChange}
+          onOpenScreener={vi.fn()}
+        />,
+      );
+      const sheet = screen.getByRole('dialog', { name: 'NVDA' });
+      expect(sheet).toHaveTextContent('screener hits');
+      await userEvent.keyboard('{Escape}');
+      expect(onSearchChange).toHaveBeenLastCalledWith({ focus: undefined });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

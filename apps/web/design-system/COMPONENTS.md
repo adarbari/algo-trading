@@ -248,7 +248,7 @@ Source: `design-system/components/CalendarGrid`
 
 ### Chart
 
-Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings, filings, macro releases) with a shape and letter each plus a key, and the marker's text in the crosshair read-out and the table; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; optional horizontal reference lines (a threshold, a target) with an end label, also listed for assistive technology; optional lanes (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
+Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings, filings, macro releases) with a shape and letter each plus a key, and the marker's text in the crosshair read-out and the table; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; optional horizontal reference lines (a threshold, a target) with an end label, also listed for assistive technology; optional lanes (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation. Inside the window, Zoom in / Zoom out / Reset zoom buttons (and, on touch, a horizontal drag and a pinch) move and scale the view; the mouse wheel scrolls the page, never the chart. Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
 
 Source: `design-system/components/Chart`
 
@@ -342,7 +342,7 @@ Source: `design-system/components/Combobox`
 
 ### DataTable
 
-DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
+DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view; `pinFirst`). Built on TanStack Table + Virtual, which stay internal.
 
 Source: `design-system/components/DataTable`
 
@@ -375,6 +375,7 @@ Source: `design-system/components/DataTable`
 | `visibleRows` | `number` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. |
 | `rowLines` | `1 \| 2` | no | Lines of text per row: 1 (default) or 2 (a symbol with its name underneath). |
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
+| `pinFirst` | `boolean` | no | Pin the checkbox column and the first column at the start while the table scrolls sideways (default true): pass false when the first column is not the row's key. |
 
 ### Dialog
 
@@ -613,7 +614,7 @@ Source: `design-system/components/Icon`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, book, spinner. |
+| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. |
 | `size` | `'sm' \| 'md' \| 'lg'` | no | sm 12, md 14 (default), lg 16 px. |
 | `tone` | `IconTone` | no | Colour role; `inherit` (default) follows the surrounding text. |
 | `label` | `string` | no | Accessible name when the icon alone carries meaning; omit for decorative icons. |
@@ -791,6 +792,25 @@ Source: `design-system/components/LoginForm`
 | `defaultEmail` | `string` | no | An email to start with (the one used last time). |
 | `onEdit` | `() => void` | no | Called when either field is edited, so the page can clear a stale `error`. |
 
+### MasterDetail
+
+MasterDetail: a list beside its detail (the ticker table and the focused ticker's tabs, a screener's picks and the pick under review). Wide, the two sit side by side in a Grid; when the component's own width is under the `collapse` breakpoint (a phone) the master takes the width, an optional summary (a compare bar, a "Detail for" picker) sits above it, and the detail opens in a side sheet (Drawer) each time `detailKey` names a new item. Dismissing the sheet calls `onDetailClose`; the caller clears its key there, so choosing the same item again reopens it.
+
+Source: `design-system/components/MasterDetail`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `master` | `ReactNode` | yes | The list (a table of rows to choose from). |
+| `detail` | `ReactNode` | yes | The chosen item's detail. Wide: always beside the master; narrow: in the sheet. |
+| `detailKey` | `string \| null` | yes | The item the detail shows (null: none chosen). Narrow: a new non-null key opens the sheet. |
+| `detailTitle` | `ReactNode` | yes | The sheet's heading and accessible name on narrow (the item's name, "AAPL"). |
+| `detailDescription` | `ReactNode` | no | One line under the sheet's heading on narrow. |
+| `onDetailClose` | `() => void` | yes | Narrow only: the sheet was dismissed (Escape, close button, backdrop). |
+| `summary` | `ReactNode` | no | Above the master on narrow, at the top of the detail column on wide (a compare bar). |
+| `columns` | `2 \| 'main-aside'` | no | Wide layout: two equal columns (default) or `main-aside` (3 : 2). |
+| `gap` | `Space` | no | Space between the columns, and between the summary and its neighbour (default 4). |
+| `collapse` | `'md' \| 'lg'` | no | The breakpoint under which the detail moves into a sheet: `md` (720) or `lg` (960, default). |
+
 ### NavList
 
 NavList: a compact vertical list of links, optionally nested one level (a section and its themes, a theme and its fields), each with an optional count; the current one carries `aria-current="page"` and the accent tint. Used as the Guide's side rail and, with anchors, as a page's "On this page" list. Links go through the app's router link (`LinkProvider`).
@@ -805,7 +825,7 @@ Source: `design-system/components/NavList`
 
 ### NavTabs
 
-NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links are plain anchors unless `renderLink` renders the app's router link with the given props (the design system never imports the router). For switching views inside a page use Tabs.
+NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links are plain anchors unless `renderLink` renders the app's router link with the given props (the design system never imports the router). One row that scrolls sideways when the sections do not fit, the current link scrolled into view. For switching views inside a page use Tabs.
 
 Source: `design-system/components/NavTabs`
 
@@ -1177,7 +1197,7 @@ Source: `design-system/components/Tooltip`
 
 ### TopBar
 
-TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search box, "As of Fri 2 Oct", the latest-run note), and a utility slot just before it for links that belong to no workspace (the Guide). Slots wrap onto new lines at phone width.
+TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search box, "As of Fri 2 Oct", the latest-run note), and a utility slot just before it for links that belong to no workspace (the Guide). Under 720 px (container width) the bar is two rows: brand, workspace switch, utility and end slots, then the nav full width.
 
 Source: `design-system/components/TopBar`
 

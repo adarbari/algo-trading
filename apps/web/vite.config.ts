@@ -47,9 +47,16 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    include: [
+      'src/**/*.test.{ts,tsx}',
+      'design-system/**/*.test.{ts,tsx}',
+      'scripts/**/*.test.ts',
+      'lint-rules/**/*.test.js',
+    ],
     exclude: [...configDefaults.exclude, ...quarantinedUnitFiles],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     restoreMocks: true,
+    pool: 'vmThreads',
     // Integration-style files (a page, widget or feature rendered with its Query hooks; the
     // script tests that run ESLint in-process) take 5 to 15 s under `make check WORKERS=2`:
     // the 5 s default read as flakes (docs/ci.md "Flaky specs"). Vitest fixes a test's timeout

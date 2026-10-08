@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { narrow } from '../../testing';
 import { SegmentedControl } from '../SegmentedControl';
 import { Chart, type ChartProps } from './Chart';
 import { CHART_RANGES, type ChartRange } from './chartData';
@@ -63,6 +64,15 @@ type Story = StoryObj<typeof meta>;
 
 /** One price series with its ex-dividend, split and earnings markers. Sample data. */
 export const Default: Story = { args: { events: aaplEvents } };
+
+/**
+ * On a phone (a 375 px container): the key, range control and zoom buttons wrap above the plot;
+ * a horizontal drag pans and a pinch zooms. Sample data.
+ */
+export const Narrow: Story = {
+  args: { events: aaplEvents, range: '1Y' },
+  decorators: [narrow],
+};
 
 /**
  * Event markers of the event-sensitivity price chart: earnings (up arrow, E), filings (down

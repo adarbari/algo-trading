@@ -1,4 +1,5 @@
 import { ToastProvider } from '@algotrade/ui';
+import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -55,12 +56,13 @@ const data: IdeasData = {
 };
 
 const onNew = vi.fn();
+const onOpenScreener = vi.fn();
 
 function setup() {
   return render(
     <ToastProvider>
       <TestQueryProvider>
-        <ScreenerRanking onNewScreener={onNew} />
+        <ScreenerRanking onNewScreener={onNew} onOpenScreener={onOpenScreener} />
       </TestQueryProvider>
     </ToastProvider>,
   );
@@ -82,6 +84,12 @@ describe('ScreenerRanking', () => {
     expect(items[2]).toHaveTextContent('Not run for this session');
     expect(items[2]).toHaveTextContent('not run');
     await expectNoA11yViolations(container);
+  });
+
+  it("opens a screener's results from its name", async () => {
+    setup();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'VRP scanner' }));
+    expect(onOpenScreener).toHaveBeenCalledWith('vrp-scanner');
   });
 
   it('shows loading, empty and error states', async () => {
