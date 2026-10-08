@@ -9,8 +9,8 @@ uses). A session with no value for a name has ``None`` there. ``instrument.*`` f
 snapshot facts with no history: asking for one is a request error, and so is a name outside the
 caller's catalogue (``UnknownFeatureError``). The rows of a stored table are shared through
 ``ctx.cache`` (market entity only: keyed on the table, ids, the session and the published
-state; each window is sliced from the one full read), so a chart that asks again, or for
-another range, reads the store once."""
+state and the window's start; the read is the window up to the session), so a chart that
+asks again for it reads the store once."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -86,14 +86,15 @@ def _frame(
         # the screens' entries; a run's pending writes do not move visible_seq.
         return rollup_rows(ctx.reader, table, start, end, instruments=ids)
     # A market table's rows do not depend on the caller, so every request shares them. The
-    # whole stored range up to the session is read once and each window is sliced from it in
-    # memory, so every chart range (1y, 5y, all) hits one entry. The published state is in the
-    # key (read before the rows, ADR 0022), so a publish makes it unreachable. The frame is
-    # only read, never changed, by its callers.
-    key = ("series-frame", table, tuple(ids), ctx.session.date, ctx.reader.visible_seq())
+    # read is the window up to the session (a day is a partition: a read from the first stored
+    # day, 14 000 of them since 1971, took 10 s for a one-year chart), and the published state
+    # is in the key (read before the rows, ADR 0022), so a publish makes it unreachable. A
+    # chart that asks again for the window reads the store once. The frame is only read, never
+    # changed, by its callers.
+    key = ("series-frame", table, tuple(ids), start, ctx.session.date, ctx.reader.visible_seq())
     cached: tuple[pd.DataFrame | None] | None = ctx.cache.get(key)
     if cached is None:
-        cached = (rollup_rows(ctx.reader, table, date.min, ctx.session.date, instruments=ids),)
+        cached = (rollup_rows(ctx.reader, table, start, ctx.session.date, instruments=ids),)
         ctx.cache.put(key, cached)
     frame = cached[0]
     if frame is None:

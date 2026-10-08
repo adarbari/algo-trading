@@ -1,8 +1,8 @@
 """The schema and its router (ADR 0037): the ``Query`` root (``types/query.py``) over the
-read model, the scalars, the document limits, and ``graphql_router``, mounted by
-``create_app`` at ``POST /graphql`` (GET off; the GraphiQL IDE only when
-``ApiSettings.debug``). Every error in a response
-carries ``extensions.code`` (``errors.py``). ``sdl()`` is the committed snapshot
+read model, the scalars, the document limits, ``OffLoop`` (top-level fields run off the event
+loop), and ``graphql_router``, mounted by ``create_app`` at ``POST /graphql`` (GET off;
+the GraphiQL IDE only when ``ApiSettings.debug``). Every error in a response carries
+``extensions.code`` (``errors.py``). ``sdl()`` is the committed snapshot
 ``apps/api/schema.graphql`` (``scripts/export_graphql_schema.py``)."""
 
 import strawberry
@@ -17,6 +17,7 @@ from algotrade.config.site.users import Role
 from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, context_getter
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
+from algotrade_api.graphql.offload import OffLoop
 from algotrade_api.graphql.scalars import SCALARS
 from algotrade_api.graphql.types.query import Query
 
@@ -24,7 +25,7 @@ PATH = "/graphql"
 
 schema = strawberry.Schema(
     query=Query,
-    extensions=list(EXTENSIONS),
+    extensions=[*EXTENSIONS, OffLoop],
     config=StrawberryConfig(scalar_map=SCALARS),
 )
 

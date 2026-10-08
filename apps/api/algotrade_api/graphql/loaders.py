@@ -12,7 +12,6 @@ from datetime import date
 from functools import partial
 from typing import Any
 
-from anyio import to_thread
 from strawberry.dataloader import DataLoader
 
 from algotrade.services.read.context import ReadContext
@@ -35,6 +34,7 @@ from algotrade.services.read.instruments.prices import Adjustment, PriceSeries, 
 from algotrade.services.read.instruments.series import FeatureSeries, load_series
 from algotrade.services.read.screens.hits import ScreenerHit, load_screener_hits
 from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_runs
+from algotrade_api.graphql.offload import off_loop
 
 FeatureKey = tuple[str, tuple[str, ...]]  # (instrument_id, catalogue names in the order asked)
 EventKey = tuple[str, date | None, date | None]  # (instrument_id, start, end)
@@ -59,7 +59,7 @@ async def batched(
     found: dict[tuple[Any, ...], Any | BaseException] = {}
     for arguments, ids in by_arguments.items():
         try:  # off the event loop: the reads are parquet and pandas work
-            values = await to_thread.run_sync(partial(load, ctx, ids, *arguments))
+            values = await off_loop(partial(load, ctx, ids, *arguments))
         except Exception as error:  # the error is the result of each key that asked
             found.update({(iid, *arguments): error for iid in ids})
         else:
@@ -82,7 +82,7 @@ def _feature_values(
 
 
 async def _latest_runs(ctx: ReadContext, keys: Sequence[RunKey]) -> list[LatestRun]:
-    found = await to_thread.run_sync(load_latest_runs, ctx, keys)
+    found = await off_loop(load_latest_runs, ctx, keys)
     return [found[key] for key in keys]
 
 
