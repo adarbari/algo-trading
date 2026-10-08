@@ -1,0 +1,30 @@
+# L3 site setting: the Guide's playbook for the site preset vrp_iv_hv (ADR 0051; docs/ui/guide.md
+# "The playbook page"). Keys and tests as in playbooks/income/vrp_scanner.toml.
+id = "vrp_iv_hv"
+version = 1  # the preset version this prose was written for
+summary = "Finds liquid optionable shares whose 30-day implied volatility (IBKR's before option chains were stored) sits well above the volatility the share has actually delivered: the volatility premium alone, on the sessions where IBKR's implied volatility is stored (about two years). It is the VRP edge's screen for the edge harness; whether to sell premium on a name is a separate judgement."
+hit = "A common stock, ADR or ETF (not leveraged or inverse) with listed options, closing above $5 on at least $50M of 20-day dollar volume, whose 30-day implied volatility (IBKR's before option chains were stored) is at least 10 points above, and at least 1.25 times, the last 30 sessions' realised volatility. Ranked by that ratio, highest first. A missing value never passes."
+not_checked = "It reads no option chain: not the put's delta, spread, open interest or volume, not an option tier, not the 52-week range, not the implied volatility's level or rank. It does not check earnings. Use vrp_scanner for those once enough chain history is stored."
+before_acting = [
+  "A report inside the month is the premium: the earnings move inflates feature.vrp_iv30; read rollup.earnings@v1.days_to_earnings.",
+  "There is no floor on realised volatility, so a pinned takeover target with HV near 0.03 shows a feature.vrp_iv_hv_ratio of 3 and tops the list; require rollup.price_stats@v2.hv30 of at least 0.10.",
+  "Before 2026-10-02 feature.vrp_iv30 is IBKR's alone (personal licence); after, the lower of IBKR's and Cboe's.",
+]
+sources = [
+  "Carr and Wu (2009), Variance risk premiums, Review of Financial Studies",
+]
+related = [
+  { id = "vrp_scanner", reason = "the same premium with the option chain's put and tier" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+optionable = "Has listed options"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+iv30 = "Has an implied volatility"
+iv_hv_spread = "IV at least 10 points over realised"
+iv_hv_ratio = "IV at least 1.25 times realised"

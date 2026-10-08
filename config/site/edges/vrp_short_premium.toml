@@ -12,11 +12,15 @@ crashes, when capital is scarce, so being known does not remove it."""
 schedule = "every_session"
 universe = "liquid_optionable"
 top_k = 20
-screeners = ["short_premium_liquidity", "vrp_scanner"]
+# vrp_iv_hv reads feature.vrp_iv30 (IBKR-only before 2026-10-02) and HV30, ~500 sessions of history. short_premium_liquidity
+# (option_liquidity@v1) and vrp_scanner v4 (put_wing@v1, option_tier) need option chains, stored
+# only from 2026-10-02: each rejoins once >= 40 independent sessions of chain data exist.
+screeners = ["vrp_iv_hv"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 frozen_from = 2026-04-01
-notes = """Hit (ED4a, owner intent 2026-10-08): the short put is not assigned, struck at a 0.30
+notes = """The one-IV rule (ADR 0053) governs the outcome (iv_field, the IBKR IV30), not the screener's selection, which reads feature.vrp_iv30.
+Hit (ED4a, owner intent 2026-10-08): the short put is not assigned, struck at a 0.30
 delta at the entry close on the IBKR IV30 read at D, held to the horizon's close (15, 21 or 31
 sessions: the 21 to 45 DTE the owner trades, the horizon the tenor). The strike is the exact
 Black-Scholes delta strike (r = q = 0): K = P exp(-z iv sqrt(T) + iv^2 T / 2), z = N^-1(1 - 0.30),
@@ -95,9 +99,11 @@ windows whose strike was touched on the way."""
 trigger_timing = """IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of the
 decision session D, so the first fill is the next session's close: the entry session is S = D + 1
 (start_offset_sessions = 1). The screen and the implied vol are read at D, the outcome at S."""
-replication = """The screens as they are: short_premium_liquidity (tradable put and call wings,
-option_liquidity@v1) and vrp_scanner v3 (IV30 at least 50%, IV30 minus HV30 at least 10 points,
-IV30 / HV30 at least 1.25). The published setting is index variance (Carr and Wu 2009); single
+replication = """The screen is vrp_iv_hv v1 (IV30 minus HV30 at least 10 points, IV30 / HV30
+at least 1.25, $50M of 20-day dollar volume, price above $5, no leveraged or inverse fund), the
+history-evaluable part of vrp_scanner (IV30 at least 50% there). short_premium_liquidity (tradable
+put and call wings, option_liquidity@v1) and vrp_scanner rejoin once >= 40 independent sessions of
+chain data exist. The published setting is index variance (Carr and Wu 2009); single
 names are a step away from it."""
 expected_size = """Implied variance exceeds realised on average for the S&P 500 and most large
 stocks (Carr and Wu 2009); the single-name premium is smaller than the index's (Driessen,
