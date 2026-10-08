@@ -77,6 +77,7 @@ def _entry(
         and r.edge_variant == runs.MAIN
         and r.slice_kind == FROZEN
         and not r.exploratory
+        and not r.in_sample
     ]
     if not rows:
         why = f"run {run.run_id} of {edge.id} has no frozen rows for {screener_id}"

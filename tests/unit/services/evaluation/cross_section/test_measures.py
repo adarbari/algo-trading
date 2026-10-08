@@ -100,3 +100,18 @@ def test_deciles_need_ten_names_and_split_best_first() -> None:
     assert decile_means([0.1] * 9) is None
     top, spread = decile_means([float(v) for v in range(20, 0, -1)])  # 20 names, 2 per decile
     assert top == pytest.approx(19.5) and spread == pytest.approx(19.5 - 1.5)
+
+
+def test_a_model_screener_slice_is_in_sample_when_it_keeps_a_session_before_frozen_from() -> None:
+    first, second = A.session, B.session
+    assert first < second
+    slices = [
+        Slice("all", "all", lambda _: True),
+        Slice("frozen", "frozen", lambda s: s.session >= second),
+        Slice("year", "y", lambda s: s.session == first),
+    ]
+    flags = lambda **kw: [m.in_sample for m in slice_measures([A, B], slices, **kw)]  # noqa: E731
+    assert flags(model=True, frozen_from=second) == [True, False, True]
+    assert flags(model=True, frozen_from=first) == [False, False, False]  # nothing before it
+    assert flags(model=True) == [True, True, True]  # no frozen period: all fitted-on unknown
+    assert flags(model=False, frozen_from=second) == [False, False, False]  # a rule screener

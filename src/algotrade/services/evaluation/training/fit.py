@@ -15,13 +15,14 @@ from datetime import date
 import numpy as np
 import numpy.typing as npt
 
+from algotrade.config.edges.document import MIN_INDEPENDENT_SESSIONS
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant import probit
 from algotrade.services.evaluation.training.frame import LABEL, TrainingFrame
 
 MIN_ROWS = 100  # fewer labelled rows than this is not a fit
 MIN_PER_CLASS = 10
-MIN_SESSIONS = 40  # independent decision sessions: the quality bar of docs/edges-plan.md
+MIN_SESSIONS = MIN_INDEPENDENT_SESSIONS  # independent decision sessions (docs/edges-plan.md)
 
 
 @dataclass(frozen=True)

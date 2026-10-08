@@ -57,6 +57,7 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                     "range_from": evaluation.start,
                     "split_from": evaluation.split_from,
                     "exploratory": evaluation.exploratory,
+                    "in_sample": m.in_sample,
                     "range_to": evaluation.end,
                     "iv_source": r.iv_source,
                     "licence": r.licence,
