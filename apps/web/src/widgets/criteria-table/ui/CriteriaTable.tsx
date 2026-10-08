@@ -1,6 +1,6 @@
 /**
  * The Builder's criteria: the screen read back in plain English, then one row per criterion
- * (mode, feature, operator, threshold, tolerance, distribution), add a criterion or a formula
+ * (mode, feature with its help drawer, operator, threshold, tolerance, distribution), add a criterion or a formula
  * feature, the tie-break column, and the universe it runs over.
  */
 import { Button, Divider, EmptyState, Legend, Panel, Stack, Text } from '@algotrade/ui';
@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useFeatureCatalogue } from '@/entities/feature';
 import { CriterionRow, TieBreakField, useScreenerBuilder } from '@/features/screener-builder';
 import { FormulaFeatureDialog } from '@/features/formula-feature';
+import { GuideHelp } from '@/features/guide-help';
 
 import { plainEnglish } from '../model/plain-english';
 
@@ -64,6 +65,9 @@ export function CriteriaTable() {
                 onRemove={() => {
                   builder.removeCriterion(criterion.id);
                 }}
+                renderFieldHelp={(field, onUse) => (
+                  <GuideHelp entry={{ kind: 'field', id: field }} onUse={onUse} />
+                )}
                 error={builder.errorCriterion === criterion.id ? builder.preview.error : null}
               />
             </Stack>

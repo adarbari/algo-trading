@@ -29,8 +29,8 @@ def test_the_index_counts_what_the_guide_holds(ctx: StoreContext) -> None:
     assert chart.themes == (GuideTheme("momentum and trend", 1),)
     # "liquid": two fields; each other intent one; ties A-Z.
     assert index.intents == (GuideIntent("liquid", 2), GuideIntent("very liquid", 1))
-    assert index.situations == (GuideSituationEntry("thin name", 2),
-                                GuideSituationEntry("takeover", 1))  # fmt: skip
+    assert index.situations == (GuideSituationEntry("thin name", 2, "thin-name"),
+                                GuideSituationEntry("takeover", 1, "takeover"))  # fmt: skip
     (trend,) = index.families
     assert (trend.id, trend.title, trend.playbooks) == (
         "trend",

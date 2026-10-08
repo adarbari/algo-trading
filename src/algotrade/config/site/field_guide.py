@@ -8,6 +8,7 @@ generated page ``docs/data/field-guide.md`` and the drafting prompt. The loader 
 vocabulary only; that every name is a catalogue field and every value fits its type and range is
 ``tests/architecture/test_features.py``."""
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -22,6 +23,7 @@ OPS = ("eq", "ne", "in", "not_in", "gt", "gte", "lt", "lte", "between", "is_null
 VALUELESS_OPS = ("is_null", "not_null")
 MODES = ("hard", "soft", "score")
 ON_MISS = ("WATCH", "LIQUIDITY_RISK", "EVENT_RISK")
+_NOT_SLUG = re.compile(r"[^a-z0-9]+")
 
 Tolerance = float | Mapping[str, float] | None
 
@@ -65,6 +67,13 @@ class Situation:
     affects: tuple[str, ...]
     do: str
 
+    @property
+    def slug(self) -> str:
+        """The situation's stable key (the Guide's URL): its name in lower case, every run of
+        other characters one ``-`` ("earnings gap inside the window" ->
+        ``earnings-gap-inside-the-window``); unique across the guide."""
+        return _NOT_SLUG.sub("-", self.name.lower()).strip("-")
+
 
 @dataclass(frozen=True)
 class FieldGuideSettings:
@@ -97,6 +106,10 @@ class FieldGuideSettings:
         if len(set(names)) != len(names):
             dupes = sorted({n for n in names if names.count(n) > 1})
             raise ConfigurationError(f"field_guide: a field is guided twice: {dupes}")
+        slugs = [s.slug for s in situations]
+        if len(set(slugs)) != len(slugs):
+            dupes = sorted({s for s in slugs if slugs.count(s) > 1})
+            raise ConfigurationError(f"field_guide: two situations share a slug: {dupes}")
         return cls(tuple(fields), tuple(situations))
 
     @classmethod

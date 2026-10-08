@@ -52,10 +52,12 @@ class GuideIntent:
 
 @dataclass(frozen=True)
 class GuideSituationEntry:
-    """A situation and the number of fields it fools (its ``affects``)."""
+    """A situation, its slug (its page's key) and the number of fields it fools (its
+    ``affects``)."""
 
     name: str
     fields: int
+    slug: str
 
 
 @dataclass(frozen=True)
@@ -125,7 +127,9 @@ def load_guide_index(ctx: Stores) -> GuideIndex:
             for g in sections.theme_groups
         ),
         intents=_intents(guide),
-        situations=tuple(GuideSituationEntry(s.name, len(s.affects)) for s in guide.situations),
+        situations=tuple(
+            GuideSituationEntry(s.name, len(s.affects), s.slug) for s in guide.situations
+        ),
         families=tuple(
             GuideFamily(f.id, f.title, _members(playbooks, f.id)) for f in sections.families
         ),
