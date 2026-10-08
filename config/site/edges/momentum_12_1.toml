@@ -1,0 +1,57 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. The harness's known result (plan ED3): 12-1 momentum
+# should show a positive decile spread over the stored sessions, with buy-and-hold as the floor.
+id = "momentum_12_1"
+name = "12-1 momentum"
+thesis = "Stocks that rose most over the past year, leaving out the last month, keep outperforming the market over the next month."
+mechanism = """Investors underreact to news and herd into winners; limits to arbitrage and
+disposition effects slow the price from reaching its value (Jegadeesh and Titman 1993; Barberis,
+Shleifer and Vishny 1998)."""
+persistence = """The premium is large, old and widely known, and has survived two decades after its
+publication in most markets, but it crashes in sharp market rebounds (Daniel and Moskowitz 2016):
+the risk that keeps arbitrageurs from removing it."""
+schedule = "month_end"
+universe = "liquid_optionable"
+top_k = 50
+screeners = ["momentum_12_1"]
+status = "candidate"
+notes = """Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1
+is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under
+the 40 the bar asks; the harness reports the count beside every number. The frozen period
+(frozen_from) is the owner's decision (proposal: 2026-04-01, the last two quarters); until it is
+set, no frozen slice is reported."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after a month-end close, net of 10 bps a
+round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions)."""
+trigger_timing = """mom_12_1 is computed from the close of S (rollups, nightly), so the first session
+we act is S+1; the window starts at S's close, before the trade, a slight overstatement the
+cost assumption absorbs."""
+replication = """The published rule: rank by the return from 12 months to 1 month back and hold
+the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid optionable universe."""
+expected_size = """Historically about 1% a month for the winner-minus-loser decile spread in large
+US stocks, smaller since 2000 (Daniel and Moskowitz 2016). Ten independent sessions cannot
+distinguish that from zero: the harness reports the t statistic and the sessions beside it."""
+capacity_costs = """Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume):
+turnover is monthly and spreads are small; the 10 bps round trip is the assumption."""
+failure_modes = """Momentum crashes: sharp market rebounds after a drawdown reverse winners and
+losers (Daniel and Moskowitz 2016). Retire if the frozen-period decile spread is not above zero
+or the top decile does not beat the buy-and-hold mean of the eligible names."""
+decoys = """The same signal in the market's own drift (compare with buy-and-hold of the eligible
+names), the size and quality tilts of past winners, and the 52-week-high effect (a different
+screen on the same sessions)."""
+
+[[sources]]
+title = "Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993"
+
+[[sources]]
+title = "Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016"
+
+[[sources]]
+title = "Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998"

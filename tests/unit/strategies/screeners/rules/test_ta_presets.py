@@ -74,3 +74,28 @@ def test_a_row_meeting_every_criterion_qualifies_and_a_miss_rejects(preset: str)
     assert rows["EQ:GOOD"].decision is Decision.QUALIFIED
     assert rows["EQ:MISSING"].decision is Decision.REJECT  # missing data never passes
     assert rows["EQ:EMPTY"].decision is Decision.REJECT
+
+
+def test_momentum_12_1_ranks_every_name_with_a_value_by_it_and_rejects_one_without() -> None:
+    """The edge harness's momentum screen (ADR 0053): not a chart pattern, so none of the setup
+    tests above; the criterion only asks for the value and the rank is the 12-1 momentum."""
+    spec = resolve_config(STORE, "momentum_12_1", UserContext("site")).screen_spec
+    assert tuple(c.id for c in spec.criteria)[: len(BASE)] == BASE
+    assert [c.id for c in spec.criteria[len(BASE) :]] == ["mom_12_1"]
+    assert spec.tie_break == "rollup.trend_stats@v2.mom_12_1" and spec.tie_break_descending
+    base = {c.rule.field: _passing(c) for c in spec.criteria}
+    mom = "rollup.trend_stats@v2.mom_12_1"
+    view = FeatureView(
+        DAY,
+        {
+            "EQ:LOW": {**base, mom: -0.3},
+            "EQ:HIGH": {**base, mom: 0.8},
+            "EQ:NONE": {k: v for k, v in base.items() if k != mom},
+        },
+    )
+    rows = evaluate_screen(spec, view).rows
+    assert [(r.instrument_id, r.decision) for r in rows] == [
+        ("EQ:HIGH", Decision.QUALIFIED),
+        ("EQ:LOW", Decision.QUALIFIED),
+        ("EQ:NONE", Decision.REJECT),
+    ]

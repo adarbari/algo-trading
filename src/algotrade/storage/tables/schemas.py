@@ -527,6 +527,37 @@ RULE_SCREEN_VALUES = _fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
 )
+# The edge harness's results (ADR 0053): one row per (edge, variant, horizon, slice), written
+# by ``services/evaluation/cross_section/results.py``. Partition ``session_date`` is the range's
+# end; ``key`` includes the range start, so re-running a range replaces its rows and another range
+# adds its own. ``sessions`` is the number of independent sessions beside every number.
+EDGE_EVAL = _fixed(
+    "results/edge_eval",
+    "results",
+    (
+        "edge_id", "user_id", "variant", "horizon_sessions", "slice_kind", "slice_value",
+        "range_from",
+    ),
+    *_strings("edge_id", "user_id", "variant", "slice_kind", "slice_value"),
+    *_strings("role", "config_hash", "run_config_hash", "benchmark"),
+    "horizon_sessions int64!",
+    "range_from date!",
+    "range_to date",
+    *(f"{n} int64" for n in (
+        "sessions", "picks", "hits", "eligible", "base_hits", "decile_sessions", "trials",
+        "excluded_unclosed", "excluded_missing", "excluded_coverage", "delisted",
+        "pre_snapshot_sessions",
+    )),
+    *_floats(
+        "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
+        "decile_spread", "decile_t", "effect_size", "sharpe", "deflated_sharpe", "pbo",
+    ),
+    runs="merge",
+    key=(
+        "edge_id", "user_id", "variant", "horizon_sessions", "slice_kind", "slice_value",
+        "range_from",
+    ),
+)  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -556,6 +587,7 @@ KNOWN: dict[str, TableSpec] = {
         IBKR_IV30,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
+        EDGE_EVAL,
         LIVE_OPTION_QUOTES,
         ETF_HOLDINGS,
         MACRO_SERIES,
@@ -654,7 +686,7 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
     if not missing:
         if frame[list(COMMON)].isna().to_numpy().any():
             problems.append("point-in-time columns contain nulls")
-        if frame["instrument_id"].isna().any():
+        if "instrument_id" in spec.required and frame["instrument_id"].isna().any():
             problems.append("null instrument_id")
         if frame.duplicated(subset=table_key(spec, frame.columns)).any():
             problems.append("duplicate rows for the table key")

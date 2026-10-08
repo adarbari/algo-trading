@@ -3,8 +3,11 @@
 import argparse
 import json
 import sys
+from datetime import UTC, datetime
 
 from algotrade.analytics.report import markdown_table
+from algotrade.config.edges.document import CLOSED
+from algotrade.config.edges.loading import load_edges
 from algotrade.config.env import config_dir, data_url
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_macro
@@ -17,6 +20,7 @@ from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
+from algotrade.services.evaluation.cross_section.report import render_edge_report
 from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
 from algotrade.services.evaluation.regime_report import render
 from algotrade.services.evaluation.regime_scorecard import load_history
@@ -26,6 +30,7 @@ from algotrade.services.jobs import JobStatus, run_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.tables.result_writer import ResultWriter
+from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade.strategies.trading.registry import create_strategy
 
 SCORECARD_COLUMNS = (
@@ -209,3 +214,44 @@ def cmd_regime_scorecard(args: argparse.Namespace) -> int:
     if args.report:
         args.report.write_text(text)
     return 0
+
+
+def cmd_evaluate_edges(args: argparse.Namespace) -> int:
+    """The edge harness (ADR 0053) through the jobs runner: every open edge that has screeners
+    or baselines (or the one ``--edge``) over ``--from``..``--to`` (default: the stored outcome
+    sessions), outcomes known as of ``--as-of`` (default now). Rows land in ``results/edge_eval``;
+    a report with the survivorship line is printed (and written to ``--report``)."""
+    backend = open_backend(data_url(args.data_url))
+    reader = StoreReader(backend)
+    configs = open_config_store(config_dir(args.config_dir))
+    user = _user(args)
+    edges = [e for e in load_edges(configs, user.user_id) if args.edge in (None, e.id)]
+    if args.edge is None:
+        edges = [e for e in edges if e.status not in CLOSED and (e.screeners or e.baselines)]
+    if not edges:
+        raise ConfigurationError(
+            f"no edge to evaluate ({args.edge or 'no open edge has screeners'})"
+        )
+    stored = reader.dates(FORWARD_RETURNS)
+    if not stored and not (args.start and args.end):
+        raise ConfigurationError("no outcomes stored: run `algotrade-ingest run outcomes`")
+    start, end = args.start or stored[0], args.end or stored[-1]
+    as_of = args.as_of or datetime.now(UTC)
+    resources = {"reader": reader, "writer": ResultWriter(backend), "configs": configs}
+    reports, failed = [], False
+    for edge in edges:
+        params = {
+            "edge": edge.id, "start": start.isoformat(), "end": end.isoformat(),
+            "as_of": as_of.isoformat(),
+        }  # fmt: skip
+        job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-eval", params, user)
+        if job.status is JobStatus.FAILED:
+            print(f"error: {edge.id}: {job.error}", file=sys.stderr)
+            failed = True
+            continue
+        reports.append(render_edge_report(job.result))
+    text = "\n".join(reports)
+    print(text, end="")
+    if args.report:
+        args.report.write_text(text)
+    return 2 if failed else 0

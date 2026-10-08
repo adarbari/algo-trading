@@ -1,0 +1,51 @@
+# 12-1 momentum: every tradeable name with a 12-1 momentum value, ranked by it (the Jegadeesh and
+# Titman signal: the 12-month return with the last month skipped). The one criterion only asks
+# that the value exists (a return is above -1; a missing value never passes, ADR 0030): the
+# ranking is the screen, so the edge harness (ADR 0053) takes its top K and compares the decile
+# spread over all eligible names. What it does not check: trend shape, extension, earnings.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "momentum_12_1"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "12-1 momentum"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as trend_continuation, so the two compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.mom_12_1]
+field = "rollup.trend_stats@v2.mom_12_1"
+op = "gt"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+mom_12_1 = "rollup.trend_stats@v2.mom_12_1"
+ret_252d = "rollup.trend_stats@v2.ret_252d"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.mom_12_1"

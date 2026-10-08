@@ -214,3 +214,11 @@ def test_config_validate_features_reports_each_user_feature(cli: Cli, tmp_path: 
         bad.stderr
     )
     assert cli("config", "show").returncode == 2  # show needs a config id
+
+
+def test_evaluate_edges_needs_stored_outcomes_and_a_known_edge(cli: Cli) -> None:
+    proc = cli("evaluate-edges")  # the golden store has no outcomes grain
+    assert proc.returncode == 2
+    assert "no outcomes stored" in proc.stderr
+    unknown = cli("evaluate-edges", "--edge", "nope")
+    assert unknown.returncode == 2 and "no edge to evaluate" in unknown.stderr

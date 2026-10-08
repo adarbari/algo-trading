@@ -18,6 +18,8 @@ and the key.
     screeners         the screener presets that implement it (empty while a candidate waits)
     baselines         screener presets run on the same sessions (quality bar 9)
     status            candidate | evidenced | live | retired | rejected | blocked
+    frozen_from       optional date: the harness reports sessions from it on their own as the
+                      frozen period (fixed once chosen, never rolling; none: no frozen slice)
     rejection_reason  required when rejected or blocked, allowed when retired, else an error
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
@@ -29,6 +31,7 @@ Whether the named presets exist is checked by ``loading.py``, which sees the sto
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, NoReturn
 
 from algotrade.config.site.fields import Table, reject_secrets
@@ -74,7 +77,7 @@ QUALITY_BAR = (
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
-    "notes",
+    "notes", "frozen_from",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -124,6 +127,7 @@ class Edge:
     quality_bar: Mapping[str, str]  # QUALITY_BAR -> answer ("" only when CLOSED)
     rejection_reason: str = ""
     notes: str = ""
+    frozen_from: date | None = None
 
     @property
     def event_class(self) -> str | None:
@@ -173,6 +177,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         quality_bar=_quality_bar(t, closed),
         rejection_reason=_prose(t, "rejection_reason"),
         notes=_prose(t, "notes"),
+        frozen_from=_frozen_from(t),
     )
     if closed and not edge.rejection_reason:
         raise ConfigurationError(f"{where} rejection_reason: required when status is {status!r}")
@@ -205,6 +210,20 @@ def _thesis(t: Table) -> str:
     if _SENTENCE_BREAK.search(thesis) or thesis[-1] not in ".!?":
         raise ConfigurationError(f"{t.where} thesis: expected one sentence, got {thesis!r}")
     return thesis
+
+
+def _frozen_from(t: Table) -> date | None:
+    raw = t.raw("frozen_from")
+    if raw is None:
+        return None
+    if type(raw) is date:
+        return raw
+    try:
+        if isinstance(raw, str):
+            return date.fromisoformat(raw)
+    except ValueError:
+        pass
+    raise ConfigurationError(f"{t.where} frozen_from: expected a date (2026-04-01), got {raw!r}")
 
 
 def _schedule(t: Table) -> str:
