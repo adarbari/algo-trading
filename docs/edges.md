@@ -9,7 +9,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
-| Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event | none yet |
+| Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps | `eap_all`, `eap_volume` |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps | `pead_small_cap` |
 | Volatility risk premium (`vrp_short_premium`) | candidate | every session | expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon | `short_premium_liquidity`, `vrp_scanner` |
@@ -21,14 +21,14 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Status:** candidate. **Thesis:** Stocks earn more in the days around a scheduled earnings report than at other times.
 
-- **Outcome:** excess return, over 6 sessions, vs SPY, starting -5 sessions from the event
+- **Outcome:** excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps
 - **Schedule:** on each `earnings_expected` (a next report expected, scheduled or from the year-ago report (earnings_expected@v1); anchor: the expected report date's session)
 - **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'`
 - **Top K:** all qualified names
-- **Screeners:** none yet
-- **Baselines:** none yet
+- **Screeners:** `eap_all`, `eap_volume`
+- **Baselines:** `momentum_12_1`, `size_small`
 - **Frozen period:** from 2026-04-01
-- **Notes:** Window: from five sessions before the scheduled report to one after (six sessions, start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must be known by the decision session D = S - 1 (earnings_expected@v1: SCHEDULED, or PRIOR_YEAR), never be taken from the actual report date; the entry session is S = A - 5 for the expected report A.
+- **Notes:** Window: from five sessions before the scheduled report to one after (six sessions, start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must be known by the decision session D = S - 1 (earnings_expected@v1: SCHEDULED, or PRIOR_YEAR), never be taken from the actual report date; the entry session is S = A - 5 for the expected report A. Liquid base gates: common stock or ADR, active, close above $5, 20-day ADV at least $50M. Cost 10 bps a round trip (decided 2026-10-08). The top_k is "all" at the edge level (a preset carries no top-k): eap_volume ranks by the earnings volume ratio and the harness reads its decile spread; the ED4 decision's top 50 is not expressible per screener. The window is built from the EXPECTED date: a PRIOR_YEAR date can miss the real report, so a window may not contain it; the share of windows that contained the actual report is a diagnostic (not a filter), a follow-up in the evaluation report. The Savor-Wilson variant (offset -1, three sessions) needs the h=3 outcomes backfill: horizons are stored from the documents, so rerun the outcomes backfill before reading it.
 
 **Quality bar**
 
@@ -36,7 +36,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 2. **Persistence:** Compensation for holding risk that concentrates on known dates: earning it means holding the announcement, which arbitrage cannot avoid.
 3. **Outcome:** Excess return over SPY from five sessions before the scheduled report to one after: a hold entered ahead of the date and closed after the reaction.
 4. **Trigger timing:** The expected report date is read at the decision session D (the day before the entry session S = A - 5): earnings_expected@v1 gives SCHEDULED or PRIOR_YEAR (Frazzini and Lamont's year-ago date + 364 days); an UNKNOWN date is excluded with a reason, and a date confirmed after D is not used.
-5. **Faithful replication:** Frazzini and Lamont's rule first: hold every stock with a report expected in the window, equally weighted; their split by expected volume is a variant; the screener is ED4c.
+5. **Faithful replication:** Frazzini and Lamont's rule first: hold every stock with a report expected in the window, equally weighted; eap_all is that rule on the liquid names; their split by expected volume is eap_volume; the Savor and Wilson window (one session before to one after) is the savor_wilson variant.
 6. **Expected size and sample:** Published as a positive abnormal return in announcement months, largest for names with high expected announcement volume (Frazzini and Lamont 2007), and found in most markets (Barber, De George, Lehavy and Trueman 2013). About eight reports per name in the stored bars, clustered in about eight seasons.
 7. **Capacity and costs:** One entry and one exit per report, no short leg; the cost is the stock's spread, small for liquid names.
 8. **Failure modes and retirement:** Moved or estimated dates, and a market sell-off in a season. Retire if the frozen-period excess return is not above the base rate of the same names outside their windows.

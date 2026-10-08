@@ -294,3 +294,35 @@ for = "liquid enough to trade before the news"
 op = "gte"
 value = 2000000
 mode = "hard"
+
+[[field]]
+name = "rollup.earnings_expected@v1.expected_basis"
+theme = "events"
+reads = "How the name's next report date is known: SCHEDULED (a report date the calendars had published by the session), PRIOR_YEAR (no date published, so the year-ago report plus 364 days, the same weekday a year on) or UNKNOWN (neither: no report in the past year either). It says how far to trust rollup.earnings_expected@v1.expected_report_date: an announced date is firm, a year-ago guess is usually within days but can be weeks out."
+caveats = [
+  "UNKNOWN is not 'no earnings': a recent listing or a name the calendars do not cover has no date by either route. A hard 'in SCHEDULED, PRIOR_YEAR' criterion leaves those names out, which is the intent for an edge that must know the date by the decision session.",
+  "PRIOR_YEAR dates miss when a company changes its calendar (a fiscal-year change, a merger): a window built on one can fall on the wrong sessions.",
+]
+sources = ["Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007): the year-ago date as the expected one"]
+[[field.use]]
+for = "a report date known by the decision session (an announcement edge)"
+op = "in"
+value = ["SCHEDULED", "PRIOR_YEAR"]
+mode = "hard"
+note = "SCHEDULED alone keeps only announced dates, which are a few weeks ahead at most"
+
+[[field]]
+name = "rollup.earnings_reaction@v1.earnings_volume_ratio"
+theme = "events"
+reads = "How much trading a report usually draws: over the last four reports, the mean dollars traded a day in the report's two-session window divided by the 20-session average before it. 2 means the window trades twice the normal volume; 5 is a name whose reports are events. Frazzini and Lamont found the earnings announcement premium concentrated in the names whose reports draw the most volume."
+caveats = [
+  "It describes the last four reports, not the coming one, and it is null until four reports have a closed window: a name with a short history is left out by a hard criterion.",
+  "A report window can carry other news (an offering, a deal), which inflates the ratio without the report being the cause.",
+]
+sources = ["Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007)"]
+[[field.use]]
+for = "names whose reports draw heavy volume"
+op = "gte"
+value = 2
+mode = "hard"
+note = "the earnings announcement premium screen ranks by it instead of cutting"

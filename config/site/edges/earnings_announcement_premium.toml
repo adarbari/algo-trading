@@ -1,5 +1,5 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. The screener comes with ED4c.
+# src/algotrade/config/edges/document.py. Screeners: eap_all, eap_volume (ED4c).
 id = "earnings_announcement_premium"
 name = "Earnings announcement premium"
 thesis = "Stocks earn more in the days around a scheduled earnings report than at other times."
@@ -11,13 +11,22 @@ holding the announcement, which arbitrage cannot avoid."""
 schedule = "on_event:earnings_expected"
 top_k = "all"
 base = "universe"
-screeners = []
+screeners = ["eap_all", "eap_volume"]
+baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 frozen_from = 2026-04-01
 notes = """Window: from five sessions before the scheduled report to one after (six sessions,
 start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must be
 known by the decision session D = S - 1 (earnings_expected@v1: SCHEDULED, or PRIOR_YEAR), never
-be taken from the actual report date; the entry session is S = A - 5 for the expected report A."""
+be taken from the actual report date; the entry session is S = A - 5 for the expected report A. Liquid base gates: common stock or ADR,
+active, close above $5, 20-day ADV at least $50M. Cost 10 bps a round trip (decided 2026-10-08).
+The top_k is "all" at the edge level (a preset carries no top-k): eap_volume ranks by the earnings
+volume ratio and the harness reads its decile spread; the ED4 decision's top 50 is not expressible
+per screener. The window is built from the EXPECTED date: a PRIOR_YEAR date can miss the real
+report, so a window may not contain it; the share of windows that contained the actual report is a
+diagnostic (not a filter), a follow-up in the evaluation report. The Savor-Wilson variant
+(offset -1, three sessions) needs the h=3 outcomes backfill: horizons are stored from the
+documents, so rerun the outcomes backfill before reading it."""
 
 [universe.where]
 all = [
@@ -25,11 +34,19 @@ all = [
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
 ]
 
+[[variants]]
+id = "savor_wilson"
+
+[variants.outcome]
+horizon_sessions = [3]
+start_offset_sessions = -1
+
 [outcome]
 kind = "excess_return"
 horizon_sessions = [6]
 benchmark = "SPY"
 start_offset_sessions = -5
+cost_bps = 10
 
 [quality_bar]
 outcome = """Excess return over SPY from five sessions before the scheduled report to one after:
@@ -39,7 +56,7 @@ the entry session S = A - 5): earnings_expected@v1 gives SCHEDULED or PRIOR_YEAR
 Lamont's year-ago date + 364 days); an UNKNOWN date is excluded with a reason, and a date
 confirmed after D is not used."""
 replication = """Frazzini and Lamont's rule first: hold every stock with a report expected in the
-window, equally weighted; their split by expected volume is a variant; the screener is ED4c."""
+window, equally weighted; eap_all is that rule on the liquid names; their split by expected volume is eap_volume; the Savor and Wilson window (one session before to one after) is the savor_wilson variant."""
 expected_size = """Published as a positive abnormal return in announcement months, largest for
 names with high expected announcement volume (Frazzini and Lamont 2007), and found in most
 markets (Barber, De George, Lehavy and Trueman 2013). About eight reports per name in the
