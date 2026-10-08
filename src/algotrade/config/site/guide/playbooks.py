@@ -1,7 +1,9 @@
 """The Guide's playbook prose (``config/site/guide/playbooks/<id>.toml``, ADR 0051; spec
 ``docs/ui/guide.md`` "The playbook page"): one file per site rule-screen preset, kept apart
 from the preset because a preset version is immutable and its explanation is not. Keys:
-``id`` (the file's name), ``summary`` (the page's hero), ``hit`` (what a hit looks like),
+``id`` (the file's name), ``version`` (the preset version the prose was written for: a new
+preset version fails a fitness test until the prose is re-read and the number raised),
+``summary`` (the page's hero), ``hit`` (what a hit looks like),
 ``not_checked`` (what it does not check), ``before_acting`` (the caveats, one string each),
 ``related`` (``{id, reason}``: other playbooks), ``sources`` and the ``[asks]`` table (each
 criterion of the preset's latest version in a few plain words, for the criteria table). The
@@ -20,7 +22,17 @@ from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "guide_playbooks"  # the config store's kind: site/guide/playbooks/<id>.toml
-KEYS = ("id", "summary", "hit", "not_checked", "before_acting", "related", "sources", "asks")
+KEYS = (
+    "id",
+    "version",
+    "summary",
+    "hit",
+    "not_checked",
+    "before_acting",
+    "related",
+    "sources",
+    "asks",
+)
 TEXTS = ("summary", "hit", "not_checked")
 RELATED_KEYS = ("id", "reason")
 
@@ -46,6 +58,7 @@ class PlaybookProse:
     """One playbook's prose (module docstring); ``asks`` in file order."""
 
     id: str
+    version: int
     summary: str
     hit: str
     not_checked: str
@@ -66,6 +79,9 @@ class PlaybookProse:
         t.only(KEYS)
         if _line(t, "id") != name:
             raise ConfigurationError(f"{where} id: expected {name!r} (the file's name)")
+        if t.raw("version") is None:
+            raise ConfigurationError(f"{where} version: required (the preset version written for)")
+        version = t.integer("version", 1, minimum=1)
         related = tuple(_related(t, name))
         ids = [r.id for r in related]
         if len(ids) != len(set(ids)):
@@ -73,6 +89,7 @@ class PlaybookProse:
         asks = t.table("asks", t.raw("asks") or {})
         return cls(
             id=name,
+            version=version,
             summary=_line(t, "summary"),
             hit=_line(t, "hit"),
             not_checked=_line(t, "not_checked"),

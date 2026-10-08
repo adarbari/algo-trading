@@ -7,6 +7,7 @@
 # src/algotrade/config/site/guide/playbooks.py; fitness tests in
 # tests/unit/config/site/guide/test_playbooks.py.
 id = "exhaustion"
+version = 1  # the preset version this prose was written for
 summary = "Finds shares that have run hard enough to be among the week's top performers, far above their one-month average and overbought, on a spike in volume and range, while this week's momentum has started to fade. These are names where a top may be forming, worth a look for trimming or fading."
 hit = "This week's return is in the top 10% of the universe's stocks; the close is more than 2 ATR above its 20-session average; RSI(14) is above 70; today's volume is more than 1.5 times the 20-session average; this week's daily range is more than 1.1 times the month's; the close sits at or beyond 95% of the way to the upper Bollinger band; and this week's return fell short of last week's."
 not_checked = "It does not know about a pending takeover or a news-driven short squeeze, both of which pin RSI high with no top behind them. The continuation case (the same screen with momentum still accelerating) is a copy in the Builder with the momentum row flipped."

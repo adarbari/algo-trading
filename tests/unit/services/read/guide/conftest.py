@@ -82,6 +82,7 @@ ALPHA_V2 = preset(
 )  # fmt: skip
 ALPHA_PROSE = {
     "id": "alpha",
+    "version": 2,
     "summary": f"Finds dips; read {PULLBACK} first.",
     "hit": "Near the average.",
     "not_checked": "News.",

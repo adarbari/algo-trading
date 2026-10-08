@@ -7,6 +7,7 @@
 # src/algotrade/config/site/guide/playbooks.py; fitness tests in
 # tests/unit/config/site/guide/test_playbooks.py.
 id = "oversold_reversal"
+version = 1  # the preset version this prose was written for
 summary = "Finds shares that had one of the worst weeks in the market and are deeply oversold, yet closed up today on a burst of volume, with a support level still beneath them and the long-term trend not broken. These are bounce candidates after a washout."
 hit = "This week's return is in the bottom 10% of the universe's stocks and RSI(14) is below 30; the close is still above a confirmed swing low; the close is above the 200-day average (up to 5% below is flagged WATCH) and the share is scored, not rejected, on not being in a DOWNTREND; this week's return beat last week's (the fall is decelerating); today's volume was at least two standard deviations above its 20-session norm, with 1.5 times average volume adding to the score; and today closed up."
 not_checked = "It does not ask why the share sold off: a profit warning and a market-wide flush look the same here. Nothing checks earnings dates; support_reversal adds the tested level, and exhaustion is the mirror case on the upside."

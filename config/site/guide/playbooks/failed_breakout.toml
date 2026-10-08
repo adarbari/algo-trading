@@ -7,6 +7,7 @@
 # src/algotrade/config/site/guide/playbooks.py; fitness tests in
 # tests/unit/config/site/guide/test_playbooks.py.
 id = "failed_breakout"
+version = 1  # the preset version this prose was written for
 summary = "Finds shares that broke out above their one-month high recently and have since closed back below that level, with heavy volume and fading momentum: the bull trap. It is a list of short-side candidates, the mirror of the breakout playbook."
 hit = "The latest 20-session breakout of the last 60 sessions has since closed below its level; that breakout was at most 10 sessions ago (11 to 15 sessions is flagged WATCH); today's volume is at least 1.2 times the 20-session average; this week's return fell short of last week's; and the old level, now resistance, is within 1 ATR above the close."
 not_checked = "It does not check whether the share can be borrowed or shorted, nor earnings. The failure test is an approximation: any close below the level since the breakout counts, not strictly 'above yesterday, below today', so the recency gate is what keeps it fresh."

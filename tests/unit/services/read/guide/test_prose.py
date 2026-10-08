@@ -2,7 +2,13 @@
 names the caller's catalogue holds; a trailing dot is the sentence's; the segments join back
 to the text. ``mentions`` lists the names in order."""
 
-from algotrade.services.read.guide.prose import LinkedProse, ProseSegment, link_prose, mentions
+from algotrade.services.read.guide.prose import (
+    LinkedProse,
+    ProseSegment,
+    link_prose,
+    mentions,
+    name_tokens,
+)
 
 ATR = "feature.atr_pct"
 REL = "rollup.momentum@v1.rel_volume"
@@ -41,3 +47,8 @@ def test_mentions_across_texts() -> None:
     assert mentions([f"{ATR} and {REL}.", "instrument.symbol"], NAMES) == [
         ATR, REL, "instrument.symbol",
     ]  # fmt: skip
+
+
+def test_name_tokens_are_dotted_words_without_the_sentence_dot() -> None:
+    text = f"Check {ATR}. Then {REL}, not rel_volume or e.g. 0.005."
+    assert name_tokens(text) == [ATR, REL, "e.g", "0.005"]

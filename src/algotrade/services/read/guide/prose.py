@@ -33,6 +33,12 @@ class LinkedProse:
         return tuple(s.field for s in self.segments if s.field is not None)
 
 
+def name_tokens(text: str) -> list[str]:
+    """Every word of ``text`` that could be a catalogue name (it has a dot inside it; a
+    trailing dot is the sentence's), in order: the one tokeniser of the Guide's prose."""
+    return [t for t in (m.group().rstrip(".") for m in _TOKEN.finditer(text)) if "." in t]
+
+
 def link_prose(text: str, names: Container[str]) -> LinkedProse:
     """``text`` split at every name of ``names`` it mentions (module docstring)."""
     segments: list[ProseSegment] = []

@@ -7,6 +7,7 @@
 # src/algotrade/config/site/guide/playbooks.py; fitness tests in
 # tests/unit/config/site/guide/test_playbooks.py.
 id = "trend_continuation"
+version = 1  # the preset version this prose was written for
 summary = "Finds the shares already in a well-established uptrend that are also beating the market: the leaders of the current trend. It is a list of names going up in an orderly way, not a prediction that they keep going."
 hit = "The three moving averages are stacked in uptrend order (the 20-session EMA above the 50 above the 200), the share is up over the last 20 and the last 60 sessions, it has outperformed SPY over the last quarter, today's close sits above the 20-session EMA, and this week's daily range is at least 80% of the month's (the range is not drying up)."
 not_checked = "It does not say how far a name has already run: a hit can be extended or just leaving a dip, so pair it with pullback or breakout for the entry. It does not check earnings dates or news."

@@ -7,6 +7,7 @@
 # src/algotrade/config/site/guide/playbooks.py; fitness tests in
 # tests/unit/config/site/guide/test_playbooks.py.
 id = "breakout"
+version = 1  # the preset version this prose was written for
 summary = "Finds shares that closed today above their highest price of the last month, with the volume, momentum and widening range that a real breakout carries, and did so near a three-month high rather than inside a longer decline. It is the list of names breaking out today."
 hit = "The close is above the highest high of the 20 sessions before today and within 3% of the 50-session high (a new high passes); the week and the month are both up and this week's return beat last week's; volume is more than 1.25 times the 20-session average; this week's daily range is at least 1.1 times the month's; the close sits in the top 30% of the day's range; and the close is no more than 3 ATR above its 20-session average (3 to 4 ATR is flagged WATCH as extended)."
 not_checked = "It does not check whether the break holds (failed_breakout finds the ones that did not), earnings or news behind the move, gaps, or the market's regime."

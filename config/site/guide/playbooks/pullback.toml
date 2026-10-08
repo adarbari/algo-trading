@@ -7,6 +7,7 @@
 # src/algotrade/config/site/guide/playbooks.py; fitness tests in
 # tests/unit/config/site/guide/test_playbooks.py.
 id = "pullback"
+version = 1  # the preset version this prose was written for
 summary = "Finds shares in a strong uptrend that have dipped back to their one-month average on quiet volume, with a support level close underneath. These are the orderly dips in leaders, where the trend is intact and the risk is well defined."
 hit = "The uptrend is confirmed on every count: the 20 and 60-session returns are positive, the EMAs are stacked BULL, price is above the 50 and 200-day averages (UPTREND), and the share is ahead of SPY over the quarter. The dip is shallow and recent: the close is within half an ATR of its 20-session average (a quarter ATR beyond that is flagged WATCH), no more than 1.5 ATR below the 20-session high, which was set within the last 10 sessions; this week's volume averages less than the month's; a support level sits within 1 ATR below; and this week's momentum has not slipped more than 3 points behind last week's (up to 6 points behind is WATCH)."
 not_checked = "It does not check earnings dates, market breadth, or whether this dip is the start of a larger decline beyond what the trend fields say. It does not confirm that the bounce has started; support_reversal and oversold_reversal look for that."
