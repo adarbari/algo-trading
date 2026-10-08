@@ -190,3 +190,53 @@ def test_a_rule_screen_runs_as_a_screen_job() -> None:
     assert job.status is JobStatus.COMPLETE, job.error
     assert job.result["summary"]["passed"] == 1
     assert reader.table("results/rule_screen", DAY) is not None
+
+
+IBKR = "rollups/instrument/ibkr_iv@v1"
+VRP_SCREEN: dict[str, Any] = {
+    "id": "vrp_like",
+    "kind": "screener",
+    "impl": "rules",
+    "version": 1,
+    "selection": "active",
+    "screening": {"min_coverage": 0.5},
+    "criteria": {"iv": {"field": "feature.vrp_iv30", "op": "gt", "value": 0.1}},
+}
+
+
+def test_an_optional_table_read_through_a_coalescing_feature_is_complete_not_partial() -> None:
+    """ADR 0055: with IB Gateway down the session has no ``ibkr_iv@v1`` partition, but
+    ``vrp_iv30`` coalesces it with Cboe's IV30: the run is COMPLETE, the optional miss is
+    audited apart, never PARTIAL (which failed the critical nightly ``screens`` step)."""
+    reader, writer = seeded()
+    cboe = [
+        {"instrument_id": "EQ:AAA", "iv30_cboe": 0.3},
+        {"instrument_id": "EQ:BBB", "iv30_cboe": 0.05},
+        {"instrument_id": "EQ:ETF1", "iv30_cboe": 0.2},
+    ]
+    writer.write_table("rollups/instrument/iv30@v1", DAY, "f1", stamped(cboe, DAY, "f1"))
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
+    )
+    config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
+    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    assert outcome.run.coverage is RunCoverage.COMPLETE
+    assert outcome.audit["missing_tables"] == []
+    assert outcome.audit["missing_optional_tables"] == [IBKR]
+    assert outcome.audit["decisions"] == {"QUALIFIED": 2, "REJECT": 2}  # CCC: UNKNOWN
+    (record,) = reader.runs("screen-vrp_like-site", DAY)
+    assert record.status is RunStatus.COMPLETE
+
+
+def test_a_required_table_missing_beside_an_optional_one_is_still_partial() -> None:
+    reader, writer = seeded(features_stored=False)
+    screen = {**SCREEN, "criteria": {**SCREEN["criteria"], **VRP_SCREEN["criteria"]}}
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "big_liquid"): screen}
+    )
+    config = resolve_config(store, "big_liquid", UserContext(SITE_USER))
+    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    assert outcome.run.coverage is RunCoverage.PARTIAL
+    assert IBKR in outcome.audit["missing_optional_tables"]
+    assert IBKR not in outcome.audit["missing_tables"]
+    assert "rollups/instrument/option_liquidity@v1" in outcome.audit["missing_tables"]

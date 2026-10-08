@@ -17,6 +17,10 @@ same window, same thresholds (``rollups.toml ["ibkr_iv@v1"]``, defaults equal to
 IBKR market data: ``licence = "personal"``. The site's ``iv_rank`` / ``iv_percentile``
 expression features prefer these and fall back to ours, saying which they used
 (``config/site/features/volatility.toml``).
+
+The group is ``optional`` (ADR 0055): IB Gateway may be down for a session, so a screen that
+reads it (only through an expression feature coalescing with a required table) goes without
+it with a warning, never a PARTIAL run.
 """
 
 from dataclasses import dataclass
@@ -131,4 +135,6 @@ GROUP = FeatureGroup(
     compute,
     IbkrIvParams(),
     applies_to="optionable",
+    # IB Gateway may be down for a session: a screen going without it warns (ADR 0055).
+    optional=True,
 )

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.site.settings import load_sources
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.backtests.run import run_configured_backtest
@@ -82,6 +83,7 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
         ctx.resources["writer"],
         config,
         date.fromisoformat(params["session"]),
+        sources=load_sources(ctx.resources["configs"]),
     )
     exports = (
         run_exports(outcome, config, Path(params["export_dir"])) if params.get("export_dir") else ()

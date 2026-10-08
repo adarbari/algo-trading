@@ -175,6 +175,54 @@ def test_preset_version_check_catches_edits(tmp_path: Path) -> None:
     assert any("gone" in p for p in preset_version_problems(tmp_path))
 
 
+# Raw IBKR IV is personal-licence and missing for names IBKR has no history for; a screener
+# reads it through the catalogue's coalescing features (feature.iv_rank, iv_percentile,
+# iv_rank_source in config/site/features/volatility.toml), never the rollup (owner 2026-10-08).
+# Only the latest version of each preset is checked: older versions are immutable (above).
+RAW_IBKR_IV = "rollup.ibkr_iv@v1."
+
+
+def latest_preset_raw_ibkr_reads(root: Path) -> list[str]:
+    """``<id>/v<N>.toml: <field>`` for each raw ``rollup.ibkr_iv@v1.*`` field the latest
+    version of a site screener preset under ``root`` reads (criteria, flags, columns, rank)."""
+
+    def strings(node: object) -> list[str]:
+        if isinstance(node, str):
+            return [node]
+        if isinstance(node, dict):
+            return [s for v in node.values() for s in strings(v)]
+        if isinstance(node, list):
+            return [s for v in node for s in strings(v)]
+        return []
+
+    found = []
+    for folder in sorted(p for p in (root / PRESETS).iterdir() if p.is_dir()):
+        versions = [p for p in folder.glob("v*.toml") if p.stem[1:].isdigit()]
+        if not versions:
+            continue
+        latest = max(versions, key=lambda p: int(p.stem[1:]))
+        name = latest.relative_to(root / PRESETS).as_posix()
+        reads = strings(tomllib.loads(latest.read_text()))
+        found += [f"{name}: {s}" for s in sorted(set(reads)) if s.startswith(RAW_IBKR_IV)]
+    return found
+
+
+def test_latest_site_presets_read_ibkr_iv_only_through_features() -> None:
+    assert latest_preset_raw_ibkr_reads(REPO_ROOT) == []
+
+
+def test_raw_ibkr_iv_check_reads_only_the_latest_version(tmp_path: Path) -> None:
+    folder = tmp_path / PRESETS / "vrp"
+    folder.mkdir(parents=True)
+    raw = '[criteria.r]\nfield = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"\n'
+    (folder / "v1.toml").write_text(raw)
+    assert latest_preset_raw_ibkr_reads(tmp_path) == [
+        "vrp/v1.toml: rollup.ibkr_iv@v1.iv_rank_252d_ibkr"
+    ]
+    (folder / "v2.toml").write_text('[columns]\niv_rank = "feature.iv_rank"\n')
+    assert latest_preset_raw_ibkr_reads(tmp_path) == []
+
+
 # The root conftest blocks real network connections unless a test is marked.
 
 

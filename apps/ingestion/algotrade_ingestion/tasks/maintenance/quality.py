@@ -19,7 +19,13 @@ from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.settings import SourcesSettings, load_macro
 from algotrade.core.model.instruments import market_id
 from algotrade.data import StoreReader
-from algotrade.data.chains import chain_status
+from algotrade.data.chains import (
+    CHRONIC,
+    FETCH_FAILURES,
+    chain_labels,
+    chain_status,
+    stale_in_tier,
+)
 from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
@@ -181,12 +187,11 @@ def check_reference_classification(
     ]
 
 
-# Chain statuses (``tasks/market/option_chains``) by what they say about the night's fetch:
-# a failed or missing fetch is a source problem (FAIL); a stale chain is the feed serving an
-# older session (FAIL above the share: a later retry usually gets the session's chains); the
-# rest are answers.
-FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED")  # FETCH_ERROR includes an open circuit
-STALE = "STALE_DATA"
+# A failed or missing chain fetch is a source problem (FAIL); a stale chain is the feed serving
+# an older session (FAIL above the share: a later retry usually gets the session's chains); the
+# rest are answers; a chain stale for over ``max_chain_stale_sessions`` is a fetch failure
+# (``STALE_CHRONIC``). The statuses, labels and per-tier shares live in ``data/chains.py``, shared
+# with the screens (``tolerated_stale``, ADR 0054).
 EXAMPLES = 8  # stale core names listed in the detail
 REPORTED = ("OK", "STALE_DATA", "NO_CHAIN", "NO_STANDARD_SERIES")
 
@@ -195,12 +200,15 @@ def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list
     status_frame = chain_status(reader, session)
     if status_frame is None or status_frame.empty:
         return [Check("chains_present", "FAIL", f"no option chains for {session}")]
-    labels = status_frame["status"].astype(str).str.split(":", n=1).str[0].str.strip()
+    labels = chain_labels(status_frame, session, s.max_chain_stale_sessions)
     total = len(labels)
     counts = labels.value_counts()
     failed = int(labels.isin(FETCH_FAILURES).sum())
     breakdown = ", ".join(f"{k} {int(counts.get(k, 0))}" for k in REPORTED)
+    chronic = int(counts.get(CHRONIC, 0))
+    of_them = f" ({chronic} {CHRONIC}: stale over {s.max_chain_stale_sessions} sessions)"
     detail = f"of {total} underlyings: {breakdown}, fetch failures {failed}"
+    detail += of_them if chronic else ""
     return [
         Check(
             "chains_fetch",
@@ -219,17 +227,12 @@ def _stale_check(
     """``chains_stale_<tier>``: the share of the tier's chains that are STALE_DATA, FAIL above
     ``limit``. The tier is the one stored with each status row at fetch time (rows from before
     the column existed count as rest); stale core names are listed."""
-    stored = frame["tier"] if "tier" in frame.columns else pd.Series("rest", index=frame.index)
-    in_tier = stored.fillna("rest").astype(str) == tier
-    total = int(in_tier.sum())
-    if tier == "core" and total == 0 and "tier" in frame.columns:
-        # a tiered status with no core name means the tier inputs were missing: no gate
+    found = stale_in_tier(frame, labels, tier)
+    total, stale, count, share = found.total, found.stale, found.count, found.share
+    if found.untiered_core:  # no gate: the tier inputs were missing
         return Check(
             "chains_stale_core", "FAIL", f"no core names in a tiered chain status; {detail}"
         )
-    stale = in_tier & (labels == STALE)
-    count = int(stale.sum())
-    share = count / total if total else 0.0
     names = ""
     if tier == "core" and count:
         listed = frame.loc[stale, "symbol"].astype(str).sort_values().head(EXAMPLES).tolist()

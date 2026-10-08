@@ -203,7 +203,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0055), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
@@ -648,14 +648,15 @@ detect = [{ string_prefix = "regime=" }, { call = "MarketFeatures" }, { call = "
 
 [[responsibility]]
 id = "screen-execution"
-description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
+description = "Run a configured screen (select, screen, audit, write results; coverage counts required tables only, an optional source's missing table is audited apart, ADR 0055); nightly submits `screen` jobs (workflows/nightly/screens.py) and warns on optional misses; the stale chains the chains gate tolerated (data.chains.tolerated_stale) are EXCLUDED from the run with a reason and out of its coverage (ADR 0054)"
 owner = [
     "src/algotrade/services/screening/run.py",
     "src/algotrade/services/screening/rule_results.py",  # a rule screen's result frames
     "src/algotrade/services/jobs/handlers.py",
+    "src/algotrade/engines/screening/exclusions.py",  # EXCLUDED rows: names out of the run with a reason (ADR 0054)
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
-detect = [{ call = "run_screener" }]
+detect = [{ call = "run_screener" }, { call = "tolerated_stale" }]
 
 [[responsibility]]
 id = "screen-spec"

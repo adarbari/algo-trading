@@ -7,17 +7,19 @@ Rules from the screener specs (for example the VRP scanner):
 
 With the regime gate on (ADR 0049, ``engines.screening.gate``) the screener's picks are PAUSED
 in the regimes it pauses in before the rows are audited; PAUSED rows count as processed.
+EXCLUDED rows (ADR 0054, ``engines.screening.exclusions``) are out of the coverage denominator.
 """
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.core.views.feature_view import FeatureView
+from algotrade.engines.screening.exclusions import exclude_rows
 from algotrade.engines.screening.gate import RegimeGate, gate_rows
-from algotrade.strategies.screeners.base import Screener, ScreenRow
+from algotrade.strategies.screeners.base import Decision, Screener, ScreenRow
 
 DEFAULT_MIN_COVERAGE = 0.98
 
@@ -43,8 +45,14 @@ class ScreenRun:
         return sum(1 for r in self.rows if r.decision.processed)
 
     @property
+    def excluded(self) -> int:
+        return sum(1 for r in self.rows if r.decision is Decision.EXCLUDED)
+
+    @property
     def coverage_pct(self) -> float:
-        return self.processed / self.unique_instruments if self.unique_instruments else 0.0
+        """Processed over the instruments left after the excluded ones (0 when none is left)."""
+        left = self.unique_instruments - self.excluded
+        return self.processed / left if left > 0 else 0.0
 
     def counts(self) -> dict[str, int]:
         return dict(Counter(r.decision.value for r in self.rows))
@@ -54,7 +62,16 @@ class ScreenRun:
             Counter(
                 r.reasons[0] if r.reasons else "unspecified"
                 for r in self.rows
-                if not r.decision.processed
+                if not r.decision.processed and r.decision is not Decision.EXCLUDED
+            )
+        )
+
+    def excluded_reasons(self) -> dict[str, int]:
+        return dict(
+            Counter(
+                r.reasons[0] if r.reasons else "unspecified"
+                for r in self.rows
+                if r.decision is Decision.EXCLUDED
             )
         )
 
@@ -66,10 +83,12 @@ class ScreenRun:
             "unique_instruments": self.unique_instruments,
             "duplicates_removed": self.duplicates_removed,
             "processed": self.processed,
-            "skipped": self.unique_instruments - self.processed,
+            "skipped": self.unique_instruments - self.processed - self.excluded,
+            "excluded": self.excluded,
             "coverage_pct": round(self.coverage_pct, 4),
             "decisions": self.counts(),
             "skipped_reasons": self.skipped_reasons(),
+            "excluded_reasons": self.excluded_reasons(),
         }
 
 
@@ -79,10 +98,11 @@ def run_screen(
     universe: Sequence[str],
     min_coverage: float = DEFAULT_MIN_COVERAGE,
     gate: RegimeGate | None = None,
+    excluded: Mapping[str, str] | None = None,
 ) -> ScreenRun:
     if sorted(set(universe)) and set(view.instruments) != set(universe):
         raise AlgoTradeError("FeatureView must contain exactly the universe instruments")
-    rows = gate_rows(screener.screen(view), gate) if universe else []
+    rows = exclude_rows(gate_rows(screener.screen(view), gate), excluded or {}) if universe else []
     return audit_rows(screener.name, rows, universe, min_coverage)
 
 
