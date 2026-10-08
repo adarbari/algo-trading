@@ -8,7 +8,7 @@ its code on that machine.
 |---|---|
 | CI: changed areas | every run (seconds): decides which jobs a pull request needs |
 | CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Python changes |
-| CI: tests, four shards (`unit-a`, `unit-b` by subfolder; `apps`, `libs`, `contract`, `architecture`; the slow rest: property, integration, e2e, scripts, reconciliation) per Python version (3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests, five shards (`unit-a`, `unit-b`, `unit-c` by subfolder, the rollup groups spread over the first two; `apps`, `libs`, `contract`, `architecture`; the slow rest: property, integration, e2e, scripts, reconciliation) per Python version (3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
 | CI: tests (the gate: fails on a failed shard; combines the shards' coverage, 90 %) | every run |
 | CI: web static (generated files fresh, ds:check, lint, types, unit) | web changes |
 | CI: web e2e (production build, Playwright, in the Playwright image) | web changes |
@@ -44,7 +44,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 | Measure | Before (2026-10-07) | After |
 |---|---|---|
 | CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | #280: 6.0 min (Storybook 30 s, then two screenshot shards of 5.3 min); #286: 3.0 min (four shards of ~2.5 min) |
-| CI critical path on a Python PR | 12 min (the Web job; the tests job 5 min) | #280: 9.0 min, all of it the one pytest job (5 142 tests with branch coverage, 8 min 34 s); #286: 6.1 min (shards unit 5.6, apps 3.3, rest 1.7 min, then the combine); P1c splits `unit` in two, target ~4 min |
+| CI critical path on a Python PR | 12 min (the Web job; the tests job 5 min) | #280: 9.0 min, all of it the one pytest job (5 142 tests with branch coverage, 8 min 34 s); #286: 6.1 min (shards unit 5.6, apps 3.3, rest 1.7 min, then the combine); #292 (P1c): 5.0 min (unit-a 4.5 with all of `features/`); P1d spreads the rollup groups over three unit shards |
 | CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | the tests job runs `tests/architecture` only (~1 min) |
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR (396 runs in the week to 2026-10-07, 4.5 per PR, three to five at once on the shared machine) | narrowed by `make changed` (Local fast path below), then the push: CI is the full gate (rule 9). A deliberate local `make check` is scope-aware (below): python-only measured 11 min 48 s on 2026-10-08 (pytest 10 min 45 s of it, 5,174 tests at `-n auto`, another session's pytest running alongside), web-only = the web gates in parallel with no pytest, mixed = the longer side, not the sum; `FULL=1` is the old 30–40 min |
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
@@ -121,7 +121,7 @@ How the web jobs are cut:
 
 How the Python tests are cut (`make test` locally is unchanged):
 
-- **test** runs four shards in parallel, `make test-shard SHARD=unit-a|unit-b|apps|rest` (the folders
+- **test** runs four shards in parallel, `make test-shard SHARD=unit-a|unit-b|unit-c|apps|rest` (the folders
   in the Makefile's `TEST_SHARD_*`; a fitness test keeps them covering every `tests/` folder),
   each writing `.coverage.<shard>` with the gate off, uploaded as an artifact.
 - **tests** is the protected check `Tests (py3.12)`: it fails when a shard failed, then

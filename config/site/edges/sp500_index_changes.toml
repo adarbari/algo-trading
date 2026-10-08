@@ -1,0 +1,45 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Rejected 2026-10-07; kept so it is not filed again.
+id = "sp500_index_changes"
+name = "S&P 500 index changes"
+thesis = "Stocks added to the S&P 500 rise around their inclusion as index funds buy them."
+mechanism = """Index funds must buy an added name by the effective date; the price pressure was
+the original effect (Shleifer 1986; Harris and Gurel 1986)."""
+persistence = """Weak: arbitrageurs trade between announcement and effective date and S&P spreads
+the demand, so the effect has been competed away."""
+schedule = "on_event:index_change"
+top_k = "all"
+screeners = []
+status = "rejected"
+rejection_reason = """Under 1% since 2010 (Greenwood and Sammon, The Disappearing Index Effect),
+inside costs and the announcement-to-inclusion window; checked 2026-10-07."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+
+[quality_bar]
+outcome = "Excess return over SPY over 20 sessions from the announcement."
+trigger_timing = """Only the announcement is tradable; events/index_change records membership as
+our reference snapshot sees it, after the announcement, so it is late for this edge."""
+replication = "Greenwood and Sammon's event study of additions, announcement to effective date."
+expected_size = "Under 1% since 2010 (Greenwood and Sammon); a few dozen additions a year."
+capacity_costs = "Large caps, cheap to trade, but the window is crowded by index arbitrageurs."
+failure_modes = "The pressure reverses after inclusion; a leak front-runs the announcement."
+decoys = "Additions follow strong past returns and growth in size: the momentum and size baselines."
+
+[[sources]]
+title = "Greenwood, R. and Sammon, M., The Disappearing Index Effect, 2022"
+
+[[sources]]
+title = "Shleifer, A., Do Demand Curves for Stocks Slope Down?, Journal of Finance, 1986"
+
+[[sources]]
+title = "Harris, L. and Gurel, E., Price and Volume Effects Associated with Changes in the S&P 500 List, Journal of Finance, 1986"

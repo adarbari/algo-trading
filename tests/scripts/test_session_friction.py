@@ -19,6 +19,8 @@ SINCE = date(2026, 10, 1)
 BLOCKED = "<tool_use_error>Blocked: sleep 30 followed by: tail -5 /tmp/check.log</tool_use_error>"
 PYTEST_FAIL = "FAILED tests/unit/x.py::test_a - assert 1 == 2\nExit code 1"
 UNREAD = "<tool_use_error>File has not been read yet.</tool_use_error>"
+OLD_USAGE = {"claude-fable-5-1": {"costUSD": 1.0}}
+USAGE = {"claude-fable-5-1": {"costUSD": 30.0}, "claude-sonnet-5-5": {"costUSD": 10.0}}
 
 
 def _use(tool: str, uid: str, **inp: object) -> dict[str, object]:
@@ -33,7 +35,10 @@ def _result(uid: str, text: str, *, error: bool = False) -> dict[str, object]:
 
 
 def _rec(kind: str, content: object, ts: str = "2026-10-06T10:00:00.000Z") -> dict[str, object]:
-    return {"type": kind, "timestamp": ts, "message": {"role": kind, "content": content}}
+    message: dict[str, object] = {"role": kind, "content": content}
+    if kind == "assistant":
+        message["model"] = "claude-fable-5-1"
+    return {"type": kind, "timestamp": ts, "message": message}
 
 
 def _write(path: Path, records: list[dict[str, object]]) -> None:
@@ -53,6 +58,9 @@ def projects(tmp_path: Path) -> Path:
         _rec("assistant", [_use("Bash", "t3", command="make check WORKERS=2")]),
         _rec("user", [_result("t3", "all green")]),
         {"type": "pr-link", "timestamp": "2026-10-06T11:00:00.000Z", "prNumber": 7},
+        {"type": "custom-title", "timestamp": "2026-10-06T11:00:00Z", "customTitle": "Fix x"},
+        {"type": "assistant", "timestamp": "2026-10-06T11:00:00Z", "modelUsage": OLD_USAGE},
+        {"type": "assistant", "timestamp": "2026-10-06T11:00:01Z", "modelUsage": USAGE},
         {"type": "system", "timestamp": "2026-10-06T11:01:00Z", "toolDenialKind": "user-rejected"},
     ]
     _write(root / "abcdef12-0000.jsonl", main)
@@ -139,3 +147,27 @@ def test_project_dir_is_the_main_checkout_slug(tmp_path: Path) -> None:
     repo.mkdir()
     assert friction.project_dir(repo).name == str(repo.resolve()).replace("/", "-")
     assert friction.project_dir(repo).parent == Path.home() / ".claude" / "projects"
+
+
+def test_spend_takes_the_last_usage_snapshot_and_flags_expensive_work_item_sessions(
+    tmp_path: Path,
+) -> None:
+    report = friction.scan(projects(tmp_path), SINCE)
+    session = report.sessions["abcdef12"]
+    assert session.title == "Fix x"
+    assert session.cost == {"fable": 30.0, "sonnet": 10.0} and session.total_cost == 40.0
+    text = friction.render(report, top=5)
+    assert "| fable | $30.00 | 75% |" in text and "| all | $40.00 | |" in text
+    assert "- 2026-10-06 Fix x: $40.00 (fable $30, sonnet $10), PRs 7" in text
+    assert (
+        friction._tier("claude-opus-5-5") == "opus"
+        and friction._tier("<synthetic>") == "<synthetic>"
+    )
+
+
+def test_a_sonnet_run_work_item_is_not_flagged(tmp_path: Path) -> None:
+    report = friction.Report(since=SINCE)
+    report.sessions["s"] = friction.Session(
+        agent=False, prs={1}, start="2026-10-06", title="T", cost={"sonnet": 9.0, "opus": 1.0}
+    )
+    assert "- none" in "\n".join(friction.spend_lines(report))

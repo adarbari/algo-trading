@@ -227,10 +227,16 @@ Token habits (every session):
 - **Never `pkill -f make`, `pkill -f node`, `pkill -f vite` or `pkill -f playwright`**: it kills
   another session's 30-40 min run. Stop your own run by its PID or job; `make check` holds a
   per-worktree lock (`scripts/ops/check_lock.sh`) and `make doctor` lists the other runs.
-- **One fresh session per work item**; batch related bugs into it. Sonnet for scoped fixes,
-  Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
-  Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
-  separate tasks.
+- **One fresh session per work item, on the tier the item needs** (owner ask 2026-10-08;
+  `make friction` reports spend by tier): a work item runs from a **Sonnet** session, which
+  delegates lookups, inventories, test and CI-log runs to `scout` / `checker` (Haiku), scoped
+  changes to `implementer` (Sonnet), design and the architect-area review to `architect`
+  (Opus), and open-ended research or content needing outside sources to an agent with
+  `model: "fable"`. Never orchestrate implementation from a Fable or Opus session: the week
+  to 2026-10-07 spent $1,051, 70% of it on Fable and Opus orchestrating PR work. Free
+  open-source models (`config/site/llm.toml`: Ollama, Groq, Gemini) serve only the app's
+  TextModel seam; no Claude Code agent runs on them. Batch related bugs into the item; plan
+  before code on new work; close the session when its PR is up; spin side issues off.
 - **Never `sleep` to poll a log** (28 blocked calls in one week): run a check in the
   foreground piped through `tail` (timeout up to 10 min), or background it and wait for the
   harness's completion notice; judge a backgrounded make by its log tail, not the task exit

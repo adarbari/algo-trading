@@ -76,7 +76,7 @@ rest-allowlist:  ## REST GET routes only shrink (ADR 0037): architecture/rest_al
 rest-allowlist-update: ## after retiring GET routes (removing their entries): lower the committed count
 	$(PY) scripts/check_rest_allowlist.py --update
 
-features-doc:    ## regenerate docs/data/features.md (catalogue) and docs/data/field-guide.md (field guide)
+features-doc:    ## regenerate docs/data/features.md (catalogue), docs/data/field-guide.md (field guide) and docs/edges.md (edges)
 	$(PY) scripts/features_doc.py
 
 roadmap-check:   ## docs/roadmap.md opens with a Now / Next of at most 25 lines (the one counter: tests/architecture/test_docs.py)
@@ -111,15 +111,17 @@ test:            ## everything, with the coverage gate, one worker per CPU (WORK
 
 # CI runs the suite as three parallel shards (docs/ci.md "Pipeline"); together they are `make test`.
 # A fitness test (tests/architecture/pipeline) checks the shards cover every tests/ folder.
-TEST_SHARDS = unit-a unit-b apps rest
-# tests/unit split in two by subfolder (the #286 run: unit 5.6 min, apps 3.3, rest 1.7)
-TEST_SHARD_unit-a = tests/unit/features tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
-TEST_SHARD_unit-b = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
+TEST_SHARDS = unit-a unit-b unit-c apps rest
+# tests/unit split three ways (the #292 run: unit-a 4.5 min with all of features/, unit-b 1.6):
+# the rollup groups are the slow unit tests, so they are spread over unit-a and unit-b
+TEST_SHARD_unit-a = tests/unit/features/rollups/market tests/unit/features/rollups/price tests/unit/features/rollups/corporate tests/unit/features/rollups/options tests/unit/features/rollups/activity
+TEST_SHARD_unit-b = tests/unit/features/rollups/positioning tests/unit/features/rollups/levels tests/unit/features/rollups/reference tests/unit/features/rollups/relative tests/unit/features/rollups/patterns tests/unit/features/expressions tests/unit/features/framework tests/unit/features/test_catalogue.py tests/unit/features/test_guide.py tests/unit/features/test_site.py tests/unit/features/test_site_fundamentals.py tests/unit/features/test_site_patterns.py tests/unit/features/test_site_positioning.py tests/unit/features/test_site_relative.py tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
+TEST_SHARD_unit-c = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
 TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
 # rest: few tests, the slow ones
 TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation
 
-test-shard:      ## one CI shard (SHARD=unit-a|unit-b|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
+test-shard:      ## one CI shard (SHARD=unit-a|unit-b|unit-c|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
 	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }
 	COVERAGE_FILE=.coverage.$(SHARD) $(PY) -m pytest -n $(WORKERS) --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
 
