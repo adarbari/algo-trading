@@ -1,0 +1,5 @@
+/* TrackRecordChip: keeps the badge on its own inline box inside a list row. */
+.root {
+  display: inline-flex;
+  max-width: 100%;
+}
