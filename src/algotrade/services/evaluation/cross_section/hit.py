@@ -43,6 +43,8 @@ MEASURE_FIELDS: Mapping[str, tuple[str, ...]] = {
 EXPIRES_OTM_FIELDS = ("fwd_return", "fwd_max_return", "fwd_max_drawdown")
 MISSING_VALUE = "missing_value"  # a row, but the measure is null (no benchmark bar, no vol)
 NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not positive
+INVALID_IMPLIED_VOL = "invalid_implied_vol"  # ... or non-finite or above MAX_IMPLIED_VOL: garbage
+MAX_IMPLIED_VOL = 5.0  # the catalogue's declared range of an IV field is (0, 5] (decimal)
 MISSING_DRAWDOWN = "missing_drawdown"
 TRADING_DAYS = 252  # sessions per year: T of an expires_otm strike
 RESULT_COLUMNS = (
@@ -61,6 +63,18 @@ def _implied_array(outcomes: pd.DataFrame, implied: Mapping[str, float | None]) 
     )
 
 
+def _implied_reasons(iv: np.ndarray) -> np.ndarray:
+    """Per row ``""`` for a usable IV (finite, in ``(0, MAX_IMPLIED_VOL]``), ``NO_IMPLIED_VOL``
+    when missing or not positive, ``INVALID_IMPLIED_VOL`` when infinite or out of range."""
+    reason = np.full(len(iv), "", dtype=object)
+    with np.errstate(invalid="ignore"):
+        missing = np.isnan(iv) | (iv <= 0)
+        invalid = ~missing & ~(iv <= MAX_IMPLIED_VOL)
+    reason[missing] = NO_IMPLIED_VOL
+    reason[invalid] = INVALID_IMPLIED_VOL
+    return reason
+
+
 def _expires_otm(
     edge: Edge, outcomes: pd.DataFrame, implied: Mapping[str, float | None]
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -69,8 +83,8 @@ def _expires_otm(
     o = edge.outcome
     assert o.structure is not None
     iv = _implied_array(outcomes, implied)
-    usable = np.isfinite(iv) & (iv > 0)
-    iv = np.where(usable, iv, np.nan)
+    usable = _implied_reasons(iv) == ""
+    iv = np.where(usable, iv, np.nan)  # masked before any exp / log: no overflow, no warning
     years = _numbers(outcomes, "horizon_sessions") / TRADING_DAYS
     ret = _numbers(outcomes, "fwd_return")
     legs = ("put", "call") if o.structure == "strangle" else (o.structure,)
@@ -119,10 +133,12 @@ def apply_outcome(
     if o.kind == "expires_otm":
         if implied is None:
             raise ConfigurationError(f"{edge.id}: expires_otm needs the implied vol")
-        value, otm_hit, reference, touched, usable_iv = _expires_otm(edge, outcomes, implied)
+        value, otm_hit, reference, touched, _ = _expires_otm(edge, outcomes, implied)
         touch = touched.astype(np.float64)
         excluded[~np.isfinite(_numbers(outcomes, "fwd_return"))] = MISSING_VALUE
-        excluded[(excluded == "") & ~usable_iv] = NO_IMPLIED_VOL
+        reasons = _implied_reasons(_implied_array(outcomes, implied))
+        excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
+        excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
     elif o.kind == "excess_return" or o.measure == "excess_return":
         value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE
@@ -131,11 +147,11 @@ def apply_outcome(
             raise ConfigurationError(f"{edge.id}: realised_to_implied_vol needs the implied vol")
         vol = _numbers(outcomes, "fwd_realised_vol")
         iv = _implied_array(outcomes, implied)
-        usable_iv = np.isfinite(iv) & (iv > 0)
+        reasons = _implied_reasons(iv)
         value = np.full(n, np.nan)
-        np.divide(vol, iv, out=value, where=usable_iv)
+        np.divide(vol, iv, out=value, where=reasons == "")
         excluded[~np.isfinite(vol)] = MISSING_VALUE
-        excluded[(excluded == "") & ~usable_iv] = NO_IMPLIED_VOL
+        excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
     else:
         raise ConfigurationError(f"{edge.id}: no measure {o.measure!r}")
     counted = excluded == ""
