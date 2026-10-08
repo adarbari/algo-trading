@@ -78,6 +78,7 @@ class EdgeRow:
     deflated_sharpe: float | None
     pbo: float | None
     exploratory: bool = False
+    decile_sessions: int | None = None
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
 
 
@@ -184,6 +185,7 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         deflated_sharpe=_float(row.get("deflated_sharpe")),
         pbo=_float(row.get("pbo")),
         exploratory=to_scalar(row.get("exploratory")) is True,
+        decile_sessions=_int(row.get("decile_sessions")),
         in_sample=to_scalar(row.get("in_sample")) is True,
     )
 

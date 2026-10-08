@@ -66,7 +66,9 @@ def resolve_rule_draft(
     overlay = OverlayConfigStore(store, {(user.user_id, SCREENERS, name): document})
     resolved = resolve_config(overlay, name, user)
     if resolved.config.kind != "screener" or resolved.config.impl not in RULE_IMPLS:
-        raise ConfigurationError(f"{user.user_id}/{name}: not a rule screen (impl = 'rules')")
+        raise ConfigurationError(
+            f"{user.user_id}/{name}: not a rule screen (impl = 'rules' or 'model')"
+        )
     return resolved
 
 

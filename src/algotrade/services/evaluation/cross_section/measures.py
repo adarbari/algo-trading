@@ -101,13 +101,11 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
 
 @dataclass(frozen=True)
 class Slice:
-    """A set of sessions reported on its own: ``kind`` ("all", "year", "regime", "frozen").
-    ``in_sample``: a model screener's score was fitted on sessions this slice holds."""
+    """A set of sessions reported on its own: ``kind`` ("all", "year", "regime", "frozen")."""
 
     kind: str
     value: str
     keep: Callable[[SessionStat], bool]
-    in_sample: bool = False
 
 
 @dataclass(frozen=True)
@@ -162,7 +160,7 @@ def _pooled(chunks: Sequence[Sequence[float]]) -> np.ndarray:
     return np.array([v for chunk in chunks for v in chunk], dtype=np.float64)
 
 
-def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
+def _measure(sl: Slice, kept: Sequence[SessionStat], in_sample: bool = False) -> SliceMeasure:
     rows = [r for r in kept if not r.excluded_coverage]
     picks = sum(len(r.pick_values) for r in rows)
     hits = sum(r.pick_hits for r in rows)
@@ -179,7 +177,7 @@ def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
     return SliceMeasure(
         slice_kind=sl.kind,
         slice_value=sl.value,
-        in_sample=sl.in_sample,
+        in_sample=in_sample,
         sessions=len(rows),
         picks=picks,
         hits=hits,
@@ -208,6 +206,18 @@ def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
     )
 
 
-def slice_measures(rows: Sequence[SessionStat], slices: Sequence[Slice]) -> list[SliceMeasure]:
-    """One ``SliceMeasure`` per slice, in the slices' order, over the stats it keeps."""
-    return [_measure(sl, [r for r in rows if sl.keep(r)]) for sl in slices]
+def slice_measures(
+    rows: Sequence[SessionStat],
+    slices: Sequence[Slice],
+    model: bool = False,
+    frozen_from: date | None = None,
+) -> list[SliceMeasure]:
+    """One ``SliceMeasure`` per slice, in the slices' order, over the stats it keeps. A ``model``
+    screener's score was fitted on sessions before ``frozen_from`` (a fitness test): a slice that
+    keeps one of them is IN_SAMPLE, whatever its kind (no ``frozen_from``: every slice is)."""
+    out = []
+    for sl in slices:
+        kept = [r for r in rows if sl.keep(r)]
+        seen = model and (frozen_from is None or any(r.session < frozen_from for r in kept))
+        out.append(_measure(sl, kept, seen))
+    return out

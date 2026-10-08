@@ -9,8 +9,11 @@ import pytest
 
 from algotrade.config.strategy.schema import parse_strategy
 from algotrade.config.strategy.screen_spec import parse_screen_spec, screen_spec
+from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureView
+from algotrade.services.configs import resolve_rule_draft
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.strategies.screeners import Decision
 from algotrade.strategies.screeners.rules import evaluate_screen
 
@@ -81,3 +84,10 @@ def test_a_model_screen_is_checked(doc: dict, message: str) -> None:  # type: ig
 def test_a_rule_screen_has_no_score() -> None:
     with pytest.raises(ConfigurationError, match="model screen"):
         parse_strategy({"id": "r", "kind": "screener", "impl": "rules", **DOC}, "r")
+
+
+def test_the_not_a_rule_screen_error_names_both_impls() -> None:
+    user = UserContext("u")
+    other = {"kind": "strategy", "impl": "momentum"}
+    with pytest.raises(ConfigurationError, match="'rules' or 'model'"):
+        resolve_rule_draft(MemoryConfigStore({}), "s", user, other)

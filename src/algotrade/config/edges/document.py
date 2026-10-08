@@ -38,9 +38,13 @@ and the key.
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
     notes             optional: a proxy, an open decision
     [implementation]  optional: ``promoted``, the one of ``screeners`` that implements the edge
-                      for use (ED7c). A learned (``impl = "model"``) screener is promoted only
-                      with evidence that it beat the edge's rule screeners in the frozen
-                      period: ``tests/architecture/data/test_edge_promotion.py``
+                      for use (ED7c), and ``[[implementation.compared]]``: the frozen-slice
+                      numbers of the cited run it rests on (``horizon``, ``screener``, ``lift``,
+                      ``decile_spread``, ``sessions``, ``decile_sessions``; the model and every
+                      rule screener at every horizon). A reader honours ``promoted`` only when
+                      the cited run's stored rows show the model ahead
+                      (``services/read/evaluation/promotion.py``); a fitness test checks the
+                      committed numbers the same way (``test_edge_promotion.py``)
     [scorer]          optional: ``features``, the selection fields (``rollup.<group>@v<n>.<column>``
                       or ``feature.<name>``) a learned scorer is fitted on (ED7)
 
@@ -58,6 +62,7 @@ from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 
+MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion need this many
 STATUSES = ("candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
 OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm")
@@ -109,6 +114,8 @@ OUTCOME_KEYS = (
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe")
 EVIDENCE_KEYS = ("run_id", "split_from")
+IMPLEMENTATION_KEYS = ("promoted", "compared")
+COMPARED_KEYS = ("horizon", "screener", "lift", "decile_spread", "sessions", "decile_sessions")
 EVIDENCE_STATUSES = ("evidenced", "live", "retired")
 _SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
 
@@ -156,6 +163,18 @@ class Evidence:
 
 
 @dataclass(frozen=True)
+class Compared:
+    """One screener's frozen-slice numbers at one horizon, as committed beside a promotion."""
+
+    horizon: int
+    screener: str
+    lift: float
+    decile_spread: float
+    sessions: int
+    decile_sessions: int
+
+
+@dataclass(frozen=True)
 class Source:
     title: str
     url: str = ""
@@ -185,6 +204,7 @@ class Edge:
     scorer_features: tuple[str, ...] = ()  # the fields a learned scorer reads (ADR 0053, ED7)
     evidence: Evidence | None = None
     promoted: str | None = None  # the screener that implements the edge for use (ED7c)
+    compared: tuple[Compared, ...] = ()  # the numbers the promotion rests on
 
     @property
     def event_class(self) -> str | None:
@@ -248,6 +268,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
         promoted=_promoted(t),
+        compared=_compared(t),
     )
     if edge.promoted is not None and edge.promoted not in edge.screeners:
         raise ConfigurationError(
@@ -494,10 +515,32 @@ def _scorer_features(t: Table) -> tuple[str, ...]:
     return found
 
 
+def _compared(t: Table) -> tuple[Compared, ...]:
+    if t.raw("implementation") is None:
+        return ()
+    found = []
+    for c in t.table("implementation", IMPLEMENTATION_KEYS).tables("compared"):
+        c.only(COMPARED_KEYS)
+        for key in COMPARED_KEYS:
+            if key not in c.names():
+                _missing(c, key)
+        found.append(
+            Compared(
+                horizon=c.integer("horizon", 0, 1),
+                screener=validate_id("screener", c.text("screener", "")),
+                lift=c.number("lift", 0.0),
+                decile_spread=c.number("decile_spread", 0.0),
+                sessions=c.integer("sessions", 0, 0),
+                decile_sessions=c.integer("decile_sessions", 0, 0),
+            )
+        )
+    return tuple(found)
+
+
 def _promoted(t: Table) -> str | None:
     if t.raw("implementation") is None:
         return None
-    sub = t.table("implementation", ("promoted",))
+    sub = t.table("implementation", IMPLEMENTATION_KEYS)
     return validate_id("screener", sub.text("promoted", "") or _missing(sub, "promoted"))
 
 

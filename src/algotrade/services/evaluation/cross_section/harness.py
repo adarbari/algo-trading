@@ -354,26 +354,15 @@ def effective_split(
     return split, split != edge.frozen_from
 
 
-def _slices(
-    stats: Sequence[SessionStat],
-    split: date | None,
-    exploratory: bool,
-    model: bool = False,
-    frozen_from: date | None = None,
-) -> list[Slice]:
-    """The slices of one variant's sessions. A ``model`` screener's score was fitted on sessions
-    before ``frozen_from`` (a fitness test): every slice that holds one is IN_SAMPLE (labelled
-    on its rows, never evidence); only the frozen slice, and an exploratory split at or after
-    ``frozen_from``, hold none."""
-    slices = [Slice("all", "all", _always, model)]
+def _slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
+    slices = [Slice("all", "all", _always)]
     for year in sorted({s.session.year for s in stats}):
-        slices.append(Slice("year", str(year), partial(_in_year, year), model))
+        slices.append(Slice("year", str(year), partial(_in_year, year)))
     for label in sorted({s.regime for s in stats}):
-        slices.append(Slice("regime", label, partial(_in_regime, label), model))
+        slices.append(Slice("regime", label, partial(_in_regime, label)))
     if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
         kind = "split" if exploratory else "frozen"
-        seen = model and (frozen_from is None or split < frozen_from)
-        slices.append(Slice(kind, kind, partial(_since, split), seen))
+        slices.append(Slice(kind, kind, partial(_since, split)))
     return slices
 
 
@@ -506,10 +495,12 @@ def evaluate_edge(
                 for block in plan.blocks
                 if any(leg.entry in closed for leg in block)
             )
-            model = variant.config.config.impl == MODEL_IMPL
             measures = tuple(
                 slice_measures(
-                    block_stats, _slices(block_stats, split, exploratory, model, edge.frozen_from)
+                    block_stats,
+                    _slices(block_stats, split, exploratory),
+                    variant.config.config.impl == MODEL_IMPL,
+                    edge.frozen_from,
                 )
             )
             results.append(
