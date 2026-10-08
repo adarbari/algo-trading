@@ -219,7 +219,10 @@ def cmd_regime_scorecard(args: argparse.Namespace) -> int:
 def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     """The edge harness (ADR 0053) through the jobs runner: every open edge that has screeners
     or baselines (or the one ``--edge``) over ``--from``..``--to`` (default: the stored outcome
-    sessions), outcomes known as of ``--as-of`` (default now). Rows land in ``results/edge_eval``;
+    sessions), outcomes known as of ``--as-of`` (default now), the test slice from
+    ``--split-from`` (else
+    the user's ``evaluation.toml``, else each edge's ``frozen_from``; another split is
+    exploratory). Rows land in ``results/edge_eval``;
     a report with the survivorship line is printed (and written to ``--report``)."""
     backend = open_backend(data_url(args.data_url))
     reader = StoreReader(backend)
@@ -243,6 +246,7 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
         params = {
             "edge": edge.id, "start": start.isoformat(), "end": end.isoformat(),
             "as_of": as_of.isoformat(), "iv_field": args.iv_field,
+            "split_from": args.split_from.isoformat() if args.split_from else None,
         }  # fmt: skip
         job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-eval", params, user)
         if job.status is JobStatus.FAILED:

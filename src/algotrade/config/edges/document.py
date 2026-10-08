@@ -31,6 +31,8 @@ and the key.
     status            candidate | evidenced | live | retired | rejected | blocked
     frozen_from       optional date: the harness reports sessions from it on their own as the
                       frozen period (fixed once chosen, never rolling; none: no frozen slice)
+    [evidence]        run_id and split_from of the run an evidenced or live edge rests on; its
+                      split_from must equal frozen_from (ADR 0053 amendment, ED5a)
     rejection_reason  required when rejected or blocked, allowed when retired, else an error
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
@@ -92,7 +94,7 @@ QUALITY_BAR = (
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
-    "notes", "frozen_from", "base", "variants",
+    "notes", "frozen_from", "base", "variants", "evidence",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -100,6 +102,8 @@ OUTCOME_KEYS = (
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe")
+EVIDENCE_KEYS = ("run_id", "split_from")
+EVIDENCE_STATUSES = ("evidenced", "live", "retired")
 _SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
 
 
@@ -137,6 +141,15 @@ class EdgeVariant:
 
 
 @dataclass(frozen=True)
+class Evidence:
+    """The harness run an evidenced or live edge cites (ADR 0053 amendment, ED5a): its record id
+    and the split it was measured at, which must be the document's ``frozen_from``."""
+
+    run_id: str
+    split_from: date
+
+
+@dataclass(frozen=True)
 class Source:
     title: str
     url: str = ""
@@ -163,6 +176,7 @@ class Edge:
     frozen_from: date | None = None
     base: str = "universe"  # what the picks are compared with: the event's names | the universe
     variants: tuple[EdgeVariant, ...] = ()
+    evidence: Evidence | None = None
 
     @property
     def event_class(self) -> str | None:
@@ -217,7 +231,12 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         frozen_from=_frozen_from(t),
         base=_base(t, schedule),
         variants=_variants(t, schedule, edge_id, universe),
+        evidence=_evidence(t),
     )
+    if edge.evidence is not None and status not in EVIDENCE_STATUSES:
+        raise ConfigurationError(
+            f"{where} evidence: only an evidenced, live or retired edge cites a run"
+        )
     if closed and not edge.rejection_reason:
         raise ConfigurationError(f"{where} rejection_reason: required when status is {status!r}")
     if edge.rejection_reason and status not in (*CLOSED, "retired"):
@@ -251,10 +270,22 @@ def _thesis(t: Table) -> str:
     return thesis
 
 
+def _evidence(t: Table) -> Evidence | None:
+    if t.raw("evidence") is None:
+        return None
+    sub = t.table("evidence", EVIDENCE_KEYS)
+    run_id, split = sub.text("run_id", ""), sub.raw("split_from")
+    if not run_id or split is None:
+        raise ConfigurationError(f"{sub.where}: run_id and split_from are both required")
+    return Evidence(run_id, _date(sub, "split_from", split))
+
+
 def _frozen_from(t: Table) -> date | None:
     raw = t.raw("frozen_from")
-    if raw is None:
-        return None
+    return None if raw is None else _date(t, "frozen_from", raw)
+
+
+def _date(t: Table, key: str, raw: Any) -> date:
     if type(raw) is date:
         return raw
     try:
@@ -262,7 +293,7 @@ def _frozen_from(t: Table) -> date | None:
             return date.fromisoformat(raw)
     except ValueError:
         pass
-    raise ConfigurationError(f"{t.where} frozen_from: expected a date (2026-04-01), got {raw!r}")
+    raise ConfigurationError(f"{t.where} {key}: expected a date (2026-04-01), got {raw!r}")
 
 
 def _schedule(t: Table) -> str:

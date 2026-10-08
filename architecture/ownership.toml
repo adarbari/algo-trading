@@ -568,7 +568,7 @@ detect = [{ call = "add_version" }, { call = "save_features" }]
 
 [[responsibility]]
 id = "edge-documents"
-description = "Load and validate edge documents (ADR 0053 decision 1): config/site/edges/<id>.toml with a user's config/users/<id>/edges/ layered over it (ADR 0015), typed into frozen Edge dataclasses fail closed (outcome, schedule and event class, universe, status, the nine quality-bar answers), screeners, baselines and a named universe checked against the presets that exist, and docs/edges.md rendered from them; consumers call load_edges, never read the kind themselves"
+description = "Load and validate edge documents (ADR 0053 decision 1): config/site/edges/<id>.toml with a user's config/users/<id>/edges/ layered over it (ADR 0015), typed into frozen Edge dataclasses fail closed (outcome, schedule and event class, universe, status, the nine quality-bar answers), screeners, baselines and a named universe checked against the presets that exist, the user's evaluation split (EvaluationSettings, ED5a), and docs/edges.md rendered from them; consumers call load_edges, never read the kind themselves"
 owner = ["src/algotrade/config/edges/*"]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "load", arg = "edges" }, { call = "names", arg = "edges" }, { call = "parse_edge" }]

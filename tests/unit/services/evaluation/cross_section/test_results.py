@@ -2,9 +2,10 @@
 together, one per variant, horizon and slice, keyed so a re-run of the range replaces them), its
 run record keeps the trial log, and the survivorship caveat is countable."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pandas as pd
+import pyarrow as pa
 import pytest
 
 from algotrade.config.user import UserContext
@@ -16,6 +17,7 @@ from algotrade.services.evaluation.cross_section.results import (
     survivorship,
     write_edge_eval,
 )
+from algotrade.storage.backends.run_selection import merge_rows
 from algotrade.storage.tables.schemas import EDGE_EVAL
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
@@ -131,3 +133,48 @@ def test_records_are_json_able_with_none_for_missing(world: World) -> None:
 def test_survivorship_counts_sessions_read_from_a_later_snapshot() -> None:
     w = build_world(snapshot=DAYS[3])  # the snapshot is Sept 4: starts Sept 1 and Sept 3 precede it
     assert survivorship(evaluate(w)) == {2: (2, 4)}
+
+
+def test_an_exploratory_split_writes_rows_under_its_own_key_and_leaves_the_sites(
+    world: World,
+) -> None:
+    def run(split: str | None, user: str, at: datetime) -> None:
+        ev = evaluate_edge(
+            world.reader, world.results, world.configs, UserContext(user),
+            edge(frozen_from="2026-09-04"), DAYS[0], DAYS[-1], AS_OF,
+            split_from=datetime.fromisoformat(split).date() if split else None,
+        )  # fmt: skip
+        write_edge_eval(world.results, ev, at)
+
+    run(None, "site", NOW)
+    site_rows = world.reader.table("results/edge_eval", DAYS[-1])
+    assert site_rows is not None
+    run("2026-09-09", "site", NOW + timedelta(hours=1))
+    stored = world.reader.table("results/edge_eval", DAYS[-1])
+    assert stored is not None
+    mine = stored[stored["split_from"] == pd.Timestamp("2026-09-09").date()]
+    assert mine["exploratory"].all() and len(mine) == len(site_rows)  # its own rows
+    kept = stored[stored["split_from"] == pd.Timestamp("2026-09-04").date()]
+    assert not kept["exploratory"].any()
+    cols = ["slice_kind", "slice_value", "sessions", "lift"]
+    assert kept[cols].reset_index(drop=True).equals(site_rows[cols].reset_index(drop=True))
+    record = world.results.runs_for("edge-eval:drift:site")[-1]
+    assert record.stats["exploratory"] and record.stats["split_from"] == "2026-09-09"
+
+
+def test_rows_written_before_the_split_columns_keep_the_null_key_beside_a_dated_run(
+    world: World,
+) -> None:
+    """Runs written before ``split_from`` was a key column carry none: merge_rows reads it as
+    null, a distinct key from a new run's date, so both stay in one partition."""
+    new = edge_eval_frame(evaluate(world), "r1", NOW).assign(split_from=date(2026, 4, 1))
+    old = new.drop(columns=["split_from", "exploratory"]).assign(picks=-1, run_id="r0")
+    both = pa.concat_tables(
+        [pa.Table.from_pandas(f, preserve_index=False) for f in (old, new)],
+        promote_options="default",
+    )
+    merged = merge_rows("results/edge_eval", both).to_pandas()
+    assert len(merged) == len(old) + len(new)
+    assert set(merged["run_id"]) == {"r0", "r1"}
+    assert merged[merged["run_id"] == "r0"]["split_from"].isna().all()
+    assert (merged[merged["run_id"] == "r1"]["split_from"] == date(2026, 4, 1)).all()
