@@ -11,7 +11,7 @@ vi.mock('./component-folders', () => ({
   THEMES: [],
 }));
 
-import { problems } from './check-design-system';
+import { noScreenshotStories, problems, unsettledClickStories } from './check-design-system';
 
 function folder(css: string, stories: string): Parameters<typeof problems>[0] {
   const dir = mkdtempSync(join(tmpdir(), 'ds-'));
@@ -34,5 +34,34 @@ describe('Narrow story requirement', () => {
     const withNarrow = `${STATES}\nexport const Narrow: Story = {};`;
     expect(has(problems(folder('@container (width < 720px) {}', withNarrow)))).toBe(false);
     expect(has(problems(folder('.a { color: red }', STATES)))).toBe(false);
+  });
+});
+
+describe('play-with-click requirement', () => {
+  const click = "await userEvent.click(canvas.getByRole('button'));";
+  const story = (name: string, play: string, extra = '') =>
+    `export const ${name}: Story = {\n  ${extra}\n  play: async ({ canvas }) => {\n    ${play}\n  },\n};\n`;
+  it('flags a click that is not followed by a settle', () => {
+    expect(unsettledClickStories(story('Open', click))).toEqual(['Open']);
+    expect(
+      unsettledClickStories(story('Open', `await expect(a).toBeVisible();\n${click}`)),
+    ).toEqual(['Open']);
+  });
+  it('accepts a settle after the click, the no-screenshot tag, or no click', () => {
+    const settled = `${click}\nawait waitFor(() => expect(a).toBeVisible());`;
+    expect(unsettledClickStories(story('Open', settled))).toEqual([]);
+    expect(
+      unsettledClickStories(story('Open', `${click}\nawait expect(a).toBeVisible();`)),
+    ).toEqual([]);
+    expect(unsettledClickStories(story('Open', click, "tags: ['no-screenshot'],"))).toEqual([]);
+    expect(unsettledClickStories('export const A: Story = { args: {} };')).toEqual([]);
+  });
+  it('a tagged story needs no committed screenshot', () => {
+    const tagged = story('Open', click, "tags: ['no-screenshot'],");
+    expect(noScreenshotStories(tagged)).toEqual(new Set(['Open']));
+  });
+  it('is part of the component check', () => {
+    const found = problems(folder('', `${STATES}\n${story('Open', click)}`));
+    expect(found.some((p) => p.includes("story 'Open' clicks in play"))).toBe(true);
   });
 });

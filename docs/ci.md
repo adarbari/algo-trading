@@ -50,7 +50,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
 | Several sessions on one machine | web servers fought over 8000 / 5173 / 4173 / 5801-5802 / 8801-8802 / 6007; two `make check` runs timed each other out; `pkill -f node` killed other sessions' runs | each worktree has its own port block (`ALGOTRADE_PORT_BASE` in `worktree.env`); `make check` refuses a second run in a worktree; `make doctor` lists the other runs and warns when the main checkout is off `main` or has local `config/site` edits |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
-| Merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push |
+| Merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push; `architecture/ownership.toml`, `layout.toml` and `web_layout.toml` entries are id-ordered inside each section (fitness test), so two PRs adding an entry stop colliding at the end of the file; screenshot baselines regenerate in CI on the `update-screenshots` label (below) instead of Docker; the roadmap's Now / Next is one line per track (details under "Track details"), so two PRs rarely edit the same line |
 
 ### Local fast path
 
@@ -109,6 +109,18 @@ How the Python tests are cut (`make test` locally is unchanged):
   90 % gate, `coverage.xml`). A web-only or docs-only PR runs `tests/architecture` in the
   `rest` shard and the gate passes without coverage.
 
+### Screenshot baselines from CI
+
+Baselines are Linux PNGs, so a change to a story or component used to need Docker locally.
+Add the label `update-screenshots` to the PR (or run the "Screenshot baselines" workflow on a
+branch): `.github/workflows/screenshots.yml` runs in the same Playwright image as CI
+(`mcr.microsoft.com/playwright:v1.63.0-noble`, a fitness test keeps the two in step), builds
+Storybook, runs `npm run visual -- --update-snapshots --fully-parallel`, commits the changed
+PNGs to the PR branch as `github-actions[bot]` and removes the label. It never runs for a
+fork. A push with `GITHUB_TOKEN` starts no CI run, so push any follow-up commit (or
+`gh workflow run ci.yml --ref <branch>`) afterwards, so CI and auto-merge see the new head.
+Review the PNG diff in the PR before that follow-up.
+
 ## Flaky specs
 
 A spec that fails under load and passes on re-run goes in `apps/web/quarantine.json`, never
@@ -119,6 +131,10 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
   At most 8; the oldest is fixed before another is added.
 - `watched`: still runs and gates; listed with the fix that keeps it green.
 - Every entry: `kind`, `file`, `title` (e2e), `since`, `reason` (what flakes, the fix it waits for).
+- A story whose `play` clicks must settle before the screenshot: `await waitFor(` or
+  `await expect(` after the last click, or `tags: ['no-screenshot']` on the story (the visual
+  suite skips it, so it has no PNG). `npm run ds:check` fails otherwise: a screenshot taken
+  while the click's redraw is in flight is the commonest flake.
 - One retry in CI for Playwright only (`playwright.config.ts`, `playwright.visual.config.ts`);
   the real-app smoke, pytest and vitest never retry. Integration-style vitest files (`pages/`,
   `widgets/`, `features/`, `scripts/`) are the `integration` vitest project with a 20 s timeout
