@@ -376,7 +376,7 @@ function guideField(name: string): Json {
   return {
     data: {
       guideField: {
-        readsLinked: linked(String(guide['reads'] ?? ''), names),
+        readsLinked: linked(typeof guide['reads'] === 'string' ? guide['reads'] : '', names),
         caveatsLinked: ((guide['caveats'] ?? []) as string[]).map((c) => linked(c, names)),
         related: name === 'rollup.iv30@v1.iv30' ? ['feature.iv_hv_ratio'] : [],
         playbooks: [
