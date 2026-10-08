@@ -108,8 +108,10 @@ def test_the_guide_files_are_site_only(root: Path) -> None:
 
 
 def test_the_guide_playbooks_are_site_only_under_the_guide_folder(root: Path) -> None:
-    (root / "site" / "guide" / "playbooks").mkdir(parents=True)
-    (root / "site" / "guide" / "playbooks" / "pullback.toml").write_text('id = "pullback"\n')
+    (root / "site" / "guide" / "playbooks" / "trend").mkdir(parents=True)  # a folder per family
+    (root / "site" / "guide" / "playbooks" / "trend" / "pullback.toml").write_text(
+        'id = "pullback"\n'
+    )
     (root / "site" / "guide" / "sections.toml").write_text("")
     store = FileConfigStore(root)
     assert store.names("site", "guide_playbooks") == ["pullback"]

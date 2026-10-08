@@ -822,7 +822,27 @@ purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, fiel
 
 [[config_dir]]
 path = "config/site/guide/playbooks"
-purpose = "the Guide's playbook prose (ADR 0051), one <id>.toml per site rule-screen preset: summary, what a hit looks like, what it does not check, the caveats before acting, related playbooks, sources and what each criterion asks (loaded by config/site/guide/playbooks.py; fitness tests: one per preset, asks match the latest version)"
+purpose = "the Guide's playbook prose (ADR 0051), one subfolder per playbook family of config/site/guide/sections.toml (the 12-file cap per folder), one <id>.toml per site rule-screen preset in its family's folder: summary, what a hit looks like, what it does not check, the caveats before acting, related playbooks, sources and what each criterion asks (loaded by config/site/guide/playbooks.py, one level of subfolders; fitness tests: one per preset, in its family's folder, asks match the latest version)"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/trend"
+purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/breakouts"
+purpose = "the Guide's playbooks of the breakout family (range breakout, breakout, failed breakout): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/reversals"
+purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/income"
+purpose = "the Guide's playbooks of the option income family (VRP scanner): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/events"
+purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/regime"

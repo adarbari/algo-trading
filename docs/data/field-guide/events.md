@@ -245,21 +245,14 @@ Sources: Site convention (ADR 0050)
 
 Sources: Hull, Options, Futures and Other Derivatives: early exercise of American calls before an ex-dividend date
 
-<<<<<<< Updated upstream
 ### `rollup.earnings_reaction@v1.reaction_excess_return`
 
 **How to read it.** How far the last report moved the stock beyond SPY: the close after the report over the close before it, minus SPY's return over the same two sessions, as a decimal (0.05 is +5% against the market). It is the surprise measure of the post-earnings-drift literature: the price reaction stands in for the surprise, so it needs no analyst estimates. Large and positive means the market read the report as good news.
-=======
-### `rollup.earnings_expected@v1.expected_basis`
-
-**How to read it.** How the name's next report date is known: SCHEDULED (a report date the calendars had published by the session), PRIOR_YEAR (no date published, so the year-ago report plus 364 days, the same weekday a year on) or UNKNOWN (neither: no report in the past year either). It says how far to trust rollup.earnings_expected@v1.expected_report_date: an announced date is firm, a year-ago guess is usually within days but can be weeks out.
->>>>>>> Stashed changes
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-<<<<<<< Updated upstream
 | a big positive earnings reaction (post-earnings drift) | `gte 0.05` | hard | - | the small-cap drift screen uses 0.05; combine with rollup.earnings_reaction@v1.reaction_status eq OK and a market cap ceiling |
 
 **When the reading lies**
@@ -273,26 +266,11 @@ Sources: Brandt, Kishore, Santa-Clara and Venkatachalam, Earnings Announcements 
 ### `rollup.earnings_reaction@v1.reaction_status`
 
 **How to read it.** Whether the name's last report has a measured reaction: OK when the report's two-session window has closed with every bar it needs; NO_REPORT when no report is known by the session (a name with none, such as an ETF); INCOMPLETE when a report is known but its window is still open or a stock or SPY bar is missing.
-=======
-| a report date known by the decision session (an announcement edge) | `in ["SCHEDULED", "PRIOR_YEAR"]` | hard | - | SCHEDULED alone keeps only announced dates, which are a few weeks ahead at most |
-
-**When the reading lies**
-
-- UNKNOWN is not 'no earnings': a recent listing or a name the calendars do not cover has no date by either route. A hard 'in SCHEDULED, PRIOR_YEAR' criterion leaves those names out, which is the intent for an edge that must know the date by the decision session.
-- PRIOR_YEAR dates miss when a company changes its calendar (a fiscal-year change, a merger): a window built on one can fall on the wrong sessions.
-
-Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007): the year-ago date as the expected one
-
-### `rollup.earnings_reaction@v1.earnings_volume_ratio`
-
-**How to read it.** How much trading a report usually draws: over the last four reports, the mean dollars traded a day in the report's two-session window divided by the 20-session average before it. 2 means the window trades twice the normal volume; 5 is a name whose reports are events. Frazzini and Lamont found the earnings announcement premium concentrated in the names whose reports draw the most volume.
->>>>>>> Stashed changes
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-<<<<<<< Updated upstream
 | only names with a measured reaction | `eq "OK"` | hard | - | - |
 
 **When the reading lies**
@@ -318,7 +296,32 @@ Sources: Site convention (docs/data/features.md, earnings_reaction@v1)
 - It is measured before the report that moved the stock, so a name whose volume dried up since is not flagged; compare rollup.price_stats@v2.adv_usd_20d for today.
 
 Sources: Chordia, Goyal, Sadka, Sadka and Shivakumar, Liquidity and the Post-Earnings-Announcement Drift (2009)
-=======
+
+### `rollup.earnings_expected@v1.expected_basis`
+
+**How to read it.** How the name's next report date is known: SCHEDULED (a report date the calendars had published by the session), PRIOR_YEAR (no date published, so the year-ago report plus 364 days, the same weekday a year on) or UNKNOWN (neither: no report in the past year either). It says how far to trust rollup.earnings_expected@v1.expected_report_date: an announced date is firm, a year-ago guess is usually within days but can be weeks out.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a report date known by the decision session (an announcement edge) | `in ["SCHEDULED", "PRIOR_YEAR"]` | hard | - | SCHEDULED alone keeps only announced dates, which are a few weeks ahead at most |
+
+**When the reading lies**
+
+- UNKNOWN is not 'no earnings': a recent listing or a name the calendars do not cover has no date by either route. A hard 'in SCHEDULED, PRIOR_YEAR' criterion leaves those names out, which is the intent for an edge that must know the date by the decision session.
+- PRIOR_YEAR dates miss when a company changes its calendar (a fiscal-year change, a merger): a window built on one can fall on the wrong sessions.
+
+Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007): the year-ago date as the expected one
+
+### `rollup.earnings_reaction@v1.earnings_volume_ratio`
+
+**How to read it.** How much trading a report usually draws: over the last four reports, the mean dollars traded a day in the report's two-session window divided by the 20-session average before it. 2 means the window trades twice the normal volume; 5 is a name whose reports are events. Frazzini and Lamont found the earnings announcement premium concentrated in the names whose reports draw the most volume.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
 | names whose reports draw heavy volume | `gte 2` | hard | - | the earnings announcement premium screen ranks by it instead of cutting |
 
 **When the reading lies**
@@ -327,4 +330,3 @@ Sources: Chordia, Goyal, Sadka, Sadka and Shivakumar, Liquidity and the Post-Ear
 - A report window can carry other news (an offering, a deal), which inflates the ratio without the report being the cause.
 
 Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007)
->>>>>>> Stashed changes
