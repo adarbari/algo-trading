@@ -545,7 +545,8 @@ EDGE_EVAL = _fixed(
     "range_to date",
     *(f"{n} int64" for n in (
         "sessions", "picks", "hits", "eligible", "base_hits", "decile_sessions", "trials",
-        "unscored", "excluded_unclosed", "excluded_missing", "excluded_coverage", "delisted",
+        "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
+        "excluded_coverage", "delisted",
         "pre_snapshot_sessions",
     )),
     *_floats(

@@ -252,8 +252,9 @@ def test_session_without_scores_is_excluded_not_ranked() -> None:
     # No name has a stored score on the first session (a rule screen still grades it COMPLETE).
     w = build_world(price_of=lambda d, i: None if d == DAYS[0] else 100.0 + 10 * i)  # type: ignore[arg-type,return-value]
     m = run(w).results[0].measures[0]
-    assert m.excluded_coverage == 1  # one start session is never ranked
-    assert m.sessions == 3 and m.decile_sessions == 3
+    assert (m.excluded_score_coverage, m.excluded_coverage) == (1, 0)  # never ranked
+    assert m.sessions == 4 and m.decile_sessions == 3  # its picks still count
+    assert m.picks == 15 and m.hits == 15 and m.unscored == 0  # the 3 ranked sessions' picks
     assert m.top_decile_mean is not None and m.top_decile_mean == pytest.approx(0.09)
 
 
@@ -274,7 +275,7 @@ def test_deciles_rank_by_edge_score_not_rule_rank() -> None:
 def test_score_coverage_boundary() -> None:
     def measured(unscored: int) -> int:
         w = build_world(price_of=lambda d, i: None if i < unscored else 100.0 + 10 * i)  # type: ignore[arg-type,return-value]
-        return run(w).results[0].measures[0].sessions
+        return run(w).results[0].measures[0].decile_sessions
 
-    assert measured(4) == 4  # 16 of 20 scored: exactly 80%, measured
-    assert measured(5) == 0  # 75%: not measured
+    assert measured(4) == 4  # 16 of 20 scored: exactly 80%, ranked
+    assert measured(5) == 0  # 75%: no deciles (the picks still count)

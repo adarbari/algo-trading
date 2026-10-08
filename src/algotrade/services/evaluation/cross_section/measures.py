@@ -28,7 +28,9 @@ BUCKETS = 10
 @dataclass(frozen=True)
 class SessionStat:
     """One variant at one session and horizon. Counts are over names with a counted outcome;
-    ``excluded_*`` and ``delisted`` are over the picks."""
+    ``excluded_*`` and ``delisted`` are over the picks; ``unscored`` counts measured (ranked)
+    sessions only, a session with too few scores has no deciles and counts in
+    ``excluded_score_coverage`` instead."""
 
     session: date
     regime: str  # the session's regime label, "UNKNOWN" when none is stored
@@ -39,7 +41,8 @@ class SessionStat:
     top_decile: float | None = None  # mean of the best-ranked tenth of the ranked eligible
     spread: float | None = None  # top tenth minus bottom tenth
     ranked: int = 0  # eligible names with a rank and a counted outcome
-    unscored: int = 0  # eligible names with no score to rank by (outside the deciles)
+    unscored: int = 0  # eligible names with no score, in sessions whose deciles were ranked
+    excluded_score_coverage: int = 0  # 1: too few names scored; picks counted, no deciles
     excluded_unclosed: int = 0
     excluded_missing: int = 0
     excluded_coverage: int = (
@@ -88,6 +91,7 @@ class SliceMeasure:
     effect_size: float | None
     sharpe: float | None  # of the per-session mean of the picks, not annualised
     unscored: int
+    excluded_score_coverage: int  # sessions with picks counted but no deciles: too few scores
     excluded_unclosed: int
     excluded_missing: int
     excluded_coverage: int  # sessions left out: the screen read incomplete data
@@ -148,6 +152,7 @@ def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
         effect_size=standardised_effect(pick_values, rest_values),
         sharpe=sharpe(means),
         unscored=sum(r.unscored for r in rows),
+        excluded_score_coverage=sum(r.excluded_score_coverage for r in rows),
         excluded_unclosed=sum(r.excluded_unclosed for r in rows),
         excluded_missing=sum(r.excluded_missing for r in rows),
         excluded_coverage=sum(r.excluded_coverage for r in kept),
