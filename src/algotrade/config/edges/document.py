@@ -35,6 +35,8 @@ and the key.
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
     notes             optional: a proxy, an open decision
+    [scorer]          optional: ``features``, the selection fields (``rollup.<group>@v<n>.<column>``
+                      or ``feature.<name>``) a learned scorer is fitted on (ED7)
 
 Whether the named presets exist is checked by ``loading.py``, which sees the store.
 """
@@ -92,7 +94,7 @@ QUALITY_BAR = (
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
-    "notes", "frozen_from", "base", "variants",
+    "notes", "frozen_from", "base", "variants", "scorer",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -163,6 +165,7 @@ class Edge:
     frozen_from: date | None = None
     base: str = "universe"  # what the picks are compared with: the event's names | the universe
     variants: tuple[EdgeVariant, ...] = ()
+    scorer_features: tuple[str, ...] = ()  # the fields a learned scorer reads (ADR 0053, ED7)
 
     @property
     def event_class(self) -> str | None:
@@ -217,6 +220,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         frozen_from=_frozen_from(t),
         base=_base(t, schedule),
         variants=_variants(t, schedule, edge_id, universe),
+        scorer_features=_scorer_features(t),
     )
     if closed and not edge.rejection_reason:
         raise ConfigurationError(f"{where} rejection_reason: required when status is {status!r}")
@@ -431,6 +435,15 @@ def _top_k(t: Table) -> int | None:
     if type(raw) is int and raw >= 1:
         return raw
     raise ConfigurationError(f"{t.where} top_k: expected an integer >= 1 or 'all', got {raw!r}")
+
+
+def _scorer_features(t: Table) -> tuple[str, ...]:
+    if t.raw("scorer") is None:
+        return ()
+    found = t.table("scorer", ("features",)).strings("features", ())
+    if not found or len(set(found)) != len(found):
+        raise ConfigurationError(f"{t.where} scorer.features: one or more distinct fields")
+    return found
 
 
 def _ids(t: Table, key: str) -> tuple[str, ...]:

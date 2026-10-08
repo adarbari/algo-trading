@@ -25,6 +25,7 @@ from algotrade.services.evaluation.overlay import compare_overlay, overlay_repor
 from algotrade.services.evaluation.regime_report import render
 from algotrade.services.evaluation.regime_scorecard import load_history
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
+from algotrade.services.evaluation.training.render import merge_scorers
 from algotrade.services.features import check_user_features
 from algotrade.services.jobs import JobStatus, run_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
@@ -255,3 +256,38 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     if args.report:
         args.report.write_text(text)
     return 2 if failed else 0
+
+
+SCORES_FILE = "site/features/edge_scores.toml"
+
+
+def cmd_fit_edge_scorer(args: argparse.Namespace) -> int:
+    """Fit the learned scorer of ``--edge`` (a probit on the document's ``[scorer] features``,
+    windows closed before its frozen period less one horizon; ADR 0053, ED7) through the jobs
+    runner and write it as an expression feature into ``config/site/features/edge_scores.toml``
+    (or ``--out``). The file is a site config change: the owner commits it."""
+    backend = open_backend(data_url(args.data_url))
+    reader = StoreReader(backend)
+    root = config_dir(args.config_dir)
+    configs = open_config_store(root)
+    stored = reader.dates(FORWARD_RETURNS)
+    if not stored:
+        raise ConfigurationError("no outcomes stored: run `algotrade-ingest run outcomes`")
+    params = {
+        "edge": args.edge,
+        "start": (args.start or stored[0]).isoformat(),
+        "until": (args.until or stored[-1]).isoformat(),
+    }
+    resources = {"reader": reader, "configs": configs}
+    job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-score-fit", params, _user(args))
+    if job.status is JobStatus.FAILED:
+        print(f"error: {args.edge}: {job.error}", file=sys.stderr)
+        return 2
+    out = args.out or root / SCORES_FILE
+    existing = out.read_text() if out.exists() else ""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(merge_scorers(existing, args.edge, job.result["table"]))
+    r = job.result
+    print(f"{args.edge}: fitted on {r['rows']} rows ({r['positives']} hits, {r['sessions']} "
+          f"sessions) through {r['fitted_through']}; wrote {out}")  # fmt: skip
+    return 0

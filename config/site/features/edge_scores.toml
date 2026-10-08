@@ -1,0 +1,16 @@
+# Learned edge scorers (ADR 0053 amendment, ED7): one probit expression feature per
+# edge, written by `algotrade-backtest fit-edge-scorer --edge ID`, never by hand. The
+# coefficients are fitted on the edge's training frame (features at the decision session, the
+# edge's hit at the entry session) over windows closed before frozen_from less one horizon:
+# `fitted_through` in the description is always before the edge's frozen_from (a fitness test).
+# A re-fit raises the version. Language and keys: docs/configuration.md "Expression features".
+
+[edge_score_momentum_12_1]
+expr = "ncdf(b0 + w1 * (trend_stats.mom_12_1 - m1) / s1 + w2 * (trend_stats.ret_252d - m2) / s2 + w3 * (price_stats.adv_usd_20d - m3) / s3)"
+params = { b0 = 0.1282211466515695, w1 = -0.08422050055331252, m1 = 0.2832564999250487, s1 = 1.1310218213250853, w2 = 0.03035311178674421, m2 = 0.3277559413363227, s2 = 1.324906867867694, w3 = -0.14645664998735047, m3 = 465566682.82703567, s3 = 1648357004.554653 }
+dtype = "float"
+unit = "decimal"
+valid_range = [0, 1]
+description = "Fitted probability that edge momentum_12_1 hits (20-session window): a probit on rollup.trend_stats@v2.mom_12_1, rollup.trend_stats@v2.ret_252d, rollup.price_stats@v2.adv_usd_20d standardised on the training rows. fitted_through=2026-03-03; 3758 rows, 3 sessions, 2075 hits."
+null_meaning = "a feature is null (UNKNOWN) for the instrument and session"
+version = 2

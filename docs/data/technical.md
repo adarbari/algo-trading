@@ -155,9 +155,9 @@ Formulas over stored columns are expression features (computed on read):
 `swing.toml` (level distances, the pullback in ATRs, the 52-week position, the 50-session breakout and
 20-session breakdown, the short put's cushion above support), `price.toml` (`rs_spy_positive`,
 `rs_improving`, `sector_leader`),
-`positioning.toml` (flow ratios, skew, term structure, implied move), `wings.toml` (the covered call's
-strike distance and annualised yield, its strike against resistance; its cushion in ATRs is in
-`swing.toml` beside the put's), `earnings.toml` (scheduled events against expiries: earnings and
+`positioning.toml` (flow ratios, skew, term structure, implied move), the covered call's strike
+distance and annualised yield and its strike against resistance (in `swing.toml` too, beside the put's
+cushion in ATRs), `earnings.toml` (scheduled events against expiries: earnings and
 ex-dividend dates).
 
 ## Shared rules

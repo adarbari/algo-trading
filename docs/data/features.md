@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-429 stored features in 46 groups, in dependency order; 120 expression features.
+429 stored features in 46 groups, in dependency order; 121 expression features.
 
 ## `option_liquidity@v1`
 
@@ -813,6 +813,12 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `ex_div_before_nearest_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option expiring then carries the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no stored chain with an expiry on or after the session | `dividend_schedule.next_ex_date <= nearest_expiry.expiry_date` | virtual |
 | `ex_div_before_call_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date falls on or before the covered-call wing's target expiry (call_wing.target_expiry): the early-assignment risk of the short call, and the dividend the shares collect if it is not assigned | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no call target expiry (call_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= call_wing.target_expiry` | virtual |
 
+### `edge_scores.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `edge_score_momentum_12_1` | expression | float | decimal | open | 0 .. 1 | Fitted probability that edge momentum_12_1 hits (20-session window): a probit on rollup.trend_stats@v2.mom_12_1, rollup.trend_stats@v2.ret_252d, rollup.price_stats@v2.adv_usd_20d standardised on the training rows. fitted_through=2026-03-03; 3758 rows, 3 sessions, 2075 hits. | a feature is null (UNKNOWN) for the instrument and session | `ncdf(b0 + w1 * (trend_stats.mom_12_1 - m1) / s1 + w2 * (trend_stats.ret_252d - m2) / s2 + w3 * (price_stats.adv_usd_20d - m3) / s3)` (b0 = 0.1282211466515695, w1 = -0.08422050055331252, m1 = 0.2832564999250487, s1 = 1.1310218213250853, w2 = 0.03035311178674421, m2 = 0.3277559413363227, s2 = 1.324906867867694, w3 = -0.14645664998735047, m3 = 465566682.82703567, s3 = 1648357004.554653) | virtual |
+
 ### `fundamentals.toml`
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
@@ -921,6 +927,9 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `dist_to_poc` | expression | float | decimal | open | >= -1 | Close / the point of control - 1: how far the price sits from the year's most-traded level, 0.05 is 5% above it (the level acts as a magnet and as support when above, resistance when below) | poc_252d is null (profile_status not OK), or no price_stats row | `price_stats.close / volume_profile.poc_252d - 1` | virtual |
 | `inside_day_breakout` | expression | bool | flag | open |  | The session closed above the previous close and the previous session was an inside day (its high-low range within the day before's): the day after the squeeze resolved up | neither condition is false and one is unknown (ret_1d null: a gap in the last 2 sessions; prev_bar_relation null: the previous session or the one before it has no bar), or no trend_stats or candle row | `trend_stats.ret_1d > 0 and candle.prev_bar_relation == "INSIDE"` | virtual |
 | `strong_close` | expression | bool | flag | open |  | The session closed strong with conviction: the close in the top 30% of the day's range (close_range_pos at least 0.7) and a body of at least half the range (body_share at least 0.5), so not a doji or a long-wick spike | neither condition is false and one is unknown (the bar has no range), or no trend_stats or candle row | `trend_stats.close_range_pos >= min_close_pos and candle.body_share >= min_body` (min_close_pos = 0.7, min_body = 0.5) | virtual |
+| `call_otm_pct` | expression | float | decimal | open | >= -1 | How far the best covered call's strike sits above the close: (strike - close) / close, 0.05 is 5% out of the money (negative: the strike is below the close, an in-the-money call) | no best call (call_wing NO_STRIKE or worse), or no price_stats row | `(call_wing.best_call_strike - price_stats.close) / price_stats.close` | virtual |
+| `cc_yield_annualised` | expression | float | decimal | open | >= 0 | The best covered call's premium yield annualised: best_call_yield x 365 / target_dte, 0.20 is 20% a year if the same call sold every period expired worthless (a premium rate, not a return: assignment caps the upside and the stock can fall) | no best call (call_wing NO_STRIKE or worse), so no yield or target_dte | `call_wing.best_call_yield * 365 / call_wing.target_dte` | virtual |
+| `call_strike_above_resistance` | expression | bool | flag | open |  | Whether the best covered call's strike is above the most recent confirmed swing high (resistance), so the shares are called away only after a break above it | no best call (call_wing NO_STRIKE or worse), or no confirmed swing high above the close in the window (swing_levels.swing_high null) | `call_wing.best_call_strike > swing_levels.swing_high` | virtual |
 
 ### `volatility.toml`
 
@@ -952,14 +961,6 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `vrp_iv30_source` | label | str | category | personal | ibkr, cboe | Where vrp_iv30 came from: ibkr or cboe (the lower one when both exist; ibkr on a tie) | vrp_iv30 is null (neither source has an IV30) | `if(is_null(vrp_iv30), null, if(is_null(iv30.iv30_cboe), "ibkr", if(is_null(ibkr_iv.iv30_ibkr), "cboe", if(ibkr_iv.iv30_ibkr <= iv30.iv30_cboe, "ibkr", "cboe"))))` | virtual |
 | `vrp_iv_hv_spread` | expression | float | decimal | personal | -5 .. 5 | vrp_iv30 minus HV30 (price_stats): the VRP scanner's volatility premium | vrp_iv30 or hv30 is null (no IV30 from IBKR or Cboe, or a gap in the last 31 sessions) | `vrp_iv30 - price_stats.hv30` | virtual |
 | `vrp_iv_hv_ratio` | expression | float | ratio | personal | >= 0 | vrp_iv30 / HV30 (price_stats): plain ratio, no HV30 floor (owner decision 2026-10-03) | vrp_iv30 or hv30 is null, or hv30 is 0 | `vrp_iv30 / price_stats.hv30` | virtual |
-
-### `wings.toml`
-
-| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
-|---|---|---|---|---|---|---|---|---|---|
-| `call_otm_pct` | expression | float | decimal | open | >= -1 | How far the best covered call's strike sits above the close: (strike - close) / close, 0.05 is 5% out of the money (negative: the strike is below the close, an in-the-money call) | no best call (call_wing NO_STRIKE or worse), or no price_stats row | `(call_wing.best_call_strike - price_stats.close) / price_stats.close` | virtual |
-| `cc_yield_annualised` | expression | float | decimal | open | >= 0 | The best covered call's premium yield annualised: best_call_yield x 365 / target_dte, 0.20 is 20% a year if the same call sold every period expired worthless (a premium rate, not a return: assignment caps the upside and the stock can fall) | no best call (call_wing NO_STRIKE or worse), so no yield or target_dte | `call_wing.best_call_yield * 365 / call_wing.target_dte` | virtual |
-| `call_strike_above_resistance` | expression | bool | flag | open |  | Whether the best covered call's strike is above the most recent confirmed swing high (resistance), so the shares are called away only after a break above it | no best call (call_wing NO_STRIKE or worse), or no confirmed swing high above the close in the window (swing_levels.swing_high null) | `call_wing.best_call_strike > swing_levels.swing_high` | virtual |
 
 ## Superseded groups
 

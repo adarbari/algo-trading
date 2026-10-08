@@ -272,3 +272,33 @@ unit = "flag"
 description = "The session closed strong with conviction: the close in the top 30% of the day's range (close_range_pos at least 0.7) and a body of at least half the range (body_share at least 0.5), so not a doji or a long-wick spike"
 null_meaning = "neither condition is false and one is unknown (the bar has no range), or no trend_stats or candle row"
 version = 1
+
+# The covered-call wing (call_wing@v1; docs/data/technical.md): the strike's distance above the close,
+# the premium annualised and the strike against resistance (merged from wings.toml, which made room
+# for edge_scores.toml under the 12-file folder cap).
+
+[call_otm_pct]
+expr = "(call_wing.best_call_strike - price_stats.close) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "How far the best covered call's strike sits above the close: (strike - close) / close, 0.05 is 5% out of the money (negative: the strike is below the close, an in-the-money call)"
+null_meaning = "no best call (call_wing NO_STRIKE or worse), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[cc_yield_annualised]
+expr = "call_wing.best_call_yield * 365 / call_wing.target_dte"
+dtype = "float"
+unit = "decimal"
+description = "The best covered call's premium yield annualised: best_call_yield x 365 / target_dte, 0.20 is 20% a year if the same call sold every period expired worthless (a premium rate, not a return: assignment caps the upside and the stock can fall)"
+null_meaning = "no best call (call_wing NO_STRIKE or worse), so no yield or target_dte"
+valid_range = [0, inf]
+version = 1
+
+[call_strike_above_resistance]
+expr = "call_wing.best_call_strike > swing_levels.swing_high"
+dtype = "bool"
+unit = "flag"
+description = "Whether the best covered call's strike is above the most recent confirmed swing high (resistance), so the shares are called away only after a break above it"
+null_meaning = "no best call (call_wing NO_STRIKE or worse), or no confirmed swing high above the close in the window (swing_levels.swing_high null)"
+version = 1
