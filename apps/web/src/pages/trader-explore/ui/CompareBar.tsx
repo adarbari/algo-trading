@@ -5,7 +5,7 @@
  */
 import { CompareSetBar } from '@/features/compare-set';
 
-import type { ExploreSearch } from '../model/search';
+import type { ExploreSearch } from '@/entities/explore';
 import { exploreState, type SearchPatch } from '../model/state';
 
 export interface CompareBarProps {

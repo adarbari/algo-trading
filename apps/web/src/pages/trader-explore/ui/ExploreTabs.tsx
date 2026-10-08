@@ -6,7 +6,7 @@
 import { Tabs, type TabItem } from '@algotrade/ui';
 import type { ReactNode } from 'react';
 
-import type { ExploreTab } from '../model/search';
+import type { ExploreTab } from '@/entities/explore';
 import { defaultTab, type SearchPatch } from '../model/state';
 
 const TABS: readonly (TabItem & { id: ExploreTab })[] = [

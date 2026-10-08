@@ -16,6 +16,7 @@ from functools import partial
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from algotrade.config.site.settings import load_users
@@ -160,6 +161,8 @@ def create_app(
     app.state.text_model, app.state.text_model_off = text_model, text_model_off
     app.state.explain_cache = open_text_cache(settings.data_url)  # ADR 0041 (amended): derived
     app.state.explain_limiter = RateLimiter()
+    # Compress what is big (the bundle, GraphQL answers): the app is served over a remote link.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),

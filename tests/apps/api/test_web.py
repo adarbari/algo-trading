@@ -57,6 +57,13 @@ def test_a_build_file_is_served_and_hashed_assets_are_cached_for_good(client: Te
     assert icon.status_code == 200 and icon.headers["cache-control"] == "no-cache"
 
 
+def test_a_big_asset_is_gzipped_on_request(dist: Path, client: TestClient) -> None:
+    (dist / "assets" / "big-3c4d.js").write_text("console.log('app');\n" * 500)
+    response = client.get("/assets/big-3c4d.js", headers={"Accept-Encoding": "gzip"})
+    assert response.headers["content-encoding"] == "gzip"
+    assert response.text.startswith("console.log")
+
+
 @pytest.mark.parametrize("path", ["/screeners/preview", "/features/check"])
 def test_a_get_on_a_post_only_api_path_is_405_not_the_app(client: TestClient, path: str) -> None:
     response = client.get(path)

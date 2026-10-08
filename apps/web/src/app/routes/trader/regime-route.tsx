@@ -1,9 +1,10 @@
 /** Trader > Regime: the market as weather (no params; the page reads the session's regime). */
 import { createRoute } from '@tanstack/react-router';
 
-import { RegimePage } from '@/pages/trader-regime';
-
 import { traderRoute } from './layout-route';
+import { lazyPage } from '../lazy-page';
+
+const RegimePage = lazyPage(() => import('@/pages/trader-regime'), 'RegimePage');
 
 export const regimeRoute = createRoute({
   getParentRoute: () => traderRoute,

@@ -130,7 +130,12 @@ export type ComparePricesQuery = { table: { instruments: Array<{ instrumentId: s
 export type FeatureCatalogueQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type FeatureCatalogueQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string, guide: { theme: string, reads: string, summary: string, caveats: Array<string>, sources: Array<string>, uses: Array<{ intent: string, op: string, value: unknown, mode: string, tolerance: unknown, onMiss: string | null, note: string }> } | null }> };
+export type FeatureCatalogueQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string, guide: { theme: string, reads: string, summary: string } | null }> };
+
+export type FeatureCatalogueDetailQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type FeatureCatalogueDetailQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string, guide: { theme: string, reads: string, summary: string, caveats: Array<string>, sources: Array<string>, uses: Array<{ intent: string, op: string, value: unknown, mode: string, tolerance: unknown, onMiss: string | null, note: string }> } | null }> };
 
 export type FeatureDistributionQueryVariables = Exact<{
   name: string;
@@ -817,6 +822,34 @@ export const FeatureCatalogueDocument = new TypedDocumentString(`
       theme
       reads
       summary
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<FeatureCatalogueQuery, FeatureCatalogueQueryVariables>;
+export const FeatureCatalogueDetailDocument = new TypedDocumentString(`
+    query FeatureCatalogueDetail {
+  catalogue {
+    name
+    kind
+    source
+    dtype
+    format
+    description
+    nullMeaning
+    version
+    group
+    key
+    inputs
+    unit
+    range
+    categories
+    scope
+    owner
+    licence
+    guide {
+      theme
+      reads
+      summary
       caveats
       sources
       uses {
@@ -831,7 +864,7 @@ export const FeatureCatalogueDocument = new TypedDocumentString(`
     }
   }
 }
-    `) as unknown as TypedDocumentString<FeatureCatalogueQuery, FeatureCatalogueQueryVariables>;
+    `) as unknown as TypedDocumentString<FeatureCatalogueDetailQuery, FeatureCatalogueDetailQueryVariables>;
 export const FeatureDistributionDocument = new TypedDocumentString(`
     query FeatureDistribution($name: FeatureName!) {
   distribution(name: $name) {
