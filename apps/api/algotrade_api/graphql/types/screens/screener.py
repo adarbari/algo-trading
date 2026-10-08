@@ -202,17 +202,9 @@ class Screener:
         return Unknown.of(found.not_run) if found.not_run is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="Its record over its edge's frozen period, from the edge's canonical run "
-        "(never an exploratory run); null: it has none (see `trackRecordNotRun`)"
+        description="Its record over the frozen period of each edge that lists it, by edge id, "
+        "from that edge's canonical run (never an exploratory run); an edge without one has an "
+        "entry whose `notRun` says why; empty: no edge lists it"
     )
-    def track_record(self, info: Info) -> TrackRecord | None:
-        found = track_record.load_track_record(self.ctx, self.id)
-        return TrackRecord.of(found.record) if found.record is not None else None
-
-    @strawberry.field(  # type: ignore[untyped-decorator]
-        description="Why it has no track record (NOT_RUN: no edge lists it, or none has a "
-        "canonical run with rows for it); null: it has one"
-    )
-    def track_record_not_run(self, info: Info) -> Unknown | None:
-        found = track_record.load_track_record(self.ctx, self.id)
-        return Unknown.of(found.not_run) if found.not_run is not None else None
+    def track_records(self, info: Info) -> list[TrackRecord]:
+        return [TrackRecord.of(t) for t in track_record.load_track_records(self.ctx, self.id)]

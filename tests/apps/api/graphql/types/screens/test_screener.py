@@ -125,10 +125,10 @@ def test_track_record_is_not_run_without_a_canonical_edge_run(graph: Graph) -> N
     body = graph(
         """query { edges { id } edgeRuns(edgeId: "nope") { runId }
           screener(id: "vrp_scanner") {
-            trackRecord { runId } trackRecordNotRun { code kind } } }"""
+            trackRecords { edgeId runId notRun { code kind } } } }"""
     )
     assert "errors" not in body, body
     data = body["data"]
     assert data["edges"] and data["edgeRuns"] == []  # the site's edge documents, no runs
-    assert data["screener"]["trackRecord"] is None
-    assert data["screener"]["trackRecordNotRun"]["code"] == "NOT_RUN"
+    for entry in data["screener"]["trackRecords"]:
+        assert entry["runId"] is None and entry["notRun"]["code"] == "NOT_RUN"

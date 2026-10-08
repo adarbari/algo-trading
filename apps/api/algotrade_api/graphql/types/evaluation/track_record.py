@@ -7,6 +7,7 @@ from typing import Self
 import strawberry
 
 from algotrade.services.read.evaluation import track_record
+from algotrade_api.graphql.types.instruments.feature import Unknown
 
 
 @strawberry.type(
@@ -34,19 +35,22 @@ class TrackHorizon:
 
 
 @strawberry.type(
-    description="A screener's record over its edge's frozen period, from the edge's canonical "
+    description="A screener's record over one edge's frozen period, from the edge's canonical "
     "run (the latest site run whose split is the edge's `frozenFrom`); never an exploratory "
-    "run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose it"
+    "run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose "
+    "it. `notRun` says why there is none (NOT_RUN); null: it has one"
 )
 class TrackRecord:
     screener_id: str
     edge_id: str
-    run_id: str
-    run_label: str
+    edge_name: str
+    not_run: Unknown | None
+    run_id: str | None
+    run_label: str | None
     range_from: dt.date | None
-    range_to: dt.date
+    range_to: dt.date | None
     split_from: dt.date | None
-    knowledge_ts: dt.datetime
+    knowledge_ts: dt.datetime | None
     horizons: list[TrackHorizon]
 
     @classmethod
@@ -54,6 +58,8 @@ class TrackRecord:
         return cls(
             screener_id=d.screener_id,
             edge_id=d.edge_id,
+            edge_name=d.edge_name,
+            not_run=Unknown.of(d.not_run) if d.not_run is not None else None,
             run_id=d.run_id,
             run_label=d.run_label,
             range_from=d.range_from,

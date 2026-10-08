@@ -1,11 +1,10 @@
-"""A screener's track record (``TrackRecord``): what the frozen period says about it, from the
-canonical run of an edge that lists it, and nothing else.
+"""A screener's track records (``TrackRecord``), one per edge that lists it: what the frozen
+period says about it, from that edge's canonical run, and nothing else.
 
 Only the ``frozen`` slice of a canonical run (its split is the edge's ``frozen_from``) feeds it:
-an exploratory run, whatever its split, never reaches it. A screener no edge lists, an edge with
-no canonical run, or a run without rows for it is ``NOT_RUN`` / ``NO_ROW`` with the reason,
-never an older value. Outcomes are not read here: the numbers are the stored rows of
-``results/edge_eval``."""
+an exploratory run, whatever its split, never reaches it. An edge with no canonical run, or a run
+without rows for the screener, yields a ``NOT_RUN`` entry with the reason, never an older value.
+Outcomes are not read here: the numbers are the stored rows of ``results/edge_eval``."""
 
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -34,26 +33,21 @@ class TrackHorizon:
 
 @dataclass(frozen=True)
 class TrackRecord:
-    """A screener's frozen-period record from one canonical run: ``run_label`` names it (the
-    edge and the frozen period it covers)."""
+    """A screener's frozen-period record under one edge that lists it. With a canonical run
+    and frozen rows: ``run_id`` .. ``horizons`` are set and ``not_run`` is None (``run_label``
+    names the run). Otherwise ``not_run`` says why (``NOT_RUN``) and the rest is empty."""
 
     screener_id: str
     edge_id: str
-    run_id: str
-    run_label: str
-    range_from: date | None
-    range_to: date
-    split_from: date | None
-    knowledge_ts: datetime
-    horizons: tuple[TrackHorizon, ...]
-
-
-@dataclass(frozen=True)
-class LatestTrackRecord:
-    """A screener's track record, or why it has none (``not_run``)."""
-
-    record: TrackRecord | None
-    not_run: Unknown | None
+    edge_name: str
+    not_run: Unknown | None = None
+    run_id: str | None = None
+    run_label: str | None = None
+    range_from: date | None = None
+    range_to: date | None = None
+    split_from: date | None = None
+    knowledge_ts: datetime | None = None
+    horizons: tuple[TrackHorizon, ...] = ()
 
 
 def _horizon(row: runs.EdgeRow) -> TrackHorizon:
@@ -67,14 +61,10 @@ def _horizon(row: runs.EdgeRow) -> TrackHorizon:
     )
 
 
-def _unknown(code: UnknownCode, job: str, why: str) -> LatestTrackRecord:
-    return LatestTrackRecord(None, Unknown(code, run_cause(job, why)))
-
-
-def _from(ctx: Stores, edge: Edge, screener_id: str) -> LatestTrackRecord:
+def _from(ctx: Stores, edge: Edge, screener_id: str) -> TrackRecord:
     found = runs.load_canonical_run(ctx, edge)
     if found.run is None:
-        return LatestTrackRecord(None, found.not_run)
+        return TrackRecord(screener_id, edge.id, edge.name, not_run=found.not_run)
     run = found.run
     rows = [
         r
@@ -87,35 +77,24 @@ def _from(ctx: Stores, edge: Edge, screener_id: str) -> LatestTrackRecord:
     ]
     if not rows:
         why = f"run {run.run_id} of {edge.id} has no frozen rows for {screener_id}"
-        return _unknown(UnknownCode.NOT_RUN, screener_id, why)
-    label = f"{edge.id} from {run.split_from} to {run.range_to}"
-    return LatestTrackRecord(
-        TrackRecord(
-            screener_id=screener_id,
-            edge_id=edge.id,
-            run_id=run.run_id,
-            run_label=label,
-            range_from=run.range_from,
-            range_to=run.range_to,
-            split_from=run.split_from,
-            knowledge_ts=run.knowledge_ts,
-            horizons=tuple(sorted((_horizon(r) for r in rows), key=lambda h: h.horizon_sessions)),
-        ),
-        None,
+        cause = run_cause(screener_id, why)
+        return TrackRecord(
+            screener_id, edge.id, edge.name, not_run=Unknown(UnknownCode.NOT_RUN, cause)
+        )
+    return TrackRecord(
+        screener_id=screener_id,
+        edge_id=edge.id,
+        edge_name=edge.name,
+        run_id=run.run_id,
+        run_label=f"{edge.id} from {run.split_from} to {run.range_to}",
+        range_from=run.range_from,
+        range_to=run.range_to,
+        split_from=run.split_from,
+        knowledge_ts=run.knowledge_ts,
+        horizons=tuple(sorted((_horizon(r) for r in rows), key=lambda h: h.horizon_sessions)),
     )
 
 
-def load_track_record(ctx: Stores, screener_id: str) -> LatestTrackRecord:
-    """The track record of ``screener_id``: from the first edge (by id) that lists it as a
-    screener and has frozen rows for it; else ``NOT_RUN`` with the first reason."""
-    listing = [e for e in load_edges(ctx) if screener_id in e.screeners]
-    if not listing:
-        return _unknown(UnknownCode.NOT_RUN, screener_id, f"no edge lists {screener_id}")
-    first: LatestTrackRecord | None = None
-    for edge in listing:
-        found = _from(ctx, edge, screener_id)
-        if found.record is not None:
-            return found
-        first = first or found
-    assert first is not None
-    return first
+def load_track_records(ctx: Stores, screener_id: str) -> tuple[TrackRecord, ...]:
+    """One entry per edge (by id) that lists ``screener_id``; none when no edge does."""
+    return tuple(_from(ctx, e, screener_id) for e in load_edges(ctx) if screener_id in e.screeners)

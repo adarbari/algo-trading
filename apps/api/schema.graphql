@@ -1798,14 +1798,9 @@ type Screener {
   notRun: Unknown
 
   """
-  Its record over its edge's frozen period, from the edge's canonical run (never an exploratory run); null: it has none (see `trackRecordNotRun`)
+  Its record over the frozen period of each edge that lists it, by edge id, from that edge's canonical run (never an exploratory run); an edge without one has an entry whose `notRun` says why; empty: no edge lists it
   """
-  trackRecord: TrackRecord
-
-  """
-  Why it has no track record (NOT_RUN: no edge lists it, or none has a canonical run with rows for it); null: it has one
-  """
-  trackRecordNotRun: Unknown
+  trackRecords: [TrackRecord!]!
 }
 
 """
@@ -1927,17 +1922,19 @@ type TrackHorizon {
 }
 
 """
-A screener's record over its edge's frozen period, from the edge's canonical run (the latest site run whose split is the edge's `frozenFrom`); never an exploratory run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose it
+A screener's record over one edge's frozen period, from the edge's canonical run (the latest site run whose split is the edge's `frozenFrom`); never an exploratory run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose it. `notRun` says why there is none (NOT_RUN); null: it has one
 """
 type TrackRecord {
   screenerId: String!
   edgeId: String!
-  runId: String!
-  runLabel: String!
+  edgeName: String!
+  notRun: Unknown
+  runId: String
+  runLabel: String
   rangeFrom: Date
-  rangeTo: Date!
+  rangeTo: Date
   splitFrom: Date
-  knowledgeTs: DateTime!
+  knowledgeTs: DateTime
   horizons: [TrackHorizon!]!
 }
 
