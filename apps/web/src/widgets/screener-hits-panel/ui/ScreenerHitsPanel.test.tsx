@@ -27,6 +27,13 @@ beforeEach(() => {
 });
 
 describe('ScreenerHitsPanel', () => {
+  it("opens a screener's results from its name when given the callback", () => {
+    const onOpenScreener = vi.fn();
+    render(<ScreenerHitsPanel symbol="AAPL" onOpenScreener={onOpenScreener} />);
+    screen.getByRole('button', { name: 'VRP scanner' }).click();
+    expect(onOpenScreener).toHaveBeenCalledWith('vrp');
+  });
+
   it('lists the screeners that picked the ticker, with what their run stored', async () => {
     const { container } = render(<ScreenerHitsPanel symbol="AAPL" />);
     expect(hooks.useScreenerHits).toHaveBeenCalledWith('AAPL');

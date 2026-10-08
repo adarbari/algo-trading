@@ -5,9 +5,18 @@
  * columns, sort and decisions are their view of this screener (`features/table-view`: saved at
  * once, never part of the screener). The header says the regime the run stamped, and the picks
  * the regime gate paused are a decision chip of their own (PAUSED, reason in the row's detail).
- * Enter on a row opens the ticker in Explore.
+ * Enter on a row opens the ticker in Explore. With `renderDetail`, the row under review's detail
+ * sits beside the table, or on a phone opens in a sheet when a row is chosen (MasterDetail).
  */
-import { Button, Chip, Grid, SearchInput, Stack, Text, type DataTableSort } from '@algotrade/ui';
+import {
+  Button,
+  Chip,
+  MasterDetail,
+  SearchInput,
+  Stack,
+  Text,
+  type DataTableSort,
+} from '@algotrade/ui';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
@@ -43,8 +52,8 @@ export interface ScreenerResultsProps {
   onOpen: (symbol: string) => void;
   /** The row under review (instrument id); null or not in the page: the first row. */
   focusId: string | null;
-  /** The row under review changed (a click, or j / k and the arrows). */
-  onFocusChange: (row: TableRow) => void;
+  /** The row under review changed (a click, or j / k and the arrows); null: its sheet was closed (phone). */
+  onFocusChange: (row: TableRow | null) => void;
   /** `c` on the row under review. */
   onToggleCompare: (row: TableRow) => void;
   /** `x` on the row under review: hide it for now. */
@@ -249,10 +258,20 @@ export function ScreenerResults({
     />
   );
   if (!renderDetail) return table;
+  // The sheet opens only for a row the user chose, not the first-row fallback.
+  const chosen = focusRow !== null && focusRow.instrumentId === focusId ? focusId : null;
   return (
-    <Grid columns="main-aside" gap={4} collapse="lg" align="start">
-      {table}
-      {screener && focusRow ? renderDetail({ row: focusRow, criteria: screener.criteria }) : null}
-    </Grid>
+    <MasterDetail
+      columns="main-aside"
+      master={table}
+      detail={
+        screener && focusRow ? renderDetail({ row: focusRow, criteria: screener.criteria }) : null
+      }
+      detailKey={chosen}
+      detailTitle={focusRow?.symbol ?? ''}
+      onDetailClose={() => {
+        onFocusChange(null);
+      }}
+    />
   );
 }

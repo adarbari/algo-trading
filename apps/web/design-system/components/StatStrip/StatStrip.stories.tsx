@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
+import { narrow } from '../../testing';
 import { StatStrip, type StatItem } from './StatStrip';
 
 const summary: StatItem[] = [
@@ -73,3 +74,6 @@ export const Dense: Story = {
     ],
   },
 };
+
+/** A phone-width container (375 px): the stats stack in one column. */
+export const Narrow: Story = { decorators: [narrow] };

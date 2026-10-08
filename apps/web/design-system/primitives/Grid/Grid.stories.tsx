@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
+import { narrow } from '../../testing';
 import { Mono } from '../Mono';
 import { Surface } from '../Surface';
 import { Text } from '../Text';
@@ -61,3 +62,6 @@ export const Empty: Story = { args: { children: undefined } };
 export const Dense: Story = {
   args: { columns: 6, gap: 0.5, children: Array.from({ length: 12 }, (_, i) => cell(`${i + 1}`)) },
 };
+
+/** A phone-width container (375 px): a collapsing grid is one column. */
+export const Narrow: Story = { args: { columns: 4, collapse: 'md' }, decorators: [narrow] };

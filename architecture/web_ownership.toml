@@ -89,3 +89,10 @@ description = "Showing a Guide entry in place: the InfoButton and HelpDrawer for
 owner = ["apps/web/src/features/guide-help/**"]
 section = "docs/adr/0051-guide-explain-once-show-in-place.md#decision"
 enforced_by = ["eslint no-restricted-imports: HelpDrawer, HelpLead, HelpSection only in src/features/guide-help (apps/web/lint-rules/restrictions.js)"]
+
+[[web_responsibility]]
+id = "web-container-width"
+description = "Measuring a component's own width against a breakpoint token when its tree (not only its CSS) changes on a phone (useNarrow; ADR 0052)"
+owner = ["apps/web/design-system/responsive/*"]
+section = "docs/adr/0052-one-ui-for-phones-and-desktops.md#decision"
+enforced_by = ["eslint no-restricted-globals / no-restricted-syntax (apps/web/lint-rules/restrictions.js: no matchMedia / ResizeObserver in src)", "review: a tree that changes by width calls useNarrow from @algotrade/ui internals only (the hook is not exported to src)"]

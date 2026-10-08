@@ -12,7 +12,7 @@ export {
   type StatusColor,
 } from './color';
 export { AA_GRAPHIC, AA_TEXT, contrastRatio, luminance } from './contrast';
-export { defaultDensity, density, type Density, type DensityName } from './density';
+export { defaultDensity, density, touch, type Density, type DensityName } from './density';
 export { zIndex } from './layers';
 export { duration, easing } from './motion';
 export { borderWidth, focusRing, radius, type Radius } from './shape';

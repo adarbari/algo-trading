@@ -108,6 +108,7 @@ export {
   type LinkedTextPart,
   type LinkedTextProps,
 } from './LinkedText';
+export { MasterDetail, type MasterDetailProps } from './MasterDetail';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
 export { NumberInput, type NumberInputProps } from './NumberInput';
 export { OptionList, type OptionListItem, type OptionListProps } from './OptionList';

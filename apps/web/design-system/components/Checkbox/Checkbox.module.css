@@ -39,3 +39,10 @@
   flex-direction: column;
   min-width: 0;
 }
+
+@media (pointer: coarse) {
+  .checkbox {
+    align-items: center;
+    min-height: var(--density-control-height);
+  }
+}

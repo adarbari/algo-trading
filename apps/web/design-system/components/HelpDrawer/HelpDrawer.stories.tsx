@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { waitFor } from 'storybook/test';
 
 import { Mono } from '../../primitives/Mono';
 import { Stack } from '../../primitives/Stack';
@@ -191,8 +192,28 @@ export const Error: Story = {
   },
 };
 
+/** Settles the scroll of a dialog whose body scrolled to its first focusable control. */
+const scrolledToTop = async () => {
+  const dialog = await waitFor((): HTMLElement => {
+    const found = document.querySelector<HTMLElement>('[role="dialog"]');
+    if (!found) throw new TypeError('no dialog yet');
+    return found;
+  });
+  // Focus moves to the first control after open and scrolls the body by a timing-dependent
+  // amount; the screenshot shows the top of the body instead.
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(resolve);
+    });
+  });
+  for (const element of dialog.querySelectorAll<HTMLElement>('*')) {
+    if (element.scrollHeight > element.clientHeight && element.scrollTop > 0) element.scrollTop = 0;
+  }
+};
+
 /** Long text and many sections: the body scrolls, the header and footer stay put. */
 export const Dense: Story = {
+  play: scrolledToTop,
   args: {
     children: (
       <>

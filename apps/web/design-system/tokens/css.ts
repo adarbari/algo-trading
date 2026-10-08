@@ -3,11 +3,11 @@
  *
  * Themes (dark-first): `:root` is dark; `[data-theme='light']` is light; `[data-theme='system']`
  * follows `prefers-color-scheme`. Density: `[data-density='comfortable']` overrides the compact
- * default. Up / down: `[data-updown='cvd']` switches to the colour-blind-safe pair.
+ * default; `@media (pointer: coarse)` raises control and row heights to the `touch` floor. Up / down: `[data-updown='cvd']` switches to the colour-blind-safe pair.
  * Run `npm run tokens` after editing a token source; CI fails if tokens.css is stale.
  */
 import { colorRoles, dark, light, type Palette } from './color';
-import { density, type Density } from './density';
+import { density, touch, type Density } from './density';
 import { zIndex } from './layers';
 import { duration, easing } from './motion';
 import { borderWidth, focusRing, radius } from './shape';
@@ -99,6 +99,15 @@ export function renderTokensCss(): string {
       '  ',
     )}\n}`,
     block(":root[data-density='comfortable']", densityVars(density.comfortable)),
+    `@media (pointer: coarse) {\n${block(
+      ':root',
+      [
+        ['--density-control-height', px(touch.controlHeight)],
+        ['--density-row-height', px(touch.rowHeight)],
+        ['--density-cell-padding-y', px(touch.cellPaddingY)],
+      ],
+      '  ',
+    )}\n}`,
     `@media (prefers-reduced-motion: reduce) {\n${block(
       ':root',
       Object.keys(duration).map((k): [string, string] => [`--duration-${k}`, '0ms']),

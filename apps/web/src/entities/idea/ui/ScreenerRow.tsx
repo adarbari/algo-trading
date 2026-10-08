@@ -3,13 +3,20 @@
  * how many tickers its run picked (both counted by the server over the whole run), or that it
  * did not run for the session (and why).
  */
-import { Mono, Stack, Text } from '@algotrade/ui';
+import { Button, Mono, Stack, Text } from '@algotrade/ui';
 
 import type { ScreenerSummary } from '../model/idea';
 
 const score = (value: number | null) => (value === null ? '—' : value.toFixed(0));
 
-export function ScreenerRow({ screener, rank }: { screener: ScreenerSummary; rank: number }) {
+export interface ScreenerRowProps {
+  screener: ScreenerSummary;
+  rank: number;
+  /** Open the screener's results; with it the name is a button. */
+  onOpen?: (screenerId: string) => void;
+}
+
+export function ScreenerRow({ screener, rank, onOpen }: ScreenerRowProps) {
   const meta = [screener.owner, screener.version === null ? null : `v${screener.version}`]
     .filter(Boolean)
     .join(' · ');
@@ -24,7 +31,19 @@ export function ScreenerRow({ screener, rank }: { screener: ScreenerSummary; ran
       <Stack direction="row" gap={3} align="center">
         <Mono tone="muted">{rank}</Mono>
         <Stack gap={0}>
-          <Text weight="medium">{screener.name}</Text>
+          {onOpen ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                onOpen(screener.id);
+              }}
+            >
+              {screener.name}
+            </Button>
+          ) : (
+            <Text weight="medium">{screener.name}</Text>
+          )}
           {meta ? (
             <Text size="xs" tone="muted">
               {meta}

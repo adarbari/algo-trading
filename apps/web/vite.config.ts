@@ -47,6 +47,12 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    include: [
+      'src/**/*.test.{ts,tsx}',
+      'design-system/**/*.test.{ts,tsx}',
+      'scripts/**/*.test.ts',
+      'lint-rules/**/*.test.js',
+    ],
     exclude: [...configDefaults.exclude, ...quarantinedUnitFiles],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     restoreMocks: true,
