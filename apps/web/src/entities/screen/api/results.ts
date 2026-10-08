@@ -47,6 +47,9 @@ const ScreenerResults = graphql(`
         runId
         session
         previousSession
+        status
+        coverage
+        missingTables
         regime
         paused
         decisions {

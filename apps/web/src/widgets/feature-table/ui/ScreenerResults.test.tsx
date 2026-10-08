@@ -88,6 +88,9 @@ function served(total = 2) {
         runId: 'r1',
         session: '2026-10-02',
         previousSession: '2026-10-01',
+        status: 'complete',
+        coverage: 'COMPLETE',
+        missingTables: [] as string[],
         regime: 'STRESS',
         paused: 1,
         decisions: [
@@ -223,6 +226,39 @@ describe('ScreenerResults', () => {
     );
     setup();
     expect(screen.getByText('Regime: not recorded for this run')).toBeVisible();
+  });
+
+  // 2026-10-07: breakout's PARTIAL run lacked trend_stats, relative_strength and vol_stats when
+  // it ran; the banner named only the session's missing tables read now (fund_reference, ibkr_iv).
+  it("names a PARTIAL run's own missing tables apart from the session's", () => {
+    const base = served();
+    hooks.useScreenerResults.mockReturnValue(
+      fakeQuery({
+        ...base,
+        session: { date: '2026-10-02', missing: ['fund_reference@v1'] },
+        screener: {
+          ...base.screener,
+          latestRun: {
+            ...base.screener.latestRun,
+            status: 'partial',
+            coverage: 'PARTIAL',
+            missingTables: ['rollups/instrument/trend_stats@v2', 'rollups/instrument/vol_stats@v1'],
+          },
+        },
+      }),
+    );
+    setup();
+    expect(
+      screen.getByText(
+        'The run for 2026-10-02 is PARTIAL, run without trend_stats@v2, vol_stats@v1; Run now re-runs it.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/Not stored for 2026-10-02: fund_reference@v1\./)).toBeVisible();
+  });
+
+  it('shows no run banner for a COMPLETE run', () => {
+    setup();
+    expect(screen.queryByText('Partial run')).toBeNull();
   });
 
   it("has a chip for the paused picks, selected by default, with the run's count", async () => {
