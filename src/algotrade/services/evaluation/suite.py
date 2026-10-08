@@ -8,10 +8,11 @@ from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.engine import run_backtest
-from algotrade.services.datasets import load_datasets
+from algotrade.services.datasets import list_datasets, load_datasets
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 
 BENCHMARK = "buy_and_hold"
+EDGE_FIXTURE_TAG = "cross-section"  # a dataset for the edge harness, not for the strategy grid
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,8 @@ def run_suite(
     config: BacktestConfig | None = None,
 ) -> list[EvaluationRow]:
     rows: list[EvaluationRow] = []
+    if datasets is None:
+        datasets = [n for n, d in list_datasets(reader).items() if EDGE_FIXTURE_TAG not in d.tags]
     for dataset, (data, terms) in load_datasets(reader, datasets).items():
         for name in strategies or sorted(STRATEGIES):
             result = run_backtest(data, create_strategy(name), config, terms)

@@ -27,7 +27,7 @@ def test_reference_data_loaded(golden_reader: StoreReader) -> None:
     snap = snapshot(golden_reader, "instruments/reference")
     assert snap is not None and not snap.pre_snapshot
     terms = instrument_terms(golden_reader, snap.snapshot_date)
-    assert len(terms) == 11
+    assert len(terms) == 72  # 11 single and multi-asset names, 61 in cross_section
     assert all(t.multiplier == 1.0 for t in terms.values())
 
 

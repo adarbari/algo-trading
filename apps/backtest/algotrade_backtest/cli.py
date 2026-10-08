@@ -10,7 +10,8 @@ algotrade-backtest regime-scorecard [--report regime-scorecard.txt]   (the regim
 algotrade-backtest fit-edge-scorer --edge ID [--from D] [--until D] [--out FILE]
 algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [--iv-field F]
                                     [--split-from D]
-                                  [--report edges.md]
+                                  [--report edges.md] [--baseline benchmarks/baseline.json
+                                  [--update-baseline]]
 """
 
 import argparse
@@ -93,6 +94,14 @@ def build_parser() -> argparse.ArgumentParser:
         "edge's frozen_from); another split than frozen_from is exploratory",
     )
     ee.add_argument("--report", type=Path, help="also write the report here")
+    ee.add_argument(
+        "--baseline",
+        type=Path,
+        help="compare with the edges section of this file (exit 1 on drift)",
+    )
+    ee.add_argument(
+        "--update-baseline", action="store_true", help="rewrite that section (make baseline only)"
+    )
     fs = sub.add_parser(
         "fit-edge-scorer", help="fit an edge's learned scorer (probit) and write its TOML feature"
     )
