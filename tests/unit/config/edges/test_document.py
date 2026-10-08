@@ -273,6 +273,43 @@ def test_evidence_is_only_for_an_evidenced_live_or_retired_edge() -> None:
         parse(status="candidate", evidence=cited)
 
 
+def test_a_variant_may_override_base_and_picks_each_checked_like_the_edges() -> None:
+    edge = parse(
+        schedule="on_event:earnings_reaction",
+        variants=[{"id": "decoy", "base": "universe", "picks": "universe"}, {"id": "plain"}],
+    )
+    decoy, plain = edge.variants
+    assert (decoy.base, decoy.picks) == ("universe", "universe")
+    assert (plain.base, plain.picks) == (None, None) and edge.picks == "event"
+    with pytest.raises(ConfigurationError, match="picks"):
+        parse(schedule="on_event:earnings_reaction", variants=[{"id": "x", "picks": "all"}])
+    with pytest.raises(ConfigurationError, match="needs an on_event"):
+        parse(schedule="month_end", variants=[{"id": "x", "base": "event"}])
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"picks": "universe", "base": "event"}, "needs base"),
+        ({"picks": "universe", "variants": [{"id": "x", "base": "event"}]}, "needs base"),
+        (
+            {"base": "universe", "variants": [{"id": "x", "picks": "universe", "base": "event"}]},
+            "needs base",
+        ),
+        ({"schedule": "month_end", "picks": "universe", "base": "universe"}, "needs an on_event"),
+        (
+            {"schedule": "month_end", "variants": [{"id": "x", "picks": "event"}]},
+            "needs an on_event",
+        ),
+    ],
+)
+def test_picks_from_the_universe_need_the_universe_base_and_an_event_schedule(
+    changes: Any, message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(**changes)
+
+
 # ---- expires_otm and kind-changing variants (ED4a) --------------------------------------
 
 OTM = {
