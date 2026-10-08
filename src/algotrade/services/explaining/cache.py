@@ -1,12 +1,13 @@
-"""The cache of regime explanations (ADR 0041, amended 2026-10-06). ``TextCache`` is the
-protocol (``get`` / ``put`` a text by key); its backend is ``storage/backends/text_cache.py``
-(JSON files under ``var/cache/explanations/``), opened here from the store's URL like the live
-recorder's. The key is the session date and the hash of what the answer depends on: which
-signals are on and their verdicts, the question, the model's name and the prompt's version (a
-changed prompt never serves an old answer), so the first click of a session pays the model and
-the rest of the team reads the file. What is cached is the model's
-raw answer, which is verified again on every read. A derived cache, not data: the API's one
-write outside user configs, the live-quote log and screener runs (ADR 0005 exception)."""
+"""The cache of regime explanations (ADR 0041, amended 2026-10-06). ``TextCache`` is the protocol
+(``get`` / ``put`` a text by key); its backend is ``storage/backends/text_cache.py`` (JSON files
+under ``var/cache/explanations/``), opened here from the store's URL like the live recorder's. The
+key is the session date and the hash of what the answer depends on: which signals are on and their
+verdicts, the question, the answering model's name (the Claude Code provider's is qualified as
+``claude-cli:<model>``, so no other provider's model of the same id shares its answers) and the
+prompt's version (a changed prompt never serves an old answer), so the first click of a session
+pays the model and the rest of the team reads the file. What is cached is the model's raw answer,
+which is verified again on every read. A derived cache, not data: the API's one write outside user
+configs, the live-quote log and screener runs (ADR 0005 exception)."""
 
 import hashlib
 import json

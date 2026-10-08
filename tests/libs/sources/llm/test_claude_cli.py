@@ -5,7 +5,10 @@ is parsed (a missing usage is ``None``), and every failure is a ``ModelUnavailab
 never quotes stderr. No test starts ``claude``: a fake runner answers."""
 
 import json
+import os
+import signal
 import subprocess
+import threading
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -14,6 +17,7 @@ import pytest
 from algotrade.config.env import claude_cli_env
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.registry import build_claude_cli
+from algotrade_sources.llm import claude_cli
 from algotrade_sources.llm.claude_cli import LOCKDOWN, ClaudeCli, run_process
 
 OK = {
@@ -62,6 +66,7 @@ def test_the_command_line_always_carries_the_lockdown_and_never_skips_permission
     assert argv[argv.index("--tools") + 1] == ""  # no tools
     assert argv[argv.index("--setting-sources") + 1] == ""  # no settings, hooks, CLAUDE.md
     assert "--strict-mcp-config" in argv and "--no-session-persistence" in argv
+    assert "--safe-mode" in argv  # no CLAUDE.md, skills, plugins (and their hooks), MCP
     assert "--bare" not in argv  # --bare skips the keychain read: the login would not be found
     assert not any("dangerously" in a or "permission" in a for a in argv)
     assert stdin == "the sentence" and "the sentence" not in argv  # the prompt is on stdin
@@ -92,7 +97,11 @@ def test_the_scrubbed_environment_keeps_four_variables_and_drops_secrets(
 
 def test_the_json_result_gives_text_tokens_and_the_notional_cost() -> None:
     done = client(Runner(json.dumps(OK))).complete("s", "u")
-    assert (done.text, done.model, done.provider) == ('{"criteria": []}', "haiku", "claude")
+    assert (done.text, done.model, done.provider) == (
+        '{"criteria": []}',
+        "claude-cli:haiku",  # qualified: no other provider's "haiku" shares its cache key
+        "claude",
+    )
     assert (done.input_tokens, done.output_tokens, done.cost_usd) == (120, 30, 0.0042)
 
 
@@ -162,4 +171,65 @@ def test_the_registry_builds_it_with_the_given_environment() -> None:
         90,
         {"HOME": "/h"},
     )
-    assert built.names == ("sonnet",) and built.names_for("anyone") == ("sonnet",)
+    assert built.names == ("claude-cli:sonnet",) and built.names_for("x") == built.names
+
+
+def test_a_second_request_waits_at_most_the_timeout_for_the_lock_then_is_busy() -> None:
+    held = Runner(json.dumps(OK))
+    waiting = ClaudeCli("/c", "haiku", {}, timeout_s=0.2, runner=held)
+    claude_cli._LOCK.acquire()
+    try:
+        with pytest.raises(ModelUnavailableError, match="busy with another request"):
+            waiting.complete("s", "u")
+    finally:
+        claude_cli._LOCK.release()
+    assert held.runs == []  # never started
+    assert waiting.complete("s", "u").text  # and the lock is free again
+
+
+def test_the_lock_is_released_after_a_failure() -> None:
+    with pytest.raises(ModelUnavailableError):
+        client(Runner("", 1)).complete("s", "u")
+    assert claude_cli._LOCK.acquire(timeout=0.1)
+    claude_cli._LOCK.release()
+
+
+def test_a_timeout_kills_the_whole_process_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    killed: list[tuple[int, int]] = []
+    real = os.killpg
+
+    def killpg(pid: int, sig: int) -> None:
+        killed.append((pid, sig))
+        real(pid, sig)
+
+    monkeypatch.setattr(claude_cli.os, "killpg", killpg)
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_process(["/bin/sh", "-c", "sleep 30 & wait"], "", tmp_path, {"PATH": "/bin"}, 0.2)
+    ((pid, sig),) = killed
+    assert sig == signal.SIGKILL and pid != os.getpgid(0)  # a group of its own, not ours
+
+
+def test_lock_contention_between_threads_serialises_runs() -> None:
+    inside, peak = [0], [0]
+    guard = threading.Lock()
+
+    def runner(
+        argv: Sequence[str], stdin: str, cwd: Path, env: Mapping[str, str], timeout: float
+    ) -> "subprocess.CompletedProcess[str]":
+        with guard:
+            inside[0] += 1
+            peak[0] = max(peak[0], inside[0])
+        threading.Event().wait(0.05)
+        with guard:
+            inside[0] -= 1
+        return subprocess.CompletedProcess(argv, 0, json.dumps(OK), "")
+
+    model = ClaudeCli("/c", "haiku", {}, timeout_s=5, runner=runner)
+    threads = [threading.Thread(target=model.complete, args=("s", "u")) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert peak[0] == 1

@@ -183,12 +183,18 @@ The owner has a Claude subscription and wants it to answer his own requests ahea
    that user may be answered by, and the explanation cache is looked up only under those names, so
    nobody else is served an answer the owner's login wrote.
 3. **Locked down.** argv list (no shell), the prompt on stdin, `--output-format json --model M
-   --system-prompt S --tools "" --strict-mcp-config --setting-sources "" --disable-slash-commands
-   --no-session-persistence`, a fresh empty temporary directory as cwd, and an environment of
+   --system-prompt S --safe-mode --tools "" --strict-mcp-config --setting-sources ""
+   --disable-slash-commands --no-session-persistence` (`--safe-mode` turns off CLAUDE.md, skills,
+   installed plugins and their hooks, MCP servers, custom commands and agents, and keeps the login;
+   `--setting-sources ""` alone would not), a fresh empty temporary directory as cwd, and an environment of
    `HOME`, `USER`, `PATH` and `LANG` only (`config.env.claude_cli_env`: no `ALGOTRADE_*`, no
    API key, no OAuth token). Never `--dangerously-skip-permissions`; never `--bare`, which skips
-   the keychain read, so the login would not be found. One run at a time (a lock); the timeout
-   kills the process. `--max-turns` does not exist in the installed CLI (2.1.285); with no tools
+   the keychain read, so the login would not be found. One run at a time (a lock that
+   a waiting request holds for at most `timeout_s`, then it is "busy" and the chain falls back);
+   the child runs in its own process group and a timeout kills the group. `only_users` ids must be
+   in `users.toml` (the API turns the text model off with the reason otherwise). The cache key
+   names the Claude provider's model as `claude-cli:<model>`, so no other provider's model of the
+   same id shares it. `--max-turns` does not exist in the installed CLI (2.1.285); with no tools
    the run is one turn.
 4. **Failures** (non-zero exit, timeout, `is_error`, not logged in, usage limit, a command that
    will not start) are `ModelUnavailableError`s that never quote stderr, so the chain falls back.

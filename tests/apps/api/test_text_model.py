@@ -17,9 +17,12 @@ from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.llm.claude_cli import ClaudeCli
 from tests.helpers.api_store import as_user
 
+USERS = {"user": [{"id": u, "role": "admin"} for u in ("local", "site", "abhi", "bob")]}
+
 
 def configs(llm: dict[str, Any] | None) -> MemoryConfigStore:
-    return MemoryConfigStore({} if llm is None else {("site", "settings", "llm"): llm})
+    docs: dict[Any, Any] = {("site", "settings", "users"): USERS}
+    return MemoryConfigStore(docs if llm is None else docs | {("site", "settings", "llm"): llm})
 
 
 def test_a_missing_or_disabled_file_is_off_without_a_complaint(
@@ -93,7 +96,7 @@ def test_a_claude_cli_provider_is_wired_for_its_users_with_the_scrubbed_environm
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     model, _ = open_text_model(configs(CLI_CHAIN))
     assert isinstance(model, FallbackTextModel)
-    assert model.names_for("abhi") == ("haiku", "gemini-2.5-flash")
+    assert model.names_for("abhi") == ("claude-cli:haiku", "gemini-2.5-flash")
     assert model.names_for("bob") == ("gemini-2.5-flash",)
     cli = model.members[0][1]
     assert isinstance(cli, ClaudeCli) and cli.provider == "claude_cli" and cli.retries == 0
@@ -161,3 +164,9 @@ def test_the_app_starts_with_a_wrong_llm_toml_and_drafting_answers_503(
     response = client.post("/screeners/s/draft-from-text", json={"text": "stocks over $5"})
     assert response.status_code == 503
     assert "llm.toml" in response.json()["detail"] and "nonsense" in response.json()["detail"]
+
+
+def test_an_only_users_id_that_is_not_in_users_toml_turns_the_text_model_off() -> None:
+    typo = CLI_CHAIN["provider"][0] | {"only_users": ["abhii"]}
+    model, reason = open_text_model(configs(CLI_CHAIN | {"provider": [typo, CHAIN["provider"][1]]}))
+    assert model is None and "['abhii'] are not in users.toml" in reason
