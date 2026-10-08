@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 SPEC = importlib.util.spec_from_file_location(
-    "check_numbering", Path(__file__).resolve().parents[2] / "scripts" / "check_numbering.py"
+    "check_numbering", Path(__file__).resolve().parents[3] / "scripts" / "check_numbering.py"
 )
 numbering = importlib.util.module_from_spec(SPEC)  # type: ignore[arg-type]
 SPEC.loader.exec_module(numbering)  # type: ignore[union-attr]
@@ -94,4 +94,4 @@ def test_a_cited_rule_must_be_in_the_table(tmp_path: Path) -> None:
 
 
 def test_the_repository_itself_is_consistent() -> None:
-    assert numbering.rule_problems(Path(__file__).resolve().parents[2]) == []
+    assert numbering.rule_problems(Path(__file__).resolve().parents[3]) == []

@@ -1,0 +1,22 @@
+/* KeyHints: a wrapping caption row of outlined keys and their meanings; gone under a coarse pointer. */
+.hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hint {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+@media (pointer: coarse) {
+  .hints {
+    display: none;
+  }
+}

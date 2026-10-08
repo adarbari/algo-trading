@@ -13,6 +13,8 @@ export interface CompareSetBarProps {
   onRemove: (symbol: string) => void;
   onClear: () => void;
   onFocus: (symbol: string) => void;
+  /** Open the detail for this ticker (the focused one, else the first): the phone's sheet. */
+  onOpen: (symbol: string) => void;
 }
 
 export function CompareSetBar({
@@ -21,6 +23,7 @@ export function CompareSetBar({
   onRemove,
   onClear,
   onFocus,
+  onOpen,
 }: CompareSetBarProps) {
   const choices = [...new Set([...(focused ? [focused] : []), ...symbols])];
   return (
@@ -68,6 +71,15 @@ export function CompareSetBar({
             value={focused ?? choices[0] ?? ''}
             onValueChange={onFocus}
           />
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => {
+              onOpen(focused ?? symbols[0] ?? '');
+            }}
+          >
+            {symbols.length > 1 ? `Compare ${symbols.length}` : 'Open detail'}
+          </Button>
         </Stack>
       ) : null}
     </Stack>

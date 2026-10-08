@@ -11,19 +11,19 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - **The Guide (GD, ADR 0051):** GD1-GD3a done, GD3b and GD4a in review, GD4b in review (`no-automerge`: the owner reads the screens); next GD3c ([GD details](#the-guide-gd-details)).
 - **Event sensitivity (EV, ADR 0050):** EV0, EV1, EV7a done; next EV2; owner action: `make web-build`, the detached earnings backfill ([EV details](#event-sensitivity-ev-details)).
 - **Workflows (WF, ADR 0039):** WF1-WF3 done; next WF3b, WF4; owner action first: the 2026-10-05 bars, rollups and screens ([WF details](#workflows-wf-details)).
-- **ETF holdings (ADR 0035):** after merge run `algotrade-ingest etf-holdings` once; ETF descriptions gap ([ETF details](#etf-holdings-etf-details)).
+- **ETF holdings (ADR 0035) and descriptions (ADR 0034):** after merge run `algotrade-ingest etf-holdings` once, then `algotrade-ingest descriptions --only funds --force` and stocks in chunks; ETF descriptions gap ([ETF details](#etf-holdings-etf-details), [Descriptions details](#descriptions-details)).
 - **Read-model track (RM, ADRs 0036-0038): done**; open: the Ideas Expiry DTE backfill (owner action) and the Market.history perf item ([RM details](#read-model-rm-details)).
 - **Identity (ID, ADR 0040) and hosting (H1, ADR 0044):** ID1-ID4 and H1 done; owner actions (Supabase, Tailscale Funnel, `make web-build`), next ID5 ([ID / H details](#identity-and-hosting-id--h-details)).
 - **Backfills pending** (past sessions read UNKNOWN until run): volume, financials, TA bands and trend, options positioning, call wing and dividends ([Backfills details](#backfills-pending-details)).
-- **Mobile UI (MU, ADR 0052): MU1 done**; owner action: `make web-build`, try the hosted app on a phone; next MU2 ([MU details](#mobile-ui-mu-details)).
+- **Mobile UI (MU, ADR 0052): MU1 and MU2 done** (MU2 in review: the phone follow-ups and the workspace switch moved into the account menu); owner action: `make web-build`, a second phone pass; next MU3 ([MU details](#mobile-ui-mu-details)).
 - **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1, P1b, P2, P3a, P4 done; P3b in review, P4b open; next P5 harness ([Pipeline details](#pipeline-details)).
-- **Descriptions (ADR 0034, accepted):** after merge run `algotrade-ingest descriptions --only funds --force`, then stocks in chunks ([Descriptions details](#descriptions-details)).
+- **Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0 done**; next ED1, the Edge document; `architect` reviews ED2 and ED3 ([ED details](#edges-ed-details)).
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC. Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
 - Massive's ticker overview has descriptions for stocks and ADRs, none for ETFs (free tier, checked 2026-10-04); ETF text is the SEC prospectus objective (~74% of ETFs). Massive: 5 requests a minute, so descriptions are capped at 100 stocks a night (ADR 0034). Company snapshots: `data.reference.companies` reads with `as_of=None`, so a past-dated `company-details --date` run would leak today's facts into backfilled features (`relative_strength@v1` sector); the loader should drop snapshots whose `knowledge_ts` is after the session (follow-up).
 - Owner screener / VRP decisions: ADR 0029, ADR 0030 (rule screens: no selection, missing data never skips, no tiers / classify / labels; `vrp_scanner` v3) and `docs/screeners/vrp-scanner.md`. Natural-language drafts (ADR 0041) ship off: `config/site/llm.toml` `enabled = true` + a provider's `base_url` / `model` (Ollama, Gemini, Groq, OpenRouter examples in the file) and `ALGOTRADE_LLM_API_KEY` in `.env` turn on the Builder's "Describe it" box. **Field guide (ADR 0041 amended 2026-10-06):** `config/site/field_guide/*.toml` (37 fields, 7 situations, sourced) is in the prompt and rendered to `docs/data/field-guide.md`, because drafts chose the right fields but poor thresholds; the Builder shows it under each criterion (`FeatureInfo.guide`; "How to read it": the reading, each intent with a Use button, the caveats); coverage: every phrased or site-screened field must have an entry (fitness test), `add-feature` ships one per feature, `make features-doc` lists the unguided rest (167 of 218 fields guided, 2026-10-06: every liquidity, option, IV, price-level, momentum, swing, wall and episode field; the rest are statuses, dates and filing bookkeeping); next: a stored pending-deal flag (`add-feature`) replaces the `atr_pct` proxy of the takeover situation, and an evaluation of recorded draft sentences against the guide's thresholds. A v3 run stores a row per snapshot instrument (about 11.4k, was about 4.2k).
-- Harness audit: last 2026-10-04 (`/audit-harness`; `/start` flags when older than 30 days; fixes log: [history.md](history.md)).
+- Harness audit: last 2026-10-04 (`/audit-harness`; `/start` flags when older than 30 days; fixes log: [history.md](history.md)). Session review: last 2026-10-07 (`/review-sessions`; `/start` runs it when the date is before today; the day's top 3 and their fixes go in [history.md](history.md)).
 
 ---
 
@@ -65,7 +65,7 @@ ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holding
 
 ### Mobile UI (MU) details
 
-**Mobile UI (MU, ADR 0052; owner ask 2026-10-07): MU1 done** (one tree for phones and desktops: `MasterDetail` for Explore and screener results, the top bar's one-row scrolling nav, touch sizing under a coarse pointer, DataTable pinned key column, chart pinch / drag and zoom buttons, screener names as buttons on Ideas / paused / hits; checks: ESLint rule 10, `Narrow` stories, the e2e `phone` project; skill `responsive-ui`). **Owner action:** `make web-build` for the hosted site; try the hosted app on a phone and note what still reads badly. Next (MU2): the Admin ingestion drilldown on `MasterDetail`; the Tooltip on tap; the pick-detail keyboard hints hidden under a coarse pointer; the real-app smoke at phone width if the mocked phone project misses something.
+**Mobile UI (MU, ADR 0052; owner ask 2026-10-07): MU1 and MU2 done** (MU1: one tree for phones and desktops: `MasterDetail` for Explore and screener results, touch sizing under a coarse pointer, DataTable pinned key column, chart pinch / drag and zoom buttons, screener names as buttons. MU2, from the owner's phone test: the ingestion drilldown on `MasterDetail`, `Tooltip` on tap, `KeyHints` hidden on touch, the workspace switch moved from the top bar into the `AccountMenu` behind the viewer's name (two-row bar, about 100 px; ADR 0052 amendment), narrow tables show their `essential` columns with the picker for the rest, screener rows open on tap, Explore's Compare button opens the detail sheet; checks: ESLint rule 10, `Narrow` stories, the e2e `phone` project with an assertion per item; skill `responsive-ui`). **Owner action:** `make web-build` for the hosted site, then a second phone pass. Next (MU3): Explore's ticker search and filter bar on a phone (the owner found the search / select experience could use the space better; nothing changed yet), a per-user memory of the columns added on a phone (today per session), the pick-detail actions as icons on narrow, the real-app smoke at phone width if the mocked phone project misses something.
 
 ### Pipeline details
 
@@ -92,6 +92,10 @@ lands. The target state of every item is described in [architecture.md](architec
 | 5a | Design system | Tokens → **owner approves mockups** → components + catalogue → lint enforcement | **done**: tokens final 2026-10-03 (ADR 0011, 0025) |
 | 5b | Web app | Screener list, results table, contract detail, data freshness; L4 watchlists and preferences | **done** (pages in `apps/web/src/pages`; further pages via Next) |
 | 6 | Expansion | Backtests from the UI on a queue-backed job runner; on-request pulls; futures (IBKR); intraday bars + `rollups/daily/*`; S3 storage backend and hosting; screener outcome tracking | |
+
+### Edges (ED) details
+
+**Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0 done** (the plan, the ADR: an edge is a typed document whose screeners are its implementations, scored point in time by one harness against a quarantined outcomes grain). Next ED1, the `Edge` document (settings type, `config/site/edges/`, three candidate documents against the quality bar), then ED2 (the outcomes grain) and ED3 (the harness) ([ED section](#edges-ed-hypotheses-with-evidence-one-point-in-time-harness-adr-0053)).
 
 ## Workflows (WF): dependencies, succeed or fail, cadence (ADR 0039)
 
@@ -233,6 +237,10 @@ Opus for the design, storage and point-in-time pieces, Sonnet for the scoped imp
 | EV7a-C | The Explore Events tab (ahead list, expiry ladder, filings, fund reference, the gaps), chart event markers and the TRADER Calendar page (`entities/event`, `widgets/event-study-panel`, `widgets/event-calendar-panel`, `features/calendar-source`); owner step `make web-build` | **done** |
 | EV7 | The Explore Events tab's history with causes and drivers after EV2 (what is coming is EV7a) | |
 | EV8 | `EventCalendar` read + `Query.eventCalendar`; the cross-name Calendar page; the Admin scope screen with its write (amends ADR 0029) and the review-staleness flag | |
+
+## Edges (ED): hypotheses with evidence, one point-in-time harness (ADR 0053)
+
+Items ED0 to ED7, their gates and status live in [edges-plan.md](edges-plan.md) (ED0 **done**: the plan and ADR 0053; next ED1); `architect` reviews ED2 (the outcomes grain, point in time) and ED3 (the harness and the `quant/` statistics).
 
 ## Swing levels and momentum (SW): support, resistance and momentum from daily bars
 
