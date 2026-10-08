@@ -1,6 +1,8 @@
 """The acceptance check of ``market-rollups`` (ADR 0047): every market group has its one
 ``MKT:US`` row for the session; nothing declared passes."""
 
+from datetime import date
+
 import pytest
 
 from algotrade.config.site.settings import SourcesSettings
@@ -8,7 +10,7 @@ from algotrade.features.site import site_features
 from algotrade.services.features import site_features as default_features
 from algotrade_ingestion.tasks.derived.market_rollups import compute_market_rollups
 from algotrade_ingestion.tasks.derived.rollups import SITE
-from algotrade_ingestion.tasks.maintenance.quality import check_market_rollups
+from algotrade_ingestion.tasks.maintenance.quality import check_market_rollups, check_rollup_inputs
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import (
     MARKET_COUNTS,
@@ -42,3 +44,19 @@ def test_a_row_per_group_for_the_session_passes_and_a_missing_one_fails(
     compute_market_rollups(task_ctx(writer), days[-1])
     [after] = check_market_rollups(reader, days[-1], SETTINGS)
     assert after.status == "PASS" and "1 market groups" in after.detail
+
+
+def test_a_group_without_input_warns_once_and_never_fails() -> None:
+    stats = {
+        "ibkr_iv@v1": {"no_input": 2, "no_input_sessions": ["2026-10-05"], "rows": 0},
+        "iv30@v1": {"no_input": 0, "no_input_sessions": [], "rows": 9},
+    }
+    [check] = check_rollup_inputs(stats, date(2026, 10, 6))
+    assert (check.name, check.status) == ("rollup_input", "WARN")
+    assert check.detail == "ibkr_iv@v1: no input for 2 session(s) (2026-10-05)"
+    assert check.data == {"group": "ibkr_iv@v1", "no_input": 2}
+
+
+def test_rollup_inputs_ignore_clean_groups_and_non_group_keys() -> None:
+    stats = {"iv30@v1": {"no_input": 0}, "failed": ["x"], "range": "a..b", "partial": [], "n": 3}
+    assert check_rollup_inputs(stats, date(2026, 10, 6)) == []

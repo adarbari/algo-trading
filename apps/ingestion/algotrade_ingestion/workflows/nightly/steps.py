@@ -62,6 +62,8 @@ type Precondition = Callable[[TaskContext, date], str | None]
 type Acceptance = Callable[[StoreReader, date, SourcesSettings], list[Check]]
 # A check that also needs the run's config store (a site registry), e.g. ``check_macro``.
 type ConfiguredAcceptance = Callable[[TaskContext, date], list[Check]]
+# A check over the run record's stats (what the task reported), e.g. ``check_rollup_inputs``.
+type StatsAcceptance = Callable[[Mapping[str, Any], date], list[Check]]
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,7 @@ class Step:
     latest_only: bool = False  # current-snapshot sources: only the latest closed session
     accept: tuple[Acceptance, ...] = ()  # acceptance checks run after the task
     accept_with: tuple[ConfiguredAcceptance, ...] = ()  # the same, given the task context
+    accept_stats: tuple[StatsAcceptance, ...] = ()  # the same, given the run record's stats
     task_complete: bool = False  # the task must finish COMPLETE (a PARTIAL item fails it)
     params: Mapping[str, Any] = field(default_factory=dict, compare=False)  # extra task params
     # The task resumes (``IngestRun(resume=True)``: it refetches only its RETRYABLE items). A
@@ -198,6 +201,7 @@ def _judged(
         return Outcome(StepStatus.SUCCEEDED, record.stats)
     checks = [c for fn in step.accept for c in fn(ctx.reader, session, ctx.settings)]
     checks += [c for fn in step.accept_with for c in fn(ctx, session)]
+    checks += [c for fn in step.accept_stats for c in fn(record.stats, session)]
     outcome = judge(checks, record.stats, wait)
     outcome.observed = observe(step.name, checks)
     return outcome

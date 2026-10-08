@@ -47,3 +47,7 @@ correct without IBKR.
 - A user's own screen with a HARD criterion directly on an optional field is not checked by the
   fitness test: on a session without the source it rejects every row and says why per row
   (`no <field>`), but the run is COMPLETE. The Builder may warn about it later.
+- The `rollups` and `market-rollups` steps warn (never fail) for each rollup group that had no
+  input for a session of the run (`check_rollup_inputs`, read from the run record's stats), so
+  an empty optional partition such as `ibkr_iv@v1` is visible in the nightly report when it
+  happens (2026-10-06: the rollups ran before `ibkr-iv` succeeded and nothing said so).
