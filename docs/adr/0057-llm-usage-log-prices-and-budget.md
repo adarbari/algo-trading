@@ -79,7 +79,7 @@ a free provider keeps answering.
 The API's fifth write (after user configs, live quotes, on-request screen results and the regime-explanation cache), the narrowest: `UsageWriter` (a copy of ADR 0028's
 `LiveWriter`) writes only `usage/*` tables; only the usage recorder imports it (import-linter);
 text-model code imports no market-data writer and no jobs. The recorder is the live recorder's
-design: a bounded queue, one daemon thread, one atomic run per batch (ADR 0022), a full queue
+design, both now subclasses of `storage/recording.py` `BatchRecorder`: a bounded queue, one daemon thread, one atomic run per batch (ADR 0022), a full queue
 drops the row (logged), and nothing the recorder or the ledger does can raise into the request:
 the chain catches it and the answer goes on.
 

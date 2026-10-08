@@ -560,6 +560,13 @@ detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry"
 # --------------------------------------------------------------------------- settings, time, jobs
 
 [[responsibility]]
+id = "background-recording"
+description = "Write what the API records in the background without ever blocking a request: the one queued batch writer (bounded queue, a daemon thread draining batches, drop and log when full or a write fails, unique run id per batch, flush and close) that the live-quote recorder (ADR 0028) and the text-model usage recorder (ADR 0057) are subclasses of"
+owner = ["src/algotrade/storage/recording.py"]
+section = "docs/adr/0057-llm-usage-log-prices-and-budget.md#the-write"
+detect = [{ call = "task_done" }, { call = "put_nowait" }]
+
+[[responsibility]]
 id = "config-authoring"
 description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; for a user the site registry declares (the API passes the registry as a predicate to `author`; no I/O of its own); the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol (which reads drafts and versions back: the read model, services/read/screens/documents.py)"
 owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
@@ -605,8 +612,7 @@ description = "Execute long-running work: threads, locks, recovery, idempotency;
 owner = ["src/algotrade/services/jobs/*"]
 allowed = [
     "libs/sources/algotrade_sources/framework/session_thread.py",  # a gateway session's own thread (its socket + event loop), not work (ADR 0028)
-    "src/algotrade/services/live/recorder.py",  # the API's background writer of live quotes: one thread draining a queue, not a job (ADR 0028)
-    "src/algotrade/services/text_model/usage.py",  # the same for the text-model usage log (ADR 0057)
+    "src/algotrade/storage/recording.py",  # the API's background batch writer (live quotes ADR 0028, usage ADR 0057): one thread draining a queue, not a job
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [

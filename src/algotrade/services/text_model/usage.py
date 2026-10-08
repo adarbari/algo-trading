@@ -12,11 +12,8 @@ exchange calendar date of the call, ``knowledge_ts`` the time of the call, ``sou
 the store holds back, for the budget ledger's counters at startup.
 """
 
-import logging
-import queue
-import threading
 from collections.abc import Callable, Mapping
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from typing import Any, Protocol, cast
 
 import pandas as pd
@@ -25,10 +22,8 @@ from algotrade.core.time.calendar import exchange_date
 from algotrade.data import StoreReader
 from algotrade.data.usage import spent_by_day
 from algotrade.storage.factory import open_backend
-from algotrade.storage.runs import start_run
+from algotrade.storage.recording import BatchRecorder
 from algotrade.storage.tables.usage_writer import UsageWriter
-
-log = logging.getLogger(__name__)
 
 TABLE = "usage/llm_calls"
 JOB = "llm_usage"
@@ -38,7 +33,6 @@ COLUMNS = (
     "ts", "provider", "model", "use_case", "user", "input_tokens", "output_tokens", "latency_s",
     "cost_usd", "cost_basis", "outcome", "fell_back_from",
 )  # fmt: skip
-_STOP = None
 
 
 class UsageSink(Protocol):
@@ -48,7 +42,7 @@ class UsageSink(Protocol):
 Seed = Callable[[date, date], dict[date, float]]
 
 
-class UsageRecorder:
+class UsageRecorder(BatchRecorder[Mapping[str, Any]]):
     """Writes submitted rows (a mapping of ``COLUMNS``) to ``usage/llm_calls`` on its thread."""
 
     def __init__(
@@ -57,81 +51,21 @@ class UsageRecorder:
         maxsize: int = 500,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
-        self._writer, self._clock = writer, clock
-        self._queue: queue.Queue[Mapping[str, Any] | None] = queue.Queue(maxsize)
-        self._last_run = ""
-        self.written = 0  # runs committed
-        self._thread = threading.Thread(target=self._drain, name="usage-recorder", daemon=True)
-        self._thread.start()
+        self._writer = writer
+        super().__init__(JOB, "rows", BATCH, maxsize, clock)
 
     def submit(self, row: Mapping[str, Any]) -> bool:
         """Queue ``row`` for writing; ``False`` (dropped, logged) when the queue is full. Never
         raises."""
-        try:
-            self._queue.put_nowait(row)
-        except queue.Full:
-            log.warning("usage recorder queue full: a text-model call is not recorded")
-            return False
-        except Exception:
-            log.exception("usage recorder could not queue a row")
-            return False
-        return True
+        return self._put(row)
 
-    def flush(self) -> None:
-        """Wait until everything submitted so far is written (tests, shutdown)."""
-        self._queue.join()
-
-    def close(self, timeout_s: float = 10.0) -> None:
-        """Write what is queued, then stop the thread."""
-        self._queue.put(_STOP)
-        self._thread.join(timeout_s)
-
-    # ------------------------------------------------------------------ on the thread
-
-    def _drain(self) -> None:
-        while True:
-            first = self._queue.get()
-            batch = [first]
-            while first is not None and len(batch) < BATCH:
-                try:
-                    batch.append(self._queue.get_nowait())
-                except queue.Empty:
-                    break
-            rows = [b for b in batch if b is not None]
-            try:
-                if rows:
-                    self._write(rows)
-            except Exception:
-                log.exception("text-model usage not recorded (%d rows)", len(rows))
-            finally:
-                for _ in batch:
-                    self._queue.task_done()
-            if any(b is None for b in batch):
-                return
-
-    def _write(self, rows: list[Mapping[str, Any]]) -> None:
-        now = self._clock()
-        frame = _frame(rows).drop_duplicates(["ts", "provider", "use_case"], keep="last")
-        run_id = self._run_id(frame["session_date"].max(), now)
+    def _write(self, items: list[Mapping[str, Any]], now: datetime) -> None:
+        frame = _frame(items).drop_duplicates(["ts", "provider", "use_case"], keep="last")
+        run_id = self.run_id(frame["session_date"].max(), now)
         with self._writer.publishing(run_id, now):
             for session, part in frame.groupby("session_date", sort=True):
-                self._writer.write_usage(
-                    TABLE,
-                    cast(date, session),
-                    run_id,
-                    part.assign(run_id=run_id).reset_index(drop=True),
-                )
-        self.written += 1
-
-    def _run_id(self, session: date, now: datetime) -> str:
-        """A fresh run id (ids have one-second resolution: a second run in the same second
-        takes the next second)."""
-        run_id = start_run(JOB, session, now).run_id
-        while run_id <= self._last_run:
-            now += timedelta(seconds=1)
-            run_id = start_run(JOB, session, now).run_id
-        self._last_run = run_id
-        return run_id
+                rows = part.assign(run_id=run_id).reset_index(drop=True)
+                self._writer.write_usage(TABLE, cast(date, session), run_id, rows)
 
 
 def _frame(rows: list[Mapping[str, Any]]) -> pd.DataFrame:
