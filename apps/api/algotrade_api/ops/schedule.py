@@ -6,9 +6,11 @@ so the owner runs ``launchctl load`` themselves (as for the nightly,
 venv with the checkout as its working directory, so the CLI reads the checkout's ``.env``
 exactly as the nightly does; it binds a loopback address only (Tailscale Funnel forwards to
 it), starts at login (``RunAtLoad``) and is restarted by launchd whenever it exits
-(``KeepAlive``). Logs go to ``var/logs/api.log`` and ``api.err.log``.
+(``KeepAlive``). Logs go to ``var/logs/api.log`` and ``api.err.log``. ``restart_command``
+is the one way to name the restart (printed, never run, by the build-identity checks).
 """
 
+import os
 import plistlib
 from pathlib import Path
 
@@ -38,3 +40,9 @@ def api_plist(repo: Path, port: int = DEFAULT_PORT) -> bytes:
         "StandardErrorPath": str(logs / "api.err.log"),
     }
     return plistlib.dumps(agent)
+
+
+def restart_command() -> str:
+    """The command that restarts the loaded agent (the owner runs it; ``ops/build.py`` prints it
+    when the running API is older than the checkout or the built web)."""
+    return f"launchctl kickstart -k gui/{os.getuid()}/{LABEL}"

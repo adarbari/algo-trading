@@ -308,6 +308,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Build */
+        Build: {
+            api: components["schemas"]["BuildStamp"];
+            checkout: components["schemas"]["BuildStamp"] | null;
+            /** Mismatches */
+            mismatches: string[];
+            /** Stale */
+            stale: boolean;
+            web: components["schemas"]["BuildStamp"] | null;
+        };
+        /** BuildStamp */
+        BuildStamp: {
+            /** At */
+            at: string | null;
+            /** Git Sha */
+            git_sha: string;
+            /** Schema Hash */
+            schema_hash: string;
+        };
         /** CheckBody */
         CheckBody: {
             /**
@@ -492,6 +511,7 @@ export interface components {
         };
         /** Health */
         Health: {
+            build: components["schemas"]["Build"];
             /** Latest Session */
             latest_session: string | null;
             /**

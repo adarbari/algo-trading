@@ -20,10 +20,16 @@ make web-build      # -> var/web (VITE_API_BASE_URL empty: API calls go to the s
 
 It reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `apps/web/.env.local`. **Redo it
 after every web change** (and after pulling one): the API serves the files as built, and a
-reload of the page picks up a new build without restarting the API (during the few seconds
+reload of the page picks up a new build of web-only changes without restarting the API (during the few seconds
 of a build the page may fail to load, and a tab left open from before needs a reload). It writes `var/web`, not
 `apps/web/dist`, because `make check` rebuilds `dist` for the development setup (API under
 `/api`).
+
+It also stamps the build (`var/web/build.json`: the commit and the GraphQL schema hash) and
+asks the running API whether it matches. **A running API keeps the schema and code it started
+with**: a build against a newer schema (a pull with API changes) serves queries the old process
+cannot answer (2026-10-07: every Builder row empty). Then `make web-build` prints a
+`WARNING: the API ... is out of step` with the restart command; run it (section 3).
 
 ## 2. Settings in `.env`
 
@@ -54,6 +60,22 @@ restart, health; `--dry-run` prints the plan). After only a config change:
 launchctl kickstart -k gui/$(id -u)/com.algotrade.api
 curl -s http://127.0.0.1:8000/health
 ```
+
+### Is the running API the checked-out code?
+
+`curl -s http://127.0.0.1:8000/health` has a `build` object: the API's stamp (`api`: commit,
+schema hash, start time), the served web's (`web`, from `var/web/build.json`), the checkout's
+(`checkout`, read now), `stale` and `mismatches`, each with its fix. `make status` prints
+`API build: OUT OF STEP` and `make doctor` warns with the same lines. The fixes:
+
+| Mismatch | Fix |
+|---|---|
+| the web was built against another schema, after the API started | restart: `launchctl kickstart -k gui/$(id -u)/com.algotrade.api` |
+| the web was built against another schema, before the API started | `make web-build` |
+| the served web has no `build.json` (built outside `make web-build`) | `make web-build` |
+| the checkout's schema or commit moved since the API started (a pull) | restart (or `scripts/ops/deploy.sh`) |
+
+The checks only print; nothing restarts the agent for you.
 
 This machine's own site values (the LLM provider, `enabled = true`) live in the git-ignored
 `config/site/llm.local.toml`, merged over the committed `llm.toml`

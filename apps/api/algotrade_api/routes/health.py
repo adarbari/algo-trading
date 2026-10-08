@@ -1,13 +1,15 @@
-"""``GET /health``: is the API up, which store it reads and how fresh it is."""
+"""``GET /health``: is the API up, which store it reads, how fresh it is, and whether the code it
+started with is still the code of its checkout and of the web it serves (``ops/build.py``)."""
 
 from importlib.metadata import PackageNotFoundError, version
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from algotrade.services.read.session import store_info
 from algotrade_api import __version__
 from algotrade_api.deps import Store
-from algotrade_api.schemas.health import Health
+from algotrade_api.ops.build import build_status
+from algotrade_api.schemas.health import Build, Health
 
 router = APIRouter(tags=["health"])
 
@@ -20,8 +22,9 @@ def _version(package: str) -> str:
 
 
 @router.get("/health")
-def health(store: Store) -> Health:
+def health(store: Store, request: Request) -> Health:
     info = store_info(store.reader)
+    build = build_status(request.app.state.build, request.app.state.web_dist)
     return Health(
         storage=store.kind,
         latest_session=info.latest_session,
@@ -31,4 +34,5 @@ def health(store: Store) -> Health:
             "schema": info.schema_version,
             "api": __version__,
         },
+        build=Build.model_validate(build),
     )

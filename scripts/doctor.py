@@ -48,6 +48,16 @@ def _port_open(host: str, port: int) -> bool:
         return False
 
 
+API_URL = "http://127.0.0.1:8000"  # the launchd agent's address (ADR 0044)
+
+
+def _api_build() -> tuple[str, ...] | None:
+    """What the API on 8000 reports out of step (``algotrade_api.ops.build``); None: no API."""
+    from algotrade_api.ops.build import running_mismatches  # noqa: PLC0415 (venv may lack it)
+
+    return running_mismatches(API_URL)
+
+
 @dataclass
 class Probes:
     """The machine, as the checks see it. Defaults are real; tests override."""
@@ -64,6 +74,7 @@ class Probes:
     llm_error: Callable[[Path], str | None] = field(default=lambda main: None)  # llm.toml's error
     launch_agents: Path = Path.home() / "Library" / "LaunchAgents"
     free_bytes: Callable[[Path], int] = lambda path: shutil.disk_usage(path).free
+    api_build: Callable[[], tuple[str, ...] | None] = field(default=_api_build)
 
 
 @dataclass(frozen=True)
@@ -269,6 +280,21 @@ def check_web_dist(p: Probes) -> Result:
     )
 
 
+def check_api_build(p: Probes) -> Result:
+    """The API keeps the code and GraphQL schema it started with, the web is read from disk on
+    every request: a ``make web-build`` or a pull after the start serves a web the API cannot
+    answer (2026-10-07: every Builder row empty). A warning: the site is up, but stale."""
+    try:
+        found = p.api_build()
+    except Exception as exc:  # a missing venv must not crash the doctor
+        return Result(INFO, "api build", f"not checked ({type(exc).__name__})")
+    if found is None:
+        return Result(INFO, "api build", f"no API answering at {API_URL}")
+    if not found:
+        return Result(OK, "api build", "the running API matches its checkout and the served web")
+    return Result(WARN, "api build", "; ".join(found), "the restart or rebuild named above")
+
+
 def check_llm(p: Probes) -> Result:
     """``config/site/llm.toml`` of the main checkout (the API's): one that does not load does not
     stop the API (drafting is off with this message), so it is a warning, not a failure."""
@@ -446,6 +472,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_ibkr(p),
         check_store(p),
         check_web_dist(p),
+        check_api_build(p),
         check_llm(p),
         *check_main_checkout(p),
         check_running_checks(p),

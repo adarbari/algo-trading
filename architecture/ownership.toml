@@ -489,6 +489,7 @@ detect = [
 id = "vendor-http"
 description = "HTTP transport to vendors, auth headers, polite retries and backoff"
 owner = ["libs/sources/algotrade_sources/framework/http.py"]
+allowed = ["apps/api/algotrade_api/ops/build.py"]  # not a vendor: a GET of our own API's /health on loopback (ADR 0044, amendment 2026-10-07)
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
     { import = "urllib.request" },
@@ -698,6 +699,16 @@ detect = [
     { import = "fastapi.security" },
     { string = "authorization" },
     { call = "get_unverified_header" },
+]
+
+[[responsibility]]
+id = "build-identity"
+description = "Say when the running API is out of step with the code it serves (ADR 0044, amended 2026-10-07): the API's stamp taken once at startup (its checkout's commit, a hash of the live GraphQL schema), the web build's build.json stamp (written by make web-build through algotrade-api stamp-web), the checkout read now, the mismatches with their fix (restart the agent, rebuild the web) on GET /health, and the probe of a running API that make status, make doctor and make web-build print; never restarts anything"
+owner = ["apps/api/algotrade_api/ops/build.py"]
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#amendment-2026-10-07-build-identity"
+detect = [
+    { string = "build.json" },
+    { call = "schema_hash" },
 ]
 
 [[responsibility]]
