@@ -30,7 +30,19 @@ def test_names_by_day_and_the_market_once() -> None:
     assert [(e.instrument_id, e.event.kind, e.event.label) for e in cpi] == [
         (None, MACRO_RELEASE, "CPI")
     ]
-    assert {(g.instrument_id, g.part) for g in found.gaps} == {("EQ:AAAU", OWN_EARNINGS)}
+    assert found.gaps == ()  # AAA reports; the fund's own-earnings "gap" is no longer asked
+
+
+def test_an_etf_has_no_own_earnings_gap_but_a_stock_and_the_reference_keep_theirs() -> None:
+    """A fund never reports: no OWN_EARNINGS gap for it (one per ETF drowned the banner); a
+    stock with nothing stored still gets its gap and a fund's reference earnings stay asked."""
+    funds = load_event_calendar(context(store_with()), ["EQ:AAAU", "EQ:ETFX"], 30)
+    assert OWN_EARNINGS not in {g.part for g in funds.gaps}
+    assert any(e.event.kind == REFERENCE_EARNINGS for d in funds.days for e in d.events)
+    bare = load_event_calendar(context(store_with(), date(2026, 10, 2)), ["EQ:AAA", "EQ:AAAU"], 30)
+    parts = {(g.instrument_id, g.part) for g in bare.gaps}
+    assert ("EQ:AAA", OWN_EARNINGS) in parts
+    assert ("EQ:AAAU", OWN_EARNINGS) not in parts
 
 
 def test_the_scope_list_adds_its_names() -> None:

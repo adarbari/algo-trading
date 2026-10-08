@@ -401,6 +401,7 @@ Source: `design-system/components/DataTable`
 | `selectedIds` | `readonly string[]` | no |  |
 | `onSelectionChange` | `(ids: string[]) => void` | no |  |
 | `onRowActivate` | `(row: TRow) => void` | no | Enter on the active row, or a click on a row (unless `activateOnClick` is false): open the row's page. Give it whenever a row has a page to open, so every table's rows click through the same way; rows that open nothing show no hover and no pointer. |
+| `canActivate` | `(row: TRow) => boolean` | no | Whether a row has a page to open (default every row): a row it rejects is neither activated nor shown as clickable (a holding outside the universe, a screener built in code). |
 | `activateOnClick` | `boolean` | no | A click activates the row (default), or only makes it the active row (`false`). |
 | `activeRowId` | `string \| null` | no | The active (keyboard) row id, when the caller controls it (else the table keeps it). |
 | `onActiveRowChange` | `(row: TRow) => void` | no | The active row changed: arrows, `j` / `k`, Home / End, Page Up / Down, or a click. |
