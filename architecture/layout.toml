@@ -721,7 +721,7 @@ purpose = "fitness tests for the API surface and the read model"
 
 [[test_dir]]
 path = "tests/architecture/pipeline"
-purpose = "fitness tests for the build and check pipeline (local gates, CI shape, harness rules)"
+purpose = "fitness tests over the delivery pipeline: the CI workflow's shape, the flaky-spec quarantine list, the local gates that keep a measured speed-up (docs/ci.md Pipeline)"
 
 [[test_dir]]
 path = "tests/contract"

@@ -43,9 +43,9 @@ export function IdeasPage({
         </Text>
       </Stack>
       <RegimeStrip onOpen={onOpenRegime} />
-      <PausedIdeas onOpen={onOpen} />
+      <PausedIdeas onOpen={onOpen} onOpenScreener={onOpenScreener} />
       <Grid columns="sidebar-start" gap={4} collapse="lg" align="start">
-        <ScreenerRanking onNewScreener={onNewScreener} />
+        <ScreenerRanking onNewScreener={onNewScreener} onOpenScreener={onOpenScreener} />
         <TopIdeas
           onCompare={onCompare}
           onOpen={onOpen}

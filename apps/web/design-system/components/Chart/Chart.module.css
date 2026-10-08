@@ -55,6 +55,12 @@
   margin-inline-start: auto;
 }
 
+.zoom {
+  display: flex;
+  gap: var(--space-0-5);
+  align-items: center;
+}
+
 .plot {
   position: relative;
   min-width: 0;

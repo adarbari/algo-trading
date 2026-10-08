@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
 import { NavTabs, type NavLinkRenderProps } from './NavTabs';
@@ -39,6 +39,16 @@ describe('NavTabs', () => {
     expect(seen).toEqual(['/ideas', '/explore']);
     expect(screen.getByRole('link', { name: 'Ideas' })).toHaveAttribute('data-router');
     expect(screen.getByRole('link', { name: 'Ideas' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('scrolls the current link into view on mount and when it changes', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const { rerender } = render(<NavTabs items={ITEMS} activeHref="/ideas" aria-label="S" />);
+    expect(scrollIntoView).toHaveBeenCalledWith({ inline: 'nearest', block: 'nearest' });
+    rerender(<NavTabs items={ITEMS} activeHref="/explore" aria-label="S" />);
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
 
   it('has no accessibility violations', async () => {

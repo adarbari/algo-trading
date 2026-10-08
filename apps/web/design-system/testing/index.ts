@@ -11,3 +11,4 @@ export {
   referenceEarnings,
   results,
 } from './eventSamples';
+export { narrow } from './narrow';

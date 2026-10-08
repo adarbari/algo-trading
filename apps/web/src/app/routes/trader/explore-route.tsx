@@ -29,7 +29,13 @@ function ExploreRoute() {
   const navigate = useNavigate({ from: exploreRoute.fullPath });
   const onSearchChange = (patch: SearchPatch) =>
     void navigate({ search: (previous) => patched(previous, patch), replace: true });
-  return <ExplorePage search={search} onSearchChange={onSearchChange} />;
+  return (
+    <ExplorePage
+      search={search}
+      onSearchChange={onSearchChange}
+      onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
+    />
+  );
 }
 
 export const exploreRoute = createRoute({

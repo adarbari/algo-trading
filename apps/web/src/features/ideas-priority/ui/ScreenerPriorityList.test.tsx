@@ -51,7 +51,7 @@ const priorityOf = (data: IdeasResponse | undefined) => data?.ideas?.priority;
 const orderOf = (data: IdeasResponse | undefined) =>
   data?.ideas?.screeners.map((s) => s.screener.id);
 
-function setup() {
+function setup(onOpenScreener?: (id: string) => void) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
@@ -59,7 +59,10 @@ function setup() {
   const view = render(
     <ToastProvider>
       <QueryClientProvider client={client}>
-        <ScreenerPriorityList screeners={SCREENERS} />
+        <ScreenerPriorityList
+          screeners={SCREENERS}
+          {...(onOpenScreener ? { onOpenScreener } : {})}
+        />
       </QueryClientProvider>
     </ToastProvider>,
   );
@@ -84,6 +87,13 @@ describe('ScreenerPriorityList', () => {
     expect(screen.getByText('vrp')).toBeInTheDocument();
     expect(screen.getAllByText('picked')).toHaveLength(2);
     await expectNoA11yViolations(container);
+  });
+
+  it("opens a screener's results from its name when given the callback", async () => {
+    const onOpenScreener = vi.fn();
+    setup(onOpenScreener);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'liq' }));
+    expect(onOpenScreener).toHaveBeenCalledWith('liq');
   });
 
   it('saves the new order at once (optimistic) and refetches when settled', async () => {

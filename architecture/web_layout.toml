@@ -36,7 +36,7 @@ purpose = "Storybook config: the design-system catalogue (main) and the theme/de
 
 [[web_dir]]
 path = "apps/web/lint-rules"
-purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4)"
+purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4), responsive (rule 10: a multi-column Grid collapses), columns and views (read model WEB 4, 7), guide (messages), and the responsive rule's test"
 
 [[web_dir]]
 path = "apps/web/scripts"
@@ -78,8 +78,13 @@ purpose = "UiProvider (fonts, tokens, theme, density, up/down palette) and the o
 styles = true
 
 [[web_dir]]
+path = "apps/web/design-system/responsive"
+purpose = "container-width hooks for components that must change their tree, not only their CSS, below a breakpoint"
+
+[[web_dir]]
 path = "apps/web/design-system/testing"
-purpose = "test and story support for design-system components (the axe assertion, sample events and calendars for the event components); never exported"
+purpose = "test and story support for design-system components (the axe assertion, sample events and calendars for the event components, the narrow story decorator); never exported"
+styles = true
 
 [[web_dir]]
 path = "apps/web/design-system/format"

@@ -43,7 +43,8 @@ describe('PausedIdeas', () => {
       ),
     );
     const onOpen = vi.fn();
-    const { container } = render(<PausedIdeas onOpen={onOpen} />);
+    const onOpenScreener = vi.fn();
+    const { container } = render(<PausedIdeas onOpen={onOpen} onOpenScreener={onOpenScreener} />);
     const toggle = screen.getByRole('button', { name: /Paused by regime/ });
     expect(toggle).toHaveTextContent('(2)');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -53,6 +54,10 @@ describe('PausedIdeas', () => {
     expect(screen.getByText('Paused by the regime gate')).toBeVisible(); // no stored reason
     await userEvent.setup().click(screen.getByRole('button', { name: 'XOM' }));
     expect(onOpen).toHaveBeenCalledWith('XOM');
+    await userEvent
+      .setup()
+      .click(screen.getAllByRole('button', { name: 'VRP scanner' }).at(0) as HTMLElement);
+    expect(onOpenScreener).toHaveBeenCalledWith('vrp');
     await expectNoA11yViolations(container);
   });
 
@@ -62,23 +67,25 @@ describe('PausedIdeas', () => {
         data({ pausedTotal: 5, paused: [paused('XOM', 'regime=STRESS: vrp pauses in STRESS')] }),
       ),
     );
-    render(<PausedIdeas onOpen={vi.fn()} />);
+    render(<PausedIdeas onOpen={vi.fn()} onOpenScreener={vi.fn()} />);
     await userEvent.setup().click(screen.getByRole('button', { name: /Paused by regime/ }));
     expect(screen.getByText('4 more not listed here')).toBeVisible();
   });
 
   it('shows nothing while nothing is paused or while loading', () => {
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(data({})));
-    const { container, rerender } = render(<PausedIdeas onOpen={vi.fn()} />);
+    const { container, rerender } = render(
+      <PausedIdeas onOpen={vi.fn()} onOpenScreener={vi.fn()} />,
+    );
     expect(container).toBeEmptyDOMElement();
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(undefined));
-    rerender(<PausedIdeas onOpen={vi.fn()} />);
+    rerender(<PausedIdeas onOpen={vi.fn()} onOpenScreener={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('says so when the read failed', () => {
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(undefined, { isError: true }));
-    render(<PausedIdeas onOpen={vi.fn()} />);
+    render(<PausedIdeas onOpen={vi.fn()} onOpenScreener={vi.fn()} />);
     expect(screen.getByText('The ideas paused by the regime could not be read.')).toBeVisible();
   });
 });
