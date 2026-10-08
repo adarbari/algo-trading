@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
+from algotrade.services.evaluation.baseline import (
+    compare_to_baseline,
+    diff_metrics,
+    edge_metrics,
+    load_baseline,
+    load_edge_baseline,
+    save_baseline,
+    save_edge_baseline,
+)
 from algotrade.services.evaluation.suite import EvaluationRow, with_benchmark_excess
 
 ROWS = [
@@ -36,3 +44,32 @@ def test_benchmark_excess() -> None:
     flat = with_benchmark_excess(ROWS)
     assert flat[1]["excess_sharpe"] == pytest.approx(0.5)
     assert flat[1]["excess_return"] == pytest.approx(0.2)
+
+
+EDGE = {"edge": "e", "rows": [
+    {"variant": "v", "edge_variant": "main", "horizon_sessions": 20, "slice_kind": "all",
+     "slice_value": "all", "sessions": 16, "decile_spread": 0.0569, "decile_t": None,
+     "deflated_sharpe": 0.99},
+]}  # fmt: skip
+
+
+def test_edge_baseline_fails_on_drift_beyond_tolerance() -> None:
+    current = edge_metrics(EDGE)
+    assert current == {"e:main/v@h20/all=all": {"sessions": 16.0, "decile_spread": 0.0569}}
+    assert diff_metrics(current, current) == []
+    moved = {k: {**v, "decile_spread": 0.0570} for k, v in current.items()}
+    assert [d.describe() for d in diff_metrics(moved, current)] == [
+        "e:main/v@h20/all=all.decile_spread: 0.0569 -> 0.057"
+    ]
+    near = {k: {**v, "decile_spread": 0.0569 * (1 + 1e-9)} for k, v in current.items()}
+    assert diff_metrics(near, current) == []
+
+
+def test_save_baseline_preserves_the_other_section(tmp_path: Path) -> None:
+    path = tmp_path / "b.json"
+    save_baseline(ROWS, path)
+    save_edge_baseline(edge_metrics(EDGE), path)
+    assert compare_to_baseline(ROWS, load_baseline(path)) == []  # results kept by the edge write
+    save_baseline([ROWS[0]], path)
+    assert load_edge_baseline(path) == edge_metrics(EDGE)  # edges kept by the results write
+    assert list(load_baseline(path)) == ["buy_and_hold@d"]

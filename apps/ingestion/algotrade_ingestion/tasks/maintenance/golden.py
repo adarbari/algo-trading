@@ -4,6 +4,8 @@ Writes, for every golden dataset:
 - ``instruments/reference``: one snapshot at the first session (multiplier-1 equities). Ids
   come from the normal id rule (ADR 0018); synthetic symbols have no FIGI, so they are
   symbol ids (``EQ:<SYMBOL>``) and the baseline does not depend on the scheme.
+- ``universe``: the same instruments as one snapshot at the first session (what the edge harness's
+  universe selection reads); ``optionable`` and ``security_type`` are synthetic facts
 - ``bars/1d``: one partition per session date, ids resolved through that reference
 - ``catalog/golden_datasets``: which instruments make up which dataset
 
@@ -36,11 +38,18 @@ def golden_reference(source: FixtureSource, session: date) -> pd.DataFrame:
     return reference[["instrument_id", "symbol"]].assign(
         asset_class=AssetClass.EQUITY.value,
         security_type="COMMON_STOCK",
+        optionable=True,
         multiplier=1.0,
         tick_size=0.01,
         currency="USD",
         status="ACTIVE",
     )
+
+
+def golden_universe(reference: pd.DataFrame, session: date) -> pd.DataFrame:
+    """The ``universe`` snapshot of the golden instruments (all active, optionable stocks)."""
+    columns = ["instrument_id", "symbol", "asset_class", "security_type", "optionable", "status"]
+    return reference[columns].assign(universe_version=session.isoformat())
 
 
 def _collect(source: FixtureSource, resolver: SymbolResolver) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -81,6 +90,7 @@ def load_golden(ctx: TaskContext, source: FixtureSource) -> RunRecord:
             frame = day.drop(columns="session_date").reset_index(drop=True)
             run.write(BARS, frame, SOURCE, session=session)
         run.write("instruments/reference", reference, SOURCE)
+        run.write("universe", golden_universe(reference, first), SOURCE)
         run.write(CATALOG, catalog, SOURCE)
         run.stats.update(
             datasets=int(catalog["dataset"].nunique()),
