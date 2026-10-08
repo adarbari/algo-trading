@@ -13,6 +13,7 @@ schedule = "every_session"
 universe = "liquid_optionable"
 top_k = 20
 screeners = ["short_premium_liquidity", "vrp_scanner"]
+baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 frozen_from = 2026-04-01
 notes = """Hit: realised volatility over the window divided by the IV30 at S (measure

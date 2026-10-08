@@ -120,7 +120,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Universe:** preset `liquid_optionable`
 - **Top K:** 20
 - **Screeners:** `short_premium_liquidity`, `vrp_scanner`
-- **Baselines:** none yet
+- **Baselines:** `momentum_12_1`, `size_small`
 - **Frozen period:** from 2026-04-01
 - **Notes:** Hit: realised volatility over the window divided by the IV30 at S (measure realised_to_implied_vol) is below target 1.0. IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of the premium it collected in the window. ED4a fixes the proxy (ADR 0053 open decisions).
 
