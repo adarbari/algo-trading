@@ -181,6 +181,97 @@ type DecisionCount {
 }
 
 """
+An edge document (ADR 0053): status, thesis, the screeners and baselines that implement it, its `frozenFrom` (null: no frozen period) and the run it cites
+"""
+type Edge {
+  id: String!
+  name: String!
+  status: String!
+  thesis: String!
+  mechanism: String!
+  persistence: String!
+  schedule: String!
+  horizons: [Int!]!
+  screeners: [String!]!
+  baselines: [String!]!
+  variants: [String!]!
+  frozenFrom: Date
+  evidence: EdgeEvidence
+  rejectionReason: String!
+
+  """
+  The latest committed site run whose split is `frozenFrom`; null: none (see `canonicalNotRun`). An exploratory or older split is never shown here
+  """
+  canonicalRun: EdgeRun
+
+  """Why it has no canonical run (NOT_RUN); null: it has one"""
+  canonicalNotRun: Unknown
+
+  """
+  Every committed run of the edge the user sees (theirs, then the site's), newest first, exploratory ones flagged
+  """
+  runs: [EdgeRun!]!
+}
+
+"""
+The run an evidenced or live edge cites and the split it was measured at
+"""
+type EdgeEvidence {
+  runId: String!
+  splitFrom: Date!
+}
+
+"""
+One stored row of a run: a screener or baseline (`variant`, its `role`) of an edge variant (`main`: the edge itself) over a horizon, for one slice (all, year, regime, frozen, split), with its measures (null: not stored); `exploratory`: the run's split is not the edge's frozen_from
+"""
+type EdgeRow {
+  edgeVariant: String!
+  variant: String!
+  role: String!
+  horizonSessions: Int!
+  sliceKind: String!
+  sliceValue: String!
+  sessions: Int
+  picks: Int
+  hits: Int
+  trials: Int
+  preSnapshotSessions: Int
+  hitRate: Float
+  baseRate: Float
+  lift: Float
+  meanExcessPicks: Float
+  decileSpread: Float
+  decileT: Float
+  effectSize: Float
+  sharpe: Float
+  deflatedSharpe: Float
+  pbo: Float
+  exploratory: Boolean!
+}
+
+"""
+A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read
+"""
+type EdgeRun {
+  runId: String!
+  edgeId: String!
+  owner: String!
+  status: String!
+  rangeFrom: Date
+  rangeTo: Date!
+  splitFrom: Date
+  exploratory: Boolean!
+  knowledgeTs: DateTime!
+  asOf: String
+  trialsCounted: Int
+
+  """
+  The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none
+  """
+  rows: [EdgeRow!]!
+}
+
+"""
 One reference market drawdown, with its plain `name`. `recovered`: the session the S&P 500 regained its peak, null while the session did not know it yet; `recession` / `nberStart` / `nberEnd`: the NBER recession months (first days) it overlapped, shown only once NBER had announced them (`kind` reads `shock` until the peak is announced; `nberEnd` is null until the trough is). Listed from `knownFrom` (its trough)
 """
 type Episode {
@@ -1346,6 +1437,19 @@ type Query {
   """
   backtests: [Backtest!]!
 
+  """
+  Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data
+  """
+  edges: [Edge!]!
+
+  """The edge `id`; null: the user has no such edge"""
+  edge(id: String!): Edge
+
+  """
+  Every committed evaluation run of the edge `edgeId` the user sees (theirs, then the site's), newest first; empty: no such edge or no run. Read by run, as the run left it (never by session)
+  """
+  edgeRuns(edgeId: String!): [EdgeRun!]!
+
   """The saved backtest run `runId`; null: no such backtest run"""
   backtest(runId: String!): BacktestDetail
 
@@ -1692,6 +1796,16 @@ type Screener {
 
   """Why it has no run for the session (NOT_RUN); null: it has one"""
   notRun: Unknown
+
+  """
+  Its record over its edge's frozen period, from the edge's canonical run (never an exploratory run); null: it has none (see `trackRecordNotRun`)
+  """
+  trackRecord: TrackRecord
+
+  """
+  Why it has no track record (NOT_RUN: no edge lists it, or none has a canonical run with rows for it); null: it has one
+  """
+  trackRecordNotRun: Unknown
 }
 
 """
@@ -1798,6 +1912,33 @@ type TableView {
 type TextPart {
   text: String!
   url: String
+}
+
+"""
+The frozen slice at one horizon: hit rate against the base rate, the lift, the independent `sessions` behind them and the `picks` counted
+"""
+type TrackHorizon {
+  horizonSessions: Int!
+  hitRate: Float
+  baseRate: Float
+  lift: Float
+  sessions: Int
+  picks: Int
+}
+
+"""
+A screener's record over its edge's frozen period, from the edge's canonical run (the latest site run whose split is the edge's `frozenFrom`); never an exploratory run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose it
+"""
+type TrackRecord {
+  screenerId: String!
+  edgeId: String!
+  runId: String!
+  runLabel: String!
+  rangeFrom: Date
+  rangeTo: Date!
+  splitFrom: Date
+  knowledgeTs: DateTime!
+  horizons: [TrackHorizon!]!
 }
 
 """
