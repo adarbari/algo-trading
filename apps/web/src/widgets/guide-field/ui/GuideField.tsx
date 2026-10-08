@@ -4,7 +4,8 @@
  * spread across the universe, the criterion per intent (with Add to Builder), when it lies and
  * the situations that fool it, how it is computed, related fields and the playbooks that use
  * it, one name's history with a way into Explore, and the sources. The field comes from the
- * catalogue; what the server derives for it (related, playbooks, situations) from `guideField`.
+ * catalogue; what the server derives for it (its reads and caveats with the field names linked,
+ * related, playbooks, situations) from `guideField`, the plain text standing in while it loads.
  */
 import { DocSection, EmptyState, ErrorState, Skeleton, Stack } from '@algotrade/ui';
 import { useState } from 'react';
@@ -40,12 +41,14 @@ function FieldSections({
   const [symbol, setSymbol] = useState<string | null>(null);
   const guide = useGuideField(feature.name);
   const uses = feature.guide?.uses ?? [];
-  const caveats = feature.guide?.caveats ?? [];
+  const caveats =
+    guide.data?.caveatsLinked ??
+    (feature.guide?.caveats ?? []).map((text) => ({ segments: [{ text }] }));
   const situations = guide.data?.situations ?? [];
   return (
     <Stack gap={6}>
       <DocSection id="reads">
-        <FieldHero feature={feature} />
+        <FieldHero feature={feature} readsLinked={guide.data?.readsLinked} />
       </DocSection>
       <DocSection id="universe">
         <UniversePanel feature={feature} useIndex={useIndex} onUseChange={setUseIndex} />

@@ -33,7 +33,24 @@ const catalogue = [
 const index = {
   sections: [
     { id: 'start', title: 'Start here', purpose: 'p', entries: 4 },
+    { id: 'playbooks', title: 'Playbooks', purpose: 'p', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'p', entries: 11 },
+    { id: 'situations', title: 'Situations', purpose: 'p', entries: 2 },
+  ],
+  families: [
+    {
+      id: 'breakouts',
+      title: 'Breakouts',
+      playbooks: [
+        { id: 'range_breakout', name: 'Range breakout' },
+        { id: 'breakout', name: 'Breakout' },
+      ],
+    },
+    { id: 'income', title: 'Option income', playbooks: [{ id: 'vrp_scanner', name: 'VRP' }] },
+  ],
+  situations: [
+    { name: 'Pending takeover', fields: 12, slug: 'pending-takeover' },
+    { name: 'Earnings gap', fields: 1, slug: 'earnings-gap' },
   ],
   themeGroups: [
     {
@@ -62,6 +79,49 @@ describe('GuideRail', () => {
     expect(within(nav).getByRole('link', { name: /Momentum and trend/ })).toHaveAttribute(
       'href',
       '/guide/fields?theme=momentum+and+trend',
+    );
+  });
+
+  it('lists the sections in the server’s order: playbooks, fields, situations', () => {
+    render(<GuideRail page="home" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    const top = within(nav)
+      .getAllByRole('link')
+      .map((l) => l.textContent)
+      .filter((t) => /^(Overview|Playbooks|Fields|Situations)/.test(t));
+    expect(top).toEqual(['Overview', 'Playbooks3', 'Fields11', 'Situations2']);
+    expect(within(nav).queryByRole('link', { name: 'Breakout' })).toBeNull();
+  });
+
+  it('opens the playbooks in family order, marking the current one', () => {
+    render(<GuideRail page="playbook" playbook="breakout" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((l) => l.getAttribute('href'))
+        .filter((h) => h?.startsWith('/guide/playbooks/')),
+    ).toEqual([
+      '/guide/playbooks/range_breakout',
+      '/guide/playbooks/breakout',
+      '/guide/playbooks/vrp_scanner',
+    ]);
+    expect(within(nav).getByRole('link', { name: 'Breakout' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('opens the situations, marking the current one', () => {
+    render(<GuideRail page="situation" situation="earnings-gap" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    expect(within(nav).getByRole('link', { name: 'Earnings gap' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Pending takeover' })).toHaveAttribute(
+      'href',
+      '/guide/situations/pending-takeover',
     );
   });
 

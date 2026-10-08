@@ -8,7 +8,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 
 **Next**
 - **Market regime (RG, ADRs 0047-0049): code done** except the Backtests page items; owner actions (FRED key, macro backfill, rollups, scorecard review, `regime@v3` run, `make web-build`) in [RG details](#market-regime-rg-details).
-- **The Guide (GD, ADR 0051):** GD1-GD3a done, GD3b and GD4a in review; next GD3c, GD4b ([GD details](#the-guide-gd-details)).
+- **The Guide (GD, ADR 0051):** GD1-GD3a done, GD3b and GD4a in review, GD4b in review (`no-automerge`: the owner reads the screens); next GD3c ([GD details](#the-guide-gd-details)).
 - **Event sensitivity (EV, ADR 0050):** EV0, EV1, EV7a done; next EV2; owner action: `make web-build`, the detached earnings backfill ([EV details](#event-sensitivity-ev-details)).
 - **Workflows (WF, ADR 0039):** WF1-WF3 done; next WF3b, WF4; owner action first: the 2026-10-05 bars, rollups and screens ([WF details](#workflows-wf-details)).
 - **ETF holdings (ADR 0035):** after merge run `algotrade-ingest etf-holdings` once; ETF descriptions gap ([ETF details](#etf-holdings-etf-details)).
@@ -37,7 +37,7 @@ The full text of each Now / Next line: status, commands and owner actions. A PR 
 
 ### The Guide (GD) details
 
-**The Guide (GD, ADR 0051; spec [ui/guide.md](ui/guide.md)): GD1, GD2, GD3a done** (spec, ADR, `add-guide-content`, prose check `architecture/web_prose.toml`; `InfoButton` / `HelpDrawer`; the Guide read model and `Query.guideIndex` / `guideField`); **GD3b in review** (top-bar Guide link and `?`, `/guide`, `/guide/fields`, `/guide/fields/<name>`, the Explore Field guide tab redirects for one release; mockup https://claude.ai/artifact/1HSXjM1zsiKzTe6fak8ieZ). Next GD3c (the drawer on feature-table headers), GD4-GD6 as the spec's section 6. **GD4a in review** (server side, `no-automerge`: architect review, the owner reads the playbook text): one `config/site/guide/playbooks/<id>.toml` per site preset with `[asks]` per criterion, `Query.guidePlaybook(id)` / `guideSituation(slug)`, Guide prose linked at catalogue names (`GuideProse`); next GD4b, the playbook and situation pages.
+**The Guide (GD, ADR 0051; spec [ui/guide.md](ui/guide.md)): GD1, GD2, GD3a done** (spec, ADR, `add-guide-content`, prose check `architecture/web_prose.toml`; `InfoButton` / `HelpDrawer`; the Guide read model and `Query.guideIndex` / `guideField`); **GD3b in review** (top-bar Guide link and `?`, `/guide`, `/guide/fields`, `/guide/fields/<name>`, the Explore Field guide tab redirects for one release; mockup https://claude.ai/artifact/1HSXjM1zsiKzTe6fak8ieZ). Next GD3c (the drawer on feature-table headers), GD4-GD6 as the spec's section 6. **GD4a in review** (server side, `no-automerge`: architect review, the owner reads the playbook text): one `config/site/guide/playbooks/<id>.toml` per site preset with `[asks]` per criterion, `Query.guidePlaybook(id)` / `guideSituation(slug)`, Guide prose linked at catalogue names (`GuideProse`); next GD4b, the playbook and situation pages. **GD4b in review**: `LinkedProse` in `@algotrade/ui`, `/guide/playbooks[/<id>]`, `/guide/situations[/<slug>]`, linked reads and caveats on the field page, a Playbook link on every preset (Screeners list, Builder header).
 
 ### Event sensitivity (EV) details
 

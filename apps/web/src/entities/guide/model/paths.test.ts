@@ -6,10 +6,25 @@ import {
   fieldPath,
   fieldsPath,
   parseFieldsSearch,
+  playbookPath,
+  screenerBuilderPath,
+  screenerResultsPath,
+  situationPath,
   themeTitle,
 } from './paths';
 
 describe('guide paths', () => {
+  it('builds the playbook, situation and screener paths, encoding what is in them', () => {
+    expect(playbookPath('breakout')).toBe('/guide/playbooks/breakout');
+    expect(situationPath('earnings-gap')).toBe('/guide/situations/earnings-gap');
+    expect(screenerResultsPath('my screen')).toBe('/screeners/my%20screen');
+    expect(screenerBuilderPath('breakout')).toBe('/screeners/breakout/edit');
+  });
+
+  it('has pages for playbooks, fields and situations, in the Guide’s order', () => {
+    expect(BUILT_SECTIONS).toEqual(['playbooks', 'fields', 'situations']);
+  });
+
   it('encodes a catalogue name in a field path', () => {
     expect(fieldPath('rollup.momentum@v1.rel_volume')).toBe(
       '/guide/fields/rollup.momentum%40v1.rel_volume',
@@ -43,8 +58,7 @@ describe('guide paths', () => {
     expect(parseFieldsSearch({ view: 'nope' })).toEqual({});
   });
 
-  it('capitalises a theme for a heading, and ships only the Fields section today', () => {
+  it('capitalises a theme for a heading', () => {
     expect(themeTitle('momentum and trend')).toBe('Momentum and trend');
-    expect(BUILT_SECTIONS).toEqual(['fields']);
   });
 });
