@@ -34,3 +34,14 @@ def test_the_report_names_survivorship_unclosed_sessions_and_each_slice() -> Non
     row = next(line for line in lines if "momo" in line and "all=all" in line)
     assert "| 3 | 15 | 100.0% | 50.0% | 2.00 |" in row  # sessions, picks, hit, base, lift
     assert row.rstrip().endswith("| - | - |")  # no deflated Sharpe or PBO with three sessions
+
+
+def test_an_exploratory_run_is_labelled_in_the_header_and_each_slice() -> None:
+    row = {"slice_kind": "split", "slice_value": "split", "exploratory": True, "variant": "v"}
+    result = {
+        "edge": "e", "run_id": "r", "trials": 1, "survivorship": {}, "unclosed_sessions": {},
+        "universe_snapshot": None, "rows": [row], "exploratory": True, "split_from": "2026-06-01",
+    }  # fmt: skip
+    text = render_edge_report(result)
+    assert "EXPLORATORY: test split from 2026-06-01" in text
+    assert "split=split (EXPLORATORY)" in text

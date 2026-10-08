@@ -102,7 +102,9 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
 def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``edge`` (id), ``start``, ``end`` (ISO dates), optional ``as_of`` (ISO instant:
     the outcomes known by then; default now), ``iv_field`` (the one implied-vol field of the run;
-    default our IV30). The harness's rows land in ``results/edge_eval``."""
+    default our IV30), ``split_from`` (ISO date: the run's test split, over the user's and the
+    edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory). The harness's rows
+    land in ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -118,6 +120,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         date.fromisoformat(params["end"]),
         as_of,
         **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
+        split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
     )
     record = write_edge_eval(ctx.resources["writer"], evaluation, now)
     rows = edge_eval_frame(evaluation, record.run_id, now)
@@ -126,6 +129,8 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "run_id": record.run_id,
         "run_hash": evaluation.run_hash,
         "as_of": as_of.isoformat(),
+        "split_from": evaluation.split_from.isoformat() if evaluation.split_from else None,
+        "exploratory": evaluation.exploratory,
         "trials": evaluation.trials,
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
         "survivorship": {str(h): list(v) for h, v in survivorship(evaluation).items()},

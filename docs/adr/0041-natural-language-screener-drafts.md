@@ -201,6 +201,25 @@ The owner has a Claude subscription and wants it to answer his own requests ahea
    `Completion.cost_usd` carries the CLI's `total_cost_usd` (a notional figure on a
    subscription; `None` when absent).
 
+## Amended 2026-10-08: no real model call outside the owner's running API
+
+The owner's Mac has `claude` logged in and an untracked `llm.local.toml` enabling a chain, so
+a test, a gate, the real-app smoke (`ALGOTRADE_AUTH=off`, user `smoke`, config dir `config/`)
+or CI could have reached a model. The socket guard does not stop a child process.
+
+1. **One off-switch**: `ALGOTRADE_LLM=off` (`config/env.py` `llm_off`). `open_text_model`
+   returns `None` with a reason before reading any file or key, so no `llm.local.toml` or `.env`
+   can turn it on.
+2. **Where it is set**: `tests/conftest.py` (at import and per test), the Makefile's test, gate
+   and smoke targets (a target-specific export), `apps/web/playwright.real.config.ts` (the API
+   it starts), and the CI workflows. The nightly and the owner's API never set it.
+3. **Second layer**: the root autouse fixture refuses to start any process whose program is
+   `claude` (patched `subprocess.Popen`, so the default `run_process` and shell strings are
+   covered) and fails loudly; adapter tests inject a fake runner. Other processes (sleep,
+   version control) are not refused.
+4. **Pinned** by `tests/architecture/pipeline/test_llm_off.py` (workflows, Makefile targets,
+   Playwright config, and every test that builds the text model or a `ClaudeCli`).
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

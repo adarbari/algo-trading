@@ -9,6 +9,7 @@ algotrade-backtest evaluate [--update-baseline] [--report scorecard.md]
 algotrade-backtest regime-scorecard [--report regime-scorecard.txt]   (the regime episodes)
 algotrade-backtest fit-edge-scorer --edge ID [--from D] [--until D] [--out FILE]
 algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [--iv-field F]
+                                    [--split-from D]
                                   [--report edges.md]
 """
 
@@ -84,6 +85,12 @@ def build_parser() -> argparse.ArgumentParser:
     ee.add_argument(
         "--iv-field",
         help="the one implied-vol field of the run (default: our IV30, rollup.iv30@v1.iv30)",
+    )
+    ee.add_argument(
+        "--split-from",
+        type=date.fromisoformat,
+        help="first session of the test slice (default: the user's evaluation.toml, else each "
+        "edge's frozen_from); another split than frozen_from is exploratory",
     )
     ee.add_argument("--report", type=Path, help="also write the report here")
     fs = sub.add_parser(

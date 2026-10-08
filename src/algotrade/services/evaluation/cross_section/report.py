@@ -22,6 +22,8 @@ def _cell(row: Mapping[str, Any], key: str, fmt: str) -> str:
     value = row.get(key)
     if key == "slice":
         value = f"{row['slice_kind']}={row['slice_value']}"
+        if row.get("exploratory"):
+            value += " (EXPLORATORY)"
     elif key == "variant" and row.get("edge_variant"):
         value = f"{row['edge_variant']}/{value}"  # an edge variant (null: the edge itself)
     return "-" if value is None else fmt.format(value)
@@ -30,6 +32,11 @@ def _cell(row: Mapping[str, Any], key: str, fmt: str) -> str:
 def render_edge_report(result: Mapping[str, Any]) -> str:
     """The report of one ``edge-eval`` job result."""
     lines = [f"# Edge {result['edge']} (run {result['run_id']}, {result['trials']} trials)", ""]
+    if result.get("exploratory"):
+        lines.append(
+            f"EXPLORATORY: test split from {result['split_from']} is not the edge's frozen_from; "
+            "never evidence"
+        )
     for horizon, (n, m) in result["survivorship"].items():
         lines.append(
             f"SURVIVORSHIP: {n} of {m} sessions (h={horizon}) before the first universe "
