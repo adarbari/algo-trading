@@ -189,6 +189,21 @@ def panel(bars: pd.DataFrame, days: list[date]) -> Panel:
     )
 
 
+def symbol_column(
+    symbols: pd.DataFrame | None, ids: npt.NDArray[np.str_], symbol: str = "SPY"
+) -> int | None:
+    """``symbol``'s column in a bars panel (SPY: the market), through the reference's
+    ``instruments/symbol_ids`` frame (never built); ``None`` when there is no reference, or the
+    symbol has no bars."""
+    if symbols is None:
+        return None
+    found = symbols.loc[symbols["symbol"] == symbol, "instrument_id"]
+    if found.empty:
+        return None
+    where = np.flatnonzero(ids == str(found.iloc[0]))
+    return int(where[0]) if len(where) else None
+
+
 def traded_rows(
     px: Panel, values: Mapping[str, npt.NDArray[Any]], columns: Iterable[str]
 ) -> pd.DataFrame:

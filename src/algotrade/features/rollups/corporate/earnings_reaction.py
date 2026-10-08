@@ -55,6 +55,7 @@ from algotrade.features.rollups.price.price_stats import (
     VOLUME,
     _mean,
     panel,
+    symbol_column,
 )
 
 type Matrix = npt.NDArray[np.float64]
@@ -62,7 +63,6 @@ type Matrix = npt.NDArray[np.float64]
 NAME = "earnings_reaction"
 VERSION = 1
 SYMBOLS = "instruments/symbol_ids"
-MARKET_SYMBOL = "SPY"
 OK, NO_REPORT, INCOMPLETE = "OK", "NO_REPORT", "INCOMPLETE"
 REPORTS = 4  # the reports the volume ratio averages
 SAME_QUARTER = timedelta(days=40)  # reports closer than this are one quarter's moved date
@@ -119,17 +119,6 @@ COLUMNS = column_types(FEATURES)
 @cache
 def _gap_sessions(start: date, end: date) -> int:
     return sessions_to(start, end)
-
-
-def _spy_column(symbols: pd.DataFrame | None, ids: npt.NDArray[np.str_]) -> int | None:
-    """SPY's column in the bars panel, or ``None`` (no reference, or SPY has no bars)."""
-    if symbols is None:
-        return None
-    found = symbols.loc[symbols["symbol"] == MARKET_SYMBOL, "instrument_id"]
-    if found.empty:
-        return None
-    where = np.flatnonzero(ids == str(found.iloc[0]))
-    return int(where[0]) if len(where) else None
 
 
 def _window(grid: list[date], report: date) -> tuple[int, int] | None:
@@ -202,7 +191,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     grid = sessions_ending(session, LOOKBACK + 1)
     px = panel(bars, grid)
     column_of = {iid: i for i, iid in enumerate(px.ids)}
-    spy = _spy_column(inputs[SYMBOLS], px.ids)
+    spy = symbol_column(inputs[SYMBOLS], px.ids)
     dollar = px.close * px.volume
     # the newest report (one per quarter) counts once its reaction window (E-1 .. E+1) is on
     # the grid: E+1 on or before the session, E-1 inside the lookback
