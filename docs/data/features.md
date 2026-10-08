@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-420 stored features in 44 groups, in dependency order; 120 expression features.
+425 stored features in 45 groups, in dependency order; 120 expression features.
 
 ## `option_liquidity@v1`
 
@@ -107,6 +107,18 @@ Next and last earnings dates, report time and sessions to the next report. Store
 | `days_to_earnings` | window | int | sessions | open | >= 0 | Exchange sessions after the session up to the next report date (0: reports today) | no report date on or after the session in the calendars stored by then | `events/earnings.ts` |
 | `date_confirmed` | window | bool | flag | open |  | Whether the source confirmed the next report date | the source does not say (the Nasdaq calendar never does), or no report date on or after the session in the calendars stored by then | `events/earnings.date_confirmed` |
 | `last_earnings_date` | window | date | date | open |  | The latest report date before the session | no earlier report date known by the session (the calendars start with the first stored snapshot, the earnings backfill from its first day) | `events/earnings.ts` |
+
+## `earnings_reaction@v1`
+
+How the last earnings report moved the price against SPY, and the volume it drew. Stored as `rollups/instrument/earnings_reaction@v1`; reads `events/earnings`, `bars/1d`, `instruments/symbol_ids` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `reaction_excess_return` | window | float32 | decimal | open | >= -2 | Return of the close before the last report to the close after it (E-1 to E+1), minus SPY's over the same sessions | no report known by the session has a closed reaction window (E+1 <= the session), or a bar of the window (or of SPY, for the return) is missing, or the history is too short | `bars/1d.close`, `events/earnings.ts`, `instruments/symbol_ids.symbol` |
+| `reaction_end_date` | window | date | date | open |  | The last session of the last report's reaction window (the first after the report) | no report known by the session has a closed reaction window (E+1 <= the session) | `events/earnings.ts` |
+| `sessions_since_reaction` | window | int | sessions | open | >= 0 | Exchange sessions from the end of the last report's reaction window up to the session (0: the session is that day) | no report known by the session has a closed reaction window (E+1 <= the session) | `events/earnings.ts` |
+| `pre_event_adv_usd_20d` | window | float32 | usd | open | >= 0 | Mean close x volume over the 20 sessions ending before the last report (the volume of the event itself excluded) | no report known by the session has a closed reaction window (E+1 <= the session), or a session among those 20 has no bar, or the history is shorter | `bars/1d.close`, `bars/1d.volume`, `events/earnings.ts` |
+| `earnings_volume_ratio` | window | float32 | ratio | open | >= 0 | Mean over the last 4 reports of the reaction window's mean dollar volume divided by that report's pre-event 20-session dollar volume | fewer than 4 reports with a closed window known by the session, or a bar of any of them is missing, or the history is shorter | `bars/1d.close`, `bars/1d.volume`, `events/earnings.ts` |
 
 ## `earnings_schedule@v1`
 
