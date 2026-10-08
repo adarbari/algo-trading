@@ -8,11 +8,12 @@ its code on that machine.
 |---|---|
 | CI: changed areas | every run (seconds): decides which jobs a pull request needs |
 | CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Python changes |
-| CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests, three shards (`unit`; `apps`, `libs`, `contract`, `architecture`; the slow rest: property, integration, e2e, scripts, reconciliation) per Python version (3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests (the gate: fails on a failed shard; combines the shards' coverage, 90 %) | every run |
 | CI: web static (generated files fresh, ds:check, lint, types, unit) | web changes |
 | CI: web e2e (production build, Playwright, in the Playwright image) | web changes |
 | CI: web Storybook build (uploaded as the `storybook-static` artifact) | web changes |
-| CI: web screenshots + axe, two shards over the artifact, in the Playwright image | web changes |
+| CI: web screenshots + axe, four shards over the artifact, in the Playwright image | web changes |
 | CI: web (the gate: passes when the four web jobs passed or were skipped) | every run |
 | CI: real app smoke (Vite dev server + the real API, empty and golden stores) | Python or web changes |
 | Auto-merge sweeps | after every CI run and every 30 minutes |
@@ -42,7 +43,8 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 
 | Measure | Before (2026-10-07) | After |
 |---|---|---|
-| CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | the longest of four parallel web jobs: Storybook build (~2 min) then two screenshot shards (~3 min each); target 5–6 min; measured on the first PRs after this change |
+| CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | #280: 6.0 min (Storybook 30 s, then two screenshot shards of 5.3 min); P1b: four shards, each ~3 min, target under 4 min |
+| CI critical path on a Python PR | 12 min (the Web job; the tests job 5 min) | #280: 9.0 min, all of it the one pytest job (5 142 tests with branch coverage, 8 min 34 s); P1b: three shards + a combine job, target 4–5 min |
 | CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | the tests job runs `tests/architecture` only (~1 min) |
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR | unchanged by this PR; the local fast path is the next PR |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
@@ -59,7 +61,18 @@ How the web jobs are cut:
   the image tag matches the locked `@playwright/test`, screenshots + axe. Adding a shard is one
   matrix entry plus the `/2` in the command.
 - All four share one `apps/web/node_modules` cache keyed on the lockfile (`npm ci` only on a
-  miss); the real-app job uses the same cache.
+  miss); the real-app job uses the same cache. `npm audit` (44 s) runs only when a package
+  file changed (`changes.web_deps`): nothing else can alter its answer.
+
+How the Python tests are cut (`make test` locally is unchanged):
+
+- **test** runs three shards in parallel, `make test-shard SHARD=unit|apps|rest` (the folders
+  in the Makefile's `TEST_SHARD_*`; a fitness test keeps them covering every `tests/` folder),
+  each writing `.coverage.<shard>` with the gate off, uploaded as an artifact.
+- **tests** is the protected check `Tests (py3.12)`: it fails when a shard failed, then
+  downloads the three data files and runs `make coverage-combine` (`coverage combine`, the
+  90 % gate, `coverage.xml`). A web-only or docs-only PR runs `tests/architecture` in the
+  `rest` shard and the gate passes without coverage.
 
 ## Flaky specs
 

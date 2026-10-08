@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
+.PHONY: test-shard coverage-combine changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -98,6 +98,22 @@ changed:         ## narrow first check: mirrored tests of files changed vs origi
 
 test:            ## everything, with the coverage gate, one worker per CPU (WORKERS=0 runs serially)
 	$(PY) -m pytest -n $(WORKERS) --cov --cov-report=term --cov-report=xml
+
+# CI runs the suite as three parallel shards (docs/ci.md "Pipeline"); together they are `make test`.
+# A fitness test (tests/architecture/pipeline) checks the shards cover every tests/ folder.
+TEST_SHARDS = unit apps rest
+TEST_SHARD_unit = tests/unit
+TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
+TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation  # few tests, the slow ones
+
+test-shard:      ## one CI shard (SHARD=unit|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
+	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }
+	COVERAGE_FILE=.coverage.$(SHARD) $(PY) -m pytest -n $(WORKERS) --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
+
+coverage-combine: ## the 90% coverage gate over the shards' data files (.coverage.*), then coverage.xml
+	$(BIN)coverage combine --keep $(wildcard .coverage.*)
+	$(BIN)coverage report --fail-under=90
+	$(BIN)coverage xml
 
 perf:            ## strict timing budgets (the `perf` tests), serially; run on an idle machine
 	$(PY) -m pytest -p no:xdist -m perf
