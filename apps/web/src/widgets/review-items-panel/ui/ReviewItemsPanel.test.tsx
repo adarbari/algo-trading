@@ -81,6 +81,22 @@ describe('ReviewItemsPanel', () => {
     await expectAccessible(container);
   });
 
+  it("opens a review item's ticker in Explore on a click on its row", async () => {
+    serve({
+      figiReview: {
+        session: '2026-10-02',
+        source: 'universe_build',
+        items: [{ symbol: 'MMED', note: 'FIGI shared with MMEDV' }],
+      },
+      leverageReview: { session: '2026-10-02', source: 'reference', items: [] },
+    });
+    const onOpen = vi.fn();
+    renderWith(<ReviewItemsPanel onOpen={onOpen} />);
+    await userEvent.click(await screen.findByRole('button', { name: /FIGI reviews/ }));
+    await userEvent.click(await screen.findByText('FIGI shared with MMEDV'));
+    expect(onOpen).toHaveBeenCalledExactlyOnceWith('MMED');
+  });
+
   it('shows a list that failed to load', async () => {
     serve({
       figiReview: FAIL,

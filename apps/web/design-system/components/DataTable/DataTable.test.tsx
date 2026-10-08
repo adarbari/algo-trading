@@ -325,6 +325,22 @@ describe('DataTable', () => {
     expect(clickable()).toEqual(all);
   });
 
+  it('activates and marks clickable only the rows canActivate accepts', async () => {
+    const onRowActivate = vi.fn();
+    const first = at(rows, 0);
+    const target = at(rows, 1);
+    render(<Table onRowActivate={onRowActivate} canActivate={(r) => r.id === target.id} />);
+    expect(bodyRows().map((row) => row.hasAttribute('data-clickable'))).toEqual(
+      rows.map((r) => r.id === target.id),
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByText(first.symbol));
+    await user.keyboard('{Enter}');
+    expect(onRowActivate).not.toHaveBeenCalled();
+    await user.click(screen.getByText(target.symbol));
+    expect(onRowActivate).toHaveBeenCalledExactlyOnceWith(target);
+  });
+
   it('can make a click only select the row, and the caller can control the active row', async () => {
     const onRowActivate = vi.fn();
     const onActiveRowChange = vi.fn();

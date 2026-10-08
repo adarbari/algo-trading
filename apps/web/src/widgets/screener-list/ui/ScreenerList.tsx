@@ -25,10 +25,7 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
   const mine = useMyScreeners();
   const [copying, setCopying] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const actions = useMemo(
-    () => ({ onOpen, onEdit, onCopy: setCopying, onDelete: setDeleting }),
-    [onOpen, onEdit],
-  );
+  const actions = useMemo(() => ({ onEdit, onCopy: setCopying, onDelete: setDeleting }), [onEdit]);
   const presetCols = useMemo(() => presetColumns(actions), [actions]);
   const myCols = useMemo(() => myColumns(actions), [actions]);
   const all = configs.data ?? [];
@@ -81,8 +78,9 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
           getRowId={(s) => s.configId}
           getRowLabel={(s) => s.configId}
           onRowActivate={(s) => {
-            if (s.impl === 'rules') onOpen(s.configId);
+            onOpen(s.configId);
           }}
+          canActivate={(s) => s.impl === 'rules'}
           defaultSort={{ columnId: 'name', direction: 'asc' }}
           emptyMessage="No site screener presets."
         />

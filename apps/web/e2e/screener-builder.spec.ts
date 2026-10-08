@@ -40,7 +40,9 @@ test('the list shows your screeners and the site presets', async ({ page }) => {
   await expect(mine.getByRole('row', { name: /idea-draft/ })).toContainText('DRAFT');
   const presets = page.getByRole('grid', { name: 'Site presets' });
   await expect(
-    presets.getByRole('row', { name: /vrp_scanner/ }).getByRole('button', { name: 'Open' }),
+    presets
+      .getByRole('row', { name: /vrp_scanner/ })
+      .getByRole('button', { name: 'Copy to my screeners' }),
   ).toBeVisible();
   await expect(presets.getByRole('row', { name: /short_premium_liquidity/ })).toContainText(
     'Python',
@@ -80,7 +82,7 @@ for (const width of [800, 1024, 1280]) {
     const row = page
       .getByRole('grid', { name: 'Site presets' })
       .getByRole('row', { name: /vrp_scanner/ });
-    for (const name of ['Open', 'Copy to my screeners']) {
+    for (const name of ['Copy to my screeners']) {
       const button = row.getByRole('button', { name });
       await expect(button).toBeInViewport({ ratio: 1 });
       // Inside its own cell: not spilling into (or clipped by) the neighbouring column.
@@ -91,7 +93,8 @@ for (const width of [800, 1024, 1280]) {
       });
       expect(fits, `${name} fits its cell`).toBe(true);
     }
-    await row.getByRole('button', { name: 'Open' }).click();
+    // The row itself opens the preset (no Open button).
+    await row.getByText('Rules').click();
     await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
   });
 }

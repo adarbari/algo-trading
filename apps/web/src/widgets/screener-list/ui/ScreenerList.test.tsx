@@ -141,19 +141,22 @@ describe('ScreenerList', () => {
     expect(row).toHaveTextContent('vrp_scanner');
   });
 
-  it('opens a screener to its results or its Builder, and a preset to its results', async () => {
+  it('opens a screener in its Builder from Edit; no row has an Open or Results button', async () => {
     const { onOpen, onEdit } = setup();
     const mine = within(screen.getByRole('row', { name: /my-vrp/ }));
     await userEvent.click(mine.getByRole('button', { name: 'Edit' }));
     expect(onEdit).toHaveBeenCalledWith('my-vrp');
-    await userEvent.click(mine.getByRole('button', { name: 'Results' }));
-    expect(onOpen).toHaveBeenCalledWith('my-vrp');
-    await userEvent.click(
-      within(screen.getByRole('grid', { name: 'Site presets' })).getByRole('button', {
-        name: 'Open',
-      }),
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /^(Open|Results)$/ })).not.toBeInTheDocument();
+  });
+
+  it('shows a Python preset row as not clickable, a rule preset row as clickable', () => {
+    setup();
+    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
+    expect(presets.getByRole('row', { name: /short_premium/ })).not.toHaveAttribute(
+      'data-clickable',
     );
-    expect(onOpen).toHaveBeenLastCalledWith('vrp_scanner');
+    expect(presets.getByRole('row', { name: /vrp_scanner/ })).toHaveAttribute('data-clickable');
   });
 
   it('opens a rule screener on a row click; a Python preset row does nothing', async () => {
