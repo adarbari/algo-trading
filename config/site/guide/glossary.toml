@@ -597,7 +597,9 @@ in New York. Before a paid call the app reserves the most it could cost and refu
 that would pass a cap, so concurrent requests cannot together overspend. When a cap is
 reached, the setting decides: free models keep answering and the paid ones are skipped, or
 every call is refused. With no cap set, nothing limits the spend; the page says so. Free
-providers never count against it.
+providers never count against it. The share of the cap used counts only what has been spent
+and recorded, not calls still in flight, so it can read slightly below what the budget
+enforces.
 """
 see_also = ["llm_cost_basis", "llm_fallback"]
 

@@ -8,10 +8,19 @@ import { Chart, Grid } from '@algotrade/ui';
 import { TOKENS, UsagePanel, USD, type LlmUsage } from '@/entities/llm-usage';
 
 function series(usage: LlmUsage) {
-  const line = (id: string, label: string, value: (d: LlmUsage['daily'][number]) => number) => ({
+  // A day whose calls reported no tokens is a gap in the token lines, never a zero.
+  const line = (
+    id: string,
+    label: string,
+    value: (d: LlmUsage['daily'][number]) => number,
+    tokens = false,
+  ) => ({
     id,
     label,
-    points: usage.daily.map((d) => ({ time: d.day, value: value(d) })),
+    points: usage.daily.map((d) => ({
+      time: d.day,
+      value: tokens && d.tally.unknown ? null : value(d),
+    })),
   });
   return {
     cost: [
@@ -19,8 +28,8 @@ function series(usage: LlmUsage) {
       line('reported', 'Notional (reported)', (d) => d.tally.reportedUsd),
     ],
     tokens: [
-      line('in', 'Input tokens', (d) => d.tally.inputTokens),
-      line('out', 'Output tokens', (d) => d.tally.outputTokens),
+      line('in', 'Input tokens', (d) => d.tally.inputTokens, true),
+      line('out', 'Output tokens', (d) => d.tally.outputTokens, true),
     ],
   };
 }

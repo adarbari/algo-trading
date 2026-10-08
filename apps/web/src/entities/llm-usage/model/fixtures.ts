@@ -150,7 +150,13 @@ export function usage(over: Partial<LlmUsage> = {}): LlmUsage {
     ],
     daily: DAYS.map((day, i) => ({
       day,
-      tally: tally({ calls: i, spentUsd: i / 2, inputTokens: i * 100, outputTokens: i * 10 }),
+      tally: tally({
+        calls: i,
+        spentUsd: i / 2,
+        inputTokens: i * 100,
+        outputTokens: i * 10,
+        unknown: i === 0 ? NOT_REPORTED : null,
+      }),
     })),
     reliability: {
       attempts: 20,

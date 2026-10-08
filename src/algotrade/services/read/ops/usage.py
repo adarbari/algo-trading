@@ -23,7 +23,7 @@ import pandas as pd
 from algotrade.config.site.settings import load_llm
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import exchange_date
-from algotrade.data.usage import LLM_CALLS, read_llm_calls
+from algotrade.data.usage import LLM_CALLS, SPENDING, read_llm_calls
 from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import Stores
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
@@ -31,7 +31,6 @@ from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 DAYS = 30  # the span of the breakdowns, the daily series and the recent calls
 WEEK = 7
 RECENT = 50
-SPENDING = ("price", "reported", "bound")
 OUTCOMES = ("ok", "fell_back", "failed", "skipped_budget")
 SKIPPED = "skipped_budget"
 COLUMNS = (
@@ -217,8 +216,10 @@ def _budget(ctx: Stores) -> BudgetInfo:
 
 def _window(key: str, start: date, end: date, frame: pd.DataFrame, cap: Cap | None) -> Window:
     tally = _tally(frame[(frame["day"] >= start) & (frame["day"] <= end)])
-    if cap is not None and cap.limit_usd:
-        cap = Cap(cap.kind, cap.limit_usd, tally.spent_usd / cap.limit_usd)
+    if cap is not None and cap.limit_usd is not None:
+        # a cap of 0 is a cap: the ledger refuses every paid call, so it reads as fully used
+        share = tally.spent_usd / cap.limit_usd if cap.limit_usd > 0 else 1.0
+        cap = Cap(cap.kind, cap.limit_usd, share)
     return Window(key, start, end, tally, cap)
 
 

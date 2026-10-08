@@ -74,6 +74,12 @@ const LlmUsageQuery = graphql(`
           outputTokens
           spentUsd
           reportedUsd
+          unknown {
+            code
+            kind
+            guideTerm
+            kindText
+          }
         }
       }
       reliability {

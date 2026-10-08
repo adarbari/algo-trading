@@ -3,18 +3,22 @@ windows with their caps, breakdowns, the daily series, reliability and the recen
 store, mixed cost bases (a notional ``reported`` cost never merged into the billed one), no
 budget, a broken ``llm.toml`` and tokens a provider did not report (never 0)."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pandas as pd
 
 from algotrade.config.user import UserContext
-from algotrade.data.usage import LLM_CALLS
+from algotrade.data import usage as data_usage
+from algotrade.data.usage import LLM_CALLS, spent_by_day
 from algotrade.services.read.context import StoreContext, open_stores
+from algotrade.services.read.ops import usage as ops_usage
 from algotrade.services.read.ops.usage import load_llm_usage
 from algotrade.services.read.values import UnknownCode
+from algotrade.services.text_model.usage import UsageRecorder
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.usage_writer import UsageWriter
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
 
@@ -176,3 +180,38 @@ def test_a_broken_llm_toml_reports_its_error_and_no_caps() -> None:
     usage = load_llm_usage(stores({TODAY: [row(TODAY, 0)]}, {"budget": {"bogus": 1}}), TODAY)
     assert usage.budget.error is not None and usage.budget.daily_usd is None
     assert usage.windows[0].tally.calls == 1  # the spend is still read
+
+
+def test_a_cap_of_zero_is_a_cap_read_as_fully_used() -> None:
+    ctx = stores({TODAY: [row(TODAY, 0)]}, {"budget": {"daily_usd": 0.0, "monthly_usd": 0.0}})
+    usage = load_llm_usage(ctx, TODAY)
+    today, month = usage.windows[0], usage.windows[3]
+    assert today.cap is not None and today.cap.limit_usd == 0.0 and today.cap.used_share == 1.0
+    assert month.cap is not None and month.cap.used_share == 1.0
+
+
+def test_the_month_total_is_what_the_ledger_seeds_from_over_the_same_range() -> None:
+    ctx = mixed()
+    windows = load_llm_usage(ctx, TODAY).windows
+    seed = spent_by_day(ctx.reader, TODAY.replace(day=1), TODAY)
+    assert windows[3].tally.spent_usd == sum(seed.values())
+    assert windows[0].tally.spent_usd == seed[TODAY]
+
+
+def test_the_spending_bases_are_the_ones_the_data_layer_counts() -> None:
+    assert ops_usage.SPENDING is data_usage.SPENDING
+
+
+def test_a_call_just_either_side_of_midnight_in_new_york_lands_in_its_day() -> None:
+    backend = MemoryBackend()
+    recorder = UsageRecorder(UsageWriter(backend))
+    before = datetime(2026, 10, 8, 3, 59, 59, tzinfo=UTC)  # 23:59:59 on 7 Oct in New York (EDT)
+    after = datetime(2026, 10, 8, 4, 0, 1, tzinfo=UTC)  # 00:00:01 on 8 Oct
+    for at in (before, after):
+        recorder.submit({**row(TODAY, 0), "ts": pd.Timestamp(at)})
+    recorder.close()
+    ctx = open_stores(StoreReader(backend), MemoryConfigStore({}), UserContext("local"))
+    usage = load_llm_usage(ctx, TODAY)
+    by_day = {p.day: p.tally.calls for p in usage.daily}
+    assert by_day[date(2026, 10, 7)] == 1 and by_day[TODAY] == 1
+    assert usage.windows[0].tally.calls == 1
