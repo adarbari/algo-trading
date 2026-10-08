@@ -170,7 +170,7 @@ def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Varia
     return found
 
 
-def _universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
+def edge_universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
     if isinstance(edge.universe, Selection):
         return edge.universe
     for scope in (user.user_id, "site"):
@@ -527,11 +527,13 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
 def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) -> list[_Scope]:
     """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides. Each
     reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
-    scopes = [_Scope(MAIN, edge, _universe(configs, user, edge), edge.outcome.iv_field or iv_field)]
+    scopes = [
+        _Scope(MAIN, edge, edge_universe(configs, user, edge), edge.outcome.iv_field or iv_field)
+    ]
     for v in edge.variants:
         applied = replace(edge, outcome=v.outcome, universe=v.universe, variants=())
         field_name = v.outcome.iv_field or iv_field
-        scopes.append(_Scope(v.id, applied, _universe(configs, user, applied), field_name))
+        scopes.append(_Scope(v.id, applied, edge_universe(configs, user, applied), field_name))
     return scopes
 
 
