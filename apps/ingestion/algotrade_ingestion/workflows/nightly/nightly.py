@@ -68,6 +68,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
 )
 from algotrade_ingestion.workflows.nightly.attempts import Attempts, earlier_attempts
 from algotrade_ingestion.workflows.nightly.notify import Notifier, default_notifier, report
+from algotrade_ingestion.workflows.nightly.records import job_name
 from algotrade_ingestion.workflows.nightly.screens import ScreenStep, screen_jobs
 from algotrade_ingestion.workflows.nightly.sessions import (
     NIGHTLY_RUN,
@@ -267,11 +268,17 @@ def _refetch(
     that SUCCEEDED with retryable items left is re-run by a retry while the session is the
     latest (the source still serves it) and the run its task would resume exists with its
     staging (``resumable_run``, the same rule the task applies; without the staging the task
-    would refetch everything: hours, every hour)."""
+    would refetch everything: hours, every hour). A stored result without its ``task_run`` (a
+    record from older code) falls back to the run the task would resume: the step's task job
+    (its registry ``TASK`` name, not necessarily the step's), ``resumable_run``."""
     if not step.resumable or stored.get("status") != StepStatus.SUCCEEDED.value:
         return 0, False
     task_run = stored.get("task_run")
-    record = ctx.writer.load_run(str(task_run)) if task_run else None
+    if task_run:
+        record = ctx.writer.load_run(str(task_run))
+    else:
+        job = job_name(step.name)
+        record = resumable_run(ctx.writer, job, session) if job else None
     if record is None:
         return 0, False
     left = len(retryable_items(record))

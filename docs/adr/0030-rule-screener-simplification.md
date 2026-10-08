@@ -53,3 +53,8 @@ operator on `near_52w` (a three-valued label) hid that "near either extreme" is 
   item 2. Python screeners keep `UNKNOWN`.
 - A user screen that sets the removed keys keeps working (`tiers`, `classify`, `label` are
   ignored; `selection` is honoured).
+
+## Amendment (ADR 0054)
+A Python screener's `UNKNOWN` row of a stale chain the chains gate tolerated is rewritten to
+`EXCLUDED` by the engine and leaves the coverage denominator; other `UNKNOWN` rows still lower
+coverage.

@@ -171,7 +171,9 @@ select (as of session) → FeatureView of the screener's rollups for the selecte
 
 Coverage statuses: `COMPLETE`, `PARTIAL` (below `min_coverage`), `UNIVERSE_INCOMPLETE`
 (universe older than `max_universe_age_days`), `EMPTY_SELECTION`. Only a `COMPLETE` run may
-report "no qualified candidates".
+report "no qualified candidates". Coverage is `processed / (instruments - excluded)`: an
+`EXCLUDED` row (a stale chain the chains acceptance check tolerated, with its reason; never a
+pick) is out of the denominator ([ADR 0054](adr/0054-stale-chains-the-gate-tolerated-are-excluded-from-screen-coverage.md)).
 
 ---
 

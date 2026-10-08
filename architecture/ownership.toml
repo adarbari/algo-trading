@@ -626,14 +626,15 @@ detect = [{ string_prefix = "regime=" }, { call = "MarketFeatures" }, { call = "
 
 [[responsibility]]
 id = "screen-execution"
-description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
+description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py); the stale chains the chains gate tolerated (data.chains.tolerated_stale) are EXCLUDED from the run with a reason and out of its coverage (ADR 0054)"
 owner = [
     "src/algotrade/services/screening/run.py",
     "src/algotrade/services/screening/rule_results.py",  # a rule screen's result frames
     "src/algotrade/services/jobs/handlers.py",
+    "src/algotrade/engines/screening/exclusions.py",  # EXCLUDED rows: names out of the run with a reason (ADR 0054)
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
-detect = [{ call = "run_screener" }]
+detect = [{ call = "run_screener" }, { call = "tolerated_stale" }]
 
 [[responsibility]]
 id = "screen-spec"

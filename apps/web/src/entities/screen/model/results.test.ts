@@ -43,11 +43,13 @@ describe('orderedDecisions', () => {
       { decision: 'QUALIFIED', count: 3 },
       { decision: 'EVENT_RISK', count: 0 },
       { decision: 'ODD', count: 2 },
+      { decision: 'EXCLUDED', count: 11 },
     ];
     expect(orderedDecisions(counts)).toEqual([
       { decision: 'QUALIFIED', count: 3 },
       { decision: 'WATCH', count: 1 },
       { decision: 'REJECT', count: 4198 },
+      { decision: 'EXCLUDED', count: 11 },
       { decision: 'ODD', count: 2 },
     ]);
   });

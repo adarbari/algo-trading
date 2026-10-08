@@ -1,16 +1,19 @@
 """Option chain snapshots for one session: option quotes, underlying quotes and fetch status;
-and the live quotes the API recorded for a session (``live/option_quotes``, ADR 0028).
+the stale chains the chains acceptance check tolerated (``tolerated_stale``, ADR 0054); and the
+live quotes the API recorded for a session (``live/option_quotes``, ADR 0028).
 
 Option quote rows are keyed by the contract (``instrument_id``) and carry their
 ``underlying_id``; ``option_quotes`` filters on the underlying, which is how consumers ask
 ("the chain of EQ:AAPL").
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.storage.tables.readers import StoreReader
 
@@ -18,6 +21,12 @@ OPTION_QUOTES = "chains/option_quotes"
 UNDERLYING_QUOTES = "chains/underlying_quotes"
 CHAIN_STATUS = "chains/status"
 LIVE_OPTION_QUOTES = "live/option_quotes"
+
+# Chain statuses (``tasks/market/option_chains``) by what they say about the night's fetch: a
+# failed or missing fetch is a source problem; a stale chain is the feed serving an older session.
+FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED")  # FETCH_ERROR includes an open circuit
+STALE = "STALE_DATA"
+STALE_REASON = "stale chain (within the chains gate's tolerance)"
 
 
 def option_quotes(
@@ -93,3 +102,65 @@ def live_option_quotes(
     """The live quotes the API took during ``session`` (every snapshot: one row per contract
     and ``ts``), limited to the chains of ``underlying_ids``. Personal-use licence (IBKR)."""
     return _of_underlyings(reader.table(LIVE_OPTION_QUOTES, session, as_of), underlying_ids)
+
+
+def chain_labels(status_frame: pd.DataFrame) -> pd.Series:
+    """Each status row's label (``STALE_DATA``, ``OK``, ...: the text before any ``:``)."""
+    return status_frame["status"].astype(str).str.split(":", n=1).str[0].str.strip()
+
+
+def fetch_failure_share(labels: pd.Series) -> float:
+    """The share of statuses that are a failed or missing fetch (``FETCH_FAILURES``)."""
+    return float(labels.isin(FETCH_FAILURES).sum()) / len(labels) if len(labels) else 0.0
+
+
+@dataclass(frozen=True)
+class TierStale:
+    """The stale chains of one tier (``core`` or ``rest``) of a chain status."""
+
+    tier: str
+    total: int  # chains in the tier
+    stale: pd.Series  # boolean mask over the status frame: in the tier and STALE_DATA
+    untiered_core: bool = False  # a tiered status with no core name: the tier inputs were missing
+
+    @property
+    def count(self) -> int:
+        return int(self.stale.sum())
+
+    @property
+    def share(self) -> float:
+        return self.count / self.total if self.total else 0.0
+
+
+def stale_in_tier(frame: pd.DataFrame, labels: pd.Series, tier: str) -> TierStale:
+    """The tier's stale chains. The tier is the one stored with each status row at fetch time
+    (rows from before the column existed count as rest). The one share the chains acceptance
+    check grades and ``tolerated_stale`` reads."""
+    stored = frame["tier"] if "tier" in frame.columns else pd.Series("rest", index=frame.index)
+    in_tier = stored.fillna("rest").astype(str) == tier
+    total = int(in_tier.sum())
+    untiered = tier == "core" and total == 0 and "tier" in frame.columns
+    return TierStale(tier, total, in_tier & (labels == STALE), untiered)
+
+
+def tolerated_stale(
+    status_frame: pd.DataFrame | None, sources: SourcesSettings
+) -> Mapping[str, str]:
+    """The ``STALE_DATA`` underlyings (instrument id -> reason) of a chain status whose stale
+    share the chains acceptance check tolerated: every tier within its limit
+    (``max_chain_stale_share_core`` / ``max_chain_stale_share``), fetch failures within
+    ``max_chain_fetch_failures``. Empty otherwise (fail closed: a chains run that failed its
+    check excludes nobody). The same helpers as ``check_chains``, so gate and screens agree."""
+    if status_frame is None or status_frame.empty:
+        return {}
+    labels = chain_labels(status_frame)
+    if fetch_failure_share(labels) > sources.max_chain_fetch_failures:
+        return {}
+    core = stale_in_tier(status_frame, labels, "core")
+    rest = stale_in_tier(status_frame, labels, "rest")
+    if core.untiered_core or core.share > sources.max_chain_stale_share_core:
+        return {}
+    if rest.share > sources.max_chain_stale_share:
+        return {}
+    ids = status_frame.loc[core.stale | rest.stale, "instrument_id"].astype(str)
+    return dict.fromkeys(ids, STALE_REASON)

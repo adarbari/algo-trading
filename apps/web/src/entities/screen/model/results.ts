@@ -58,7 +58,7 @@ export function shownDecisions(
 
 /** The decisions of a run in display order (picks first, rejects last), with their counts. */
 export function orderedDecisions(counts: readonly { decision: string; count: number }[]) {
-  const order = [...DEFAULT_DECISIONS, 'UNKNOWN', 'REJECT', 'SKIPPED'];
+  const order = [...DEFAULT_DECISIONS, 'UNKNOWN', 'REJECT', 'SKIPPED', 'EXCLUDED'];
   const rank = (decision: string) => {
     const i = order.indexOf(decision);
     return i < 0 ? order.length : i;
