@@ -62,7 +62,8 @@ worker instead of once per file.
 
 ### Scope-aware `make check` (the release, and a deliberate full run)
 
-`make check` gates the areas the branch changed vs `origin/main` (`make check-scope` prints
+A bare `make check` refuses and prints rule 9 (the mechanical side of "CI is the gate": an
+agent that types it out of habit is stopped by the Makefile). `make check SCOPED=1` gates the areas the branch changed vs `origin/main` (`make check-scope` prints
 them; `scripts/changed_tests.py --areas`, the rule of CI's "Changed areas" job: `apps/web/*`
 is web; `docs/`, `.claude/`, `*.md` are docs; the CI workflow and the API's exported schemas
 are both; everything else is python; a branch with no change is every area). The python side

@@ -138,9 +138,9 @@ the skill with the fix.
    one gate for what you touched when `changed` cannot map it; never the full `make check`
    on the machine (396 runs in one week, 30-40 min each, were the bottleneck). After a CI
    failure rerun only the failed gate locally (`make <gate>` / `npm run <script>`), fix, push
-   again. `make check` stays for the release (`FULL=1`) and for a deliberate full run: it gates
-   the areas changed vs `origin/main` (`make check-scope`), the two sides in parallel, one run
-   per worktree (`scripts/ops/check_lock.sh`).
+   again. A bare `make check` refuses; `make check SCOPED=1` is a deliberate run of the areas
+   changed vs `origin/main` (`make check-scope`; the two sides in parallel, one run per
+   worktree) and `make check FULL=1` every gate (the release).
 10. **Push and open the PR yourself, then move on.** When `make changed` passes, push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start

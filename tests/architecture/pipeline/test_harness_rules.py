@@ -18,8 +18,9 @@ def test_claude_md_forbids_the_broad_pkills() -> None:
 
 def test_make_check_runs_the_gates_under_the_lock() -> None:
     makefile = (REPO / "Makefile").read_text()
-    assert re.search(
-        r"^check:.*\n\tscripts/ops/check_lock\.sh \$\(MAKE\) .*check-gates$", makefile, re.M
+    check = re.search(r"^check:.*?(?=^\S)", makefile, re.S | re.M)
+    assert check and re.search(
+        r"^\tscripts/ops/check_lock\.sh \$\(MAKE\) .*check-gates$", check.group(0), re.M
     )
     gates = re.search(r"^check-gates:(.*)$", makefile, re.M)
     assert gates and "$(CHECK_TARGETS)" in gates.group(1)  # scope-aware: docs/ci.md

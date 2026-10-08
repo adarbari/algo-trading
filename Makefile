@@ -181,9 +181,10 @@ web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build t
 # scripts/changed_tests.py --areas), the python and web sides side by side (CHECK_JOBS=2), under
 # the per-worktree lock (scripts/ops/check_lock.sh: a second run here refuses and names the first).
 # FULL=1 runs every gate whatever changed, as the release does. CHECK_SCOPE overrides the detection.
-# Rule 9: sessions run `make changed` and push; CI is the gate; `make check` is for the release
-# and a deliberate full run.
+# Rule 9: sessions run `make changed` and push; CI is the gate. A bare `make check` refuses;
+# SCOPED=1 runs the detected areas, FULL=1 every gate (the release).
 FULL ?=
+SCOPED ?=
 CHECK_JOBS ?= 2
 CHECK_SCOPE ?= $(if $(FULL),python web,$(shell $(PY) scripts/changed_tests.py --areas $(BASE)))
 CHECK_PY = lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering datasets-verify test evaluate
@@ -197,7 +198,12 @@ check-scope:     ## which areas `make check` would gate for this branch (python 
 fitness:         ## the architecture fitness tests only (what CI runs for a docs-only change)
 	$(PY) -m pytest -q -n $(WORKERS) tests/architecture
 
-check:           ## the gate for the areas changed vs BASE, python and web sides in parallel, one run per worktree; FULL=1 = every gate (the release)
+check:           ## refuses by default (rule 9: `make changed`, push, CI gates); SCOPED=1 = the gates of the areas changed vs BASE in parallel, FULL=1 = every gate (the release); one run per worktree
+	@if [ -z "$(FULL)$(SCOPED)" ]; then \
+	  echo "refusing: rule 9 (CLAUDE.md, owner decision 2026-10-08): run \`make changed\` for what changed, push, and let CI gate; the machine never runs the full check." >&2; \
+	  echo "  a deliberate run: \`make check SCOPED=1\` (the areas changed vs $(BASE): $(strip $(CHECK_SCOPE))) or \`make check FULL=1\` (every gate, the release)." >&2; \
+	  exit 1; \
+	fi
 	scripts/ops/check_lock.sh $(MAKE) --no-print-directory -j$(CHECK_JOBS) check-gates
 
 check-gates: $(strip $(CHECK_TARGETS))  ## the gates of the detected scope (CHECK_SCOPE / FULL=1), run by `make check` under the lock

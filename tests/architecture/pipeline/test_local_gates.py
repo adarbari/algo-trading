@@ -3,6 +3,7 @@
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -58,3 +59,15 @@ def test_the_web_gates_are_make_targets_that_build_once() -> None:
     assert "npm run build" not in makefile.replace("$(NPM) run build --", "")
     web_check = re.search(r"^web-check:.*?(?=^\S)", makefile, re.S | re.M)
     assert web_check and "$(NPM) run check" not in web_check.group(0)
+
+
+def test_a_bare_make_check_refuses_with_rule_9() -> None:
+    out = subprocess.run(
+        ["make", "-n", "check", "PY=/nonexistent/python"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # Under -n the guard still runs (a shell `if` with the refusal); the sub-make is never reached.
+    assert "rule 9" in out.stdout + out.stderr and "check_lock.sh" in out.stdout
