@@ -72,6 +72,18 @@ How the web jobs are cut:
 - All four share one `apps/web/node_modules` cache keyed on the lockfile (`npm ci` only on a
   miss); the real-app job uses the same cache.
 
+### Screenshot baselines from CI
+
+Baselines are Linux PNGs, so a change to a story or component used to need Docker locally.
+Add the label `update-screenshots` to the PR (or run the "Screenshot baselines" workflow on a
+branch): `.github/workflows/screenshots.yml` runs in the same Playwright image as CI
+(`mcr.microsoft.com/playwright:v1.63.0-noble`, a fitness test keeps the two in step), builds
+Storybook, runs `npm run visual -- --update-snapshots --fully-parallel`, commits the changed
+PNGs to the PR branch as `github-actions[bot]` and removes the label. It never runs for a
+fork. A push with `GITHUB_TOKEN` starts no CI run, so push any follow-up commit (or
+`gh workflow run ci.yml --ref <branch>`) afterwards, so CI and auto-merge see the new head.
+Review the PNG diff in the PR before that follow-up.
+
 ## Flaky specs
 
 A spec that fails under load and passes on re-run goes in `apps/web/quarantine.json`, never
@@ -82,6 +94,10 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
   At most 8; the oldest is fixed before another is added.
 - `watched`: still runs and gates; listed with the fix that keeps it green.
 - Every entry: `kind`, `file`, `title` (e2e), `since`, `reason` (what flakes, the fix it waits for).
+- A story whose `play` clicks must settle before the screenshot: `await waitFor(` or
+  `await expect(` after the last click, or `tags: ['no-screenshot']` on the story (the visual
+  suite skips it, so it has no PNG). `npm run ds:check` fails otherwise: a screenshot taken
+  while the click's redraw is in flight is the commonest flake.
 - One retry in CI for Playwright only (`playwright.config.ts`, `playwright.visual.config.ts`);
   the real-app smoke, pytest and vitest never retry. Integration-style vitest files (`pages/`,
   `widgets/`, `features/`, `scripts/`) are the `integration` vitest project with a 20 s timeout

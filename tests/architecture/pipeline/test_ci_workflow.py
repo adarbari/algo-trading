@@ -104,3 +104,33 @@ def test_retries_exist_only_in_the_playwright_configs() -> None:
     assert "retries: 0" in (web / "playwright.real.config.ts").read_text()
     assert "retry" not in (web / "vite.config.ts").read_text()
     assert "reruns" not in (REPO / "pyproject.toml").read_text()
+
+
+SCREENSHOTS = REPO / ".github" / "workflows" / "screenshots.yml"
+
+
+def test_the_screenshot_workflow_uses_ci_image_and_runs_only_on_the_label() -> None:
+    """Baselines are regenerated in the image CI compares them in, only when asked for (the
+    `update-screenshots` label or a manual run), and never for a fork."""
+    ci_image = yaml.safe_load(WORKFLOW.read_text())["env"]["PLAYWRIGHT_IMAGE"]
+    text = SCREENSHOTS.read_text()
+    doc = yaml.safe_load(text)
+    assert doc["env"]["PLAYWRIGHT_IMAGE"] == ci_image
+    containers = re.findall(r"^\s+image: (\S+)$", text, flags=re.MULTILINE)
+    assert containers == [ci_image], "the one container is the CI image"
+    triggers = doc[True]  # PyYAML reads the key `on` as True
+    assert set(triggers) == {"pull_request", "workflow_dispatch"}
+    assert triggers["pull_request"]["types"] == ["labeled"]
+    condition = " ".join(doc["jobs"]["update"]["if"].split())
+    assert "github.event.label.name == 'update-screenshots'" in condition
+    assert "head.repo.full_name == github.repository" in condition, "never on forks"
+    assert doc["permissions"] == {"contents": "write", "pull-requests": "write"}
+    run = "\n".join(str(s.get("run", "")) for s in doc["jobs"]["update"]["steps"])
+    for needle in (
+        "npm ci",
+        "npm run storybook:build",
+        "npm run visual -- --update-snapshots --fully-parallel",
+        "github-actions[bot]",
+        "--remove-label update-screenshots",
+    ):
+        assert needle in run, needle

@@ -1,0 +1,66 @@
+name: Screenshot baselines
+
+# Regenerates the committed Linux screenshot baselines in the same Playwright image CI
+# compares them in (docs/ci.md "Screenshot baselines from CI"), so nobody needs Docker:
+# add the label `update-screenshots` to a pull request (or run this workflow by hand on a
+# branch). It commits the changed PNGs to the branch as github-actions[bot], removes the
+# label, and never runs for a fork. A commit pushed with GITHUB_TOKEN starts no CI run:
+# push any follow-up commit (or `gh workflow run ci.yml --ref <branch>`) so CI sees the new head.
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch whose screenshot baselines to regenerate
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: screenshots-${{ github.event.pull_request.number || inputs.branch }}
+  cancel-in-progress: false
+
+env:
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+
+jobs:
+  update:
+    name: Update screenshot baselines
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.label.name == 'update-screenshots' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref || inputs.branch }}
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci --no-fund --no-audit
+      - run: npm run storybook:build
+      - name: Regenerate the baselines (one story per worker)
+        run: npm run visual -- --update-snapshots --fully-parallel
+      - name: Commit the changed PNGs to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- '*.png'
+          if git diff --cached --quiet; then echo "baselines already match"; exit 0; fi
+          git commit -m "Update screenshot baselines (CI)"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref || inputs.branch }}"
+      - name: Remove the label
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit "${{ github.event.pull_request.number }}" --repo "$GITHUB_REPOSITORY" --remove-label update-screenshots
