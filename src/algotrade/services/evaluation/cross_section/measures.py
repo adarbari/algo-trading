@@ -41,6 +41,9 @@ class SessionStat:
     ranked: int = 0  # eligible names with a rank and a counted outcome
     excluded_unclosed: int = 0
     excluded_missing: int = 0
+    excluded_coverage: int = (
+        0  # 1: the screen's coverage was not COMPLETE; the session is not measured
+    )
     delisted: int = 0
     pre_snapshot: bool = False
     outside_universe: int = 0  # qualified names the edge's universe does not contain
@@ -85,6 +88,7 @@ class SliceMeasure:
     sharpe: float | None  # of the per-session mean of the picks, not annualised
     excluded_unclosed: int
     excluded_missing: int
+    excluded_coverage: int  # sessions left out: the screen read incomplete data
     delisted: int
     pre_snapshot_sessions: int
     deflated_sharpe: float | None = field(default=None)
@@ -109,7 +113,8 @@ def _pooled(chunks: Sequence[Sequence[float]]) -> np.ndarray:
     return np.array([v for chunk in chunks for v in chunk], dtype=np.float64)
 
 
-def _measure(sl: Slice, rows: Sequence[SessionStat]) -> SliceMeasure:
+def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
+    rows = [r for r in kept if not r.excluded_coverage]
     picks = sum(len(r.pick_values) for r in rows)
     hits = sum(r.pick_hits for r in rows)
     eligible = sum(r.eligible for r in rows)
@@ -142,6 +147,7 @@ def _measure(sl: Slice, rows: Sequence[SessionStat]) -> SliceMeasure:
         sharpe=sharpe(means),
         excluded_unclosed=sum(r.excluded_unclosed for r in rows),
         excluded_missing=sum(r.excluded_missing for r in rows),
+        excluded_coverage=sum(r.excluded_coverage for r in kept),
         delisted=sum(r.delisted for r in rows),
         pre_snapshot_sessions=sum(1 for r in rows if r.pre_snapshot),
     )

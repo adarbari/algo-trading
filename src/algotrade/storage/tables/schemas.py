@@ -534,22 +534,29 @@ RULE_SCREEN_VALUES = _fixed(
 EDGE_EVAL = _fixed(
     "results/edge_eval",
     "results",
-    ("edge_id", "variant", "horizon_sessions", "slice_kind", "slice_value", "range_from"),
-    *_strings("edge_id", "variant", "slice_kind", "slice_value"),
+    (
+        "edge_id", "user_id", "variant", "horizon_sessions", "slice_kind", "slice_value",
+        "range_from",
+    ),
+    *_strings("edge_id", "user_id", "variant", "slice_kind", "slice_value"),
     *_strings("role", "config_hash", "run_config_hash", "benchmark"),
     "horizon_sessions int64!",
     "range_from date!",
     "range_to date",
     *(f"{n} int64" for n in (
         "sessions", "picks", "hits", "eligible", "base_hits", "decile_sessions", "trials",
-        "excluded_unclosed", "excluded_missing", "delisted", "pre_snapshot_sessions",
+        "excluded_unclosed", "excluded_missing", "excluded_coverage", "delisted",
+        "pre_snapshot_sessions",
     )),
     *_floats(
         "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
         "decile_spread", "decile_t", "effect_size", "sharpe", "deflated_sharpe", "pbo",
     ),
     runs="merge",
-    key=("edge_id", "variant", "horizon_sessions", "slice_kind", "slice_value", "range_from"),
+    key=(
+        "edge_id", "user_id", "variant", "horizon_sessions", "slice_kind", "slice_value",
+        "range_from",
+    ),
 )  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})

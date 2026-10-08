@@ -12,6 +12,7 @@ from datetime import date
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.data import StoreReader
+from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.screening.run import ScreenSession, screen_session
 from algotrade.services.selection import select
 from algotrade.strategies.screeners.base import Decision
@@ -27,6 +28,7 @@ class RankedRun:
     ranking: tuple[str, ...]
     qualified: tuple[str, ...]
     pre_snapshot: bool
+    coverage: RunCoverage
     screened: ScreenSession
 
 
@@ -53,6 +55,7 @@ def screen_variant(reader: StoreReader, config: ResolvedConfig, session: date) -
         ranking=tuple(i for i, _ in ranked),
         qualified=tuple(i for i, d in ranked if d is Decision.QUALIFIED),
         pre_snapshot=screened.universe.pre_snapshot,
+        coverage=screened.run.coverage,
         screened=screened,
     )
 

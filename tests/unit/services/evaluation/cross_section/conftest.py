@@ -107,6 +107,7 @@ def build_world(
     snapshot: date | None = None,
     closed: Sequence[date] | None = None,
     rows_of: Callable[[date], list[dict[str, Any]]] | None = None,
+    no_features: Sequence[date] = (),
 ) -> World:
     """The store over ``days``; ``price_of(day, i)`` overrides name i's price on a day; the
     universe snapshot is ``snapshot`` (default: before the first day); outcomes are stored
@@ -124,9 +125,10 @@ def build_world(
     )
     w = World(backend, writer, StoreReader(backend), configs)
     for day in days:
-        w.write_features(
-            day, (lambda i, d=day: price_of(d, i)) if price_of else lambda i: 100.0 + 10 * i
-        )
+        if day not in no_features:
+            w.write_features(
+                day, (lambda i, d=day: price_of(d, i)) if price_of else lambda i: 100.0 + 10 * i
+            )
         if closed is None or day in closed:
             default = [outcome_row(iid, i, day) for i, iid in enumerate(IDS)]
             w.write_outcomes(day, rows_of(day) if rows_of else default)

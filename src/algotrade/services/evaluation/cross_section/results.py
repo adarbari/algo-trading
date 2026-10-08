@@ -10,7 +10,11 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, VariantResult
+from algotrade.services.evaluation.cross_section.harness import (
+    EdgeEvaluation,
+    VariantResult,
+    job_name,
+)
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
 
@@ -20,13 +24,9 @@ MEASURE_COLUMNS = (
     "sessions", "picks", "hits", "hit_rate", "eligible", "base_hits", "base_rate", "lift",
     "mean_excess_picks", "bh_mean", "top_decile_mean", "decile_spread", "decile_t",
     "decile_sessions", "effect_size", "sharpe", "deflated_sharpe", "trials", "pbo",
-    "excluded_unclosed", "excluded_missing", "delisted", "pre_snapshot_sessions",
+    "excluded_unclosed", "excluded_missing", "excluded_coverage", "delisted",
+    "pre_snapshot_sessions",
 )  # fmt: skip
-
-
-def job_name(edge_id: str) -> str:
-    """The run-record ``job`` whose records hold an edge's trial log."""
-    return f"edge-eval:{edge_id}"
 
 
 def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> pd.DataFrame:
@@ -38,6 +38,7 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
             rows.append(
                 {
                     "edge_id": evaluation.edge_id,
+                    "user_id": evaluation.user_id,
                     "variant": r.variant,
                     "role": r.role,
                     "config_hash": r.config_hash,
@@ -85,6 +86,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "deflated_sharpe": m.deflated_sharpe,
         "ranked_share": sum(s.ranked for s in r.stats) / eligible if eligible else None,
         "outside_universe": sum(s.outside_universe for s in r.stats),
+        "excluded_coverage": m.excluded_coverage,
     }
 
 
@@ -101,10 +103,8 @@ def survivorship(evaluation: EdgeEvaluation) -> dict[int, tuple[int, int]]:
 def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datetime) -> RunRecord:
     """Save ``evaluation``: its rows (both visible or neither) and its run record, whose stats
     hold the trial log. Returns the finished record."""
-    record = start_run(job_name(evaluation.edge_id), evaluation.end, now)
+    record = start_run(job_name(evaluation.edge_id, evaluation.user_id), evaluation.end, now)
     frame = edge_eval_frame(evaluation, record.run_id, now)
-    with writer.publishing(record.run_id, now):
-        writer.write_result(RESULT, evaluation.end, record.run_id, frame, pending=True)
     stats = {
         "edge": evaluation.edge_id,
         "run_hash": evaluation.run_hash,
@@ -116,5 +116,9 @@ def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datet
         "unclosed_sessions": dict(evaluation.unclosed_sessions),
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
     }
-    writer.save_run(record.finish(now, complete=True, stats=stats))
+    # The record goes in before the commit: a crash between the two leaves a trial counted
+    # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
+    with writer.publishing(record.run_id, now):
+        writer.write_result(RESULT, evaluation.end, record.run_id, frame, pending=True)
+        writer.save_run(record.finish(now, complete=True, stats=stats))
     return record

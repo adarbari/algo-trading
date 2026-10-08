@@ -57,7 +57,8 @@ def test_rows_and_a_run_record_with_the_trial_log(world: World) -> None:
     assert pd.Timestamp(all_row["range_from"]).date() == DAYS[0]
     assert pd.isna(all_row["deflated_sharpe"]) and all_row["trials"] == 1
     saved = world.results.load_run(record.run_id)
-    assert saved is not None and saved.job == "edge-eval:drift"
+    assert saved is not None and saved.job == "edge-eval:drift:site"
+    assert all_row["user_id"] == "site" and saved.stats["trials"][0]["excluded_coverage"] == 0
     (trial,) = saved.stats["trials"]
     assert (trial["variant"], trial["horizon"], trial["lift"], trial["ranked_share"]) == (
         "momo",

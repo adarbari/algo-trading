@@ -12,7 +12,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, _pbo, evaluate_edge
 from algotrade.services.evaluation.cross_section.picks import screen_variant
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
 from tests.helpers.stored_frames import stamped
@@ -205,3 +205,41 @@ def test_a_ratio_measure_divides_the_realised_vol_by_the_implied_vol_known_at_th
     assert first.pick_values == pytest.approx((-0.5,) * 4)  # 0.2 / 0.4 oriented: lower is better
     assert first.pick_hits == 4 and first.excluded_missing == 1  # N19: no IV30, excluded
     assert first.base_hits == 9 and first.eligible == 19
+
+
+def test_a_session_whose_screen_read_incomplete_data_is_not_measured_but_counted() -> None:
+    ev = run(build_world(no_features=[DAYS[2]]))  # the Sept 3 screen finds no feature table
+    (r,) = ev.results
+    m = r.measures[0]
+    assert (m.sessions, m.excluded_coverage) == (3, 1)  # four start sessions, one not measured
+    assert m.picks == 15  # nothing from the incomplete session reaches the pooled numbers
+
+
+def test_trials_are_counted_per_user_and_the_regime_label_is_the_sites() -> None:
+    w = build_world()
+    write_edge_eval(w.results, run(w), AS_OF)
+    other = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("bob"), edge(), DAYS[0], DAYS[-1], AS_OF
+    )
+    assert other.trials == 1 and other.user_id == "bob"  # site's earlier trial is not bob's
+    assert write_edge_eval(w.results, other, AS_OF).job == "edge-eval:drift:bob"
+
+
+def test_the_probability_of_overfitting_leaves_out_sessions_a_variant_held_nothing() -> None:
+    days = sessions_between(date(2026, 8, 3), date(2026, 9, 25))
+    w = build_world(days)
+    w.configs = type(w.configs)(
+        {
+            ("site", "selections", "active"): w.configs.load("site", "selections", "active"),
+            ("site", "strategies", "momo"): screen(),
+            ("site", "strategies", "other"): {**screen("asc"), "id": "other"},
+        }
+    )
+    ev = evaluate_edge(
+        w.reader, w.results, w.configs, USER, edge(baselines=["other"]), days[0], days[-1], AS_OF
+    )
+    peers = list(ev.results)
+    assert _pbo(peers) is not None
+    held = tuple(dataclasses.replace(s, pick_values=()) for s in peers[1].stats)
+    nothing = [peers[0], dataclasses.replace(peers[1], stats=held)]
+    assert _pbo(nothing) is None  # no session where both held something: no guess at zero

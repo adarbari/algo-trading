@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.config.user import UserContext
@@ -32,6 +33,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
+from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.hit import (
@@ -58,6 +60,8 @@ HARNESS_VERSION = 1
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
 PBO_SPLITS = 16
 UNKNOWN = "UNKNOWN"
+# A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
+MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
 
 
@@ -82,6 +86,7 @@ class VariantResult:
 class EdgeEvaluation:
     edge_id: str
     run_hash: str
+    user_id: str
     benchmark: str  # the edge document's: "SPY" or "none"
     start: date
     end: date
@@ -91,6 +96,11 @@ class EdgeEvaluation:
     trials: int
     start_sessions: Mapping[int, int]  # horizon -> start sessions the schedule gave
     unclosed_sessions: Mapping[int, int]  # horizon -> of those, sessions with no closed window
+
+
+def job_name(edge_id: str, user_id: str) -> str:
+    """The run-record ``job`` whose records hold one user's trial log of an edge (ADR 0015)."""
+    return f"edge-eval:{edge_id}:{user_id}"
 
 
 def run_hash(
@@ -132,10 +142,10 @@ class _Session:
     """What is read once per start session, whatever the horizon: each variant's run, the
     eligible names, the regime label and (when the measure needs it) the implied vol."""
 
-    def __init__(
-        self, reader: StoreReader, edge: Edge, universe: Selection, variants: list[Variant]
-    ):
-        self._reader, self._edge, self._universe, self._variants = reader, edge, universe, variants
+    def __init__(self, reader: StoreReader, edge: Edge, universe: Selection, label_field: str):
+        self._reader, self._edge, self._universe, self._label_field = (
+            reader, edge, universe, label_field,
+        )  # fmt: skip
         self._runs: dict[tuple[str, date], RankedRun] = {}
         self._eligible: dict[date, frozenset[str]] = {}
         self._labels: dict[date, str] = {}
@@ -157,7 +167,7 @@ class _Session:
 
     def label(self, day: date) -> str:
         if day not in self._labels:
-            name = self._variants[0].config.regime.label
+            name = self._label_field
             value = session_market(self._reader, [name], day).get(name)
             self._labels[day] = UNKNOWN if value is None else str(value)
         return self._labels[day]
@@ -179,6 +189,8 @@ def _stat(
 ) -> SessionStat:
     """One variant at one session: ``rows`` are the stored outcomes of the session."""
     run, ids = session.run(variant, day), session.eligible(day)
+    if run.coverage not in MEASURED_COVERAGE:  # read incomplete data: not measured, counted
+        return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     inside = rows[rows["instrument_id"].isin(ids)]
     implied = session.implied(day) if needs_implied_vol(edge) else None
     res = apply_outcome(edge, inside, implied).set_index("instrument_id")
@@ -235,41 +247,52 @@ def _since(day: date, stat: SessionStat) -> bool:
     return stat.session >= day
 
 
-def _prior_trials(writer: ResultWriter, edge_id: str) -> set[tuple[str, str, int]]:
+def _prior_trials(writer: ResultWriter, edge_id: str, user_id: str) -> set[tuple[str, str, int]]:
     found: set[tuple[str, str, int]] = set()
-    for record in writer.runs_for(f"edge-eval:{edge_id}"):
+    for record in writer.runs_for(job_name(edge_id, user_id)):
         for t in record.stats.get("trials", []):
             found.add((t["variant"], t["config_hash"], int(t["horizon"])))
     return found
 
 
 def _deflate(results: list[VariantResult], trials: int) -> list[VariantResult]:
-    """The deflated Sharpe ratio, the trial count and PBO on each variant's "all" rows."""
-    sharpes = [m.sharpe for r in results for m in r.measures[:1] if m.sharpe is not None]
-    variance = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
+    """The deflated Sharpe ratio, the trial count and PBO on each variant's "all" rows. The
+    Sharpe variance across trials is taken within a horizon (windows of other lengths are not
+    the same kind of trial)."""
     by_horizon: dict[int, list[VariantResult]] = {}
     for r in results:
         by_horizon.setdefault(r.horizon, []).append(r)
+    variance, pbo = {}, {}
+    for horizon, peers in by_horizon.items():
+        sharpes = [p.measures[0].sharpe for p in peers if p.measures[0].sharpe is not None]
+        variance[horizon] = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
+        pbo[horizon] = _pbo(peers)
     out = []
     for r in results:
-        peers = by_horizon[r.horizon]
-        days = [s.session for s in r.stats]
-        matrix = np.array([[_mean_on(p, d) for p in peers] for d in days], dtype=np.float64)
-        pbo = pbo_cscv(matrix, PBO_SPLITS) if len(peers) > 1 and days else None
         means = [m for m in (s.pick_mean for s in r.stats) if m is not None]
-        first = r.measures[0]
-        dsr = deflated_sharpe(means, trials, variance) if means else None
-        deflated = replace(first, deflated_sharpe=dsr, trials=trials, pbo=pbo)
+        dsr = deflated_sharpe(means, trials, variance[r.horizon]) if means else None
+        deflated = replace(r.measures[0], deflated_sharpe=dsr, trials=trials, pbo=pbo[r.horizon])
         out.append(replace(r, measures=(deflated, *r.measures[1:])))
     return out
 
 
+def _pbo(peers: Sequence[VariantResult]) -> float | None:
+    """PBO over the sessions every variant held something at: a session where one held nothing
+    is left out, never filled in."""
+    if len(peers) < 2:
+        return None
+    days = sorted({s.session for p in peers for s in p.stats})
+    matrix = np.array([[_mean_on(p, d) for p in peers] for d in days], dtype=np.float64)
+    matrix = matrix.reshape(len(days), len(peers))
+    return pbo_cscv(matrix[~np.isnan(matrix).any(axis=1)], PBO_SPLITS)
+
+
 def _mean_on(result: VariantResult, day: date) -> float:
-    """A variant's pick mean at ``day``; 0.0 when it held nothing (not invested)."""
+    """A variant's pick mean at ``day``; NaN when it held nothing then."""
     for s in result.stats:
-        if s.session == day:
-            return s.pick_mean if s.pick_mean is not None else 0.0
-    return 0.0
+        if s.session == day and s.pick_mean is not None:
+            return s.pick_mean
+    return float("nan")
 
 
 def evaluate_edge(
@@ -288,7 +311,8 @@ def evaluate_edge(
     if edge.event_class is not None:
         raise ConfigurationError(f"edge {edge.id}: {edge.schedule} arrives with ED4")
     variants = _variants(configs, user, edge)
-    session = _Session(reader, edge, _universe(configs, user, edge), variants)
+    label = site_regime(configs.load).label  # the site's, not a user's
+    session = _Session(reader, edge, _universe(configs, user, edge), label)
     days = sessions_between(start, end)
     results: list[VariantResult] = []
     starts: dict[int, int] = {}
@@ -309,11 +333,12 @@ def evaluate_edge(
                 )
             )
     tried = {(r.variant, r.config_hash, r.horizon) for r in results}
-    trials = len(tried | _prior_trials(writer, edge.id))
+    trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(
         edge_id=edge.id,
         run_hash=run_hash(edge, variants, start, end, as_of),
+        user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,
         end=end,
