@@ -46,7 +46,7 @@ def test_ideas_rank_the_runs_of_the_session_with_every_pick(graph: Graph) -> Non
     ideas = body["data"]["ideas"]
     assert (ideas["session"], ideas["priority"], ideas["total"]) == ("2022-11-23", [], 2)
     [screener] = [s for s in ideas["screeners"] if s["screener"]["id"] == "vrp_scanner"]
-    assert len(ideas["screeners"]) == 10  # the other nine site presets have no run: NOT_RUN
+    assert len(ideas["screeners"]) == 11  # the other ten site presets have no run: NOT_RUN
     assert screener["screener"] == {
         "id": "vrp_scanner", "owner": "site", "scope": "site", "name": "VRP", "version": 4,
         "latestRun": {"runId": screener["run"]["runId"]}, "notRun": None,
@@ -103,7 +103,7 @@ def test_screeners_and_a_view(graph: Graph) -> None:
         ' missing: view(scope: "screener:nope") { scope } }'
     )
     screeners = {s["id"]: s for s in body["data"]["screeners"]}
-    assert len(screeners) == 10  # vrp_scanner and the nine technical presets (no run: NOT_RUN)
+    assert len(screeners) == 11  # vrp_scanner and the ten technical presets (no run: NOT_RUN)
     assert screeners["vrp_scanner"] == {
         "id": "vrp_scanner", "name": "VRP", "latestRun": {"picked": 2}, "notRun": None
     }  # fmt: skip

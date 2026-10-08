@@ -30,6 +30,14 @@
   transition-timing-function: var(--easing-standard);
 }
 
+.item[data-clickable] {
+  cursor: pointer;
+}
+
+.item[data-clickable]:hover {
+  background: var(--color-row);
+}
+
 .item[data-dragging],
 .item[data-grabbed] {
   border-color: var(--color-accent-border);

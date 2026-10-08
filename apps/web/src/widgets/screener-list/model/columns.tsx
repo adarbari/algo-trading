@@ -1,7 +1,8 @@
 /**
  * The screeners list's columns. Site presets: name, kind (rules or Python), universe,
- * state, Playbook (its Guide page), Open and Copy. Your screeners: name, state (DRAFT or vN
- * finalized, a working copy beside it), the preset it copies, universe, Results, Edit and Delete.
+ * state, Playbook (its Guide page) and Copy. Your screeners: name, state (DRAFT or vN
+ * finalized, a working copy beside it), the preset it copies, universe, Edit and Delete. A row
+ * click opens the screener (ScreenerList), so no row has an Open button.
  */
 import { Button, Stack, StatusBadge, TextLink, type DataTableColumn } from '@algotrade/ui';
 
@@ -9,8 +10,6 @@ import { playbookPath } from '@/entities/guide';
 import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
 
 export interface ScreenerActions {
-  /** Open a screener's results. */
-  onOpen: (id: string) => void;
   /** Open a screener in the Builder. */
   onEdit: (id: string) => void;
   onCopy: (preset: string) => void;
@@ -59,21 +58,13 @@ export function presetColumns(actions: ScreenerActions): DataTableColumn<Screene
       value: () => null,
       sortable: false,
       hideable: false,
-      width: '2xl', // Open + Copy to my screeners: narrower clips the buttons
+      width: '2xl', // Playbook + Copy to my screeners: narrower clips them
       cell: ({ row }) =>
         isRules(row) ? (
           <Stack direction="row" gap={3} justify="end" align="center">
             <TextLink href={playbookPath(row.configId)} icon="book" size="sm">
               Playbook
             </TextLink>
-            <Button
-              size="sm"
-              onClick={() => {
-                actions.onOpen(row.configId);
-              }}
-            >
-              Open
-            </Button>
             <Button
               size="sm"
               variant="primary"
@@ -143,14 +134,6 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
       width: 'xl',
       cell: ({ row }) => (
         <Stack direction="row" gap={2} justify="end">
-          <Button
-            size="sm"
-            onClick={() => {
-              actions.onOpen(row.screenerId);
-            }}
-          >
-            Results
-          </Button>
           <Button
             size="sm"
             onClick={() => {

@@ -35,6 +35,7 @@ from tests.helpers.stored_frames import stamped
 
 DAYS = sessions_ending(SESSION, 5)
 START = DAYS[0]
+WINDOW = f"{START.isoformat()}..{SESSION.isoformat()}"  # a full backfill's item window
 
 
 def bars(values: list[float]) -> list[Bar]:
@@ -86,7 +87,7 @@ def test_backfill_one_iv_request_per_name_and_one_partition_per_session() -> Non
     a = frame[frame["instrument_id"] == "EQ:A"]
     assert list(a["iv30_ibkr"]) == [0.2, 0.21, 0.22, 0.23, 0.24]
     assert a["hv30_ibkr"].isna().all()  # HV comes from the nightly snapshot only
-    assert record.items["hist:EQ:A"] == f"OK: {START.isoformat()}"
+    assert record.items["hist:EQ:A"] == f"OK: {WINDOW}"
     assert record.stats["sessions_written"] == 5 and record.stats["backfill_pending"] == 0
     assert "placeOrder" not in ib.calls and "IB.connect" not in ib.calls
 
@@ -112,6 +113,35 @@ def test_history_done_reads_ok_and_no_data_items_from_an_earlier_start() -> None
                     "hist:EQ:C": "FETCH_ERROR: x", "snap:EQ:A": "OK: 1/1"}  # fmt: skip
     assert history_done([record], date(2024, 10, 1)) == {"EQ:A", "EQ:B"}
     assert history_done([record], date(2024, 9, 30)) == set()
+    # a status without a window covers through the history run's session
+    assert history_done([record], date(2024, 10, 1), SESSION) == {"EQ:A", "EQ:B"}
+    assert history_done([record], date(2024, 10, 1), SESSION + timedelta(1)) == set()
+
+
+def test_history_done_needs_the_window_to_reach_the_end() -> None:
+    record = start_run("ibkr_iv_history", SESSION, pd.Timestamp("2026-10-02", tz="UTC"))
+    record.items = {"hist:EQ:A": "OK: 2024-10-01..2026-09-30", "hist:EQ:B": "OK: 2024-10-01"}
+    end = date(2026, 10, 1)
+    assert history_done([record], date(2024, 10, 1), date(2026, 9, 30)) == {"EQ:A", "EQ:B"}
+    assert history_done([record], date(2024, 10, 1), end) == {"EQ:B"}  # B: through SESSION
+    assert history_done([record], date(2024, 10, 1)) == {"EQ:A", "EQ:B"}  # the nightly's ask
+    nightly = start_run("ibkr_iv", SESSION, pd.Timestamp("2026-10-02", tz="UTC"))
+    nightly.items = {"hist:EQ:C": "OK: 2024-10-01"}  # the nightly's backfill ends the day before
+    before = sessions_ending(SESSION, 2)[0]
+    assert history_done([nightly], date(2024, 10, 1), before) == {"EQ:C"}
+    assert history_done([nightly], date(2024, 10, 1), SESSION) == set()
+
+
+def test_a_session_missed_after_the_backfill_is_filled_by_a_one_day_backfill() -> None:
+    ctx, reader = market(["A", "B"], iv_backfill_per_night=2)
+    # the nightly's backfill reaches the session before; no snapshot ticks for SESSION
+    nightly = nightly_ivs(ctx, ibkr_source(fake(["A", "B"]), stream_wait_s=0.01), SESSION)
+    assert len(nightly.items) == 3 and ibkr_iv30(reader, SESSION, SESSION).empty
+    ib = fake(["A", "B"])
+    record = backfill_ivs(ctx, ibkr_source(ib), SESSION, SESSION)
+    assert record.status is RunStatus.COMPLETE and record.stats["backfilled"] == 2
+    assert ib.calls.count("reqHistoricalData") == 2
+    assert set(ibkr_iv30(reader, SESSION, SESSION)["instrument_id"]) == {"EQ:A", "EQ:B"}
 
 
 def test_a_name_without_history_is_no_data_not_a_failure() -> None:
@@ -121,7 +151,7 @@ def test_a_name_without_history_is_no_data_not_a_failure() -> None:
     ib.hv = {"A": ib.hv["A"]}
     record = backfill_ivs(ctx, ibkr_source(ib), START, SESSION)
     assert record.status is RunStatus.COMPLETE
-    assert record.items["hist:EQ:B"] == f"NO_DATA: {START.isoformat()}"
+    assert record.items["hist:EQ:B"] == f"NO_DATA: {WINDOW}"
 
 
 def test_nightly_snapshot_then_a_capped_backfill_of_names_without_history() -> None:
@@ -171,7 +201,7 @@ def test_a_request_ib_did_not_answer_is_retried_then_pending_never_no_data(fault
     ib.faults = {"B": [fault] * 3}
     held = CountingLimiter()
     record = backfill_ivs(ctx, ibkr_source(ib, historical=held), START, SESSION)
-    assert record.items["hist:EQ:A"] == f"OK: {START.isoformat()}"
+    assert record.items["hist:EQ:A"] == f"OK: {WINDOW}"
     assert record.items["hist:EQ:B"].startswith("FETCH_ERROR: ")  # never NO_DATA
     assert [r["symbol"] for r in ib.requests].count("B") == 3  # 3 attempts
     assert held.held == 30.0 + 60.0  # back-off on the shared historical limiter
@@ -188,7 +218,7 @@ def test_a_retry_that_ib_answers_is_ok_and_a_flap_with_bars_is_ok() -> None:
     held = CountingLimiter()
     record = backfill_ivs(ctx, ibkr_source(ib, historical=held), START, SESSION)
     assert record.status is RunStatus.COMPLETE, record.stats
-    assert record.items["hist:EQ:A"] == record.items["hist:EQ:B"] == f"OK: {START.isoformat()}"
+    assert record.items["hist:EQ:A"] == record.items["hist:EQ:B"] == f"OK: {WINDOW}"
     assert held.held == 30.0 and len(ib.requests) == 3
 
 
@@ -200,7 +230,7 @@ def test_a_genuine_empty_answer_stays_no_data(fault: str | None) -> None:
     ib.faults = {"B": [fault]} if fault else {}  # IB's 162 "query returned no data", or none
     record = backfill_ivs(ctx, ibkr_source(ib), START, SESSION)
     assert record.status is RunStatus.COMPLETE
-    assert record.items["hist:EQ:B"] == f"NO_DATA: {START.isoformat()}"
+    assert record.items["hist:EQ:B"] == f"NO_DATA: {WINDOW}"
     assert len(ib.requests) == 2  # answered: no retry
 
 
@@ -223,8 +253,10 @@ def test_a_name_not_fetched_is_fetched_by_a_later_run_and_a_resume() -> None:
     assert stuck.items["hist:EQ:A"].startswith("FETCH_ERROR")
     ib = fake(["A", "B"])
     again = backfill_ivs(ctx, ibkr_source(ib), START - timedelta(1), later + timedelta(1))
-    assert [r["symbol"] for r in ib.requests] == ["A"]
-    assert again.items == {"hist:EQ:A": f"OK: {(START - timedelta(1)).isoformat()}"}
+    # A was left pending; B's history ended at ``later``, before this run's end: both fetched
+    assert sorted(r["symbol"] for r in ib.requests) == ["A", "B"]
+    window = f"{(START - timedelta(1)).isoformat()}..{(later + timedelta(1)).isoformat()}"
+    assert again.items == {"hist:EQ:A": f"OK: {window}", "hist:EQ:B": f"OK: {window}"}
     assert set(ibkr_iv30(reader, START, SESSION)["instrument_id"]) == {"EQ:A", "EQ:B"}
 
 
@@ -290,7 +322,7 @@ def test_a_resume_that_cannot_connect_is_not_complete_and_keeps_what_was_fetched
     with pytest.raises(RuntimeError, match="died"):
         backfill_ivs(ctx, crashing, START, SESSION, limit=1)
     failed = ctx.writer.runs_for(HISTORY_TASK, SESSION)[-1]
-    assert failed.status is RunStatus.FAILED and failed.items == {"hist:EQ:A": f"OK: {START}"}
+    assert failed.status is RunStatus.FAILED and failed.items == {"hist:EQ:A": f"OK: {WINDOW}"}
     assert ibkr_iv30(reader, START, SESSION).empty  # staged, not published
     down = FakeIB(connect_error=ConnectionRefusedError("refused"))
     skipped = backfill_ivs(ctx, ibkr_source(down), START, SESSION)

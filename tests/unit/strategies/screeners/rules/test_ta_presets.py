@@ -99,3 +99,28 @@ def test_momentum_12_1_ranks_every_name_with_a_value_by_it_and_rejects_one_witho
         ("EQ:LOW", Decision.QUALIFIED),
         ("EQ:NONE", Decision.REJECT),
     ]
+
+
+def test_size_small_ranks_the_smallest_market_cap_first_and_rejects_one_without() -> None:
+    """The edge harness's size baseline (ADR 0053, quality bar 9): stocks only, smallest first;
+    a missing market cap never passes (ADR 0030)."""
+    spec = resolve_config(STORE, "size_small", UserContext("site")).screen_spec
+    assert tuple(c.id for c in spec.criteria)[: len(BASE)] == BASE
+    assert [c.id for c in spec.criteria[len(BASE) :]] == ["market_cap"]
+    assert spec.tie_break == "feature.market_cap" and not spec.tie_break_descending
+    base = {c.rule.field: _passing(c) for c in spec.criteria}
+    cap = "feature.market_cap"
+    view = FeatureView(
+        DAY,
+        {
+            "EQ:BIG": {**base, cap: 5e10},
+            "EQ:SMALL": {**base, cap: 3e8},
+            "EQ:NONE": {k: v for k, v in base.items() if k != cap},
+        },
+    )
+    rows = evaluate_screen(spec, view).rows
+    assert [(r.instrument_id, r.decision) for r in rows] == [
+        ("EQ:SMALL", Decision.QUALIFIED),
+        ("EQ:BIG", Decision.QUALIFIED),
+        ("EQ:NONE", Decision.REJECT),
+    ]

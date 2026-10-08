@@ -11,9 +11,11 @@ const NAMES = ['Liquidity', 'IV rank', 'Earnings'];
 function Harness({
   onReorder = () => undefined,
   disabled = false,
+  onActivate,
 }: {
   onReorder?: (names: string[]) => void;
   disabled?: boolean;
+  onActivate?: (name: string) => void;
 }) {
   const [items, setItems] = useState(NAMES);
   return (
@@ -24,6 +26,7 @@ function Harness({
       getLabel={(name) => name}
       renderItem={(name) => <span>{name}</span>}
       disabled={disabled}
+      {...(onActivate ? { onActivate } : {})}
       onReorder={(next) => {
         setItems(next);
         onReorder(next);
@@ -35,6 +38,26 @@ function Harness({
 const order = () => screen.getAllByRole('listitem').map((li) => li.textContent);
 
 describe('SortableList', () => {
+  it('opens an item on a click on its row, not on its handle, and marks it clickable', async () => {
+    const onActivate = vi.fn();
+    render(<Harness onActivate={onActivate} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByText('IV rank'));
+    expect(onActivate).toHaveBeenCalledExactlyOnceWith('IV rank');
+    await user.click(screen.getByRole('button', { name: 'Reorder Earnings' }));
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(item).toHaveAttribute('data-clickable');
+    }
+  });
+
+  it('marks no item clickable without onActivate', () => {
+    render(<Harness />);
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(item).not.toHaveAttribute('data-clickable');
+    }
+  });
+
   it('reorders from the keyboard and announces each move', async () => {
     const onReorder = vi.fn();
     render(<Harness onReorder={onReorder} />);

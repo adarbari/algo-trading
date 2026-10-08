@@ -1,6 +1,7 @@
 /**
  * The user's screeners as a sortable list: drag (or Space and arrows) to reorder; each move is
- * saved at once and the Ideas ranking follows the new priority.
+ * saved at once and the Ideas ranking follows the new priority. A click on a screener's row
+ * opens its results (its name is the keyboard's button).
  */
 import { SortableList } from '@algotrade/ui';
 
@@ -10,7 +11,7 @@ import { useSavePriority } from '../api/hooks';
 
 export interface ScreenerPriorityListProps {
   screeners: readonly ScreenerSummary[];
-  /** Open a screener's results (its name is a button). */
+  /** Open a screener's results (a click on its row, or its name's button). */
   onOpenScreener?: (screenerId: string) => void;
 }
 
@@ -29,6 +30,13 @@ export function ScreenerPriorityList({ screeners, onOpenScreener }: ScreenerPrio
           {...(onOpenScreener ? { onOpen: onOpenScreener } : {})}
         />
       )}
+      {...(onOpenScreener
+        ? {
+            onActivate: (s: ScreenerSummary) => {
+              onOpenScreener(s.id);
+            },
+          }
+        : {})}
       onReorder={(next) => {
         save.mutate(next.map((s) => s.id));
       }}
