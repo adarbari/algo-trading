@@ -283,7 +283,8 @@ test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) =>
     'harnessRun:run-b': { runId: 'run-b', rows: [] },
   });
   await page.goto('/admin/harness-runs');
-  await page.getByRole('row', { name: /run-b/ }).tap();
+  // A phone shows 3 of the columns (edge, started, status): the run id is in the sheet
+  await page.getByRole('row', { name: /momentum_12_1/ }).tap();
   await expect(page.getByRole('dialog', { name: 'run-b' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
