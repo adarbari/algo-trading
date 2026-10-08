@@ -15,7 +15,7 @@ import logging
 
 from algotrade.config.env import LLM_API_KEY, claude_cli_env, credential, llm_key
 from algotrade.config.site.llm import CLAUDE_CLI, LlmSettings, ProviderSettings
-from algotrade.config.site.settings import SiteDocuments, load_llm
+from algotrade.config.site.settings import SiteDocuments, load_llm, load_users
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
@@ -33,10 +33,23 @@ def open_text_model(configs: SiteDocuments) -> tuple[TextModel | None, str]:
         settings = load_llm(configs)
         if not settings.enabled:
             return None, OFF
+        _known_users(settings, configs)
         return _chain(settings), OFF
     except ConfigurationError as exc:
         log.error("the text model is off, llm.toml is not usable: %s", exc)
         return None, f"the text model is off: {exc}"
+
+
+def _known_users(settings: LlmSettings, configs: SiteDocuments) -> None:
+    """Every ``only_users`` id is a user of ``users.toml``: a typo would silently lock the owner
+    out of their own provider."""
+    known = {u.user_id for u in load_users(configs).users}
+    for provider in settings.providers:
+        unknown = sorted(set(provider.only_users) - known)
+        if unknown:
+            raise ConfigurationError(
+                f"llm.toml provider {provider.id} only_users: {unknown} are not in users.toml"
+            )
 
 
 def _chain(settings: LlmSettings) -> TextModel:
