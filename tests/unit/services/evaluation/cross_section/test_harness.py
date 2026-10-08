@@ -493,3 +493,15 @@ def test_a_trial_logged_before_edge_variants_is_the_edges_own() -> None:
             return [Record()]
 
     assert _prior_trials(Writer(), "drift", "site") == {("main", "momo", "h", 2)}  # type: ignore[arg-type]
+
+
+def test_changing_a_variants_override_changes_its_trial_key_and_adds_a_trial() -> None:
+    w = build_world()
+    first = run(w, edge(variants=[{"id": "costly", "outcome": {"cost_bps": 100}}]))
+    write_edge_eval(w.results, first, AS_OF)
+    again = run(w, edge(variants=[{"id": "costly", "outcome": {"cost_bps": 100}}]))
+    edited = run(w, edge(variants=[{"id": "costly", "outcome": {"cost_bps": 200}}]))
+    assert again.trials == 2 and edited.trials == 3  # main + the old override + the new one
+    hashes = {r.edge_variant: r.config_hash for r in edited.results}
+    assert hashes["costly"] != hashes["main"] != ""
+    assert hashes["costly"] != {r.edge_variant: r.config_hash for r in first.results}["costly"]

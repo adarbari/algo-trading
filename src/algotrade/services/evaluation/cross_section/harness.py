@@ -422,7 +422,7 @@ def evaluate_edge(
                     VariantResult(
                         variant.id,
                         variant.role,
-                        variant.config.hash,
+                        _trial_hash(scope, variant),
                         horizon,
                         stats,
                         measures,
@@ -477,6 +477,15 @@ def _block_stats(
                 )
             )
     return tuple(out)
+
+
+def _trial_hash(scope: _Scope, variant: Variant) -> str:
+    """The screener's config hash; for an edge variant it also covers the variant's id and
+    resolved outcome and universe, so an edited override is another trial."""
+    if scope.key == MAIN:
+        return variant.config.hash
+    payload = [variant.config.hash, scope.key, asdict(scope.edge.outcome), scope.edge.universe]
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 
 def _scopes(configs: ConfigStore, user: UserContext, edge: Edge) -> list[_Scope]:
