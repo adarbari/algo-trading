@@ -53,15 +53,18 @@ def event_blocks(
     event_days: Sequence[date], sessions: Sequence[date], horizon: int
 ) -> list[list[date]]:
     """``event_days`` (ascending decision sessions with events) pooled into blocks: a day joins
-    the current block when it is fewer than ``horizon`` sessions after the block's last day, so
-    no window of one block overlaps the first window of the next and a block is one statistic,
-    never several independent sessions."""
+    the current block when it is fewer than ``horizon`` sessions after the block's FIRST day, so a
+    block spans at most ``horizon`` sessions and is one statistic. Measured from the last day,
+    daily events (earnings) chained the whole history into one block (2026-10-08: one
+    "independent session" over two years). A window starting near a block's end can overlap the
+    next block's first windows by up to ``horizon - 1`` sessions: at most one boundary overlap,
+    the price of keeping every event (ADR 0053 amendment, item 7)."""
     if horizon < 1:
         raise ConfigurationError(f"horizon must be >= 1 session, got {horizon}")
     position = {day: i for i, day in enumerate(sessions)}
     blocks: list[list[date]] = []
     for day in sorted(event_days):
-        if blocks and position[day] - position[blocks[-1][-1]] < horizon:
+        if blocks and position[day] - position[blocks[-1][0]] < horizon:
             blocks[-1].append(day)
         else:
             blocks.append([day])

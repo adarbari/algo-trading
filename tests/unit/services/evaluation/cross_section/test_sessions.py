@@ -55,18 +55,26 @@ def test_the_entry_session_is_the_offset_th_session_after_the_decision() -> None
         entry_session(friday, 0)  # never the decision session itself
 
 
-def test_event_days_join_a_block_while_the_gap_to_its_last_day_is_under_a_horizon() -> None:
+def test_event_days_join_a_block_while_they_are_under_a_horizon_from_its_first_day() -> None:
     days = DAYS[:30]
     event_days = [days[2], days[3], days[11], days[12], days[13], days[14], days[25]]
     blocks = event_blocks(event_days, days, 5)
-    # A day joins while it is fewer than 5 sessions after the block's last day: overlapping
-    # event windows are one statistic, never several independent sessions.
+    # A day joins while it is fewer than 5 sessions after the block's first day: a block spans
+    # at most one horizon and is one statistic.
     assert blocks == [[days[2], days[3]], [days[11], days[12], days[13], days[14]], [days[25]]]
     assert event_blocks(event_days, days, 1) == [[d] for d in event_days]
     chain = [days[0], days[4], days[8], days[12]]  # each within 5 of the last, 12 from the first
-    assert event_blocks(chain, days, 5) == [chain]  # no window overlaps the next block's first
+    assert event_blocks(chain, days, 5) == [[days[0], days[4]], [days[8], days[12]]]
     assert event_blocks([days[0], days[5]], days, 5) == [[days[0]], [days[5]]]
     assert event_blocks([], days, 5) == []
     assert event_blocks([days[5], days[2]], days, 5) == [[days[2], days[5]]]  # order-free
     with pytest.raises(ConfigurationError, match="horizon"):
         event_blocks(event_days, days, 0)
+
+
+def test_daily_events_over_a_long_range_make_one_block_per_horizon_never_one_block() -> None:
+    """2026-10-08: earnings land almost every session; blocks measured from their last day
+    chained two years into ONE independent session. A block spans at most one horizon."""
+    days = DAYS[:60]
+    blocks = event_blocks(days, days, 20)
+    assert len(blocks) == 3 and all(len(b) == 20 for b in blocks)

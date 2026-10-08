@@ -229,8 +229,13 @@ corrected it on point-in-time grounds.
    Both read at D = S - 1, consistent with item 1. Events are deduplicated by (name, quarter)
    when a PRIOR_YEAR expectation turns SCHEDULED. A name with no row is UNKNOWN (excluded with
    a reason), never "no earnings" (the VRP earnings exclusion included).
-   Event days are pooled into blocks of h sessions, one statistic per block, so overlapping
-   windows never inflate the count of independent sessions. The picks are the screener's
+   Event days are pooled into blocks, one statistic per block: a day joins a block while it is
+   fewer than h decision sessions after the block's first day, so a block spans at most h
+   sessions (measured from the last day, daily earnings chained two years into one block,
+   2026-10-08). The last windows of one block overlap the first windows of the next by up to
+   h - 1 sessions, the price of keeping every event; with dense events only common moves carry
+   it (a lag-1 correlation of at most about 0.17), so t statistics and the deflated Sharpe ratio
+   are overstated by at most about 15% on event edges; plain schedules have no overlap. The picks are the screener's
    qualified names within the event names. The base (`base = "event" | "universe"`) is the
    event names, or the universe for the announcement premium. A name eligible at D with no row
    at S is excluded as `no_entry_bar`.
