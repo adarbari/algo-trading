@@ -35,7 +35,7 @@
       "kind": "unit",
       "file": "scripts/lint-help-drawer.test.ts",
       "since": "2026-10-05",
-      "reason": "'Test timed out in 5000ms': it runs ESLint in-process over fixture files, which takes 5 to 15 s under load; kept, with the 20 s integration-style timeout (vitest.setup.ts)"
+      "reason": "'Test timed out in 5000ms': it runs ESLint in-process over fixture files, which takes 5 to 15 s under load; kept, with the 20 s integration-style timeout (vite.config.ts, the integration project)"
     }
   ]
 }

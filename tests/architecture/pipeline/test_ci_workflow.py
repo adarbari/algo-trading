@@ -68,11 +68,23 @@ def test_the_web_gate_waits_for_every_web_job_and_tolerates_skips() -> None:
 
 def test_python_jobs_skip_web_only_and_docs_only_changes() -> None:
     jobs = _jobs()
-    assert jobs["test"]["if"] == "needs.changes.outputs.python == 'true'"
     assert jobs["quality"]["if"] == "needs.changes.outputs.python == 'true'"
-    assert jobs["architecture"]["if"] == "needs.changes.outputs.python != 'true'"
+    steps = {s.get("name"): s for s in jobs["test"]["steps"]}
+    full = next(s for n, s in steps.items() if n and n.startswith("Unit + architecture"))
+    assert full["if"] == "needs.changes.outputs.python == 'true'"
+    arch = next(s for n, s in steps.items() if n and n.startswith("Architecture tests only"))
+    assert arch["if"] == "needs.changes.outputs.python != 'true'"
+    assert "tests/architecture" in arch["run"]
     classify = jobs["changes"]["steps"][-1]["run"]
     assert "docs/* | .claude/* | *.md" in classify, "docs-only PRs run the architecture tests only"
+
+
+def test_a_matrix_job_with_a_protected_name_has_no_job_level_if() -> None:
+    """GitHub does not expand the matrix of a skipped job: the check reports under the literal
+    name "Tests (py${{ matrix.python }})" and the protected "Tests (py3.12)" never appears."""
+    for name, job in _jobs().items():
+        if "matrix" in job.get("strategy", {}) and job["name"] in PROTECTED_CHECKS:
+            assert "if" not in job, f"{name}: put the condition on its steps, not the job"
 
 
 def test_playwright_image_is_one_string_matching_the_lockfile() -> None:

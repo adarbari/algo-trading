@@ -8,8 +8,7 @@ its code on that machine.
 |---|---|
 | CI: changed areas | every run (seconds): decides which jobs a pull request needs |
 | CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Python changes |
-| CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Python changes |
-| CI: architecture tests | web-only and docs-only PRs (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
 | CI: web static (generated files fresh, ds:check, lint, types, unit) | web changes |
 | CI: web e2e (production build, Playwright, in the Playwright image) | web changes |
 | CI: web Storybook build (uploaded as the `storybook-static` artifact) | web changes |
@@ -44,7 +43,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 | Measure | Before (2026-10-07) | After |
 |---|---|---|
 | CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | the longest of four parallel web jobs: Storybook build (~2 min) then two screenshot shards (~3 min each); target 5–6 min; measured on the first PRs after this change |
-| CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | architecture tests only (~1 min) |
+| CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | the tests job runs `tests/architecture` only (~1 min) |
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR | unchanged by this PR; the local fast path is the next PR |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
 
@@ -74,7 +73,8 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
 - Every entry: `kind`, `file`, `title` (e2e), `since`, `reason` (what flakes, the fix it waits for).
 - One retry in CI for Playwright only (`playwright.config.ts`, `playwright.visual.config.ts`);
   the real-app smoke, pytest and vitest never retry. Integration-style vitest files (`pages/`,
-  `widgets/`, `features/`, `scripts/`) get a 20 s timeout (`vitest.setup.ts`).
+  `widgets/`, `features/`, `scripts/`) are the `integration` vitest project with a 20 s timeout
+  (`vite.config.ts`; Vitest fixes a test's timeout at collection, so a setup-file hook is too late).
 - A story whose `play` function clicks and whose canvas redraws later screenshots differently
   run to run (two CI rounds on 2026-10-07): the screenshot suite waits for Storybook's render
   phase `finished` and `document.fonts.ready`; a story that still settles later must wait for

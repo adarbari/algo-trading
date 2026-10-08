@@ -80,8 +80,9 @@ jobs:
 
   test:
     name: Tests (py${{ matrix.python }})
+    # No job-level `if`: GitHub does not expand the matrix of a skipped job, so the protected
+    # check "Tests (py3.12)" would never report. The steps decide instead.
     needs: [changes]
-    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -99,33 +100,22 @@ jobs:
       - run: uv sync --all-packages --locked
       # Hypothesis keeps failing examples here and replays them first on the next run.
       - uses: actions/cache@v6
+        if: needs.changes.outputs.python == 'true'
         with:
           path: .hypothesis
           key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ github.run_id }}
           restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-
       - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
+        if: needs.changes.outputs.python == 'true'
         run: make test
+      # A web-only or docs-only change still answers to the fitness tests: the web layout rules
+      # (architecture/web_layout.toml [[web_dir]]), the ADR index, the roadmap cap, the links.
+      - name: Architecture tests only (the change is web-only or docs-only)
+        if: needs.changes.outputs.python != 'true'
+        run: .venv/bin/python -m pytest -q -n auto tests/architecture
       - uses: actions/upload-artifact@v7
-        if: matrix.python == '3.12'
+        if: matrix.python == '3.12' && needs.changes.outputs.python == 'true'
         with: { name: coverage, path: coverage.xml }
-
-  # A web-only or docs-only change still answers to the fitness tests: the web layout rules
-  # (architecture/web_layout.toml [[web_dir]]), the ADR index, the roadmap cap, the links.
-  architecture:
-    name: Architecture tests (the change is web-only or docs-only)
-    needs: [changes]
-    if: needs.changes.outputs.python != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: true }
-      - uses: actions/cache@v6
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}
-      - run: uv sync --all-packages --locked
-      - run: .venv/bin/python -m pytest -q -n auto tests/architecture
 
   # The real app, not mocks: the Vite dev server against the real API on an EMPTY store and the
   # golden fixture store, every route in both workspaces (apps/web/real, docs/ui/architecture.md).
