@@ -161,3 +161,73 @@ Every open edge document sets `frozen_from = 2026-04-01` (the last two quarters 
 sessions when ED4 starts): fixed, never rolling; the harness reports it as its own slice and an
 edge is `evidenced` only on it. A fitness test pins the date
 (`tests/architecture/data/test_edge_outcomes_expressible.py`); moving it is a further amendment.
+
+## Amendment 2026-10-08: ED4 (decision and entry sessions, events, variants, `expires_otm`)
+
+Decided on the owner's behalf on 2026-10-08, from the owner's inputs. The owner judges short
+premium by how often the option is not assigned, trades 21 to 45 days to expiry, and accepts IBKR
+IV for a private evaluation. The research (with sources) is in the ED4 PR descriptions; `architect`
+corrected it on point-in-time grounds.
+
+1. **Decision and entry sessions.** A harness row has a decision session D and an entry session
+   S = D + `start_offset_sessions`. The screen, eligibility, IV and the event set are read at D.
+   The outcome is the partition at S. An event counts only when `known_from <= D`.
+   - Schedules that are not event schedules need an offset of at least 1: the screen runs after
+     D's close, so the first fill is at S's close. The same holds for an event class not
+     announced ahead.
+   - A negative offset is allowed only for an event announced ahead (the earnings announcement
+     premium: -5 means D = A - 6).
+   - The offset lives in the documents and the harness, never in the grain. Only a new horizon
+     needs an outcomes backfill.
+2. **Expected report dates, never actual dates.** The stored history knows a report date only
+   from that day (`known_from` = the report date before 2026-10-13). So the pre-announcement
+   window reads `earnings_expected@v1`, whose `expected_basis` is one of:
+   - SCHEDULED: a date known by S;
+   - PRIOR_YEAR: the year-ago same-quarter report + 364 days, known from that report
+     (Frazzini and Lamont's method);
+   - UNKNOWN: excluded with a reason, never read as "no earnings".
+   The VRP earnings exclusion reads the same group.
+3. **Post-earnings drift's surprise** is the two-session excess return over SPY, close(E-1) to
+   close(E+1) (Brandt, Kishore, Santa-Clara and Venkatachalam 2008). 72% of report times are
+   unknown, so a single reaction session is unreliable. The anchor is E+1 and the entry is
+   E+2's close. Liquidity is read on a pre-event 20-day ADV. The edge is long-only (a long-short
+   variant is a trial row), with 40 bps of cost.
+4. **`expires_otm`, the VRP win rate.** A new outcome kind for a short option that expires out
+   of the money.
+   - Structure: `put` | `call` | `strangle`.
+   - The strike comes from an exact Black-Scholes delta with r = q = 0,
+     K = S·exp(∓zσ√T + σ²T/2), z = N⁻¹(δ), with σ the run's `iv_field` at D (or `otm_pct`).
+   - The hit compares `fwd_return` with K/S - 1.
+   - The reference rate is the mean risk-neutral N(d2) per name (the joint form for a
+     strangle), not 1 - δ.
+   - A touch rate (the strike crossed intraday) is reported beside the hit, never inside it.
+   - Horizons: 15, 21 and 31 sessions (21, 30 and 45 calendar days).
+   - Caveat: a win rate carries no premium and no P&L, and overstates expectancy (the short
+     left tail). `realised_to_implied_vol < 1` stays as a second row.
+5. **Edge variants.** Cap buckets, structure, delta, the earnings exclusion, Savor and Wilson's
+   [-1, +1] window and the realised-to-implied row are `[[variants]]` in the document, with
+   outcome and universe overrides. They are not session slices. Each variant is a trial in the
+   deflated Sharpe ratio. `results/edge_eval` gains the key column `edge_variant` (null read as
+   "main") and the columns `iv_source`, `licence`, `reference_rate` and `touch_rate`.
+6. **One IV field per run** (`iv_field`): never a mixed-source feature. The run records
+   `iv_source`, and the licence comes from the catalogue's `Feature.licence` (personal for
+   IBKR's).
+7. **Event schedules.** `on_event:<class>` takes the event names at D from a declared field per
+   class:
+   - `earnings_reaction@v1.sessions_since_reaction == offset - 1`;
+   - `earnings_expected@v1.sessions_to_expected_report == 1 - offset`.
+   Event days are pooled into blocks of h sessions, one statistic per block, so overlapping
+   windows never inflate the count of independent sessions. The picks are the screener's
+   qualified names within the event names. The base (`base = "event" | "universe"`) is the
+   event names, or the universe for the announcement premium. A name eligible at D with no row
+   at S is excluded as `no_entry_bar`.
+8. **Train and test split in the UI** (ED5). The site `frozen_from` stays the only evidence
+   gate: an edge's status changes only from a run whose split equals it. A user may set
+   `split_from` in `config/users/<id>/evaluation.toml`, or per run (ADR 0015 layering:
+   site < user < run). The run records it with its config hash. Every number from a split that
+   is not the site's is labelled EXPLORATORY in the read model and the UI. The track-record chip
+   never reads one, and a fitness test forbids a status change from one.
+9. **Option history.** No free source has usable history. The Cboe chains captured daily since
+   2026-10-02 are the evidence set going forward. Massive's free Options Basic tier (EOD
+   aggregates of expired contracts, 2 years, 5 calls a minute, no bid/ask or IV) is the
+   candidate backfill when real premiums are needed (a later item).
