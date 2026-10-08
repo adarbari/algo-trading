@@ -150,6 +150,9 @@ def test_the_preview_serves_a_trader_no_table_and_an_admin_the_chain(
         text[max(0, text.find(p) - 80) : text.find(p) + 60] for p in TABLE_PREFIXES if p in text
     ] == []
     assert all(u["cause"] is None and u["guide_term"] for u in trader["coverage"]["unavailable"])
+    for served in (trader, admin):
+        texts = {u["kind_text"] for u in served["coverage"]["unavailable"]}
+        assert texts and texts <= set(GENERIC_REASONS.values())
     assert trader["coverage"]["unavailable"]
     assert all(u["cause"] for u in admin["coverage"]["unavailable"])
 

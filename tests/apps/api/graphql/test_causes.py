@@ -39,8 +39,8 @@ CAUSE_WORDS = re.compile(
 OPS = "algotrade_api.graphql.types.ops."
 TRADER_OPS = (OPS + "backtest", OPS + "config")
 CHAIN = "cause { links { level subject status message runId } }"
-UNKNOWN = f"code reason kind guideTerm {CHAIN}"
-GAPS = f"unavailable {{ kind features guideTerm {CHAIN} }}"
+UNKNOWN = f"code reason kind guideTerm kindText {CHAIN}"
+GAPS = f"unavailable {{ kind features guideTerm kindText {CHAIN} }}"
 GAPS_QUERY = f"""query($date: Date, $names: [FeatureName!]!, $dist: FeatureName!) {{
   session(date: $date) {{ {GAPS} }}
   instrument(key: "CCC", date: $date) {{
@@ -48,7 +48,7 @@ GAPS_QUERY = f"""query($date: Date, $names: [FeatureName!]!, $dist: FeatureName!
   }}
   regime(date: $date) {{ unknownReason {{ {UNKNOWN} }} }}
   distribution(name: $dist, date: $date) {{ unknown {{ {UNKNOWN} }} }}
-  table(columns: $names, date: $date) {{ session {{ {GAPS} }} {GAPS} }}
+  table(columns: $names, date: $date) {{ kindTexts {{ kind text }} session {{ {GAPS} }} {GAPS} }}
   ideas(limit: 3, date: $date) {{
     screeners {{
       notRun {{ {UNKNOWN} }}
@@ -240,6 +240,28 @@ def test_a_table_cell_behind_a_skipped_step_is_drawn_by_kind_system(
     assert "errors" not in body, body
     kinds = {k for row in body["data"]["table"]["kinds"] for k in row if k}
     assert kinds == {"SYSTEM"}, body
+
+
+def _texts(node: Any) -> list[str]:
+    """Every served `kindText` and every `kindTexts[].text` under ``node``."""
+    if isinstance(node, dict):
+        found = [node["kindText"]] if "kindText" in node else []
+        found += [t["text"] for t in node.get("kindTexts", [])]
+        return found + [x for v in node.values() for x in _texts(v)]
+    if isinstance(node, list):
+        return [x for v in node for x in _texts(v)]
+    return []
+
+
+def test_every_served_kind_text_is_one_of_the_generic_reasons(
+    as_role: Callable[[Role], Graph],
+) -> None:
+    for role in (Role.TRADER, Role.ADMIN):
+        for day in (PREVIOUS, END):
+            body = as_role(role)(GAPS_QUERY, {**VARIABLES, "date": day.isoformat()})
+            assert "errors" not in body, body
+            texts = _texts(body["data"])
+            assert texts and set(texts) <= set(GENERIC_REASONS.values()), (role, set(texts))
 
 
 def test_an_internal_error_is_generic_for_a_trader() -> None:

@@ -20,9 +20,11 @@ function featureName(name: string): string {
 export interface UnavailableNoteProps {
   /** The `unavailable` of a session, table, result page or run. */
   gaps: readonly ServedUnavailable[];
+  /** A catalogue name in words (the page passes `featureTitle`); default: its column, humanised. */
+  titleOf?: (name: string) => string;
 }
 
-export function UnavailableNote({ gaps }: UnavailableNoteProps) {
+export function UnavailableNote({ gaps, titleOf = featureName }: UnavailableNoteProps) {
   const termHelp = useTermHelp();
   const groups = groupByKind(gaps);
   if (groups.length === 0) return null;
@@ -31,7 +33,7 @@ export function UnavailableNote({ gaps }: UnavailableNoteProps) {
       {groups.map((group) => (
         <Stack key={group.kind} gap={1}>
           <Banner tone="warning" title={KIND_TITLE[group.kind]} actions={termHelp(group.guideTerm)}>
-            {group.features.map(featureName).join(', ')}
+            {group.features.map(titleOf).join(', ')}
           </Banner>
           {group.causes.map((cause, index) => (
             <CauseChain key={index} links={cause.links} />

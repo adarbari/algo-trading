@@ -5,6 +5,7 @@
  */
 import { Banner, Disclosure, KeyValue, Panel, Stack, StatStrip, Text } from '@algotrade/ui';
 
+import { featureTitle } from '@/entities/feature';
 import { fromRest, UnavailableNote } from '@/entities/availability';
 import { previewPanelState, useScreenerBuilder } from '@/features/screener-builder';
 import {
@@ -62,7 +63,7 @@ function Summary({ preview }: { preview: ScreenPreview }) {
           Some rows could not be evaluated.
         </Banner>
       )}
-      <UnavailableNote gaps={fromRest(coverage.unavailable)} />
+      <UnavailableNote gaps={fromRest(coverage.unavailable)} titleOf={featureTitle} />
       {reasons.length > 0 && (
         <Disclosure
           label="Missing data"

@@ -6,6 +6,7 @@
 import { Banner, Button, Dialog, Field, Input, KeyValue, Select, Stack, Text } from '@algotrade/ui';
 import { useState } from 'react';
 
+import { featureTitle } from '@/entities/feature';
 import { fromRest, UnavailableNote } from '@/entities/availability';
 import { errorDetail } from '@/shared/api';
 
@@ -126,7 +127,7 @@ export function FormulaFeatureDialog({ open, onOpenChange, onSaved }: FormulaFea
             ]}
           />
         )}
-        {checked && <UnavailableNote gaps={fromRest(checked.unavailable)} />}
+        {checked && <UnavailableNote gaps={fromRest(checked.unavailable)} titleOf={featureTitle} />}
         <Field label="Unit">
           <Select
             options={UNITS.map((u) => ({ value: u, label: u.replace(/_/g, ' ') }))}

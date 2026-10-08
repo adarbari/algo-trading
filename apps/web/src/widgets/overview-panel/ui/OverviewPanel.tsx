@@ -21,6 +21,7 @@ import {
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 
+import { featureTitle } from '@/entities/feature';
 import { UnavailableNote } from '@/entities/availability';
 import { useInstrumentEvents, useInstrumentFacts } from '@/entities/instrument';
 import { useRegimeEpisodes } from '@/entities/regime';
@@ -90,7 +91,7 @@ export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
       >
         {view && profile && (
           <Stack gap={4}>
-            <UnavailableNote gaps={session?.unavailable ?? []} />
+            <UnavailableNote gaps={session?.unavailable ?? []} titleOf={featureTitle} />
             <Stack gap={2}>
               <Stack direction="row" gap={2} wrap>
                 <Chip label={profile.kind} />

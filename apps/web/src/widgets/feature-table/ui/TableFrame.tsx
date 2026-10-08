@@ -22,7 +22,7 @@ import type { ReactNode } from 'react';
 
 import { UnavailableNote, type ServedUnavailable } from '@/entities/availability';
 import { isStale } from '@/entities/explore';
-import type { ColumnPlan, TableRow } from '@/entities/feature';
+import { featureTitle, type ColumnPlan, type TableRow } from '@/entities/feature';
 import { helped } from '@/features/guide-help';
 
 /** A screener run's own coverage, as its run record says (not the session as read now). */
@@ -81,13 +81,13 @@ function Notes({ notes }: { notes: SessionNotes }) {
           The universe snapshot is from after this session.
         </Banner>
       ) : null}
-      <UnavailableNote gaps={notes.unavailable} />
+      <UnavailableNote gaps={notes.unavailable} titleOf={featureTitle} />
       {notes.run?.partial ? (
         <Banner tone="warning" title="Partial run">
           {`The run for ${notes.run.session} is PARTIAL; Run now re-runs it.`}
         </Banner>
       ) : null}
-      {notes.run ? <UnavailableNote gaps={notes.run.unavailable} /> : null}
+      {notes.run ? <UnavailableNote gaps={notes.run.unavailable} titleOf={featureTitle} /> : null}
     </>
   );
 }

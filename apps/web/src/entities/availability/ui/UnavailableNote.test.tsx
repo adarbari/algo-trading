@@ -70,6 +70,13 @@ describe('UnavailableNote', () => {
     expect(screen.getByRole('button', { name: 'help unavailable_not_stored' })).toBeVisible();
   });
 
+  it('names a feature as the page says, else by its humanised column', () => {
+    render(<UnavailableNote gaps={GAPS} titleOf={(name) => `T:${name.length}`} />);
+    expect(screen.getByText(/^T:\d+, T:\d+, T:\d+$/)).toBeVisible();
+    render(<UnavailableNote gaps={GAPS.slice(2)} />);
+    expect(screen.getByText('Next earnings date')).toBeVisible();
+  });
+
   it('renders nothing for no gaps', () => {
     const { container } = render(<UnavailableNote gaps={[]} />);
     expect(container).toBeEmptyDOMElement();
