@@ -14,7 +14,7 @@ import pytest
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import SITE_USER, UserContext
-from algotrade.data.chains import STALE_REASON, chain_status, tolerated_stale
+from algotrade.data.chains import chain_status, tolerated_stale
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.configs import resolve_config
 from algotrade.services.screening.run import run_screener
@@ -44,13 +44,15 @@ def test_stale_names_at_the_gates_limits_are_excluded_and_the_run_is_complete() 
     assert run.coverage is RunCoverage.COMPLETE
     assert (run.excluded, run.processed, run.coverage_pct) == (11, 89, 1.0)
     assert outcome.audit["excluded"] == 11 and outcome.audit["skipped"] == 0
-    assert outcome.audit["excluded_reasons"] == {STALE_REASON: 11}
+    assert outcome.audit["excluded_reasons"] == {"STALE_DATA: chain is for 2026-10-01": 11}
     stale = [r for r in run.rows if r.decision is Decision.EXCLUDED]
     assert {r.instrument_id for r in stale} == {
         *(f"EQ:C{i}" for i in range(1)),
         *(f"EQ:R{i}" for i in range(10)),
     }
-    assert all(r.reasons[0] == STALE_REASON for r in stale)  # then the screener's own reason
+    assert all(
+        r.reasons[0].startswith("STALE_DATA") for r in stale
+    )  # then the screener's own reason
     saved = reader.table("results/short_premium_liquidity", DAY)
     assert saved is not None
     assert set(

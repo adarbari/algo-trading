@@ -177,6 +177,7 @@ def run_screener(
     config: ResolvedConfig,
     session_date: date,
     now: datetime | None = None,
+    *,
     sources: SourcesSettings | None = None,
 ) -> ScreenOutcome:
     """Select -> screen -> audit -> save, for one resolved screener config and user."""

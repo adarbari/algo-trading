@@ -26,7 +26,6 @@ LIVE_OPTION_QUOTES = "live/option_quotes"
 # failed or missing fetch is a source problem; a stale chain is the feed serving an older session.
 FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED")  # FETCH_ERROR includes an open circuit
 STALE = "STALE_DATA"
-STALE_REASON = "stale chain (within the chains gate's tolerance)"
 
 
 def option_quotes(
@@ -146,8 +145,9 @@ def stale_in_tier(frame: pd.DataFrame, labels: pd.Series, tier: str) -> TierStal
 def tolerated_stale(
     status_frame: pd.DataFrame | None, sources: SourcesSettings
 ) -> Mapping[str, str]:
-    """The ``STALE_DATA`` underlyings (instrument id -> reason) of a chain status whose stale
-    share the chains acceptance check tolerated: every tier within its limit
+    """The ``STALE_DATA`` underlyings of a chain status whose stale share the chains
+    acceptance check tolerated, as instrument id -> its stored status text (the exclusion
+    reason, e.g. ``STALE_DATA: chain is for 2026-09-23``): every tier within its limit
     (``max_chain_stale_share_core`` / ``max_chain_stale_share``), fetch failures within
     ``max_chain_fetch_failures``. Empty otherwise (fail closed: a chains run that failed its
     check excludes nobody). The same helpers as ``check_chains``, so gate and screens agree."""
@@ -162,5 +162,5 @@ def tolerated_stale(
         return {}
     if rest.share > sources.max_chain_stale_share:
         return {}
-    ids = status_frame.loc[core.stale | rest.stale, "instrument_id"].astype(str)
-    return dict.fromkeys(ids, STALE_REASON)
+    stale = status_frame.loc[core.stale | rest.stale]
+    return dict(zip(stale["instrument_id"].astype(str), stale["status"].astype(str), strict=True))

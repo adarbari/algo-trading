@@ -42,4 +42,9 @@ critical `screens` step FAILED. Two thresholds judged the same names differently
 - Rule screens reject on missing data (0030), a processed outcome, so today they exclude nothing;
   the rule path is wired for rows a screen leaves unprocessed.
 - Excluded names carry their reason in `results/*`, so a stale name is never silently dropped.
-- Evaluation (ADR 0053) must drop EXCLUDED rows from the base rate as well as from the picks.
+- `services/evaluation` must drop EXCLUDED from the base rate when ADR 0053's harness filters
+  decisions.
+- The reason is the chain's stored status text (`STALE_DATA: chain is for <date>`), so the audit
+  shows each name's age.
+- The Builder preview does not exclude: it applies no gate either, and rule screens exclude
+  nothing today, so its dry run matches the saved run.

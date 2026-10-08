@@ -9,7 +9,6 @@ from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
-    STALE_REASON,
     chain_expiries,
     chain_status,
     live_option_quotes,
@@ -113,7 +112,7 @@ def test_tolerated_stale_lists_the_stale_names_when_every_tier_is_within_its_lim
     frame = pd.DataFrame(chain_status_rows(50, 1, 50, 10))  # exactly 2% and 20%
     found = tolerated_stale(frame, SOURCES)
     assert sorted(found) == ["EQ:C0", *sorted(f"EQ:R{i}" for i in range(10))]
-    assert set(found.values()) == {STALE_REASON}
+    assert set(found.values()) == {"STALE_DATA: chain is for 2026-10-01"}
 
 
 @pytest.mark.parametrize(
