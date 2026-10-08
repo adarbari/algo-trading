@@ -26,6 +26,17 @@ def test_a_text_model_provider_has_its_own_key_variable() -> None:
     assert env.llm_key("x") != env.LLM_API_KEY  # the legacy variable is the single-provider form
 
 
+def test_the_llm_off_switch_is_only_the_word_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(env.LLM_SWITCH, raising=False)
+    assert not env.llm_off()
+    for value in ("off", "OFF", " off "):
+        monkeypatch.setenv(env.LLM_SWITCH, value)
+        assert env.llm_off()
+    for value in ("", "on", "0", "false"):
+        monkeypatch.setenv(env.LLM_SWITCH, value)
+        assert not env.llm_off()
+
+
 def test_locations_and_user_resolve_flag_then_environment_then_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
