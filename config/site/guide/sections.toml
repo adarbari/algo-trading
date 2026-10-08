@@ -73,7 +73,7 @@ presets = ["support_reversal", "oversold_reversal", "exhaustion"]
 [[family]]
 id = "income"
 title = "Option income"
-presets = ["vrp_scanner"]
+presets = ["vrp_scanner", "vrp_iv_hv"]
 
 [[family]]
 id = "events"
