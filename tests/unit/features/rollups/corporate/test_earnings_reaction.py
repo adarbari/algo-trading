@@ -164,3 +164,18 @@ def test_a_moved_date_listed_twice_is_one_report() -> None:
     first, moved = date(2026, 7, 22), date(2026, 8, 5)  # one quarter, two dates
     got = _row(_compute([(A, first, first), (A, moved, moved)], _bars()))
     assert got["reaction_end_date"] == date(2026, 7, 23)  # the earliest, not the 08-06 one
+
+
+class _NoTrading(dict[date, float]):
+    """Every session of A traded nothing (a halted or dormant name)."""
+
+    def get(self, key: date, default: float | None = None) -> float:  # type: ignore[override]
+        return 0.0
+
+
+def test_a_name_with_no_pre_event_trading_has_a_null_volume_ratio_never_an_error() -> None:
+    """The 2026-10-08 backfill stopped on ``float division by zero`` (a zero pre-event ADV)."""
+    reports = [(A, q, q) for q in QUARTERS]
+    got = _row(_compute(reports, _bars(volume=_NoTrading({SESSION: 0.0}))))  # non-empty: truthy
+    assert pd.isna(got["earnings_volume_ratio"]) and got["pre_event_adv_usd_20d"] == 0.0
+    assert got["reaction_status"] == "OK"  # the return does not need volume
