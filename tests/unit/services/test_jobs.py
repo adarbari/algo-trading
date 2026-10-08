@@ -12,6 +12,14 @@ from algotrade.services.jobs import JobContext, JobRecord, JobStatus, LocalJobRu
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.backends.memory import MemoryRuns
 from algotrade.storage.configs.files import MemoryConfigStore
+from tests.unit.services.evaluation.cross_section.conftest import (
+    ACTIVE,
+    AS_OF,
+    DAYS,
+    build_world,
+    edge_document,
+    screen,
+)
 
 T0 = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
 USER = UserContext("alice")
@@ -213,3 +221,30 @@ def test_as_completed_yields_every_item_and_its_outcome() -> None:
         except ValueError as exc:
             results[item] = str(exc)
     assert results == {1: 10, 2: 20, 3: "three"}
+
+
+def test_edge_eval_handler_runs_the_harness_and_reports_rows() -> None:
+    w = build_world()
+    configs = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "momo"): screen(),
+            ("site", "edges", "drift"): edge_document(),
+        }
+    )
+    runner = LocalJobRunner(
+        MemoryRuns(),
+        LIBRARY_HANDLERS,
+        {"reader": w.reader, "writer": w.results, "configs": configs},
+    )
+    params = {"edge": "drift", "start": DAYS[0].isoformat(), "end": DAYS[-1].isoformat()}
+    job = runner.wait(runner.submit("edge-eval", {**params, "as_of": AS_OF.isoformat()}, USER))
+    assert job.status is JobStatus.COMPLETE, job.error
+    assert job.result["edge"] == "drift" and job.result["trials"] == 1
+    assert job.result["survivorship"] == {"2": [0, 4]}
+    rows = job.result["rows"]
+    assert rows[0]["variant"] == "momo" and rows[0]["lift"] == 2.0
+    assert w.reader.table("results/edge_eval", DAYS[-1]) is not None
+    missing = runner.wait(runner.submit("edge-eval", {**params, "edge": "nope"}, USER))
+    assert missing.status is JobStatus.FAILED and "unknown edge" in (missing.error or "")
+    runner.shutdown()

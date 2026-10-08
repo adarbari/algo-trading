@@ -238,7 +238,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/quant"
-purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, edge statistics (lift, effect size, deciles, deflated Sharpe, PBO)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -265,7 +265,11 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/)"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/cross_section"
+purpose = "the edge harness (ADR 0053): an edge's schedule sessions, each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them) and its results/edge_eval rows and report"
 
 [[dir]]
 path = "src/algotrade/services/events"

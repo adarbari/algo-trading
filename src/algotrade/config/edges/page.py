@@ -65,6 +65,8 @@ def _section(e: Edge) -> list[str]:
         f"- **Screeners:** {_ids(e.screeners)}",
         f"- **Baselines:** {_ids(e.baselines)}",
     ]
+    if e.frozen_from:
+        lines.append(f"- **Frozen period:** from {e.frozen_from.isoformat()}")
     if e.notes:
         lines.append(f"- **Notes:** {e.notes}")
     lines += ["", "**Quality bar**", ""]

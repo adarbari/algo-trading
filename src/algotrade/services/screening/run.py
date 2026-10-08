@@ -153,15 +153,25 @@ def _write(
             writer.write_result(name, stamp.session_date, stamp.run_id, frame, pending=True)
 
 
-def run_screener(
-    reader: StoreReader,
-    writer: ResultWriter,
-    config: ResolvedConfig,
-    session_date: date,
-    now: datetime | None = None,
-) -> ScreenOutcome:
-    """Select -> screen -> audit -> save, for one resolved screener config and user."""
-    now = now or datetime.now(UTC)
+@dataclass(frozen=True)
+class ScreenSession:
+    """One screen of one session as computed, before anything is written: the audited run, a
+    rule screen's ranked rows, the selection, the universe it read and the regime gate."""
+
+    run: ScreenRun
+    rules: RuleScreenResult | None
+    selected: SelectionResult
+    universe: Universe
+    gate: RegimeGate | None
+    missing_tables: tuple[str, ...]
+
+
+def screen_session(
+    reader: StoreReader, config: ResolvedConfig, session_date: date
+) -> ScreenSession:
+    """Select -> screen -> audit for one resolved screener config on what was known at
+    ``session_date``: no run record, no write (``run_screener`` saves it; the edge harness
+    scores it, ADR 0053)."""
     if config.config.kind != "screener":
         raise ConfigurationError(f"{config.config.id} is a {config.config.kind}, not a screener")
     if config.selection is None:
@@ -186,6 +196,26 @@ def run_screener(
         ids = list(selected.instruments)
         run = run_screen(screener, view, ids, screening.min_coverage, gate)
     run = settle_coverage(run, selected, universe, session_date, screening, missing_tables)
+    return ScreenSession(run, rules, selected, universe, gate, missing_tables)
+
+
+def run_screener(
+    reader: StoreReader,
+    writer: ResultWriter,
+    config: ResolvedConfig,
+    session_date: date,
+    now: datetime | None = None,
+) -> ScreenOutcome:
+    """Select -> screen -> audit -> save, for one resolved screener config and user."""
+    now = now or datetime.now(UTC)
+    screened = screen_session(reader, config, session_date)
+    run, rules, selected, universe = (
+        screened.run,
+        screened.rules,
+        screened.selected,
+        screened.universe,
+    )
+    gate, missing_tables = screened.gate, screened.missing_tables
     user = config.user.user_id
     record = start_run(run_job_name(config.config.id, user), session_date, now)
     run_id = record.run_id

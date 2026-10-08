@@ -7,12 +7,13 @@ algotrade-backtest [--user U] config validate|show sma_trend
 algotrade-backtest [--user U] config validate-features   (the user's expression features)
 algotrade-backtest evaluate [--update-baseline] [--report scorecard.md]
 algotrade-backtest regime-scorecard [--report regime-scorecard.txt]   (the regime episodes)
+algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [--report edges.md]
 """
 
 import argparse
 import sys
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from algotrade.config.env import load_dotenv
@@ -22,6 +23,7 @@ from algotrade_backtest.commands import (
     cmd_config,
     cmd_datasets,
     cmd_evaluate,
+    cmd_evaluate_edges,
     cmd_regime_scorecard,
 )
 
@@ -67,6 +69,16 @@ def build_parser() -> argparse.ArgumentParser:
         "regime-scorecard", help="the regime model against the reference crash episodes"
     )
     rg.add_argument("--report", type=Path, help="also write the text here")
+    ee = sub.add_parser(
+        "evaluate-edges", help="the edge harness: each edge's screeners against the stored outcomes"
+    )
+    ee.add_argument("--edge", help="one edge id (default: every open edge with screeners)")
+    ee.add_argument("--from", dest="start", type=date.fromisoformat, help="first session")
+    ee.add_argument("--to", dest="end", type=date.fromisoformat, help="last session")
+    ee.add_argument(
+        "--as-of", type=datetime.fromisoformat, help="outcomes known by this instant (default now)"
+    )
+    ee.add_argument("--report", type=Path, help="also write the report here")
     return parser
 
 
@@ -78,6 +90,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "backtest": cmd_backtest,
         "evaluate": cmd_evaluate,
         "regime-scorecard": cmd_regime_scorecard,
+        "evaluate-edges": cmd_evaluate_edges,
         "config": cmd_config,
     }
     try:

@@ -2,6 +2,7 @@
 fails closed with the file and the key; rejected and blocked documents need their reason and
 may leave the quality bar unanswered."""
 
+from datetime import date
 from typing import Any
 
 import pytest
@@ -172,3 +173,12 @@ def test_every_rule_fails_closed_with_the_file_and_key(
     with pytest.raises(ConfigurationError, match=message) as caught:
         parse(**changes)
     assert "drift" in str(caught.value)
+
+
+def test_the_frozen_period_start_is_optional_and_a_date() -> None:
+    assert parse().frozen_from is None
+    assert parse(frozen_from=date(2026, 4, 1)).frozen_from == date(2026, 4, 1)
+    assert parse(frozen_from="2026-04-01").frozen_from == date(2026, 4, 1)
+    for bad in ("last quarter", 20260401, "2026-13-01"):
+        with pytest.raises(ConfigurationError, match="frozen_from"):
+            parse(frozen_from=bad)

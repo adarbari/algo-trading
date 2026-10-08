@@ -315,6 +315,11 @@ owner = "src/algotrade/storage/tables/result_writer.py"
 note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen"
 
 [[table]]
+name = "results/edge_eval"
+owner = "src/algotrade/storage/tables/result_writer.py"
+note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py"
+
+[[table]]
 name = "results/*"
 owner = "src/algotrade/storage/tables/result_writer.py"
 note = "one results/<name> per screener (services/screening/run.py) or backtest output (services/backtests/run.py)"

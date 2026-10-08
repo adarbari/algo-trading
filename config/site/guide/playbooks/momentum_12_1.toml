@@ -1,0 +1,32 @@
+# L3 site setting: the Guide's playbook for the site preset momentum_12_1 (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "momentum_12_1"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable name by its 12-month return with the last month left out, the momentum signal of the finance literature. It is a ranking, not a chart pattern: the top of the list is where the past year's winners are."
+hit = "The name is a listed common stock, ADR or ETF closing above $5 that trades at least $50M a day, and it has a 12-1 momentum value (the close a month ago over the close a year ago, minus one). Every such name qualifies; the order is the point, best momentum first."
+not_checked = "It does not check the trend's shape (a name can be ranked high on one old jump), how extended it is, or earnings dates. It is the edge harness's momentum test, not a trade signal."
+before_acting = [
+  "Momentum crashes in sharp rebounds after a market fall: the winners of the fall lag the bounce. Check the market's regime before acting on the top of the list.",
+  "A year back is one start date: compare rollup.trend_stats@v2.mom_12_1 with rollup.trend_stats@v2.ret_252d; when they differ a lot, the last month moved the name.",
+  "A high rank can be a takeover target pinned near its offer: feature.atr_pct near 0 after one large day is the signature.",
+]
+sources = [
+  "Jegadeesh and Titman, Returns to Buying Winners and Selling Losers (1993)",
+  "Daniel and Moskowitz, Momentum Crashes (2016)",
+]
+related = [
+  { id = "trend_continuation", reason = "leaders whose chart is also in an orderly uptrend" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+mom_12_1 = "Has a 12-1 momentum value"
