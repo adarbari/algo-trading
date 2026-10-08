@@ -78,4 +78,4 @@ presets = ["vrp_scanner"]
 [[family]]
 id = "events"
 title = "Earnings events"
-presets = ["pead_small_cap"]
+presets = ["pead_small_cap", "eap_all", "eap_volume"]

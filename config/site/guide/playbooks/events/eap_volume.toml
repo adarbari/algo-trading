@@ -1,0 +1,32 @@
+# L3 site setting: the Guide's playbook for the site preset eap_volume (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "eap_volume"
+version = 1  # the preset version this prose was written for
+summary = "Lists the stocks with an expected earnings report whose past reports drew at least twice the normal volume, the busiest first: Frazzini and Lamont's finding that the earnings announcement premium is largest where announcements draw the most volume. It is a candidate edge under test."
+hit = "The name meets the earnings announcement premium list (liquid, report date expected) and also has an earnings volume ratio of at least 2 (its last four reports drew at least twice the normal volume). The usually busiest report ranks first."
+not_checked = "It does not know whether this report will draw the usual volume, that the date is confirmed, or whether the premium exists: the harness measures that. Names with fewer than four past reports are left out."
+before_acting = [
+  "The ratio, rollup.earnings_reaction@v1.earnings_volume_ratio, is the past four reports' dollar volume against the 20 sessions before each: it describes the past, not the coming report.",
+  "A date taken from last year is a guess: check rollup.earnings_expected@v1.expected_basis.",
+  "The premium has faded in the US in recent studies; read the harness's decile spread by this ratio before trusting the order.",
+]
+sources = [
+  "Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007)",
+]
+related = [
+  { id = "eap_all", reason = "every name with an expected report, unranked" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+expected_basis = "Its next report date is announced or taken from last year"
+volume_ratio = "Its reports draw at least twice the normal volume (over the last four)"

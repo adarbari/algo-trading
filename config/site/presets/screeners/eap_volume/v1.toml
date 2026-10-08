@@ -1,0 +1,55 @@
+# Earnings announcement premium, high expected volume (ADR 0053, the ED4c amendment; edge
+# earnings_announcement_premium): Frazzini and Lamont's split, the same names as eap_all that also
+# have an earnings volume ratio of at least 2 (the mean over the last four reports of the reaction window's dollar
+# volume against the 20 sessions before it), ranked by it, largest first; the premium is claimed to
+# concentrate in the top. A missing ratio (fewer than four reports) never passes (ADR 0030). The
+# preset ranks only: the harness takes the edge's top K and the decile spread by this rank.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "eap_volume"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Earnings announcement premium: high volume"
+
+# ------------------------------------------------ who is screened and tradeable (the liquid base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.expected_basis]
+field = "rollup.earnings_expected@v1.expected_basis"
+op = "in"
+value = ["SCHEDULED", "PRIOR_YEAR"]
+
+[criteria.volume_ratio]
+field = "rollup.earnings_reaction@v1.earnings_volume_ratio"
+op = "gte"
+value = 2.0  # pre-declared cut for high expected announcement volume (Frazzini and Lamont)
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+expected_report_date = "rollup.earnings_expected@v1.expected_report_date"
+expected_basis = "rollup.earnings_expected@v1.expected_basis"
+earnings_volume_ratio = "rollup.earnings_reaction@v1.earnings_volume_ratio"
+
+[rank]
+tie_break = "rollup.earnings_reaction@v1.earnings_volume_ratio"
+tie_break_order = "desc"
