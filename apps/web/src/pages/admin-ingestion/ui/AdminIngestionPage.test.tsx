@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminIngestionPage } from './AdminIngestionPage';
 
@@ -15,12 +16,17 @@ vi.mock('@/widgets/verification-panel', () => ({ VerificationPanel: stub('verifi
 vi.mock('@/widgets/review-items-panel', () => ({ ReviewItemsPanel: stub('review') }));
 vi.mock('@/widgets/recent-runs-panel', () => ({ RecentRunsPanel: stub('runs') }));
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('AdminIngestionPage', () => {
   it('lays out every section and passes the selected cell down', () => {
     render(
       <AdminIngestionPage
         selected={{ dataset: 'bars/1d', session: '2026-10-02' }}
         onSelectCell={vi.fn()}
+        onClearCell={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ingestion' })).toBeInTheDocument();
@@ -35,5 +41,19 @@ describe('AdminIngestionPage', () => {
     ]) {
       expect(document.body).toHaveTextContent(`[${name}]`);
     }
+  });
+
+  it('on a phone the drill-down opens in a sheet only once a cell is chosen, and closing clears it', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    const onClearCell = vi.fn();
+    const props = { onSelectCell: vi.fn(), onClearCell };
+    const { rerender } = render(<AdminIngestionPage {...props} />);
+    expect(screen.queryByText('[drilldown]')).not.toBeInTheDocument();
+    rerender(
+      <AdminIngestionPage selected={{ dataset: 'bars/1d', session: '2026-10-02' }} {...props} />,
+    );
+    expect(await screen.findByText('[drilldown]')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(onClearCell).toHaveBeenCalled();
   });
 });

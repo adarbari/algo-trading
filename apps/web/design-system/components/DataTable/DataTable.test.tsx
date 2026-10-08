@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
 import type { DataTableColumn } from './columns';
@@ -347,5 +347,58 @@ describe('DataTable', () => {
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(header.getAttribute('aria-sort')).toBe('none'); // the action did not sort
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('DataTable on a narrow width', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the essential columns, the rest wait in the picker until added back', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    const columns: DataTableColumn<TickerRow>[] = [
+      { id: 'symbol', header: 'Symbol', value: (r) => r.symbol, hideable: false },
+      { id: 'name', header: 'Name', value: (r) => r.name },
+      { id: 'close', header: 'Close', value: (r) => r.close, essential: true },
+      { id: 'adv', header: 'ADV', value: (r) => r.adv },
+    ];
+    render(<Table columns={columns} />);
+    const headers = () => screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers()).toEqual(['Symbol', 'Close']);
+    const button = screen.getByRole('button', { name: /Columns/ });
+    expect(button).toHaveTextContent('2 of 4');
+    await userEvent.click(button);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'ADV' }));
+    expect(headers()).toEqual(['Symbol', 'Close', 'ADV']);
+  });
+
+  it('keeps the first three columns when none is marked essential', () => {
+    vi.stubGlobal('innerWidth', 375);
+    const columns: DataTableColumn<TickerRow>[] = [
+      { id: 'symbol', header: 'Symbol', value: (r) => r.symbol },
+      { id: 'name', header: 'Name', value: (r) => r.name },
+      { id: 'close', header: 'Close', value: (r) => r.close },
+      { id: 'adv', header: 'ADV', value: (r) => r.adv },
+    ];
+    render(<Table columns={columns} />);
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
+      'Symbol',
+      'Name',
+      'Close',
+    ]);
+  });
+
+  it('shows every column on a wide width', () => {
+    vi.stubGlobal('innerWidth', 1400);
+    const columns: DataTableColumn<TickerRow>[] = [
+      { id: 'symbol', header: 'Symbol', value: (r) => r.symbol },
+      { id: 'name', header: 'Name', value: (r) => r.name },
+      { id: 'close', header: 'Close', value: (r) => r.close, essential: true },
+      { id: 'adv', header: 'ADV', value: (r) => r.adv },
+    ];
+    render(<Table columns={columns} />);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(4);
+    expect(screen.queryByRole('button', { name: /Columns/ })).toBeNull();
   });
 });

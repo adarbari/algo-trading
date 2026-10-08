@@ -4,6 +4,11 @@
   max-width: 100%;
 }
 
+/* A disabled trigger swallows pointer events: the anchor takes them, so hover and tap still describe it. */
+.anchor > :disabled {
+  pointer-events: none;
+}
+
 .tooltip {
   z-index: var(--z-tooltip);
   box-sizing: border-box;

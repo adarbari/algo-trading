@@ -7,7 +7,8 @@
 import {
   Button,
   formatValue,
-  Kbd,
+  KeyHints,
+  type KeyHint,
   KeyValue,
   Mono,
   Panel,
@@ -53,6 +54,14 @@ const WORDS: Readonly<Record<string, string>> = {
   FAIL: 'Missed',
   MISSING: 'No value',
 };
+
+/** The keyboard shortcuts of the picks table (its `rowKeys`), as hints; hidden under a coarse pointer. */
+const KEY_HINTS: readonly KeyHint[] = [
+  { keys: ['j', 'k'], label: 'move' },
+  { keys: ['c'], label: 'compare' },
+  { keys: ['x'], label: 'dismiss' },
+  { keys: ['Enter'], label: 'open in Explore' },
+];
 
 export function PickDetail({
   row,
@@ -128,25 +137,7 @@ export function PickDetail({
             Dismiss
           </Button>
         </Stack>
-        <Stack direction="row" gap={2} align="center" wrap>
-          <Kbd keys={['j']} size="xs" />
-          <Kbd keys={['k']} size="xs" />
-          <Text size="xs" tone="muted">
-            move
-          </Text>
-          <Kbd keys={['c']} size="xs" />
-          <Text size="xs" tone="muted">
-            compare
-          </Text>
-          <Kbd keys={['x']} size="xs" />
-          <Text size="xs" tone="muted">
-            dismiss
-          </Text>
-          <Kbd keys={['Enter']} size="xs" />
-          <Text size="xs" tone="muted">
-            open in Explore
-          </Text>
-        </Stack>
+        <KeyHints hints={KEY_HINTS} />
       </Stack>
     </Panel>
   );

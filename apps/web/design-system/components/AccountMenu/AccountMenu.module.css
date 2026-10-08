@@ -1,0 +1,4 @@
+/* AccountMenu: the popover's content keeps the label width so a short name does not squeeze the switch. */
+.menu {
+  min-width: var(--size-label);
+}

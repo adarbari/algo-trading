@@ -92,7 +92,6 @@ export function featureColumn(
     description: describe(info),
     value: (row) => shownValue(row.cells[info.name]?.value ?? null),
     format,
-    hideable: false,
     ...fieldHelp(info.name),
     cell: ({ row, formatted }) => {
       const cell = row.cells[info.name];
@@ -179,6 +178,7 @@ export function decisionColumn(
     description: "The screen's decision for the ticker",
     value: (row) => row.decision,
     width: 'lg',
+    essential: true,
     cell: ({ row }) =>
       row.decision ? (
         <Stack gap={0}>
@@ -203,6 +203,7 @@ export function scoreColumn(
     value: (row) => row.score,
     format: { kind: 'number', digits: 0 },
     width: 'xs',
+    essential: true,
     cell: ({ row, formatted }) =>
       row.scoring ? (
         <ScoreBreakdown row={row.scoring} {...(labelOf ? { labelOf } : {})} />
