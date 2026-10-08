@@ -36,7 +36,7 @@ describe('harness run hooks', () => {
   });
 
   it('asks HarnessRun for one run only once a run is chosen', async () => {
-    GQL.mockResolvedValue({ harnessRun: { runId: 'run-b', rows: [row()] } });
+    GQL.mockResolvedValue({ harnessRun: { runId: 'run-b', rows: [row()], lostInputs: [] } });
     const idle = renderHook(() => useHarnessRunRows(null), { wrapper });
     expect(idle.result.current.fetchStatus).toBe('idle');
     expect(GQL).not.toHaveBeenCalled();

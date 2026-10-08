@@ -1,5 +1,5 @@
 /** Test builders for the harness-run entity (exported for widget tests): runs as the API answers them. */
-import type { HarnessRow, HarnessRun } from './types';
+import type { HarnessLostInput, HarnessRow, HarnessRun } from './types';
 
 export const run = (over: Partial<HarnessRun> = {}): HarnessRun => ({
   runId: 'run-b',
@@ -63,5 +63,13 @@ export const row = (over: Partial<HarnessRow> = {}): HarnessRow => ({
   lift: 1.14,
   decileSpread: 0.012,
   exploratory: false,
+  ...over,
+});
+
+export const lostInput = (over: Partial<HarnessLostInput> = {}): HarnessLostInput => ({
+  variant: 'main/momentum_12_1',
+  horizon: 21,
+  table: 'rollups/instrument/ibkr_iv@v1',
+  sessions: 4,
   ...over,
 });

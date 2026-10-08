@@ -227,7 +227,7 @@ export type HarnessRunQueryVariables = Exact<{
 }>;
 
 
-export type HarnessRunQuery = { harnessRun: { runId: string, rows: Array<{ edgeVariant: string, variant: string, role: string, horizonSessions: number, sliceKind: string, sliceValue: string, sessions: number | null, picks: number | null, hits: number | null, trials: number | null, hitRate: number | null, baseRate: number | null, lift: number | null, decileSpread: number | null, exploratory: boolean }> } | null };
+export type HarnessRunQuery = { harnessRun: { runId: string, lostInputs: Array<{ variant: string, horizon: number, table: string, sessions: number }>, rows: Array<{ edgeVariant: string, variant: string, role: string, horizonSessions: number, sliceKind: string, sliceValue: string, sessions: number | null, picks: number | null, hits: number | null, trials: number | null, hitRate: number | null, baseRate: number | null, lift: number | null, decileSpread: number | null, exploratory: boolean }> } | null };
 
 export type EtfHoldingsQueryVariables = Exact<{
   key: string;
@@ -1361,6 +1361,12 @@ export const HarnessRunDocument = new TypedDocumentString(`
     query HarnessRun($runId: String!) {
   harnessRun(runId: $runId) {
     runId
+    lostInputs {
+      variant
+      horizon
+      table
+      sessions
+    }
     rows {
       edgeVariant
       variant

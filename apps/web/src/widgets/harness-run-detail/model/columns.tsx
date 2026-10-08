@@ -4,7 +4,7 @@
  */
 import { Mono, StatusBadge, type DataTableColumn } from '@algotrade/ui';
 
-import { rowLabel, type HarnessRow } from '@/entities/harness-run';
+import { rowLabel, type HarnessLostInput, type HarnessRow } from '@/entities/harness-run';
 import { GuideHelp } from '@/features/guide-help';
 
 const term = (id: string) => <GuideHelp entry={{ kind: 'term', id }} />;
@@ -90,6 +90,29 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
       value: (r) => r.decileSpread ?? null,
       format: { kind: 'percent', digits: 2 },
       align: 'end',
+    },
+  ];
+}
+
+/** The input tables a variant had no data in: the sessions lost to each (unmeasured, not a miss). */
+export function lostColumns(): DataTableColumn<HarnessLostInput>[] {
+  return [
+    { id: 'variant', header: 'Variant', value: (l) => l.variant, hideable: false, grow: true },
+    {
+      id: 'horizon',
+      header: 'Horizon',
+      value: (l) => l.horizon,
+      format: COUNT,
+      align: 'end',
+    },
+    { id: 'table', header: 'Missing table', value: (l) => l.table, essential: true },
+    {
+      id: 'sessions',
+      header: 'Sessions lost',
+      value: (l) => l.sessions,
+      format: COUNT,
+      align: 'end',
+      essential: true,
     },
   ];
 }

@@ -72,6 +72,11 @@ from algotrade.services.evaluation.cross_section.picks import (
     SelectionReads,
     screen_variant,
 )
+from algotrade.services.evaluation.cross_section.report_containment import (
+    ReportContainment,
+    containment,
+    reports_after,
+)
 from algotrade.services.evaluation.cross_section.sessions import (
     decision_sessions,
     entry_session,
@@ -123,6 +128,7 @@ class VariantResult:
     iv_source: str | None = None  # the run's iv_field when the outcome reads an implied vol
     licence: str | None = None  # that field's catalogue licence
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
+    report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
 
 
 @dataclass(frozen=True)
@@ -478,6 +484,7 @@ def evaluate_edge(
     ]
     stats = _measure(reader, session, plans, variants, schedules, as_of)
     results: list[VariantResult] = []
+    reports = None  # the real report dates, read once and only for an earnings_expected edge
     starts: dict[int, int] = {}
     unclosed: dict[int, int] = {}
     for plan in plans:
@@ -488,6 +495,20 @@ def evaluate_edge(
         unclosed.setdefault(
             horizon, sum(all(leg.entry not in closed for leg in b) for b in plan.blocks)
         )
+        diagnostic = None
+        if scope.edge.event_class == "earnings_expected":
+            reports = reports_after(reader, as_of) if reports is None else reports
+            diagnostic = containment(
+                [
+                    (i, leg.decision, leg.entry)
+                    for b in plan.blocks
+                    for leg in b
+                    if leg.entry in closed
+                    for i in sorted(schedules[scope.key].names[leg.decision])
+                ],
+                horizon,
+                reports,
+            )
         for variant in variants:
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
@@ -514,6 +535,7 @@ def evaluate_edge(
                     edge_variant=scope.key,
                     iv_source=scope.iv_field if needs_iv else None,
                     licence=licences[scope.key],
+                    report_containment=diagnostic,
                     lost_sessions=dict(
                         Counter(stats.lost.get((plan.key, variant.id), {}).values())
                     ),

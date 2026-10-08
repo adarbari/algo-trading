@@ -72,6 +72,22 @@ def test_the_trial_log_figures_and_the_unrecorded(backend: MemoryBackend) -> Non
     assert bare.variants == () and bare.knowledge_ts == T
 
 
+def test_the_lost_input_tables_come_from_the_trial_log(backend: MemoryBackend) -> None:
+    trials = [
+        {"variant": "momo", "edge_variant": "main", "horizon": 20,
+         "lost_sessions": {"rollups/ibkr_iv": 4, "rollups/other": 1}},
+        {"variant": "base", "horizon": 5, "lost_sessions": {}},
+    ]  # fmt: skip
+    _record(backend, {"trials": trials}, "edge-eval:drift:site")
+    [run] = load_harness_runs(stores(backend))
+    assert [(x.variant, x.horizon, x.table, x.sessions) for x in run.lost_inputs] == [
+        ("main/momo", 20, "rollups/ibkr_iv", 4), ("main/momo", 20, "rollups/other", 1),
+    ]  # fmt: skip
+    _record(backend, {"trials": [{"variant": "v", "horizon": 1}]}, "edge-eval:drift:local")
+    bare = next(r for r in load_harness_runs(stores(backend)) if r.user == "local")
+    assert bare.lost_inputs == ()  # an older record without the key: none, never invented
+
+
 def test_one_run_by_id_only_an_evaluation_run(backend: MemoryBackend) -> None:
     write_run(backend, "r1", FROZEN, 0.5)
     ResultWriter(backend).save_run(RunRecord("other", "nightly", END, T))

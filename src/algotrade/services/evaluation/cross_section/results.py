@@ -105,6 +105,9 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "no_entry_bar": sum(s.no_entry_bar for s in r.stats),
         "excluded_coverage": m.excluded_coverage,
         "lost_sessions": dict(r.lost_sessions),  # table with no data -> decision sessions
+        "report_containment": None
+        if r.report_containment is None
+        else asdict(r.report_containment),
     }
 
 
@@ -120,6 +123,22 @@ def lost_sessions(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
         }
         for r in evaluation.results
         for table, n in sorted(r.lost_sessions.items())
+    ]
+
+
+def report_containment(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per variant and horizon of an ``earnings_expected`` edge, the share of event windows that
+    contained the real report (a diagnostic, ``report_containment.py``; none for other edges)."""
+    return [
+        {
+            "variant": f"{r.edge_variant}/{r.variant}",
+            "horizon": r.horizon,
+            "windows": r.report_containment.windows,
+            "contained": r.report_containment.contained,
+            "no_report": r.report_containment.no_report,
+        }
+        for r in evaluation.results
+        if r.report_containment is not None
     ]
 
 

@@ -855,7 +855,7 @@ type GuideUse {
 }
 
 """
-One edge evaluation run of any status: `user` whose run (`site`: the shared one), `splitFrom` and `exploratory`, `variants` and `horizons` measured, `sessions` the most any variant measured, the left-out counts `unclosed`, `excludedCoverage` (no screen run or input tables), `scoreCoverage` (lowest share of eligible names scored) and `noEntryBar`, `trials` counted and `knowledgeTs` (null counts: not recorded)
+One edge evaluation run of any status: `user` whose run (`site`: the shared one), `splitFrom` and `exploratory`, `variants` and `horizons` measured, `sessions` the most any variant measured, the left-out counts `unclosed`, `excludedCoverage` (no screen run or input tables), `scoreCoverage` (lowest share of eligible names scored) and `noEntryBar`, `lostInputs` (the input tables a variant lacked, with the sessions lost to each), `trials` counted and `knowledgeTs` (null counts: not recorded)
 """
 type HarnessRun {
   runId: String!
@@ -875,6 +875,7 @@ type HarnessRun {
   excludedCoverage: Int
   scoreCoverage: Float
   noEntryBar: Int
+  lostInputs: [LostInput!]!
   trials: Int
   knowledgeTs: DateTime!
   asOf: String
@@ -1126,6 +1127,16 @@ type LlmUsage {
   daily: [UsageDay!]!
   reliability: UsageReliability!
   recent: [UsageCall!]!
+}
+
+"""
+An input table a variant (`<edge variant>/<screener>`) had no data in at a horizon, and the decision sessions lost to it (counted as unmeasured, never a miss)
+"""
+type LostInput {
+  variant: String!
+  horizon: Int!
+  table: String!
+  sessions: Int!
 }
 
 """

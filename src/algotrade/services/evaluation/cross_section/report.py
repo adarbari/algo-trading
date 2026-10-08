@@ -49,6 +49,13 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
             f"LOST: {lost['variant']} h={lost['horizon']} lost {lost['sessions']} sessions: "
             f"no data in {lost['table']} (counted as unmeasured, not a miss)"
         )
+    for c in result.get("report_containment", []):
+        share = c["contained"] / c["windows"] if c["windows"] else None
+        lines.append(
+            f"CONTAINED: {c['variant']} h={c['horizon']} contained the report: "
+            f"{'-' if share is None else f'{share:.0%}'} of {c['windows']} windows "
+            f"({c['no_report']} with no later report stored; a diagnostic, never a filter)"
+        )
     rows: Sequence[Mapping[str, Any]] = result["rows"]
     header = "| " + " | ".join(label for _, label, _ in COLUMNS) + " |"
     divider = "|" + "|".join("---" for _ in COLUMNS) + "|"
