@@ -4,13 +4,7 @@
  * guard sends it `?reason=unregistered` when a valid token belongs to no registered user, which
  * signs the session out (so the next visit is a plain sign-in) and says why.
  */
-import {
-  createRoute,
-  lazyRouteComponent,
-  redirect,
-  useNavigate,
-  useSearch,
-} from '@tanstack/react-router';
+import { createRoute, redirect, useNavigate, useSearch } from '@tanstack/react-router';
 
 import { ensureViewer, NOT_REGISTERED } from '@/entities/viewer';
 import { signOutSession } from '@/shared/api';
@@ -18,8 +12,9 @@ import { signOutSession } from '@/shared/api';
 import { DEFAULT_WORKSPACE } from '../workspaces';
 import type { LoginReason } from '../workspaces/guard';
 import { rootRoute } from './root';
+import { lazyPage } from './lazy-page';
 
-const LoginPage = lazyRouteComponent(() => import('@/pages/login'), 'LoginPage');
+const LoginPage = lazyPage(() => import('@/pages/login'), 'LoginPage');
 
 interface LoginSearch {
   reason?: LoginReason;

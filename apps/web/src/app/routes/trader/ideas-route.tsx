@@ -2,11 +2,12 @@
  * Trader > Ideas: tickers open in Explore, one or as a compare set (Explore's search params); a
  * screener chip opens that screener's results.
  */
-import { createRoute, lazyRouteComponent, useNavigate } from '@tanstack/react-router';
+import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
+import { lazyPage } from '../lazy-page';
 
-const IdeasPage = lazyRouteComponent(() => import('@/pages/trader-ideas'), 'IdeasPage');
+const IdeasPage = lazyPage(() => import('@/pages/trader-ideas'), 'IdeasPage');
 
 function IdeasRoute() {
   const navigate = useNavigate();

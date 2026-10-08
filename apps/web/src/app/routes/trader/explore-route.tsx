@@ -2,14 +2,15 @@
  * Trader > Explore: the route validates the search params (Explore's whole state, so views
  * are shareable links) and hands them to the page with a setter that replaces the URL.
  */
-import { createRoute, lazyRouteComponent, useNavigate } from '@tanstack/react-router';
+import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { parseExploreSearch, type ExploreSearch } from '@/entities/explore';
 import type { SearchPatch } from '@/pages/trader-explore';
 
 import { traderRoute } from './layout-route';
+import { lazyPage } from '../lazy-page';
 
-const ExplorePage = lazyRouteComponent(() => import('@/pages/trader-explore'), 'ExplorePage');
+const ExplorePage = lazyPage(() => import('@/pages/trader-explore'), 'ExplorePage');
 
 /** The search params after a patch: `undefined` removes a key. */
 function patched(previous: ExploreSearch, patch: SearchPatch): ExploreSearch {

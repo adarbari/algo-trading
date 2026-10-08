@@ -3,20 +3,12 @@
  * (`?dataset=bars/1d&session=2026-10-02`) so a drill-down can be shared; both or neither. A
  * ticker row (verification, review items) opens the ticker in Explore.
  */
-import {
-  createRoute,
-  lazyRouteComponent,
-  useNavigate,
-  useSearch,
-  type AnyRoute,
-} from '@tanstack/react-router';
+import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/react-router';
 
 import type { CellRef } from '@/entities/ingestion';
+import { lazyPage } from '../lazy-page';
 
-const AdminIngestionPage = lazyRouteComponent(
-  () => import('@/pages/admin-ingestion'),
-  'AdminIngestionPage',
-);
+const AdminIngestionPage = lazyPage(() => import('@/pages/admin-ingestion'), 'AdminIngestionPage');
 
 interface IngestionSearch {
   dataset?: string;
