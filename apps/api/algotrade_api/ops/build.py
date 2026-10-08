@@ -162,12 +162,12 @@ def build_status(api: Stamp, web_dist: Path | None, repo: Path = REPO) -> BuildR
 Fetch = Callable[[str], bytes]
 
 
-def _fetch(url: str) -> bytes:
+def fetch_http(url: str) -> bytes:
     with urlopen(url, timeout=2) as response:
         return bytes(response.read())
 
 
-def running_mismatches(base_url: str, fetch: Fetch = _fetch) -> tuple[str, ...] | None:
+def running_mismatches(base_url: str, fetch: Fetch = fetch_http) -> tuple[str, ...] | None:
     """What the API answering at ``base_url`` reports out of step; ``None`` when none answers.
     An API from before build identity (no ``build`` in its health) is itself out of step."""
     try:

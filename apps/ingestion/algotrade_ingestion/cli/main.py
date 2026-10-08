@@ -48,6 +48,7 @@ notifying. ``--force`` runs anyway (the last closed session again when nothing i
 """
 
 import argparse
+import subprocess
 import sys
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
@@ -75,6 +76,7 @@ from algotrade_ingestion.cli.commands import (
     run_task_command,
 )
 from algotrade_ingestion.ops.checkout import ensure_main_checkout
+from algotrade_ingestion.ops.hold import hold
 from algotrade_ingestion.ops.schedule import (
     DEFAULT_TIME,
     DEFAULT_WATCHDOG_MINUTES,
@@ -190,6 +192,10 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
         else:
             s.add_argument("--config", default="short_premium_liquidity", help="config id")
             s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
+    dh = sub.add_parser(
+        "deploy-hold", help="run a command under the deploy and ingest locks (exit 75: busy)"
+    )
+    dh.add_argument("cmd", nargs=argparse.REMAINDER)
     sc = sub.add_parser(
         "schedule",
         help="write the launchd agents of the nightly job and the monthly Tiingo fill "
@@ -360,6 +366,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     check_waive(parser, args)
     backend = open_backend(data_url())
+    if args.command == "deploy-hold":  # not an ingest run: before the writes / lock path
+        cmd = args.cmd[1:] if args.cmd[:1] == ["--"] else args.cmd
+        if not cmd:
+            parser.error("deploy-hold needs a command after --")
+        return hold(backend, lambda: subprocess.run(cmd, check=False).returncode)
     try:
         if args.command == "nightly":  # never an unmerged branch against the real store
             ensure_main_checkout()
