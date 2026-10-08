@@ -18,8 +18,10 @@ from strawberry.types import Info
 
 from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
+from algotrade.services.read.guide import episode as episode_page
 from algotrade.services.read.guide import field as field_page
 from algotrade.services.read.guide import index as guide_contents
+from algotrade.services.read.guide import indicator as indicator_page
 from algotrade.services.read.guide import playbook as playbook_page
 from algotrade.services.read.guide import situation as situation_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
@@ -34,8 +36,10 @@ from algotrade_api.graphql.limits import MAX_DAYS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.events.calendar import EventCalendar
+from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
 from algotrade_api.graphql.types.guide.field import GuideField
 from algotrade_api.graphql.types.guide.index import GuideIndex
+from algotrade_api.graphql.types.guide.indicator import GuideIndicatorDetail
 from algotrade_api.graphql.types.guide.playbook import GuidePlaybookDetail
 from algotrade_api.graphql.types.guide.situation import GuideSituationDetail
 from algotrade_api.graphql.types.instruments.distribution import FeatureDistribution
@@ -282,6 +286,26 @@ class Query:
         ctx = info.context.stores()
         found = situation_page.load_guide_situation(ctx, slug) if ctx is not None else None
         return GuideSituationDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the regime indicator `key` (ADR 0051): its card's "
+        "explanation without a session value, how it is computed, the field it reads and its "
+        "reading list; null: no such card"
+    )
+    def guide_indicator(self, info: Ctx, key: str) -> GuideIndicatorDetail | None:
+        ctx = info.context.stores()
+        found = indicator_page.load_guide_indicator(ctx, key) if ctx is not None else None
+        return GuideIndicatorDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the reference episode `slug` (its key, ADR 0051): the "
+        "episode as its config holds it and the indicators whose before-line is about it; "
+        "null: no such episode"
+    )
+    def guide_episode(self, info: Ctx, slug: str) -> GuideEpisodeDetail | None:
+        ctx = info.context.stores()
+        found = episode_page.load_guide_episode(ctx, slug) if ctx is not None else None
+        return GuideEpisodeDetail.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every strategy and screener config the user sees: site presets, then "
