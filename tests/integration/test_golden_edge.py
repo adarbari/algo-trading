@@ -10,6 +10,7 @@ from algotrade.config.env import config_dir
 from algotrade.config.user import UserContext
 from algotrade.core.time.clock import business_days
 from algotrade.data import StoreReader
+from algotrade.services.datasets import EDGE_FIXTURE_TAG
 from algotrade.services.jobs import JobStatus, run_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.backends.memory import MemoryBackend
@@ -19,7 +20,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.derived.outcomes import compute_outcomes
 from algotrade_ingestion.tasks.derived.rollups import compute_rollups
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
-from algotrade_sources.fixtures.catalog import CROSS_SECTION_BARS, START
+from algotrade_sources.fixtures.catalog import CROSS_SECTION_BARS, CROSS_SECTION_TAG, START
 from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.ingest_fakes import task_ctx
 
@@ -76,3 +77,7 @@ def test_the_makefile_range_is_the_catalogue_range() -> None:
     assert f"GOLDEN_FROM = {START}" in makefile
     assert f"GOLDEN_TO = {last.isoformat()}" in makefile
     assert f"{FROM}, {TO}" == f"{START}, {last}"
+
+
+def test_the_strategy_grid_skips_the_catalogue_tag() -> None:
+    assert EDGE_FIXTURE_TAG == CROSS_SECTION_TAG

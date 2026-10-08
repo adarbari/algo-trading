@@ -40,6 +40,14 @@ def list_datasets(reader: StoreReader) -> dict[str, DatasetInfo]:
     return out
 
 
+EDGE_FIXTURE_TAG = "cross-section"  # a dataset for the edge harness, not for the strategy grid
+
+
+def strategy_datasets(reader: StoreReader) -> list[str]:
+    """The datasets the strategy grid runs on: every one but the edge-harness fixtures."""
+    return [n for n, d in list_datasets(reader).items() if EDGE_FIXTURE_TAG not in d.tags]
+
+
 def load_datasets(
     reader: StoreReader, names: Iterable[str] | None = None
 ) -> dict[str, tuple[dict[str, PriceSeries], dict[str, Instrument]]]:
