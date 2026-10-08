@@ -86,7 +86,20 @@ def test_pre_event_adv_excludes_the_event_volume() -> None:
 
 def test_open_window_report_does_not_count_yet() -> None:
     e = date(2026, 10, 2)  # reports today: E+1 is after the session
-    assert _compute([(A, e, e)], _bars()).empty
+    got = _row(_compute([(A, e, e)], _bars()))
+    assert got["reaction_status"] == "INCOMPLETE"
+    assert pd.isna(got["reaction_excess_return"]) and pd.isna(got["sessions_since_reaction"])
+
+
+def test_a_name_with_no_report_gets_a_no_report_row_and_a_missing_bar_is_incomplete() -> None:
+    e = date(2026, 9, 16)
+    out = _compute([("EQ:OTHER", e, e)], _bars())  # A has no report at all
+    assert _row(out)["reaction_status"] == "NO_REPORT"
+    assert pd.isna(_row(out)["sessions_since_reaction"])
+    assert set(out["instrument_id"]) == {A, SPY}  # dense: every instrument traded on S
+    bars = _bars(missing={(A, date(2026, 9, 15))})
+    assert _row(_compute([(A, e, e)], bars))["reaction_status"] == "INCOMPLETE"
+    assert _row(_compute([(A, e, e)], _bars()))["reaction_status"] == "OK"
 
 
 def test_null_when_the_spy_bar_is_missing_never_zero() -> None:

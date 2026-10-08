@@ -24,10 +24,13 @@ exchange sessions (``core.time.calendar``), whether or not E itself is.
                               dollar volume (E-1, E, E+1 sessions) divided by that report's
                               pre-event 20-session dollar volume
 
-A value is null (UNKNOWN), never zero, when a session it needs (a window bar, SPY's bar, a
-bar of the 20 before) has no bar, SPY has none, or the history reaches back less far than the
-report needs; the ratio is also null below four counted reports. One row per instrument with a
-counted report; others have no row (UNKNOWN). The windows (two sessions, 20, four reports,
+One row per instrument traded on the session (dense), with ``reaction_status`` OK, NO_REPORT
+(no report known by the session: a name with no event, not a missing row) or INCOMPLETE (a
+report is known but its window is open or off the history, or a bar it needs is missing);
+``sessions_since_reaction`` is null unless OK. A value is null (UNKNOWN), never zero, when a
+session it needs (a window bar, SPY's bar, a bar of the 20 before) has no bar, SPY has none, or
+the history reaches back less far than the report needs; the ratio is also null below four
+counted reports. The windows (two sessions, 20, four reports,
 ``LOOKBACK``) are part of the definition: changing one is a new version. EV2's
 ``event_reaction@v1`` must read this group, not recompute the window.
 """
@@ -35,6 +38,7 @@ counted report; others have no row (UNKNOWN). The windows (two sessions, 20, fou
 from bisect import bisect_left, bisect_right
 from datetime import date
 from functools import cache
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -52,6 +56,7 @@ NAME = "earnings_reaction"
 VERSION = 1
 SYMBOLS = "instruments/symbol_ids"
 MARKET_SYMBOL = "SPY"
+OK, NO_REPORT, INCOMPLETE = "OK", "NO_REPORT", "INCOMPLETE"
 REPORTS = 4  # the reports the volume ratio averages
 LOOKBACK = 330  # sessions back: four quarters of reports and the 20 sessions before the oldest
 
@@ -60,6 +65,13 @@ _NONE = "no report known by the session has a closed reaction window (E+1 <= the
 _BAR = "a bar of the window (or of SPY, for the return) is missing, or the history is too short"
 
 FEATURES = (
+    Feature(
+        "reaction_status", "str", "category",
+        "OK: the last report's window closed with its bars; NO_REPORT: no report known by the "
+        "session; INCOMPLETE: a report is known but its window is open, off the stored history "
+        "or lacks a bar (the other columns may be null)",
+        "never", "label", categories=(OK, NO_REPORT, INCOMPLETE), inputs=(_REPORT,),
+    ),
     Feature(
         "reaction_excess_return", "float32", "decimal",
         "Return of the close before the last report to the close after it (E-1 to E+1), "
@@ -133,7 +145,7 @@ def _pre_adv(dollar: Matrix, column: int, before: int) -> float:
 
 def _row(
     reports: list[date], grid: list[date], column: int, px: Matrix, dollar: Matrix, spy: int | None
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """The columns of one instrument from its counted reports, newest first."""
     last = _window(grid, reports[0])
     assert last is not None  # counted reports have a closed window on the grid
@@ -177,16 +189,26 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     # a report counts once its reaction window (E-1 .. E+1) is on the grid: E+1 on or before
     # the session, E-1 inside the lookback
     counted = rows[rows["report"].map(lambda d: _window(grid, d) is not None)]
+    by_report = {
+        str(iid): list(g["report"])
+        for iid, g in counted.sort_values("report", ascending=False).groupby("instrument_id")
+    }
+    known_ids = set(rows["instrument_id"].astype(str))
     out = []
-    for iid, group in counted.sort_values("report", ascending=False).groupby("instrument_id"):
-        if str(iid) in column_of:
-            reports = list(group["report"])
-            out.append(
-                {
-                    "instrument_id": str(iid),
-                    **_row(reports, grid, column_of[str(iid)], px.close, dollar, spy),
-                }
-            )
+    for traded in px.ids[~np.isnan(px.close[-1])]:  # every instrument traded on the session
+        iid = str(traded)
+        if iid in by_report:
+            values = _row(by_report[iid], grid, column_of[iid], px.close, dollar, spy)
+            if pd.notna(values["reaction_excess_return"]) and pd.notna(
+                values["pre_event_adv_usd_20d"]
+            ):
+                out.append({"instrument_id": iid, "reaction_status": OK, **values})
+                continue
+            values = {**values, "sessions_since_reaction": pd.NA}
+            out.append({"instrument_id": iid, "reaction_status": INCOMPLETE, **values})
+        else:  # a known report whose window is open or off the grid: INCOMPLETE, else none
+            status = INCOMPLETE if iid in known_ids else NO_REPORT
+            out.append({"instrument_id": iid, "reaction_status": status})
     frame = pd.DataFrame(out, columns=["instrument_id", *COLUMNS])
     frame["sessions_since_reaction"] = frame["sessions_since_reaction"].astype("Int64")
     return frame.sort_values("instrument_id", kind="stable").reset_index(drop=True)
