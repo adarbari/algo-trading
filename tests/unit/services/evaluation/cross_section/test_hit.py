@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.quant.black_scholes import prob_otm, strike_from_delta
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, needs_implied_vol
 from tests.unit.services.evaluation.cross_section.conftest import edge
 
@@ -97,3 +98,86 @@ def test_delisted_rows_count_and_are_flagged() -> None:
 def test_the_implied_vol_is_required_for_a_ratio_measure() -> None:
     with pytest.raises(ConfigurationError, match="implied"):
         apply_outcome(edge(outcome=VRP, schedule="every_session"), rows(fwd_excess_return=[0.0]))
+
+
+# ---- expires_otm: the short option is not assigned at the horizon's close ----------------
+
+SIGMA, YEARS = 0.30, 21 / 252
+OTM = {
+    "kind": "expires_otm", "horizon_sessions": [21], "benchmark": "none", "structure": "put",
+    "strike_delta": 0.30, "iv_field": "rollup.ibkr_iv@v1.iv30_ibkr", "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def rel(delta: float, right: str, sigma: float = SIGMA) -> float:
+    """The strike relative to the entry close, minus 1: the return the strike sits at."""
+    return float(strike_from_delta(1.0, sigma, YEARS, delta, right)) - 1.0
+
+
+def otm_rows(returns: list[float], **columns: list[object]) -> pd.DataFrame:
+    n = len(returns)
+    return rows(fwd_return=returns, horizon_sessions=[21] * n, fwd_max_return=[0.0] * n, **columns)
+
+
+def ivs(n: int, level: float = SIGMA) -> dict[str, float | None]:
+    return {f"EQ:{i}": level for i in range(n)}
+
+
+@pytest.mark.parametrize(
+    "structure,delta,returns,hits",
+    [
+        ("put", 0.30, lambda: [rel(0.30, "put") + 0.01, rel(0.30, "put") - 0.01], [True, False]),
+        ("call", 0.30, lambda: [rel(0.30, "call") - 0.01, rel(0.30, "call") + 0.01], [True, False]),
+        (
+            "strangle",
+            0.16,
+            lambda: [0.0, rel(0.16, "put") - 0.01, rel(0.16, "call") + 0.01],
+            [True, False, False],
+        ),
+    ],
+)
+def test_the_hit_table_of_each_structure(structure, delta, returns, hits) -> None:  # type: ignore[no-untyped-def]
+    e = edge(outcome={**OTM, "structure": structure, "strike_delta": delta})
+    r = returns()
+    out = apply_outcome(e, otm_rows(r), ivs(len(r)))
+    assert list(out["hit"]) == hits and set(out["excluded"]) == {""}
+    assert out["value"].iloc[0] > 0  # the cushion to the nearest strike; negative on a miss
+    assert (out["value"].iloc[1:] < 0).all()
+
+
+def test_an_otm_pct_strike_is_a_fixed_fraction_of_the_entry_close() -> None:
+    e = edge(outcome={**{k: v for k, v in OTM.items() if k != "strike_delta"}, "otm_pct": 0.05})
+    out = apply_outcome(e, otm_rows([-0.049, -0.051, 0.0]), ivs(3))
+    assert list(out["hit"]) == [True, False, True]
+
+
+def test_the_reference_rate_is_the_risk_neutral_chance_and_touch_is_the_intraday_strike() -> None:
+    e = edge(outcome=OTM)
+    k = rel(0.30, "put")
+    out = apply_outcome(
+        e,
+        otm_rows([0.0, 0.0], fwd_max_drawdown=[-k - 0.001, -k + 0.001]),  # low under / above K
+        ivs(2),
+    )
+    assert list(out["touch"]) == [0.0, 1.0]  # the low reaches K when drawdown >= 1 - K
+    expected = float(prob_otm(1.0, 1.0 + k, SIGMA, YEARS, "put"))
+    assert out["reference"].iloc[0] == pytest.approx(expected) and 0.5 < expected < 0.8
+    two = apply_outcome(edge(outcome={**OTM, "structure": "strangle"}), otm_rows([0.0]), ivs(1))
+    assert two["reference"].iloc[0] < expected  # the joint chance is below one leg's
+
+
+def test_a_null_or_zero_implied_vol_is_excluded_with_a_reason_never_a_hit_or_a_miss() -> None:
+    out = apply_outcome(
+        edge(outcome=OTM), otm_rows([0.0, 0.0, 0.0]), {"EQ:0": None, "EQ:1": 0.0, "EQ:2": 0.3}
+    )
+    assert list(out["excluded"]) == ["no_implied_vol", "no_implied_vol", ""]
+    assert not out["hit"].iloc[:2].any() and np.isnan(out["reference"].iloc[:2]).all()
+    assert needs_implied_vol(edge(outcome=OTM))
+    with pytest.raises(ConfigurationError, match="needs the implied vol"):
+        apply_outcome(edge(outcome=OTM), otm_rows([0.0]))
+
+
+def test_a_higher_vol_puts_the_strike_further_out_so_the_same_return_hits() -> None:
+    low = apply_outcome(edge(outcome=OTM), otm_rows([-0.05]), ivs(1, 0.2))
+    high = apply_outcome(edge(outcome=OTM), otm_rows([-0.05]), ivs(1, 0.6))
+    assert [bool(low["hit"].iloc[0]), bool(high["hit"].iloc[0])] == [False, True]

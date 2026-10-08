@@ -200,8 +200,9 @@ corrected it on point-in-time grounds.
    of the money.
    - Structure: `put` | `call` | `strangle`.
    - The strike comes from an exact Black-Scholes delta with r = q = 0,
-     K = P·exp(∓zσ√T + σ²T/2) for the close P at D, - for the put and + for the call, δ = |delta|,
-     z = N⁻¹(1 - δ) > 0, and σ the run's `iv_field` at D (or `otm_pct`).
+     K = P·exp(∓zσ√T + σ²T/2) for the entry close P at S (what `fwd_return` is measured from), - for
+     the put and + for the call, δ = |delta|, z = N⁻¹(1 - δ) > 0, and σ the `iv_field` read at D
+     (or `otm_pct`).
    - The hit compares `fwd_return` with K/P - 1.
    - The reference rate is the mean risk-neutral N(d2) per name (the joint form for a
      strangle), not 1 - δ.
@@ -214,7 +215,8 @@ corrected it on point-in-time grounds.
    outcome and universe overrides. They are not session slices. Each variant is a trial in the
    deflated Sharpe ratio. `results/edge_eval` gains the key column `edge_variant` (null read as
    "main") and the columns `iv_source`, `licence`, `reference_rate` and `touch_rate`.
-6. **One IV field per run** (`iv_field`): never a mixed-source feature. The run records
+6. **One IV field per variant row** (`iv_field` on the outcome; a run parameter is the default):
+   never a mixed-source feature. The row records
    `iv_source`, and the licence comes from the catalogue's `Feature.licence` (personal for
    IBKR's).
 7. **Event schedules.** `on_event:<class>` takes the event names at D from a declared field per

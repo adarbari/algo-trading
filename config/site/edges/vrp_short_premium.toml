@@ -16,26 +16,82 @@ screeners = ["short_premium_liquidity", "vrp_scanner"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 frozen_from = 2026-04-01
-notes = """Hit: realised volatility over the window divided by the IV30 at S (measure
-realised_to_implied_vol) is below target 1.0. IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a
-short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of the premium it
-collected in
-the window. ED4a fixes the proxy (ADR 0053 open decisions)."""
+notes = """Hit (ED4a, owner intent 2026-10-08): the short put is not assigned, struck at a 0.30
+delta at the entry close on the IBKR IV30 read at D, held to the horizon's close (15, 21 or 31
+sessions: the 21 to 45 DTE the owner trades, the horizon the tenor). The strike is the exact
+Black-Scholes delta strike (r = q = 0): K = P exp(-z iv sqrt(T) + iv^2 T / 2), z = N^-1(1 - 0.30),
+T = horizon / 252, P the entry close; the hit is the window's return above K / P - 1. Reported
+beside the hit rate, never in it: reference_rate (the mean risk-neutral N(d2), the win rate an
+efficient premium would give) and touch_rate (the strike reached intraday). No premium and no
+P&L is modelled: a win rate overstates expectancy, because the rare losses are large. IBKR's IV
+is personal-use (licence recorded on the result rows), fine for this private evaluation. Variants:
+delta 0.16, strangle, call, our own IV30, windows with no report expected, and the older
+realised-to-implied ratio below 1. IV30 (a 30-day tenor) is applied to the 15- and 31-session
+horizons too: a term-structure approximation, the same in the hit and in the reference rate."""
 
 [outcome]
-kind = "hit_target"
-horizon_sessions = [20]
+kind = "expires_otm"
+structure = "put"
+strike_delta = 0.30
+iv_field = "rollup.ibkr_iv@v1.iv30_ibkr"
+horizon_sessions = [15, 21, 31]
 benchmark = "none"
+start_offset_sessions = 1
+
+[[variants]]
+id = "delta16"
+[variants.outcome]
+strike_delta = 0.16
+
+[[variants]]
+id = "strangle"
+[variants.outcome]
+structure = "strangle"
+strike_delta = 0.16
+
+[[variants]]
+id = "call"
+[variants.outcome]
+structure = "call"
+
+[[variants]]
+id = "our_iv30"
+[variants.outcome]
+iv_field = "rollup.iv30@v1.iv30"
+
+# Windows with no report expected inside the largest window (read at D, the window ends at
+# D + 1 + 31, so more than 32 sessions to the expected report): the premium is not an earnings
+# premium. A stock whose date is UNKNOWN (null) never passes, never read as "no earnings"
+# (earnings_expected@v1); an ETF has no earnings, so it stays.
+[[variants]]
+id = "no_earnings"
+[variants.universe]
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { any = [
+    { field = "instrument.security_type", op = "eq", value = "ETF" },
+    { all = [
+      { field = "rollup.earnings_expected@v1.expected_basis", op = "ne", value = "UNKNOWN" },
+      { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 32 },
+    ] },
+  ] },
+]
+
+[[variants]]
+id = "realised_below_implied"
+[variants.outcome]
+kind = "hit_target"
 measure = "realised_to_implied_vol"
 direction = "below"
 target = 1.0
-max_drawdown = 0.5
-start_offset_sessions = 1
 
 [quality_bar]
-outcome = """Realised below implied over the option's horizon, with a drawdown cap on a short
-straddle proxy: how a short-premium trade is held, to expiry, with a stop (the PRD's proposal,
-ADR 0053 open decisions)."""
+outcome = """The short put is not assigned at the horizon's close (expires_otm): how often the
+option the owner sells finishes out of the money, beside the risk-neutral rate and the share of
+windows whose strike was touched on the way."""
 trigger_timing = """IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of the
 decision session D, so the first fill is the next session's close: the entry session is S = D + 1
 (start_offset_sessions = 1). The screen and the implied vol are read at D, the outcome at S."""
