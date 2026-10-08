@@ -37,7 +37,9 @@ class DecisionCount:
     "status and `audit` (coverage, the selection's audit), and every decision with its count "
     "over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate "
     "held back, never counted as picked; `regime`: the label the run stamped, null when the "
-    "gate was off or the label unknown)"
+    "gate was off or the label unknown); `coverage` / `missingTables`: the run record's own "
+    "coverage (COMPLETE, PARTIAL; null: not recorded) and the tables that had no rows when it "
+    "ran, not the session's missing tables as read now"
 )
 class ScreenerRun:
     run_id: str
@@ -52,6 +54,8 @@ class ScreenerRun:
     paused: int
     regime: str | None
     audit: JSON
+    coverage: str | None
+    missing_tables: list[str]
     run: strawberry.Private[runs.ScreenerRun]
     ctx: strawberry.Private[ReadContext]
 
@@ -70,6 +74,8 @@ class ScreenerRun:
             paused=d.paused,
             regime=d.regime,
             audit=JSON(dict(d.audit)),
+            coverage=d.coverage,
+            missing_tables=list(d.missing_tables),
             run=d,
             ctx=ctx,
         )

@@ -14,7 +14,9 @@ from algotrade.services.read.screens.runs import (
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
-from tests.unit.services.read.screens.conftest import D0, D1, T, write_gated
+from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.writers import StoreWriter
+from tests.unit.services.read.screens.conftest import D0, D1, T, context, write_gated
 
 
 def _on(reader: StoreReader, day: date) -> ReadContext:
@@ -88,6 +90,23 @@ def test_a_run_carries_its_record_stats(ctx: ReadContext) -> None:
     assert run is not None and run.audit == {}  # the record holds no stats
     beta = latest_run(ctx, "me", "beta").run
     assert beta is not None and beta.audit == {}  # no record at all
+    assert (beta.coverage, beta.missing_tables) == (None, ())
+
+
+def test_a_partial_run_names_the_tables_it_ran_without(backend: MemoryBackend) -> None:
+    """The run's own coverage and ``stats["missing_tables"]``, not the session's as read now
+    (2026-10-07: breakout's PARTIAL run lacked trend_stats, the page named other tables)."""
+    stats = {"coverage": "PARTIAL", "missing_tables": ["rollups/instrument/vol_stats@v1",
+             "rollups/instrument/trend_stats@v2"], "selection": {"missing_tables": []}}  # fmt: skip
+    StoreWriter(backend).save_run(
+        RunRecord("rs", "screen-beta-site", D1, T).finish(T, complete=False, stats=stats)
+    )
+    run = latest_run(context(StoreReader(backend), user="site"), "site", "beta").run
+    assert run is not None and run.status == "partial"
+    assert run.coverage == "PARTIAL"
+    assert run.missing_tables == (
+        "rollups/instrument/trend_stats@v2", "rollups/instrument/vol_stats@v1",
+    )  # fmt: skip
 
 
 def test_the_previous_run_is_the_screeners_run_in_the_previous_session(

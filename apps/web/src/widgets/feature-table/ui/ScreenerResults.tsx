@@ -5,6 +5,7 @@
  * columns, sort and decisions are their view of this screener (`features/table-view`: saved at
  * once, never part of the screener). The header says the regime the run stamped, and the picks
  * the regime gate paused are a decision chip of their own (PAUSED, reason in the row's detail).
+ * A PARTIAL run says so with the tables it ran without, apart from the session's missing tables.
  * Enter on a row opens the ticker in Explore. With `renderDetail`, the row under review's detail
  * sits beside the table, or on a phone opens in a sheet when a row is chosen (MasterDetail).
  */
@@ -166,6 +167,11 @@ export function ScreenerResults({
               session: results.data.session.date,
               missing: [...results.data.session.missing, ...run.results.missing],
               preSnapshot: false,
+              run: {
+                session: run.session,
+                partial: run.status === 'partial' || run.coverage === 'PARTIAL',
+                missing: run.missingTables,
+              },
             }
           : null
       }

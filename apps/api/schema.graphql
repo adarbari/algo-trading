@@ -1579,7 +1579,7 @@ type ScreenerHit {
 }
 
 """
-A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown)
+A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown); `coverage` / `missingTables`: the run record's own coverage (COMPLETE, PARTIAL; null: not recorded) and the tables that had no rows when it ran, not the session's missing tables as read now
 """
 type ScreenerRun {
   runId: String!
@@ -1594,6 +1594,8 @@ type ScreenerRun {
   paused: Int!
   regime: String
   audit: JSON!
+  coverage: String
+  missingTables: [String!]!
 
   """
   The session of the previous run it is compared with; null: none (nothing is new or dropped)
