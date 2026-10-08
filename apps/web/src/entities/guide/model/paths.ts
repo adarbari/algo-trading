@@ -8,9 +8,23 @@ export const GUIDE_PATH = '/guide';
 export const GUIDE_FIELDS_PATH = '/guide/fields';
 export const GUIDE_PLAYBOOKS_PATH = '/guide/playbooks';
 export const GUIDE_SITUATIONS_PATH = '/guide/situations';
+export const GUIDE_REGIME_PATH = '/guide/regime';
+
+/** Today's readings: the Regime page in the Trader workspace. */
+export const REGIME_PAGE_PATH = '/regime';
 
 /** The sections that have pages today, by the id `Query.guideIndex` gives them. */
-export const BUILT_SECTIONS: readonly string[] = ['playbooks', 'fields', 'situations'];
+export const BUILT_SECTIONS: readonly string[] = ['regime', 'playbooks', 'fields', 'situations'];
+
+/** A regime indicator's page (its key is the card's). */
+export function indicatorPath(key: string): string {
+  return `${GUIDE_REGIME_PATH}/indicators/${encodeURIComponent(key)}`;
+}
+
+/** A reference market fall's page (its key is the episode's slug). */
+export function episodePath(key: string): string {
+  return `${GUIDE_REGIME_PATH}/episodes/${encodeURIComponent(key)}`;
+}
 
 /** A playbook's page (the id is the site preset's). */
 export function playbookPath(id: string): string {

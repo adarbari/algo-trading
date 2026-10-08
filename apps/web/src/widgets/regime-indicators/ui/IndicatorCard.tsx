@@ -2,8 +2,9 @@
  * One indicator card (RG7): the plain name and verdict, where today's value sits on its
  * low-risk to high-risk band with the "on" threshold marked, how it is calculated (the terms
  * linked), where it comes from (the exact series, its cadence and links) with its provenance,
- * then two disclosures: its history over the years (mounted only when opened) and why it
- * matters, what it did before past falls and where to read more.
+ * a help button that opens the indicator's Guide entry (why it matters, what it did before,
+ * where to read more), the plain-words explanation on request, and its history over the years
+ * (a disclosure, mounted only when opened).
  */
 import {
   Box,
@@ -28,10 +29,10 @@ import {
   sourceItems,
   type RegimeIndicator,
 } from '@/entities/regime';
+import { GuideHelp } from '@/features/guide-help';
 import { IndicatorHistory } from '@/features/indicator-history';
+import { ExplainRegime } from '@/features/regime-explain';
 import { RegimeRangeControl, useRegimeRange } from '@/features/regime-range';
-
-import { IndicatorDetail } from './IndicatorDetail';
 
 const isNumber = (value: unknown): value is number => typeof value === 'number';
 
@@ -65,6 +66,12 @@ export function IndicatorCard({
       />
       <Box paddingX={3} paddingY={2}>
         <Stack gap={2}>
+          <Stack direction="row" gap={2} align="center">
+            <GuideHelp entry={{ kind: 'indicator', id: indicator.key }} />
+            <Text size="sm" tone="muted">
+              What this tells you
+            </Text>
+          </Stack>
           <ScoreMeter
             label={indicator.technicalName}
             value={isNumber(indicator.value) ? indicator.value : null}
@@ -107,9 +114,9 @@ export function IndicatorCard({
               />
             )}
           </Disclosure>
-          <Disclosure label="Why it matters, what it did before, and where to read more">
-            <IndicatorDetail indicator={indicator} explainable={explainable} />
-          </Disclosure>
+          {explainable && (
+            <ExplainRegime card={indicator.key} label="Explain this in plain words" />
+          )}
         </Stack>
       </Box>
     </Stack>

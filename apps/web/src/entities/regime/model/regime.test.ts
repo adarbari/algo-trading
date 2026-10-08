@@ -8,7 +8,6 @@ import {
   indicatorsOfPace,
   indicatorStatus,
   plainLabel,
-  readingList,
   regimeLabelFeature,
   regimeTone,
   gateLine,
@@ -99,18 +98,6 @@ describe('indicators', () => {
     expect(indicatorStatus('ON')).toEqual({ tone: 'warning', label: 'On' });
     expect(indicatorStatus('OFF')).toEqual({ tone: 'positive', label: 'Off' });
     expect(indicatorStatus('UNKNOWN')).toEqual({ tone: 'neutral', label: 'Unknown' });
-  });
-});
-
-describe('readingList', () => {
-  it('lists each link once, with every card that cites it', () => {
-    const list = readingList(regimeFixture());
-    expect(list.map((l) => l.url)).toEqual([
-      'https://fred.stlouisfed.org/series/T10Y3M',
-      'https://www.chicagofed.org/nfci',
-    ]);
-    expect(list[0]?.cards).toEqual(['Is the yield curve inverted?']);
-    expect(list[1]?.cards).toEqual(['Are financial conditions tight?', 'Is fear rising?']);
   });
 });
 
