@@ -133,7 +133,9 @@ def test_bad_documents_fail_naming_the_file(change: dict[str, Any], message: str
 def test_every_playbook_sits_in_the_folder_of_the_family_that_lists_it() -> None:
     """A folder per family keeps each under the 12-file cap: the file's folder is its family."""
     families = {f.id: f.presets for f in load_guide_sections(SHIPPED).families}
-    placed = {p.stem: p.parent.name for p in (REPO_ROOT / WHERE).glob("*/*.toml")}
+    files = list((REPO_ROOT / WHERE).glob("*/*.toml"))
+    assert len({p.stem for p in files}) == len(files), "a playbook id appears in two folders"
+    placed = {p.stem: p.parent.name for p in files}
     assert not list((REPO_ROOT / WHERE).glob("*.toml")), "a playbook goes in its family's folder"
     expected = {preset: fam for fam, presets in families.items() for preset in presets}
     assert placed == expected

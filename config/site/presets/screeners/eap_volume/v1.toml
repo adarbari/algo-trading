@@ -1,6 +1,6 @@
 # Earnings announcement premium, high expected volume (ADR 0053, the ED4c amendment; edge
 # earnings_announcement_premium): Frazzini and Lamont's split, the same names as eap_all that also
-# have an earnings volume ratio (the mean over the last four reports of the reaction window's dollar
+# have an earnings volume ratio of at least 2 (the mean over the last four reports of the reaction window's dollar
 # volume against the 20 sessions before it), ranked by it, largest first; the premium is claimed to
 # concentrate in the top. A missing ratio (fewer than four reports) never passes (ADR 0030). The
 # preset ranks only: the harness takes the edge's top K and the decile spread by this rank.
@@ -41,7 +41,7 @@ value = ["SCHEDULED", "PRIOR_YEAR"]
 [criteria.volume_ratio]
 field = "rollup.earnings_reaction@v1.earnings_volume_ratio"
 op = "gte"
-value = 0
+value = 2.0  # pre-declared cut for high expected announcement volume (Frazzini and Lamont)
 
 [columns]
 close = "rollup.price_stats@v2.close"

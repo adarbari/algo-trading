@@ -73,7 +73,7 @@ class PlaybookProse:
 
     @classmethod
     def from_document(cls, name: str, doc: Mapping[str, Any] | None) -> "PlaybookProse":
-        where = f"guide/playbooks/{name}.toml"
+        where = f"guide/playbooks/<family>/{name}.toml"
         reject_secrets(doc or {}, where)
         t = Table(doc, where)
         t.only(KEYS)

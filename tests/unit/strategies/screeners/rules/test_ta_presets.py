@@ -180,6 +180,7 @@ def test_eap_presets_take_an_expected_date_never_unknown_and_eap_volume_ranks_by
             DAY,
             {
                 "EQ:SCHED": {**base, basis: "SCHEDULED", **({ratio: 3.0} if signal else {})},
+                "EQ:LOW": {**base, basis: "SCHEDULED", **({ratio: 1.5} if signal else {})},
                 "EQ:PRIOR": {**base, basis: "PRIOR_YEAR", **({ratio: 5.0} if signal else {})},
                 "EQ:UNKNOWN": {**base, basis: "UNKNOWN"},
                 "EQ:THIN": {**base, "rollup.price_stats@v2.adv_usd_20d": 1e6},
@@ -193,6 +194,7 @@ def test_eap_presets_take_an_expected_date_never_unknown_and_eap_volume_ranks_by
         qualified = [r.instrument_id for r in rows if r.decision is Decision.QUALIFIED]
         if signal:
             assert decisions["EQ:NORATIO"] is Decision.REJECT
+            assert decisions["EQ:LOW"] is Decision.REJECT  # under the cut of 2
             assert qualified == ["EQ:PRIOR", "EQ:SCHED"]  # the larger ratio first
             assert spec.tie_break == ratio and spec.tie_break_descending
         else:
