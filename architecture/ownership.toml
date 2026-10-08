@@ -585,6 +585,17 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pbo_cscv" }, { string = "results/edge_eval" }]
 
 [[responsibility]]
+id = "edge-scorer-fit"
+description = "Fit a learned scorer for an edge (ADR 0053 amendment, ED7): the training frame (the edge's eligible names at each decision session D with the features its document declares under [scorer] read at D only, and the edge's hit at the entry session S as the label, only windows closing before frozen_from less one horizon: purged and embargoed, never the frozen period), the probit of the hit on the standardised features (quant/probit.py is the model), and the coefficients written as the TOML expression feature edge_score_<edge> in config/site/features/edge_scores.toml with fitted_through; run by algotrade-backtest fit-edge-scorer through the edge-score-fit job; nightly scoring is the expression engine's ncdf over the file, with no label at score time"
+owner = ["src/algotrade/services/evaluation/training/*"]
+allowed = [
+    "src/algotrade/services/jobs/handlers.py",  # the edge-score-fit job kind (ADR 0010)
+    "apps/backtest/algotrade_backtest/commands.py",  # fit-edge-scorer writes the features file
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-08-ed7a-the-first-learned-scorer-a-probit-in-site-config"
+detect = [{ call = "fit_scorer" }, { call = "training_frame" }, { call = "render_scorer" }, { call = "merge_scorers" }]
+
+[[responsibility]]
 id = "forward-outcomes"
 description = "Compute and store forward outcomes (ADR 0053 decision 3): for each window a session closes (S = T - h exchange sessions, horizons and benchmarks from the open edge documents plus the 20-session SPY default), every name in the universe at S with a bar at S measured from S's close to T's on bars split-adjusted as of T (return, excess over the benchmark, max favourable and adverse excursion, realised volatility; DELISTED by the reference snapshot's delisting date, else a reason), one run per window end into outcomes/instrument/forward_returns@v1, and its acceptance check; read back only through algotrade.data.outcomes, importable only from services/evaluation"
 owner = [
@@ -594,7 +605,8 @@ owner = [
 ]
 allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the outcomes tables' one schema
-    "src/algotrade/services/evaluation/cross_section/harness.py",  # the one reader of outcomes (ADR 0053)
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the reader of outcomes (ADR 0053)
+    "src/algotrade/services/evaluation/training/frame.py",  # the other: the labels of a fit (ED7)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, { call = "read_outcomes" }]

@@ -21,6 +21,13 @@ is stored from about 2025-10-31, so the stored history gives about ten independe
 the 40 the bar asks; the harness reports the count beside every number. The frozen period
 starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment)."""
 
+[scorer]  # ED7: the fields a learned scorer is fitted on (edge_scores.toml, fit-edge-scorer)
+features = [
+  "rollup.trend_stats@v2.mom_12_1",
+  "rollup.trend_stats@v2.ret_252d",
+  "rollup.price_stats@v2.adv_usd_20d",
+]
+
 [outcome]
 kind = "excess_return"
 horizon_sessions = [20]
