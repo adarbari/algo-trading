@@ -70,6 +70,10 @@ class Step:
 
     name: str
     needs: tuple[str, ...] = ()  # steps that must be satisfied before this one runs
+    # Optional inputs: steps whose success in this attempt re-runs a step an earlier attempt
+    # did (its input changed), without gating it (e.g. rollups after ibkr-iv: the IV rollup
+    # reads it, but IV rank falls back to ours when IBKR is down).
+    reruns_after: tuple[str, ...] = ()
     critical: bool = True  # False: a failure is a warning, not the run's failure
     requires: Precondition | None = None  # data that must exist for the session
     latest_only: bool = False  # current-snapshot sources: only the latest closed session
@@ -81,6 +85,11 @@ class Step:
     # step that SUCCEEDED with such items left is re-run, not reused, by a retry while its
     # session is the latest and the task run's staging exists; its dependents re-run too.
     resumable: bool = False
+
+    @property
+    def inputs(self) -> tuple[str, ...]:
+        """Every step whose success in this attempt makes a done step run again."""
+        return (*self.needs, *self.reruns_after)
 
 
 @dataclass
