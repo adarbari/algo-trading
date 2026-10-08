@@ -16,7 +16,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - **Identity (ID, ADR 0040) and hosting (H1, ADR 0044):** ID1-ID4 and H1 done; owner actions (Supabase, Tailscale Funnel, `make web-build`), next ID5 ([ID / H details](#identity-and-hosting-id--h-details)).
 - **Backfills pending** (past sessions read UNKNOWN until run): volume, financials, TA bands and trend, options positioning, call wing and dividends ([Backfills details](#backfills-pending-details)).
 - **Mobile UI (MU, ADR 0052): MU1 done**; owner action: `make web-build`, try the hosted app on a phone; next MU2 ([MU details](#mobile-ui-mu-details)).
-- **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1, P1b, P2 done; P3a in review (#283); P3b (this PR) in review; next P4 shared machine, P5 harness ([Pipeline details](#pipeline-details)).
+- **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1, P1b, P2, P3a done (#283); P3b in review; next P4 shared machine, P5 harness ([Pipeline details](#pipeline-details)).
 - **Descriptions (ADR 0034, accepted):** after merge run `algotrade-ingest descriptions --only funds --force`, then stocks in chunks ([Descriptions details](#descriptions-details)).
 
 **Facts**
@@ -69,7 +69,7 @@ ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holding
 
 ### Pipeline details
 
-VRP live spread check in the UI via `GET /chains/{id}/live`. **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1 done (parallel web jobs, Storybook artifact, screenshot shards, docs-only skip, the flaky list `apps/web/quarantine.json`); P1b done (three pytest shards with a coverage-combine gate, four screenshot shards, `npm audit` only on a dependency change); P2 done (#281: `make changed` for the web, vitest `vmThreads`, the one-full-check rule); P3a in review (#283: `scripts/merge_main.sh`, numbering checks, rerere off, generated files exempt from the length gate); P3b in review (id-ordered registries `make` fitness test, this roadmap's track details with `make roadmap-check`, screenshot baselines from CI via the `update-screenshots` label, the play-with-click story rule); next P4 shared machine (per-worktree ports, `make check` lock, `scripts/deploy.sh`), P5 harness.
+VRP live spread check in the UI via `GET /chains/{id}/live`. **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1 done (parallel web jobs, Storybook artifact, screenshot shards, docs-only skip, the flaky list `apps/web/quarantine.json`); P1b done (three pytest shards with a coverage-combine gate, four screenshot shards, `npm audit` only on a dependency change); P2 done (#281: `make changed` for the web, vitest `vmThreads`, the one-full-check rule); P3a done (#283: `scripts/merge_main.sh`, numbering checks, rerere off, generated files exempt from the length gate); P3b in review (id-ordered registries `make` fitness test, this roadmap's track details with `make roadmap-check`, screenshot baselines from CI via the `update-screenshots` label, the play-with-click story rule); next P4 shared machine (per-worktree ports, `make check` lock, `scripts/deploy.sh`), P5 harness.
 
 ### Descriptions details
 

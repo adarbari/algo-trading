@@ -47,6 +47,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR | narrowed by `make changed` (Local fast path below); the full pass still runs once per PR |
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
+| Merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push; `architecture/ownership.toml`, `layout.toml` and `web_layout.toml` entries are id-ordered inside each section (fitness test), so two PRs adding an entry stop colliding at the end of the file; screenshot baselines regenerate in CI on the `update-screenshots` label (below) instead of Docker; the roadmap's Now / Next is one line per track (details under "Track details"), so two PRs rarely edit the same line |
 
 ### Local fast path
 
