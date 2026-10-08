@@ -6,12 +6,12 @@ import datetime as dt
 from typing import Self
 
 import strawberry
-from anyio import to_thread
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime import episodes as episodes_read
 from algotrade.services.read.regime import history, regime
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.market.indicator import RegimeIndicator
 
@@ -241,19 +241,21 @@ class MarketRegime:
     )
     async def bands(self, info: Info, start: dt.date, end: dt.date) -> list[RegimeBand]:
         # Off the event loop: one range read of the label table.
-        found = await to_thread.run_sync(history.load_regime_bands, self.ctx, start, end)
+        found = await off_loop(history.load_regime_bands, self.ctx, start, end)
         return [RegimeBand.of(b) for b in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The reference drawdowns the session knows (those whose trough has come), "
         "oldest first"
     )
-    def episodes(self, info: Info) -> list[Episode]:
-        return [Episode.of(e) for e in episodes_read.load_regime_episodes(self.ctx).episodes]
+    async def episodes(self, info: Info) -> list[Episode]:
+        found = await off_loop(episodes_read.load_regime_episodes, self.ctx)
+        return [Episode.of(e) for e in found.episodes]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The NBER recessions since 1969 the session knows (listed from the day "
         "the committee dated the peak), oldest first"
     )
-    def recessions(self, info: Info) -> list[Recession]:
-        return [Recession.of(r) for r in episodes_read.load_regime_episodes(self.ctx).recessions]
+    async def recessions(self, info: Info) -> list[Recession]:
+        found = await off_loop(episodes_read.load_regime_episodes, self.ctx)
+        return [Recession.of(r) for r in found.recessions]

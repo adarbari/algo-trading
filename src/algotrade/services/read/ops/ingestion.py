@@ -82,11 +82,20 @@ class Completeness:
 
 
 class _Counts:
-    """Row counts and run ids per (table, date), each partition read once."""
+    """Row counts and run ids per (table, date), each partition read once, and each table's
+    stored dates listed once (listing walks every partition directory of the table: the grid
+    asks it for every cell)."""
 
     def __init__(self, ctx: Stores) -> None:
         self.ctx = ctx
         self._seen: dict[tuple[str, date], tuple[int, tuple[str, ...], tuple[str, ...]]] = {}
+        self._stored: dict[str, tuple[date, ...]] = {}
+
+    def stored(self, table: str) -> tuple[date, ...]:
+        """``stored_dates`` of ``table``, listed once for this grid."""
+        if table not in self._stored:
+            self._stored[table] = stored_dates(self.ctx, table)
+        return self._stored[table]
 
     def of(self, table: str, day: date) -> tuple[int, tuple[str, ...], tuple[str, ...]]:
         """-> (rows, run ids, statuses when the table has a ``status`` column)."""
@@ -110,7 +119,7 @@ def _share_status(present: int, expected: int | None) -> str:
 
 
 def _session_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
-    stored = stored_dates(counts.ctx, d.name)
+    stored = counts.stored(d.name)
     earlier = [s for s in stored if s < day]
     expected = counts.of(d.name, earlier[-1])[0] if earlier else None
     basis = f"rows on {earlier[-1]}" if earlier else "no earlier session"

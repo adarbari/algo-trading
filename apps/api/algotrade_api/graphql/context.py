@@ -10,11 +10,11 @@ the objects it returns; fields of one operation that pass the same ``date`` shar
 resolved session and one set of dataloaders. An empty store (nothing to resolve a session
 from) is ``None``: the fields are null, not an error (ADR 0036)."""
 
+import threading
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import date
 
-from anyio import to_thread
 from fastapi import Request
 from strawberry.dataloader import DataLoader
 from strawberry.fastapi import BaseContext
@@ -26,6 +26,7 @@ from algotrade.services.read.availability.explain import explain
 from algotrade.services.read.context import NotFoundError, ReadContext, Stores
 from algotrade_api.deps import Caller
 from algotrade_api.graphql.loaders import Loaders
+from algotrade_api.graphql.offload import off_loop
 
 # Opens the read context for a user and a requested session (None: the latest):
 # ``open_context`` over the app's store, configs and result cache.
@@ -46,16 +47,18 @@ class RequestContext(BaseContext):
         self._user = UserContext(viewer.user_id)
         self._open = opener
         self._open_stores = stores
+        # top-level fields resolve in the read pool, side by side: opening is under a lock
+        self._lock = threading.RLock()
         self._contexts: dict[date | None, ReadContext | None] = {}
         self._stores: Stores | None = None
         self._causes: DataLoader[Cause, Cause] = DataLoader(load_fn=self._explain_all)
 
     async def _explain_all(self, leaves: list[Cause]) -> list[Cause]:
         """``explain`` of each distinct leaf: one read of the run records each, off the loop."""
-        stores = self.stores()
+        stores = await self.astores()
         if stores is None:
             return leaves
-        return [await to_thread.run_sync(explain, stores, leaf) for leaf in leaves]
+        return [await off_loop(explain, stores, leaf) for leaf in leaves]
 
     async def cause_of(self, leaf: Cause) -> Cause:
         """The chain behind ``leaf`` (ADR 0056): batched and cached per request, and called
@@ -65,14 +68,24 @@ class RequestContext(BaseContext):
     def read(self, requested: date | None) -> ReadContext | None:
         """The read context for ``requested`` (None: the latest session), with this request's
         dataloaders; ``None`` when the store holds nothing to resolve a session from."""
-        if requested not in self._contexts:
-            try:
-                ctx = self._open(self._user, requested)
-            except NotFoundError:
-                self._contexts[requested] = None
-            else:
-                self._contexts[requested] = replace(ctx, loaders=Loaders(ctx))
-        return self._contexts[requested]
+        with self._lock:
+            if requested not in self._contexts:
+                try:
+                    ctx = self._open(self._user, requested)
+                except NotFoundError:
+                    self._contexts[requested] = None
+                else:
+                    self._contexts[requested] = replace(ctx, loaders=Loaders(ctx))
+            return self._contexts[requested]
+
+    async def aread(self, requested: date | None) -> ReadContext | None:
+        """``read`` for an async resolver: opening a context lists partitions (parquet
+        directories), so it runs off the event loop."""
+        return await off_loop(self.read, requested)
+
+    async def astores(self) -> Stores | None:
+        """``stores`` for an async resolver, off the event loop."""
+        return await off_loop(self.stores)
 
     def stores(self) -> Stores | None:
         """The session-free context for configs, run records and the catalogue: it needs no
@@ -80,9 +93,10 @@ class RequestContext(BaseContext):
         the latest session's read context (None on an empty store)."""
         if self._open_stores is None:
             return self.read(None)
-        if self._stores is None:
-            self._stores = self._open_stores(self._user)
-        return self._stores
+        with self._lock:
+            if self._stores is None:
+                self._stores = self._open_stores(self._user)
+            return self._stores
 
 
 def context_getter(
