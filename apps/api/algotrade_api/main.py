@@ -5,7 +5,8 @@ bad token -> 401, a caller the registry refuses -> 403), CORS for the configured
 handlers that map library errors to HTTP (not found -> 404, bad configuration or parameters
 -> 400, another user's job -> 403, a write that clashes with what exists -> 409, the drafting
 model off or not answering -> 503), and, when ``settings.web_dist`` is set, the built web app
-on the same origin (``web``, ADR 0044: mounted last, so every API route keeps precedence)."""
+on the same origin (``web``, ADR 0044: mounted last, so every API route keeps precedence);
+the build identity it started with (``ops/build.py``) is taken here, once."""
 
 import json
 from collections.abc import AsyncIterator, Callable
@@ -46,8 +47,9 @@ from algotrade_api.auth.local import LocalAuthenticator
 from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller
-from algotrade_api.graphql.schema import graphql_router
+from algotrade_api.graphql.schema import graphql_router, sdl
 from algotrade_api.live import no_live, open_live
+from algotrade_api.ops.build import api_stamp
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
 from algotrade_api.text_model import OFF as TEXT_MODEL_OFF
 from algotrade_api.text_model import open_text_model
@@ -121,6 +123,8 @@ def create_app(
         ),
         lifespan=lifespan,
     )
+    app.state.build = api_stamp(sdl())  # the code and schema this process serves until restarted
+    app.state.web_dist = settings.web_dist
     app.state.store = store if store is not None else settings.open()
     app.state.writer = writer if writer is not None else settings.open_writer()
     if live is None:

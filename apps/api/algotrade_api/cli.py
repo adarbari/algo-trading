@@ -1,7 +1,10 @@
 """``algotrade-api``: serve the API with uvicorn on 127.0.0.1:8000 (``--reload`` for dev).
 With ``ALGOTRADE_AUTH=off`` (no token, ADR 0040) it refuses a non-loopback ``--host``.
 ``algotrade-api schedule`` writes the launchd agent that keeps it serving on this Mac
-(``ops/schedule.py``, ADR 0044) and prints the commands to install it; it never installs."""
+(``ops/schedule.py``, ADR 0044) and prints the commands to install it; it never installs.
+``algotrade-api stamp-web <dist>`` stamps a web build with the checkout it was built from
+(``make web-build`` runs it) and says when the running API is out of step with it
+(``ops/build.py``): it prints the restart command, never runs it."""
 
 import argparse
 import json
@@ -13,6 +16,7 @@ from algotrade.config.env import auth_mode, load_dotenv, port_base
 from algotrade.core.model.errors import ConfigurationError
 from algotrade_api.auth.local import require_loopback
 from algotrade_api.auth.mode import AuthMode
+from algotrade_api.ops.build import Fetch, running_mismatches, write_web_stamp
 from algotrade_api.ops.schedule import DEFAULT_PORT, HOST, LABEL, api_plist
 
 APP = "algotrade_api.app:app"
@@ -35,6 +39,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     sc.add_argument("--port", type=int, default=DEFAULT_PORT, dest="agent_port")
     sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
+    st = sub.add_parser("stamp-web", help="stamp a web build; say if the running API is behind it")
+    st.add_argument("dist", type=Path)
+    st.add_argument("--port", type=int, default=DEFAULT_PORT, dest="agent_port")
     return parser
 
 
@@ -64,12 +71,31 @@ def write_schedule(out: Path, port: int) -> dict[str, object]:
     return plan
 
 
+def stamp_web(dist: Path, port: int, fetch: Fetch | None = None) -> list[str]:
+    """Stamp the build in ``dist``; the lines to print: the stamp, then what the API on ``port``
+    reports out of step (a running API keeps its schema until restarted)."""
+    stamp = write_web_stamp(dist)
+    lines = [f"stamped {dist}: commit {stamp.git_sha[:9]}, GraphQL schema {stamp.schema_hash}"]
+    url = f"http://{HOST}:{port}"
+    found = running_mismatches(url) if fetch is None else running_mismatches(url, fetch)
+    if found is None:
+        lines.append(f"no API answering at {url}")
+    elif found:
+        lines += [f"WARNING: the API at {url} is out of step:", *(f"  - {m}" for m in found)]
+    else:
+        lines.append(f"the API at {url} serves this build's schema and commit")
+    return lines
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = _parser()
     args = parser.parse_args(argv)
     load_dotenv()
     if args.command == "schedule":
         print(json.dumps(write_schedule(args.out, args.agent_port), indent=2))
+        return
+    if args.command == "stamp-web":
+        print("\n".join(stamp_web(args.dist, args.agent_port)))
         return
     if auth_mode() == AuthMode.OFF:
         try:

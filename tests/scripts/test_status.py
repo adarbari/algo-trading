@@ -49,6 +49,7 @@ def probes(tmp_path: Path, **kw: object) -> "status.Probes":
         "port_open": lambda port: port == 8000,
         "store_facts": lambda: ("2026-10-02", "2026-10-02 SUCCESS"),
         "logs": tmp_path,
+        "api_build": lambda url: (),
     }
     return status.Probes(**{**base, **kw})
 
@@ -69,6 +70,7 @@ def test_report_is_short_and_covers_every_area(
         "job.status: chunk 2 exit=0",
         "latest session 2026-10-02; last nightly 2026-10-02 SUCCESS",
         "8000 api",
+        "API build: in step",
     ):
         assert want in text, want
     assert "launchd" not in text
@@ -100,3 +102,15 @@ def test_gh_failure_says_how_to_fix(tmp_path: Path) -> None:
 def test_servers_probe_this_worktrees_port_block(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ALGOTRADE_PORT_BASE", "12340")
     assert list(status.ports()) == [12340, 12341, 12346]
+
+
+def test_an_api_out_of_step_with_its_build_is_flagged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 2026-10-07: an API started before make web-build served a web it could not answer.
+    monkeypatch.delenv("ALGOTRADE_PORT_BASE", raising=False)
+    stale = ("the web was built against GraphQL schema b, the API serves a; restart the API: x",)
+    lines = status.api_build(probes(tmp_path, api_build=lambda url: stale))
+    assert lines == ["API build: OUT OF STEP", f"  {stale[0]}"]
+    assert status.api_build(probes(tmp_path, port_open=lambda port: False)) == []
+    assert "does not answer" in status.api_build(probes(tmp_path, api_build=lambda url: None))[0]
