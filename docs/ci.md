@@ -28,3 +28,11 @@ auto-merge. Every push to main runs everything.
 
 `make check` runs every CI step (tests in parallel, one worker per CPU; `make test
 WORKERS=0` runs them serially). The web screenshots need Docker: `make web-visual`.
+
+## Pipeline
+
+Measured changes to the delivery pipeline, each kept by a check.
+
+| Measure | Before (2026-10-07) | After |
+|---|---|---|
+| merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push |
