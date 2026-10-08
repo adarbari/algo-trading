@@ -279,12 +279,17 @@ def _backtest(writer: StoreWriter) -> RunRecord:
     return run
 
 
-def _site_only_config_root() -> Path:
+def _site_only_config_root(site: Path = CONFIG_ROOT / "site") -> Path:
     """The site presets alone: a developer's git-ignored ``config/users`` stays out of tests."""
     root = Path(tempfile.mkdtemp(prefix="api-store-configs-"))
     atexit.register(shutil.rmtree, root, ignore_errors=True)
-    (root / "site").symlink_to(CONFIG_ROOT / "site")
+    (root / "site").symlink_to(site)
     return root
+
+
+def site_only_store(site: Path = CONFIG_ROOT / "site") -> FileConfigStore:
+    """The repo's site presets, without this machine's git-ignored ``*.local.toml`` overlay."""
+    return FileConfigStore(_site_only_config_root(site), local=False)
 
 
 def api_store(source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
@@ -306,4 +311,4 @@ def api_store(source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
         "backtest": backtest.run_id,
     }
     user = UserContext("local")
-    return store_over(backend, FileConfigStore(_site_only_config_root()), user), ids
+    return store_over(backend, site_only_store(), user), ids

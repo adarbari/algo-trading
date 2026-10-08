@@ -93,7 +93,7 @@ def user_client(
     """A client for ``user`` over configs where alice has a feature."""
 
     def client_for(user: str) -> TestClient:
-        store = replace(api_golden[0], configs=FileConfigStore(user_configs))
+        store = replace(api_golden[0], configs=FileConfigStore(user_configs, local=False))
         settings = ApiSettings("memory://", str(user_configs), user)
         return TestClient(create_app(settings, store, authenticator=as_user(user)))
 

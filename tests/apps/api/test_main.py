@@ -511,3 +511,13 @@ def test_every_page_operation_answers_within_a_second_on_golden_data(
         timings.append(time.process_time() - started)
         assert response.status_code == 200 and "errors" not in response.json(), response.text
     assert min(timings) < 1.0, f"{name} took {min(timings):.2f}s (best of 3: {timings})"
+
+
+def test_the_api_test_store_ignores_a_machines_local_site_file(tmp_path: Path) -> None:
+    from tests.helpers.api_store import site_only_store  # noqa: PLC0415
+
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "llm.toml").write_text("enabled = false\n")
+    (site / "llm.local.toml").write_text("enabled = true\n")
+    assert site_only_store(site).load("site", "settings", "llm") == {"enabled": False}
