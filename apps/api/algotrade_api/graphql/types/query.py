@@ -23,7 +23,9 @@ from algotrade.services.read.guide import field as field_page
 from algotrade.services.read.guide import index as guide_contents
 from algotrade.services.read.guide import indicator as indicator_page
 from algotrade.services.read.guide import playbook as playbook_page
+from algotrade.services.read.guide import search as guide_search
 from algotrade.services.read.guide import situation as situation_page
+from algotrade.services.read.guide import written as written_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
@@ -41,7 +43,9 @@ from algotrade_api.graphql.types.guide.field import GuideField
 from algotrade_api.graphql.types.guide.index import GuideIndex
 from algotrade_api.graphql.types.guide.indicator import GuideIndicatorDetail
 from algotrade_api.graphql.types.guide.playbook import GuidePlaybookDetail
+from algotrade_api.graphql.types.guide.search import GuideSearch
 from algotrade_api.graphql.types.guide.situation import GuideSituationDetail
+from algotrade_api.graphql.types.guide.written import GuideStartPage, GuideTerm
 from algotrade_api.graphql.types.instruments.distribution import FeatureDistribution
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -71,6 +75,8 @@ Day = Annotated[
 Ctx = Info[RequestContext, None]
 MAX_RUNS = 100  # nightlyRuns(limit)
 MAX_SESSIONS = 60  # completeness(sessions)
+MAX_SEARCH = 50  # guideSearch(limit): hits per kind
+MAX_QUERY = 200  # guideSearch(q): characters
 
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
@@ -306,6 +312,35 @@ class Query:
         ctx = info.context.stores()
         found = episode_page.load_guide_episode(ctx, slug) if ctx is not None else None
         return GuideEpisodeDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The glossary term `id` (ADR 0051): its entry, the body linked and the "
+        "terms it refers to; null: no such term"
+    )
+    def guide_term(self, info: Ctx, id: str) -> GuideTerm | None:
+        ctx = info.context.stores()
+        found = written_page.load_guide_term(ctx, id) if ctx is not None else None
+        return GuideTerm.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Start here page `id` (ADR 0051): its entry, the sections linked and "
+        "the Guide entries it links to; null: no such page"
+    )
+    def guide_start_page(self, info: Ctx, id: str) -> GuideStartPage | None:
+        ctx = info.context.stores()
+        found = written_page.load_guide_start_page(ctx, id) if ctx is not None else None
+        return GuideStartPage.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Search every Guide entry for `q` (ADR 0051): at most `limit` results per "
+        "kind, grouped by kind, ranked exact name, then name or title, then intent or theme, "
+        "then prose (case-insensitive); not session data",
+        extensions=[MaxItems("q", MAX_QUERY), MaxItems("limit", MAX_SEARCH)],
+    )
+    def guide_search(self, info: Ctx, q: str, limit: int = 5) -> GuideSearch | None:
+        ctx = info.context.stores()
+        found = guide_search.load_guide_search(ctx, q, limit) if ctx is not None else None
+        return GuideSearch.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every strategy and screener config the user sees: site presets, then "

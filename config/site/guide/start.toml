@@ -1,0 +1,267 @@
+# L3 site setting: the Guide's Start here pages (ADR 0051, docs/ui/guide.md section 3, "Start
+# here"): numbered how-to pages for someone who does not follow markets. One [[page]] each: id
+# (its page's key), order (its number), title, summary (one line, the index's), [[page.section]]
+# (title and body, one paragraph each; catalogue names in a body are linked) and links (the
+# Guide entries to read next, {kind, id}: kind one of start, indicator, episode, playbook,
+# field, situation, term). Typed by src/algotrade/config/site/guide/start.py; fitness tests in
+# tests/unit/config/site/guide/test_start.py (every link resolves, catalogue names exist).
+
+# --------------------------------------------------------------------------------------- 1
+[[page]]
+id = "how-the-app-thinks"
+order = 1
+title = "How the app thinks about a day"
+summary = "Every page reads one trading day, shows only what was known for it, and says so when something is missing."
+links = [
+  { kind = "term", id = "session" },
+  { kind = "term", id = "knowledge_time" },
+  { kind = "term", id = "unknown" },
+  { kind = "term", id = "not_run" },
+  { kind = "term", id = "run" },
+  { kind = "situation", id = "a-null-is-not-a-value" },
+]
+
+[[page.section]]
+title = "One day at a time"
+body = """
+The app works in sessions: trading days. Each night, after the market closes, it loads the
+day's prices and the other data it follows, checks them, computes the catalogue's fields for
+every instrument, and then runs the screens. A page reads one session, by
+default the latest one with stored prices, and every daily number on it is for exactly that
+day.
+"""
+
+[[page.section]]
+title = "What was known, and when"
+body = """
+Every stored fact remembers two times: the day it is about, and when the app learned it (its
+knowledge time). A correction from a data vendor is stored as a new fact with a later knowledge
+time, never written over the old one, and an announced event such as an earnings date only
+counts from the day it was known. That is how a backtest sees the past as it was, not with
+today's hindsight.
+"""
+
+[[page.section]]
+title = "UNKNOWN instead of a guess"
+body = """
+When a value was not computed or pulled for the session, the page says UNKNOWN and why
+(nothing stored that day, no row for this instrument, a stored empty value, a field that does
+not apply). It never shows yesterday's number instead, so everything side by side is about the
+same day. Screens treat missing data the same way: it never counts as a pass.
+"""
+
+[[page.section]]
+title = "A screen that did not run"
+body = """
+A screen's results belong to the session it ran for. If a screen has no run for the session
+you are reading, it is NOT_RUN, which is not the same as a run that found nothing. If a
+critical step of the nightly load fails, the screens for that day wait rather than run on
+incomplete data, and show as NOT_RUN until the step succeeds or is waived by hand.
+"""
+
+# --------------------------------------------------------------------------------------- 2
+[[page]]
+id = "read-a-result"
+order = 2
+title = "Read a screen's result"
+summary = "Each row has a decision (pass, near miss or reject), a score for ordering, and the reasons, criterion by criterion."
+links = [
+  { kind = "term", id = "qualified" },
+  { kind = "term", id = "near_miss" },
+  { kind = "term", id = "watch" },
+  { kind = "term", id = "liquidity_risk" },
+  { kind = "term", id = "reject" },
+  { kind = "term", id = "paused" },
+  { kind = "term", id = "score" },
+  { kind = "term", id = "gating_criterion" },
+]
+
+[[page.section]]
+title = "The decision"
+body = """
+Every instrument the screen looked at gets one decision. QUALIFIED: it met every hard and soft
+criterion. A near miss: it passed every hard criterion but missed a soft one by no more than
+that criterion's tolerance, and the row takes the near-miss decision the criterion names,
+WATCH by default, LIQUIDITY_RISK when the miss is about how much the name trades, EVENT_RISK
+for an event to stay away from. REJECT: it failed a hard criterion, had no value for one, or
+missed a soft one by more than its tolerance. PAUSED: it met the screen, but the regime gate
+held it back for the market's current weather.
+"""
+
+[[page.section]]
+title = "The score and the order"
+body = """
+The score orders the list; it is not a probability. A row that meets every threshold scores
+100, and each miss takes points off: up to 10 for a near miss, 10 for a missed score criterion
+or a missing soft value, 100 for a hard miss. Rows sort by score, then by the screen's
+tie-break field, then by instrument, so the order is the same every time.
+"""
+
+[[page.section]]
+title = "The reasons"
+body = """
+A row lists why it got its decision: each criterion's value, whether it passed, missed
+narrowly, failed or had no value (no <field>), and how far it was from the threshold. Flags
+mark something worth knowing (a leveraged fund, say) without changing the decision, and the
+screen's extra columns show values kept with the row.
+"""
+
+[[page.section]]
+title = "The run as a whole"
+body = """
+Each run reports how many rows passed, the count of each decision, and the narrow misses: the
+rows that missed only within tolerance. In the Builder, the funnel shows the gating criteria
+in order and how many rows each one removed, which tells you which rule does the work and
+which value is missing most often.
+"""
+
+# --------------------------------------------------------------------------------------- 3
+[[page]]
+id = "build-a-screen"
+order = 3
+title = "Build a screen"
+summary = "Start from a playbook, take criteria from the field pages, preview on today's data, then finalise to run it nightly."
+links = [
+  { kind = "playbook", id = "trend_continuation" },
+  { kind = "field", id = "rollup.price_stats@v2.adv_usd_20d" },
+  { kind = "term", id = "criterion" },
+  { kind = "term", id = "mode" },
+  { kind = "term", id = "tolerance" },
+  { kind = "term", id = "preset" },
+  { kind = "term", id = "draft" },
+  { kind = "start", id = "draft-from-a-sentence" },
+]
+
+[[page.section]]
+title = "Start from a playbook"
+body = """
+Each site screen has a playbook in the Guide: the setup it looks for, what a hit looks like,
+what it does not check and each criterion in plain words. Open in Builder shows that screen in
+the Builder. Your first edit makes your own copy, which keeps the site's version it started
+from until you choose to rebase onto a newer one.
+"""
+
+[[page.section]]
+title = "Add and tune criteria"
+body = """
+A criterion is a field, a comparison, a threshold and a mode. The help button beside a
+criterion's field opens its Guide entry: how to read the number, the usual criterion for each
+intent (Use this sets the row to it) and when the number lies. Choose hard for a must, soft
+with a tolerance for a must that may miss by a little, and score for a preference that only
+orders the list. Who is screened at all (stocks or funds, listed, optionable) is written as
+hard criteria too, usually first, with the liquidity gate on
+rollup.price_stats@v2.adv_usd_20d.
+"""
+
+[[page.section]]
+title = "Preview"
+body = """
+The preview runs your criteria on the latest session and saves nothing: the decisions, the
+funnel of the gating criteria, the narrow misses and the top rows. Change a threshold, a mode
+or a tolerance and preview again until the list says what you meant.
+"""
+
+[[page.section]]
+title = "Save and finalise"
+body = """
+Save draft keeps your work; a draft is never run. Finalize checks the screen (every field
+exists, every value fits its field), saves it as the next numbered version, which never
+changes, and puts it on the nightly: from then on it runs every night.
+"""
+
+# --------------------------------------------------------------------------------------- 4
+[[page]]
+id = "draft-from-a-sentence"
+order = 4
+title = "Draft a screen from a sentence"
+summary = "Describe it turns a sentence into draft criteria you review, preview and finalise yourself; it never saves or runs anything."
+links = [
+  { kind = "term", id = "draft" },
+  { kind = "term", id = "criterion" },
+  { kind = "start", id = "build-a-screen" },
+]
+
+[[page.section]]
+title = "Write the sentence"
+body = """
+In the Builder's Describe it box, write what you want in your own words, such as optionable
+stocks over $5 with IV rank above 50%, and choose Draft it. A text model maps the sentence onto
+the field catalogue, using the app's phrasebook of trader vocabulary and the Guide's field
+entries (how to read each field and its usual criterion per intent). It sees the catalogue
+(each field's name, type, unit and description) and those texts, never market data, results
+or credentials.
+"""
+
+[[page.section]]
+title = "Review what came back"
+body = """
+The draft loads as unsaved rows in the Builder. A criterion on a field the catalogue does not
+have is left out, with the reason, and every kept criterion is checked exactly as Finalize
+checks it. The model's notes say what it could not map. Read each row, open its field's help
+to check the threshold, and change what does not match what you meant.
+"""
+
+[[page.section]]
+title = "Then as usual"
+body = """
+Preview, save and finalise as for any screen: nothing is saved or run until you do. Drafting
+is off unless the site has set up a text model; when it is off, the box says why.
+"""
+
+# --------------------------------------------------------------------------------------- 5
+[[page]]
+id = "read-the-regime-page"
+order = 5
+title = "Read the Regime page"
+summary = "The market as weather: the label, the warning signs behind it, and how to read every chart on the page."
+links = [
+  { kind = "term", id = "regime" },
+  { kind = "term", id = "paused" },
+  { kind = "indicator", id = "curve_10y3m" },
+  { kind = "indicator", id = "spx_trend_200d" },
+  { kind = "episode", id = "gfc_2007" },
+]
+
+[[page.section]]
+title = "The weather"
+body = """
+The page's label is the market's weather for the session: Clear, Clouds building, Storm or
+Severe storm, or Not computed yet when the scores behind it could not be computed. It comes
+from two scores: macro risk, the slow warning signs in the economy (weeks to months ahead),
+and market stress, the fast ones in prices (days). Clouds building is macro risk alone, Storm
+is market stress alone, Severe storm is both.
+"""
+
+[[page.section]]
+title = "The indicator cards"
+body = """
+Each card asks one plain question, such as whether long-term interest rates are below
+short-term ones, and says whether its warning signal is on today. Slow cards watch the
+economy; fast cards watch the market. Behind each card: why it matters, what on means, how
+far ahead it has warned before, its false alarms, and what it did before each past market fall.
+"""
+
+[[page.section]]
+title = "Read a chart left to right"
+body = """
+The line is the value; the dashed line is where the signal turns on; a gap in the line is a
+period with no stored value. Every chart on the page uses the same colors.
+"""
+
+[[page.section]]
+title = "The strips under a chart"
+body = """
+The scores chart has a regime strip, the weather word for each stretch of sessions (Not
+computed where it is unknown), and an evidence strip: Full evidence where at least 90% of a
+score's inputs, by weight, were known that day, Partial evidence where some were, No evidence
+where none were (a score with less than half its weight known is not computed). Each indicator
+chart has a signal strip: Signal on where its warning was on, No data where nothing is stored.
+"""
+
+[[page.section]]
+title = "Shaded behind the lines"
+body = """
+The shading shows the past: each market fall from peak to trough, each recovery from the trough
+to a new high, and the economy's recessions as dated by the NBER, hatched so that overlapping
+spans stay readable. The falls are the reference episodes the indicators are judged on.
+"""

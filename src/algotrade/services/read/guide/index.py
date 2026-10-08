@@ -2,14 +2,17 @@
 (``config/site/guide/sections.toml``): the sections with their entry counts, the field theme
 groups with the number of guided fields per theme, the intents a trader has (each with the
 number of fields offering a criterion for it, most first), the situations with the number of
-fields each fools, the playbooks by family, and the regime indicators and reference episodes
-as their config holds them. Counts are computed here, never in the browser (ADR 0038)."""
+fields each fools, the playbooks by family, the regime indicators and reference episodes as
+their config holds them, the Start here pages in order and the glossary terms in file order.
+Counts are computed here, never in the browser (ADR 0038)."""
 
 from collections import Counter
 from dataclasses import dataclass
 
 from algotrade.config.site.field_guide import FieldGuideSettings
+from algotrade.config.site.guide.glossary import load_guide_glossary
 from algotrade.config.site.guide.sections import load_guide_sections
+from algotrade.config.site.guide.start import load_guide_start
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_field_guide
@@ -94,6 +97,27 @@ class GuideEpisode:
 
 
 @dataclass(frozen=True)
+class GuideStartEntry:
+    """A Start here page: its id (its page's key, ``written.py``), number, title and one-line
+    summary."""
+
+    id: str
+    order: int
+    title: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class GuideTermEntry:
+    """A glossary term: its id (its page's key, ``written.py``), the term as the app writes it
+    and its one-sentence ``short`` (the help button's hover)."""
+
+    id: str
+    term: str
+    short: str
+
+
+@dataclass(frozen=True)
 class GuideIndex:
     sections: tuple[GuideSection, ...]
     theme_groups: tuple[GuideThemeGroup, ...]
@@ -102,6 +126,8 @@ class GuideIndex:
     families: tuple[GuideFamily, ...]
     indicators: tuple[GuideIndicator, ...]
     episodes: tuple[GuideEpisode, ...]
+    start_pages: tuple[GuideStartEntry, ...]
+    terms: tuple[GuideTermEntry, ...]
 
 
 def load_guide_index(ctx: Stores) -> GuideIndex:
@@ -113,14 +139,21 @@ def load_guide_index(ctx: Stores) -> GuideIndex:
         GuideIndicator(c.key, c.plain_name, c.pace) for c in load_cards(ctx.configs).cards
     )
     episodes = tuple(GuideEpisode(e.key, e.name) for e in load_episodes(ctx.configs).episodes)
+    start = tuple(
+        GuideStartEntry(p.id, p.order, p.title, p.summary)
+        for p in load_guide_start(ctx.configs).pages
+    )
+    terms = tuple(
+        GuideTermEntry(t.id, t.term, t.short) for t in load_guide_glossary(ctx.configs).terms
+    )
     per_theme = Counter(f.theme for f in guide.fields)
     counts = {
-        "start": 0,
+        "start": len(start),
         "regime": len(indicators) + len(episodes),
         "playbooks": len(playbooks),
         "fields": len(guide.fields),
         "situations": len(guide.situations),
-        "glossary": 0,
+        "glossary": len(terms),
     }
     return GuideIndex(
         sections=tuple(
@@ -139,6 +172,8 @@ def load_guide_index(ctx: Stores) -> GuideIndex:
         ),
         indicators=indicators,
         episodes=episodes,
+        start_pages=start,
+        terms=terms,
     )
 
 

@@ -147,6 +147,17 @@ One search over all kinds (name, display name, theme, reads, intent, playbook an
 names, glossary terms), results grouped by kind, ranked exact name, display name, intent, then
 prose; every result is a URL under `/guide`. ⌘K anywhere; the rail's box on Guide pages.
 
+Server side (GD6a, `Query.guideSearch(q, limit)`, `services/read/guide/search.py`; ADR 0038:
+the browser does not search): fields have no display name, so a field matches by its
+catalogue name, then its intents and theme, then its reads, caveats and catalogue description;
+every other kind by its id and title, then its prose. Tiers: the query is a name or title;
+a name or title contains it; an intent or theme contains it; every word of it starts a word of
+the prose. Case-insensitive, ties by match position, title length, title, kind and id, at most
+`limit` results per kind, the groups by their best result. Each result is `{kind, id, title,
+snippet}`: the prose around the first query word for a prose match, else the entry's lead. It
+is computed from the loaded sources on each request (about 0.1 s over the shipped Guide), with
+no stored index and no cache.
+
 ## 4. Migrating today's explanations
 
 Inventory of 2026-10-07. Each row moves in the phase named; the PR that moves it lowers
@@ -179,9 +190,18 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
 - **Coverage**: fitness tests that every Guide reference in the web code and in config resolves,
   that every site preset has a playbook, every regime card and episode a page, and (existing)
   every phrased or site-screened field a field-guide entry.
-- **Sources**: Guide-only sources live under `config/site/guide/`: `sections.toml` now (the
-  section order, the theme groups, the playbook families), and from GD4 one
-  `config/site/guide/playbooks/<id>.toml` per site preset (the playbook prose above).
+- **Sources**: Guide-only sources live under `config/site/guide/`: `sections.toml` (the
+  section order, the theme groups, the playbook families), one
+  `config/site/guide/playbooks/<id>.toml` per site preset (the playbook prose above, GD4),
+  `glossary.toml` (GD6a: one `[[term]]` each, `id, term, short` (one sentence, the hover),
+  `body`, `see_also` (term ids); read as `Query.guideTerm(id)`) and `start.toml` (GD6a: one
+  `[[page]]` each, `id, order, title, summary`, `[[page.section]]` (`title, body`) and `links`
+  (`{kind, id}`, kind one of start, indicator, episode, playbook, field, situation, term); read
+  as `Query.guideStartPage(id)`; the index lists both). Fitness tests: every term the spec
+  lists is written, `see_also` and links resolve to an entry of their kind, `short` is one
+  sentence, every catalogue name in the prose exists. The Regime page's chart key (the legend
+  and the history note) is the Start here page `read-the-regime-page`; the web PR deletes the
+  words from `widgets/regime-legend` and `features/indicator-history`.
   Field, situation and regime entries stay where they are (`config/site/field_guide/`,
   `config/site/regime/`).
 - **Process**: `.claude/skills/add-guide-content` (where each kind lives, its owner, how to put
@@ -200,7 +220,9 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   and drafter hooks.
 - **GD5**: market regime pages (indicators, episodes) and the Regime page's drawers.
 - **GD6**: Start here, glossary, grouped search behind ⌘K, the remaining migrations, the
-  baseline at its floor.
+  baseline at its floor. GD6a (server side and content): `glossary.toml`, `start.toml`,
+  `Query.guideTerm` / `guideStartPage` / `guideSearch`, the index's terms and pages; GD6b the
+  pages, the drawer for terms, ⌘K and the migrations.
 
 Not recommended: a separate docs site (duplicates the read model and loses session-aware
 distributions), a guided tour (the drawer is cheaper and persistent), beginner / advanced

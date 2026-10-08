@@ -9,6 +9,7 @@ site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``,
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
+site/guide/{glossary,start}.toml           L3 Guide glossary, Start here pages (kind ``guide``)
 site/guide/playbooks/<id>.toml             L3 Guide playbook prose (kind ``guide_playbooks``)
 site/edges/<id>.toml                       L3 edge documents (kind ``edges``, ADR 0053)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
