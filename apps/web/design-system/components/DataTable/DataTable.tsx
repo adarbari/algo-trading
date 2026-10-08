@@ -10,7 +10,9 @@
  * Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the
  * caller's own `rowKeys` act on it); the active row can be controlled; horizontal
  * scrolling on narrow widths, with the checkbox column and the first column pinned at the start
- * (the row's key stays in view; `pinFirst`). Built on TanStack Table + Virtual, which stay internal.
+ * (the row's key stays in view; `pinFirst`). Under the `md` breakpoint (its own width: a phone)
+ * only the `essential` columns show by default (else the first three) and the column picker
+ * appears so the user adds the rest back. Built on TanStack Table + Virtual, which stay internal.
  */
 import {
   useTable,
@@ -33,9 +35,17 @@ import {
 } from 'react';
 
 import { formatValue } from '../../format';
+import { useNarrow } from '../../responsive';
 import { Checkbox } from '../Checkbox';
 import { ColumnPicker } from './ColumnPicker';
-import { alignOf, features, gridTemplate, toColumnDefs, type DataTableColumn } from './columns';
+import {
+  alignOf,
+  features,
+  gridTemplate,
+  narrowDefaults,
+  toColumnDefs,
+  type DataTableColumn,
+} from './columns';
 import styles from './DataTable.module.css';
 import { useRowHeight } from './useRowHeight';
 
@@ -69,7 +79,7 @@ export interface DataTableProps<TRow> {
   /** Initially hidden column ids when uncontrolled. */
   defaultHiddenColumns?: readonly string[];
   onHiddenColumnsChange?: (hidden: string[]) => void;
-  /** Show the "Columns" picker in the toolbar. */
+  /** Show the "Columns" picker in the toolbar (a narrow table shows it whenever it hid a column). */
   columnPicker?: boolean;
   /** Add the checkbox column. Selection is controlled: pass `selectedIds` and `onSelectionChange`. */
   selectable?: boolean;
@@ -144,6 +154,7 @@ export function DataTable<TRow extends RowData>({
 }: DataTableProps<TRow>) {
   const id = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [rootRef, narrow] = useNarrow('md');
   // Scrolled sideways: the pinned column shows its end border over the cells sliding under it.
   const [scrolledX, setScrolledX] = useState(false);
   const { base: baseHeight, row: rowHeight } = useRowHeight(scrollRef, rowLines);
@@ -152,7 +163,21 @@ export function DataTable<TRow extends RowData>({
   const [ownSort, setOwnSort] = useState<DataTableSort | null>(defaultSort);
   const [ownHidden, setOwnHidden] = useState<readonly string[]>(defaultHiddenColumns);
   const activeSort = sort === undefined ? ownSort : sort;
-  const hidden = hiddenColumns ?? ownHidden;
+  const chosenHidden = hiddenColumns ?? ownHidden;
+  // Narrow: the non-essential columns wait in the picker until the user adds them (per table,
+  // for the session); a column the user then hides goes into the hidden set like on wide.
+  const [narrowShown, setNarrowShown] = useState<readonly string[]>([]);
+  const narrowHidden = useMemo(() => {
+    if (!narrow) return [];
+    const shown = narrowDefaults(columns);
+    return columns
+      .filter((column) => !shown.has(column.id) && !narrowShown.includes(column.id))
+      .map((column) => column.id);
+  }, [narrow, columns, narrowShown]);
+  const hidden = useMemo(
+    () => [...new Set([...chosenHidden, ...narrowHidden])],
+    [chosenHidden, narrowHidden],
+  );
 
   const setSort = (next: DataTableSort | null) => {
     if (sort === undefined) setOwnSort(next);
@@ -162,6 +187,15 @@ export function DataTable<TRow extends RowData>({
     if (hiddenColumns === undefined) setOwnHidden(next);
     onHiddenColumnsChange?.(next);
   };
+  const toggleColumn = (columnId: string, visible: boolean) => {
+    if (visible) {
+      if (narrowHidden.includes(columnId)) setNarrowShown([...narrowShown, columnId]);
+      if (chosenHidden.includes(columnId)) setHidden(chosenHidden.filter((h) => h !== columnId));
+    } else if (!chosenHidden.includes(columnId)) {
+      setHidden([...chosenHidden, columnId]);
+    }
+  };
+  const showPicker = columnPicker || narrowHidden.length > 0;
 
   const columnDefs = useMemo(() => toColumnDefs(columns), [columns]);
   const data = rows as TRow[];
@@ -187,7 +221,8 @@ export function DataTable<TRow extends RowData>({
     },
     onColumnVisibilityChange: (updater: Updater<Record<string, boolean>>) => {
       const next = resolve(updater, columnVisibility);
-      setHidden(Object.keys(next).filter((columnId) => next[columnId] === false));
+      const wanted = Object.keys(next).filter((columnId) => next[columnId] === false);
+      setHidden(wanted.filter((columnId) => !narrowHidden.includes(columnId)));
     },
     onRowSelectionChange: (updater: Updater<RowSelectionState>) => {
       const next = resolve(updater, rowSelection);
@@ -337,18 +372,11 @@ export function DataTable<TRow extends RowData>({
   }
 
   return (
-    <div className={styles.root} style={gridVars}>
-      {(toolbar !== undefined || columnPicker) && (
+    <div ref={rootRef} className={styles.root} style={gridVars} data-narrow={narrow || undefined}>
+      {(toolbar !== undefined || showPicker) && (
         <div className={styles.toolbar}>
           <div className={styles.toolbarStart}>{toolbar}</div>
-          {columnPicker && (
-            <ColumnPicker
-              columns={pickerColumns}
-              onToggle={(columnId, visible) => {
-                setHidden(visible ? hidden.filter((h) => h !== columnId) : [...hidden, columnId]);
-              }}
-            />
-          )}
+          {showPicker && <ColumnPicker columns={pickerColumns} onToggle={toggleColumn} />}
         </div>
       )}
       <div

@@ -158,6 +158,18 @@ Source: `design-system/primitives/VisuallyHidden`
 
 ## Components
 
+### AccountMenu
+
+AccountMenu: the top bar's account control: a ghost button with the viewer's name that opens a small Popover holding what belongs to the account rather than to a workspace: the workspace choice (a `WorkspaceSwitch` from the app, admins only; a trader sees none) and "Sign out" when the app gives `onSignOut`. Keeps the workspace switch out of the bar's prime space (owner decision 2026-10-07): the bar shows the brand, the Guide, the status chips and the name; the workspace is chosen here, by the account that may enter it.
+
+Source: `design-system/components/AccountMenu`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The viewer's name (the trigger's text). |
+| `children` | `ReactNode` | no | The menu's content: the workspace switch, settings links. Nothing: only "Sign out". |
+| `onSignOut` | `() => void` | no | Shown as a "Sign out" button at the end of the menu; absent: no sign-out (auth off). |
+
 ### AppShell
 
 AppShell: the frame of every screen: a skip link, the TopBar, and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
@@ -342,7 +354,7 @@ Source: `design-system/components/Combobox`
 
 ### DataTable
 
-DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view; `pinFirst`). Built on TanStack Table + Virtual, which stay internal.
+DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view; `pinFirst`). Under the `md` breakpoint (its own width: a phone) only the `essential` columns show by default (else the first three) and the column picker appears so the user adds the rest back. Built on TanStack Table + Virtual, which stay internal.
 
 Source: `design-system/components/DataTable`
 
@@ -360,7 +372,7 @@ Source: `design-system/components/DataTable`
 | `hiddenColumns` | `readonly string[]` | no | Controlled hidden column ids (pair with `onHiddenColumnsChange`). |
 | `defaultHiddenColumns` | `readonly string[]` | no | Initially hidden column ids when uncontrolled. |
 | `onHiddenColumnsChange` | `(hidden: string[]) => void` | no |  |
-| `columnPicker` | `boolean` | no | Show the "Columns" picker in the toolbar. |
+| `columnPicker` | `boolean` | no | Show the "Columns" picker in the toolbar (a narrow table shows it whenever it hid a column). |
 | `selectable` | `boolean` | no | Add the checkbox column. Selection is controlled: pass `selectedIds` and `onSelectionChange`. |
 | `selectedIds` | `readonly string[]` | no |  |
 | `onSelectionChange` | `(ids: string[]) => void` | no |  |
@@ -723,6 +735,17 @@ Source: `design-system/components/Kbd`
 |---|---|---|---|
 | `keys` | `readonly string[]` | yes | The keys of one shortcut, pressed together: `['Ctrl', 'K']`, `['/']`. |
 | `size` | `'sm' \| 'xs'` | no | `sm` (default, inline in body text) or `xs` (in captions and tooltips). |
+
+### KeyHints
+
+KeyHints: a row of keyboard shortcuts with what each does ("j k move · c compare · Enter open"), at caption size, under a panel's actions. Hidden under a coarse pointer (a phone or tablet without a keyboard): a shortcut is never the only way to an action, so a touch user loses nothing. Keeps the hint row out of page code: a page lists the hints, never a Kbd.
+
+Source: `design-system/components/KeyHints`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `hints` | `readonly KeyHint[]` | yes |  |
+| `label` | `string` | no | Accessible name of the list (default "Keyboard shortcuts"). |
 
 ### KeyValue
 
@@ -1170,7 +1193,7 @@ Source: `design-system/components/Toast`
 
 ### Tooltip
 
-Tooltip: a short description of a control, shown on hover (after a delay) and immediately on keyboard focus; Escape hides it. The text is the trigger's accessible description: the trigger is rendered through `children(props)` and receives `aria-describedby`, so it must be focusable (a Button, IconButton, link). Never put essential information or interactive content in a tooltip. Positioned with Floating UI above the trigger (flips when there is no room); rendered in a portal.
+Tooltip: a short description of a control, shown on hover (after a delay), immediately on keyboard focus, and on a tap under a coarse pointer (a finger has no hover: the tap toggles it, a tap elsewhere or Escape hides it; the mouse never toggles, hover does that). The text is the trigger's accessible description: the trigger is rendered through `children(props)` and receives `aria-describedby`, so it must be focusable (a Button, IconButton, link). Never put essential information or interactive content in a tooltip. Positioned with Floating UI above the trigger (flips when there is no room); rendered in a portal.
 
 Source: `design-system/components/Tooltip`
 
@@ -1184,14 +1207,13 @@ Source: `design-system/components/Tooltip`
 
 ### TopBar
 
-TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search box, "As of Fri 2 Oct", the latest-run note), and a utility slot just before it for links that belong to no workspace (the Guide). Under 720 px (container width) the bar is two rows: brand, workspace switch, utility and end slots, then the nav full width.
+TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the workspace's NavTabs, a utility slot for links that belong to no workspace (the Guide) and an end slot pushed to the far side (status chips, the account menu, "As of Fri 2 Oct"). The workspace switch is not in the bar: it lives in the AccountMenu (owner decision 2026-10-07). Under 720 px (container width) the bar is a two-row grid: brand, utility and end on the first row (the end slot keeps one line and scrolls sideways), the nav on the second.
 
 Source: `design-system/components/TopBar`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `brand` | `ReactNode` | yes | The product mark (e.g. `<Mono weight="medium">algotrade</Mono>`). |
-| `workspace` | `ReactNode` | no | The workspace switch (WorkspaceSwitch). |
 | `nav` | `ReactNode` | no | The workspace's section links (NavTabs). |
 | `utility` | `ReactNode` | no | A utility link on the far side, before `end` (a TextLink to the Guide), in every workspace. |
 | `end` | `ReactNode` | no | Content at the far end: a SearchInput, an as-of date, a status note. |

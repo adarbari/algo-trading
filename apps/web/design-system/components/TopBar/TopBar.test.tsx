@@ -11,13 +11,12 @@ describe('TopBar', () => {
     render(
       <TopBar
         brand="algotrade"
-        workspace={<span>switch</span>}
         nav={<NavTabs items={[{ href: '/a', label: 'A' }]} aria-label="Sections" />}
         end="As of Fri 2 Oct"
       />,
     );
     const banner = screen.getByRole('banner');
-    expect(banner).toHaveTextContent(/^algotradeswitchAAs of Fri 2 Oct$/);
+    expect(banner).toHaveTextContent(/^algotradeAAs of Fri 2 Oct$/);
     expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
   });
 

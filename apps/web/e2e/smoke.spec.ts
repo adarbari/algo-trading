@@ -63,8 +63,12 @@ test('the top bar switches workspace and section', async ({ page }) => {
   await page.getByRole('link', { name: 'Explore' }).click();
   await expect(page).toHaveURL(/\/explore$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
+  // The workspace switch lives in the account menu (the viewer's name), not in the bar.
+  await expect(page.getByRole('radio', { name: 'Admin' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Abhi Admin' }).click();
   await page.getByRole('radio', { name: 'Admin' }).click();
   await expect(page).toHaveURL(/\/admin\/ingestion$/);
+  await page.getByRole('button', { name: 'Abhi Admin' }).click();
   await expect(page.getByRole('radio', { name: 'Admin' })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('radio', { name: 'Admin' }).press('ArrowLeft');
   await expect(page).toHaveURL(/\/ideas$/);

@@ -63,11 +63,13 @@ other. A page receives route params as props from its route in `app/`.
 
 ## Workspaces and navigation
 
-A horizontal top bar switches between two workspaces; each is a route group with a layout route
+A horizontal top bar shows the current workspace's sections; the workspace is chosen in the
+account menu (the viewer's name; owner decision 2026-10-07: the switch leaves the bar's prime
+space). Each workspace is a route group with a layout route
 and a `beforeLoad` guard (`app/workspaces/guard.ts`, the one place role gating goes: it reads
 `Query.viewer`, ADR 0040; no session redirects to `/login`, a workspace the viewer's role lacks to the
-default workspace; the top bar lists only the workspaces they may enter, shows their name and a
-sign-out action). `/login` (`pages/login`, outside both workspaces) is the design-system `LoginForm`
+default workspace; the account menu lists only the workspaces they may enter, none for a
+trader, and a sign-out action). `/login` (`pages/login`, outside both workspaces) is the design-system `LoginForm`
 over Supabase password sign-in (`entities/viewer`, `shared/api/auth.ts`, the bearer token on every
 request; a 401 ends the session):
 

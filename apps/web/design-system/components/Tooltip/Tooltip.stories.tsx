@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor } from 'storybook/test';
 
+import { narrow } from '../../testing';
 import { Box } from '../../primitives/Box';
 import { Stack } from '../../primitives/Stack';
 import { Button } from '../Button';
@@ -77,4 +78,15 @@ export const Dense: Story = {
       ))}
     </Stack>
   ),
+};
+
+/** A phone (375 px, a coarse pointer): a tap on the trigger opens the tooltip, a tap elsewhere closes it. */
+export const Narrow: Story = {
+  decorators: [narrow],
+  play: async ({ canvasElement }) => {
+    const trigger = canvasElement.querySelector('button');
+    if (!trigger) throw new Error('no trigger');
+    await userEvent.pointer({ keys: '[TouchA]', target: trigger });
+    await waitFor(() => expect(document.querySelector('[role="tooltip"]')).toBeVisible());
+  },
 };

@@ -37,6 +37,9 @@ function IngestionRoute() {
       onSelectCell={(cell) => {
         void navigate({ to: '/admin/ingestion', search: { ...cell }, replace: true });
       }}
+      onClearCell={() => {
+        void navigate({ to: '/admin/ingestion', search: {}, replace: true });
+      }}
     />
   );
 }

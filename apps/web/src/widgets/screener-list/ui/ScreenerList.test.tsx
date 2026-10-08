@@ -143,6 +143,24 @@ describe('ScreenerList', () => {
     expect(onOpen).toHaveBeenLastCalledWith('vrp_scanner');
   });
 
+  it('opens a rule screener on a row click; a Python preset row does nothing', async () => {
+    const { onOpen } = setup();
+    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
+    await userEvent.click(
+      within(presets.getByRole('row', { name: /short_premium/ })).getByText('Python'),
+    );
+    expect(onOpen).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(presets.getByRole('row', { name: /vrp_scanner/ })).getByText('Rules'),
+    );
+    expect(onOpen).toHaveBeenLastCalledWith('vrp_scanner');
+    const mineRow = within(screen.getByRole('grid', { name: 'Your screeners' })).getByRole('row', {
+      name: /my-vrp/,
+    });
+    await userEvent.click(within(mineRow).getByText('v2 + draft'));
+    expect(onOpen).toHaveBeenLastCalledWith('my-vrp');
+  });
+
   it('deletes one of your screeners after a confirmation; presets have no Delete', async () => {
     setup();
     const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
