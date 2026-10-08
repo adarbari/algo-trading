@@ -283,6 +283,13 @@ export type InstrumentHistoryQueryVariables = Exact<{
 
 export type InstrumentHistoryQuery = { instrument: { instrumentId: string, series: { names: Array<string>, points: Array<{ session: string, values: Array<unknown> }> } } | null };
 
+export type LlmUsageQueryVariables = Exact<{
+  recent: number;
+}>;
+
+
+export type LlmUsageQuery = { llmUsage: { today: string, recorded: boolean, budget: { dailyUsd: number | null, monthlyUsd: number | null, over: string | null, reportedCallUsd: number | null, error: string | null }, windows: Array<{ key: string, start: string, end: string, cap: { kind: string, limitUsd: number | null, usedShare: number | null } | null, tally: { calls: number, inputTokens: number, outputTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number, freeCalls: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, breakdowns: Array<{ by: string, rows: Array<{ key: string | null, provider: string | null, costShare: number | null, tally: { calls: number, inputTokens: number, outputTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number } }> }>, daily: Array<{ day: string, tally: { calls: number, inputTokens: number, outputTokens: number, spentUsd: number, reportedUsd: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, reliability: { attempts: number, ok: number, fellBack: number, failed: number, skippedBudget: number, fallbackRate: number | null, failureRate: number | null }, recent: Array<{ ts: string, provider: string, model: string, useCase: string, user: string | null, inputTokens: number | null, outputTokens: number | null, latencyS: number | null, costUsd: number | null, costBasis: string, outcome: string, fellBackFrom: string | null, runId: string, unknownFields: Array<string>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }> } | null };
+
 export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -1607,6 +1614,122 @@ export const InstrumentHistoryDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<InstrumentHistoryQuery, InstrumentHistoryQueryVariables>;
+export const LlmUsageDocument = new TypedDocumentString(`
+    query LlmUsage($recent: Int!) {
+  llmUsage(recent: $recent) {
+    today
+    recorded
+    budget {
+      dailyUsd
+      monthlyUsd
+      over
+      reportedCallUsd
+      error
+    }
+    windows {
+      key
+      start
+      end
+      cap {
+        kind
+        limitUsd
+        usedShare
+      }
+      tally {
+        calls
+        inputTokens
+        outputTokens
+        callsWithoutTokens
+        spentUsd
+        billedUsd
+        reportedUsd
+        boundUsd
+        freeCalls
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+    }
+    breakdowns {
+      by
+      rows {
+        key
+        provider
+        costShare
+        tally {
+          calls
+          inputTokens
+          outputTokens
+          callsWithoutTokens
+          spentUsd
+          billedUsd
+          reportedUsd
+          boundUsd
+        }
+      }
+    }
+    daily {
+      day
+      tally {
+        calls
+        inputTokens
+        outputTokens
+        spentUsd
+        reportedUsd
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+    }
+    reliability {
+      attempts
+      ok
+      fellBack
+      failed
+      skippedBudget
+      fallbackRate
+      failureRate
+    }
+    recent {
+      ts
+      provider
+      model
+      useCase
+      user
+      inputTokens
+      outputTokens
+      latencyS
+      costUsd
+      costBasis
+      outcome
+      fellBackFrom
+      runId
+      unknownFields
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<LlmUsageQuery, LlmUsageQueryVariables>;
 export const RegimeDocument = new TypedDocumentString(`
     query Regime {
   regime {

@@ -1084,6 +1084,20 @@ type LadderRung {
 }
 
 """
+The text model's usage and cost up to `today` (exchange date): windows with their caps, 30-day breakdowns, a daily series, reliability and the latest calls. A date range, not one session (ADR 0058); `recorded` false when the log is empty
+"""
+type LlmUsage {
+  today: Date!
+  recorded: Boolean!
+  budget: UsageBudget!
+  windows: [UsageWindow!]!
+  breakdowns: [UsageBreakdown!]!
+  daily: [UsageDay!]!
+  reliability: UsageReliability!
+  recent: [UsageCall!]!
+}
+
+"""
 A market (`marketId` `MKT:US`) for the session. Per-session values (breadth, trend, the regime's inputs) are market catalogue features: `features(names)`
 """
 type Market {
@@ -1556,6 +1570,11 @@ type Query {
     """
     date: Date = null
   ): ReviewList
+
+  """
+  What the text model spent: tokens and cost against the budget, by model, use case and user, a 30-day series and the `recent` latest calls (newest first). A date range ending today, not one session (ADR 0058)
+  """
+  llmUsage(recent: Int! = 50): LlmUsage
 }
 
 """
@@ -2017,6 +2036,111 @@ enum UnknownCode {
   NOT_APPLICABLE
   ILLIQUID
   EXPLAINED
+}
+
+"""
+The 30 days by `by` (model, use_case, user, cost_basis, outcome), most spent first
+"""
+type UsageBreakdown {
+  by: String!
+  rows: [UsageSlice!]!
+}
+
+"""
+`[budget]` of llm.toml (a cap null: not set); `error` the words of an unreadable file
+"""
+type UsageBudget {
+  dailyUsd: Float
+  monthlyUsd: Float
+  over: String
+  reportedCallUsd: Float
+  error: String
+}
+
+"""
+One stored attempt; `unknownFields` names the values stored null (tokens a provider did not report, a cost not known), `unknown` says why
+"""
+type UsageCall {
+  ts: DateTime!
+  provider: String!
+  model: String!
+  useCase: String!
+  user: String
+  inputTokens: Int
+  outputTokens: Int
+  latencyS: Float
+  costUsd: Float
+  costBasis: String!
+  outcome: String!
+  fellBackFrom: String
+  runId: String!
+  unknownFields: [String!]!
+  unknown: Unknown
+}
+
+"""
+A budget cap: `kind` daily or monthly, `limitUsd` null when none is set, `usedShare` spent / limit (above 1: over the cap), null without a cap
+"""
+type UsageCap {
+  kind: String!
+  limitUsd: Float
+  usedShare: Float
+}
+
+"""One day of the 30-day series (a day with no calls: zero calls)"""
+type UsageDay {
+  day: Date!
+  tally: UsageTally!
+}
+
+"""
+Attempts of the 30 days and how they ended; a rate is null with no attempts
+"""
+type UsageReliability {
+  attempts: Int!
+  ok: Int!
+  fellBack: Int!
+  failed: Int!
+  skippedBudget: Int!
+  fallbackRate: Float
+  failureRate: Float
+}
+
+"""
+One group of a breakdown (`key` null: stored null; `provider` set for the model breakdown); `costShare` its share of the 30 days' spend, null when none was spent
+"""
+type UsageSlice {
+  key: String
+  provider: String
+  tally: UsageTally!
+  costShare: Float
+}
+
+"""
+The calls of a slice: tokens summed over the calls that reported them (`callsWithoutTokens` the others; `unknown` set when none did), `spentUsd` what counts against the budget = `billedUsd` (priced) + `reportedUsd` (the notional seat cost of a Claude Code login, not a bill) + `boundUsd` (an upper bound charged for an unknown cost)
+"""
+type UsageTally {
+  calls: Int!
+  inputTokens: Int!
+  outputTokens: Int!
+  callsWithoutTokens: Int!
+  spentUsd: Float!
+  billedUsd: Float!
+  reportedUsd: Float!
+  boundUsd: Float!
+  freeCalls: Int!
+  unknown: Unknown
+}
+
+"""
+`key` today, 7d, 30d or month over `start`..`end`; `cap` null for a window with no cap of its own (7d, 30d)
+"""
+type UsageWindow {
+  key: String!
+  start: Date!
+  end: Date!
+  tally: UsageTally!
+  cap: UsageCap
 }
 
 """

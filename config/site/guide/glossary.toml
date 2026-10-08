@@ -545,3 +545,73 @@ in one half of history fails in the other. A result shown without its trial coun
 comparable.
 """
 see_also = ["frozen_period", "independent_sessions"]
+
+# ---------------------------------------------------------------- the text model's cost (ADR 0058)
+
+[[term]]
+id = "llm_cost_basis"
+term = "Cost basis"
+short = "How a text-model call's cost was worked out: priced, reported, bound, free or unknown."
+body = """
+Every call to the text model is logged with a cost and the way that cost was worked out.
+Priced: the tokens it used times the model's price per million tokens. Reported: the notional
+cost the Claude Code login says the call was worth (see notional seat cost). Bound: the cost
+was not known, so the largest the call could have cost is charged instead (see bound cost).
+Free: a local model or a free tier, logged at zero. Unknown: the attempt was skipped, so
+nothing was asked and nothing spent. Tokens a provider did not report are shown as unknown, never
+as zero.
+"""
+see_also = ["llm_notional_seat_cost", "llm_bound_cost", "llm_budget"]
+
+[[term]]
+id = "llm_notional_seat_cost"
+term = "Notional seat cost"
+short = "What a call through the owner's Claude Code login would have cost: a size reference, not a bill."
+body = """
+A Claude Code login is a subscription, so no call is billed on its own. The login still reports
+a dollar figure for each call, and the app records it so you can see how heavy the use is. It
+counts against the budget (so a runaway loop still stops) but it is shown apart from billed
+cost and is not money leaving an account.
+"""
+see_also = ["llm_cost_basis", "llm_budget"]
+
+[[term]]
+id = "llm_bound_cost"
+term = "Bound cost"
+short = "The most a call could have cost, charged when the real cost is unknown."
+body = """
+When a paid provider answers without saying how many tokens it used, or an attempt fails (a
+timeout can still bill), the app charges the upper bound it reserved before the call: the
+prompt's length times the input price plus the longest answer allowed times the output price.
+It errs on the high side on purpose, so an unknown never looks like free.
+"""
+see_also = ["llm_cost_basis", "llm_budget"]
+
+[[term]]
+id = "llm_budget"
+term = "Text-model budget"
+short = "The daily and monthly caps on what paid and reported text-model calls may spend."
+body = """
+The site sets an optional daily and monthly cap in dollars, counted by calendar day and month
+in New York. Before a paid call the app reserves the most it could cost and refuses the call if
+that would pass a cap, so concurrent requests cannot together overspend. When a cap is
+reached, the setting decides: free models keep answering and the paid ones are skipped, or
+every call is refused. With no cap set, nothing limits the spend; the page says so. Free
+providers never count against it. The share of the cap used counts only what has been spent
+and recorded, not calls still in flight, so it can read slightly below what the budget
+enforces.
+"""
+see_also = ["llm_cost_basis", "llm_fallback"]
+
+[[term]]
+id = "llm_fallback"
+term = "Fallback"
+short = "A call answered by a later provider because an earlier one in the chain failed or was skipped."
+body = """
+The text model tries its providers in order. When the first is down, out of retries or skipped
+for the budget, the next one answers and the call is logged as a fallback, with the provider
+it fell back from. A high fallback rate means the first choice is unreliable or the budget is
+tight; a high failure rate means calls are being lost, and a failed attempt of a paid provider
+may still have been billed.
+"""
+see_also = ["llm_budget", "llm_cost_basis"]

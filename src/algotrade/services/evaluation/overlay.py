@@ -19,7 +19,7 @@ from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.backtests.market import load_market_features
 from algotrade.services.backtests.run import regime_overlays
-from algotrade.services.datasets import load_datasets
+from algotrade.services.datasets import load_datasets, strategy_datasets
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 
 NO_ROWS = "regime overlay: no market feature rows in the store"
@@ -51,6 +51,8 @@ def compare_overlay(
     """Each strategy x dataset with market feature rows, without and with the overlay."""
     overlays = regime_overlays(replace(regime, enabled=True))
     rows: list[OverlayComparison] = []
+    if datasets is None:
+        datasets = strategy_datasets(reader)
     for dataset, (data, terms) in load_datasets(reader, datasets).items():
         timeline = next(iter(data.values())).timestamps
         try:
