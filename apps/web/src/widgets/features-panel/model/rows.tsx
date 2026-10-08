@@ -1,7 +1,8 @@
 /**
  * Every catalogue feature for one ticker: its value for the session (as the server served it),
  * unit, kind, definition and (numbers with a history only) its recent history, as the rows
- * and columns of the features table.
+ * and columns of the features table. Each feature name carries its Guide help button (hover:
+ * the entry's first sentence; click: the help drawer with "Open full page").
  */
 import {
   formatValue,
@@ -24,6 +25,7 @@ import {
   type ServedValue,
 } from '@/entities/feature';
 import { historyOf, type FeatureHistory } from '@/entities/instrument';
+import { GuideHelp } from '@/features/guide-help';
 
 export interface FeatureRow {
   feature: CatalogueFeature;
@@ -76,13 +78,16 @@ export function featureColumns(symbol: string): DataTableColumn<FeatureRow>[] {
       value: (r) => r.feature.name,
       width: 'lg',
       cell: ({ row }) => (
-        <Stack gap={0}>
-          <Text truncate title={row.title}>
-            {[row.title, ...featureMarks(row.feature)].join(' · ')}
-          </Text>
-          <Mono size="xs" tone="muted" truncate title={row.feature.name}>
-            {row.feature.name}
-          </Mono>
+        <Stack direction="row" gap={1} align="center">
+          <Stack gap={0} grow>
+            <Text truncate title={row.title}>
+              {[row.title, ...featureMarks(row.feature)].join(' · ')}
+            </Text>
+            <Mono size="xs" tone="muted" truncate title={row.feature.name}>
+              {row.feature.name}
+            </Mono>
+          </Stack>
+          <GuideHelp entry={{ kind: 'field', id: row.feature.name }} />
         </Stack>
       ),
     },

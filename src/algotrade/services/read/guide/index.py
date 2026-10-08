@@ -80,11 +80,12 @@ class GuideFamily:
 
 @dataclass(frozen=True)
 class GuideIndicator:
-    """A regime indicator card: its key (its Guide page's, ``indicator.py``) and plain-language
-    name."""
+    """A regime indicator card: its key (its Guide page's, ``indicator.py``), plain-language
+    name and pace (``slow``: macro, ``fast``: market; cards are listed slow first)."""
 
     key: str
     plain_name: str
+    pace: str
 
 
 @dataclass(frozen=True)
@@ -134,7 +135,9 @@ def load_guide_index(ctx: Stores) -> GuideIndex:
     sections = load_guide_sections(ctx.configs)
     guide = load_field_guide(ctx.configs)
     playbooks = site_playbooks(ctx)
-    indicators = tuple(GuideIndicator(c.key, c.plain_name) for c in load_cards(ctx.configs).cards)
+    indicators = tuple(
+        GuideIndicator(c.key, c.plain_name, c.pace) for c in load_cards(ctx.configs).cards
+    )
     episodes = tuple(GuideEpisode(e.key, e.name) for e in load_episodes(ctx.configs).episodes)
     start = tuple(
         GuideStartEntry(p.id, p.order, p.title, p.summary)

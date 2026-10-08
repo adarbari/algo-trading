@@ -256,7 +256,9 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
   it (rollups, market-rollups) re-run on the new data (2026-10-05: 199 stale chains failed the
   screens hourly on the same names, with chains and rollups reused). Without the staging it is
   reused and the reason says so; a refetch that fails keeps the earlier success and notes
-  why. `--force` reruns every step. A step only
+  why. A reused step also re-runs when an optional input it does not need succeeds in this
+  attempt (`Step.reruns_after`, never a gate: the rollups after `ibkr-iv`, 2026-10-06), and so
+  do the steps that need it. `--force` reruns every step. A step only
   held back (NOT_RUN) was never tried, so a latest-only one is SKIPPED on a later day, not
   expired. A critical latest-only step that failed and whose session is no
   longer the latest FAILS as expired until waived: `algotrade-ingest nightly --date D --waive

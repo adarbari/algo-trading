@@ -441,11 +441,12 @@ type GuideIndex {
 }
 
 """
-A regime indicator card: its key (`Query.guideIndicator(key)`) and plain-language name
+A regime indicator card: its key (`Query.guideIndicator(key)`), plain-language name and `pace` (slow: macro, fast: market)
 """
 type GuideIndicator {
   key: String!
   plainName: String!
+  pace: String!
 }
 
 """

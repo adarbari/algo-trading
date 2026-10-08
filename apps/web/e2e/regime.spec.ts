@@ -2,7 +2,8 @@
  * Trader > Regime end to end, against the production build with the regime mocked from
  * fixtures recorded from the real API (regime-api.ts): on the golden store the regime is
  * UNKNOWN with its reason, every indicator card is listed (slow and fast) with its unknown
- * meter, the legend and the cycles chart render, and the reading list shows each link once; a
+ * meter, the legend and the cycles chart render; each card and each market fall opens its Guide
+ * entry in the help drawer (the reading list and the cards' explanations live in the Guide); a
  * computed regime shows range meters, sources, history and the market falls. The top-bar chip says "not computed" on every page and opens the
  * Regime page; the Ideas strip says the sizing rule; accessibility in both themes.
  */
@@ -26,9 +27,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const theme of ['dark', 'light'] as const) {
-  test(`the Regime page shows the UNKNOWN state, the cards and the reading list (${theme})`, async ({
-    page,
-  }) => {
+  test(`the Regime page shows the UNKNOWN state and the cards (${theme})`, async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto('/regime');
     await page.evaluate((t) => {
@@ -44,8 +43,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('region', { name: 'How to read the charts' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Scores through the cycles' })).toBeVisible();
     await expect(slow.getByRole('img', { name: /: unknown\./ }).first()).toBeVisible();
-    const reading = page.getByRole('region', { name: 'Reading list' });
-    await expect(reading.getByRole('link').first()).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Reading list' })).toHaveCount(0);
     await expectAccessible(page);
     expect(errors).toEqual([]);
   });
@@ -60,14 +58,42 @@ test('the Regime page shows the sizing rules of the caller, read-only', async ({
   await expect(page.getByLabel('Your screeners')).toContainText('pause in Storm and Severe storm');
 });
 
-test('a card opens to its detail and its links', async ({ page }) => {
+test('a card opens its indicator in the help drawer, which opens the Guide page', async ({
+  page,
+}) => {
   await page.goto('/regime');
+  await expect(
+    page.getByRole('button', { name: /Why it matters, what it did before/ }),
+  ).toHaveCount(0);
   await page
-    .getByRole('button', { name: /Why it matters, what it did before/ })
-    .first()
+    .getByRole('region', { name: 'Slow-moving warning signs' })
+    .getByRole('button', { name: /^What is Are long-term rates/ })
     .click();
-  await expect(page.getByRole('heading', { name: 'What it did before' }).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: /FRED/ }).first()).toBeVisible();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toContainText('10-year minus 3-month Treasury spread');
+  await expect(drawer.getByRole('heading', { level: 3, name: 'Why it matters' })).toBeVisible();
+  await expect(drawer).toContainText('Normally lenders want more to lend for longer');
+  await expectAccessible(page);
+  await drawer.getByRole('button', { name: 'Open full page' }).click();
+  await expect(page).toHaveURL(/\/guide\/regime\/indicators\/curve_10y3m$/);
+});
+
+test('a market fall opens its drawer from its row without choosing the chart window', async ({
+  page,
+}) => {
+  await mockRegimeComputed(page);
+  await page.goto('/regime');
+  const falls = page.getByRole('grid', { name: 'Market falls' });
+  await falls
+    .getByRole('row', { name: /Global financial crisis/ })
+    .getByRole('button', { name: /^About / })
+    .click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toContainText('Global financial crisis, 2007-09');
+  await expect(drawer).toContainText('The housing bust and subprime losses');
+  await expectAccessible(page);
+  await drawer.getByRole('button', { name: 'Open full page' }).click();
+  await expect(page).toHaveURL(/\/guide\/regime\/episodes\/gfc_2007$/);
 });
 
 test('the Regime page teaches: legend, scores through the cycles, range meters, sources, falls', async ({

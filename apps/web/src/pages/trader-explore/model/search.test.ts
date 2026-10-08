@@ -26,10 +26,10 @@ describe('explore search params', () => {
     expect(parseExploreSearch({ tab: 'nope', right: 'X', sel: '  ' })).toEqual({});
   });
 
-  it("keeps a retired Field guide link's tab, theme and field (the route redirects) and drops its symbol", () => {
-    expect(
-      parseExploreSearch({ tab: 'guide', theme: 'volatility', field: 'feature.x', symbol: 'aapl' }),
-    ).toEqual({ tab: 'guide', theme: 'volatility', field: 'feature.x' });
+  it('drops the retired Field guide tab and its theme and field (an old link opens the default tab)', () => {
+    expect(parseExploreSearch({ tab: 'guide', theme: 'volatility', field: 'feature.x' })).toEqual(
+      {},
+    );
   });
 
   it('reads the columns added on a narrow table from ncols', () => {

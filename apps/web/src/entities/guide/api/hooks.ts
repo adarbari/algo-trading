@@ -3,7 +3,8 @@
  * counts, the field theme groups, the intents, the playbook families, the situations),
  * `Query.guideField` (what the server derives for one field's page: its reads and caveats split
  * at the names they mention, related fields, the playbooks that use it, the situations that
- * fool it), `Query.guidePlaybook` and `Query.guideSituation`. The field's own facts and guide
+ * fool it), `Query.guidePlaybook`, `Query.guideSituation`, `Query.guideIndicator` and
+ * `Query.guideEpisode` (the market regime's indicators and reference falls). The field's own facts and guide
  * entry come from the catalogue (entities/feature).
  */
 import { useQuery } from '@tanstack/react-query';
@@ -46,6 +47,15 @@ const GuideIndexQuery = graphql(`
         name
         fields
         slug
+      }
+      indicators {
+        key
+        plainName
+        pace
+      }
+      episodes {
+        key
+        name
       }
     }
   }
@@ -176,6 +186,110 @@ const GuideSituationQuery = graphql(`
   }
 `);
 
+const GuideIndicatorQuery = graphql(`
+  query GuideIndicator($key: String!) {
+    guideIndicator(key: $key) {
+      key
+      plainName
+      technicalName
+      pace
+      summary {
+        segments {
+          text
+          field
+        }
+      }
+      whyItMatters {
+        segments {
+          text
+          field
+        }
+      }
+      whatOnMeans {
+        segments {
+          text
+          field
+        }
+      }
+      leadTime {
+        segments {
+          text
+          field
+        }
+      }
+      trackRecord {
+        segments {
+          text
+          field
+        }
+      }
+      before {
+        label
+        episode
+        line {
+          segments {
+            text
+            field
+          }
+        }
+      }
+      how {
+        text
+        url
+      }
+      feature
+      sources {
+        title
+        url
+      }
+    }
+  }
+`);
+
+const GuideEpisodeQuery = graphql(`
+  query GuideEpisode($slug: String!) {
+    guideEpisode(slug: $slug) {
+      episode {
+        key
+        name
+        kind
+        peak
+        trough
+        recovered
+        spxDrawdown
+        nasdaqDrawdown
+        recession
+        nberStart
+        nberEnd
+        knownFrom
+      }
+      cause {
+        segments {
+          text
+          field
+        }
+      }
+      notes {
+        segments {
+          text
+          field
+        }
+      }
+      indicators {
+        key
+        plainName
+        label
+        line {
+          segments {
+            text
+            field
+          }
+        }
+      }
+    }
+  }
+`);
+
 export function useGuideIndex() {
   return useQuery({
     queryKey: queryKeys.gql('GuideIndex', {}),
@@ -216,5 +330,29 @@ export function useGuideSituation(slug: string) {
     queryFn: () => gql(GuideSituationQuery, variables),
     select: (data) => data.guideSituation,
     staleTime: GUIDE_STALE_MS,
+  });
+}
+
+/** One regime indicator's page (null data: no such indicator). */
+export function useGuideIndicator(key: string) {
+  const variables = { key };
+  return useQuery({
+    queryKey: queryKeys.gql('GuideIndicator', variables),
+    queryFn: () => gql(GuideIndicatorQuery, variables),
+    select: (data) => data.guideIndicator,
+    staleTime: GUIDE_STALE_MS,
+    retry: false,
+  });
+}
+
+/** One reference market fall's page (null data: no such episode). */
+export function useGuideEpisode(slug: string) {
+  const variables = { slug };
+  return useQuery({
+    queryKey: queryKeys.gql('GuideEpisode', variables),
+    queryFn: () => gql(GuideEpisodeQuery, variables),
+    select: (data) => data.guideEpisode,
+    staleTime: GUIDE_STALE_MS,
+    retry: false,
   });
 }
