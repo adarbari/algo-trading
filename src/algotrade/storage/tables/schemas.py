@@ -534,7 +534,9 @@ RULE_SCREEN_VALUES = _fixed(
 # ``edge_variant`` (a key column; null is read as "main", the edge itself) names the edge's own
 # ``[[variants]]`` row; ``iv_source`` / ``licence`` record the implied-vol field an outcome read
 # and its catalogue licence; ``reference_rate`` / ``touch_rate`` are filled by the expires_otm
-# outcome (ED4a), null until then.
+# outcome (ED4a), null until then. ``split_from`` (a key column; null: no split) is the first
+# session of the test slice the run used and ``exploratory`` is true when it is not the edge's
+# ``frozen_from``: a user's split writes rows under its own key, never over the site's (ED5a).
 EDGE_EVAL = _fixed(
     "results/edge_eval",
     "results",
@@ -548,6 +550,8 @@ EDGE_EVAL = _fixed(
     "horizon_sessions int64!",
     "range_from date!",
     "range_to date",
+    "split_from date",
+    "exploratory bool",
     *(f"{n} int64" for n in (
         "sessions", "picks", "hits", "eligible", "base_hits", "decile_sessions", "trials",
         "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
@@ -562,7 +566,7 @@ EDGE_EVAL = _fixed(
     runs="merge",
     key=(
         "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "slice_kind",
-        "slice_value", "range_from",
+        "slice_value", "range_from", "split_from",
     ),
 )  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".

@@ -2,7 +2,8 @@
 gets one row per (edge variant, variant, horizon, slice) of the run's range, published
 atomically (pending, then committed); the run record ``edge-eval:<edge>`` keeps the trial log
 (the "all" row of each variant and horizon, the count the next run's deflated Sharpe ratio is
-taken over), the run hash and how much was excluded."""
+taken over), the run hash, the split and whether the run was
+exploratory, and how much was excluded."""
 
 from dataclasses import asdict
 from datetime import datetime
@@ -51,6 +52,8 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                     "slice_kind": m.slice_kind,
                     "slice_value": m.slice_value,
                     "range_from": evaluation.start,
+                    "split_from": evaluation.split_from,
+                    "exploratory": evaluation.exploratory,
                     "range_to": evaluation.end,
                     "iv_source": r.iv_source,
                     "licence": r.licence,
@@ -118,6 +121,8 @@ def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datet
     stats = {
         "edge": evaluation.edge_id,
         "run_hash": evaluation.run_hash,
+        "split_from": evaluation.split_from.isoformat() if evaluation.split_from else None,
+        "exploratory": evaluation.exploratory,
         "range": [evaluation.start.isoformat(), evaluation.end.isoformat()],
         "as_of": evaluation.as_of.isoformat(),
         "trials_counted": evaluation.trials,

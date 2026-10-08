@@ -26,7 +26,7 @@ SITE = "site"
 RULE_SCREENS = "screeners"
 CONFIGS = "strategies"
 SELECTIONS = "selections"
-SITE_DECIDES = ("status", "rejection_reason")  # a user layer never sets these
+SITE_DECIDES = ("status", "rejection_reason", "evidence")  # a user layer never sets these
 DRAFT_STATUS = "candidate"
 
 

@@ -249,3 +249,14 @@ def test_variants_override_the_outcome_and_the_universe_each_with_its_own_id() -
 def test_a_variant_is_checked_like_the_edge(variants: Any, message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         parse(variants=variants)
+
+
+def test_the_evidence_table_is_optional_and_needs_both_keys() -> None:
+    assert parse().evidence is None
+    found = parse(evidence={"run_id": "r1", "split_from": "2026-04-01"}).evidence
+    assert found is not None and (found.run_id, found.split_from) == ("r1", date(2026, 4, 1))
+    for bad in ({"run_id": "r1"}, {"split_from": "2026-04-01"}, {"run_id": "r", "split_from": "x"}):
+        with pytest.raises(ConfigurationError, match="evidence"):
+            parse(evidence=bad)
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        parse(evidence={"run_id": "r1", "split_from": "2026-04-01", "extra": 1})

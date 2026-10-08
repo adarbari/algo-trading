@@ -304,6 +304,16 @@ types (`enabled = "yes"`), out-of-range values (`workers = 0`, a fraction above 
 negative interval) and invalid leverage-marker regexes. Every key must also drive code
 (`tests/architecture/test_ownership.py`). Credentials never go in these files.
 
+## Evaluation split (edge harness)
+
+`config/users/<id>/evaluation.toml` (git-ignored, optional) holds `split_from` (a date), typed as
+`EvaluationSettings` by `src/algotrade/config/edges/evaluation.py`: the first session of the test slice
+of the edge harness (ADR 0053, ED5a). Layering (ADR 0015): the site default is none (each edge's
+`frozen_from` is the site's split) < the user's file < the run (`algotrade-backtest evaluate-edges
+--split-from D`). A split other than the edge's `frozen_from` makes the run exploratory: its rows
+carry it in their key (`results/edge_eval.split_from`) and `exploratory`, and it never moves an
+edge's status or the track-record chip.
+
 ## Expression features
 
 A formula over existing features is a TOML entry, not code (ADR 0023 step 3). Each

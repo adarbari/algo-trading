@@ -77,6 +77,7 @@ def test_a_user_document_layers_over_the_site_and_adds_drafts() -> None:
     ("site_doc", "user_doc", "message"),
     [
         ({}, {"status": "live"}, "\\['status'\\] are the site's to set"),
+        ({}, {"evidence": {"run_id": "r", "split_from": "2026-04-01"}}, "\\['evidence'\\] are the"),
         (
             {"status": "rejected", "rejection_reason": "Gone."},
             {"rejection_reason": "Back."},
