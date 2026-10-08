@@ -280,27 +280,6 @@ export function indicatorsOfPace(
   return regime.indicators.filter((indicator) => indicator.pace === pace);
 }
 
-/** One reading-list entry: a link and the indicators whose card cites it. */
-export interface ReadingLink {
-  title: string;
-  url: string;
-  /** Plain names of the indicators that cite it. */
-  cards: readonly string[];
-}
-
-/** Every card's links, de-duplicated by address (the first title wins), in card order. */
-export function readingList(regime: Regime): readonly ReadingLink[] {
-  const byUrl = new Map<string, { title: string; cards: string[] }>();
-  for (const indicator of regime.indicators) {
-    for (const link of indicator.links) {
-      const entry = byUrl.get(link.url) ?? { title: link.title, cards: [] };
-      if (!entry.cards.includes(indicator.plainName)) entry.cards.push(indicator.plainName);
-      byUrl.set(link.url, entry);
-    }
-  }
-  return [...byUrl].map(([url, { title, cards }]) => ({ title, url, cards }));
-}
-
 const percent = (value: number): string => formatValue(value, { kind: 'percent', digits: 0 }).text;
 
 /** "Storm", "Storm and Severe storm", "Clouds building, Storm and Severe storm". */

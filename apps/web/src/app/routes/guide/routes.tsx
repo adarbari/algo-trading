@@ -3,7 +3,8 @@
  * `intent` in the search params, so every view is a link) and `/guide/fields/$name` (a field's
  * page; the name is the catalogue name), `/guide/playbooks` and `/guide/playbooks/$id` (a site
  * preset's playbook; its buttons open that screener's results and Builder) and
- * `/guide/situations` and `/guide/situations/$slug`. No role gating (`viewerGuard`: any registered
+ * `/guide/situations` and `/guide/situations/$slug`, `/guide/regime`, `/guide/regime/indicators/$key`
+ * and `/guide/regime/episodes/$key` (the market regime's indicators and reference falls). No role gating (`viewerGuard`: any registered
  * viewer) and no workspace: the layout shows the top bar of the workspace the user came from
  * (`GuideLayout`), so an admin stays in ADMIN.
  */
@@ -11,11 +12,14 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { parseFieldsSearch } from '@/entities/guide';
 import {
+  GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
   GuideHomePage,
+  GuideIndicatorPage,
   GuidePlaybookPage,
   GuidePlaybooksPage,
+  GuideRegimePage,
   GuideSituationPage,
   GuideSituationsPage,
 } from '@/pages/guide';
@@ -112,6 +116,34 @@ const situationRoute = createRoute({
   component: SituationRoute,
 });
 
+const regimeIndexRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'regime',
+  component: GuideRegimePage,
+});
+
+function IndicatorRoute() {
+  const { key } = indicatorRoute.useParams();
+  return <GuideIndicatorPage indicatorKey={key} />;
+}
+
+const indicatorRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'regime/indicators/$key',
+  component: IndicatorRoute,
+});
+
+function EpisodeRoute() {
+  const { key } = episodeRoute.useParams();
+  return <GuideEpisodePage slug={key} />;
+}
+
+const episodeRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'regime/episodes/$key',
+  component: EpisodeRoute,
+});
+
 export const guideRoutes = guideRoute.addChildren([
   homeRoute,
   fieldsRoute,
@@ -120,4 +152,7 @@ export const guideRoutes = guideRoute.addChildren([
   playbookRoute,
   situationsRoute,
   situationRoute,
+  regimeIndexRoute,
+  indicatorRoute,
+  episodeRoute,
 ]);

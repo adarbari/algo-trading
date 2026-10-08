@@ -33,6 +33,7 @@ const catalogue = [
 const index = {
   sections: [
     { id: 'start', title: 'Start here', purpose: 'p', entries: 4 },
+    { id: 'regime', title: 'Market regime', purpose: 'p', entries: 3 },
     { id: 'playbooks', title: 'Playbooks', purpose: 'p', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'p', entries: 11 },
     { id: 'situations', title: 'Situations', purpose: 'p', entries: 2 },
@@ -63,6 +64,11 @@ const index = {
     },
   ],
   intents: [],
+  indicators: [
+    { key: 'curve_10y3m', plainName: 'Is the yield curve inverted?', pace: 'slow' },
+    { key: 'vix_term', plainName: 'Is fear rising?', pace: 'fast' },
+  ],
+  episodes: [{ key: 'gfc_2007', name: 'Global financial crisis, 2007-09' }],
 };
 
 beforeEach(() => {
@@ -82,14 +88,14 @@ describe('GuideRail', () => {
     );
   });
 
-  it('lists the sections in the server’s order: playbooks, fields, situations', () => {
+  it('lists the sections in the server’s order: regime, playbooks, fields, situations', () => {
     render(<GuideRail page="home" />);
     const nav = screen.getByRole('navigation', { name: 'Guide' });
     const top = within(nav)
       .getAllByRole('link')
       .map((l) => l.textContent)
-      .filter((t) => /^(Overview|Playbooks|Fields|Situations)/.test(t));
-    expect(top).toEqual(['Overview', 'Playbooks3', 'Fields11', 'Situations2']);
+      .filter((t) => /^(Overview|Market regime|Playbooks|Fields|Situations)/.test(t));
+    expect(top).toEqual(['Overview', 'Market regime3', 'Playbooks3', 'Fields11', 'Situations2']);
     expect(within(nav).queryByRole('link', { name: 'Breakout' })).toBeNull();
   });
 
@@ -110,6 +116,24 @@ describe('GuideRail', () => {
       'aria-current',
       'page',
     );
+  });
+
+  it('opens the indicators then the market falls under Market regime, marking the current one', () => {
+    render(<GuideRail page="episode" episode="gfc_2007" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((l) => l.getAttribute('href'))
+        .filter((h) => h?.startsWith('/guide/regime/')),
+    ).toEqual([
+      '/guide/regime/indicators/curve_10y3m',
+      '/guide/regime/indicators/vix_term',
+      '/guide/regime/episodes/gfc_2007',
+    ]);
+    expect(
+      within(nav).getByRole('link', { name: 'Global financial crisis, 2007-09' }),
+    ).toHaveAttribute('aria-current', 'page');
   });
 
   it('opens the situations, marking the current one', () => {

@@ -26,6 +26,16 @@ vi.mock('@/features/indicator-history', async () => {
   };
 });
 
+// The help button and its drawer: GuideHelp.test.tsx.
+vi.mock('@/features/guide-help', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    GuideHelp: ({ entry }: { entry: { kind: string; id: string } }) => (
+      <Button>{`Help: ${entry.kind} ${entry.id}`}</Button>
+    ),
+  };
+});
+
 vi.mock('@/features/regime-explain', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
@@ -52,27 +62,16 @@ describe('RegimeIndicators', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('opens a card to its why, history, lead time, false alarms and links', async () => {
+  it('gives each card a help button for its Guide entry, and keeps no explanation of its own', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
     render(<RegimeIndicators />);
     expect(
-      screen.getByText('An inverted curve has come before every recent recession.'),
-    ).not.toBeVisible();
-    await userEvent.setup().click(
-      screen.getAllByRole('button', {
-        name: /Why it matters, what it did before/,
-      })[0] as HTMLElement,
-    );
+      screen.getAllByRole('button', { name: /^Help: / }).map((button) => button.textContent),
+    ).toEqual(['Help: indicator curve_10y3m', 'Help: indicator nfci', 'Help: indicator vix_term']);
     expect(
-      screen.getByText('An inverted curve has come before every recent recession.'),
-    ).toBeVisible();
-    expect(screen.getByText('2008: Inverted for 16 months before the fall.')).toBeVisible();
-    expect(screen.getByText('Lead time: 6 to 24 months')).toBeVisible();
-    expect(screen.getByText('False alarms: Few, but it can be early by two years.')).toBeVisible();
-    expect(screen.getByRole('link', { name: /FRED: 10y minus 3m spread/ })).toHaveAttribute(
-      'href',
-      'https://fred.stlouisfed.org/series/T10Y3M',
-    );
+      screen.queryByText('An inverted curve has come before every recent recession.'),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: /Why it matters/ })).toBeNull();
   });
 
   it('places each value on its range with the threshold marked and the rule in words', () => {

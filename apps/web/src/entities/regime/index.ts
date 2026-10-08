@@ -58,7 +58,6 @@ export {
   indicatorsOfPace,
   indicatorStatus,
   plainLabel,
-  readingList,
   regimeLabelFeature,
   regimeTone,
   sizingLine,
@@ -76,7 +75,6 @@ export {
   type RegimeUnknown,
   type IndicatorSource,
   type TextPart,
-  type ReadingLink,
 } from './model/regime';
 export { RegimeChip, type RegimeChipProps } from './ui/RegimeChip';
 export { RegimeHeadline, type RegimeHeadlineProps } from './ui/RegimeHeadline';

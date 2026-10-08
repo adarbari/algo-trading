@@ -22,6 +22,9 @@ const EXTRA_ROUTES = [
   '/guide/playbooks/breakout',
   '/guide/situations',
   '/guide/situations/pending-takeover',
+  '/guide/regime',
+  '/guide/regime/indicators/curve_10y3m',
+  '/guide/regime/episodes/gfc_2007',
 ];
 const ROUTES = [...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)), ...EXTRA_ROUTES];
 

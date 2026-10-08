@@ -6,11 +6,14 @@ import { Text } from '@algotrade/ui';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import {
+  GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
   GuideHomePage,
+  GuideIndicatorPage,
   GuidePlaybookPage,
   GuidePlaybooksPage,
+  GuideRegimePage,
   GuideSituationPage,
   GuideSituationsPage,
 } from './GuidePages';
@@ -21,6 +24,8 @@ const widgets = vi.hoisted(() => ({
   field: vi.fn(),
   playbook: vi.fn(),
   situation: vi.fn(),
+  indicator: vi.fn(),
+  episode: vi.fn(),
 }));
 
 vi.mock('@/widgets/guide-rail', () => ({
@@ -51,6 +56,17 @@ vi.mock('@/widgets/guide-playbook', () => ({
   GuidePlaybook: (props: Record<string, unknown>) => {
     widgets.playbook(props);
     return <Text>playbook page</Text>;
+  },
+}));
+vi.mock('@/widgets/guide-regime', () => ({
+  GuideRegimeIndex: () => <Text>regime index</Text>,
+  GuideIndicator: (props: Record<string, unknown>) => {
+    widgets.indicator(props);
+    return <Text>indicator page</Text>;
+  },
+  GuideEpisode: (props: Record<string, unknown>) => {
+    widgets.episode(props);
+    return <Text>episode page</Text>;
   },
 }));
 vi.mock('@/widgets/guide-situations', () => ({
@@ -106,6 +122,18 @@ describe('Guide pages', () => {
     render(<GuideSituationPage slug="earnings-gap" />);
     expect(widgets.situation).toHaveBeenLastCalledWith({ slug: 'earnings-gap' });
     expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'situation', situation: 'earnings-gap' });
+  });
+
+  it('frames the regime index, an indicator’s page and a market fall’s page with the rail on it', () => {
+    render(<GuideRegimePage />);
+    expect(screen.getByText('regime index')).toBeInTheDocument();
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'regime' });
+    render(<GuideIndicatorPage indicatorKey="curve_10y3m" />);
+    expect(widgets.indicator).toHaveBeenLastCalledWith({ indicatorKey: 'curve_10y3m' });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'indicator', indicator: 'curve_10y3m' });
+    render(<GuideEpisodePage slug="gfc_2007" />);
+    expect(widgets.episode).toHaveBeenLastCalledWith({ slug: 'gfc_2007' });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'episode', episode: 'gfc_2007' });
   });
 
   it('has no accessibility violations', async () => {

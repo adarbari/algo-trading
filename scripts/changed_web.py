@@ -50,8 +50,14 @@ def spec_for(name: str) -> str:
     return stem if stem in SPECS else "smoke"
 
 
-def plan(files: list[str], on_linux: bool = sys.platform == "linux") -> list[Step]:
-    """The web checks covering `files` (repo-relative paths), in run order."""
+def plan(
+    files: list[str], on_linux: bool = sys.platform == "linux", root: Path | None = None
+) -> list[Step]:
+    """The web checks covering `files` (repo-relative paths), in run order.
+
+    With `root` (the `apps/web` folder), a folder that no longer exists (a deleted widget) has
+    no tests to run and is left out.
+    """
     vitest: set[str] = set()
     specs: set[str] = set()
     visual: set[str] = set()
@@ -72,6 +78,8 @@ def plan(files: list[str], on_linux: bool = sys.platform == "linux") -> list[Ste
             vitest.add("/".join(parts[:3]))
             if rel.name.endswith((".stories.tsx", ".module.css")):
                 visual.add(parts[2])
+    if root is not None:
+        vitest = {folder for folder in vitest if (root / folder).is_dir()}
     return _steps(typed, vitest, specs, visual, on_linux)
 
 
@@ -98,7 +106,7 @@ def _steps(
 
 def main(argv: list[str]) -> int:
     base = argv[1] if len(argv) > 1 else "origin/main"
-    steps = plan(changed_tests.changed_files(base))
+    steps = plan(changed_tests.changed_files(base), root=changed_tests.REPO / "apps" / "web")
     if not steps:
         print("no web checks for the changed files")
         return 0

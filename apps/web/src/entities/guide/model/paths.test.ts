@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BUILT_SECTIONS,
+  episodePath,
   exploreFieldPath,
   fieldPath,
   fieldsPath,
+  indicatorPath,
   parseFieldsSearch,
   playbookPath,
   screenerBuilderPath,
@@ -21,8 +23,13 @@ describe('guide paths', () => {
     expect(screenerBuilderPath('breakout')).toBe('/screeners/breakout/edit');
   });
 
-  it('has pages for playbooks, fields and situations, in the Guide’s order', () => {
-    expect(BUILT_SECTIONS).toEqual(['playbooks', 'fields', 'situations']);
+  it('builds the regime indicator and market fall paths', () => {
+    expect(indicatorPath('curve_10y3m')).toBe('/guide/regime/indicators/curve_10y3m');
+    expect(episodePath('gfc_2007')).toBe('/guide/regime/episodes/gfc_2007');
+  });
+
+  it('has pages for the market regime, playbooks, fields and situations, in the Guide’s order', () => {
+    expect(BUILT_SECTIONS).toEqual(['regime', 'playbooks', 'fields', 'situations']);
   });
 
   it('encodes a catalogue name in a field path', () => {

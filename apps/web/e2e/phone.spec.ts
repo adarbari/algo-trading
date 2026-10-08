@@ -4,7 +4,7 @@
  * the screen (no horizontal page scroll, a top bar that does not eat it), logs no errors and is
  * accessible; a ticker opens its detail as a sheet; a screener name opens its results; the chart
  * has zoom buttons for fingers; the ingestion drill-down opens as a sheet; a tooltip opens on
- * a tap; the keyboard hints are gone; a narrow table shows its essential columns with the picker.
+ * a tap; the keyboard hints are gone; a narrow table shows its essential columns with the picker; a Regime card's help opens as a sheet.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -12,8 +12,14 @@ import { WORKSPACES } from '../src/app/workspaces/workspaces';
 import { expectAccessible, settled } from './a11y';
 import { mockApi } from './mock-api';
 
-/** Every section, and the Guide (its own layout, outside the workspaces). */
-const ROUTES = [...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)), '/guide'];
+/** Every section, and the Guide (its own layout, outside the workspaces) with its regime pages. */
+const ROUTES = [
+  ...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)),
+  '/guide',
+  '/guide/regime',
+  '/guide/regime/indicators/curve_10y3m',
+  '/guide/regime/episodes/gfc_2007',
+];
 /**
  * The top bar's height bound: the two-row grid under 720 px (brand, Guide and the end slot,
  * then the nav; the workspace switch is in the account menu) measures about 100 px at 390 px.
@@ -114,6 +120,20 @@ test('Screener results: the pick sheet shows no keyboard hints on a phone', asyn
   const sheet = page.getByRole('dialog', { name: 'AAPL' });
   await expect(sheet.getByRole('button', { name: 'Open in Explore' })).toBeVisible();
   await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' })).toBeHidden();
+});
+
+test('Regime: a tapped card help button opens the indicator drawer as a sheet', async ({
+  page,
+}) => {
+  await page.goto('/regime');
+  const card = page.getByRole('region', { name: 'Slow-moving warning signs' });
+  await card
+    .getByRole('button', { name: /^What is / })
+    .first()
+    .tap();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('heading', { level: 3, name: 'Why it matters' })).toBeVisible();
+  await expectAccessible(page);
 });
 
 test('Screeners: a tapped row opens the screener', async ({ page }) => {

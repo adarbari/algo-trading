@@ -1,7 +1,7 @@
 /**
  * The Guide's home: one block per section that has pages today, in the spec's order (sections of
  * later phases stay out). Each block is the section's title and purpose as the server gives
- * them; Playbooks lists the families with their playbooks, Fields the theme groups in the order
+ * them; Market regime lists the warning signs and the market falls, Playbooks lists the families with their playbooks, Fields the theme groups in the order
  * a screen uses them (with the field count of every theme, and links to the by-intent and A to Z
  * views), Situations the situations with how many fields each fools.
  */
@@ -18,9 +18,12 @@ import {
 
 import {
   BUILT_SECTIONS,
+  episodePath,
   fieldsPath,
   GUIDE_PLAYBOOKS_PATH,
+  GUIDE_REGIME_PATH,
   GUIDE_SITUATIONS_PATH,
+  indicatorPath,
   playbookPath,
   situationPath,
   themeTitle,
@@ -34,7 +37,7 @@ export function GuideHome() {
   }
   if (index.isPending) return <Skeleton variant="rect" height="lg" label="Loading the Guide" />;
   if (!index.data) return <EmptyState bordered title="The Guide has no entries." />;
-  const { sections, themeGroups, families, situations } = index.data;
+  const { sections, themeGroups, families, situations, indicators, episodes } = index.data;
   return (
     <Stack gap={6}>
       <Stack gap={1}>
@@ -54,6 +57,11 @@ export function GuideHome() {
                 {section.title}
               </Heading>
               <Text tone="muted">{`${section.entries.toLocaleString('en-US')} entries`}</Text>
+              {section.id === 'regime' && (
+                <TextLink href={GUIDE_REGIME_PATH} size="sm">
+                  The warning signs and the falls
+                </TextLink>
+              )}
               {section.id === 'playbooks' && (
                 <TextLink href={GUIDE_PLAYBOOKS_PATH} size="sm">
                   What each one says
@@ -78,6 +86,30 @@ export function GuideHome() {
             <Text as="p" tone="secondary">
               {section.purpose}
             </Text>
+            {section.id === 'regime' && (
+              <Grid columns={2} gap={5} collapse="md" align="start">
+                <Stack gap={2} as="section" aria-label="Warning signs">
+                  <Heading level={3} tone="muted">
+                    Warning signs
+                  </Heading>
+                  {indicators.map((i) => (
+                    <TextLink key={i.key} href={indicatorPath(i.key)}>
+                      {i.plainName}
+                    </TextLink>
+                  ))}
+                </Stack>
+                <Stack gap={2} as="section" aria-label="Market falls">
+                  <Heading level={3} tone="muted">
+                    Market falls
+                  </Heading>
+                  {episodes.map((e) => (
+                    <TextLink key={e.key} href={episodePath(e.key)}>
+                      {e.name}
+                    </TextLink>
+                  ))}
+                </Stack>
+              </Grid>
+            )}
             {section.id === 'playbooks' && (
               <Grid columns={2} gap={5} collapse="md" align="start">
                 {families.map((family) => (

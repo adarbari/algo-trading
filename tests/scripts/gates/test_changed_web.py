@@ -49,3 +49,20 @@ def test_a_story_or_css_module_maps_to_the_component_screenshots() -> None:
 
 def test_other_files_map_to_nothing() -> None:
     assert cmds("src/algotrade/x.py", "apps/web/package.json", "apps/web/COMPONENTS.md") == []
+
+
+def test_a_deleted_folder_has_no_tests_to_run(tmp_path: Path) -> None:
+    (tmp_path / "src/widgets/kept").mkdir(parents=True)
+    got = [
+        " ".join(c)
+        for _, c in changed_web.plan(
+            [
+                "apps/web/src/widgets/gone/ui/Gone.tsx",
+                "apps/web/src/widgets/kept/ui/Kept.tsx",
+            ],
+            True,
+            tmp_path,
+        )
+    ]
+    assert "npx vitest run src/widgets/kept" in got
+    assert "npx vitest run src/widgets/gone" not in got

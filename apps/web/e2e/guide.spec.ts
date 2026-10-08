@@ -3,7 +3,7 @@
  * top bar's Guide link and the "?" key, the home with its theme groups, the field index, a
  * field's page (what it means, its spread, criteria, when it lies, related, a ticker), the rail's
  * search, the playbook and situation pages reached from the home (a linked field and back, the two
- * buttons, the linked prose), and Explore's retired Field guide tab redirecting here; accessible
+ * buttons, the linked prose), the market regime pages (the index, an indicator, an episode), and Explore's retired Field guide tab redirecting here; accessible
  * in dark and light.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -244,4 +244,75 @@ test('the Explore Field guide tab redirects to the Guide, keeping the field', as
   await page.goto('/explore?tab=guide&theme=volatility');
   await expect(page).toHaveURL(/\/guide\/fields\?theme=volatility$/);
   expect(errors).toEqual([]);
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`market regime: the index to an indicator to an episode and back (${theme})`, async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    await page.goto('/guide');
+    await expect(page.getByRole('heading', { level: 2, name: 'Market regime' })).toBeVisible();
+    await page
+      .getByRole('region', { name: 'Market regime' })
+      .getByRole('link', { name: 'The warning signs and the falls' })
+      .click();
+    await expect(page).toHaveURL(/\/guide\/regime$/);
+    const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
+    await expect(slow.getByRole('link')).toHaveCount(5);
+    await expect(
+      page.getByRole('region', { name: 'Fast-moving market signs' }).getByRole('link'),
+    ).toHaveCount(3);
+    await expect(
+      page.getByRole('link', { name: 'Today’s readings on the Regime page' }),
+    ).toHaveAttribute('href', '/regime');
+
+    await slow.getByRole('link', { name: 'Are long-term rates below short-term ones?' }).click();
+    await expect(page).toHaveURL(/\/guide\/regime\/indicators\/curve_10y3m$/);
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Are long-term rates below short-term ones?' }),
+    ).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Why it matters' })).toContainText(
+      'Normally lenders want more to lend for longer',
+    );
+    await expect(page.getByRole('region', { name: 'Lead time and track record' })).toContainText(
+      '6 to 18 months before a recession.',
+    );
+    await expect(
+      page
+        .getByRole('region', { name: 'Sources' })
+        .getByRole('link', { name: /FRED: 10-year/ })
+        .first(),
+    ).toBeVisible();
+    await page.evaluate((t) => {
+      document.documentElement.setAttribute('data-theme', t);
+    }, theme);
+    await expectAccessible(page);
+
+    await page
+      .getByRole('region', { name: 'What it did before' })
+      .getByRole('link', { name: '2008' })
+      .click();
+    await expect(page).toHaveURL(/\/guide\/regime\/episodes\/gfc_2007$/);
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Global financial crisis, 2007-09' }),
+    ).toBeVisible();
+    await expect(page.getByText('The housing bust and subprime losses')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'The fall' })).toContainText('Recovered');
+    await expectAccessible(page);
+
+    await page
+      .getByRole('region', { name: 'What the warning signs did before it' })
+      .getByRole('link', { name: 'Are long-term rates below short-term ones?' })
+      .click();
+    await expect(page).toHaveURL(/\/guide\/regime\/indicators\/curve_10y3m$/);
+    expect(errors).toEqual([]);
+  });
+}
+
+test('an unknown indicator or market fall says so', async ({ page }) => {
+  await page.goto('/guide/regime/indicators/nope');
+  await expect(page.getByText('No such indicator')).toBeVisible();
+  await page.goto('/guide/regime/episodes/nope');
+  await expect(page.getByText('No such market fall')).toBeVisible();
 });
