@@ -28,6 +28,8 @@ const STRUCTURE = [
   'src/widgets/event-study-panel/model/columns.tsx', // an instrument's events ahead and its 8-Ks
   'src/widgets/features-panel/model/rows.tsx', // one instrument's features, one row each
   'src/widgets/guide-playbook/model/columns.tsx', // a playbook's criteria, one row each
+  'src/widgets/harness-run-detail/model/columns.tsx', // admin: one evaluation run's stored rows
+  'src/widgets/harness-run-list/model/columns.tsx', // admin: edge evaluation runs, one record each
   'src/widgets/holdings-panel/model/columns.tsx', // an ETF's holdings (issuer-dated weights)
   'src/widgets/options-panel/model/columns.tsx', // an option chain's quotes by strike
   'src/widgets/regime-episodes/model/columns.tsx', // the regime's reference market falls
