@@ -143,6 +143,10 @@ purpose = "reads of the outcomes grain (outcomes/instrument/, ADR 0053): what ha
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
 
 [[dir]]
+path = "src/algotrade/data/usage"
+purpose = "reads of the usage grain (usage/, ADR 0058): what the API's text model spent, over a date range; seeds the budget ledger and feeds the Admin usage page"
+
+[[dir]]
 path = "src/algotrade/engines"
 purpose = "engines that run strategies or screeners over data views"
 contracts = ["Engines are independent of each other"]
@@ -375,7 +379,11 @@ contracts = ["Layout: use-case packages are independent (backtests, screening, a
 
 [[dir]]
 path = "src/algotrade/services/text_model"
-purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08); no vendor, no storage"
+purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08), with the usage ledger (prices, budget) and the background recorder of usage/llm_calls (ADR 0058); no vendor, no market-data writer, no jobs"
+contracts = [
+    "Text-model usage writes only usage/* tables: no market-data writer, no jobs (ADR 0058)",
+    "Only the text-model usage recorder imports the usage writer (ADR 0058)",
+]
 
 [[dir]]
 path = "src/algotrade/storage"

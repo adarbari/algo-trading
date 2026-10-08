@@ -317,6 +317,33 @@ LIVE_OPTION_QUOTES = _fixed(
     runs="merge",
     retention_days=7,  # [sources] live_retention_days overrides the window
 )
+# The text-model usage log (ADR 0058, the API's fifth write): one row per provider
+# attempt of a call (the failed and the budget-skipped ones too), one partition per exchange
+# calendar date of the call. Runs merge (each is a batch of attempts; all kept). Tokens, cost
+# and ``fell_back_from`` are null when unknown or not applicable, never 0: ``cost_basis`` says
+# where ``cost_usd`` came from (``price`` tokens x the model's [[price]], ``reported`` a
+# subscription's notional total, ``bound`` the upper bound reserved when the cost is unknown or
+# the attempt failed, ``free`` 0 for a free provider, ``unknown`` null: a skipped attempt). Written
+# only through ``UsageWriter`` (``usage/*``); read across a date range by ``data.usage``.
+USAGE_LLM_CALLS = _fixed(
+    "usage/llm_calls",
+    "usage",
+    ("ts", "provider", "use_case", "outcome"),
+    "ts timestamp_utc!",
+    "provider string!",
+    "model string!",
+    "use_case string!",
+    "user string",
+    "input_tokens int64",
+    "output_tokens int64",
+    "latency_s float64!",
+    "cost_usd float64",
+    "cost_basis string!",
+    "outcome string!",
+    "fell_back_from string",
+    runs="merge",
+    key=("ts", "provider", "use_case"),
+)
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
 TREASURY_RATES = _fixed(
@@ -602,6 +629,7 @@ KNOWN: dict[str, TableSpec] = {
         RULE_SCREEN_VALUES,
         EDGE_EVAL,
         LIVE_OPTION_QUOTES,
+        USAGE_LLM_CALLS,
         ETF_HOLDINGS,
         MACRO_SERIES,
         EARNINGS_EVENTS,

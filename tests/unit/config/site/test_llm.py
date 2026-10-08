@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.site.llm import LlmSettings, Phrase, PhrasebookSettings
+from algotrade.config.site.llm import BudgetSettings, LlmSettings, Phrase, PhrasebookSettings, Rate
 from algotrade.config.site.settings import load_llm, load_phrasebook
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
@@ -38,9 +38,11 @@ def test_a_remote_provider() -> None:
             "timeout_s": 20,
             "answer_limit": 800,
             "retries": 0,
+            "price": [{"model": "llama-3.3-70b-versatile", "free": True}],
         }
     )
     (p,) = s.providers
+    assert s.rate(p) == Rate("free")
     assert s.enabled and s.legacy and p.base_url == "https://api.groq.com/openai/v1"
     assert (p.model, p.timeout_s, p.answer_limit) == ("llama-3.3-70b-versatile", 20.0, 800)
     assert p.retries == 0 and not p.local
@@ -147,6 +149,10 @@ CHAIN: dict[str, Any] = {
     "timeout_s": 30,
     "retries": 1,
     "request": {"reasoning_effort": "low"},
+    "price": [
+        {"model": "claude-haiku-4-5", "input_per_mtok": 1.0, "output_per_mtok": 5.0},
+        {"model": "gemini-2.5-flash", "free": True},
+    ],
     "provider": [
         {"id": "claude", "base_url": "https://api.anthropic.com/v1/", "model": "claude-haiku-4-5"},
         {
@@ -232,6 +238,8 @@ def test_a_machine_file_adds_the_chain_over_the_shipped_file(tmp_path: Path) -> 
         '[[provider]]\nid = "gemini"\n'
         'base_url = "https://generativelanguage.googleapis.com/v1beta/openai"\n'
         'model = "gemini-2.5-flash"\n'
+        '[[price]]\nmodel = "claude-haiku-4-5"\ninput_per_mtok = 1\noutput_per_mtok = 5\n'
+        '[[price]]\nmodel = "gemini-2.5-flash"\nfree = true\n'
     )
     s = load_llm(FileConfigStore(tmp_path))
     assert s.enabled and not s.legacy
@@ -239,6 +247,7 @@ def test_a_machine_file_adds_the_chain_over_the_shipped_file(tmp_path: Path) -> 
     # and a machine file with the single-provider keys still works over the shipped one
     (site_dir / "llm.local.toml").write_text(
         'enabled = true\nbase_url = "https://x.example/v1"\nmodel = "m"\n'
+        '[[price]]\nmodel = "m"\nfree = true\n'
     )
     assert load_llm(FileConfigStore(tmp_path)).providers[0].model == "m"
 
@@ -300,3 +309,61 @@ def test_claude_cli_errors_name_the_entry(entry: dict[str, Any], message: str) -
 def test_command_belongs_to_claude_cli_only() -> None:
     with pytest.raises(ConfigurationError, match=r"command belongs to kind"):
         LlmSettings.from_document({"provider": [GEMINI | {"command": "/bin/claude"}]})
+
+
+PAID = {"id": "p", "base_url": "https://a.io/v1", "model": "m"}
+
+
+def test_rates_are_a_price_free_or_reported_and_a_paid_model_without_a_price_is_refused() -> None:
+    s = LlmSettings.from_document(CHAIN)
+    claude, gemini = s.providers
+    assert s.rate(claude) == Rate("price", 1.0, 5.0, 8000) and s.rate(claude).spends
+    assert s.rate(gemini) == Rate("free") and not s.rate(gemini).spends
+    local = LlmSettings.from_document({"enabled": True})  # a loopback server needs no entry
+    assert local.rate(local.providers[0]) == Rate("free")
+    cli = {"id": "c", "kind": "claude-cli", "command": "/x/claude", "model": "haiku"}
+    with_cli = LlmSettings.from_document(
+        {"enabled": True, "provider": [cli | {"only_users": ["a"]}]}
+    )
+    assert with_cli.rate(with_cli.providers[0]) == Rate("reported")
+    with pytest.raises(ConfigurationError, match=r"provider p: no \[\[price\]\] for model 'm'"):
+        LlmSettings.from_document({"enabled": True, "provider": [PAID]})
+    off = LlmSettings.from_document({"provider": [PAID]})  # a disabled file is not checked
+    assert not off.enabled
+
+
+@pytest.mark.parametrize(
+    ("price", "message"),
+    [
+        ({"input_per_mtok": 1, "output_per_mtok": 2}, "model is required"),
+        ({"model": "m", "input_per_mtok": 1}, "input_per_mtok and output_per_mtok"),
+        ({"model": "m", "free": True, "input_per_mtok": 1}, "a free model has no price"),
+        ({"model": "m", "input_per_mtok": -1, "output_per_mtok": 2}, "input_per_mtok"),
+        ({"model": "m", "input_per_mtok": 1, "output_per_mtok": 2, "cost": 1}, "unknown keys"),
+    ],
+)
+def test_price_errors_name_the_entry(price: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        LlmSettings.from_document({"price": [price]})
+    with pytest.raises(ConfigurationError, match="a list of tables"):
+        LlmSettings.from_document({"price": "free"})
+    twice = [{"model": "m", "free": True}] * 2
+    with pytest.raises(ConfigurationError, match="priced twice"):
+        LlmSettings.from_document({"price": twice})
+
+
+def test_the_budget_is_optional_typed_and_daily_cannot_exceed_monthly() -> None:
+    assert LlmSettings.from_document({}).budget == BudgetSettings(None, None, "free")
+    b = LlmSettings.from_document({"budget": {"daily_usd": 1, "monthly_usd": 15, "over": "refuse"}})
+    assert b.budget == BudgetSettings(1.0, 15.0, "refuse")
+    assert LlmSettings.from_document({"budget": {"reported_call_usd": 0.5}}).budget == (
+        BudgetSettings(None, None, "free", 0.5)
+    )
+    for doc, message in [
+        ({"over": "ignore"}, "over: expected one of"),
+        ({"daily_usd": -1}, "daily_usd"),
+        ({"daily_usd": 20, "monthly_usd": 15}, "above monthly_usd"),
+        ({"limit": 3}, "unknown keys"),
+    ]:
+        with pytest.raises(ConfigurationError, match=message):
+            LlmSettings.from_document({"budget": doc})
