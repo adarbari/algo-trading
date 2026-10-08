@@ -35,6 +35,8 @@ const STRUCTURE = [
   'src/widgets/recent-runs-panel/ui/RecentRunsPanel.tsx', // admin: nightly runs
   'src/widgets/review-items-panel/ui/ReviewItemsPanel.tsx', // admin: review lists
   'src/widgets/verification-panel/ui/VerificationPanel.tsx', // admin: IBKR verification
+  'src/widgets/usage-breakdown-panel/model/columns.tsx', // admin: text-model usage by group
+  'src/widgets/usage-calls-panel/model/columns.tsx', // admin: text-model calls, one log row each
   'src/entities/run/ui/RunRecordDrawer.tsx', // admin: a run's items
 ];
 

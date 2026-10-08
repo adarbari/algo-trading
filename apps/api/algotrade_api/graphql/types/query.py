@@ -31,7 +31,15 @@ from algotrade.services.read.guide import written as written_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
-from algotrade.services.read.ops import backtests, configs, ingestion, quality, review, runs
+from algotrade.services.read.ops import (
+    backtests,
+    configs,
+    ingestion,
+    quality,
+    review,
+    runs,
+    usage,
+)
 from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.users.viewer import load_viewer
@@ -61,6 +69,7 @@ from algotrade_api.graphql.types.ops.ingestion import CellDetail, Completeness
 from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
 from algotrade_api.graphql.types.ops.review import ReviewList
 from algotrade_api.graphql.types.ops.run import NightlyRun, RunDetail, RunItem
+from algotrade_api.graphql.types.ops.usage import LlmUsage
 from algotrade_api.graphql.types.screens.document import ScreenDetail, ScreenListing, ScreenVersion
 from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
@@ -78,6 +87,7 @@ Day = Annotated[
 Ctx = Info[RequestContext, None]
 MAX_RUNS = 100  # nightlyRuns(limit)
 MAX_SESSIONS = 60  # completeness(sessions)
+MAX_CALLS = 200  # llmUsage(recent)
 MAX_SEARCH = 50  # guideSearch(limit): hits per kind
 MAX_QUERY = 200  # guideSearch(q): characters
 
@@ -531,3 +541,18 @@ class Query:
         ctx = info.context.read(date)
         found = review.load_leverage_review(ctx) if ctx is not None else None
         return ReviewList.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="What the text model spent: tokens and cost against the budget, by model, "
+        "use case and user, a 30-day series and the `recent` latest calls (newest first). A "
+        "date range ending today, not one session (ADR 0058)",
+        extensions=[AdminOnly(), MaxItems("recent", MAX_CALLS)],
+    )
+    async def llm_usage(self, info: Ctx, recent: int = 50) -> LlmUsage | None:
+        ctx = info.context.stores()
+        found = (
+            await to_thread.run_sync(usage.load_llm_usage, ctx, None, recent)
+            if ctx is not None
+            else None
+        )
+        return LlmUsage.of(found) if found is not None else None
