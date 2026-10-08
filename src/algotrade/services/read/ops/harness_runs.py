@@ -23,6 +23,17 @@ PREFIX = "edge-eval:"
 
 
 @dataclass(frozen=True)
+class LostInput:
+    """An input table a variant had no data in at ``horizon``: ``sessions`` decision sessions
+    lost to it (counted as unmeasured, never a miss). ``variant``: ``<edge variant>/<screener>``."""
+
+    variant: str
+    horizon: int
+    table: str
+    sessions: int
+
+
+@dataclass(frozen=True)
 class HarnessRun:
     """One evaluation run. ``user``: whose run (``site`` for the shared one); ``split_from``:
     the split its frozen slice was measured at; ``exploratory``: the run says so; ``variants``
@@ -30,7 +41,9 @@ class HarnessRun:
     ``unclosed``: decision blocks with no closed window (summed over horizons);
     ``excluded_coverage``: sessions left out for lack of a screen run or its input tables;
     ``score_coverage``: the lowest share of eligible names a variant could score;
-    ``no_entry_bar``: the most names without an entry bar in one variant; ``trials``: the
+    ``no_entry_bar``: the most names without an entry bar in one variant; ``lost_inputs``: the
+    input tables each variant lacked and the sessions lost to each (empty: none recorded or
+    none lost); ``trials``: the
     trials counted; ``knowledge_ts``: when it committed (its start while it has not)."""
 
     run_id: str
@@ -50,6 +63,7 @@ class HarnessRun:
     excluded_coverage: int | None
     score_coverage: float | None
     no_entry_bar: int | None
+    lost_inputs: tuple[LostInput, ...]
     trials: int | None
     knowledge_ts: datetime
     as_of: str | None
@@ -65,6 +79,21 @@ def _numbers(trials: list[dict[str, Any]], key: str) -> list[float]:
 
 def _most(values: list[float]) -> int | None:
     return int(max(values)) if values else None
+
+
+def _lost_inputs(trials: list[dict[str, Any]]) -> tuple[LostInput, ...]:
+    """The tables the trial log records as lost (``lost_sessions``: table -> sessions)."""
+    return tuple(
+        LostInput(
+            f"{t.get('edge_variant', 'main')}/{t['variant']}",
+            int(t.get("horizon", 0)),
+            str(table),
+            int(n),
+        )
+        for t in trials
+        if "variant" in t and isinstance(t.get("lost_sessions"), dict)
+        for table, n in sorted(t["lost_sessions"].items())
+    )
 
 
 def _run(record: RunRecord, edge_id: str, user: str) -> HarnessRun:
@@ -90,6 +119,7 @@ def _run(record: RunRecord, edge_id: str, user: str) -> HarnessRun:
         excluded_coverage=_most(_numbers(trials, "excluded_coverage")),
         score_coverage=min(shares) if shares else None,
         no_entry_bar=_most(_numbers(trials, "no_entry_bar")),
+        lost_inputs=_lost_inputs(trials),
         trials=stats.get("trials_counted"),
         knowledge_ts=record.finished_at or record.started_at,
         as_of=stats.get("as_of"),

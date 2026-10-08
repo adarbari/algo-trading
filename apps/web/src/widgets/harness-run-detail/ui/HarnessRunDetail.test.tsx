@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { rowFixture as row } from '@/entities/harness-run';
+import { lostInputFixture as lostInput, rowFixture as row } from '@/entities/harness-run';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { HarnessRunDetail } from './HarnessRunDetail';
@@ -21,7 +21,7 @@ stubElementSize();
 const rows = [row(), row({ variant: 'equal_weight', role: 'baseline', exploratory: true })];
 
 beforeEach(() => {
-  hooks.useHarnessRunRows.mockReturnValue(fakeQuery({ runId: 'run-b', rows }));
+  hooks.useHarnessRunRows.mockReturnValue(fakeQuery({ runId: 'run-b', rows, lostInputs: [] }));
 });
 
 describe('HarnessRunDetail', () => {
@@ -42,6 +42,22 @@ describe('HarnessRunDetail', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('lists the input tables a variant lacked, with the sessions lost to each', () => {
+    hooks.useHarnessRunRows.mockReturnValue(
+      fakeQuery({ runId: 'run-b', rows, lostInputs: [lostInput()] }),
+    );
+    render(<HarnessRunDetail id="run-b" />);
+    const table = screen.getByRole('grid', { name: 'Missing input tables' });
+    const lost = within(table).getByRole('row', { name: /main\/momentum_12_1/ });
+    expect(within(lost).getByText('rollups/instrument/ibkr_iv@v1')).toBeInTheDocument();
+    expect(within(lost).getByText('4')).toBeInTheDocument();
+  });
+
+  it('shows no missing-tables table when none were lost', () => {
+    render(<HarnessRunDetail id="run-b" />);
+    expect(screen.queryByRole('grid', { name: 'Missing input tables' })).not.toBeInTheDocument();
+  });
+
   it('shows the loading, error and empty states', () => {
     hooks.useHarnessRunRows.mockReturnValue(fakeQuery(undefined));
     const { rerender } = render(<HarnessRunDetail id="run-b" />);
@@ -49,7 +65,9 @@ describe('HarnessRunDetail', () => {
     hooks.useHarnessRunRows.mockReturnValue(fakeQuery(undefined, { isError: true }));
     rerender(<HarnessRunDetail id="run-b" />);
     expect(screen.getByText("The run's rows failed to load.")).toBeInTheDocument();
-    hooks.useHarnessRunRows.mockReturnValue(fakeQuery({ runId: 'run-b', rows: [] }));
+    hooks.useHarnessRunRows.mockReturnValue(
+      fakeQuery({ runId: 'run-b', rows: [], lostInputs: [] }),
+    );
     rerender(<HarnessRunDetail id="run-b" />);
     expect(screen.getByText('The run holds no rows.')).toBeInTheDocument();
   });

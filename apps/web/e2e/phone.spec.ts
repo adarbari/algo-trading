@@ -280,7 +280,7 @@ test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) =>
         asOf: null,
       },
     ],
-    'harnessRun:run-b': { runId: 'run-b', rows: [] },
+    'harnessRun:run-b': { runId: 'run-b', rows: [], lostInputs: [] },
   });
   await page.goto('/admin/harness-runs');
   // A phone shows 3 of the columns (edge, started, status): the run id is in the sheet

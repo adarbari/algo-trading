@@ -14,11 +14,27 @@ from algotrade_api.graphql.types.evaluation.edge import EdgeRow
 
 
 @strawberry.type(
+    description="An input table a variant (`<edge variant>/<screener>`) had no data in at a "
+    "horizon, and the decision sessions lost to it (counted as unmeasured, never a miss)"
+)
+class LostInput:
+    variant: str
+    horizon: int
+    table: str
+    sessions: int
+
+    @classmethod
+    def of(cls, d: harness_runs.LostInput) -> Self:
+        return cls(variant=d.variant, horizon=d.horizon, table=d.table, sessions=d.sessions)
+
+
+@strawberry.type(
     description="One edge evaluation run of any status: `user` whose run (`site`: the shared "
     "one), `splitFrom` and `exploratory`, `variants` and `horizons` measured, `sessions` the "
     "most any variant measured, the left-out counts `unclosed`, `excludedCoverage` (no screen "
     "run or input tables), `scoreCoverage` (lowest share of eligible names scored) and "
-    "`noEntryBar`, `trials` counted and `knowledgeTs` (null counts: not recorded)"
+    "`noEntryBar`, `lostInputs` (the input tables a variant lacked, with the sessions lost to "
+    "each), `trials` counted and `knowledgeTs` (null counts: not recorded)"
 )
 class HarnessRun:
     run_id: str
@@ -38,6 +54,7 @@ class HarnessRun:
     excluded_coverage: int | None
     score_coverage: float | None
     no_entry_bar: int | None
+    lost_inputs: list[LostInput]
     trials: int | None
     knowledge_ts: dt.datetime
     as_of: str | None
@@ -63,6 +80,7 @@ class HarnessRun:
             excluded_coverage=d.excluded_coverage,
             score_coverage=d.score_coverage,
             no_entry_bar=d.no_entry_bar,
+            lost_inputs=[LostInput.of(x) for x in d.lost_inputs],
             trials=d.trials,
             knowledge_ts=d.knowledge_ts,
             as_of=d.as_of,

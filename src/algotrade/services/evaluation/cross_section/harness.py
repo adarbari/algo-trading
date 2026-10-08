@@ -72,6 +72,11 @@ from algotrade.services.evaluation.cross_section.picks import (
     SelectionReads,
     screen_variant,
 )
+from algotrade.services.evaluation.cross_section.report_containment import (
+    ReportContainment,
+    containment,
+    reports_after,
+)
 from algotrade.services.evaluation.cross_section.sessions import (
     decision_sessions,
     entry_session,
@@ -123,6 +128,7 @@ class VariantResult:
     iv_source: str | None = None  # the run's iv_field when the outcome reads an implied vol
     licence: str | None = None  # that field's catalogue licence
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
+    report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
 
 
 @dataclass(frozen=True)
@@ -478,6 +484,7 @@ def evaluate_edge(
     ]
     stats = _measure(reader, session, plans, variants, schedules, as_of)
     results: list[VariantResult] = []
+    reports = None  # the real report dates, read once and only for an earnings_expected edge
     starts: dict[int, int] = {}
     unclosed: dict[int, int] = {}
     for plan in plans:
@@ -488,6 +495,21 @@ def evaluate_edge(
         unclosed.setdefault(
             horizon, sum(all(leg.entry not in closed for leg in b) for b in plan.blocks)
         )
+        diagnostic = None
+        if scope.edge.event_class == "earnings_expected":
+            reports = reports_after(reader, as_of) if reports is None else reports
+            diagnostic = containment(
+                [
+                    (i, leg.decision, leg.entry)
+                    for b in plan.blocks
+                    for leg in b
+                    if leg.entry in closed
+                    for i in sorted(schedules[scope.key].names[leg.decision])
+                    if i in stats.stored[horizon, leg.entry]  # measured: has an entry bar
+                ],
+                horizon,
+                reports,
+            )
         for variant in variants:
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
@@ -514,6 +536,7 @@ def evaluate_edge(
                     edge_variant=scope.key,
                     iv_source=scope.iv_field if needs_iv else None,
                     licence=licences[scope.key],
+                    report_containment=diagnostic,
                     lost_sessions=dict(
                         Counter(stats.lost.get((plan.key, variant.id), {}).values())
                     ),
@@ -567,6 +590,7 @@ class _Measured:
     legs: dict[tuple[tuple[str, int], str], dict[date, SessionStat]]
     lost: dict[tuple[tuple[str, int], str], dict[date, str]]
     closed: dict[int, set[date]]
+    stored: dict[tuple[int, date], frozenset[str]]  # (horizon, S) -> names with an outcome row
 
 
 def _measure(
@@ -580,7 +604,7 @@ def _measure(
     """One statistic per (plan, variant, leg), over chunks of ``CHUNK_SESSIONS`` decision
     sessions: each chunk reads the outcomes of its entry sessions, screens its sessions and
     keeps only the statistics, so peak memory does not grow with the range."""
-    out = _Measured({}, {}, {})
+    out = _Measured({}, {}, {}, {})
     days = sorted({leg.decision for p in plans for b in p.blocks for leg in b})
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set() for p in plans})
@@ -630,6 +654,8 @@ def _read_closed(
         kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
         out.closed[horizon] |= set(closed[horizon])
+        for entry, rows in closed[horizon].items():
+            out.stored[horizon, entry] = frozenset(rows["instrument_id"])
     return closed
 
 

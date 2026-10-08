@@ -40,6 +40,12 @@ const HarnessRunQuery = graphql(`
   query HarnessRun($runId: String!) {
     harnessRun(runId: $runId) {
       runId
+      lostInputs {
+        variant
+        horizon
+        table
+        sessions
+      }
       rows {
         edgeVariant
         variant

@@ -60,6 +60,7 @@ const RUNS = [
 
 const ROWS = {
   runId: 'run-b',
+  lostInputs: [],
   rows: [
     {
       edgeVariant: 'main',

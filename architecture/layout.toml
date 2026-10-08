@@ -277,7 +277,7 @@ purpose = "use case: evaluate every strategy on every golden dataset against the
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
-purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them) and its results/edge_eval rows and report"
+purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), the report-containment diagnostic of an earnings_expected edge (report_containment.py) and its results/edge_eval rows and report"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/training"
