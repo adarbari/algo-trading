@@ -41,7 +41,6 @@ function ScreenerResultsRoute() {
   return (
     <ScreenerResultsPage
       id={id}
-      onDeleted={() => void navigate({ to: '/screeners' })}
       onEdit={() => void navigate({ to: '/screeners/$id/edit', params: { id } })}
       onOpenTicker={(symbol) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })

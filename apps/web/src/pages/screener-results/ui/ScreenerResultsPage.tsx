@@ -3,19 +3,13 @@
  * table with the row under review beside it (its decision, criteria and price chart), and
  * "Edit criteria" for the Builder. Reviewing comes first, editing is one click away. The
  * review is keyboard-first: j / k move, c adds the ticker to the compare set, x hides it for
- * now, Enter opens it in Explore. "Edit criteria" opens the criteria in a drawer over this page
- * (the Builder's state, started on first use): an edit shows who would enter or leave before it
- * is saved, and that note stays above the results while the edit is unsaved.
+ * now, Enter opens it in Explore. "Edit criteria" goes straight to the Builder page.
  */
-import { Button, Drawer, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
+import { Button, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
 import { useState } from 'react';
 
-import { ScreenerBuilderProvider } from '@/features/screener-builder';
-import { CriteriaTable } from '@/widgets/criteria-table';
-import { DraftBar } from '@/widgets/draft-bar';
 import { ScreenerResults } from '@/widgets/feature-table';
 import { PickDetail } from '@/widgets/pick-detail';
-import { PreviewChangesReporter, PreviewDiff } from '@/widgets/preview-diff';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 
 export interface ScreenerResultsPageProps {
@@ -27,8 +21,6 @@ export interface ScreenerResultsPageProps {
   onOpenTicker: (symbol: string) => void;
   /** Open the tickers added to the compare set in Explore. */
   onCompare: (symbols: readonly string[]) => void;
-  /** The screener was deleted: back to the list. */
-  onDeleted: () => void;
 }
 
 export function ScreenerResultsPage({
@@ -36,19 +28,11 @@ export function ScreenerResultsPage({
   onEdit,
   onOpenTicker,
   onCompare,
-  onDeleted,
 }: ScreenerResultsPageProps) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [compared, setCompared] = useState<readonly string[]>([]);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [range, setRange] = useState<ChartRange>('1Y');
-  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
-  const [editing, setEditing] = useState(false);
-  const [builderStarted, setBuilderStarted] = useState(false); // its preview runs once asked for
-  const edit = () => {
-    setBuilderStarted(true);
-    setEditing(true);
-  };
   const toggle = (symbol: string) => {
     setCompared((now) =>
       now.includes(symbol) ? now.filter((s) => s !== symbol) : [...now, symbol],
@@ -77,37 +61,11 @@ export function ScreenerResultsPage({
               {`Compare ${String(compared.length)} in Explore`}
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={edit}>
+          <Button variant="secondary" onClick={onEdit}>
             Edit criteria
           </Button>
         </Stack>
       </Stack>
-      {builderStarted && (
-        <ScreenerBuilderProvider id={id} key={id}>
-          <PreviewChangesReporter onChange={setLeaving} />
-          {!editing && <PreviewDiff onReview={edit} />}
-          <Drawer
-            open={editing}
-            onOpenChange={setEditing}
-            title={`${id} · criteria`}
-            description="Change a rule and see who would enter or leave before you save."
-            size="lg"
-            footer={
-              <Stack direction="row" gap={2} justify="end">
-                <Button variant="ghost" onClick={onEdit}>
-                  Open in Builder
-                </Button>
-              </Stack>
-            }
-          >
-            <Stack gap={3}>
-              <DraftBar compact onDeleted={onDeleted} />
-              <PreviewDiff />
-              <CriteriaTable />
-            </Stack>
-          </Drawer>
-        </ScreenerBuilderProvider>
-      )}
       <ScreenerResults
         id={id}
         onOpen={onOpenTicker}
@@ -122,7 +80,6 @@ export function ScreenerResultsPage({
           hide(row.instrumentId);
         }}
         dismissed={dismissed}
-        leaving={leaving}
         onShowDismissed={() => {
           setDismissed(new Set());
         }}
