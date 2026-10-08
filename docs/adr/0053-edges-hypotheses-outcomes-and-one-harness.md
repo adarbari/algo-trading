@@ -200,9 +200,9 @@ corrected it on point-in-time grounds.
    of the money.
    - Structure: `put` | `call` | `strangle`.
    - The strike comes from an exact Black-Scholes delta with r = q = 0,
-     K = S·exp(∓zσ√T + σ²T/2), - for the put and + for the call, with δ = |delta| and
+     K = P·exp(∓zσ√T + σ²T/2) for the close P at D, - for the put and + for the call, δ = |delta|,
      z = N⁻¹(1 - δ) > 0, and σ the run's `iv_field` at D (or `otm_pct`).
-   - The hit compares `fwd_return` with K/S - 1.
+   - The hit compares `fwd_return` with K/P - 1.
    - The reference rate is the mean risk-neutral N(d2) per name (the joint form for a
      strangle), not 1 - δ.
    - A touch rate (the strike crossed intraday) is reported beside the hit, never inside it.
