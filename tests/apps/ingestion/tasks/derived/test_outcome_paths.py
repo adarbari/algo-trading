@@ -78,6 +78,13 @@ def test_delisted_name_is_measured_to_its_last_bar() -> None:
     assert reasons == {}
 
 
+def test_a_delisting_noticed_after_t_still_counts() -> None:
+    bars = _bars({"EQ:D": [50, 45, None, None, None]})
+    noticed = {"EQ:D": date(2026, 10, 9)}  # the weekly reference build, a week after T
+    d = _by_id(window_rows(bars, WINDOW, {"EQ:D"}, None, noticed)[0])["EQ:D"]
+    assert d["outcome_status"] == "DELISTED" and d["fwd_return"] == pytest.approx(-0.10)
+
+
 def test_delisted_the_day_after_s_has_a_flat_path() -> None:
     bars = _bars({"EQ:D": [50, None, None, None, None]})
     d = _by_id(window_rows(bars, WINDOW, {"EQ:D"}, None, {"EQ:D": WINDOW.sessions[1]})[0])["EQ:D"]
@@ -87,8 +94,8 @@ def test_delisted_the_day_after_s_has_a_flat_path() -> None:
 
 def test_a_gap_at_the_end_is_a_reason_not_a_row() -> None:
     bars = _bars({"EQ:G": [10, 11, 12, 13, None], "EQ:L": [10, 11, None, None, None]})
-    later = {"EQ:L": date(2026, 12, 1)}  # delisted, but after T: not in this window
-    rows, reasons = window_rows(bars, WINDOW, {"EQ:G", "EQ:L"}, None, later)
+    stale = {"EQ:L": WINDOW.start}  # a delisting recorded on or before S is not this window's
+    rows, reasons = window_rows(bars, WINDOW, {"EQ:G", "EQ:L"}, None, stale)
     assert rows.empty
     assert reasons == {"EQ:G": NO_END_BAR, "EQ:L": NO_END_BAR}
 

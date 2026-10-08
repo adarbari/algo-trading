@@ -4,9 +4,12 @@ path fields from daily bars split-adjusted as of T (``data.prices.SessionBars.wi
 
 A name is eligible when it was in the universe at S and has a bar at S. Its row is
 - COMPLETE when it has a bar at T: ``fwd_return`` = close(T) / close(S) - 1;
-- DELISTED when it has no bar at T and the reference snapshot at T dates its delisting on or
-  before T: measured to its last bar in the window;
-- otherwise absent, with a reason (a gap at T, or a name that left without a delisting date).
+- DELISTED when it has no bar at T and the reference records it delisted after S (the weekly
+  reference build stamps ``delisted_on`` when it notices, after the last bar): measured to its
+  last bar in the window (a name whose last bar is S: a zero return, no volatility); the
+  delisting return itself (a cash-out, a final print) is not measured;
+- otherwise absent, with a reason (a gap at T, or a name not yet recorded as delisted: the
+  task recomputes recent windows each night, so a later reference build turns it into a row).
 
 The path fields run over the bars after S up to the measured end: ``fwd_max_return`` from the
 highs (favourable excursion), ``fwd_max_drawdown`` from the lows (adverse excursion, a positive
@@ -60,7 +63,8 @@ def window_rows(
     """``bars`` (``instrument_id``, ``session_date``, ``high``, ``low``, ``close``; S..T, adjusted
     as of T) -> (one row per measured name, ``_COLUMNS``; reason per eligible name without one).
     ``eligible``: the universe at S (names without a bar at S are dropped, not reasons);
-    ``benchmark``: its instrument id, or None; ``delisted``: id -> delisting date, as of T."""
+    ``benchmark``: its instrument id, or None; ``delisted``: id -> delisting date, as the
+    latest reference snapshot records it."""
     close, high, low = (_wide(bars, window, field) for field in ("close", "high", "low"))
     ids = np.array(
         [i for i in close.columns if i in eligible and pd.notna(close.at[window.start, i])]
@@ -100,7 +104,7 @@ def _wide(bars: pd.DataFrame, window: Window, field: str) -> pd.DataFrame:
 
 
 def _gone(delisted_on: date | None, window: Window) -> bool:
-    return delisted_on is not None and pd.notna(delisted_on) and delisted_on <= window.end
+    return delisted_on is not None and pd.notna(delisted_on) and delisted_on > window.start
 
 
 def _last_bar(c: np.ndarray) -> np.ndarray:

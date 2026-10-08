@@ -17,6 +17,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.derived.outcome_paths import NO_END_BAR
 from algotrade_ingestion.tasks.derived.outcomes import (
     DEFAULT_HORIZON,
+    RECHECK,
     TABLE,
     check_outcomes,
     compute_outcomes,
@@ -30,7 +31,7 @@ N = 70  # sessions of bars: room for the 60-session horizon
 IDS = {"A": "EQ:A", "B": "EQ:B", "D": "EQ:D", "SPY": SPY}
 
 
-def _reference(days: list[date], delisted: date) -> list[dict[str, object]]:
+def _reference(delisted: date | None) -> list[dict[str, object]]:
     return [
         {"instrument_id": iid, "symbol": symbol, "asset_class": "EQ",
          "security_type": "COMMON_STOCK", "multiplier": 1.0, "status": "ACTIVE",
@@ -45,7 +46,7 @@ def _store() -> tuple[StoreWriter, StoreReader, list[date]]:
               "EQ:D": series(N - 3, seed=4)}  # fmt: skip
     # D's bars start three sessions in and stop four before END (skip: indexes from day 0)
     days = write_bars(writer, closes, skip={"EQ:D": [N - 3, N - 2, N - 1]})
-    write_rows(writer, "instruments/reference", days[0], _reference(days, days[-2]))
+    write_rows(writer, "instruments/reference", days[0], _reference(days[-2]))
     rows = universe_rows(["A", "B", "D"]) + universe_rows(["SPY"], instrument_id=SPY)
     write_rows(writer, "universe", days[0], rows)
     return writer, reader, days
@@ -71,9 +72,10 @@ def test_backfill_rows_equal_nightly_rows() -> None:
         record = compute_outcomes(task_ctx(nightly_writer), day)
         assert record.status == RunStatus.COMPLETE, record.stats
     backfill_writer, backfill_reader, _ = _store()
-    compute_outcomes(task_ctx(backfill_writer), days[-1], days[-3], days[-1])
+    first = days[-3 - RECHECK]  # each night also recomputes the RECHECK window ends before it
+    compute_outcomes(task_ctx(backfill_writer), days[-1], first, days[-1])
     pd.testing.assert_frame_equal(_outcomes(nightly_reader), _outcomes(backfill_reader))
-    assert len(backfill_reader.runs("outcomes")) == 3  # one run per window end
+    assert len(backfill_reader.runs("outcomes")) == 3 + RECHECK  # one run per window end
 
 
 def test_rows_land_in_the_start_partition_with_the_excess_over_spy() -> None:
@@ -103,12 +105,28 @@ def test_a_delisted_name_is_measured_to_its_last_bar() -> None:
     assert record.stats["h6"]["reasons"] == 0
 
 
-def test_a_gap_at_the_end_is_counted_as_a_reason() -> None:
-    writer, _, days = _store()  # D's last bar is days[-4], its delisting date days[-2]
-    record = compute_outcomes(task_ctx(writer), days[-2])
-    assert record.stats["h6"]["reasons"] == 0  # delisted on or before T: DELISTED
-    record = compute_outcomes(task_ctx(writer), days[-3])  # delisted after T: a gap
+def test_a_delisting_the_reference_notices_later_turns_a_reason_into_a_row() -> None:
+    writer, reader, days = _store()  # D's last bar is days[-4]
+    write_rows(writer, "instruments/reference", days[0], _reference(None))  # not noticed yet
+    record = compute_outcomes(task_ctx(writer), days[-3])
     assert record.stats["h6"]["examples"] == {"EQ:D": NO_END_BAR}
+    start = sessions_ending(days[-3], 7)[0]
+    assert "EQ:D" not in set(_partition(reader, start, days[-3])["instrument_id"])
+    # the weekly build notices on days[-1]; that night rechecks the window ending days[-3]
+    write_rows(writer, "instruments/reference", days[-1], _reference(days[-1]))
+    compute_outcomes(task_ctx(writer), days[-1])
+    d = _partition(reader, start, days[-3])
+    assert d.loc[d["instrument_id"] == "EQ:D", "outcome_status"].tolist() == ["DELISTED"]
+    assert [c.status for c in check_outcomes(reader, days[-3], task_ctx(writer).settings)] == [
+        "PASS"
+    ]
+
+
+def _partition(reader: StoreReader, start: date, end: date) -> pd.DataFrame:
+    part = reader.table(TABLE, start)
+    assert part is not None
+    window_end = pd.to_datetime(part["window_end"]).dt.date
+    return part[(window_end == end) & (part["horizon_sessions"] == 6)]
 
 
 def test_windows_before_the_stored_history_are_not_computed() -> None:

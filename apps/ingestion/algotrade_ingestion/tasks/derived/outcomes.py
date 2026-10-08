@@ -10,6 +10,11 @@ benchmarks come from the site's edge documents that are not rejected or blocked
 stored bars session is not computed; one whose T has not closed is refused (``knowledge_ts``,
 the write time, is never before the window's close).
 
+Each night also recomputes the ``RECHECK`` window ends before it, reading delistings from the
+latest reference snapshot (``outcome_paths``: a delisting is stamped when the weekly build
+notices it). A re-run never retracts a row it no longer computes (runs merge); a row whose
+bars later vanish stays until a restating backfill.
+
 ``--from/--to`` backfills: each window-end session is its own run, exactly what that night's
 run writes (a re-run's rows win per instrument, horizon and benchmark), so backfilled rows equal
 nightly rows on the same store. Bars restated after T are read as stored now; the bars of a
@@ -46,6 +51,10 @@ TABLES = (TABLE,)
 DEFAULT_HORIZON = 20  # sessions: the harness default (ADR 0053), always computed
 DEFAULT_BENCHMARK = "SPY"
 CHUNK = 40  # window ends whose bars are read at once in a backfill
+# A night also recomputes the window ends of the sessions before it: the weekly reference build
+# stamps a delisting when it notices, after the last bar, so a name that was a reason the night
+# its window closed becomes a DELISTED row (its new run wins on the merge key).
+RECHECK = 10
 SHOWN = 5  # reasons listed per window in the run stats
 SITE = FileConfigStore(config_dir())
 
@@ -62,14 +71,18 @@ def horizons_and_benchmarks(configs: Documents | None = None) -> tuple[list[int]
 def compute_outcomes(
     ctx: TaskContext, session: date, start: date | None = None, end: date | None = None
 ) -> RunRecord:
-    """The windows ``session`` closes, or those of every window-end session in ``start..end``
+    """The windows ``session`` and the ``RECHECK`` sessions before it close, or those of every
+    window-end session in ``start..end``
     (one run each) -> the last run's record."""
-    ends = sessions_between(start, end or session) if start else [session]
+    ends = (
+        sessions_between(start, end or session) if start else sessions_ending(session, RECHECK + 1)
+    )
     if not ends:
         raise ValueError(f"no exchange session in {start}..{end or session}")
     if close_time(ends[-1]) > ctx.clock():
         raise ValueError(f"the window ending {ends[-1]} has not closed yet")
     horizons, benchmarks = horizons_and_benchmarks(ctx.configs)
+    gone = _delisted(ctx.reader, ends[-1])  # the latest snapshot: delistings noticed since
     stored = ctx.reader.dates("bars/1d")
     first = stored[0] if stored else ends[-1]
     record: RunRecord | None = None
@@ -80,7 +93,7 @@ def compute_outcomes(
             ctx.reader, max(lo, first), chunk[-1], columns=("high", "low", "close")
         )
         for t in chunk:
-            record = _one(ctx, t, horizons, benchmarks, first, panel)
+            record = _one(ctx, t, horizons, benchmarks, first, panel, gone)
     assert record is not None
     return record
 
@@ -92,9 +105,9 @@ def _one(
     benchmarks: Sequence[str],
     first: date,
     panel: SessionBars,
+    gone: dict[str, date],
 ) -> RunRecord:
     with IngestRun(ctx, TASK, end) as run:
-        gone = _delisted(run.reader, end)
         for h in horizons:
             window = Window(tuple(sessions_ending(end, h + 1)))
             if window.start < first:
@@ -175,4 +188,4 @@ def _eligible(reader: StoreReader, start: date) -> set[str]:
     """The names in the universe at ``start`` with a bar at ``start``."""
     universe = set(load_universe(reader, start).instruments)
     day = bars(reader, "1d", start, start, columns=("close",))
-    return universe & set(day["instrument_id"].astype(str))
+    return universe & set(day.loc[day["close"].notna(), "instrument_id"].astype(str))

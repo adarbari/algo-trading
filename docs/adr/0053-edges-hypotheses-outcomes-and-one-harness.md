@@ -120,9 +120,13 @@ Decision 3 holds; ED2 fixes what it left open.
   `storage/tables/schemas.py`), one row per (instrument, start session S, horizon, benchmark):
   `window_end` (T, the h-th exchange session after S), `fwd_return`, `fwd_excess_return`,
   `fwd_max_return` and `fwd_max_drawdown` (intraday highs and lows after S: the path a drawdown
-  cap tests), `fwd_realised_vol`, `outcome_status` (COMPLETE, or DELISTED when the reference
-  snapshot at T dates a delisting on or before T: measured to the last bar; a gap at T, or a
-  name that left without a delisting date, has no row and a reason in the run). Whether an
+  cap tests), `fwd_realised_vol`, `outcome_status` (COMPLETE, or DELISTED when the latest reference
+  snapshot records the name delisted after S: measured to its last bar, a zero return and no
+  volatility when that bar is S; the delisting return itself is not measured; a gap at T, or a
+  name not yet recorded as delisted, has no row and a reason in the run). `delisted_on` is the
+  session the weekly reference build noticed the delisting, after the last bar, so each night
+  recomputes the last 10 window ends and a reason becomes a DELISTED row once it is recorded;
+  runs merge, so a re-run never retracts a row it no longer computes. Whether an
   edge's outcome held (its target, direction and drawdown cap; for `realised_to_implied_vol` the
   implied volatility at S, a one-session read) is computed by the harness from these fields
   (ED3), so a document edit never rewrites the grain.
@@ -140,4 +144,6 @@ Decision 3 holds; ED2 fixes what it left open.
   the harness must report until ED6's listing history. Bars restated after T are read as stored
   when the backfill runs.
 - The nightly step `outcomes` needs `bars` and `corporate-actions` (the splits), is optional,
-  and its acceptance recounts the eligible names: each has a row or a reason.
+  and its acceptance recounts the eligible names: each has a row or a reason. The task reads
+  each window's bars through `data.prices.session_bars` (split-adjusted as of the window's
+  end, the read rollups use), an `allowed` reuse under `feature-input-loading`.
