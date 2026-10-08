@@ -69,3 +69,6 @@ a new API.
    restarts the agent (decision 4): `scripts/ops/deploy.sh` remains the one-command update.
 5. The GET of `/health` from `ops/build.py` is our own API on loopback, not a vendor: it is
    `allowed` under `vendor-http` in `architecture/ownership.toml` for that reason.
+6. *Amendment 2026-10-08 ([0057](0057-auto-deploy-from-origin-main.md)):* `scripts/ops/deploy.sh --auto`,
+   run by a second launchd agent (`com.algotrade.deploy`, written never installed), now
+   deploys `origin/main` by itself under the ingest lock; code still never installs an agent.

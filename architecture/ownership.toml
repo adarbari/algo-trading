@@ -751,6 +751,16 @@ detect = [
 ]
 
 [[responsibility]]
+id = "deploy-cycle"
+description = "Decide what a deploy of origin/main must do: map the changed paths to actions (sync, web, restart, plists), hold the deploy and ingest locks around it (the ingestion app's `algotrade-ingest deploy-hold`), poll the running API until it serves the deployed commit; scripts/ops/deploy.sh orchestrates (git, build, swap, notify, log) and calls this through `algotrade-api deploy-plan|deploy-verify` and `algotrade-ingest deploy-hold` (ADR 0057)"
+owner = [
+    "apps/api/algotrade_api/ops/deploy.py",
+    "apps/ingestion/algotrade_ingestion/ops/hold.py",
+]
+section = "docs/adr/0057-auto-deploy-from-origin-main.md#decision"
+detect = [{ call = "fnmatchcase" }]
+
+[[responsibility]]
 id = "http-api"
 description = "Serve HTTP: FastAPI routers (one per area: writes, job polling, health, live quotes, preview POSTs), response schemas, CORS, error mapping and the ASGI server; routes call one library function each (page reads are GraphQL: graphql-schema)"
 owner = ["apps/api/algotrade_api/*"]
@@ -759,7 +769,7 @@ detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn"
 
 [[responsibility]]
 id = "launchd-agents"
-description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py) and the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044)"
+description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py), the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044) and the auto-deploy poll (the same api module, ADR 0057)"
 owner = [
     "apps/ingestion/algotrade_ingestion/ops/schedule.py",
     "apps/api/algotrade_api/ops/schedule.py",
