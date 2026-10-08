@@ -10,8 +10,8 @@ import { Button, Disclosure, Stack, Text } from '@algotrade/ui';
 import { useIdeas, type PausedIdea } from '@/entities/idea';
 
 export interface PausedIdeasProps {
-  /** Open one ticker in Explore. */
-  onOpen: (symbol: string) => void;
+  /** Open one ticker in Explore, with the screener that paused it. */
+  onOpen: (symbol: string, via: string) => void;
   /** Open the screener that paused a pick (its name). */
   onOpenScreener: (screenerId: string) => void;
 }
@@ -25,7 +25,7 @@ function PausedRow({ idea, onOpen, onOpenScreener }: { idea: PausedIdea } & Paus
           size="sm"
           variant="ghost"
           onClick={() => {
-            onOpen(symbol);
+            onOpen(symbol, idea.screenerId);
           }}
         >
           {symbol}

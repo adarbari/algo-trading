@@ -2,13 +2,12 @@
  * Trader > Ideas end to end, against the production build with the API mocked from
  * fixtures shaped like the `IdeasPage` GraphQL response (ideas-api.ts): the ranked table with
  * its screener chips, earnings (next, else the last date) and earnings-before-expiry flag,
- * decision filters, opening tickers in Explore, reordering the screeners (saved, and rolled
- * back with a toast when the save fails), accessibility.
+ * the preset views and filter chips (kept in the URL), opening tickers in Explore with the
+ * screener that surfaced them, accessibility.
  */
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
-import { mockIdeasApi } from './ideas-api';
 import { mockApi } from './mock-api';
 
 function collectErrors(page: Page): string[] {
@@ -21,14 +20,13 @@ function collectErrors(page: Page): string[] {
 }
 
 const grid = (page: Page) => page.getByRole('grid', { name: 'Top ideas' });
-const screeners = (page: Page) => page.getByRole('list', { name: 'Screener priority' });
 
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
 
 for (const theme of ['dark', 'light'] as const) {
-  test(`the ideas and the screeners are listed (${theme})`, async ({ page }) => {
+  test(`the ideas are listed (${theme})`, async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto('/ideas');
     await page.evaluate((t) => {
@@ -37,8 +35,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(
       page.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' }),
     ).toBeVisible();
-    await expect(screeners(page).getByRole('listitem')).toHaveCount(3);
-    await expect(screeners(page).getByRole('listitem').first()).toContainText('VRP scanner');
+    await expect(page.getByRole('list', { name: 'Screener priority' })).toHaveCount(0);
     const aapl = grid(page).getByRole('row', { name: /AAPL/ });
     await expect(aapl).toContainText('Short premium liquidity');
     await expect(aapl).toContainText('Earnings first');
@@ -60,11 +57,38 @@ test('a field header in Top ideas opens its Guide drawer', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('filters by decision', async ({ page }) => {
+test('a preset view and the filter chips narrow the table and live in the URL', async ({
+  page,
+}) => {
   await page.goto('/ideas');
-  await page.getByRole('button', { name: 'Event risk' }).click();
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'High conviction' }).click();
+  await expect(page).toHaveURL(/view=conviction/);
+  await expect(grid(page).getByRole('row', { name: /KO/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Top today' }).click();
+
+  await page.getByRole('button', { name: 'Liquidity', exact: true }).click();
+  await page.getByRole('button', { name: 'Liquidity risk', exact: true }).click();
+  await expect(page).toHaveURL(/liq=risk/);
+  await expect(grid(page).getByRole('row', { name: /KO/ })).toBeVisible();
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Screener', exact: true }).click();
+  await page.getByRole('button', { name: 'VRP scanner', exact: true }).click();
+  await expect(
+    page.getByText(/No idea matches Screener: VRP scanner · Liquidity: Liquidity risk/),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Remove Screener: VRP scanner' }).click();
+  await page.getByRole('button', { name: 'Clear filters' }).first().click();
+  await expect(page).not.toHaveURL(/liq=/);
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
+});
+
+test('a link with filters opens the filtered table', async ({ page }) => {
+  await page.goto('/ideas?decision=EVENT_RISK');
   await expect(grid(page).getByRole('row', { name: /TSLA/ })).toBeVisible();
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Remove Decision: Event risk' })).toBeVisible();
 });
 
 test('shows the stored display values and the watch-outs', async ({ page }) => {
@@ -102,12 +126,6 @@ test('shows the size the regime allows and lists the paused picks with their rea
   expect(errors).toEqual([]);
 });
 
-test('+ New screener opens the Builder', async ({ page }) => {
-  await page.goto('/ideas');
-  await page.getByRole('button', { name: '+ New screener' }).click();
-  await expect(page).toHaveURL(/\/screeners\/new$/);
-});
-
 test('opens a ticker and a compare set in Explore', async ({ page }) => {
   await page.goto('/ideas');
   await grid(page)
@@ -123,30 +141,5 @@ test('opens a ticker and a compare set in Explore', async ({ page }) => {
   await page.goto('/ideas');
   await grid(page).getByRole('row', { name: /KO/ }).getByText('KO', { exact: true }).click();
   await expect(page).toHaveURL(/focus=KO/);
-});
-
-test('reordering the screeners saves the new priority', async ({ page }) => {
-  const mock = await mockIdeasApi(page);
-  await page.goto('/ideas');
-  await page.getByRole('button', { name: 'Reorder VRP scanner' }).focus();
-  await page.keyboard.press('Space');
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Space');
-  await expect(screeners(page).getByRole('listitem').first()).toContainText(
-    'Short premium liquidity',
-  );
-  await expect
-    .poll(() => mock.saved)
-    .toEqual([['short-premium-liquidity', 'vrp-scanner', 'post-earnings-iv-crush']]);
-});
-
-test('a failed save puts the order back and says so', async ({ page }) => {
-  await mockIdeasApi(page, { failSave: true });
-  await page.goto('/ideas');
-  await page.getByRole('button', { name: 'Reorder VRP scanner' }).focus();
-  await page.keyboard.press('Space');
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Space');
-  await expect(page.getByText('Could not save the screener order')).toBeVisible();
-  await expect(screeners(page).getByRole('listitem').first()).toContainText('VRP scanner');
+  await expect(page).toHaveURL(/via=short-premium-liquidity/);
 });

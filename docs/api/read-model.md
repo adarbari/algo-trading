@@ -533,7 +533,7 @@ its own change). View preferences go through one adapter, `features/table-view`
 | WEB 4 | Column defs only from the factories | ESLint `algotrade/column-factories` on `DataTableColumn` outside `entities/feature/model/columns.tsx` (`apps/web/lint-rules/columns.js`) | **on** (PR 7); `PENDING` (shrink-only) lists top ideas only since PR 8 |
 | WEB 5 | Feature names typed | ESLint on `rollup.` / `feature.` / `instrument.` literals outside `feature('<name>')` (tests and stories exempt) | **on** |
 | WEB 6 | Generated files fresh | `npm run generated:check` (`schema.ts`, `generated/graphql/**`); `catalogue.ts` by `tests/scripts/test_export_catalogue.py` | **on** |
-| WEB 7 | One view-prefs adapter | ESLint `algotrade-views/view-adapter` on a `/preferences/` literal outside `features/table-view/api` (`apps/web/lint-rules/views.js`; `features/ideas-priority/api` allowed: the Ideas priority is not a table view) | **on** (PR 8) |
+| WEB 7 | One view-prefs adapter | ESLint `algotrade-views/view-adapter` on a `/preferences/` literal outside `features/table-view/api` (`apps/web/lint-rules/views.js`) | **on** (PR 8) |
 
 ### Ownership during the migration
 

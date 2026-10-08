@@ -1,12 +1,20 @@
 import { render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { IDEA_FACTS, toIdeasData, type IdeasData, type IdeasResponse } from '@/entities/idea';
+import {
+  IDEA_FACTS,
+  parseIdeasSearch,
+  toIdeasData,
+  type IdeasData,
+  type IdeasResponse,
+  type IdeasSearch,
+} from '@/entities/idea';
 import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
-import { TopIdeas } from './TopIdeas';
+import { TopIdeas, type TopIdeasProps } from './TopIdeas';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -125,7 +133,33 @@ const response: IdeasResponse = {
 };
 const data = toIdeasData(response);
 
-function setup() {
+/** The page's job: the search params held in state, a patch applied to them. */
+function Held({
+  handlers,
+  initial,
+}: {
+  handlers: Omit<TopIdeasProps, 'search' | 'onSearchChange'>;
+  initial: IdeasSearch;
+}) {
+  const [search, setSearch] = useState(initial);
+  return (
+    <TopIdeas
+      {...handlers}
+      search={search}
+      onSearchChange={(patch) => {
+        setSearch((previous) =>
+          parseIdeasSearch(
+            Object.fromEntries(
+              Object.entries({ ...previous, ...patch }).filter(([, value]) => value !== undefined),
+            ),
+          ),
+        );
+      }}
+    />
+  );
+}
+
+function setup(initial: IdeasSearch = {}) {
   const handlers = {
     onCompare: vi.fn(),
     onOpen: vi.fn(),
@@ -134,7 +168,7 @@ function setup() {
   };
   const view = render(
     <TestQueryProvider>
-      <TopIdeas {...handlers} />
+      <Held handlers={handlers} initial={initial} />
     </TestQueryProvider>,
   );
   return { ...view, ...handlers, grid: () => screen.getByRole('grid', { name: 'Top ideas' }) };
@@ -175,7 +209,7 @@ describe('TopIdeas', () => {
     expect(within(aapl).getByText('36')).toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
     expect(within(ko).queryByText('Earnings first')).not.toBeInTheDocument();
-    expect(screen.getByText('Session 2026-10-02')).toBeInTheDocument();
+    expect(screen.getByText('Session 2026-10-02 · 4 of 4')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
@@ -225,14 +259,47 @@ describe('TopIdeas', () => {
     expect(within(ko).getByText('Leveraged / inverse')).toBeInTheDocument();
   });
 
-  it('filters by decision and hides near-term earnings', async () => {
+  it('switches the preset view', async () => {
     const user = userEvent.setup();
     setup();
+    expect(screen.getByRole('button', { name: 'Top today' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(screen.getByRole('button', { name: 'High conviction' }));
+    expect(screen.queryByRole('row', { name: /KO/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /AAPL/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'No earnings soon' }));
+    expect(screen.queryByRole('row', { name: /KO/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /SPY/ })).toBeInTheDocument();
+  });
+
+  it('adds a filter chip, says why nothing matches, and clears the filters', async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'Decision' })[0] as HTMLElement);
     await user.click(screen.getByRole('button', { name: 'Watch' }));
     expect(screen.queryByRole('row', { name: /AAPL/ })).not.toBeInTheDocument();
     expect(screen.getByRole('row', { name: /KO/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Hide earnings within 14 sessions' }));
-    expect(screen.getByText('No idea matches these filters.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'High conviction' }));
+    expect(screen.getByText('No idea matches High conviction · Decision: Watch.')).toBeVisible();
+    await user.click(
+      screen.getAllByRole('button', { name: 'Clear filters' }).at(-1) as HTMLElement,
+    );
+    expect(screen.getByRole('row', { name: /AAPL/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Top today' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('removes one filter chip with its x', async () => {
+    const user = userEvent.setup();
+    setup({ screener: 'vrp' });
+    expect(screen.queryByRole('row', { name: /KO/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove Screener: VRP scanner' }));
+    expect(screen.getByRole('row', { name: /KO/ })).toBeInTheDocument();
   });
 
   it('opens a ticker, and the selected ones, in Explore', async () => {
@@ -243,7 +310,7 @@ describe('TopIdeas', () => {
     await user.click(screen.getByRole('button', { name: 'Compare selected (2)' }));
     expect(onCompare).toHaveBeenCalledWith({ sel: 'SPY,AAPL', focus: 'SPY' });
     await user.click(within(screen.getByRole('row', { name: /KO/ })).getByText('KO'));
-    expect(onOpen).toHaveBeenCalledWith('KO');
+    expect(onOpen).toHaveBeenCalledWith('KO', 'liq');
   });
 
   it('shows loading, empty and error states', async () => {

@@ -29,9 +29,10 @@ function setup() {
     <ToastProvider>
       <QueryClientProvider client={client}>
         <IdeasPage
+          search={{}}
+          onSearchChange={vi.fn()}
           onCompare={vi.fn()}
           onOpen={vi.fn()}
-          onNewScreener={vi.fn()}
           onScreeners={vi.fn()}
           onOpenScreener={vi.fn()}
           onOpenRegime={vi.fn()}

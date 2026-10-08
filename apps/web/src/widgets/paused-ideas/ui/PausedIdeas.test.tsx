@@ -53,7 +53,7 @@ describe('PausedIdeas', () => {
     expect(screen.getAllByText('VRP scanner')).toHaveLength(2);
     expect(screen.getByText('Paused by the regime gate')).toBeVisible(); // no stored reason
     await userEvent.setup().click(screen.getByRole('button', { name: 'XOM' }));
-    expect(onOpen).toHaveBeenCalledWith('XOM');
+    expect(onOpen).toHaveBeenCalledWith('XOM', 'vrp');
     await userEvent
       .setup()
       .click(screen.getAllByRole('button', { name: 'VRP scanner' }).at(0) as HTMLElement);
