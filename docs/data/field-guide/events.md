@@ -244,3 +244,55 @@ Sources: Site convention (ADR 0050)
 - The two wings usually share the expiry; when they differ (one right has no quotes at the monthly), this flag and feature.ex_div_before_expiry can disagree, and this one is the covered-call answer.
 
 Sources: Hull, Options, Futures and Other Derivatives: early exercise of American calls before an ex-dividend date
+
+### `rollup.earnings_reaction@v1.reaction_excess_return`
+
+**How to read it.** How far the last report moved the stock beyond SPY: the close after the report over the close before it, minus SPY's return over the same two sessions, as a decimal (0.05 is +5% against the market). It is the surprise measure of the post-earnings-drift literature: the price reaction stands in for the surprise, so it needs no analyst estimates. Large and positive means the market read the report as good news.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a big positive earnings reaction (post-earnings drift) | `gte 0.05` | hard | - | the small-cap drift screen uses 0.05; combine with rollup.earnings_reaction@v1.reaction_status eq OK and a market cap ceiling |
+
+**When the reading lies**
+
+- The window is two sessions around the report, so it holds the move whether the company reported before the open or after the close, and it can include other news of those days (a deal, an offering, a guidance change). Read the headline before treating a +20% as an earnings surprise.
+- Null while the window is open (the session after the report has not closed), when a bar of the stock or of SPY is missing, or for a name with no report known: a hard criterion rejects those names. Pair it with rollup.earnings_reaction@v1.reaction_status eq OK to say why a name was left out.
+- The reaction is already in the price when you can first buy: the drift studies measure what follows it, over weeks, and it has faded in larger stocks; check feature.market_cap and rollup.earnings_reaction@v1.pre_event_adv_usd_20d.
+
+Sources: Brandt, Kishore, Santa-Clara and Venkatachalam, Earnings Announcements are Full of Surprises (2008); Martineau, Rest in Peace Post-Earnings Announcement Drift (2022)
+
+### `rollup.earnings_reaction@v1.reaction_status`
+
+**How to read it.** Whether the name's last report has a measured reaction: OK when the report's two-session window has closed with every bar it needs; NO_REPORT when no report is known by the session (a name with none, such as an ETF); INCOMPLETE when a report is known but its window is still open or a stock or SPY bar is missing.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| only names with a measured reaction | `eq "OK"` | hard | - | - |
+
+**When the reading lies**
+
+- OK says the numbers exist, not that the report is recent: rollup.earnings_reaction@v1.sessions_since_reaction counts the sessions since it, and a name stays OK for months until its next report. Add sessions_since_reaction when only fresh reactions matter.
+- A report that only an 8-K dated (not the earnings calendar) is missed until the earnings feed adds its results rows, so a recent reporter can read NO_REPORT.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v1)
+
+### `rollup.earnings_reaction@v1.pre_event_adv_usd_20d`
+
+**How to read it.** The average dollars traded a day (close times volume) over the 20 sessions before the last report, the report's own volume left out. It is the liquidity you could count on before the news; after a big reaction the current volume is inflated for days and says little about what a later exit can trade.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| liquid enough to trade before the news | `gte 2000000` | hard | - | - |
+
+**When the reading lies**
+
+- Null when the history is shorter than 20 sessions before the report or a session has no bar: a hard floor rejects new listings. Check instrument.listed_on.
+- It is measured before the report that moved the stock, so a name whose volume dried up since is not flagged; compare rollup.price_stats@v2.adv_usd_20d for today.
+
+Sources: Chordia, Goyal, Sadka, Sadka and Shivakumar, Liquidity and the Post-Earnings-Announcement Drift (2009)

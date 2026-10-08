@@ -409,3 +409,20 @@ Sources: Relative-strength line slope: https://school.stockcharts.com/doku.php?i
 - Null when sector_rank_63d is null (no sector or ETF for the name, the ETF has no complete window, or fewer than 6 ETFs do).
 
 Sources: Sector rotation by relative strength: https://school.stockcharts.com/doku.php?id=market_analysis:sector_rotation_analysis
+
+### `instrument.exchange`
+
+**How to read it.** The exchange the stock is listed on, as the symbol directory gives it: NASDAQ for Nasdaq-listed names (the Nasdaq Trader directory is the universe's source). Identity, not a measure, so hard, never soft or scored.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| Nasdaq-listed names | `eq "NASDAQ"` | hard | - | - |
+
+**When the reading lies**
+
+- Names listed on other exchanges carry other codes (the directory's other-listed file); a 'Nasdaq stocks' gate drops every NYSE and NYSE American name, including S&P 500 members that are not on Nasdaq.
+- A company that moves its listing changes value on the snapshot after the move; a backtest reads the snapshot of its own session.
+
+Sources: Site convention (docs/data/instruments.md; Nasdaq Trader symbol directory)

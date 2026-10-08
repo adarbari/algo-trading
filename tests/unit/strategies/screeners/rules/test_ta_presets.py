@@ -124,3 +124,43 @@ def test_size_small_ranks_the_smallest_market_cap_first_and_rejects_one_without(
         ("EQ:BIG", Decision.QUALIFIED),
         ("EQ:NONE", Decision.REJECT),
     ]
+
+
+def test_pead_small_cap_needs_a_reaction_of_five_percent_and_ranks_the_largest_first() -> None:
+    """The small-cap drift screen (ADR 0053, ED4b): Nasdaq common stock under $2B, liquid before
+    the report, a complete reaction window of at least +5% over SPY; a missing value never
+    passes (ADR 0030); ranked by the reaction, largest first."""
+    spec = resolve_config(STORE, "pead_small_cap", UserContext("site")).screen_spec
+    ids = [c.id for c in spec.criteria]
+    assert ids == [
+        "security_type", "status", "exchange", "market_cap", "price", "pre_event_adv",
+        "reaction_status", "reaction",
+    ]  # fmt: skip
+    reaction = "rollup.earnings_reaction@v1.reaction_excess_return"
+    assert spec.tie_break == reaction and spec.tie_break_descending
+    base = {c.rule.field: _passing(c) for c in spec.criteria}
+    assert base["feature.market_cap"] < 2e9 and base[reaction] >= 0.05
+    adv = "rollup.earnings_reaction@v1.pre_event_adv_usd_20d"
+    status = "rollup.earnings_reaction@v1.reaction_status"
+    view = FeatureView(
+        DAY,
+        {
+            "EQ:SMALL": {**base, reaction: 0.08},
+            "EQ:BIG": {**base, reaction: 0.30},
+            "EQ:FLAT": {**base, reaction: 0.04},
+            "EQ:THIN": {**base, adv: 1e6},
+            "EQ:CAP": {**base, "feature.market_cap": 3e9},
+            "EQ:INCOMPLETE": {**base, status: "INCOMPLETE"},
+            "EQ:NONE": {k: v for k, v in base.items() if k != reaction},
+        },
+    )
+    rows = evaluate_screen(spec, view).rows
+    decisions = {r.instrument_id: r.decision for r in rows}
+    assert [r.instrument_id for r in rows if r.decision is Decision.QUALIFIED] == [
+        "EQ:BIG",
+        "EQ:SMALL",
+    ]
+    assert all(
+        decisions[i] is Decision.REJECT
+        for i in ("EQ:FLAT", "EQ:THIN", "EQ:CAP", "EQ:INCOMPLETE", "EQ:NONE")
+    )

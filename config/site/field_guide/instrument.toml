@@ -448,3 +448,18 @@ op = "eq"
 value = true
 mode = "hard"
 note = "with rollup.relative_strength@v1.rs_sector_63d gt 0 for a leader within it"
+
+[[field]]
+name = "instrument.exchange"
+theme = "instrument gates"
+reads = "The exchange the stock is listed on, as the symbol directory gives it: NASDAQ for Nasdaq-listed names (the Nasdaq Trader directory is the universe's source). Identity, not a measure, so hard, never soft or scored."
+caveats = [
+  "Names listed on other exchanges carry other codes (the directory's other-listed file); a 'Nasdaq stocks' gate drops every NYSE and NYSE American name, including S&P 500 members that are not on Nasdaq.",
+  "A company that moves its listing changes value on the snapshot after the move; a backtest reads the snapshot of its own session.",
+]
+sources = ["Site convention (docs/data/instruments.md; Nasdaq Trader symbol directory)"]
+[[field.use]]
+for = "Nasdaq-listed names"
+op = "eq"
+value = "NASDAQ"
+mode = "hard"
