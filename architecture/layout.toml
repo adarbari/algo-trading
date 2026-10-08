@@ -84,7 +84,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/guide"
-purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, playbook families; playbooks/<id>.toml: each site playbook's prose; glossary.toml: the terms; start.toml: the Start here pages; shape.py: the shape checks they share; split from config/site, at its module cap)"
+purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, playbook families; playbooks/<id>.toml: each site playbook's prose; glossary.toml: the terms; start.toml: the Start here pages; split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]

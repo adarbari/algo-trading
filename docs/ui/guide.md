@@ -200,7 +200,7 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   as `Query.guideStartPage(id)`; the index lists both). Fitness tests: every term the spec
   lists is written, `see_also` and links resolve to an entry of their kind, `short` is one
   sentence, every catalogue name in the prose exists. The Regime page's chart key (the legend
-  and the history note) is the Start here page `read-the-regime-page`; the web PR deletes the
+  and the history note) is the Start here page `read_the_regime_page`; the web PR deletes the
   words from `widgets/regime-legend` and `features/indicator-history`.
   Field, situation and regime entries stay where they are (`config/site/field_guide/`,
   `config/site/regime/`).

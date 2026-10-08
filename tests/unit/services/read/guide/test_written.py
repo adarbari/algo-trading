@@ -68,7 +68,7 @@ def test_a_start_page() -> None:
 def test_the_shipped_pages(site: StoreContext) -> None:
     term = load_guide_term(site, "liquidity_risk")
     assert term is not None and ADV in term.body.fields and term.see_also
-    page = load_guide_start_page(site, "read-the-regime-page")
+    page = load_guide_start_page(site, "read_the_regime_page")
     assert page is not None and page.entry.order == 5
     assert ("indicator", "curve_10y3m") in {(link.kind, link.id) for link in page.links}
     assert all(link.title for link in page.links)

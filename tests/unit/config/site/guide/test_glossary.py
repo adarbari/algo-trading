@@ -90,6 +90,8 @@ def test_a_document_is_typed_and_a_missing_file_has_no_terms() -> None:
     ("terms", "message"),
     [
         ([{**TERM, "id": ""}], "id: expected a non-empty string"),
+        ([{**TERM, "id": "near-miss"}], "id: expected snake_case"),
+        ([{**TERM, "id": "Alpha"}], "id: expected snake_case"),
         ([{**TERM, "short": " "}], "short: expected a non-empty string"),
         ([{**TERM, "colour": "red"}], "unknown keys"),
         ([{**TERM, "see_also": ["alpha"]}], "does not refer to itself"),

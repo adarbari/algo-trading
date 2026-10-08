@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from algotrade.config.site.fields import Table, reject_secrets
-from algotrade.config.site.guide.shape import line, lines
 from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "guide_playbooks"  # the config store's kind: site/guide/playbooks/<id>.toml
@@ -78,7 +77,7 @@ class PlaybookProse:
         reject_secrets(doc or {}, where)
         t = Table(doc, where)
         t.only(KEYS)
-        if line(t, "id") != name:
+        if t.line("id") != name:
             raise ConfigurationError(f"{where} id: expected {name!r} (the file's name)")
         if t.raw("version") is None:
             raise ConfigurationError(f"{where} version: required (the preset version written for)")
@@ -91,13 +90,13 @@ class PlaybookProse:
         return cls(
             id=name,
             version=version,
-            summary=line(t, "summary"),
-            hit=line(t, "hit"),
-            not_checked=line(t, "not_checked"),
-            before_acting=lines(t, "before_acting"),
+            summary=t.line("summary"),
+            hit=t.line("hit"),
+            not_checked=t.line("not_checked"),
+            before_acting=t.lines("before_acting"),
             related=related,
-            sources=lines(t, "sources"),
-            asks=tuple((key, line(asks, key)) for key in asks.names()),
+            sources=t.lines("sources"),
+            asks=tuple((key, asks.line(key)) for key in asks.names()),
         )
 
 
@@ -127,7 +126,7 @@ def _related(t: Table, name: str) -> list[RelatedPlaybook]:
     for i, entry in enumerate(raw):
         row = Table(entry, f"{t.where} related[{i}]")
         row.only(RELATED_KEYS)
-        related = RelatedPlaybook(line(row, "id"), line(row, "reason"))
+        related = RelatedPlaybook(row.line("id"), row.line("reason"))
         if related.id == name:
             raise ConfigurationError(f"{row.where} id: a playbook is not related to itself")
         found.append(related)

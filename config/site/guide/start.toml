@@ -1,6 +1,6 @@
 # L3 site setting: the Guide's Start here pages (ADR 0051, docs/ui/guide.md section 3, "Start
 # here"): numbered how-to pages for someone who does not follow markets. One [[page]] each: id
-# (its page's key), order (its number), title, summary (one line, the index's), [[page.section]]
+# (its page's key, snake_case), order (its number), title, summary (one line, the index's), [[page.section]]
 # (title and body, one paragraph each; catalogue names in a body are linked) and links (the
 # Guide entries to read next, {kind, id}: kind one of start, indicator, episode, playbook,
 # field, situation, term). Typed by src/algotrade/config/site/guide/start.py; fitness tests in
@@ -8,7 +8,7 @@
 
 # --------------------------------------------------------------------------------------- 1
 [[page]]
-id = "how-the-app-thinks"
+id = "how_the_app_thinks"
 order = 1
 title = "How the app thinks about a day"
 summary = "Every page reads one trading day, shows only what was known for it, and says so when something is missing."
@@ -61,7 +61,7 @@ incomplete data, and show as NOT_RUN until the step succeeds or is waived by han
 
 # --------------------------------------------------------------------------------------- 2
 [[page]]
-id = "read-a-result"
+id = "read_a_result"
 order = 2
 title = "Read a screen's result"
 summary = "Each row has a decision (pass, near miss or reject), a score for ordering, and the reasons, criterion by criterion."
@@ -117,7 +117,7 @@ which value is missing most often.
 
 # --------------------------------------------------------------------------------------- 3
 [[page]]
-id = "build-a-screen"
+id = "build_a_screen"
 order = 3
 title = "Build a screen"
 summary = "Start from a playbook, take criteria from the field pages, preview on today's data, then finalise to run it nightly."
@@ -129,7 +129,7 @@ links = [
   { kind = "term", id = "tolerance" },
   { kind = "term", id = "preset" },
   { kind = "term", id = "draft" },
-  { kind = "start", id = "draft-from-a-sentence" },
+  { kind = "start", id = "draft_from_a_sentence" },
 ]
 
 [[page.section]]
@@ -171,14 +171,14 @@ changes, and puts it on the nightly: from then on it runs every night.
 
 # --------------------------------------------------------------------------------------- 4
 [[page]]
-id = "draft-from-a-sentence"
+id = "draft_from_a_sentence"
 order = 4
 title = "Draft a screen from a sentence"
 summary = "Describe it turns a sentence into draft criteria you review, preview and finalise yourself; it never saves or runs anything."
 links = [
   { kind = "term", id = "draft" },
   { kind = "term", id = "criterion" },
-  { kind = "start", id = "build-a-screen" },
+  { kind = "start", id = "build_a_screen" },
 ]
 
 [[page.section]]
@@ -210,7 +210,7 @@ is off unless the site has set up a text model; when it is off, the box says why
 
 # --------------------------------------------------------------------------------------- 5
 [[page]]
-id = "read-the-regime-page"
+id = "read_the_regime_page"
 order = 5
 title = "Read the Regime page"
 summary = "The market as weather: the label, the warning signs behind it, and how to read every chart on the page."

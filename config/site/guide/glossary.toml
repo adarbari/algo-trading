@@ -188,7 +188,7 @@ body = """
 A soft criterion needs a tolerance. A value that passes is fine; one that misses by no more
 than the tolerance is a near miss and gives the row the decision its on_miss names (WATCH by
 default); one that misses by more is a REJECT. A row with no value for it stays in, loses the
-full near-miss penalty of 10 points and lists no <field> among its reasons.
+full near-miss penalty of 10 points, and its reasons list no <field>.
 """
 see_also = ["tolerance", "on_miss", "near_miss", "mode"]
 
@@ -317,8 +317,8 @@ id = "paused"
 term = "PAUSED"
 short = "A pick the regime gate held back: it met the screen, but the market's regime is one the screen pauses in."
 body = """
-With the regime gate on, a screen lists the regimes it pauses in, and on a session in one of
-them its QUALIFIED and WATCH rows become PAUSED, with the rule that paused them as the first
+With the regime gate on, the [regime] settings (the site's defaults or your own config) list
+the regimes each screen pauses in, and on a session in one of them its QUALIFIED and WATCH rows become PAUSED, with the rule that paused them as the first
 reason. The VRP scanner, which sells option volatility, pauses in Storm and Severe storm. The
 gate fails closed: when the regime is UNKNOWN for the session, every QUALIFIED and WATCH row
 of a gated screen is paused. A paused pick stays visible with its reason (Ideas, Paused by regime), never silently
