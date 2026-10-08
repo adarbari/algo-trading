@@ -50,6 +50,12 @@ export interface DataTableColumn<TRow> {
   sortable?: boolean;
   /** Can be hidden from the column picker (default true). */
   hideable?: boolean;
+  /**
+   * Shown on a narrow table (under `sm`: a phone) by default; the rest wait in the column picker. When no
+   * column of a table is marked, its first `NARROW_COLUMNS` columns are. Columns that cannot
+   * be hidden always show.
+   */
+  essential?: boolean;
   /** Minimum width step (default `sm` for numeric formats, `md` otherwise). */
   width?: ColumnWidth;
   /** Take three times the share of leftover width (the main text column). */
@@ -67,6 +73,22 @@ export interface DataTableColumn<TRow> {
  * what it is (the value, or a "Why" column beside it), so colour never carries the meaning alone.
  */
 export type DataTableFill = 'warning' | 'negative';
+
+/** The columns a narrow table shows when none is marked `essential`. */
+export const NARROW_COLUMNS = 3;
+
+/**
+ * The ids a narrow table shows by default: the `essential` columns (else the first
+ * `NARROW_COLUMNS`) and every column that cannot be hidden.
+ */
+export function narrowDefaults<TRow>(columns: readonly DataTableColumn<TRow>[]): Set<string> {
+  const marked = columns.filter((column) => column.essential);
+  const shown = marked.length > 0 ? marked : columns.slice(0, NARROW_COLUMNS);
+  return new Set([
+    ...shown.map((column) => column.id),
+    ...columns.filter((column) => column.hideable === false).map((column) => column.id),
+  ]);
+}
 
 /** The TanStack features the DataTable registers (module scope: stable across renders). */
 export const features = tableFeatures({

@@ -4,9 +4,9 @@
  * quality checks; verification vs IBKR beside the open review items; recent nightly runs. The
  * selected cell comes from the route (shareable); the page only lays the widgets out.
  */
-import { Grid, Heading, Stack } from '@algotrade/ui';
+import { Grid, Heading, MasterDetail, Stack } from '@algotrade/ui';
 
-import type { CellRef } from '@/entities/ingestion';
+import { datasetLabel, type CellRef } from '@/entities/ingestion';
 import { CompletenessPanel } from '@/widgets/completeness-panel';
 import { DrilldownPanel } from '@/widgets/drilldown-panel';
 import { IngestionSummary } from '@/widgets/ingestion-summary';
@@ -19,17 +19,28 @@ export interface AdminIngestionPageProps {
   /** The drilled-into cell (from the URL); none = the latest session's worst cell. */
   selected?: CellRef | null;
   onSelectCell: (cell: CellRef) => void;
+  /** Narrow only: the drill-down sheet was dismissed; the route clears the cell. */
+  onClearCell: () => void;
 }
 
-export function AdminIngestionPage({ selected = null, onSelectCell }: AdminIngestionPageProps) {
+export function AdminIngestionPage({
+  selected = null,
+  onSelectCell,
+  onClearCell,
+}: AdminIngestionPageProps) {
   return (
     <Stack gap={4}>
       <Heading level={1}>Ingestion</Heading>
       <IngestionSummary />
-      <Grid columns="main-aside" gap={4} collapse="lg" align="start">
-        <CompletenessPanel selected={selected} onSelect={onSelectCell} />
-        <DrilldownPanel selected={selected} />
-      </Grid>
+      <MasterDetail
+        columns="main-aside"
+        collapse="lg"
+        master={<CompletenessPanel selected={selected} onSelect={onSelectCell} />}
+        detail={<DrilldownPanel selected={selected} />}
+        detailKey={selected ? `${selected.dataset}@${selected.session}` : null}
+        detailTitle={selected ? `${datasetLabel(selected.dataset)} · ${selected.session}` : ''}
+        onDetailClose={onClearCell}
+      />
       <QualityChecksPanel />
       <Grid columns={2} gap={4} collapse="lg" align="start">
         <VerificationPanel />

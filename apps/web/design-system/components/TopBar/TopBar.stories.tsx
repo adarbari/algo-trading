@@ -2,9 +2,12 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { narrow } from '../../testing';
 import { Mono } from '../../primitives/Mono';
+import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
+import { AccountMenu } from '../AccountMenu';
 import { NavTabs } from '../NavTabs';
 import { SearchInput } from '../SearchInput';
+import { StatusBadge } from '../StatusBadge';
 import { TextLink } from '../TextLink';
 import { WorkspaceSwitch } from '../WorkspaceSwitch';
 import { TopBar } from './TopBar';
@@ -27,9 +30,6 @@ const meta = {
   component: TopBar,
   args: {
     brand,
-    workspace: (
-      <WorkspaceSwitch workspaces={WORKSPACES} value="trader" onValueChange={() => undefined} />
-    ),
     nav: <NavTabs items={TRADER} activeHref="/ideas" aria-label="Trader sections" />,
     end: <SearchInput width="fixed" placeholder="Search a ticker…" aria-label="Search tickers" />,
   },
@@ -52,9 +52,6 @@ export const Default: Story = {};
 /** Admin workspace with a status note in the end slot. */
 export const AdminWithNote: Story = {
   args: {
-    workspace: (
-      <WorkspaceSwitch workspaces={WORKSPACES} value="admin" onValueChange={() => undefined} />
-    ),
     nav: (
       <NavTabs
         aria-label="Admin sections"
@@ -83,7 +80,7 @@ export const WithUtilityLink: Story = {
 };
 
 /** Brand only (sign-in, error pages). */
-export const Empty: Story = { args: { workspace: undefined, nav: undefined, end: undefined } };
+export const Empty: Story = { args: { nav: undefined, end: undefined } };
 
 /** A 320 px frame, set by the page rather than the container query's frame. */
 export const Dense: Story = {
@@ -96,5 +93,33 @@ export const Dense: Story = {
   ],
 };
 
-/** A 375 px phone: brand, switch and search on row 1, the nav alone on row 2. */
-export const Narrow: Story = { decorators: [narrow] };
+/** The app's slots: the Guide link; the regime chip and the account menu (the workspace switch inside). */
+const APP_SLOTS = {
+  utility: (
+    <TextLink href="/guide" icon="book" keys={['?']}>
+      Guide
+    </TextLink>
+  ),
+  end: (
+    <Stack direction="row" gap={2} align="center">
+      <StatusBadge tone="positive">NORMAL</StatusBadge>
+      <AccountMenu name="Abhinav" onSignOut={() => undefined}>
+        <Stack gap={1}>
+          <Text size="xs" tone="muted">
+            Workspace
+          </Text>
+          <WorkspaceSwitch workspaces={WORKSPACES} value="trader" onValueChange={() => undefined} />
+        </Stack>
+      </AccountMenu>
+    </Stack>
+  ),
+};
+
+/** The app's bar: brand, nav, the Guide, the regime chip and the account menu. */
+export const App: Story = { args: APP_SLOTS };
+
+/**
+ * A 375 px phone: brand, Guide and the end slot (one line, scrolling sideways) on the first
+ * row, the nav on the second; the workspace switch waits in the account menu.
+ */
+export const Narrow: Story = { args: APP_SLOTS, decorators: [narrow] };

@@ -21,6 +21,9 @@ export function CompareBar({ search, onSearchChange }: CompareBarProps) {
       focus: focused && next.includes(focused) ? search.focus : undefined,
     });
   };
+  const focus = (symbol: string) => {
+    onSearchChange({ focus: symbol, expiry: undefined, feature: undefined });
+  };
   return (
     <CompareSetBar
       symbols={selected}
@@ -31,9 +34,8 @@ export function CompareBar({ search, onSearchChange }: CompareBarProps) {
       onClear={() => {
         setSelected([]);
       }}
-      onFocus={(symbol) => {
-        onSearchChange({ focus: symbol, expiry: undefined, feature: undefined });
-      }}
+      onFocus={focus}
+      onOpen={focus}
     />
   );
 }

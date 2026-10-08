@@ -3,6 +3,7 @@
  * the final tokens (ADR 0011: tokens -> approved mockups -> components -> screens). Copy the folder
  * shape of primitives/Text (the template) and follow .claude/skills/add-ui-component.
  */
+export { AccountMenu, type AccountMenuProps } from './AccountMenu';
 export { AppShell, type AppShellProps } from './AppShell';
 export { Banner, type BannerProps, type BannerTone } from './Banner';
 export { BarList, type BarListItem, type BarListProps } from './BarList';
@@ -97,6 +98,7 @@ export {
 } from './IndicatorRow';
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
+export { KeyHints, type KeyHint, type KeyHintsProps } from './KeyHints';
 export { NavList, type NavListItem, type NavListProps } from './NavList';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
 export { KeyValue, type KeyValueItem, type KeyValueProps } from './KeyValue';
