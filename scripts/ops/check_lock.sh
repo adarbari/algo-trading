@@ -37,13 +37,20 @@ if ! take; then
   # (itself stale when its PID is dead). Inside it the holder is checked again, so a lock that
   # a faster run took meanwhile is never moved aside; then the old lock moves aside atomically.
   guard="$lock.takeover"
+  # The guard is never removed by another run: two runs clearing a "dead" guard at once would
+  # both get inside it, and a takeover killed before its PID is written would otherwise block
+  # for good. A leftover guard can only come from a crashed takeover; the operator removes it.
   if ! mkdir "$guard" 2>/dev/null; then
     gpid=$(cat "$guard/pid" 2>/dev/null || true)
-    if [ -n "$gpid" ] && ! kill -0 "$gpid" 2>/dev/null; then rm -rf "$guard"; fi  # stale guard
-    mkdir "$guard" 2>/dev/null || { echo "refusing: another run is taking over $lock; retry" >&2; exit 1; }
+    if [ -n "$gpid" ] && kill -0 "$gpid" 2>/dev/null; then
+      echo "refusing: another run (PID $gpid) is taking over $lock; retry in a moment" >&2
+    else
+      echo "refusing: a crashed takeover left $guard behind; check nothing runs, then: rm -rf $guard" >&2
+    fi
+    exit 1
   fi
-  echo $$ >"$guard/pid"
   trap 'rm -rf "$guard"' EXIT
+  echo $$ >"$guard/pid"
   if [ -d "$lock" ] && holder_alive; then
     echo "refusing: another \`make check\` took $lock first (PID $(cat "$lock/pid"))" >&2; exit 1
   fi
