@@ -23,6 +23,7 @@ from algotrade.services.read.context import (
     previous_session,
     snapshot_on,
     stored_dates,
+    weigh,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -202,6 +203,31 @@ def test_result_cache_holds_32_entries_by_default() -> None:
     for i in range(33):
         cache.put(i, i)
     assert cache.get(0) is None and cache.get(1) == 1 and cache.get(32) == 32
+
+
+def test_result_cache_is_bounded_by_the_bytes_of_its_frames() -> None:
+    frame = pd.DataFrame({"x": range(1000)})  # 8 000 bytes and its index
+    held = weigh(frame)
+    assert held >= 8000 and weigh((frame, {"k": frame})) == 2 * held and weigh("text") == 0
+    cache = ResultCache(size=32, max_bytes=2 * held + 1)
+    for key in "abc":
+        cache.put(key, frame)
+    # the oldest went to keep the frames under the bound; the newest always stays
+    assert (cache.get("a"), cache.get("b") is frame, cache.get("c") is frame) == (None, True, True)
+    cache.put("d", pd.DataFrame({"x": range(10 * 1000)}))  # alone over the bound
+    assert cache.get("d") is not None and cache.get("b") is None and cache.get("c") is None
+    cache.put("d", 1)  # replaced by a small value: its weight is released
+    cache.put("e", frame)
+    cache.put("f", frame)
+    assert cache.get("d") == 1 and cache.get("e") is frame and cache.get("f") is frame
+
+
+def test_a_request_memo_is_its_own_and_shared_by_its_sessions(
+    stored: tuple[StoreWriter, StoreReader],
+) -> None:
+    ctx = open_for(stored[1])
+    assert ctx.memo == {} and at_session(ctx, D1).memo is ctx.memo
+    assert open_for(stored[1]).memo is not ctx.memo
 
 
 def test_open_read_stores_opens_the_store_and_the_configs(tmp_path: Path) -> None:

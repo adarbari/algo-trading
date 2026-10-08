@@ -42,7 +42,11 @@ def test_one_read_for_every_instrument_asking_the_same_names(
     body = graph(query, {"n": [CLOSE], "m": [SECTOR, CLOSE]})
     assert "errors" not in body
     assert [v["value"] for v in body["data"]["b"]["features"]] == [102.0]
-    assert sorted(calls) == [(["EQ:AAA", "EQ:BBB"], (CLOSE,)), (["EQ:CCC"], (SECTOR, CLOSE))]
+    # (top-level fields resolve in threads, so the order the siblings asked in is not fixed)
+    assert sorted((sorted(ids), names) for ids, names in calls) == [
+        (["EQ:AAA", "EQ:BBB"], (CLOSE,)),
+        (["EQ:CCC"], (SECTOR, CLOSE)),
+    ]
 
 
 def test_an_error_is_the_result_of_each_key_that_asked(ctx: ReadContext) -> None:

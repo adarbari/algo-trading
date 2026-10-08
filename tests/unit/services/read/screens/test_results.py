@@ -1,11 +1,15 @@
 from collections.abc import Sequence
+from dataclasses import replace
+from typing import Any
 
+import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
+from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.results import (
     ChangeCount,
     CriterionResult,
@@ -38,6 +42,49 @@ def test_results_carry_criteria_columns_flags_and_identity(ctx: ReadContext) -> 
         CriterionResult("iv_rank", "rollup.x@v1.iv_rank", "soft", "NEAR", 40.0, 10.0),
     )
     assert (aaa.change, aaa.previous_decision) == (None, None)  # not compared
+
+
+def test_only_the_asked_instruments_values_become_records(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # every run's value rows of every asked instrument were turned into records, though a run
+    # is only read back for its own: most of an Ideas read on the real store
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    converted: list[int] = []
+    real = results._records
+
+    def counting(frame: pd.DataFrame) -> list[Any]:
+        converted.append(len(frame))
+        return real(frame)
+
+    monkeypatch.setattr(results, "_records", counting)
+    both = load_results(ctx, {"r1": ["EQ:AAA", "EQ:BBB"]}, [run])
+    converted.clear()
+    one = load_results(ctx, {"r1": ["EQ:AAA"]}, [run])
+    assert sorted(both) == [("r1", "EQ:AAA"), ("r1", "EQ:BBB")] and sorted(one) == [
+        ("r1", "EQ:AAA")
+    ]
+    assert converted == [2, 1]  # AAA's two value rows and its result row, not BBB's
+    assert one[("r1", "EQ:AAA")] == both[("r1", "EQ:AAA")]
+
+
+def test_a_runs_rows_are_filtered_once_per_request(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    filtered: list[str] = []
+    real = runs.screen_rows
+
+    def counting(c: ReadContext) -> Any:
+        filtered.append(c.session.date.isoformat())
+        return real(c)
+
+    monkeypatch.setattr(runs, "screen_rows", counting)
+    first = runs.run_rows(ctx, run)
+    assert runs.run_rows(ctx, run) is first and len(filtered) == 1
+    assert runs.run_rows(replace(ctx, memo={}), run) is not first  # another request: its own
 
 
 def test_nothing_asked_reads_nothing(ctx: ReadContext) -> None:

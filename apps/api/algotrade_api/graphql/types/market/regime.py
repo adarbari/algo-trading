@@ -6,12 +6,12 @@ import datetime as dt
 from typing import Self
 
 import strawberry
-from anyio import to_thread
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime import episodes as episodes_read
 from algotrade.services.read.regime import history, regime
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.market.indicator import RegimeIndicator
 
@@ -241,7 +241,7 @@ class MarketRegime:
     )
     async def bands(self, info: Info, start: dt.date, end: dt.date) -> list[RegimeBand]:
         # Off the event loop: one range read of the label table.
-        found = await to_thread.run_sync(history.load_regime_bands, self.ctx, start, end)
+        found = await off_loop(history.load_regime_bands, self.ctx, start, end)
         return [RegimeBand.of(b) for b in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
