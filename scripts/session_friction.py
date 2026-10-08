@@ -5,8 +5,10 @@ the subagent transcripts under `<session>/subagents/`) since a date and counts t
 signals a harness rule, check or script could remove: blocked and failing tool calls
 (clustered by message), gate runs against gate failures (`make check`, `make changed`,
 pytest, vitest, ...), the same failing command retried, permission denials, hook errors
-and the owner's corrections. Ranks them by count x sessions touched, prints the top ones
-and writes the full report (markdown + JSON) under `var/harness/friction/`. It never reads
+and the owner's corrections, plus the token spend per model tier (the last usage snapshot
+of each transcript) and which work-item sessions ran on the expensive tiers. Ranks the
+frictions by count x sessions touched, prints the top ones and writes the full report
+(markdown + JSON) under `var/harness/friction/`. It never reads
 the store and never judges: `.claude/skills/review-sessions` reads the report and decides.
 """
 
@@ -48,6 +50,14 @@ CORRECTION_RE = re.compile(
     r"\b(no[,.]|don't|do not|never|stop|wrong|instead|why did|not what)\b", re.I
 )
 EXCERPT = 110
+EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+EXPENSIVE = ("fable", "opus")
+
+
+def _tier(model: str) -> str:
+    """`claude-opus-5-5` -> `opus`; the tier is what the routing rule talks about."""
+    parts = model.split("-")
+    return parts[1] if len(parts) > 1 and parts[0] == "claude" else model
 
 
 @dataclass
@@ -84,6 +94,13 @@ class Session:
     prs: set[int] = field(default_factory=set)
     start: str = ""
     end: str = ""
+    title: str = ""
+    cost: dict[str, float] = field(default_factory=dict)
+    edits: Counter[str] = field(default_factory=Counter)
+
+    @property
+    def total_cost(self) -> float:
+        return sum(self.cost.values())
 
     def row(self) -> dict[str, object]:
         return {
@@ -92,6 +109,9 @@ class Session:
             "prs": sorted(self.prs),
             "start": self.start,
             "end": self.end,
+            "title": self.title,
+            "cost": self.cost,
+            "edits": dict(self.edits),
         }
 
 
@@ -204,6 +224,21 @@ def _scan_file(path: Path, report: Report, since: datetime) -> None:
             report.note("retried failing command", cmd[:EXCERPT], sid, cmd)
 
 
+def _scan_meta(rec: dict[str, object], session: Session) -> None:
+    """The record's bookkeeping: times, linked PRs, the title, the cumulative usage snapshot."""
+    if ts := str(rec.get("timestamp") or ""):
+        session.start = session.start or ts
+        session.end = ts
+    if rec.get("type") == "pr-link" and rec.get("prNumber"):
+        session.prs.add(int(str(rec["prNumber"])))
+    if rec.get("customTitle"):
+        session.title = str(rec["customTitle"])
+    if isinstance(usage := rec.get("modelUsage"), dict):  # cumulative: the last one wins
+        session.cost = {
+            _tier(m): float(u.get("costUSD") or 0) for m, u in usage.items() if isinstance(u, dict)
+        }
+
+
 def _scan_record(
     rec: dict[str, object],
     sid: str,
@@ -213,11 +248,7 @@ def _scan_record(
     failed_cmds: Counter[str],
 ) -> None:
     kind = rec.get("type")
-    if ts := str(rec.get("timestamp") or ""):
-        session.start = session.start or ts
-        session.end = ts
-    if kind == "pr-link" and rec.get("prNumber"):
-        session.prs.add(int(str(rec["prNumber"])))
+    _scan_meta(rec, session)
     if rec.get("toolDenialKind"):
         report.note("permission denial", str(rec["toolDenialKind"]), sid)
     if rec.get("hookErrors"):
@@ -233,6 +264,8 @@ def _scan_record(
         if not isinstance(block, dict):
             continue
         if block.get("type") == "tool_use":
+            if block.get("name") in EDIT_TOOLS and isinstance(message, dict):
+                session.edits[_tier(str(message.get("model") or "?"))] += 1
             inp = block.get("input") or {}
             cmd = str(inp.get("command", "")) if block.get("name") == "Bash" else ""
             pending[str(block.get("id"))] = (str(block.get("name")), cmd)
@@ -311,6 +344,7 @@ def render(report: Report, top: int) -> str:
             f"| {i} | {sig.kind} | `{_cell(sig.key)}` | {sig.count} | {len(sig.sessions)} | "
             f"`{_cell(sig.example)}` |"
         )
+    lines += spend_lines(report)
     lines += ["", "## Owner corrections (read them; the script does not judge)", ""]
     lines += [f"- `{sid}`: {text}" for sid, text in report.corrections] or ["- none found"]
     lines += [
@@ -325,6 +359,53 @@ def render(report: Report, top: int) -> str:
         prs_s = ", ".join(str(p) for p in sorted(s.prs))
         lines.append(f"| {sid} | {kind} | {s.start[:16]} | {s.end[:16]} | {s.turns} | {prs_s} |")
     return "\n".join(lines) + "\n"
+
+
+def _cost_breakdown(session: Session) -> str:
+    by_cost = sorted(session.cost.items(), key=lambda kv: -kv[1])
+    return ", ".join(f"{tier} ${cost:,.0f}" for tier, cost in by_cost)
+
+
+def spend_lines(report: Report) -> list[str]:
+    """Token spend per tier, the costliest sessions, and implementation done on fable / opus."""
+    per_tier: Counter[str] = Counter()
+    for s in report.sessions.values():
+        per_tier.update(s.cost)
+    lines = ["", "## Token spend by model tier (last usage snapshot per transcript)", ""]
+    lines += ["| Tier | Cost | Share |", "|---|---|---|"]
+    total = sum(per_tier.values()) or 1.0
+    for tier, cost in per_tier.most_common():
+        lines.append(f"| {tier} | ${cost:,.2f} | {cost / total:.0%} |")
+    lines.append(f"| all | ${total:,.2f} | |")
+    main = sorted(
+        (s for s in report.sessions.values() if not s.agent and s.cost),
+        key=lambda s: -s.total_cost,
+    )
+    lines += ["", "| Session | Cost | Edits by tier | Title |", "|---|---|---|---|"]
+    for s in main[:10]:
+        edits = ", ".join(f"{t} {n}" for t, n in s.edits.most_common())
+        lines.append(
+            f"| {_cell(s.title) or '?'} | ${s.total_cost:,.2f} | {edits} | |".replace(
+                f"| {_cell(s.title) or '?'} |", f"| {s.start[:10]} |", 1
+            ).replace("| |", f"| {_cell(s.title)[:50]} |", 1)
+        )
+    flagged = [
+        s for s in main if s.prs and sum(s.cost.get(t, 0.0) for t in EXPENSIVE) > 0.5 * s.total_cost
+    ]
+    lines += [
+        "",
+        "Work-item sessions (they opened PRs) orchestrated on the expensive tiers (over half the "
+        'cost on fable / opus; CLAUDE.md "Agents, models and tokens": a work item runs from a '
+        "Sonnet session, Opus and Fable are called for design and research):",
+        "",
+    ]
+    lines += [
+        f"- {s.start[:10]} {_cell(s.title)[:60]}: ${s.total_cost:,.2f} "
+        f"({_cost_breakdown(s)}),"
+        f" PRs {', '.join(str(p) for p in sorted(s.prs))}"
+        for s in flagged
+    ] or ["- none"]
+    return lines
 
 
 def write(report: Report, out: Path, top: int) -> tuple[Path, Path]:
