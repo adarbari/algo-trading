@@ -34,10 +34,13 @@ ANSWER = {
 class Canned:
     names = ("canned",)
 
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
     def __init__(self, answer: Any) -> None:
         self.answer, self.asked = json.dumps(answer), 0
 
-    def complete(self, system: str, user: str) -> Completion:
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
         self.asked += 1
         return Completion(self.answer, "canned", "canned")
 
@@ -45,7 +48,10 @@ class Canned:
 class Down:
     names = ("down",)
 
-    def complete(self, system: str, user: str) -> Completion:
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
         raise ModelUnavailableError("llama at http://localhost:11434/v1: HTTP 429 slow down")
 
 

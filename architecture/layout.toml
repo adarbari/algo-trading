@@ -437,7 +437,7 @@ contracts = ["Layout: only the source registry imports vendor folders"]
 
 [[dir]]
 path = "libs/sources/algotrade_sources/llm"
-purpose = "the text-model adapter (ADR 0041): one OpenAI-compatible chat-completions client over the framework's POST transport, which any provider answers by base_url alone; built by the registry, injected into the API"
+purpose = "the text-model adapters (ADR 0041): the OpenAI-compatible chat-completions client over the framework's POST transport, which any provider answers by base_url alone, and the Claude Code headless client (the owner's own login, owner-only); built by the registry, injected into the API"
 
 [[dir]]
 path = "libs/sources/algotrade_sources/vendors"

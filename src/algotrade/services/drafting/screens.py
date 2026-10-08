@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from algotrade.config.site.settings import load_field_guide, load_phrasebook
+from algotrade.core.model.completion import CallTag
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
@@ -72,7 +73,7 @@ def draft_screen(
     guide = load_field_guide(ctx.configs)
     system = system_prompt(infos.values(), phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
-    answer = model.complete(system, user).text
+    answer = model.complete(system, user, tag=CallTag("screener-draft", ctx.user.user_id)).text
     proposal = parse_answer(answer)
     criteria, dropped = criteria_of(proposal, set(infos))
     document: dict[str, Any] = {

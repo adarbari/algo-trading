@@ -241,3 +241,62 @@ def test_a_machine_file_adds_the_chain_over_the_shipped_file(tmp_path: Path) -> 
         'enabled = true\nbase_url = "https://x.example/v1"\nmodel = "m"\n'
     )
     assert load_llm(FileConfigStore(tmp_path)).providers[0].model == "m"
+
+
+CLI: dict[str, Any] = {
+    "id": "claude_cli",
+    "kind": "claude-cli",
+    "command": "/Users/o/.local/bin/claude",
+    "model": "haiku",
+    "only_users": ["abhi"],
+}
+GEMINI: dict[str, Any] = {
+    "id": "gemini",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "model": "gemini-2.5-flash",
+}
+
+
+def test_a_claude_cli_provider_has_a_command_a_model_no_retries_and_its_users() -> None:
+    s = LlmSettings.from_document({"provider": [CLI, GEMINI | {"only_users": ["abhi", "bob"]}]})
+    cli, gemini = s.providers
+    assert (cli.kind, cli.command, cli.model, cli.only_users) == (
+        "claude-cli",
+        "/Users/o/.local/bin/claude",
+        "haiku",
+        ("abhi",),
+    )
+    assert (cli.retries, cli.timeout_s, cli.local) == (0, 60.0, True)  # no key, no pauses
+    assert cli.worst_case_s == 60.0
+    assert (gemini.kind, gemini.only_users) == ("openai", ("abhi", "bob"))  # any kind may have it
+    assert s.deadline_s == 60 + gemini.worst_case_s
+
+
+def test_a_claude_cli_provider_may_set_its_own_timeout_and_retries() -> None:
+    s = LlmSettings.from_document({"provider": [CLI | {"timeout_s": 90, "retries": 1}, GEMINI]})
+    assert (s.providers[0].timeout_s, s.providers[0].retries) == (90.0, 1)
+
+
+@pytest.mark.parametrize(
+    ("entry", "message"),
+    [
+        ({"only_users": None}, r"needs only_users"),
+        ({"only_users": []}, r"only_users: expected one or more user ids"),
+        ({"only_users": [" "]}, r"only_users: expected one or more user ids"),
+        ({"command": "claude"}, r"absolute path of claude"),
+        ({"command": None}, r"absolute path of claude"),
+        ({"model": None}, r"model is required"),
+        ({"base_url": "https://a.io/v1"}, r"do not apply to kind"),
+        ({"request": {"a": 1}}, r"do not apply to kind"),
+        ({"kind": "codex"}, r"kind: expected one of"),
+    ],
+)
+def test_claude_cli_errors_name_the_entry(entry: dict[str, Any], message: str) -> None:
+    doc = {k: v for k, v in (CLI | entry).items() if v is not None}
+    with pytest.raises(ConfigurationError, match=message):
+        LlmSettings.from_document({"provider": [doc, GEMINI]})
+
+
+def test_command_belongs_to_claude_cli_only() -> None:
+    with pytest.raises(ConfigurationError, match=r"command belongs to kind"):
+        LlmSettings.from_document({"provider": [GEMINI | {"command": "/bin/claude"}]})

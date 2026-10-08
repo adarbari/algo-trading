@@ -14,6 +14,7 @@ from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from algotrade_api.text_model import OFF, open_text_model
 from algotrade_sources.llm.chat import ChatCompletions
+from algotrade_sources.llm.claude_cli import ClaudeCli
 from tests.helpers.api_store import as_user
 
 
@@ -66,6 +67,52 @@ def test_a_chain_is_one_adapter_per_provider_each_with_its_own_key(
     ] and model.deadline_s == 440.0  # 2 x (3 x 60 s + 2 x 20 s)
     claude = model.members[0][1]
     assert isinstance(claude, ChatCompletions) and claude.provider == "claude"
+
+
+CLI_CHAIN: dict[str, Any] = {
+    "enabled": True,
+    "provider": [
+        {
+            "id": "claude_cli",
+            "kind": "claude-cli",
+            "command": "/Users/o/.local/bin/claude",
+            "model": "haiku",
+            "only_users": ["abhi"],
+        },
+        CHAIN["provider"][1],
+    ],
+}
+
+
+def test_a_claude_cli_provider_is_wired_for_its_users_with_the_scrubbed_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    monkeypatch.setenv("HOME", "/Users/o")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "t")  # never reaches the child
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    model, _ = open_text_model(configs(CLI_CHAIN))
+    assert isinstance(model, FallbackTextModel)
+    assert model.names_for("abhi") == ("haiku", "gemini-2.5-flash")
+    assert model.names_for("bob") == ("gemini-2.5-flash",)
+    cli = model.members[0][1]
+    assert isinstance(cli, ClaudeCli) and cli.provider == "claude_cli" and cli.retries == 0
+    assert cli.command == "/Users/o/.local/bin/claude"
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in cli.env and "ANTHROPIC_API_KEY" not in cli.env
+    assert cli.env["HOME"] == "/Users/o"
+
+
+def test_a_lone_claude_cli_provider_still_answers_only_its_users(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model, _ = open_text_model(configs(CLI_CHAIN | {"provider": CLI_CHAIN["provider"][:1]}))
+    assert isinstance(model, FallbackTextModel) and model.names_for("bob") == ()
+
+
+def test_a_claude_cli_provider_without_only_users_turns_the_text_model_off() -> None:
+    bare = {k: v for k, v in CLI_CHAIN["provider"][0].items() if k != "only_users"}
+    model, reason = open_text_model(configs(CLI_CHAIN | {"provider": [bare]}))
+    assert model is None and "needs only_users" in reason
 
 
 def test_a_remote_provider_without_a_key_is_left_out_of_the_chain(

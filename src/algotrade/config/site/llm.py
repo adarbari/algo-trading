@@ -25,7 +25,20 @@ KEYS = (
     "deadline_s",
     "provider",
 )
-PROVIDER_KEYS = ("id", "base_url", "model", "timeout_s", "answer_limit", "retries", "request")
+PROVIDER_KEYS = (
+    "id",
+    "kind",
+    "base_url",
+    "model",
+    "timeout_s",
+    "answer_limit",
+    "retries",
+    "request",
+    "command",
+    "only_users",
+)
+KINDS = ("openai", "claude-cli")
+CLAUDE_CLI = "claude-cli"
 RESERVED_REQUEST_KEYS = ("model", "messages", "temperature", "max_tokens", "response_format")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
 PHRASE_KEYS = ("say", "fields", "hint")
@@ -44,7 +57,12 @@ class ProviderSettings:
     budget: ~2,000), ``retries`` how many times a busy provider (429, 5xx) or a dropped
     connection is retried before the chain moves on (0: never), ``request`` extra fields sent
     with every request as given (``reasoning_effort = "low"`` tells Gemini to think briefly):
-    strings, numbers and booleans only, never the ones the adapter sets."""
+    strings, numbers and booleans only, never the ones the adapter sets. ``only_users``: the
+    registry users it answers (empty: everyone; any kind may set it). ``kind = "claude-cli"``
+    runs Claude Code headless on this machine under the owner's own login instead of calling an
+    endpoint: it has ``command`` (the absolute path of ``claude``; no ``base_url``), ``model``
+    ("haiku", "sonnet"), ``timeout_s`` and ``retries`` (default 0), and must set ``only_users``:
+    a subscription login never answers anyone else (ADR 0041, amended 2026-10-08)."""
 
     id: str
     base_url: str
@@ -53,18 +71,23 @@ class ProviderSettings:
     answer_limit: int = 8000
     retries: int = 2
     request: Mapping[str, str | float | bool] = field(default_factory=lambda: MappingProxyType({}))
+    kind: str = "openai"
+    command: str = ""
+    only_users: tuple[str, ...] = ()
 
     @property
     def worst_case_s(self) -> float:
         """The longest this provider can keep a chain waiting: every attempt timing out, plus
         the pauses between them (a bare 429 waits 20 s; a ``Retry-After`` may wait longer)."""
+        if self.kind == CLAUDE_CLI:
+            return self.timeout_s * (self.retries + 1)
         pauses: float = sum(max(20.0, 3.0 * 2.0**a) for a in range(self.retries))
         return self.timeout_s * (self.retries + 1) + pauses
 
     @property
     def local(self) -> bool:
         """Served from this machine: needs no key."""
-        return urlsplit(self.base_url).hostname in LOOPBACK
+        return self.kind == CLAUDE_CLI or urlsplit(self.base_url).hostname in LOOPBACK
 
 
 @dataclass(frozen=True)
@@ -157,6 +180,15 @@ def _providers(raw: Any, shared: ProviderSettings, where: str) -> tuple[Provider
             )
         if any(p.id == pid for p in out):
             raise ConfigurationError(f"{t.where} id: {pid!r} is used twice")
+        kind = t.text("kind", "openai")
+        if kind not in KINDS:
+            raise ConfigurationError(f"{t.where} kind: expected one of {list(KINDS)}, got {kind!r}")
+        only = _only_users(t)
+        if kind == CLAUDE_CLI:
+            out.append(_claude_cli(t, pid, only, shared))
+            continue
+        if "command" in t.names():
+            raise ConfigurationError(f"{t.where}: command belongs to kind = {CLAUDE_CLI!r}")
         if "base_url" not in t.names() or "model" not in t.names():
             raise ConfigurationError(f"{t.where}: base_url and model are required")
         out.append(
@@ -168,9 +200,51 @@ def _providers(raw: Any, shared: ProviderSettings, where: str) -> tuple[Provider
                 t.integer("answer_limit", shared.answer_limit, 1),
                 t.integer("retries", shared.retries, 0),
                 _request(t) if "request" in t.names() else shared.request,
+                only_users=only,
             )
         )
     return tuple(out)
+
+
+def _only_users(t: Table) -> tuple[str, ...]:
+    users = t.strings("only_users", ())
+    if "only_users" in t.names() and (not users or not all(u.strip() for u in users)):
+        raise ConfigurationError(f"{t.where} only_users: expected one or more user ids")
+    return tuple(u.strip() for u in users)
+
+
+def _claude_cli(
+    t: Table, pid: str, only: tuple[str, ...], shared: ProviderSettings
+) -> ProviderSettings:
+    """A Claude Code provider: the owner's own login, so only the users it names are answered
+    (its own ``retries`` default is 0: a refused login or a used-up limit is not retried)."""
+    if not only:
+        raise ConfigurationError(
+            f"{t.where}: kind = {CLAUDE_CLI!r} needs only_users (a subscription login must "
+            "not answer other users; name the owner)"
+        )
+    stray = [k for k in ("base_url", "answer_limit", "request") if k in t.names()]
+    if stray:
+        raise ConfigurationError(f"{t.where}: {stray} do not apply to kind = {CLAUDE_CLI!r}")
+    command = t.text("command", "")
+    if not command.startswith("/"):
+        raise ConfigurationError(
+            f"{t.where} command: expected the absolute path of claude (launchd's PATH is "
+            f"minimal), got {command!r}"
+        )
+    if "model" not in t.names():
+        raise ConfigurationError(f'{t.where}: model is required ("haiku", "sonnet")')
+    return ProviderSettings(
+        pid,
+        "",
+        t.text("model", ""),
+        t.number("timeout_s", shared.timeout_s, 1),
+        shared.answer_limit,
+        t.integer("retries", 0, 0),
+        kind=CLAUDE_CLI,
+        command=command,
+        only_users=only,
+    )
 
 
 def _request(t: Table) -> Mapping[str, str | float | bool]:

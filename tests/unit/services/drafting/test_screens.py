@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.core.model.completion import Completion
+from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.configs import resolve_rule_draft
 from algotrade.services.drafting.screens import (
@@ -41,19 +41,27 @@ class Canned:
 
     names = ("canned",)
 
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
     def __init__(self, answer: Any) -> None:
         self.answer = answer if isinstance(answer, str) else json.dumps(answer)
         self.asked: list[tuple[str, str]] = []
+        self.tags: list[object] = []
 
-    def complete(self, system: str, user: str) -> Completion:
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
         self.asked.append((system, user))
+        self.tags.append(tag)
         return Completion(self.answer, "canned", "canned")
 
 
 class Down:
     names = ("down",)
 
-    def complete(self, system: str, user: str) -> Completion:
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
         raise ModelUnavailableError("llama at http://localhost:11434/v1: timed out")
 
 
@@ -69,6 +77,12 @@ def proposal(*criteria: dict[str, Any], **extra: Any) -> dict[str, Any]:
 
 ACTIVE = {"id": "active", "field": "instrument.status", "op": "eq", "value": "ACTIVE"}
 PRICE_GT = {"id": "price", "field": PRICE, "op": "gt", "value": 50, "why": "over $50"}
+
+
+def test_the_model_is_asked_as_the_drafting_user(ctx: ReadContext) -> None:
+    model = Canned(proposal(ACTIVE))
+    draft_screen(ctx, model, "my_screen", "active stocks")
+    assert model.tags == [CallTag("screener-draft", ALICE)]  # who decides which providers answer
 
 
 def test_the_answer_becomes_a_valid_draft(ctx: ReadContext) -> None:
