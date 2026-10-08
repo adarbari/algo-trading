@@ -64,7 +64,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges"
-purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, and rendered to docs/edges.md"
+purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, and the user's evaluation split (evaluation.py, ADR 0015 layering)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]

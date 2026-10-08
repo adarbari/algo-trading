@@ -22,6 +22,7 @@ KINDS = (
     "screeners",
     "preferences",
     "identity",
+    "evaluation",
 )
 
 
@@ -38,7 +39,7 @@ class ConfigStore(Protocol):
         ``guide_playbooks`` its playbook prose (``site/guide/playbooks/<id>.toml``, site-only);
         ``edges`` the edge documents (``site/edges/<id>.toml``, or a user's draft under
         ``users/<id>/edges/``, ADR 0053).
-        ``preferences`` and
+        ``preferences``, ``evaluation`` (the user's edge-evaluation split, ADR 0053) and
         ``identity`` are one file per user (``users/<id>/<kind>.toml``; identity holds the
         sign-in email, ADR 0040), never the site's. ``screeners`` are versioned rule screens:
         ``name`` loads the latest version, ``name@N`` exactly version N; drafts are never

@@ -145,6 +145,19 @@ FROZEN_FROM = date(2026, 4, 1)
 
 
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_an_evidenced_or_live_edge_cites_a_run_at_its_frozen_split(edge: Edge) -> None:
+    """Only a run whose split is the site's (the edge's ``frozen_from``) is evidence (ADR 0053
+    amendment, ED5a): an exploratory run never moves a status."""
+    if edge.status not in ("evidenced", "live"):
+        return
+    assert edge.evidence is not None, (
+        f"{edge.id}: {edge.status} needs [evidence] run_id, split_from"
+    )
+    split = edge.evidence.split_from
+    assert split == edge.frozen_from, f"{edge.id}: evidence split {split} != {edge.frozen_from}"
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
 def test_every_open_edge_names_the_decided_frozen_period(edge: Edge) -> None:
     """An open edge is judged in the one frozen period; moving it needs an ADR amendment."""
     assert edge.frozen_from == FROZEN_FROM, f"{edge.id}: frozen_from must be {FROZEN_FROM}"
