@@ -94,6 +94,11 @@ export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, schedule: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, variants: Array<string>, frozenFrom: string | null, rejectionReason: string, evidence: { runId: string, splitFrom: string } | null, canonicalRun: { runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, afterSession: boolean, rows: Array<{ edgeVariant: string, variant: string, role: string, horizonSessions: number, sliceKind: string, sliceValue: string, sessions: number | null, picks: number | null, hitRate: number | null, baseRate: number | null, lift: number | null, exploratory: boolean }> } | null, canonicalNotRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string }> }> };
 
+export type EvaluationSplitQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EvaluationSplitQuery = { evaluationSplit: { splitFrom: string | null, latestSession: string, frozenPeriods: Array<{ edgeId: string, frozenFrom: string }> } | null };
+
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -579,6 +584,18 @@ export const EdgesPageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+export const EvaluationSplitDocument = new TypedDocumentString(`
+    query EvaluationSplit {
+  evaluationSplit {
+    splitFrom
+    latestSession
+    frozenPeriods {
+      edgeId
+      frozenFrom
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EvaluationSplitQuery, EvaluationSplitQueryVariables>;
 export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
     query ScreenerTrackRecords {
   edges {

@@ -43,6 +43,20 @@ test('the Edges tab lists the edges and the chosen edge shows its frozen odds', 
   expect(errors).toEqual([]);
 });
 
+test('a user sets and clears their train / test split', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/edges');
+  await expect(page.getByText('2026-06-01').first()).toBeVisible();
+  await page.getByLabel('Test slice starts').fill('2026-04-01');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(/labelled EXPLORATORY and come from evaluate-edges/)).toBeVisible();
+  await expect(page.getByText('2026-04-01').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Clear' }).click();
+  await expect(page.getByText(/Cleared/)).toBeVisible();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('Screeners shows the track-record chip and Ideas the odds line', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/screeners');

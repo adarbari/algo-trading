@@ -300,6 +300,15 @@ type EquityPoint {
 }
 
 """
+The user's own `splitFrom` (null: none set, so each edge's frozen period is the split), the `frozenPeriods` of the edges they see and the `latestSession` a split may name. A run under a personal split is exploratory
+"""
+type EvaluationSplit {
+  splitFrom: Date
+  frozenPeriods: [FrozenPeriod!]!
+  latestSession: Date!
+}
+
+"""
 A stored event: `table` events/<kind>, `date` the event date (UTC), `values` the row's other columns
 """
 type Event {
@@ -475,6 +484,12 @@ type Fill {
   price: Float
   commission: Float
   multiplier: Float
+}
+
+"""One edge's frozen period: the first session of its test slice"""
+type FrozenPeriod {
+  edgeId: String!
+  frozenFrom: Date!
 }
 
 """
@@ -1445,6 +1460,11 @@ type Query {
 
   """The edge `id`; null: the user has no such edge"""
   edge(id: String!): Edge
+
+  """
+  The user's train / test split (their evaluation.toml), the frozen periods of the edges they see and the latest session a split may name; null: nothing stored
+  """
+  evaluationSplit: EvaluationSplit
 
   """
   Every committed evaluation run of the edge `edgeId` the user sees (theirs, then the site's), newest first; empty: no such edge or no run. Read by run, as the run left it (never by session)
