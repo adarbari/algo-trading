@@ -153,7 +153,7 @@ def create_app(
     app.state.authenticator = authenticator
     text_model_off = TEXT_MODEL_OFF
     if text_model is None and settings.live:
-        text_model, text_model_off = open_text_model(app.state.store.configs)
+        text_model, text_model_off = open_text_model(app.state.store.configs, settings.data_url)
     app.state.text_model, app.state.text_model_off = text_model, text_model_off
     app.state.explain_cache = open_text_cache(settings.data_url)  # ADR 0041 (amended): derived
     app.state.explain_limiter = RateLimiter()

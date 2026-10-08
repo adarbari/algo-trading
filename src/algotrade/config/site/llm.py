@@ -24,7 +24,13 @@ KEYS = (
     "request",
     "deadline_s",
     "provider",
+    "price",
+    "budget",
 )
+PRICE_KEYS = ("model", "input_per_mtok", "output_per_mtok", "free")
+BUDGET_KEYS = ("daily_usd", "monthly_usd", "over")
+OVER = ("free", "refuse")
+PRICED, REPORTED, FREE = "price", "reported", "free"  # a rate's basis (usage/llm_calls cost_basis)
 PROVIDER_KEYS = (
     "id",
     "kind",
@@ -91,6 +97,45 @@ class ProviderSettings:
 
 
 @dataclass(frozen=True)
+class Rate:
+    """What a provider's calls cost (ADR 0057): ``basis`` ``price`` (per million tokens, the
+    ``[[price]]`` of its model), ``reported`` (a subscription login, ``claude-cli``: the notional
+    cost Claude Code reports) or ``free`` (a local server, or a model declared ``free = true``)."""
+
+    basis: str
+    input_per_mtok: float = 0.0
+    output_per_mtok: float = 0.0
+
+    @property
+    def spends(self) -> bool:
+        """Counts against the budget: everything but a free provider."""
+        return self.basis != FREE
+
+
+@dataclass(frozen=True)
+class PriceSettings:
+    """One ``[[price]]``: a model's price in USD per million input and output tokens, or
+    ``free = true`` (a free tier). A paid remote model without one is a ``ConfigurationError``:
+    missing data never counts as $0."""
+
+    model: str
+    input_per_mtok: float = 0.0
+    output_per_mtok: float = 0.0
+    free: bool = False
+
+
+@dataclass(frozen=True)
+class BudgetSettings:
+    """``[budget]``: ``daily_usd`` / ``monthly_usd`` (exchange-calendar day and month; ``None``:
+    no cap) and ``over``: what a spent budget does: ``free`` (only the free providers answer,
+    the priced and reported ones are skipped) or ``refuse`` (every call is refused)."""
+
+    daily_usd: float | None = None
+    monthly_usd: float | None = None
+    over: str = "free"
+
+
+@dataclass(frozen=True)
 class LlmSettings:
     """``llm.toml``: the text model behind screener drafts and regime explanations (ADR 0041,
     amended 2026-10-08). ``providers`` is the chain in the order tried: the ``[[provider]]``
@@ -107,6 +152,26 @@ class LlmSettings:
     )
     deadline_s: float = 120.0
     legacy: bool = True
+    prices: tuple[PriceSettings, ...] = ()
+    budget: BudgetSettings = field(default_factory=BudgetSettings)
+
+    def rate(self, provider: ProviderSettings) -> Rate:
+        """What ``provider``'s calls cost: ``reported`` for ``claude-cli``, ``free`` for a local
+        server, else its model's ``[[price]]``; no price is a ``ConfigurationError``."""
+        if provider.kind == CLAUDE_CLI:
+            return Rate(REPORTED)
+        price = next((p for p in self.prices if p.model == provider.model), None)
+        if price is None:
+            if provider.local:
+                return Rate(FREE)
+            raise ConfigurationError(
+                f"llm.toml provider {provider.id}: no [[price]] for model {provider.model!r}; "
+                "add its price per million tokens, or `free = true` for a free tier (a missing "
+                "price must not count as $0, ADR 0057)"
+            )
+        if price.free:
+            return Rate(FREE)
+        return Rate(PRICED, price.input_per_mtok, price.output_per_mtok)
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "LlmSettings":
@@ -157,12 +222,60 @@ class LlmSettings:
                 f"last can take ({needed:g} s: timeout_s x (retries + 1) plus the pauses); "
                 "raise it, or lower their timeout_s / retries, so the fallback is reached"
             )
-        return cls(
+        settings = cls(
             enabled=t.boolean("enabled", d.enabled),
             providers=providers,
             deadline_s=deadline,
             legacy=is_legacy,
+            prices=_prices(t.raw("price"), where),
+            budget=_budget(t.table("budget", BUDGET_KEYS)),
         )
+        if settings.enabled:
+            for provider in providers:
+                settings.rate(provider)
+        return settings
+
+
+def _prices(raw: Any, where: str) -> tuple[PriceSettings, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
+        raise ConfigurationError(f"{where} price: expected a list of tables ([[price]])")
+    out: list[PriceSettings] = []
+    for i, entry in enumerate(raw):
+        t = Table(entry, f"{where} [[price]][{i}]")
+        t.only(PRICE_KEYS)
+        model = t.text("model", "")
+        if not model:
+            raise ConfigurationError(f"{t.where}: model is required")
+        if any(p.model == model for p in out):
+            raise ConfigurationError(f"{t.where} model: {model!r} is priced twice")
+        if t.boolean("free", False):
+            if "input_per_mtok" in t.names() or "output_per_mtok" in t.names():
+                raise ConfigurationError(f"{t.where}: a free model has no price")
+            out.append(PriceSettings(model, free=True))
+            continue
+        if "input_per_mtok" not in t.names() or "output_per_mtok" not in t.names():
+            raise ConfigurationError(
+                f"{t.where}: input_per_mtok and output_per_mtok (USD per million tokens), "
+                "or free = true"
+            )
+        out.append(
+            PriceSettings(
+                model, t.number("input_per_mtok", 0.0, 0.0), t.number("output_per_mtok", 0.0, 0.0)
+            )
+        )
+    return tuple(out)
+
+
+def _budget(t: Table) -> BudgetSettings:
+    over = t.text("over", "free")
+    if over not in OVER:
+        raise ConfigurationError(f"{t.where} over: expected one of {list(OVER)}, got {over!r}")
+    daily, monthly = t.number("daily_usd", None, 0.0), t.number("monthly_usd", None, 0.0)
+    if daily is not None and monthly is not None and daily > monthly:
+        raise ConfigurationError(f"{t.where}: daily_usd {daily:g} is above monthly_usd {monthly:g}")
+    return BudgetSettings(daily, monthly, over)
 
 
 def _providers(raw: Any, shared: ProviderSettings, where: str) -> tuple[ProviderSettings, ...]:

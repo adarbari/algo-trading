@@ -71,3 +71,27 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # id = "gemini"
 # base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 # model = "gemini-2.5-flash"
+
+# Prices and budget (ADR 0057). Every call is logged (usage/llm_calls: tokens, latency, cost).
+# A remote provider's model needs a [[price]] (USD per million tokens) or `free = true` (a free
+# tier): a model without one makes this file refuse to load, because a missing price must not
+# count as $0. A local server (Ollama) is free without one; `claude-cli` counts the notional cost
+# Claude Code reports. [budget] caps what the paid and reported providers may spend per exchange
+# calendar day / month (all optional; absent: no cap). Over a cap, `over = "free"` skips them and
+# lets only the free providers answer (the default), `over = "refuse"` refuses every call.
+# The Gemini free tier is `free = true`: logged at $0 (cost_basis "free") and still answering
+# when the budget is spent under `over = "free"`.
+#
+# [[price]]
+# model = "claude-haiku-4-5"
+# input_per_mtok = 1.0
+# output_per_mtok = 5.0
+#
+# [[price]]
+# model = "gemini-2.5-flash"
+# free = true
+#
+# [budget]
+# daily_usd = 1.0
+# monthly_usd = 15.0
+# over = "free"
