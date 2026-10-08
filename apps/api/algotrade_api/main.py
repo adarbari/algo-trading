@@ -13,7 +13,6 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date
 from functools import partial
-from typing import cast
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,7 +51,7 @@ from algotrade_api import __version__
 from algotrade_api.auth.local import LocalAuthenticator
 from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
-from algotrade_api.deps import ApiSettings, ReadStore, get_caller
+from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.graphql.schema import graphql_router, sdl
 from algotrade_api.live import no_live, open_live
 from algotrade_api.ops.build import api_stamp
@@ -64,28 +63,18 @@ from algotrade_api.web import web_router
 TITLE = "algotrade API"
 
 
-def _is_admin(request: Request) -> bool:
-    """Whether the caller of ``request`` is an admin (an error handler runs outside the route's
-    dependencies, so it asks the authenticator again; any failure reads as not an admin)."""
-    try:
-        caller = cast(Authenticator, request.app.state.authenticator).authenticate(request)
-    except Exception:  # unauthenticated, forbidden, a key fetch failing: not an admin
-        return False
-    return caller.role is Role.ADMIN
-
-
 def _not_found(request: Request, exc: Exception) -> JSONResponse:
     """404 with the text for an admin; for anyone else the data behind a missing table or a
     stored table's path is "not available because of a system error" (ADR 0056)."""
     text = str(exc)
-    if (isinstance(exc, MissingDataError) or names_a_table(text)) and not _is_admin(request):
+    if (isinstance(exc, MissingDataError) or names_a_table(text)) and not is_admin_request(request):
         text = GENERIC_REASONS[UnavailableKind.SYSTEM]
     return JSONResponse(status_code=404, content={"detail": text})
 
 
 def _bad_request(request: Request, exc: Exception) -> JSONResponse:
     text = str(exc)
-    if names_a_table(text) and not _is_admin(request):
+    if names_a_table(text) and not is_admin_request(request):
         text = GENERIC_REASONS[UnavailableKind.SYSTEM]
     return JSONResponse(status_code=400, content={"detail": text})
 

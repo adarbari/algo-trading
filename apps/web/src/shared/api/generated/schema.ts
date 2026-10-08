@@ -544,7 +544,10 @@ export interface components {
             status: string;
             /** Storage */
             storage: string;
-            /** Tables */
+            /**
+             * Tables
+             * @description the stored tables (admins only: empty for anyone else, ADR 0056)
+             */
             tables: string[];
             /** Versions */
             versions: {

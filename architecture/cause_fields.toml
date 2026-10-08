@@ -118,11 +118,6 @@ name = "ScreenVersion.document"
 reason = "the caller's own screen document"
 
 [[fact]]
-name = "Health.tables"
-surface = "rest"
-reason = "the stored table names of the public health probe (an ops check, unchanged by ADR 0056)"
-
-[[fact]]
 name = "PreviewRow.columns"
 surface = "rest"
 reason = "the display values of a previewed row"

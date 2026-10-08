@@ -151,6 +151,16 @@ def get_caller(request: Request) -> UserRecord:
 Caller = Annotated[UserRecord, Depends(get_caller)]
 
 
+def is_admin_request(request: Request) -> bool:
+    """Whether the caller of ``request`` is an admin, for a route or error handler that answers
+    without credentials (any failure to authenticate reads as not an admin)."""
+    try:
+        caller = cast(Authenticator, request.app.state.authenticator).authenticate(request)
+    except Exception:  # unauthenticated, forbidden, a key fetch failing
+        return False
+    return caller.role is Role.ADMIN
+
+
 def acting_for(caller: UserRecord, requested: str | None) -> str:
     """Whose configs a request is for: the caller, or the user ``requested`` names when the
     caller is an admin (ADR 0040 decision 2); a trader naming someone else is 403."""

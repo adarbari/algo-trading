@@ -599,6 +599,8 @@
             "type": "string"
           },
           "tables": {
+            "admin_cause": [],
+            "description": "the stored tables (admins only: empty for anyone else, ADR 0056)",
             "items": {
               "type": "string"
             },
