@@ -15,11 +15,14 @@ from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, _pbo, evaluate_edge
 from algotrade.services.evaluation.cross_section.picks import screen_variant
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
+from algotrade.storage.configs.files import MemoryConfigStore
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
+    ACTIVE,
     AS_OF,
     DAYS,
     IDS,
+    PRICE,
     N,
     World,
     build_world,
@@ -243,3 +246,36 @@ def test_the_probability_of_overfitting_leaves_out_sessions_a_variant_held_nothi
     held = tuple(dataclasses.replace(s, pick_values=()) for s in peers[1].stats)
     nothing = [peers[0], dataclasses.replace(peers[1], stats=held)]
     assert _pbo(nothing) is None  # no session where both held something: no guess at zero
+
+
+def test_session_without_scores_is_excluded_not_ranked() -> None:
+    # No name has a stored score on the first session (a rule screen still grades it COMPLETE).
+    w = build_world(price_of=lambda d, i: None if d == DAYS[0] else 100.0 + 10 * i)  # type: ignore[arg-type,return-value]
+    m = run(w).results[0].measures[0]
+    assert (m.excluded_score_coverage, m.excluded_coverage) == (1, 0)  # never ranked
+    assert m.sessions == 4 and m.decile_sessions == 3  # its picks still count
+    assert m.picks == 15 and m.hits == 15 and m.unscored == 0  # the 3 ranked sessions' picks
+    assert m.top_decile_mean is not None and m.top_decile_mean == pytest.approx(0.09)
+
+
+def test_deciles_rank_by_edge_score_not_rule_rank() -> None:
+    # Ascending score: the cheapest names score best, and they are REJECTed (price <= 150).
+    rule = {**screen("asc"), "criteria": {"price": {"field": PRICE, "op": "gt", "value": 150}}}
+    w = build_world(price_of=lambda d, i: None if i == N - 1 else 100.0 + 10 * i)  # type: ignore[arg-type,return-value]
+    w.configs = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "momo"): rule}
+    )
+    m = run(w).results[0].measures[0]
+    # Top decile = the 2 best scores of the 19 scored names (N00, N01: rejects), not the
+    # qualified names the rule rank puts first.
+    assert m.top_decile_mean == pytest.approx(-0.09)
+    assert m.unscored == 4  # N19 has no price on any of the 4 sessions: outside the deciles
+
+
+def test_score_coverage_boundary() -> None:
+    def measured(unscored: int) -> int:
+        w = build_world(price_of=lambda d, i: None if i < unscored else 100.0 + 10 * i)  # type: ignore[arg-type,return-value]
+        return run(w).results[0].measures[0].decile_sessions
+
+    assert measured(4) == 4  # 16 of 20 scored: exactly 80%, ranked
+    assert measured(5) == 0  # 75%: no deciles (the picks still count)

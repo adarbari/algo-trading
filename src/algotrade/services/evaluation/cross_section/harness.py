@@ -61,6 +61,11 @@ BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols
 PBO_SPLITS = 16
 UNKNOWN = "UNKNOWN"
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
+# A session is measured only when at least this share of the eligible names carries the edge's
+# score; the rest are counted as ``unscored`` and never ranked (recent listings lack a year of
+# history, but a session where the signal was not computed at all is dropped). The screen's own
+# coverage (``DEFAULT_MIN_COVERAGE``) is a different check.
+MIN_SCORE_COVERAGE = 0.8
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
 
@@ -191,6 +196,8 @@ def _stat(
     run, ids = session.run(variant, day), session.eligible(day)
     if run.coverage not in MEASURED_COVERAGE:  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
+    scored = {i: v for i, v in run.scores.items() if i in ids and v is not None}
+    thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
     inside = rows[rows["instrument_id"].isin(ids)]
     implied = session.implied(day) if needs_implied_vol(edge) else None
     res = apply_outcome(edge, inside, implied).set_index("instrument_id")
@@ -200,7 +207,11 @@ def _stat(
     pick_set = set(picks)
     have = set(res.index)
     got = [i for i in picks if i in counted.index]
-    ranked = [i for i in run.ranking if i in counted.index]
+    ranked = (
+        []
+        if thin
+        else sorted((i for i in scored if i in counted.index), key=lambda i: (-scored[i], i))
+    )
     deciles = decile_means(counted.loc[ranked, "oriented"].to_list()) if ranked else None
     return SessionStat(
         session=day,
@@ -212,6 +223,8 @@ def _stat(
         top_decile=deciles[0] if deciles else None,
         spread=deciles[1] if deciles else None,
         ranked=len(ranked),
+        unscored=0 if thin else len(ids) - len(scored),
+        excluded_score_coverage=int(thin),
         excluded_unclosed=sum(1 for i in picks if i not in have),
         excluded_missing=sum(1 for i in picks if i in have and i not in counted.index),
         delisted=int(counted.loc[got, "delisted"].sum()),
