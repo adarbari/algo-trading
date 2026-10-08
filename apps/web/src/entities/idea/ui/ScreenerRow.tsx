@@ -4,6 +4,7 @@
  * did not run for the session (and why).
  */
 import { Button, Mono, Stack, Text } from '@algotrade/ui';
+import type { ReactNode } from 'react';
 
 import { unknownText } from '@/entities/availability';
 
@@ -16,9 +17,11 @@ export interface ScreenerRowProps {
   rank: number;
   /** Open the screener's results; with it the name is a button. */
   onOpen?: (screenerId: string) => void;
+  /** The screener's odds line (its frozen-period record), under its finds; the widget supplies it. */
+  odds?: ReactNode;
 }
 
-export function ScreenerRow({ screener, rank, onOpen }: ScreenerRowProps) {
+export function ScreenerRow({ screener, rank, onOpen, odds }: ScreenerRowProps) {
   const meta = [screener.owner, screener.version === null ? null : `v${screener.version}`]
     .filter(Boolean)
     .join(' · ');
@@ -58,6 +61,7 @@ export function ScreenerRow({ screener, rank, onOpen }: ScreenerRowProps) {
           >
             {finds}
           </Text>
+          {odds}
         </Stack>
       </Stack>
       <Stack gap={0} align="end">

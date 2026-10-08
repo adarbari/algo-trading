@@ -89,6 +89,16 @@ export type OptionQuotesQueryVariables = Exact<{
 
 export type OptionQuotesQuery = { instrument: { instrumentId: string, chain: { quotes: Array<{ instrumentId: string, expiry: string, right: string, strike: number, bid: number | null, ask: number | null, last: number | null, volume: number | null, openInterest: number | null, iv: number | null, delta: number | null, gamma: number | null, theta: number | null, vega: number | null }> } | null } | null };
 
+export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, schedule: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, variants: Array<string>, frozenFrom: string | null, rejectionReason: string, evidence: { runId: string, splitFrom: string } | null, canonicalRun: { runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, afterSession: boolean, rows: Array<{ edgeVariant: string, variant: string, role: string, horizonSessions: number, sliceKind: string, sliceValue: string, sessions: number | null, picks: number | null, hitRate: number | null, baseRate: number | null, lift: number | null, exploratory: boolean }> } | null, canonicalNotRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string }> }> };
+
+export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: string }>, screeners: Array<{ id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, lift: number | null, sessions: number | null, picks: number | null }> }> }> };
+
 export type EventCalendarQueryVariables = Exact<{
   instrumentIds: Array<string> | string;
   scope: boolean;
@@ -497,6 +507,120 @@ export const OptionQuotesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<OptionQuotesQuery, OptionQuotesQueryVariables>;
+export const EdgesPageDocument = new TypedDocumentString(`
+    query EdgesPage {
+  edges {
+    id
+    name
+    status
+    thesis
+    mechanism
+    persistence
+    schedule
+    horizons
+    screeners
+    baselines
+    variants
+    frozenFrom
+    rejectionReason
+    evidence {
+      runId
+      splitFrom
+    }
+    canonicalRun {
+      runId
+      owner
+      rangeFrom
+      rangeTo
+      splitFrom
+      exploratory
+      knowledgeTs
+      afterSession
+      rows {
+        edgeVariant
+        variant
+        role
+        horizonSessions
+        sliceKind
+        sliceValue
+        sessions
+        picks
+        hitRate
+        baseRate
+        lift
+        exploratory
+      }
+    }
+    canonicalNotRun {
+      code
+      reason
+      kind
+      guideTerm
+      kindText
+      cause {
+        links {
+          level
+          subject
+          status
+          message
+          runId
+        }
+      }
+    }
+    runs {
+      runId
+      owner
+      rangeFrom
+      rangeTo
+      splitFrom
+      exploratory
+      knowledgeTs
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
+    query ScreenerTrackRecords {
+  edges {
+    id
+    status
+  }
+  screeners {
+    id
+    trackRecords {
+      screenerId
+      edgeId
+      edgeName
+      runLabel
+      afterSession
+      notRun {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      horizons {
+        horizonSessions
+        hitRate
+        baseRate
+        lift
+        sessions
+        picks
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenerTrackRecordsQuery, ScreenerTrackRecordsQueryVariables>;
 export const EventCalendarDocument = new TypedDocumentString(`
     query EventCalendar($instrumentIds: [String!]!, $scope: Boolean!) {
   eventCalendar(instrumentIds: $instrumentIds, scope: $scope) {
