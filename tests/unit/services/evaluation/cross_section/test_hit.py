@@ -14,6 +14,7 @@ NAN = float("nan")
 VRP = {
     "kind": "hit_target", "horizon_sessions": [20], "benchmark": "none", "target": 1.0,
     "measure": "realised_to_implied_vol", "direction": "below", "max_drawdown": 0.5,
+    "start_offset_sessions": 1,
 }  # fmt: skip
 
 
@@ -33,6 +34,7 @@ def test_an_excess_return_hit_is_net_of_the_round_trip_cost() -> None:
             "kind": "excess_return",
             "horizon_sessions": [2],
             "benchmark": "SPY",
+            "start_offset_sessions": 1,
             "cost_bps": 100,
         }
     )

@@ -1,8 +1,8 @@
 """An evaluation as stored rows and a run record (ADR 0053, ADR 0015): ``results/edge_eval``
-gets one row per (variant, horizon, slice) of the run's range, published atomically (pending,
-then committed); the run record ``edge-eval:<edge>`` keeps the trial log (the "all" row of each
-variant and horizon, the count the next run's deflated Sharpe ratio is taken over), the run
-hash and how much was excluded."""
+gets one row per (edge variant, variant, horizon, slice) of the run's range, published
+atomically (pending, then committed); the run record ``edge-eval:<edge>`` keeps the trial log
+(the "all" row of each variant and horizon, the count the next run's deflated Sharpe ratio is
+taken over), the run hash and how much was excluded."""
 
 from dataclasses import asdict
 from datetime import datetime
@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.config.edges.document import MAIN
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
@@ -40,6 +41,7 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                 {
                     "edge_id": evaluation.edge_id,
                     "user_id": evaluation.user_id,
+                    "edge_variant": None if r.edge_variant == MAIN else r.edge_variant,
                     "variant": r.variant,
                     "role": r.role,
                     "config_hash": r.config_hash,
@@ -50,6 +52,11 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                     "slice_value": m.slice_value,
                     "range_from": evaluation.start,
                     "range_to": evaluation.end,
+                    "iv_source": r.iv_source,
+                    "licence": r.licence,
+                    # Filled by the expires_otm outcome (ED4a): null until then.
+                    "reference_rate": float("nan"),
+                    "touch_rate": float("nan"),
                     **{c: measured[c] for c in MEASURE_COLUMNS},
                 }
             )
@@ -73,6 +80,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
     m = r.measures[0]  # the "all" slice
     eligible = sum(s.eligible for s in r.stats)
     return {
+        "edge_variant": r.edge_variant,
         "variant": r.variant,
         "role": r.role,
         "config_hash": r.config_hash,
@@ -87,6 +95,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "deflated_sharpe": m.deflated_sharpe,
         "ranked_share": sum(s.ranked for s in r.stats) / eligible if eligible else None,
         "outside_universe": sum(s.outside_universe for s in r.stats),
+        "no_entry_bar": sum(s.no_entry_bar for s in r.stats),
         "excluded_coverage": m.excluded_coverage,
     }
 
@@ -115,6 +124,7 @@ def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datet
         "trials": [_trial(evaluation, r) for r in evaluation.results],
         "start_sessions": dict(evaluation.start_sessions),
         "unclosed_sessions": dict(evaluation.unclosed_sessions),
+        "event_unknown": dict(evaluation.event_unknown),
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
     }
     # The record goes in before the commit: a crash between the two leaves a trial counted

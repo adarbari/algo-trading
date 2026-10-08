@@ -30,13 +30,15 @@ measure = "realised_to_implied_vol"
 direction = "below"
 target = 1.0
 max_drawdown = 0.5
+start_offset_sessions = 1
 
 [quality_bar]
 outcome = """Realised below implied over the option's horizon, with a drawdown cap on a short
 straddle proxy: how a short-premium trade is held, to expiry, with a stop (the PRD's proposal,
 ADR 0053 open decisions)."""
-trigger_timing = """IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of S; the
-first session we act is S+1, so no window may start before S's close."""
+trigger_timing = """IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of the
+decision session D, so the first fill is the next session's close: the entry session is S = D + 1
+(start_offset_sessions = 1). The screen and the implied vol are read at D, the outcome at S."""
 replication = """The screens as they are: short_premium_liquidity (tradable put and call wings,
 option_liquidity@v1) and vrp_scanner v3 (IV30 at least 50%, IV30 minus HV30 at least 10 points,
 IV30 / HV30 at least 1.25). The published setting is index variance (Carr and Wu 2009); single
