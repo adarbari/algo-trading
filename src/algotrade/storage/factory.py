@@ -41,4 +41,6 @@ def open_text_cache(url: str) -> LocalTextCache | MemoryTextCache:
 
 def open_config_store(directory: str | Path) -> ConfigStore:
     """TOML config files under ``directory`` (``config.env.config_dir()`` by default)."""
-    return FileConfigStore(Path(directory))
+    return FileConfigStore(
+        Path(directory)
+    )  # tests over the repo config build FileConfigStore(..., local=False)

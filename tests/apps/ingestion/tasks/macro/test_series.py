@@ -265,7 +265,7 @@ def test_a_published_file_is_refetched_by_cadence_but_at_most_weekly() -> None:
 
 def test_the_registry_entry_runs_the_task_from_the_site_registry() -> None:
     ctx = context(Feeds())
-    ctx.configs = FileConfigStore(config_dir())
+    ctx.configs = FileConfigStore(config_dir(), local=False)
     record = run_task(
         "macro", ctx, {"session": D1, "only": "SPX,T10Y3M", "since": date(2026, 9, 1)}
     )

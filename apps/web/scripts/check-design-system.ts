@@ -6,6 +6,8 @@
  *     named in `parameters.states.notApplicable` with the reason;
  *   - a `Narrow` story when its CSS has an `@container` or `(pointer: coarse)` rule, or the
  *     reason it has none in `parameters.states.notApplicable` (ADR 0025 rule 10);
+ *   - a story whose `play` clicks settles before the screenshot (`await waitFor(` or
+ *     `await expect(` after the last click), or is tagged `tags: ['no-screenshot']`;
  *   - an axe accessibility assertion in its unit test;
  *   - committed screenshots for every story in light and dark (__screenshots__/, made by
  *     `npm run visual:update`; compared in CI).
@@ -29,6 +31,41 @@ export function storyNames(source: string): string[] {
 export function notApplicable(source: string): Set<string> {
   const block = /notApplicable:\s*\{([^}]*)\}/s.exec(source)?.[1] ?? '';
   return new Set([...block.matchAll(/(\w+):\s*['"`][^'"`]{10,}/g)].map((m) => m[1] as string));
+}
+
+export const NO_SCREENSHOT_TAG = 'no-screenshot';
+
+/** Each story export with its source text. */
+function storyBlocks(source: string): { name: string; body: string }[] {
+  const starts = [...source.matchAll(/^export const (\w+)\s*:/gm)];
+  return starts.map((match, i) => ({
+    name: match[1] as string,
+    body: source.slice(match.index, starts[i + 1]?.index ?? source.length),
+  }));
+}
+
+const isTagged = (body: string): boolean =>
+  new RegExp(`tags:\\s*\\[[^\\]]*['"]${NO_SCREENSHOT_TAG}['"]`).test(body);
+
+/** Stories tagged `tags: ['no-screenshot']`: the visual suite skips them, so they have no PNG. */
+export function noScreenshotStories(source: string): Set<string> {
+  return new Set(
+    storyBlocks(source)
+      .filter((b) => isTagged(b.body))
+      .map((b) => b.name),
+  );
+}
+
+/** Stories whose `play` clicks and then neither settles nor opts out of the screenshot. */
+export function unsettledClickStories(source: string): string[] {
+  return storyBlocks(source)
+    .filter(({ body }) => {
+      const lastClick = body.lastIndexOf('.click(');
+      if (lastClick < 0 || lastClick < body.indexOf('play:') || !body.includes('play:'))
+        return false;
+      return !/await (waitFor|expect)\(/.test(body.slice(lastClick)) && !isTagged(body);
+    })
+    .map((b) => b.name);
 }
 
 export function problems(folder: ComponentFolder): string[] {
@@ -56,6 +93,11 @@ export function problems(folder: ComponentFolder): string[] {
       );
     }
   }
+  for (const story of unsettledClickStories(stories)) {
+    found.push(
+      `story '${story}' clicks in play and does not settle: add 'await waitFor(' or 'await expect(' after the click, or tags: ['${NO_SCREENSHOT_TAG}'] (a screenshot taken mid-redraw flakes; docs/ci.md "Flaky specs")`,
+    );
+  }
   const cssPath = join(dir, `${name}.module.css`);
   const css = existsSync(cssPath) ? readFileSync(cssPath, 'utf8') : '';
   if (
@@ -74,7 +116,8 @@ export function problems(folder: ComponentFolder): string[] {
   const shots = existsSync(join(dir, '__screenshots__'))
     ? readdirSync(join(dir, '__screenshots__'))
     : [];
-  for (const story of names) {
+  const unshot = noScreenshotStories(stories);
+  for (const story of names.filter((n) => !unshot.has(n))) {
     for (const theme of THEMES) {
       const file = `${storyFileStem(story)}.${theme}.png`;
       if (!shots.includes(file))
