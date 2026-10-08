@@ -12,7 +12,6 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section import harness
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, _pbo, evaluate_edge
 from algotrade.services.evaluation.cross_section.picks import screen_variant
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
@@ -258,8 +257,7 @@ def test_session_without_scores_is_excluded_not_ranked() -> None:
     assert m.top_decile_mean is not None and m.top_decile_mean == pytest.approx(0.09)
 
 
-def test_deciles_rank_by_edge_score_not_rule_rank(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(harness, "DEFAULT_MIN_COVERAGE", 0.9)  # 1 of the 20 names is unscored
+def test_deciles_rank_by_edge_score_not_rule_rank() -> None:
     # Ascending score: the cheapest names score best, and they are REJECTed (price <= 150).
     rule = {**screen("asc"), "criteria": {"price": {"field": PRICE, "op": "gt", "value": 150}}}
     w = build_world(price_of=lambda d, i: None if i == N - 1 else 100.0 + 10 * i)  # type: ignore[arg-type,return-value]
@@ -271,3 +269,12 @@ def test_deciles_rank_by_edge_score_not_rule_rank(monkeypatch: pytest.MonkeyPatc
     # qualified names the rule rank puts first.
     assert m.top_decile_mean == pytest.approx(-0.09)
     assert m.unscored == 4  # N19 has no price on any of the 4 sessions: outside the deciles
+
+
+def test_score_coverage_boundary() -> None:
+    def measured(unscored: int) -> int:
+        w = build_world(price_of=lambda d, i: None if i < unscored else 100.0 + 10 * i)  # type: ignore[arg-type,return-value]
+        return run(w).results[0].measures[0].sessions
+
+    assert measured(4) == 4  # 16 of 20 scored: exactly 80%, measured
+    assert measured(5) == 0  # 75%: not measured

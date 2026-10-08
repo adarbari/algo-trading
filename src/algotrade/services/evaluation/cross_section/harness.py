@@ -33,7 +33,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.engines.screening.runner import DEFAULT_MIN_COVERAGE, RunCoverage
+from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.hit import (
@@ -61,6 +61,11 @@ BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols
 PBO_SPLITS = 16
 UNKNOWN = "UNKNOWN"
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
+# A session is measured only when at least this share of the eligible names carries the edge's
+# score; the rest are counted as ``unscored`` and never ranked (recent listings lack a year of
+# history, but a session where the signal was not computed at all is dropped). The screen's own
+# coverage (``DEFAULT_MIN_COVERAGE``) is a different check.
+MIN_SCORE_COVERAGE = 0.8
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
 
@@ -192,7 +197,7 @@ def _stat(
     if run.coverage not in MEASURED_COVERAGE:  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     scored = {i: v for i, v in run.scores.items() if i in ids and v is not None}
-    if len(scored) < DEFAULT_MIN_COVERAGE * len(ids):  # no score to rank by: never ranked
+    if len(scored) < MIN_SCORE_COVERAGE * len(ids):  # no score to rank by: never ranked
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     inside = rows[rows["instrument_id"].isin(ids)]
     implied = session.implied(day) if needs_implied_vol(edge) else None
