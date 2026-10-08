@@ -1,10 +1,13 @@
-/** Page: the Guide (home, field index and page, playbook index and page, situation index and page). */
+/** Page: the Guide (home, field, playbook, situation and market regime pages). */
 export {
+  GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
   GuideHomePage,
+  GuideIndicatorPage,
   GuidePlaybookPage,
   GuidePlaybooksPage,
+  GuideRegimePage,
   GuideSituationPage,
   GuideSituationsPage,
   type GuideFieldPageProps,

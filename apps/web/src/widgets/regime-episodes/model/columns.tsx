@@ -1,11 +1,13 @@
 /**
  * The episodes table's columns: the episode's name (over what kind it was), when the S&P 500 peaked
  * and bottomed, how far it fell, when it regained its peak (or that it has not), and whether the
- * NBER dated a recession in it. The rows are reference market falls, not instruments.
+ * NBER dated a recession in it, and a help button that opens the fall's Guide entry. The rows are
+ * reference market falls, not instruments.
  */
 import { Stack, Text, type DataTableColumn } from '@algotrade/ui';
 
 import type { RegimeEpisode } from '@/entities/regime';
+import { GuideHelp } from '@/features/guide-help';
 
 export const NOT_RECOVERED = 'Not yet';
 
@@ -64,6 +66,15 @@ export function episodeColumns(): DataTableColumn<RegimeEpisode>[] {
       description: 'The NBER dated a recession that overlapped the fall',
       value: (row) => (row.recession ? 'Yes' : 'No'),
       tone: 'secondary',
+    },
+    {
+      id: 'guide',
+      header: 'Guide',
+      description: 'What caused the fall and how it unfolded',
+      value: () => '',
+      hideable: false,
+      sortable: false,
+      cell: ({ row }) => <GuideHelp entry={{ kind: 'episode', id: row.key }} />,
     },
   ];
 }

@@ -1,140 +1,38 @@
 /**
  * The help button for a Guide entry and the drawer it opens (ADR 0051, docs/ui/guide.md
  * "The help drawer"): an `InfoButton` whose hover is the entry's first sentence and whose click
- * opens the entry: the catalogue name, the title, the theme and unit, how to read it, what to use
- * it for (each intent with its rule, and "Use this" when the page passes `onUse`), how many caveats the full page lists, and "Open full page".
- * The text is the server's; nothing is written here.
+ * opens the entry's first sections and "Open full page". The kind picks the sections: a field
+ * (how to read it, what to use it for, "Use this" when the page passes `onUse`), a regime
+ * indicator (why it matters, when it is on, lead time and track record) or a reference market
+ * fall (dates, drawdowns, cause). The text is the server's; nothing is written here.
  */
-import {
-  Button,
-  ErrorState,
-  HelpDrawer,
-  HelpLead,
-  HelpSection,
-  InfoButton,
-  Mono,
-  Skeleton,
-  Stack,
-  Surface,
-  Text,
-} from '@algotrade/ui';
-import { useState } from 'react';
+import type { GuideUse } from '@/entities/feature';
 
-import { featureTitle, ruleText, unitLabel, type GuideUse } from '@/entities/feature';
-
-import { useGuideHelp } from '../api/hooks';
-import { guidePath, type GuideEntry } from '../model/entry';
-import { useGuideNavigate } from '../model/navigation';
+import type { GuideEntry } from '../model/entry';
+import { EpisodeHelp } from './EpisodeHelp';
+import { FieldHelp } from './FieldHelp';
+import { IndicatorHelp } from './IndicatorHelp';
 
 export interface GuideHelpProps {
   /** The Guide entry the button explains. */
   entry: GuideEntry;
   /**
-   * Set the thing being edited to one of the field's intents (a criterion row in the Builder).
-   * Each intent shows "Use this" only when given; the drawer closes so the change is seen.
+   * Field entries: set the thing being edited to one of the field's intents (a criterion row in
+   * the Builder). Each intent shows "Use this" only when given; the drawer closes so the change
+   * is seen.
    */
   onUse?: (use: GuideUse) => void;
-  /** The "Use this" buttons are inert (a read-only form). */
+  /** Field entries: the "Use this" buttons are inert (a read-only form). */
   useDisabled?: boolean;
 }
 
-/** "3 caveats" / "1 caveat", for the line that points to the full page. */
-const caveatCount = (n: number) => `${String(n)} ${n === 1 ? 'caveat' : 'caveats'}`;
-
 export function GuideHelp({ entry, onUse, useDisabled = false }: GuideHelpProps) {
-  const [open, setOpen] = useState(false);
-  const navigate = useGuideNavigate();
-  const help = useGuideHelp(entry.id);
-  const title = featureTitle(entry.id);
-  const guide = help.data?.guide ?? null;
-  const unit = unitLabel(help.data?.unit ?? null);
-  const meta = [guide?.theme, unit].filter(Boolean).join(' · ');
-  return (
-    <>
-      <InfoButton
-        label={`What is ${title}?`}
-        {...(guide ? { summary: guide.summary } : {})}
-        expanded={open}
-        onClick={() => {
-          setOpen(true);
-        }}
-      />
-      <HelpDrawer
-        open={open}
-        onOpenChange={setOpen}
-        eyebrow={<Mono>{entry.id}</Mono>}
-        title={title}
-        {...(meta ? { meta } : {})}
-        fullPage={
-          <Button
-            variant="ghost"
-            size="sm"
-            iconEnd="chevron-right"
-            onClick={() => {
-              setOpen(false);
-              navigate(guidePath(entry));
-            }}
-          >
-            Open full page
-          </Button>
-        }
-      >
-        {help.isPending ? (
-          <Skeleton label={`Loading ${title}`} />
-        ) : help.isError ? (
-          <ErrorState
-            title={`${title} could not be loaded.`}
-            onRetry={() => {
-              void help.refetch();
-            }}
-            retrying={help.isFetching}
-            compact
-          />
-        ) : !guide ? (
-          <Text tone="muted">The Guide has no entry for this field yet.</Text>
-        ) : (
-          <>
-            <HelpLead>{guide.reads}</HelpLead>
-            {guide.uses.length > 0 ? (
-              <HelpSection title="Use it for">
-                <Stack gap={2}>
-                  {guide.uses.map((use) => (
-                    <Surface key={use.intent} tone="row" border="all" radius="lg" padding={3}>
-                      <Stack gap={1}>
-                        <Text weight="medium">{use.intent}</Text>
-                        <Text size="sm" mono>
-                          {ruleText(use)}
-                        </Text>
-                        {onUse ? (
-                          <Stack direction="row" gap={2}>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              aria-label={`Use this: ${use.intent}`}
-                              disabled={useDisabled}
-                              onClick={() => {
-                                setOpen(false);
-                                onUse(use);
-                              }}
-                            >
-                              Use this
-                            </Button>
-                          </Stack>
-                        ) : null}
-                      </Stack>
-                    </Surface>
-                  ))}
-                </Stack>
-              </HelpSection>
-            ) : null}
-            {guide.caveats.length > 0 ? (
-              <Text size="sm" tone="muted">
-                {caveatCount(guide.caveats.length)} on the full page.
-              </Text>
-            ) : null}
-          </>
-        )}
-      </HelpDrawer>
-    </>
-  );
+  switch (entry.kind) {
+    case 'field':
+      return <FieldHelp name={entry.id} onUse={onUse} useDisabled={useDisabled} />;
+    case 'indicator':
+      return <IndicatorHelp indicatorKey={entry.id} />;
+    case 'episode':
+      return <EpisodeHelp episodeKey={entry.id} />;
+  }
 }

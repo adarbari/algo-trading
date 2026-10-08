@@ -2,13 +2,12 @@
  * Trader > Regime: the market as weather, and how to read it. The header (the weather word,
  * its sentence, the three scores, what changed this week), one legend for the colors of every
  * chart, the scores through the cycles, the slow and fast warning signs (each with its meter,
- * explanation, sources and history) beside the caller's sizing rules (read-only), the reference
- * market falls (a row sets every chart's window) and the reading list the cards cite.
+ * sources and history; a help button opens each one's Guide entry) beside the caller's sizing rules
+ * (read-only), and the reference market falls (a row sets every chart's window).
  */
 import { Grid, Heading, Stack, Text } from '@algotrade/ui';
 
 import { RegimeRangeProvider } from '@/features/regime-range';
-import { ReadingList } from '@/widgets/reading-list';
 import { RegimeCycles } from '@/widgets/regime-cycles';
 import { RegimeEpisodes } from '@/widgets/regime-episodes';
 import { RegimeHeader } from '@/widgets/regime-header';
@@ -35,7 +34,6 @@ export function RegimePage() {
           <RegimeSizing />
         </Grid>
         <RegimeEpisodes />
-        <ReadingList />
       </RegimeRangeProvider>
     </Stack>
   );
