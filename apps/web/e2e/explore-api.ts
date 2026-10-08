@@ -13,7 +13,16 @@ import { fileURLToPath } from 'node:url';
 
 import type { Page, Route } from '@playwright/test';
 
-import { FAMILIES, guidePlaybook, guideSituation, linked, SITUATION } from './guide-pages-api';
+import {
+  FAMILIES,
+  guideEpisode,
+  guideIndicator,
+  guidePlaybook,
+  guideSituation,
+  linked,
+  REGIME_INDEX,
+  SITUATION,
+} from './guide-pages-api';
 
 type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -337,6 +346,12 @@ function guideIndex(): Json {
       guideIndex: {
         sections: [
           { id: 'start', title: 'Start here', purpose: 'How the app thinks.', entries: 4 },
+          {
+            id: 'regime',
+            title: 'Market regime',
+            purpose: 'The indicators behind the weather and the falls they are judged on.',
+            entries: REGIME_INDEX.indicators.length + REGIME_INDEX.episodes.length,
+          },
           { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 2 },
           { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 3 },
           {
@@ -347,6 +362,8 @@ function guideIndex(): Json {
           },
         ],
         families: FAMILIES,
+        indicators: REGIME_INDEX.indicators,
+        episodes: REGIME_INDEX.episodes,
         situations: [{ name: SITUATION.name, fields: 1, slug: SITUATION.slug }],
         themeGroups: [
           {
@@ -411,6 +428,8 @@ function graphqlAnswer(operation: Operation): Json | null {
   if (name === 'FeatureCatalogue') return catalogue();
   if (name === 'GuideIndex') return guideIndex();
   if (name === 'GuidePlaybook') return guidePlaybook(String(operation.variables?.['id']));
+  if (name === 'GuideIndicator') return guideIndicator(String(operation.variables?.['key']));
+  if (name === 'GuideEpisode') return guideEpisode(String(operation.variables?.['slug']));
   if (name === 'GuideSituation') return guideSituation(String(operation.variables?.['slug']));
   if (name === 'GuideField') return guideField(String(operation.variables?.['name']));
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));

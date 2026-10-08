@@ -1,7 +1,7 @@
 /**
  * The Guide's pages (ADR 0051): the home (`/guide`), the field index (`/guide/fields`) and one
  * field's page (`/guide/fields/$name`), the playbook index and a playbook's page, the situation
- * index and a situation's page. Each is the reference frame (a rail on the side, the article,
+ * index and a situation's page, the Market regime index and an indicator's and a market fall's page. Each is the reference frame (a rail on the side, the article,
  * and on a field page the "On this page" list) around one widget; the choices (view, theme,
  * intent, field, playbook, situation) and where a playbook's buttons go come from the route as
  * props.
@@ -15,6 +15,7 @@ import { GuideHome } from '@/widgets/guide-home';
 import { GuidePlaybook } from '@/widgets/guide-playbook';
 import { GuidePlaybooksIndex } from '@/widgets/guide-playbooks';
 import { GuideRail } from '@/widgets/guide-rail';
+import { GuideEpisode, GuideIndicator, GuideRegimeIndex } from '@/widgets/guide-regime';
 import { GuideSituation, GuideSituationsIndex } from '@/widgets/guide-situations';
 
 export function GuideHomePage() {
@@ -89,6 +90,30 @@ export function GuideSituationPage({ slug }: { slug: string }) {
   return (
     <DocLayout rail={<GuideRail page="situation" situation={slug} />}>
       <GuideSituation slug={slug} />
+    </DocLayout>
+  );
+}
+
+export function GuideRegimePage() {
+  return (
+    <DocLayout rail={<GuideRail page="regime" />}>
+      <GuideRegimeIndex />
+    </DocLayout>
+  );
+}
+
+export function GuideIndicatorPage({ indicatorKey }: { indicatorKey: string }) {
+  return (
+    <DocLayout rail={<GuideRail page="indicator" indicator={indicatorKey} />}>
+      <GuideIndicator indicatorKey={indicatorKey} />
+    </DocLayout>
+  );
+}
+
+export function GuideEpisodePage({ slug }: { slug: string }) {
+  return (
+    <DocLayout rail={<GuideRail page="episode" episode={slug} />}>
+      <GuideEpisode slug={slug} />
     </DocLayout>
   );
 }

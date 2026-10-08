@@ -12,6 +12,16 @@ import { RegimeEpisodes } from './RegimeEpisodes';
 
 stubElementSize();
 
+// The help button and its drawer: GuideHelp.test.tsx.
+vi.mock('@/features/guide-help', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    GuideHelp: ({ entry }: { entry: { kind: string; id: string } }) => (
+      <Button>{`Help: ${entry.kind} ${entry.id}`}</Button>
+    ),
+  };
+});
+
 const hooks = vi.hoisted(() => ({ useRegime: vi.fn(), useRegimeEpisodes: vi.fn() }));
 vi.mock('@/entities/regime', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -80,6 +90,23 @@ describe('RegimeEpisodes', () => {
     expect(rows[2]).toHaveTextContent('Recession bear market');
     expect(rows[2]).toHaveTextContent(/[-−]57%/);
     expect(screen.getByRole('grid', { name: 'Market falls' })).toBeVisible();
+  });
+
+  it('gives each fall a help button for its Guide entry that does not choose the row', async () => {
+    render(
+      <RegimeRangeProvider>
+        <RegimeEpisodes />
+        <Window />
+      </RegimeRangeProvider>,
+    );
+    const buttons = screen.getAllByRole('button', { name: /^Help: / });
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      'Help: episode tariffs_2025',
+      'Help: episode covid_2020',
+      'Help: episode gfc_2008',
+    ]);
+    await userEvent.setup().click(buttons[0] as HTMLElement);
+    expect(screen.getByText('window 1971-01-01 to 2026-10-02')).toBeVisible();
   });
 
   it('sets every chart to a year before the peak through six months after the recovery', async () => {

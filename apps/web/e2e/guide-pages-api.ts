@@ -3,8 +3,15 @@
  * server derives, docs/ui/guide.md section 3): the index's families and situations,
  * `Query.guidePlaybook` and `Query.guideSituation` for a breakout and a VRP playbook and one
  * situation, and the linked prose (text cut at the catalogue names it mentions, as the
- * server does).
+ * server does); and the market regime's: `GuideIndex`'s indicators and episodes,
+ * `Query.guideIndicator(key)` and `Query.guideEpisode(slug)`, built from the same recorded
+ * fixtures as the Regime page (fixtures/regime/), so the Guide says what the cards and episodes
+ * say. Before-lines are tied to the episodes they mean by the label ("2008" is the global
+ * financial crisis), as the server does with `episodes.toml`.
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 type Json = Record<string, unknown>;
 
 /** Text cut at the first mention of each name: `{ text, field }` segments, as `GuideProse`. */
@@ -134,6 +141,102 @@ export function guideSituation(slug: string): Json {
         do: linked(SITUATION.do, SITUATION.affects),
         affects: SITUATION.affects,
         playbooks: [{ id: 'vrp_scanner', name: 'VRP scanner', fields: [IV30] }],
+      },
+    },
+  };
+}
+
+const fixture = (name: string): { data: { regime: Json } } =>
+  JSON.parse(
+    readFileSync(fileURLToPath(new URL(`./fixtures/regime/${name}.json`, import.meta.url)), 'utf8'),
+  ) as { data: { regime: Json } };
+
+interface Card {
+  key: string;
+  pace: string;
+  plainName: string;
+  technicalName: string;
+  oneLiner: string;
+  whyItMatters: string;
+  whatOnMeans: string;
+  before: { episode: string; line: string }[];
+  leadTime: string;
+  falseAlarms: string;
+  links: { title: string; url: string }[];
+  how: { text: string; url: string | null }[];
+  feature: string;
+}
+interface Episode extends Json {
+  key: string;
+  name: string;
+  cause: string;
+  notes: string;
+}
+
+const CARDS = fixture('regime').data.regime['indicators'] as Card[];
+const EPISODES = fixture('regime-episodes').data.regime['episodes'] as Episode[];
+
+/** The episode a before-line's label means (null: none of the reference falls). */
+const LABELS: Record<string, string> = { '2008': 'gfc_2007', '2020': 'covid_2020' };
+
+const plain = (text: string): Json => ({ text, segments: text ? [{ text, field: null }] : [] });
+
+/** `GuideIndex.indicators` and `.episodes`. */
+export const REGIME_INDEX = {
+  indicators: CARDS.map(({ key, plainName, pace }) => ({ key, plainName, pace })),
+  episodes: EPISODES.map(({ key, name }) => ({ key, name })),
+};
+
+/** `Query.guideIndicator(key)`: null for a key that is not a card. */
+export function guideIndicator(key: string): Json {
+  const card = CARDS.find((c) => c.key === key);
+  if (!card) return { data: { guideIndicator: null } };
+  return {
+    data: {
+      guideIndicator: {
+        key: card.key,
+        plainName: card.plainName,
+        technicalName: card.technicalName,
+        pace: card.pace,
+        summary: plain(card.oneLiner),
+        whyItMatters: plain(card.whyItMatters),
+        whatOnMeans: plain(card.whatOnMeans),
+        leadTime: plain(card.leadTime),
+        trackRecord: plain(card.falseAlarms),
+        before: card.before.map((b) => ({
+          label: b.episode,
+          line: plain(b.line),
+          episode: LABELS[b.episode] ?? null,
+        })),
+        how: card.how,
+        feature: card.feature,
+        sources: card.links,
+      },
+    },
+  };
+}
+
+/** `Query.guideEpisode(slug)`: the episode with the indicators whose before-line is about it. */
+export function guideEpisode(slug: string): Json {
+  const episode = EPISODES.find((e) => e.key === slug);
+  if (!episode) return { data: { guideEpisode: null } };
+  const { cause, notes, ...facts } = episode;
+  return {
+    data: {
+      guideEpisode: {
+        episode: facts,
+        cause: plain(cause),
+        notes: plain(notes),
+        indicators: CARDS.flatMap((card) =>
+          card.before
+            .filter((b) => LABELS[b.episode] === slug)
+            .map((b) => ({
+              key: card.key,
+              plainName: card.plainName,
+              label: b.episode,
+              line: plain(b.line),
+            })),
+        ),
       },
     },
   };

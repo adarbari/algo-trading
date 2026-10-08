@@ -90,16 +90,17 @@ class GuideFamily:
 
 
 @strawberry.type(
-    description="A regime indicator card: its key (`Query.guideIndicator(key)`) and "
-    "plain-language name"
+    description="A regime indicator card: its key (`Query.guideIndicator(key)`), "
+    "plain-language name and `pace` (slow: macro, fast: market)"
 )
 class GuideIndicator:
     key: str
     plain_name: str
+    pace: str
 
     @classmethod
     def of(cls, d: index.GuideIndicator) -> Self:
-        return cls(key=d.key, plain_name=d.plain_name)
+        return cls(key=d.key, plain_name=d.plain_name, pace=d.pace)
 
 
 @strawberry.type(
