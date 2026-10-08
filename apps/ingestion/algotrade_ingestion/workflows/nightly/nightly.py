@@ -12,7 +12,9 @@ steps that SUCCEEDED or were WAIVED are not rerun, except a resumable step (``St
 chains) that SUCCEEDED with items its task would refetch (STALE_DATA names Cboe had not rolled
 over), which a retry re-runs while the session is the latest and the task's staging exists;
 the steps that need it (rollups, market-rollups) re-run on the new data, so the screens do not
-fail hourly on the same stale names. A refetch that fails keeps the earlier success). A
+fail hourly on the same stale names. A refetch that fails keeps the earlier success. A done
+step also re-runs when an optional input it does not need succeeds in a later attempt
+(``Step.reruns_after``: the rollups after IBKR IV came back). A
 latest-only step (universe files, SEC,
 Cboe chains: sources that serve only the current snapshot) runs only for the last closed
 session; one that failed and whose session is no longer the latest FAILS as expired until it
@@ -165,7 +167,15 @@ NIGHTLY: tuple[Step, ...] = (
     # (a gap in a lookback window included) fails the step.
     # Its acceptance is the coverage of the key features by tier (ADR 0043): a FAIL-level breach
     # (core-tier prices) fails the step and holds the screens back; the rest are warnings.
-    Step("rollups", needs=MARKET_DATA, accept=(check_coverage,), task_complete=True),
+    # ibkr-iv does not gate it (optional), but when it succeeds in a later attempt the
+    # rollups re-run (ibkr_iv@v1 for the session), and so do the steps that need them.
+    Step(
+        "rollups",
+        needs=MARKET_DATA,
+        reruns_after=("ibkr-iv",),
+        accept=(check_coverage,),
+        task_complete=True,
+    ),
     # Economic series and index levels with their vintages (ADR 0048), before the market
     # rollups whose macro and regime groups read them. Latest session only (the sources serve
     # their current state); optional, and its run budget ([macro] run_budget_s) bounds a FRED
@@ -219,10 +229,10 @@ def _carried(
     reran: Container[str],
 ) -> StepResult | None:
     """Done before (an earlier attempt SUCCEEDED or WAIVED it) or waived now, else ``None``.
-    A done step runs again when one it needs ran in this attempt (``reran``: its input
-    changed) or when it is a refetch (``_refetch``)."""
+    A done step runs again when one of its inputs (what it needs, or reruns after) ran in
+    this attempt (``reran``: its input changed) or when it is a refetch (``_refetch``)."""
     if step.name in before.done:
-        if any(n in reran for n in step.needs):
+        if any(n in reran for n in step.inputs):
             return None
         stored = before.done[step.name]
         left, resumable = _refetch(step, stored, ctx, session, latest)
@@ -404,8 +414,8 @@ def run_session(
                     settle_until(step, session, settings) if wait else None,
                     latest,
                 )
-                # a done step that ran although none of its needs did is a refetch
-                refetch = step.name in before.done and not any(n in reran for n in step.needs)
+                # a done step that ran although none of its inputs did is a refetch
+                refetch = step.name in before.done and not any(n in reran for n in step.inputs)
                 if refetch and result.status in BAD:
                     result = _refetch_failed(step, before.done[step.name], result)
                 elif result.status is StepStatus.SUCCEEDED:  # new data for what needs it

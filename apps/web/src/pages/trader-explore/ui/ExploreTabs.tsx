@@ -1,7 +1,7 @@
 /**
- * Explore's tab row (Overview, Compare, Chart, Options, Features, Events, Screener hits, and the
- * Field guide, which the route redirects to the Guide for one release). Choosing the default tab
- * for the compare set removes `tab` from the URL.
+ * Explore's tab row (Overview, Compare, Chart, Options, Features, Events, Screener hits; field help
+ * is the Guide, opened from each field's help button). Choosing the default tab for the compare
+ * set removes `tab` from the URL.
  */
 import { Tabs, type TabItem } from '@algotrade/ui';
 import type { ReactNode } from 'react';
@@ -17,7 +17,6 @@ const TABS: readonly (TabItem & { id: ExploreTab })[] = [
   { id: 'features', label: 'Features' },
   { id: 'events', label: 'Events' },
   { id: 'hits', label: 'Screener hits' },
-  { id: 'guide', label: 'Field guide' },
 ];
 
 export interface ExploreTabsProps {

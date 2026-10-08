@@ -11,6 +11,7 @@ const hooks = vi.hoisted(() => ({
   useFeatureDistribution: vi.fn(),
   useFeatureValues: vi.fn(),
   useFeatureHistory: vi.fn(),
+  openHelp: vi.fn(),
 }));
 
 vi.mock('@/entities/feature', async (importOriginal) => ({
@@ -18,6 +19,22 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
   useFeatureCatalogue: hooks.useFeatureCatalogue,
   useFeatureDistribution: hooks.useFeatureDistribution,
 }));
+vi.mock('@/features/guide-help', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    GuideHelp: ({ entry }: { entry: { id: string } }) => (
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          hooks.openHelp(entry.id);
+        }}
+      >
+        {`What is ${entry.id}?`}
+      </Button>
+    ),
+  };
+});
 vi.mock('@/entities/instrument', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useFeatureValues: hooks.useFeatureValues,
@@ -128,6 +145,22 @@ describe('FeaturesPanel', () => {
     await expectNoA11yViolations(container);
     await userEvent.setup().click(within(grid).getByText('IV30 (ours)'));
     expect(onFeatureChange).toHaveBeenCalledWith(IV30);
+  });
+
+  it('gives every feature name its Guide help button, which opens help without choosing the row', async () => {
+    const onFeatureChange = vi.fn();
+    render(<FeaturesPanel symbol="AAPL" feature={null} onFeatureChange={onFeatureChange} />);
+    const grid = screen.getByRole('grid', { name: 'AAPL features' });
+    const [first, ...rest] = within(grid).getAllByRole('row').slice(1);
+    const last = rest.at(-1);
+    if (!first || !last) throw new Error('expected feature rows');
+    const help = within(first).getByRole('button', { name: `What is ${IV30}?` });
+    expect(
+      within(last).getByRole('button', { name: 'What is instrument.sector?' }),
+    ).toBeInTheDocument();
+    await userEvent.setup().click(help);
+    expect(hooks.openHelp).toHaveBeenCalledWith(IV30);
+    expect(onFeatureChange).not.toHaveBeenCalled();
   });
 
   it("asks for every value, and the history of numbers that have one, up to the values' session", () => {

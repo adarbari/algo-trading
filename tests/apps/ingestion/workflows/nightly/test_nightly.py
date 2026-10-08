@@ -128,7 +128,7 @@ def statuses(summary: Mapping[str, Any], i: int = -1) -> dict[str, str]:
 def test_steps_are_declared_after_what_they_need() -> None:
     seen: set[str] = set()
     for step in NIGHTLY:
-        assert set(step.needs) <= seen, f"{step.name} runs before {set(step.needs) - seen}"
+        assert set(step.inputs) <= seen, f"{step.name} runs before {set(step.inputs) - seen}"
         seen.add(step.name)
 
 
@@ -479,6 +479,35 @@ def test_a_need_skipped_every_attempt_does_not_rerun_its_dependents(
     second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
     assert calls.sessions("ibkr-contracts") == [D, D]  # SKIPPED is never carried
     assert calls.sessions("ibkr-iv") == [D] and statuses(second)["ibkr-iv"] == "SUCCEEDED"
+
+
+def test_rollups_rerun_when_ibkr_iv_succeeds_in_a_later_attempt(
+    fake: Callable[..., Calls],
+) -> None:
+    # 2026-10-06: ibkr-iv was SKIPPED (IB Gateway down) while the rollups SUCCEEDED; at 07:45Z
+    # ibkr-iv succeeded, but the rollups were reused (ibkr-iv is not a need), so ibkr_iv@v1 had
+    # no partition for the session, vrp_scanner was PARTIAL and the screens failed until waived.
+    calls, screens = fake(skip=("ibkr-iv",)), Screens()
+    writer = store()
+    first = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert statuses(first)["ibkr-iv"] == "SKIPPED" and statuses(first)["rollups"] == "SUCCEEDED"
+    calls.skip, screens.short = (), False  # the gateway is back
+    second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert second["status"] == "SUCCEEDED" and statuses(second)["ibkr-iv"] == "SUCCEEDED"
+    assert calls.sessions("rollups") == [D, D]  # recomputed with the session's IBKR IV
+    assert "earlier attempt" not in (steps_of(second)["rollups"].get("reason") or "")
+    assert calls.sessions("market-rollups") == [D, D]  # needs rollups
+    assert screens.calls == 2
+    assert calls.sessions("bars") == [D]  # unrelated steps are reused
+    run_nightly(task_ctx(writer), Plan([D]), screens=screens)  # ibkr-iv reused: no rerun
+    assert calls.sessions("ibkr-iv") == [D, D] and calls.sessions("rollups") == [D, D]
+
+
+def test_an_optional_input_never_holds_back_the_rollups(fake: Callable[..., Calls]) -> None:
+    fake(fail=("ibkr-iv",))
+    summary = run_nightly(task_ctx(store()), Plan([D]))
+    assert statuses(summary)["ibkr-iv"] == "FAILED" and statuses(summary)["rollups"] == "SUCCEEDED"
+    assert summary["status"] == "SUCCEEDED"
 
 
 def test_a_failed_refetch_keeps_the_earlier_chains(fake: Callable[..., Calls]) -> None:
