@@ -47,6 +47,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 | Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR | narrowed by `make changed` (Local fast path below); the full pass still runs once per PR |
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
+| Merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push |
 
 ### Local fast path
 
@@ -95,11 +96,3 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
 
 `make check` runs every CI step (tests in parallel, one worker per CPU; `make test
 WORKERS=0` runs them serially). The web screenshots need Docker: `make web-visual`.
-
-## Pipeline
-
-Measured changes to the delivery pipeline, each kept by a check.
-
-| Measure | Before (2026-10-07) | After |
-|---|---|---|
-| merge rounds per PR | 3 merges of origin/main + 2 screenshot regenerations in one session | one `scripts/merge_main.sh` run (generated files regenerated on conflict); `make numbering` catches ADR and rule number collisions before the push |
