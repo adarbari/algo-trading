@@ -44,6 +44,7 @@ from algotrade_sources.framework.http import (
 )
 from algotrade_sources.framework.limiter import Limiter, Pacing
 from algotrade_sources.llm.chat import ChatCompletions
+from algotrade_sources.llm.claude_cli import ClaudeCli
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
 from algotrade_sources.vendors.fred.observations import (
     FredObservations,
@@ -548,3 +549,18 @@ def build_text_model(
     return ChatCompletions(
         base_url, model, transport, pause, max_tokens, retries, extra=extra or {}, provider=provider
     )
+
+
+def build_claude_cli(
+    command: str,
+    model: str,
+    timeout_s: float,
+    retries: int,
+    env: Mapping[str, str],
+    provider: str,
+) -> ClaudeCli:
+    """The Claude Code provider of the text model (ADR 0041, amended 2026-10-08): ``command``
+    (the absolute path of ``claude``) run headless for ``model`` under the owner's own login,
+    with exactly ``env`` as the child's environment (``config.env.claude_cli_env``), answering
+    as the ``llm.toml`` provider ``provider``. Built here, like every client."""
+    return ClaudeCli(command, model, env, timeout_s, retries, provider)
