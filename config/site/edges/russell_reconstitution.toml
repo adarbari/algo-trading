@@ -1,0 +1,43 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-07 until ED6.
+id = "russell_reconstitution"
+name = "Russell reconstitution"
+thesis = "Stocks moving between the Russell 1000 and 2000 at the annual reconstitution feel predictable pressure from the funds that track them."
+mechanism = """Funds tracking the Russell 2000 must buy names that enter it and sell those that
+leave on the reconstitution date, ranked on a known date before (Madhavan 2003; Chang, Hong and
+Liskovich 2015)."""
+persistence = """The assets tracking the Russell indexes keep the demand large and the date fixed;
+competition shrinks it but it remains (about 1% over 20 sessions, checked 2026-10-07)."""
+schedule = "on_event:index_change"
+top_k = "all"
+screeners = []
+status = "blocked"
+rejection_reason = """Alive, but one event a year gives at most two in the stored bars, under the
+40 independent events the bar asks, and we hold no Russell membership (events/index_change is the
+S&P 500 only); ED6 (listing history from 2010) unblocks it."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+
+[quality_bar]
+outcome = "Excess return over SPY over 20 sessions around the reconstitution date."
+trigger_timing = "Membership is predictable from the rank day's market caps, weeks before the date."
+replication = "Madhavan's additions and deletions around the rank day and reconstitution date."
+expected_size = "About 1% over 20 sessions (checked 2026-10-07); one event a year."
+capacity_costs = "Small caps at the 1000 / 2000 boundary; a crowded trade on one day."
+failure_modes = "Front-running moves the pressure earlier each year; a semiannual schedule changes the dates."
+decoys = "Size and past returns decide membership: the size and momentum baselines."
+
+[[sources]]
+title = "Madhavan, A., The Russell Reconstitution Effect, Financial Analysts Journal, 2003"
+
+[[sources]]
+title = "Chang, Y.-C., Hong, H. and Liskovich, I., Regression Discontinuity and the Price Effects of Stock Market Indexing, Review of Financial Studies, 2015"

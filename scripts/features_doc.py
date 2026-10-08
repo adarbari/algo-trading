@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Write the feature catalogue (docs/data/features.md) from the feature registry and the
-repository's config/site/features/*.toml, and the field guide (docs/data/field-guide.md) from
+repository's config/site/features/*.toml, the field guide (docs/data/field-guide.md) from
 config/site/field_guide/*.toml (the index docs/data/field-guide.md and one page per theme under
-docs/data/field-guide/; a theme page no longer rendered is removed).
+docs/data/field-guide/; a theme page no longer rendered is removed), and the edges page
+(docs/edges.md) from config/site/edges/*.toml (ADR 0053).
 
 Usage: python scripts/features_doc.py [--check]
 Without --check it also lists the catalogue fields that have no field guide entry.
@@ -14,6 +15,9 @@ import argparse
 import sys
 from pathlib import Path
 
+from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.page import PATH as EDGES_PATH
+from algotrade.config.edges.page import render as render_edges
 from algotrade.config.site.settings import load_field_guide
 from algotrade.features.catalogue import PATH, render
 from algotrade.features.guide import DIR as GUIDE_DIR
@@ -30,7 +34,11 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="fail if the file is out of date")
     args = parser.parse_args()
     store = FileConfigStore(ROOT / "config")
-    pages = {PATH: render(site_features(store)), **guide_pages(load_field_guide(store))}
+    pages = {
+        PATH: render(site_features(store)),
+        **guide_pages(load_field_guide(store)),
+        EDGES_PATH: render_edges(load_edges(store)),
+    }
     stale = []
     for rel, text in pages.items():
         path = ROOT / rel

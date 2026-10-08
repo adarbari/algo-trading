@@ -1,0 +1,63 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Edge zero (plan ED4a): the harness end to end on the
+# existing short-premium screens, with no new rules.
+id = "vrp_short_premium"
+name = "Volatility risk premium"
+thesis = "Option implied volatility on liquid names tends to exceed the volatility that follows, so selling premium where implied is richest earns the gap."
+mechanism = """Holders of stock pay for crash and variance protection; the dealers who sell it ask a
+premium for jump and variance risk they cannot diversify (Carr and Wu 2009; Bakshi and Kapadia
+2003)."""
+persistence = """A risk premium, not a mispricing: the seller is paid for losses that cluster in
+crashes, when capital is scarce, so being known does not remove it."""
+schedule = "every_session"
+universe = "liquid_optionable"
+top_k = 20
+screeners = ["short_premium_liquidity", "vrp_scanner"]
+status = "candidate"
+notes = """Hit: realised volatility over the window divided by the IV30 at S is below target 1.0.
+IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a
+short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of its premium in
+the window. ED4a fixes the proxy (ADR 0053 open decisions)."""
+
+[outcome]
+kind = "hit_target"
+horizon_sessions = [20]
+benchmark = "none"
+target = 1.0
+max_drawdown = 0.5
+
+[quality_bar]
+outcome = """Realised below implied over the option's horizon, with a drawdown cap on a short
+straddle proxy: how a short-premium trade is held, to expiry, with a stop (the PRD's proposal,
+ADR 0053 open decisions)."""
+trigger_timing = """IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of S; the
+first session we act is S+1, so no window may start before S's close."""
+replication = """The screens as they are: short_premium_liquidity (tradable put and call wings,
+option_liquidity@v1) and vrp_scanner v3 (IV30 at least 50%, IV30 minus HV30 at least 10 points,
+IV30 / HV30 at least 1.25). The published setting is index variance (Carr and Wu 2009); single
+names are a step away from it."""
+expected_size = """Implied variance exceeds realised on average for the S&P 500 and most large
+stocks (Carr and Wu 2009); the single-name premium is smaller than the index's (Driessen,
+Maenhout and Vilkov 2009). IV30 history covers 502 sessions (ibkr_iv@v1, roadmap): 20-session
+windows spaced a horizon apart give about 25 independent sessions, under the 40 the bar asks,
+unless ED4a counts names within a session; chains are stored from 2026-10-02 only
+(docs/screeners/vrp-scanner.md), so short_premium_liquidity has days of history."""
+capacity_costs = """The cost is the option bid-ask spread, judged live; vrp_scanner (from v2) scores
+the put's stored spread (under 15% of mid), open interest and volume (over 1,000 each), and v3
+requires $50M of 20-day dollar volume. An individual's size is far below the open interest."""
+failure_modes = """Losses arrive together in volatility spikes (short premium is short the left
+tail), so the drawdown cap, not the hit rate, decides; an earnings date inside the window raises
+implied for a reason. Retire if, in the frozen period, the picks' hit rate is not above the base
+rate of every liquid optionable name, or the cap is breached more often than the base rate."""
+decoys = """Implied above realised before every earnings date and after every shock (a known event,
+not a premium), and high-IV names are small: compare with the size and 12-1 momentum baselines on
+the same sessions, and log windows without an earnings date as a variant."""
+
+[[sources]]
+title = "Carr, P. and Wu, L., Variance Risk Premiums, Review of Financial Studies, 2009"
+
+[[sources]]
+title = "Bakshi, G. and Kapadia, N., Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies, 2003"
+
+[[sources]]
+title = "Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk: Evidence from Equity Options, Journal of Finance, 2009"

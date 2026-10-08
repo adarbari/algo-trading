@@ -17,7 +17,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - **Backfills pending** (past sessions read UNKNOWN until run): volume, financials, TA bands and trend, options positioning, call wing and dividends ([Backfills details](#backfills-pending-details)).
 - **Mobile UI (MU, ADR 0052): MU1 done**; owner action: `make web-build`, try the hosted app on a phone; next MU2 ([MU details](#mobile-ui-mu-details)).
 - **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1, P1b, P2, P3a, P4 done; P3b in review, P4b open; next P5 harness ([Pipeline details](#pipeline-details)).
-- **Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0 done**; next ED1, the Edge document; `architect` reviews ED2 and ED3 ([ED details](#edges-ed-details)).
+- **Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0, ED1 done** (six edge documents, [edges.md](edges.md)); next ED2, the outcomes grain; `architect` reviews ED2 and ED3 ([ED details](#edges-ed-details)).
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC. Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
@@ -95,7 +95,7 @@ lands. The target state of every item is described in [architecture.md](architec
 
 ### Edges (ED) details
 
-**Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0 done** (the plan, the ADR: an edge is a typed document whose screeners are its implementations, scored point in time by one harness against a quarantined outcomes grain). Next ED1, the `Edge` document (settings type, `config/site/edges/`, three candidate documents against the quality bar), then ED2 (the outcomes grain) and ED3 (the harness) ([ED section](#edges-ed-hypotheses-with-evidence-one-point-in-time-harness-adr-0053)).
+**Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0 done** (the plan, the ADR: an edge is a typed document whose screeners are its implementations, scored point in time by one harness against a quarantined outcomes grain). **ED1 done**: the `Edge` document (`src/algotrade/config/edges/`, responsibility `edge-documents`; `config/site/edges/`, user drafts layered from `config/users/<id>/edges/`; `docs/edges.md` from `make features-doc`): three candidates (`vrp_short_premium` on `short_premium_liquidity` and `vrp_scanner`, `small_cap_earnings_drift`, `earnings_announcement_premium`), two rejected (`sp500_index_changes`, `leveraged_etf_rebalancing`) and one blocked (`russell_reconstitution`, until ED6). Next ED2 (the outcomes grain), then ED3 (the harness) ([ED section](#edges-ed-hypotheses-with-evidence-one-point-in-time-harness-adr-0053)).
 
 ## Workflows (WF): dependencies, succeed or fail, cadence (ADR 0039)
 
@@ -240,7 +240,7 @@ Opus for the design, storage and point-in-time pieces, Sonnet for the scoped imp
 
 ## Edges (ED): hypotheses with evidence, one point-in-time harness (ADR 0053)
 
-Items ED0 to ED7, their gates and status live in [edges-plan.md](edges-plan.md) (ED0 **done**: the plan and ADR 0053; next ED1); `architect` reviews ED2 (the outcomes grain, point in time) and ED3 (the harness and the `quant/` statistics).
+Items ED0 to ED7, their gates and status live in [edges-plan.md](edges-plan.md) (ED0 **done**: the plan and ADR 0053; ED1 **done**: the edge documents; next ED2); `architect` reviews ED2 (the outcomes grain, point in time) and ED3 (the harness and the `quant/` statistics).
 
 ## Swing levels and momentum (SW): support, resistance and momentum from daily bars
 
