@@ -18,7 +18,6 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - **Mobile UI (MU, ADR 0052): MU1 and MU2 done** (MU2 in review: the phone follow-ups and the workspace switch moved into the account menu); owner action: `make web-build`, a second phone pass; next MU3 ([MU details](#mobile-ui-mu-details)).
 - **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1, P1b, P1c, P1d, P2, P2b, P3a, P3b, P4, P4b, P5 done; Python PR 5.0 min after P1c (unit-a 4.5 min the long pole), P1d (#296) spread the rollup groups over two shards, re-measure on the next Python PR ([Pipeline details](#pipeline-details)).
 - **Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0, ED1 done** (six edge documents, [edges.md](edges.md)); next ED2, the outcomes grain; `architect` reviews ED2 and ED3 ([ED details](#edges-ed-details)).
-- **Descriptions (ADR 0034, accepted):** after merge run `algotrade-ingest descriptions --only funds --force`, then stocks in chunks ([Descriptions details](#descriptions-details)).
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC. Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
