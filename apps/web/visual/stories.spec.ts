@@ -16,6 +16,7 @@ interface StoryEntry {
   id: string;
   exportName: string;
   importPath: string;
+  tags?: string[];
 }
 
 const index = JSON.parse(
@@ -23,7 +24,11 @@ const index = JSON.parse(
 ) as {
   entries: Record<string, StoryEntry>;
 };
-const stories = Object.values(index.entries).filter((entry) => entry.type === 'story');
+// A story tagged `no-screenshot` is exercised by its play function in the unit tests only:
+// its click redraws after the render finishes, so a screenshot of it flakes (ds:check rule).
+const stories = Object.values(index.entries).filter(
+  (entry) => entry.type === 'story' && !entry.tags?.includes('no-screenshot'),
+);
 
 /**
  * `a11y.manual`: Storybook's a11y addon otherwise runs axe by itself after every story render

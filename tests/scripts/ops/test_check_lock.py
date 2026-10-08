@@ -46,3 +46,11 @@ def test_a_lock_of_a_dead_pid_is_stale(tmp_path: Path) -> None:
     dead.wait()
     (lock / "pid").write_text(f"{dead.pid}\n")
     assert _lock(tmp_path, "true").returncode == 0
+
+
+def test_a_stale_takeover_moves_the_old_lock_aside(tmp_path: Path) -> None:
+    lock = tmp_path / "var" / "check.lock.d"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text("999999\n")
+    assert _lock(tmp_path, "true").returncode == 0
+    assert list((tmp_path / "var").iterdir()) == []  # no check.lock.d, no *.stale.* left

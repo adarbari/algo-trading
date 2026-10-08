@@ -54,33 +54,8 @@ path = "src/algotrade"
 purpose = "the shared library package root (no modules of its own)"
 
 [[dir]]
-path = "src/algotrade/core"
-purpose = "pure domain code, split by kind (curated exports in __init__ only)"
-contracts = ["Core is dependency-free domain code (no pandas, no I/O)"]
-
-[[dir]]
-path = "src/algotrade/core/*"
-purpose = "a pure core kind: no I/O, no pandas or pyarrow, no other algotrade package"
-contracts = ["Layout: core subpackages are pure (no pandas, pyarrow, storage or config) at every path"]
-
-[[dir]]
-path = "src/algotrade/core/model"
-purpose = "domain value objects: types, instruments, option contracts, field names, ids, errors, three-valued predicates, the rule-screen spec"
-contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
-
-[[dir]]
-path = "src/algotrade/core/time"
-purpose = "the exchange session calendar and UTC clock helpers; never compute weekdays elsewhere"
-contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
-
-[[dir]]
-path = "src/algotrade/core/views"
-purpose = "the strategy-facing read API: MarketView, FeatureView, PriceSeries"
-contracts = ["Strategies and screeners are pure: they only see core and quant"]
-
-[[dir]]
-path = "src/algotrade/core/validation"
-purpose = "pure sanity checks on domain values (OHLCV bar rules)"
+path = "src/algotrade/analytics"
+purpose = "performance metrics and report formatting"
 
 [[dir]]
 path = "src/algotrade/config"
@@ -117,35 +92,33 @@ path = "src/algotrade/config/strategy"
 purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog, rule-screen spec parser"
 
 [[dir]]
-path = "src/algotrade/storage"
-purpose = "generic data contract, split by kind; runs, locks and the backend factory"
-contracts = ["R2: storage is generic (no domain read helpers: readers move to algotrade.data)"]
+path = "src/algotrade/core"
+purpose = "pure domain code, split by kind (curated exports in __init__ only)"
+contracts = ["Core is dependency-free domain code (no pandas, no I/O)"]
 
 [[dir]]
-path = "src/algotrade/storage/tables"
-purpose = "market and result tables: schemas, store protocols, reader / writer facades"
-contracts = [
-    "Only the ingestion app writes market and feature data (ADR 0005)",
-    "R1: only algotrade.data reads market data (consumers never import storage readers)",
-    "Layout: market tables never import config documents",
-]
+path = "src/algotrade/core/*"
+purpose = "a pure core kind: no I/O, no pandas or pyarrow, no other algotrade package"
+contracts = ["Layout: core subpackages are pure (no pandas, pyarrow, storage or config) at every path"]
 
 [[dir]]
-path = "src/algotrade/storage/backends"
-purpose = "table backends (local Parquet, memory): the only code that knows physical layout"
-contracts = ["Parquet / Arrow I/O lives only in storage backends"]
+path = "src/algotrade/core/model"
+purpose = "domain value objects: types, instruments, option contracts, field names, ids, errors, three-valued predicates, the rule-screen spec"
+contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
 
 [[dir]]
-path = "src/algotrade/storage/configs"
-purpose = "config documents only: the ConfigStore protocol and its file / memory stores; the ConfigWriter (writer.py: user drafts, immutable versions, schedules, user features)"
-contracts = [
-    "Layout: config documents and market tables stay separate (storage.configs never imports them)",
-]
+path = "src/algotrade/core/time"
+purpose = "the exchange session calendar and UTC clock helpers; never compute weekdays elsewhere"
+contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
 
 [[dir]]
-path = "src/algotrade/quant"
-purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model"
-contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
+path = "src/algotrade/core/validation"
+purpose = "pure sanity checks on domain values (OHLCV bar rules)"
+
+[[dir]]
+path = "src/algotrade/core/views"
+purpose = "the strategy-facing read API: MarketView, FeatureView, PriceSeries"
+contracts = ["Strategies and screeners are pure: they only see core and quant"]
 
 [[dir]]
 path = "src/algotrade/data"
@@ -158,101 +131,6 @@ purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035),
 [[dir]]
 path = "src/algotrade/data/macro"
 purpose = "reads of macro series and index levels (macro/series, ADR 0048): each observation's latest vintage a session knew, and the pit = lag vintage rule"
-
-[[dir]]
-path = "src/algotrade/features"
-purpose = "the feature store: the framework, the feature groups, expression features, the registry (registry.py), the site feature set (site.py) and the generated catalogue (catalogue.py)"
-contracts = [
-    "Features read market data only through algotrade.data (never storage)",
-    "Features ask algotrade.data for inputs by table name (data.feature_inputs), never a domain reader",
-]
-
-[[dir]]
-path = "src/algotrade/features/framework"
-purpose = "the feature-group framework: Feature and FeatureGroup declarations, column typing, dependency graph, per-session runner"
-contracts = ["Features read market data only through algotrade.data (never storage)"]
-
-[[dir]]
-path = "src/algotrade/features/expressions"
-purpose = "the expression language for features (lexer, parser, type checker, vectorised evaluator, built-ins) and expression feature definitions resolved into the site FeatureSet"
-contracts = ["Expressions are pure: no storage, data, services or Python eval of config text"]
-
-[[dir]]
-path = "src/algotrade/features/rollups"
-purpose = "feature groups (rollups), one folder per kind of input (no modules of its own)"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/activity"
-purpose = "feature groups of volatility and trading activity from daily bars (ATR and realised-vol windows and percentiles, volume averages and rank, volume at price): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/patterns"
-purpose = "bar-shape and candlestick pattern feature groups from daily bars (body and wick shares, two-bar relations, the named candles a screen thresholds): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/price"
-purpose = "feature groups from daily bars: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/levels"
-purpose = "feature groups of price-level structure from daily bars (swing pivots and their strength, breakouts and their retests, unfilled gaps): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/relative"
-purpose = "feature groups comparing an instrument with the market, its sector and the universe: relative strength, sector membership and momentum, cross-sectional percentiles; one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/market"
-purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus tickers.py, the ticker -> id lookup and close panel they share (the relative-strength groups use it too)"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/options"
-purpose = "feature groups from option chains and implied volatility: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/reference"
-purpose = "feature groups from what an instrument is, its reference facts and a fund's holdings (the stock or basket a leveraged fund tracks): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus fund_names.py, the name rules for the fund's ticker and kind it shares"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/positioning"
-purpose = "options positioning and chain-shape feature groups (ADR 0031): flow, implied move, skew and term structure, from the same chain inputs options/ reads; one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus chain_inputs.py, the chain readings they share"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/corporate"
-purpose = "feature groups from corporate events and filings (earnings, dividends, share counts, financials): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/analytics"
-purpose = "performance metrics and report formatting"
-
-[[dir]]
-path = "src/algotrade/strategies"
-purpose = "pure decision logic, split into trading strategies and screeners"
-contracts = ["Strategies and screeners are pure: they only see core and quant"]
-
-[[dir]]
-path = "src/algotrade/strategies/trading"
-purpose = "backtest strategies and their registry"
-
-[[dir]]
-path = "src/algotrade/strategies/screeners"
-purpose = "screeners: pure point-in-time filters, and their registry"
-
-[[dir]]
-path = "src/algotrade/strategies/screeners/rules"
-purpose = "the rule screener (ADR 0029): criteria, decision incl. SKIPPED, distance score, tiers / flags / classify, run summary (pure)"
-contracts = ["Strategies and screeners are pure: they only see core and quant"]
 
 [[dir]]
 path = "src/algotrade/engines"
@@ -276,18 +154,86 @@ path = "src/algotrade/engines/selection"
 purpose = "the selection engine: evaluate a Selection with a per-rule audit"
 
 [[dir]]
+path = "src/algotrade/features"
+purpose = "the feature store: the framework, the feature groups, expression features, the registry (registry.py), the site feature set (site.py) and the generated catalogue (catalogue.py)"
+contracts = [
+    "Features read market data only through algotrade.data (never storage)",
+    "Features ask algotrade.data for inputs by table name (data.feature_inputs), never a domain reader",
+]
+
+[[dir]]
+path = "src/algotrade/features/expressions"
+purpose = "the expression language for features (lexer, parser, type checker, vectorised evaluator, built-ins) and expression feature definitions resolved into the site FeatureSet"
+contracts = ["Expressions are pure: no storage, data, services or Python eval of config text"]
+
+[[dir]]
+path = "src/algotrade/features/framework"
+purpose = "the feature-group framework: Feature and FeatureGroup declarations, column typing, dependency graph, per-session runner"
+contracts = ["Features read market data only through algotrade.data (never storage)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups"
+purpose = "feature groups (rollups), one folder per kind of input (no modules of its own)"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/activity"
+purpose = "feature groups of volatility and trading activity from daily bars (ATR and realised-vol windows and percentiles, volume averages and rank, volume at price): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/corporate"
+purpose = "feature groups from corporate events and filings (earnings, dividends, share counts, financials): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/levels"
+purpose = "feature groups of price-level structure from daily bars (swing pivots and their strength, breakouts and their retests, unfilled gaps): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/market"
+purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus tickers.py, the ticker -> id lookup and close panel they share (the relative-strength groups use it too)"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/options"
+purpose = "feature groups from option chains and implied volatility: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/patterns"
+purpose = "bar-shape and candlestick pattern feature groups from daily bars (body and wick shares, two-bar relations, the named candles a screen thresholds): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/positioning"
+purpose = "options positioning and chain-shape feature groups (ADR 0031): flow, implied move, skew and term structure, from the same chain inputs options/ reads; one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus chain_inputs.py, the chain readings they share"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/price"
+purpose = "feature groups from daily bars: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/reference"
+purpose = "feature groups from what an instrument is, its reference facts and a fund's holdings (the stock or basket a leveraged fund tracks): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus fund_names.py, the name rules for the fund's ticker and kind it shares"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/relative"
+purpose = "feature groups comparing an instrument with the market, its sector and the universe: relative strength, sector membership and momentum, cross-sectional percentiles; one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/quant"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model"
+contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/services"
 purpose = "use cases (the backend's interface for apps); shared helpers: configs, datasets, selection, views, run_items"
-
-[[dir]]
-path = "src/algotrade/services/backtests"
-purpose = "use case: run a configured backtest, record its run and results"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
-
-[[dir]]
-path = "src/algotrade/services/screening"
-purpose = "use case: run a screener over the universe, record the run, export its rows"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
 
 [[dir]]
 path = "src/algotrade/services/authoring"
@@ -298,18 +244,18 @@ contracts = [
 ]
 
 [[dir]]
-path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history"
-
-[[dir]]
-path = "src/algotrade/services/preview"
-purpose = "read-only dry runs of unsaved Builder input (ADR 0029) over the request's ReadContext: a draft rule screen previewed with the nightly evaluator on the context's session (cached field frame), a formula type checked and sampled; the API serves them as POSTs"
-contracts = ["Preview is read-only: no writers, no jobs (ADR 0029)"]
+path = "src/algotrade/services/backtests"
+purpose = "use case: run a configured backtest, record its run and results"
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
 
 [[dir]]
 path = "src/algotrade/services/drafting"
 purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the prompt over the caller's catalogue, strict parsing of the answer, invented fields dropped with a reason, the rest validated as finalise does; never a write, never a run"
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
+
+[[dir]]
+path = "src/algotrade/services/evaluation"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history"
 
 [[dir]]
 path = "src/algotrade/services/events"
@@ -320,10 +266,6 @@ contracts = [
 ]
 
 [[dir]]
-path = "src/algotrade/services/text_model"
-purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through; no vendor, no storage"
-
-[[dir]]
 path = "src/algotrade/services/explaining"
 purpose = "use case: the market regime explained in plain words on request (ADR 0041, amended): the prompt of facts and allowed links, the answer cleaned and number-checked, the TextCache protocol and key, the per-user rate limit; the only write is the explanation cache"
 contracts = [
@@ -332,18 +274,30 @@ contracts = [
 ]
 
 [[dir]]
+path = "src/algotrade/services/jobs"
+purpose = "long-running work as jobs: runner, models, handlers, exclusive runs"
+contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
+
+[[dir]]
+path = "src/algotrade/services/live"
+purpose = "use case: the API's live option quotes (ADR 0028): a quote feed with a short cache and the stored chain as the fallback; answers recorded in the background to live/* tables"
+contracts = [
+    "Live quotes write only live/* tables: no market-data writer, no jobs (ADR 0028)",
+    "Only the live-quotes recorder imports the live writer (ADR 0028)",
+]
+
+[[dir]]
+path = "src/algotrade/services/ondemand"
+purpose = "use case: the API's on-request screen runs (ADR 0033): a local job runner for the `screen` job (no wait for ingestion: atomic publication); writes only result tables and run records"
+
+[[dir]]
+path = "src/algotrade/services/preview"
+purpose = "read-only dry runs of unsaved Builder input (ADR 0029) over the request's ReadContext: a draft rule screen previewed with the nightly evaluator on the context's session (cached field frame), a formula type checked and sampled; the API serves them as POSTs"
+contracts = ["Preview is read-only: no writers, no jobs (ADR 0029)"]
+
+[[dir]]
 path = "src/algotrade/services/read"
 purpose = "the read model (ADR 0037): session resolution (ADR 0036), UNKNOWN values and scalar coercion, the read context the GraphQL layer calls; one loader per domain object in the subfolders (docs/api/read-model.md)"
-contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
-
-[[dir]]
-path = "src/algotrade/services/read/instruments"
-purpose = "read objects at instrument grain for one session: Instrument identity, feature values by catalogue name (ADR 0038), catalogue, option chain, holdings, series, the feature table"
-contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
-
-[[dir]]
-path = "src/algotrade/services/read/guide"
-purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), and the one splitter of prose at the catalogue names it mentions"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
@@ -352,8 +306,23 @@ purpose = "read objects about events for one session (ADR 0050): the stored even
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/guide"
+purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), and the one splitter of prose at the catalogue names it mentions"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/instruments"
+purpose = "read objects at instrument grain for one session: Instrument identity, feature values by catalogue name (ADR 0038), catalogue, option chain, holdings, series, the feature table"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/market"
 purpose = "read objects at market grain (ADR 0047): Market for one session, the market-entity feature values by catalogue name (the MKT:US row, through the instrument feature-value read), and the history of its stored fields over a named window (loader + the pure bucketing a chart takes)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/ops"
+purpose = "read objects over run records and the configs they run: backtests, the strategy / screener configs a user sees, ingest and nightly runs, data-quality checks, admin review lists"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
@@ -367,31 +336,62 @@ purpose = "read objects over stored screen results for one session: Screener, Sc
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
-path = "src/algotrade/services/read/ops"
-purpose = "read objects over run records and the configs they run: backtests, the strategy / screener configs a user sees, ingest and nightly runs, data-quality checks, admin review lists"
-contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
-
-[[dir]]
 path = "src/algotrade/services/read/users"
 purpose = "read objects about the app's users (ADR 0040): the Viewer (the request's registry user, role, workspaces)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
-path = "src/algotrade/services/ondemand"
-purpose = "use case: the API's on-request screen runs (ADR 0033): a local job runner for the `screen` job (no wait for ingestion: atomic publication); writes only result tables and run records"
+path = "src/algotrade/services/screening"
+purpose = "use case: run a screener over the universe, record the run, export its rows"
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
 
 [[dir]]
-path = "src/algotrade/services/live"
-purpose = "use case: the API's live option quotes (ADR 0028): a quote feed with a short cache and the stored chain as the fallback; answers recorded in the background to live/* tables"
+path = "src/algotrade/services/text_model"
+purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through; no vendor, no storage"
+
+[[dir]]
+path = "src/algotrade/storage"
+purpose = "generic data contract, split by kind; runs, locks and the backend factory"
+contracts = ["R2: storage is generic (no domain read helpers: readers move to algotrade.data)"]
+
+[[dir]]
+path = "src/algotrade/storage/backends"
+purpose = "table backends (local Parquet, memory): the only code that knows physical layout"
+contracts = ["Parquet / Arrow I/O lives only in storage backends"]
+
+[[dir]]
+path = "src/algotrade/storage/configs"
+purpose = "config documents only: the ConfigStore protocol and its file / memory stores; the ConfigWriter (writer.py: user drafts, immutable versions, schedules, user features)"
 contracts = [
-    "Live quotes write only live/* tables: no market-data writer, no jobs (ADR 0028)",
-    "Only the live-quotes recorder imports the live writer (ADR 0028)",
+    "Layout: config documents and market tables stay separate (storage.configs never imports them)",
 ]
 
 [[dir]]
-path = "src/algotrade/services/jobs"
-purpose = "long-running work as jobs: runner, models, handlers, exclusive runs"
-contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
+path = "src/algotrade/storage/tables"
+purpose = "market and result tables: schemas, store protocols, reader / writer facades"
+contracts = [
+    "Only the ingestion app writes market and feature data (ADR 0005)",
+    "R1: only algotrade.data reads market data (consumers never import storage readers)",
+    "Layout: market tables never import config documents",
+]
+
+[[dir]]
+path = "src/algotrade/strategies"
+purpose = "pure decision logic, split into trading strategies and screeners"
+contracts = ["Strategies and screeners are pure: they only see core and quant"]
+
+[[dir]]
+path = "src/algotrade/strategies/screeners"
+purpose = "screeners: pure point-in-time filters, and their registry"
+
+[[dir]]
+path = "src/algotrade/strategies/screeners/rules"
+purpose = "the rule screener (ADR 0029): criteria, decision incl. SKIPPED, distance score, tiers / flags / classify, run summary (pure)"
+contracts = ["Strategies and screeners are pure: they only see core and quant"]
+
+[[dir]]
+path = "src/algotrade/strategies/trading"
+purpose = "backtest strategies and their registry"
 
 # --------------------------------------------------------------------------- backtest app
 
@@ -413,9 +413,17 @@ contracts = [
 ]
 
 [[dir]]
+path = "libs/sources/algotrade_sources/fixtures"
+purpose = "the golden synthetic fixture source (generators, catalogue, CSV files)"
+
+[[dir]]
 path = "libs/sources/algotrade_sources/framework"
 purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry, a session source served on its own thread (session_thread)"
 contracts = ["Layout: only the source registry imports vendor folders"]
+
+[[dir]]
+path = "libs/sources/algotrade_sources/llm"
+purpose = "the text-model adapter (ADR 0041): one OpenAI-compatible chat-completions client over the framework's POST transport, which any provider answers by base_url alone; built by the registry, injected into the API"
 
 [[dir]]
 path = "libs/sources/algotrade_sources/vendors"
@@ -426,14 +434,6 @@ path = "libs/sources/algotrade_sources/vendors/*"
 purpose = "one vendor: fetch + normalise only; registered in framework/registry.py"
 kind = "vendor"
 contracts = ["Layout: vendors never import each other (one folder per vendor)"]
-
-[[dir]]
-path = "libs/sources/algotrade_sources/llm"
-purpose = "the text-model adapter (ADR 0041): one OpenAI-compatible chat-completions client over the framework's POST transport, which any provider answers by base_url alone; built by the registry, injected into the API"
-
-[[dir]]
-path = "libs/sources/algotrade_sources/fixtures"
-purpose = "the golden synthetic fixture source (generators, catalogue, CSV files)"
 
 # --------------------------------------------------------------------------- api app (ADR 0024)
 
@@ -451,55 +451,6 @@ purpose = "who is calling (ADR 0040): the Authenticator protocol, Supabase token
 contracts = ["API: routes reach the library only through services.read, services.preview, services.drafting, services.explaining, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)"]
 
 [[dir]]
-path = "apps/api/algotrade_api/ops"
-purpose = "operating the API on a host: the launchd agent that keeps it serving (ADR 0044)"
-
-[[dir]]
-path = "apps/api/algotrade_api/routes"
-purpose = "one FastAPI router per area (REST: writes, job polling, health, live quotes, preview POSTs): parse parameters, call one library function, map it to a schema"
-
-[[dir]]
-path = "apps/api/algotrade_api/routes/authoring"
-purpose = "the routes that write (ADR 0029): user rule screens and user features, each calling one services.authoring use case"
-contracts = ["Config writes go only through services.authoring (ADR 0029)"]
-
-[[dir]]
-path = "apps/api/algotrade_api/routes/screens"
-purpose = "the screens area's routes that stay REST (ADR 0033, 0037): run a screener on request and poll its job; its reads are GraphQL (Query.screener)"
-
-[[dir]]
-path = "apps/api/algotrade_api/routes/preview"
-purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.preview dry run"
-
-[[dir]]
-path = "apps/api/algotrade_api/routes/drafting"
-purpose = "the drafting route (ADR 0041): a sentence to a draft rule screen through the app's text model; a POST body, never a write; calls the one services.drafting use case"
-
-[[dir]]
-path = "apps/api/algotrade_api/routes/regime"
-purpose = "the regime route (ADR 0041, amended): the market regime in plain words through the app's text model; a POST body whose only write is the explanation cache; calls the one services.explaining use case"
-
-[[dir]]
-path = "apps/api/algotrade_api/schemas"
-purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
-
-[[dir]]
-path = "apps/api/algotrade_api/schemas/drafting"
-purpose = "request body and response of the drafting route (ADR 0041)"
-
-[[dir]]
-path = "apps/api/algotrade_api/schemas/regime"
-purpose = "request body and response of the regime explanation route (ADR 0041, amended)"
-
-[[dir]]
-path = "apps/api/algotrade_api/schemas/preview"
-purpose = "request bodies and responses of the dry-run routes (screen preview, formula check)"
-
-[[dir]]
-path = "apps/api/algotrade_api/schemas/authoring"
-purpose = "request bodies and responses of the config-writing routes (ADR 0029)"
-
-[[dir]]
 path = "apps/api/algotrade_api/graphql"
 purpose = "the GraphQL read layer (ADR 0037): Strawberry schema at POST /graphql, scalars, errors, request context, dataloaders; thin types over services.read in types/"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
@@ -507,6 +458,11 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types"
 purpose = "GraphQL object types, one module per domain read object, split by area (instruments/, events/, screens/, ops/); here only the Query root and Session: fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/events"
+purpose = "GraphQL types about events (mirrors services/read/events): Event, InstrumentEvents (ahead, filings, expiry ladder, fund reference, gaps) and EventCalendar"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
@@ -520,18 +476,8 @@ purpose = "GraphQL types at instrument grain (mirrors services/read/instruments)
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
-path = "apps/api/algotrade_api/graphql/types/events"
-purpose = "GraphQL types about events (mirrors services/read/events): Event, InstrumentEvents (ahead, filings, expiry ladder, fund reference, gaps) and EventCalendar"
-contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
-
-[[dir]]
 path = "apps/api/algotrade_api/graphql/types/market"
 purpose = "GraphQL types at market grain (mirrors services/read/market and services/read/regime): Market (values and the history of its stored fields) and MarketRegime with its scores, indicator cards, sizing rule, label bands, episodes and recessions"
-contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
-
-[[dir]]
-path = "apps/api/algotrade_api/graphql/types/screens"
-purpose = "GraphQL types over stored screen results (mirrors services/read/screens): Screener, ScreenerRun, ScreenResult, Ideas, TableView"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
@@ -540,9 +486,63 @@ purpose = "GraphQL types over run records and the configs they run (mirrors serv
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
+path = "apps/api/algotrade_api/graphql/types/screens"
+purpose = "GraphQL types over stored screen results (mirrors services/read/screens): Screener, ScreenerRun, ScreenResult, Ideas, TableView"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/graphql/types/users"
 purpose = "GraphQL types about users (mirrors services/read/users): Viewer"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/ops"
+purpose = "operating the API on a host: the launchd agent that keeps it serving (ADR 0044)"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes"
+purpose = "one FastAPI router per area (REST: writes, job polling, health, live quotes, preview POSTs): parse parameters, call one library function, map it to a schema"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/authoring"
+purpose = "the routes that write (ADR 0029): user rule screens and user features, each calling one services.authoring use case"
+contracts = ["Config writes go only through services.authoring (ADR 0029)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/drafting"
+purpose = "the drafting route (ADR 0041): a sentence to a draft rule screen through the app's text model; a POST body, never a write; calls the one services.drafting use case"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/preview"
+purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.preview dry run"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/regime"
+purpose = "the regime route (ADR 0041, amended): the market regime in plain words through the app's text model; a POST body whose only write is the explanation cache; calls the one services.explaining use case"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/screens"
+purpose = "the screens area's routes that stay REST (ADR 0033, 0037): run a screener on request and poll its job; its reads are GraphQL (Query.screener)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas"
+purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/authoring"
+purpose = "request bodies and responses of the config-writing routes (ADR 0029)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/drafting"
+purpose = "request body and response of the drafting route (ADR 0041)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/preview"
+purpose = "request bodies and responses of the dry-run routes (screen preview, formula check)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/regime"
+purpose = "request body and response of the regime explanation route (ADR 0041, amended)"
 
 # --------------------------------------------------------------------------- ingestion app
 
@@ -563,27 +563,8 @@ path = "apps/ingestion/algotrade_ingestion/tasks"
 purpose = "ingestion tasks by domain (no modules of its own)"
 
 [[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/framework"
-purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the task registry and refresh scheduling (slot days for incremental tasks)"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/reference"
-purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids"
-kind = "task-domain"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/profile"
-purpose = "profile tasks: descriptive text about what an instrument is (stock descriptions from Massive, ETF investment objectives from SEC prospectuses)"
-kind = "task-domain"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/market"
-purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings"
-kind = "task-domain"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/macro"
-purpose = "macro-series tasks: the macro task (FRED / ALFRED and published economic series and index levels into macro/series, with vintages) and the rows it adds to what is stored"
+path = "apps/ingestion/algotrade_ingestion/tasks/derived"
+purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups)"
 kind = "task-domain"
 
 [[dir]]
@@ -592,13 +573,32 @@ purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings
 kind = "task-domain"
 
 [[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/derived"
-purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups)"
+path = "apps/ingestion/algotrade_ingestion/tasks/framework"
+purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the task registry and refresh scheduling (slot days for incremental tasks)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/macro"
+purpose = "macro-series tasks: the macro task (FRED / ALFRED and published economic series and index levels into macro/series, with vintages) and the rows it adds to what is stored"
 kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/maintenance"
 purpose = "maintenance tasks: quality checks, raw purge, id migration, golden load"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/market"
+purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/profile"
+purpose = "profile tasks: descriptive text about what an instrument is (stock descriptions from Massive, ETF investment objectives from SEC prospectuses)"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/reference"
+purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids"
 kind = "task-domain"
 
 [[dir]]
@@ -674,44 +674,6 @@ purpose = "app tests: one folder per app, mirroring the app package ([[test_mirr
 holds = "folders"
 
 [[test_dir]]
-path = "tests/libs"
-purpose = "workspace library tests (libs/): one folder per package, mirroring it ([[test_mirror]])"
-holds = "folders"
-
-[[test_dir]]
-path = "tests/helpers"
-purpose = "test builders and fakes shared across suites, one module per thing built (stored frames, ingest fakes, rollup stores, domain objects)"
-
-[[test_dir]]
-path = "tests/helpers/payloads"
-purpose = "synthetic payloads in a vendor's wire format, one module per vendor or feed"
-
-[[test_dir]]
-path = "tests/fixtures"
-purpose = "recorded data files used by tests (no Python)"
-holds = "data"
-
-[[test_dir]]
-path = "tests/fixtures/sources"
-purpose = "recorded vendor responses (real format, trimmed), one folder per vendor"
-holds = "data"
-
-[[test_dir]]
-path = "tests/fixtures/sources/*"
-purpose = "one vendor's recorded responses"
-holds = "data"
-
-[[test_dir]]
-path = "tests/fixtures/reconciliation"
-purpose = "recorded cross-source comparisons, one folder per source and session (both sides' recorded values)"
-holds = "data"
-
-[[test_dir]]
-path = "tests/fixtures/reconciliation/*"
-purpose = "one recorded comparison: the other source's values, our raw inputs, a README with provenance"
-holds = "data"
-
-[[test_dir]]
 path = "tests/architecture"
 purpose = "fitness tests: layout, ownership, structure, docs, registries"
 
@@ -733,12 +695,58 @@ path = "tests/contract/storage"
 purpose = "the storage contract: every table backend passes it"
 
 [[test_dir]]
-path = "tests/property"
-purpose = "Hypothesis invariants across every registered strategy and screener"
+path = "tests/e2e"
+purpose = "the CLIs end to end against the committed golden datasets and baseline"
+
+[[test_dir]]
+path = "tests/fixtures"
+purpose = "recorded data files used by tests (no Python)"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/reconciliation"
+purpose = "recorded cross-source comparisons, one folder per source and session (both sides' recorded values)"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/reconciliation/*"
+purpose = "one recorded comparison: the other source's values, our raw inputs, a README with provenance"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/sources"
+purpose = "recorded vendor responses (real format, trimmed), one folder per vendor"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/sources/*"
+purpose = "one vendor's recorded responses"
+holds = "data"
+
+[[test_dir]]
+path = "tests/helpers"
+purpose = "test builders and fakes shared across suites, one module per thing built (stored frames, ingest fakes, rollup stores, domain objects)"
+
+[[test_dir]]
+path = "tests/helpers/payloads"
+purpose = "synthetic payloads in a vendor's wire format, one module per vendor or feed"
 
 [[test_dir]]
 path = "tests/integration"
 purpose = "a real store and engine across every golden dataset"
+
+[[test_dir]]
+path = "tests/libs"
+purpose = "workspace library tests (libs/): one folder per package, mirroring it ([[test_mirror]])"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/property"
+purpose = "Hypothesis invariants across every registered strategy and screener"
+
+[[test_dir]]
+path = "tests/reconciliation"
+purpose = "cross-source reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values (marker reconciliation)"
 
 [[test_dir]]
 path = "tests/scripts"
@@ -747,14 +755,6 @@ purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests
 [[test_dir]]
 path = "tests/scripts/ops"
 purpose = "tests for the operator scripts in scripts/ops/ (deploy)"
-
-[[test_dir]]
-path = "tests/reconciliation"
-purpose = "cross-source reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values (marker reconciliation)"
-
-[[test_dir]]
-path = "tests/e2e"
-purpose = "the CLIs end to end against the committed golden datasets and baseline"
 
 # --------------------------------------------------------------------------- config (config/)
 # Every config/site/*.toml is loaded by the one settings loader (config/site/settings.py;

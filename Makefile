@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: test-shard coverage-combine check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
+.PHONY: test-shard coverage-combine check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering roadmap-check unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -75,6 +75,9 @@ rest-allowlist-update: ## after retiring GET routes (removing their entries): lo
 
 features-doc:    ## regenerate docs/data/features.md (catalogue) and docs/data/field-guide.md (field guide)
 	$(PY) scripts/features_doc.py
+
+roadmap-check:   ## docs/roadmap.md opens with a Now / Next of at most 25 lines (the one counter: tests/architecture/test_docs.py)
+	$(PY) -m pytest -q tests/architecture/test_docs.py::test_roadmap_opens_with_a_short_now_next_section
 
 filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
@@ -176,7 +179,7 @@ web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build t
 check:
 	scripts/ops/check_lock.sh $(MAKE) check-gates
 
-check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering datasets-verify test evaluate web-check web-real
+check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering roadmap-check datasets-verify test evaluate web-check web-real
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

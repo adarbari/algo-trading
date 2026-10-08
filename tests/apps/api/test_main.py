@@ -112,11 +112,25 @@ def test_settings_from_env_open_the_named_store(
 
 
 def test_cli_runs_uvicorn_on_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ALGOTRADE_PORT_BASE", raising=False)
     calls: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: calls.append((app, kw)))
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
     cli.main(["--reload"])
     assert calls == [(cli.APP, {"host": "127.0.0.1", "port": 8000, "reload": True})]
+
+
+def test_cli_serves_on_the_worktrees_port_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ALGOTRADE_PORT_BASE", raising=False)
+    assert cli.serve_port() == 8000
+    monkeypatch.setenv("ALGOTRADE_PORT_BASE", "x")
+    assert cli.serve_port() == 8000
+    calls: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setenv("ALGOTRADE_PORT_BASE", "12340")
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: calls.append((app, kw)))
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    cli.main([])
+    assert calls[0][1]["port"] == 12340
 
 
 def test_asgi_app_is_configured_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
