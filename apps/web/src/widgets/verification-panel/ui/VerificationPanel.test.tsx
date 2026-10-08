@@ -58,6 +58,7 @@ async function expectAccessible(container: Element) {
 }
 
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it } from 'vitest';
 
 import { VerificationPanel } from './VerificationPanel';
@@ -92,6 +93,16 @@ describe('VerificationPanel', () => {
     ).toHaveTextContent('SPY');
     expect(screen.getByText(/6 instruments · 4.5% of graded checks failed/)).toBeInTheDocument();
     await expectAccessible(container);
+  });
+
+  it("opens a failing check's ticker in Explore on a click on its row", async () => {
+    serve({ verification: VERIFICATION });
+    const onOpen = vi.fn();
+    renderWith(<VerificationPanel onOpen={onOpen} />);
+    const grid = await screen.findByRole('grid', { name: 'Failing verification checks' });
+    expect(grid.querySelector('[data-clickable]')).not.toBeNull();
+    await userEvent.click(await screen.findByText('SPY'));
+    expect(onOpen).toHaveBeenCalledExactlyOnceWith('SPY');
   });
 
   it('says when nothing failed, and when there is no run', async () => {

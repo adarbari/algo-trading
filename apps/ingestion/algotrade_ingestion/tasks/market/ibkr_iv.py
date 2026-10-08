@@ -11,9 +11,12 @@ around the work) and only for underlyings with a resolved IBKR contract
   ``ibkr_historical`` limiter (``[ibkr] historical_min_interval_s``). Rows are
   ``source_kind = history``, one partition per session. Resumable per underlying, also
   across nights: an underlying is skipped when an earlier finished run (this task or the
-  nightly) already fetched its history from the same start or earlier (item ``hist:<id>``,
-  status ``OK: <from>`` or ``NO_DATA: <from>``). ``NO_DATA`` only when IB ANSWERED with no
-  bars; a request IB did not answer (timeout, pacing or connectivity error: the facade's
+  nightly) already fetched its history from the same start or earlier through the same end or
+  later (item ``hist:<id>``, status ``OK: <from>..<to>`` or ``NO_DATA: <from>..<to>``; an
+  older ``OK: <from>`` covers through its run's backfill end), so a session missed after the
+  backfill (gateway down that night) is filled by ``--from D --to D``. ``NO_DATA`` only
+  when IB ANSWERED with no bars; a request IB did not answer (timeout, pacing or
+  connectivity error: the facade's
   ``TransientFetchError``) is retried ``HISTORY_ATTEMPTS`` times with a growing back-off
   (``cool_down`` holds the historical limiter for every process), then recorded
   ``FETCH_ERROR`` (pending: a resume or a later run fetches it again); an error a retry
@@ -175,13 +178,34 @@ def history_failed(runs: Sequence[RunRecord]) -> set[str]:
     }
 
 
-def history_done(runs: Sequence[RunRecord], start: date) -> set[str]:
-    """Instrument ids whose history an earlier finished run fetched from ``start`` or before."""
+def _window(start: date, end: date) -> str:
+    return f"{start.isoformat()}..{end.isoformat()}"
+
+
+def _covered(record: RunRecord, window: str) -> tuple[str, str]:
+    """The ``(from, to)`` a history item's window covers. A status recorded before windows
+    were (``OK: <from>``) covers through its run's backfill end: the history task's session,
+    the nightly's session before."""
+    first, sep, last = window.partition("..")
+    if sep:
+        return first, last
+    if record.job == HISTORY_TASK:
+        return first, record.session_date.isoformat()
+    return first, sessions_ending(record.session_date, 2)[0].isoformat()
+
+
+def history_done(runs: Sequence[RunRecord], start: date, end: date | None = None) -> set[str]:
+    """Instrument ids whose history an earlier finished run fetched from ``start`` or before
+    and, when ``end`` is given, through ``end`` or later. The nightly passes no ``end``: its
+    backfill is for names with no history; a later gap is filled by a ``--from/--to`` run."""
     done: set[str] = set()
     for record in runs:
         for key, status in record.items.items():
-            label, _, since = status.partition(": ")
-            if key.startswith("hist:") and label in DONE and since and since <= start.isoformat():
+            label, _, window = status.partition(": ")
+            if not (key.startswith("hist:") and label in DONE and window):
+                continue
+            first, last = _covered(record, window)
+            if first <= start.isoformat() and (end is None or last >= end.isoformat()):
                 done.add(key.removeprefix("hist:"))
     return done
 
@@ -225,7 +249,7 @@ def _fetch_history(
     rows = normalized.parsed["volhist"]
     rows = rows[(rows["date"] >= start) & (rows["date"] <= end)]
     if rows.empty:
-        return f"NO_DATA: {start.isoformat()}"
+        return f"NO_DATA: {_window(start, end)}"
     # IV only: a session's stored HV is kept (this row replaces the stored one)
     stored = [kept_hv.get((name.instrument_id, d)) for d in rows["date"]]
     fetched = rows["hv30_ibkr"].astype(float).to_numpy()
@@ -241,7 +265,7 @@ def _fetch_history(
         }
     )
     run.stage_sessions(TABLE, f"hist_{name.instrument_id}", frame, SOURCE)
-    return f"OK: {start.isoformat()}"
+    return f"OK: {_window(start, end)}"
 
 
 def _backfill(
@@ -251,11 +275,13 @@ def _backfill(
     start: date,
     end: date,
     limit: int | None,
+    through: date | None,
 ) -> dict[str, int | float]:
-    """Fetch the history of ``names`` not done yet (``limit`` at most), the most liquid
+    """Fetch the history of ``names`` not done yet (``limit`` at most; ``through``: done also
+    needs an earlier fetch through that session, see ``history_done``), the most liquid
     first and names earlier runs could not fetch last (``by_liquidity``) -> progress stats."""
     earlier = finished_runs(run.writer, NIGHTLY_TASK, HISTORY_TASK)
-    done = history_done(earlier, start)
+    done = history_done(earlier, start, through)
     ordered, liquid = by_liquidity(run, run.session, names, history_failed(earlier) - done)
     pending = [
         n
@@ -361,7 +387,7 @@ def backfill_ivs(
 
     def work(run: IngestRun, source: SessionSource, names: list[Name]) -> None:
         run.stats.update(history_from=start.isoformat(), history_to=end.isoformat())
-        run.stats.update(_backfill(run, source, names, start, end, limit))
+        run.stats.update(_backfill(run, source, names, start, end, limit, end))
 
     return _run(ctx, source, HISTORY_TASK, end, symbols, work)
 
@@ -383,7 +409,8 @@ def nightly_ivs(
         if settings.iv_backfill_per_night > 0:
             end = sessions_ending(session, 2)[0]
             start = session - timedelta(days=settings.iv_history_days)
-            stats = _backfill(run, source, names, start, end, settings.iv_backfill_per_night)
+            per_night = settings.iv_backfill_per_night
+            stats = _backfill(run, source, names, start, end, per_night, None)
             run.stats.update(stats)
 
     return _run(ctx, source, NIGHTLY_TASK, session, symbols, work)

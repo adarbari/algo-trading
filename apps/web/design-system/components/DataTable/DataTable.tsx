@@ -93,8 +93,17 @@ export interface DataTableProps<TRow> {
   selectable?: boolean;
   selectedIds?: readonly string[];
   onSelectionChange?: (ids: string[]) => void;
-  /** Enter on the active row, or a click on a row (unless `activateOnClick` is false). */
+  /**
+   * Enter on the active row, or a click on a row (unless `activateOnClick` is false): open the
+   * row's page. Give it whenever a row has a page to open, so every table's rows click through
+   * the same way; rows that open nothing show no hover and no pointer.
+   */
   onRowActivate?: (row: TRow) => void;
+  /**
+   * Whether a row has a page to open (default every row): a row it rejects is neither activated
+   * nor shown as clickable (a holding outside the universe, a screener built in code).
+   */
+  canActivate?: (row: TRow) => boolean;
   /** A click activates the row (default), or only makes it the active row (`false`). */
   activateOnClick?: boolean;
   /** The active (keyboard) row id, when the caller controls it (else the table keeps it). */
@@ -155,6 +164,7 @@ export function DataTable<TRow extends RowData>({
   selectedIds = EMPTY_IDS,
   onSelectionChange,
   onRowActivate,
+  canActivate,
   activateOnClick = true,
   activeRowId,
   onActiveRowChange,
@@ -196,6 +206,8 @@ export function DataTable<TRow extends RowData>({
     () => [...new Set([...chosenHidden, ...narrowHidden])],
     [chosenHidden, narrowHidden],
   );
+
+  const activatable = (row: TRow) => onRowActivate !== undefined && (canActivate?.(row) ?? true);
 
   const setSort = (next: DataTableSort | null) => {
     if (sort === undefined) setOwnSort(next);
@@ -320,9 +332,9 @@ export function DataTable<TRow extends RowData>({
     if (rowKey) {
       event.preventDefault();
       rowKey(row.original);
-    } else if (event.key === 'Enter' && onRowActivate) {
+    } else if (event.key === 'Enter' && activatable(row.original)) {
       event.preventDefault();
-      onRowActivate(row.original);
+      onRowActivate?.(row.original);
     } else if (event.key === ' ' && selectable) {
       event.preventDefault();
       row.toggleSelected();
@@ -338,7 +350,7 @@ export function DataTable<TRow extends RowData>({
     if (!row) return;
     setActiveId(row.id);
     onActiveRowChange?.(row.original);
-    if (activateOnClick) onRowActivate?.(row.original);
+    if (activateOnClick && activatable(row.original)) onRowActivate?.(row.original);
   }
 
   const { template, minWidth } = gridTemplate(visibleColumns, selectable);
@@ -349,6 +361,11 @@ export function DataTable<TRow extends RowData>({
     '--dt-visible-rows': visibleRows,
     '--dt-row-lines': rowLines,
   } as CSSProperties;
+
+  // A click on a row does something (opens it, or focuses it for the caller's detail): the row
+  // shows the pointer and the hover; a row a click does nothing to shows neither.
+  const clickable = (row: TRow) =>
+    onActiveRowChange !== undefined || (activateOnClick && activatable(row));
 
   const allSelected = table.getIsAllRowsSelected();
   const someSelected = table.getIsSomeRowsSelected();
@@ -555,6 +572,7 @@ export function DataTable<TRow extends RowData>({
                     aria-rowindex={item.index + 2}
                     aria-selected={selectable ? selected : undefined}
                     data-active={item.index === activeIndex || undefined}
+                    data-clickable={clickable(row.original) || undefined}
                     data-virtual
                     style={{
                       transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`,

@@ -72,6 +72,7 @@ export function HoldingsPanel({ symbol, onSelectSymbol }: HoldingsPanelProps) {
               onRowActivate: (row: HoldingRow) => {
                 if (row.symbol !== null) onSelectSymbol(row.symbol);
               },
+              canActivate: (row: HoldingRow) => row.symbol !== null,
             }
           : {})}
       />
