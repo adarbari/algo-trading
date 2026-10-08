@@ -184,13 +184,14 @@ Source: `design-system/components/ActionGroup`
 
 ### AppShell
 
-AppShell: the frame of every screen: a skip link, the TopBar, and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
+AppShell: the frame of every screen: a skip link, the TopBar, an optional status strip under it (a StatusStrip) and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
 
 Source: `design-system/components/AppShell`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `topBar` | `ReactNode` | yes | The bar across the top (TopBar). |
+| `strip` | `ReactNode` | no | A slim strip under the bar, on every page (a StatusStrip); absent: nothing. |
 | `layout` | `'page' \| 'full'` | no | `page` (centred, max page width, padded; default) or `full` (edge to edge). |
 | `skipLabel` | `string` | no | Text of the skip link that jumps past the top bar to the content. |
 | `children` | `ReactNode` | yes | The page. |
@@ -1234,6 +1235,21 @@ Source: `design-system/components/StatusBadge`
 | `icon` | `IconName` | no | An optional leading icon (check, alert, info). |
 | `title` | `string` | no | Full explanation on hover ("Earnings in 6 sessions"). |
 | `children` | `ReactNode` | yes | The state, in words. |
+
+### StatusStrip
+
+StatusStrip: one slim line under the top bar of every page that says what is wrong with the system, instead of a stack of banners. Severity pills ("1 failing", "2 warnings"), the most serious message and "and N more"; the whole line is one button that expands the full list, each issue with its title, detail, its own actions and a snooze. Issues arrive most serious first. With no issue it renders nothing, or the slim `allClear` line when the caller gives one. Presentational: the caller decides what an issue is and where a snooze is remembered (`onSnooze`); the words are props with English defaults. Container query: under 480 px an issue's actions drop under its text.
+
+Source: `design-system/components/StatusStrip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `issues` | `readonly StatusIssue[]` | yes | The open issues, most serious first. |
+| `onSnooze` | `(id: string) => void` | no | Hides one issue (a per-viewer snooze); without it the list has no snooze button. |
+| `allClear` | `ReactNode` | no | The slim all-clear line ("All systems normal"); omitted, a clear system shows nothing. |
+| `defaultExpanded` | `boolean` | no | Start expanded (default false). |
+| `label` | `string` | no | Accessible name of the strip. |
+| `words` | `Partial<StatusStripWords>` | no | Words: the pills, "and N more" and the snooze button. |
 
 ### Tabs
 

@@ -96,8 +96,10 @@ const QualityChecks = graphql(`
   }
 `);
 
-export function useNightlyRuns(limit = NIGHTLY_LIMIT) {
+/** The newest nightly runs; `enabled: false` skips the read (the viewer may not see runs). */
+export function useNightlyRuns(limit = NIGHTLY_LIMIT, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: queryKeys.gql('NightlyRuns', { limit }),
     queryFn: () => gql(NightlyRuns, { limit }),
     select: (data) => data.nightlyRuns,
