@@ -126,6 +126,37 @@ def test_size_small_ranks_the_smallest_market_cap_first_and_rejects_one_without(
     ]
 
 
+def test_vrp_iv_hv_reads_only_ibkr_iv_and_ranks_the_highest_ratio_first() -> None:
+    """The VRP edge's history-evaluable screen (ADR 0053): IBKR IV30 and HV30 only, no chain
+    field and no Cboe-mixed IV; a missing IBKR IV never passes (ADR 0030); ranked by IV/HV."""
+    spec = resolve_config(STORE, "vrp_iv_hv", UserContext("site")).screen_spec
+    fields = {c.rule.field for c in spec.criteria}
+    assert "rollup.ibkr_iv@v1.iv30_ibkr" in fields  # the edge's iv_field
+    assert not {f for f in fields if "put_wing" in f or "option_tier" in f or "vrp_iv30" in f}
+    ratio = "feature.vrp_ibkr_iv_hv_ratio"
+    assert spec.tie_break == ratio and spec.tie_break_descending
+    base = {c.rule.field: _passing(c) for c in spec.criteria}
+    iv = "rollup.ibkr_iv@v1.iv30_ibkr"
+    view = FeatureView(
+        DAY,
+        {
+            "EQ:LOW": {**base, ratio: 1.5},
+            "EQ:HIGH": {**base, ratio: 3.0},
+            "EQ:NOIV": {k: v for k, v in base.items() if k != iv},
+            "EQ:GEARED": {**base, "instrument.is_leveraged": True},
+        },
+    )
+    rows = evaluate_screen(spec, view).rows
+    assert [(r.instrument_id, r.decision) for r in rows[:2]] == [
+        ("EQ:HIGH", Decision.QUALIFIED),
+        ("EQ:LOW", Decision.QUALIFIED),
+    ]
+    assert {r.instrument_id: r.decision for r in rows[2:]} == {
+        "EQ:NOIV": Decision.REJECT,
+        "EQ:GEARED": Decision.REJECT,
+    }
+
+
 def test_pead_small_cap_needs_a_reaction_of_five_percent_and_ranks_the_largest_first() -> None:
     """The small-cap drift screen (ADR 0053, ED4b): Nasdaq common stock under $2B, liquid before
     the report, a complete reaction window of at least +5% over SPY; a missing value never

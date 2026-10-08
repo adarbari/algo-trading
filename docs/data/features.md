@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-429 stored features in 46 groups, in dependency order; 120 expression features.
+429 stored features in 46 groups, in dependency order; 122 expression features.
 
 ## `option_liquidity@v1`
 
@@ -952,6 +952,8 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `vrp_iv30_source` | label | str | category | personal | ibkr, cboe | Where vrp_iv30 came from: ibkr or cboe (the lower one when both exist; ibkr on a tie) | vrp_iv30 is null (neither source has an IV30) | `if(is_null(vrp_iv30), null, if(is_null(iv30.iv30_cboe), "ibkr", if(is_null(ibkr_iv.iv30_ibkr), "cboe", if(ibkr_iv.iv30_ibkr <= iv30.iv30_cboe, "ibkr", "cboe"))))` | virtual |
 | `vrp_iv_hv_spread` | expression | float | decimal | personal | -5 .. 5 | vrp_iv30 minus HV30 (price_stats): the VRP scanner's volatility premium | vrp_iv30 or hv30 is null (no IV30 from IBKR or Cboe, or a gap in the last 31 sessions) | `vrp_iv30 - price_stats.hv30` | virtual |
 | `vrp_iv_hv_ratio` | expression | float | ratio | personal | >= 0 | vrp_iv30 / HV30 (price_stats): plain ratio, no HV30 floor (owner decision 2026-10-03) | vrp_iv30 or hv30 is null, or hv30 is 0 | `vrp_iv30 / price_stats.hv30` | virtual |
+| `vrp_ibkr_iv_hv_spread` | expression | float | decimal | personal | -5 .. 5 | IBKR's IV30 minus HV30 (price_stats): the volatility premium on one source, no Cboe mix | IBKR has no IV30 for the session, or hv30 is null (a gap in the last 31 sessions) | `ibkr_iv.iv30_ibkr - price_stats.hv30` | virtual |
+| `vrp_ibkr_iv_hv_ratio` | expression | float | ratio | personal | >= 0 | IBKR's IV30 / HV30 (price_stats): plain ratio on one source, no Cboe mix | IBKR has no IV30 for the session, or hv30 is null or 0 | `if(price_stats.hv30 > 0, ibkr_iv.iv30_ibkr / price_stats.hv30, null)` | virtual |
 
 ### `wings.toml`
 
