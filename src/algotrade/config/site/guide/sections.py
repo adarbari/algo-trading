@@ -12,8 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from algotrade.config.site.fields import Table, reject_secrets
-from algotrade.config.site.guide.shape import line, lines, once, tables
+from algotrade.config.site.fields import Table, reject_secrets, unique
 from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "guide"
@@ -73,20 +72,19 @@ class GuideSections:
         reject_secrets(doc or {}, where)
         root = Table(doc, where)
         root.only(("section", "theme_group", "family"))
-        sections = tuple(_section(t) for t in tables(root, "section"))
+        sections = tuple(_section(t) for t in root.tables("section"))
         groups = tuple(
-            ThemeGroup(*_head(t, GROUP_KEYS), lines(t, "themes"))
-            for t in tables(root, "theme_group")
+            ThemeGroup(*_head(t, GROUP_KEYS), t.lines("themes")) for t in root.tables("theme_group")
         )
         families = tuple(
-            PlaybookFamily(*_head(t, FAMILY_KEYS), lines(t, "presets"))
-            for t in tables(root, "family")
+            PlaybookFamily(*_head(t, FAMILY_KEYS), t.lines("presets"))
+            for t in root.tables("family")
         )
-        once(where, "section ids", (s.id for s in sections))
-        once(where, "theme group ids", (g.id for g in groups))
-        once(where, "themes", (t for g in groups for t in g.themes))
-        once(where, "family ids", (f.id for f in families))
-        once(where, "presets", (p for f in families for p in f.presets))
+        unique(where, "section ids", (s.id for s in sections))
+        unique(where, "theme group ids", (g.id for g in groups))
+        unique(where, "themes", (t for g in groups for t in g.themes))
+        unique(where, "family ids", (f.id for f in families))
+        unique(where, "presets", (p for f in families for p in f.presets))
         return cls(sections, groups, families)
 
     @property
@@ -102,7 +100,7 @@ def load_guide_sections(configs: Documents) -> GuideSections:
 
 def _head(t: Table, keys: tuple[str, ...]) -> tuple[str, str]:
     t.only(keys)
-    return line(t, "id"), line(t, "title")
+    return t.line("id"), t.line("title")
 
 
 def _section(t: Table) -> GuideSectionEntry:
@@ -110,4 +108,4 @@ def _section(t: Table) -> GuideSectionEntry:
     section = t.choice("id", "", SECTIONS) if t.raw("id") is not None else ""
     if not section:
         raise ConfigurationError(f"{t.where} id: expected one of {', '.join(SECTIONS)}")
-    return GuideSectionEntry(section, line(t, "title"), line(t, "purpose"))
+    return GuideSectionEntry(section, t.line("title"), t.line("purpose"))

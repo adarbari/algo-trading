@@ -19,7 +19,7 @@ PAGES = """query P($term: String!, $page: String!) {
 
 
 def test_a_term_and_a_start_page(graph: Graph) -> None:
-    body = graph(PAGES, {"term": "liquidity_risk", "page": "build-a-screen"})
+    body = graph(PAGES, {"term": "liquidity_risk", "page": "build_a_screen"})
     assert "errors" not in body, body
     data = body["data"]
     term = data["guideTerm"]

@@ -94,6 +94,8 @@ def test_a_document_is_typed_in_order_and_a_missing_file_has_no_pages() -> None:
     ("change", "message"),
     [
         ({"order": None}, "order: required"),
+        ({"id": "read-a-result"}, "id: expected snake_case"),
+        ({"id": ""}, "id: expected a non-empty string"),
         ({"order": 0}, "order"),
         ({"title": ""}, "title: expected a non-empty string"),
         ({"section": []}, "expected one or more"),

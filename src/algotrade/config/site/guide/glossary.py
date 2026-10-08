@@ -5,8 +5,9 @@ section 3, "Glossary"): the app's own words and the rule grammar, one ``[[term]]
 ``body`` (a short paragraph; catalogue names in it are linked) and ``see_also`` (other term
 ids, in reading order).
 
-The loader checks shape only: known keys, non-empty text, no id or term twice (terms compared
-without case), no ``see_also`` naming the term itself or another twice, no secrets. That every
+The loader checks shape only: known keys, snake_case ids, non-empty text, no id or term twice
+(terms compared without case), no ``see_also`` naming the term itself or another twice, no
+secrets. That every
 ``see_also`` id is a term, every catalogue name in the prose exists, ``short`` is one sentence
 and every term the spec lists is written are fitness tests over the shipped file."""
 
@@ -14,8 +15,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from algotrade.config.site.fields import Table, reject_secrets
-from algotrade.config.site.guide.shape import line, lines, once, tables
+from algotrade.config.site.fields import Table, reject_secrets, unique
+from algotrade.config.site.guide.start import entry_id
 from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "guide"  # the config store's kind: site/guide/glossary.toml
@@ -42,12 +43,12 @@ class GlossaryTerm:
     @classmethod
     def from_table(cls, t: Table) -> "GlossaryTerm":
         t.only(TERM_KEYS)
-        term_id = line(t, "id")
-        see_also = lines(t, "see_also", required=False)
+        term_id = entry_id(t)
+        see_also = t.lines("see_also", required=False)
         if term_id in see_also:
             raise ConfigurationError(f"{t.where} see_also: a term does not refer to itself")
-        once(t.where, "see_also ids", see_also)
-        return cls(term_id, line(t, "term"), line(t, "short"), line(t, "body"), see_also)
+        unique(t.where, "see_also ids", see_also)
+        return cls(term_id, t.line("term"), t.line("short"), t.line("body"), see_also)
 
 
 @dataclass(frozen=True)
@@ -65,9 +66,9 @@ class GuideGlossary:
         reject_secrets(doc or {}, where)
         root = Table(doc, where)
         root.only(("term",))
-        terms = tuple(GlossaryTerm.from_table(t) for t in tables(root, "term"))
-        once(where, "term ids", (t.id for t in terms))
-        once(where, "terms", (t.term.lower() for t in terms))
+        terms = tuple(GlossaryTerm.from_table(t) for t in root.tables("term"))
+        unique(where, "term ids", (t.id for t in terms))
+        unique(where, "terms", (t.term.lower() for t in terms))
         return cls(terms)
 
 

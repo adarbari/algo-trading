@@ -2,6 +2,7 @@
 error that names the file, section and key (``sources.toml [http] max_retry_s: ...``); and
 ``reject_secrets``: no config document (site or user) may hold a credential."""
 
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any, overload
 
@@ -107,6 +108,36 @@ class Table:
         if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
             raise self._fail(key, "a list of strings")
         return tuple(value)
+
+    def line(self, key: str) -> str:
+        """``key`` with its whitespace collapsed; required and non-empty."""
+        value = " ".join(self.text(key, "").split())
+        if not value:
+            raise ConfigurationError(f"{self.where} {key}: expected a non-empty string")
+        return value
+
+    def lines(self, key: str, required: bool = True) -> tuple[str, ...]:
+        """``key``'s strings, each collapsed and non-empty; ``required``: at least one."""
+        values = tuple(" ".join(v.split()) for v in self.strings(key, ()))
+        if required and not values:
+            raise ConfigurationError(f"{self.where} {key}: expected one or more non-empty strings")
+        if not all(values):
+            raise ConfigurationError(f"{self.where} {key}: expected non-empty strings")
+        return values
+
+    def tables(self, key: str) -> list["Table"]:
+        """``[[key]]``: a list of tables (missing: none), each named by its position."""
+        raw = self._doc.get(key) or []
+        if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
+            raise ConfigurationError(f"{self.where} {key}: expected a list of tables ([[{key}]])")
+        return [Table(e, f"{self.where} [[{key}]][{i}]") for i, e in enumerate(raw)]
+
+
+def unique(where: str, what: str, values: Iterable[str]) -> None:
+    """Fails naming every value of ``values`` listed more than once."""
+    repeated = sorted(k for k, n in Counter(values).items() if n > 1)
+    if repeated:
+        raise ConfigurationError(f"{where}: {what} listed more than once: {repeated}")
 
 
 def _is_int(value: object) -> bool:
