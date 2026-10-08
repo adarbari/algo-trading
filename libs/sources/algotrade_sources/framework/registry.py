@@ -536,13 +536,15 @@ def build_text_model(
     credential: str | None,
     retries: int = 2,
     extra: Mapping[str, Any] | None = None,
+    provider: str = "default",
 ) -> ChatCompletions:
     """The text model behind screener drafts (ADR 0041): an OpenAI-compatible chat client at
-    ``base_url`` for ``model``, the credential (``$ALGOTRADE_LLM_API_KEY``; a local server
-    needs none) as a bearer header, never in the URL; a busy provider is retried ``retries``
-    times. Built here, like every vendor client, so the API imports only the registry."""
+    ``base_url`` for ``model`` answering as the ``llm.toml`` provider ``provider``, the
+    credential (``$ALGOTRADE_LLM_API_KEY_<ID>``; a local server needs none) as a bearer header,
+    never in the URL; a busy provider is retried ``retries`` times. Built here, like every
+    vendor client, so the API imports only the registry."""
     headers = {"Authorization": f"Bearer {credential}"} if credential else {}
     transport = json_post_transport(timeout=timeout_s, headers=headers)
     return ChatCompletions(
-        base_url, model, transport, pause, max_tokens, retries, extra=extra or {}
+        base_url, model, transport, pause, max_tokens, retries, extra=extra or {}, provider=provider
     )

@@ -10,6 +10,7 @@ from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.http import HttpError, pause
 from algotrade_sources.framework.registry import build_text_model
 from algotrade_sources.llm.chat import ChatCompletions, content_of
+from tests.helpers.payloads.llm import anthropic_answer, gemini_answer
 
 BASE = "https://api.groq.com/openai/v1"
 
@@ -30,7 +31,8 @@ def test_asks_for_json_at_temperature_zero_and_returns_the_content() -> None:
         return answer('{"criteria": []}')
 
     client = ChatCompletions(BASE + "/", "llama", transport, NO_WAIT, max_tokens=500)
-    assert client.complete("task", "sentence") == '{"criteria": []}'
+    done = client.complete("task", "sentence")
+    assert done.text == '{"criteria": []}' and done.model == "llama" and done.provider == "default"
     ((url, body),) = sent
     assert url == BASE + "/chat/completions"
     request = json.loads(body)
@@ -111,7 +113,7 @@ def test_a_busy_provider_is_retried_with_a_doubling_pause_or_retry_after() -> No
         return answer('{"criteria": []}')
 
     client = ChatCompletions(BASE, "llama", busy_then_ok, slept.append, retries=3)
-    assert client.complete("s", "u") == '{"criteria": []}'
+    assert client.complete("s", "u").text == '{"criteria": []}'
     # back-off, then the Retry-After header, then the per-minute floor for a bare 429
     assert len(calls) == 4 and slept == [3.0, 7.0, 20.0]
 
@@ -156,3 +158,45 @@ def test_the_registry_builds_it_with_the_key_in_a_header_only() -> None:
     assert "sk-secret" not in model.url and "sk-secret" not in json.dumps(model.request("s", "u"))
     local = build_text_model("http://localhost:11434/v1", "llama3.1", 60.0, 2000, None)
     assert local.url == "http://localhost:11434/v1/chat/completions"
+    assert build_text_model(BASE, "m", 1.0, 1, None, provider="claude").provider == "claude"
+
+
+def test_tokens_and_latency_come_from_the_provider_payloads() -> None:
+    ticks = iter([10.0, 12.5])
+    claude = ChatCompletions(
+        BASE,
+        "claude-haiku-4-5",
+        lambda u, b: anthropic_answer('{"criteria": []}'),
+        NO_WAIT,
+        provider="claude",
+        clock=lambda: next(ticks),
+    )
+    done = claude.complete("s", "u")
+    assert (done.provider, done.model) == ("claude", "claude-haiku-4-5")
+    assert (done.input_tokens, done.output_tokens, done.latency_s) == (412, 87, 2.5)
+    assert done.fell_back_from is None
+    gemini = ChatCompletions(BASE, "gemini-2.5-flash", lambda u, b: gemini_answer("{}"), NO_WAIT)
+    assert gemini.complete("s", "u").output_tokens == 2140
+
+
+@pytest.mark.parametrize(
+    ("usage", "tokens"),
+    [
+        (None, (None, None)),
+        ({}, (None, None)),
+        ({"prompt_tokens": 5}, (5, None)),
+        ({"prompt_tokens": "5", "completion_tokens": True}, (None, None)),
+        ({"prompt_tokens": -1, "completion_tokens": 0}, (None, 0)),
+        ("usage", (None, None)),
+    ],
+)
+def test_a_count_the_provider_left_out_is_none_never_zero(
+    usage: object, tokens: tuple[int | None, int | None]
+) -> None:
+    body: dict[str, object] = {"choices": [{"message": {"content": "{}"}}]}
+    if usage is not None:
+        body["usage"] = usage
+    done = ChatCompletions(BASE, "m", lambda u, b: json.dumps(body).encode(), NO_WAIT).complete(
+        "s", "u"
+    )
+    assert (done.input_tokens, done.output_tokens) == tokens

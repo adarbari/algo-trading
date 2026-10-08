@@ -47,7 +47,8 @@ SEC_CONTACT = "ALGOTRADE_SEC_CONTACT"
 TIINGO_API_KEY = "ALGOTRADE_TIINGO_API_KEY"
 # The text model behind natural-language screener drafts (ADR 0041): optional (a local server
 # needs none); the provider is `config/site/llm.toml`, never the environment.
-LLM_API_KEY = "ALGOTRADE_LLM_API_KEY"
+LLM_API_KEY = "ALGOTRADE_LLM_API_KEY"  # the single-provider (legacy) form of llm.toml only
+LLM_KEY_PREFIX = "ALGOTRADE_LLM_API_KEY_"  # + the provider id upper-cased: see `llm_key`
 REQUIRED_KEYS = (MASSIVE_API_KEY, SEC_CONTACT)
 
 __all__ = [
@@ -59,6 +60,7 @@ __all__ = [
     "credential",
     "data_url",
     "dotenv_keys",
+    "llm_key",
     "load_dotenv",
     "supabase_jwt_secret",
     "supabase_url",
@@ -95,6 +97,13 @@ def port_base(default: int) -> int:
     """``$ALGOTRADE_PORT_BASE`` (a worktree's ports, ``scripts/worktree.sh``), else ``default``."""
     raw = credential(PORT_BASE) or ""
     return int(raw) if raw.isdigit() else default
+
+
+def llm_key(provider_id: str) -> str:
+    """The environment variable holding the key of the ``[[provider]]`` with this id in
+    ``llm.toml``: ``ALGOTRADE_LLM_API_KEY_<ID upper>`` (``claude`` -> ``..._CLAUDE``). The
+    name, never the value: read it with ``credential``."""
+    return LLM_KEY_PREFIX + provider_id.upper()
 
 
 def credential(name: str) -> str | None:

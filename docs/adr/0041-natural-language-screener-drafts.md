@@ -15,7 +15,9 @@ thresholds; the owner wants the same explanation for people as for the model), a
 time 2026-10-06 (**the text-model seam** has a second caller, the on-demand regime
 explanation: `TextModel` moves to `services/text_model`, the explanation's prompt discipline,
 number check and link filter, and an ADR 0005 write exception for its answer cache; see
-"Amended 2026-10-06: the text-model seam"). Extends
+"Amended 2026-10-06: the text-model seam"), and again 2026-10-08 (**a provider chain**:
+`[[provider]]` tables in `llm.toml`, Claude first and Gemini Flash behind it, one
+`Completion` result; see "Amended 2026-10-08: a provider chain"). Extends
 [0027](0027-vendor-sources-shared-package.md) (an external text model is a vendor adapter in
 `libs/sources`), [0029](0029-rule-screener.md) (a draft is still the only thing the Builder
 edits), [0005](0005-ingestion-is-the-only-writer.md) (one derived-cache write exception) and [0037](0037-domain-read-model-served-by-graphql.md) decision 4 (a compute over a request body
@@ -125,6 +127,42 @@ asks the same `TextModel` for plain words about the market weather.
 5. **REST.** `POST /regime/explain {question | card}` is a compute over a request body, the
    same class as `draft-from-text`; it is a POST, so it is not on the GET allow-list
    (ADR 0037 is unchanged).
+
+## Amended 2026-10-08: a provider chain
+
+The owner wants Claude first and Gemini Flash behind it, site-wide, so one provider's outage or
+quota is not "drafting unavailable".
+
+1. **`llm.toml` names a chain.** `[[provider]]` tables (`id`, `base_url`, `model`, optional
+   `timeout_s`, `answer_limit`, `retries`, `[provider.request]`) are tried in file order; the
+   top-level `timeout_s`, `answer_limit`, `retries` and `request` are their defaults. A file
+   with no `[[provider]]` is one provider from the top-level `base_url` and `model` (the
+   single-provider form, unchanged); both forms in one file is a `ConfigurationError`. Anthropic
+   is reached through its OpenAI-compatible endpoint, so the one adapter serves every provider.
+2. **Keys.** `ALGOTRADE_LLM_API_KEY_<ID upper>` per provider (`llm_key(id)` in `config/env.py`);
+   `ALGOTRADE_LLM_API_KEY` stays the key of the single-provider form only. No variable name is
+   written in TOML. A remote provider whose key is not set is left out of the chain with a
+   WARNING; no usable provider is "the text model is off", with the variables to set.
+3. **`Completion` replaces the bare string.** `TextModel.complete` returns
+   `Completion(text, model, provider, input_tokens, output_tokens, latency_s, fell_back_from)`
+   (`core/model/completion.py`); tokens are read from `usage.prompt_tokens` /
+   `completion_tokens` and are `None`, never `0`, when the provider omits them. `TextModel.name`
+   becomes `names` (the models that may answer, in chain order).
+4. **`FallbackTextModel`** (`services/text_model/chain.py`, pure) asks the members in order and
+   falls back only on `ModelUnavailableError` (logged at WARNING); any other error propagates.
+   When all failed, the error names every provider with its own message. One `deadline_s`
+   covers the chain: after it no further provider is started; a request already running keeps
+   its own `timeout_s`. Unset, it is every provider's worst case added up (`timeout_s` x
+   (`retries` + 1) plus the pauses); a value not above the providers before the last is
+   refused, so a hanging primary can never use up the fallback's turn. A non-retryable 4xx
+   (bad key, unknown model) falls back too but is logged at ERROR.
+5. **The explanation cache is keyed by the model that answered.** A lookup tries each name in
+   chain order; a put uses `Completion.model`. A fallback's answer is therefore never kept under
+   the primary's name, and a primary-only chain never reads the fallback's answer as its own.
+   A cached fallback answer is served while the primary is up again (the lookup tries every
+   name): an answer is for the signals, not for the model, and is checked again on every read.
+6. The draft and explanation parsers already tolerate a code fence around the JSON object
+   (Anthropic's compatibility endpoint may ignore `response_format`); tests cover both.
 
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
