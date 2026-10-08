@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { Text } from '../../primitives/Text';
 import { Tabs, type TabItem, type TabsProps } from './Tabs';
+import { narrow } from '../../testing';
 
 const views: TabItem[] = [
   { id: 'compare', label: 'Compare' },
@@ -66,3 +67,6 @@ export const CountsAndDisabled: Story = {
 
 /** Small tabs in a dense toolbar. */
 export const Dense: Story = { args: { size: 'sm' } };
+
+/** A 375 px phone frame; under a coarse pointer the control floors apply. */
+export const Narrow: Story = { ...Dense, decorators: [narrow] };

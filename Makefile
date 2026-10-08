@@ -104,7 +104,8 @@ test:            ## everything, with the coverage gate, one worker per CPU (WORK
 TEST_SHARDS = unit apps rest
 TEST_SHARD_unit = tests/unit
 TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
-TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation  # few tests, the slow ones
+# rest: few tests, the slow ones
+TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation
 
 test-shard:      ## one CI shard (SHARD=unit|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
 	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }

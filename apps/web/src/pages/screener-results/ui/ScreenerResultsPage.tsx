@@ -113,7 +113,7 @@ export function ScreenerResultsPage({
         onOpen={onOpenTicker}
         focusId={focusId}
         onFocusChange={(row) => {
-          setFocusId(row.instrumentId);
+          setFocusId(row ? row.instrumentId : null);
         }}
         onToggleCompare={(row) => {
           toggle(row.symbol);

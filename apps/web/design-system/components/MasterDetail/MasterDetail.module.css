@@ -1,0 +1,7 @@
+/*
+ * MasterDetail: the measured root. It takes its parent's width (useNarrow reads it) and lets
+ * wide children shrink instead of overflowing it.
+ */
+.root {
+  min-inline-size: 0;
+}

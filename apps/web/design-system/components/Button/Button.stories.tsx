@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
 import { Button } from './Button';
+import { narrow } from '../../testing';
 
 const meta = {
   title: 'Components/Button',
@@ -102,3 +103,6 @@ export const Dense: Story = {
 };
 
 export const FullWidth: Story = { args: { fullWidth: true, variant: 'primary' } };
+
+/** A 375 px phone frame; under a coarse pointer the control floors apply. */
+export const Narrow: Story = { ...Dense, decorators: [narrow] };

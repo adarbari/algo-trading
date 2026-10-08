@@ -6,7 +6,10 @@
  * reference lines with an end label, an optional volume pane and lanes (a thin pane each, drawn
  * by lanes.ts on the chart's own time scale), in the
  * colours and font read from the tokens; reports the crosshair position. A theme or data change redraws from scratch (cheap at daily resolution) instead of
- * patching options. Scrolling and zooming are off: the caller's range control sets the window.
+ * patching options. The caller's range control sets the window; inside it, touch pans (horizontal
+ * drag, kinetic) and pinches to zoom, while the mouse wheel and drags stay off so a page scrolls
+ * past the chart; the returned handle zooms around the centre and resets to the window (the
+ * Chart's zoom buttons).
  */
 import {
   AreaSeries,
@@ -41,6 +44,39 @@ import {
   type ChartValueBand,
   type PreparedSeries,
 } from './chartData';
+
+/** What `drawChart` returns: remove the chart, zoom the visible window, or reset it. */
+export interface ChartHandle {
+  /** Remove the chart and its listeners. */
+  dispose: () => void;
+  /**
+   * Scale the visible window around its centre: 0.5 shows half as many days (closer), 2 twice as
+   * many (wider). Kept inside the data; zooming out past it shows the whole window.
+   */
+  zoom: (factor: number) => void;
+  /** Show the caller's whole window again. */
+  reset: () => void;
+}
+
+/** The fewest days a zoom shows. */
+const MIN_ZOOM_DAYS = 5;
+
+/** Touch pans and pinches; the mouse wheel and drags scroll the page, not the chart. */
+const INTERACTION = {
+  handleScale: {
+    pinch: true,
+    mouseWheel: false,
+    axisPressedMouseMove: false,
+    axisDoubleClickReset: false,
+  },
+  handleScroll: {
+    horzTouchDrag: true,
+    vertTouchDrag: false,
+    mouseWheel: false,
+    pressedMouseMove: false,
+  },
+  kineticScroll: { mouse: false, touch: true },
+} as const;
 
 /** Colours and font for the canvas, read from the CSS tokens of the active theme. */
 export interface EngineTheme {
@@ -135,14 +171,14 @@ function isoDay(time: Time): string {
 
 /**
  * Draws the chart into `container` (sized by its CSS; resizes with it through ResizeObserver).
- * Returns the cleanup that removes it.
+ * Returns the handle that zooms it and removes it.
  */
 export function drawChart(
   container: HTMLElement,
   input: EngineInput,
   theme: EngineTheme,
   onCrosshair: (info: CrosshairInfo | null) => void,
-): () => void {
+): ChartHandle {
   const chart: IChartApi = createChart(container, {
     autoSize: true,
     layout: {
@@ -161,9 +197,7 @@ export function drawChart(
       vertLine: { color: theme.control, style: LineStyle.Solid, labelBackgroundColor: theme.row },
       horzLine: { color: theme.control, style: LineStyle.Dashed, labelBackgroundColor: theme.row },
     },
-    handleScroll: false,
-    handleScale: false,
-    kineticScroll: { mouse: false, touch: false },
+    ...INTERACTION,
   });
 
   // Every line and every finite band edge stays inside the price range (they do not scale it).
@@ -344,7 +378,29 @@ export function drawChart(
     onCrosshair({ time: isoDay(param.time), x: param.point.x, y: param.point.y });
   });
 
-  return () => {
-    chart.remove();
+  // The last logical index: every day some series or the volume has (the time scale's bars).
+  const last =
+    new Set([...input.series.flatMap((s) => s.points), ...input.volume].map((p) => p.time)).size -
+    1;
+  const timeScale = chart.timeScale();
+  return {
+    dispose: () => {
+      chart.remove();
+    },
+    zoom: (factor) => {
+      const current = timeScale.getVisibleLogicalRange() ?? { from: 0, to: last };
+      const span = Math.max((current.to - current.from) * factor, MIN_ZOOM_DAYS - 1);
+      if (span >= last) {
+        timeScale.fitContent();
+        return;
+      }
+      const centre = (current.from + current.to) / 2;
+      // Shift the window back inside the data rather than past either end.
+      const from = Math.min(Math.max(centre - span / 2, 0), last - span);
+      timeScale.setVisibleLogicalRange({ from, to: from + span });
+    },
+    reset: () => {
+      timeScale.fitContent();
+    },
   };
 }

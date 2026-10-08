@@ -11,9 +11,23 @@ const widgets = vi.hoisted(() => ({ ranking: vi.fn(), top: vi.fn() }));
 vi.mock('@/widgets/screener-ranking', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
-    ScreenerRanking: (props: { onNewScreener: () => void }) => {
+    ScreenerRanking: (props: {
+      onNewScreener: () => void;
+      onOpenScreener: (id: string) => void;
+    }) => {
       widgets.ranking(props);
-      return <Button onClick={props.onNewScreener}>new screener</Button>;
+      return (
+        <>
+          <Button onClick={props.onNewScreener}>new screener</Button>
+          <Button
+            onClick={() => {
+              props.onOpenScreener('vrp');
+            }}
+          >
+            ranked screener
+          </Button>
+        </>
+      );
     },
   };
 });
@@ -28,14 +42,23 @@ vi.mock('@/widgets/regime-strip', async () => {
 vi.mock('@/widgets/paused-ideas', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
-    PausedIdeas: (props: { onOpen: (s: string) => void }) => (
-      <Button
-        onClick={() => {
-          props.onOpen('XOM');
-        }}
-      >
-        paused
-      </Button>
+    PausedIdeas: (props: { onOpen: (s: string) => void; onOpenScreener: (id: string) => void }) => (
+      <>
+        <Button
+          onClick={() => {
+            props.onOpen('XOM');
+          }}
+        >
+          paused
+        </Button>
+        <Button
+          onClick={() => {
+            props.onOpenScreener('liq');
+          }}
+        >
+          paused screener
+        </Button>
+      </>
     ),
   };
 });
@@ -83,13 +106,14 @@ describe('IdeasPage', () => {
     const onNewScreener = vi.fn();
     const onScreeners = vi.fn();
     const onOpenRegime = vi.fn();
+    const onOpenScreener = vi.fn();
     const { container } = render(
       <IdeasPage
         onCompare={onCompare}
         onOpen={onOpen}
         onNewScreener={onNewScreener}
         onScreeners={onScreeners}
-        onOpenScreener={vi.fn()}
+        onOpenScreener={onOpenScreener}
         onOpenRegime={onOpenRegime}
       />,
     );
@@ -104,6 +128,10 @@ describe('IdeasPage', () => {
     expect(onOpen).toHaveBeenCalledWith('KO');
     await user.click(screen.getByRole('button', { name: 'paused' }));
     expect(onOpen).toHaveBeenLastCalledWith('XOM');
+    await user.click(screen.getByRole('button', { name: 'ranked screener' }));
+    expect(onOpenScreener).toHaveBeenLastCalledWith('vrp');
+    await user.click(screen.getByRole('button', { name: 'paused screener' }));
+    expect(onOpenScreener).toHaveBeenLastCalledWith('liq');
     await user.click(screen.getByRole('button', { name: 'screeners' }));
     expect(onScreeners).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);

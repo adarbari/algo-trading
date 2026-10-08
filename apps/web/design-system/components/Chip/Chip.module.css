@@ -72,3 +72,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@media (pointer: coarse) {
+  .chip {
+    min-height: var(--density-control-height);
+  }
+
+  .main {
+    align-self: stretch;
+  }
+}

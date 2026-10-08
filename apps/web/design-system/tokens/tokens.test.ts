@@ -51,3 +51,14 @@ describe('tokens.css', () => {
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
   });
 });
+
+describe('touch sizing', () => {
+  it('raises the control and row heights under coarse pointers, after the density blocks', () => {
+    const css = renderTokensCss();
+    const coarse = css.indexOf('@media (pointer: coarse)');
+    expect(coarse).toBeGreaterThan(css.indexOf("[data-density='comfortable']"));
+    expect(css.slice(coarse)).toMatch(
+      /--density-control-height: 36px;[\s\S]*--density-row-height: 40px;[\s\S]*--density-cell-padding-y: 9px;/,
+    );
+  });
+});

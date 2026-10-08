@@ -4,6 +4,7 @@ import { Heading } from '../../primitives/Heading';
 import { Mono } from '../../primitives/Mono';
 import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
+import { narrow } from '../../testing';
 import { NavTabs } from '../NavTabs';
 import { Panel } from '../Panel';
 import { WorkspaceSwitch } from '../WorkspaceSwitch';
@@ -91,3 +92,6 @@ export const Dense: Story = {
     ),
   ],
 };
+
+/** A phone-width container (375 px): the top bar wraps to two rows and the page padding tightens. */
+export const Narrow: Story = { decorators: [narrow] };

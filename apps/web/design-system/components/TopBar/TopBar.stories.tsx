@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
+import { narrow } from '../../testing';
 import { Mono } from '../../primitives/Mono';
 import { Text } from '../../primitives/Text';
 import { NavTabs } from '../NavTabs';
@@ -84,7 +85,7 @@ export const WithUtilityLink: Story = {
 /** Brand only (sign-in, error pages). */
 export const Empty: Story = { args: { workspace: undefined, nav: undefined, end: undefined } };
 
-/** Phone width (a 320 px frame): the slots wrap onto new lines. */
+/** A 320 px frame, set by the page rather than the container query's frame. */
 export const Dense: Story = {
   decorators: [
     (Story) => (
@@ -94,3 +95,6 @@ export const Dense: Story = {
     ),
   ],
 };
+
+/** A 375 px phone: brand, switch and search on row 1, the nav alone on row 2. */
+export const Narrow: Story = { decorators: [narrow] };
