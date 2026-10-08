@@ -531,6 +531,10 @@ RULE_SCREEN_VALUES = _fixed(
 # by ``services/evaluation/cross_section/results.py``. Partition ``session_date`` is the range's
 # end; ``key`` includes the range start, so re-running a range replaces its rows and another range
 # adds its own. ``sessions`` is the number of independent sessions beside every number.
+# ``edge_variant`` (a key column; null is read as "main", the edge itself) names the edge's own
+# ``[[variants]]`` row; ``iv_source`` / ``licence`` record the implied-vol field an outcome read
+# and its catalogue licence; ``reference_rate`` / ``touch_rate`` are filled by the expires_otm
+# outcome (ED4a), null until then.
 EDGE_EVAL = _fixed(
     "results/edge_eval",
     "results",
@@ -540,6 +544,7 @@ EDGE_EVAL = _fixed(
     ),
     *_strings("edge_id", "user_id", "variant", "slice_kind", "slice_value"),
     *_strings("role", "config_hash", "run_config_hash", "benchmark"),
+    *_strings("edge_variant", "iv_source", "licence"),
     "horizon_sessions int64!",
     "range_from date!",
     "range_to date",
@@ -552,11 +557,12 @@ EDGE_EVAL = _fixed(
     *_floats(
         "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
         "decile_spread", "decile_t", "effect_size", "sharpe", "deflated_sharpe", "pbo",
+        "reference_rate", "touch_rate",
     ),
     runs="merge",
     key=(
-        "edge_id", "user_id", "variant", "horizon_sessions", "slice_kind", "slice_value",
-        "range_from",
+        "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "slice_kind",
+        "slice_value", "range_from",
     ),
 )  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".

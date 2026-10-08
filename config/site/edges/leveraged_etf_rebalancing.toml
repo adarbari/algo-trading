@@ -22,6 +22,7 @@ all = [{ field = "instrument.is_leveraged", op = "eq", value = true }]
 kind = "excess_return"
 horizon_sessions = [1]
 benchmark = "SPY"
+start_offset_sessions = 1
 
 [quality_bar]
 outcome = "Excess return of the funds' underlying over SPY over one session; the real window is minutes."

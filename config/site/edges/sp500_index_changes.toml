@@ -24,6 +24,7 @@ all = [
 kind = "excess_return"
 horizon_sessions = [20]
 benchmark = "SPY"
+start_offset_sessions = 1
 
 [quality_bar]
 outcome = "Excess return over SPY over 20 sessions from the announcement."

@@ -19,7 +19,11 @@ COLUMNS = (
 
 
 def _cell(row: Mapping[str, Any], key: str, fmt: str) -> str:
-    value = f"{row['slice_kind']}={row['slice_value']}" if key == "slice" else row.get(key)
+    value = row.get(key)
+    if key == "slice":
+        value = f"{row['slice_kind']}={row['slice_value']}"
+    elif key == "variant" and row.get("edge_variant"):
+        value = f"{row['edge_variant']}/{value}"  # an edge variant (null: the edge itself)
     return "-" if value is None else fmt.format(value)
 
 

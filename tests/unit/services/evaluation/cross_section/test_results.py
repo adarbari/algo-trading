@@ -20,6 +20,7 @@ from algotrade.storage.tables.schemas import EDGE_EVAL
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
+    PRICE,
     World,
     build_world,
     edge,
@@ -75,6 +76,36 @@ def test_rerunning_a_range_replaces_its_rows(world: World) -> None:
     assert stored is not None
     all_rows = stored[stored["slice_kind"] == "all"]
     assert len(all_rows) == 1 and all_rows.iloc[0]["picks"] == 12  # the later run won the key
+
+
+def test_edge_variants_are_rows_of_their_own_and_the_edge_itself_has_a_null_key(
+    world: World,
+) -> None:
+    cheap = {"where": {"all": [{"field": PRICE, "op": "lt", "value": 200}]}}
+    changes = {"variants": [{"id": "cheap", "universe": cheap}]}
+    write_edge_eval(world.results, evaluate(world, **changes), NOW)
+    write_edge_eval(world.results, evaluate(world, **changes), NOW + timedelta(hours=1))
+    stored = world.reader.table("results/edge_eval", DAYS[-1])
+    assert stored is not None
+    all_rows = stored[stored["slice_kind"] == "all"]
+    # Two runs merged on the key (edge variant included): one row per edge variant, not four.
+    assert sorted(all_rows["edge_variant"].fillna("main")) == ["cheap", "main"]
+    assert (
+        all_rows.set_index(all_rows["edge_variant"].fillna("main")).loc["cheap", "eligible"] == 40
+    )
+    trials = world.results.runs_for("edge-eval:drift:site")[-1].stats["trials"]
+    assert [(t["edge_variant"], t["variant"]) for t in trials] == [
+        ("main", "momo"),
+        ("cheap", "momo"),
+    ]
+
+
+def test_the_iv_source_licence_and_rate_columns_are_null_until_something_fills_them(
+    world: World,
+) -> None:
+    row = edge_eval_frame(evaluate(world), "r1", NOW).iloc[0]
+    assert pd.isna(row["edge_variant"]) and pd.isna(row["iv_source"]) and pd.isna(row["licence"])
+    assert pd.isna(row["reference_rate"]) and pd.isna(row["touch_rate"])
 
 
 def test_an_invalid_frame_publishes_nothing(world: World) -> None:

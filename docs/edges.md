@@ -9,33 +9,33 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
-| Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_scheduled` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event | none yet |
-| 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, costs 10 bps | `momentum_12_1` |
-| Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings` | excess return, over 20, 60 sessions, vs SPY, costs 20 bps | none yet |
-| Volatility risk premium (`vrp_short_premium`) | candidate | every session | hit target, over 20 sessions, hit when realised_to_implied_vol is below 1, max drawdown 0.5 | `short_premium_liquidity`, `vrp_scanner` |
-| Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | rejected | every session | excess return, over 1 session, vs SPY | none yet |
-| S&P 500 index changes (`sp500_index_changes`) | rejected | on each `index_change` | excess return, over 20 sessions, vs SPY | none yet |
-| Russell reconstitution (`russell_reconstitution`) | blocked | on each `index_change` | excess return, over 20 sessions, vs SPY | none yet |
+| Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event | none yet |
+| 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
+| Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | none yet |
+| Volatility risk premium (`vrp_short_premium`) | candidate | every session | hit target, over 20 sessions, entered 1 session after the decision session, hit when realised_to_implied_vol is below 1, max drawdown 0.5 | `short_premium_liquidity`, `vrp_scanner` |
+| Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | rejected | every session | excess return, over 1 session, vs SPY, entered 1 session after the decision session | none yet |
+| S&P 500 index changes (`sp500_index_changes`) | rejected | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
+| Russell reconstitution (`russell_reconstitution`) | blocked | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
 
 ## Earnings announcement premium (`earnings_announcement_premium`)
 
 **Status:** candidate. **Thesis:** Stocks earn more in the days around a scheduled earnings report than at other times.
 
 - **Outcome:** excess return, over 6 sessions, vs SPY, starting -5 sessions from the event
-- **Schedule:** on each `earnings_scheduled` (a next report date known (earnings_schedule@v1 reads SCHEDULED); anchor: the scheduled report date's session)
+- **Schedule:** on each `earnings_expected` (a next report expected, scheduled or from the year-ago report (earnings_expected@v1); anchor: the expected report date's session)
 - **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'`
 - **Top K:** all qualified names
 - **Screeners:** none yet
 - **Baselines:** none yet
 - **Frozen period:** from 2026-04-01
-- **Notes:** Window: from five sessions before the scheduled report to one after (six sessions, start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must read SCHEDULED (earnings_schedule@v1) at the window's start, never be taken from the report.
+- **Notes:** Window: from five sessions before the scheduled report to one after (six sessions, start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must be known by the decision session D = S - 1 (earnings_expected@v1: SCHEDULED, or PRIOR_YEAR), never be taken from the actual report date; the entry session is S = A - 5 for the expected report A.
 
 **Quality bar**
 
 1. **Mechanism:** Announcements draw attention-driven buying, and the announcement's own risk, which cannot be diversified away in a reporting season, is priced (Frazzini and Lamont 2007; Savor and Wilson 2016).
 2. **Persistence:** Compensation for holding risk that concentrates on known dates: earning it means holding the announcement, which arbitrage cannot avoid.
 3. **Outcome:** Excess return over SPY from five sessions before the scheduled report to one after: a hold entered ahead of the date and closed after the reaction.
-4. **Trigger timing:** The next report date is known when earnings_schedule@v1 reads SCHEDULED; we act only if it does on the window's first session, so a date confirmed later is not used.
+4. **Trigger timing:** The expected report date is read at the decision session D (the day before the entry session S = A - 5): earnings_expected@v1 gives SCHEDULED or PRIOR_YEAR (Frazzini and Lamont's year-ago date + 364 days); an UNKNOWN date is excluded with a reason, and a date confirmed after D is not used.
 5. **Faithful replication:** Frazzini and Lamont's rule first: hold every stock with a report expected in the window, equally weighted; their split by expected volume is a variant; the screener is ED4c.
 6. **Expected size and sample:** Published as a positive abnormal return in announcement months, largest for names with high expected announcement volume (Frazzini and Lamont 2007), and found in most markets (Barber, De George, Lehavy and Trueman 2013). About eight reports per name in the stored bars, clustered in about eight seasons.
 7. **Capacity and costs:** One entry and one exit per report, no short leg; the cost is the stock's spread, small for liquid names.
@@ -52,7 +52,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Status:** candidate. **Thesis:** Stocks that rose most over the past year, leaving out the last month, keep outperforming the market over the next month.
 
-- **Outcome:** excess return, over 20 sessions, vs SPY, costs 10 bps
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
 - **Schedule:** month end
 - **Universe:** preset `liquid_common_stocks`
 - **Top K:** 50
@@ -65,8 +65,8 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 1. **Mechanism:** Investors underreact to news and herd into winners; limits to arbitrage and disposition effects slow the price from reaching its value (Jegadeesh and Titman 1993; Barberis, Shleifer and Vishny 1998).
 2. **Persistence:** The premium is large, old and widely known, and has survived two decades after its publication in most markets, but it crashes in sharp market rebounds (Daniel and Moskowitz 2016): the risk that keeps arbitrageurs from removing it.
-3. **Outcome:** Excess return over SPY over the 20 sessions after a month-end close, net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
-4. **Trigger timing:** mom_12_1 is computed from the close of S (rollups, nightly), so the first session we act is S+1; the window starts at S's close, before the trade, a slight overstatement the cost assumption absorbs.
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
+4. **Trigger timing:** mom_12_1 is computed from the close of the decision session D (rollups, nightly), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
 5. **Faithful replication:** The published rule: rank by the return from 12 months to 1 month back and hold the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid common stocks (liquid_common_stocks).
 6. **Expected size and sample:** Historically about 1% a month for the winner-minus-loser decile spread in large US stocks, smaller since 2000 (Daniel and Moskowitz 2016). Ten independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
 7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): turnover is monthly and spreads are small; the 10 bps round trip is the assumption.
@@ -83,8 +83,8 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Status:** candidate. **Thesis:** Small Nasdaq-listed stocks keep drifting for weeks in the direction of their earnings-day reaction.
 
-- **Outcome:** excess return, over 20, 60 sessions, vs SPY, costs 20 bps
-- **Schedule:** on each `earnings` (a reported result (events/earnings); anchor: the reaction session, the first to trade after the report time (an after-close report: the next session))
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps
+- **Schedule:** on each `earnings_reaction` (a reported result's two-session reaction (earnings_reaction@v1); anchor: the reaction's last session, E+1 (E: the first session to trade after the report))
 - **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.exchange eq 'NASDAQ'` and `instrument.status eq 'ACTIVE'` and `feature.market_cap lt 2000000000`
 - **Top K:** all qualified names
 - **Screeners:** none yet
@@ -97,7 +97,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 1. **Mechanism:** Investors underreact to earnings news, most in small names that few analysts cover and where arbitrage is expensive (Bernard and Thomas 1989; Chordia et al. 2009).
 2. **Persistence:** Limits to arbitrage: the drift survives where spreads, short-sale costs and low capacity keep institutions out; it has faded in large caps but not in the smallest names (Martineau 2022).
 3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the reaction session, net of 20 bps a round trip (the PRD's proposal, ADR 0053 open decisions): drift is held for weeks.
-4. **Trigger timing:** A report is known from its events/earnings known_from session; the reaction session is the first one after the release (an after-close report reacts the next day); we act on the session after the reaction, so S is the reaction session (the class's anchor) and the window starts at its close, after the return the surprise is measured on.
+4. **Trigger timing:** The reaction is two sessions, close(E-1) to close(E+1) (E: the first session to trade after the report); the anchor is E+1 and the decision session D = E+1, so the entry session is S = E+2 (start_offset_sessions = 1). The event names are read at D from earnings_reaction@v1 (sessions_since_reaction = 0), never from a row known after D.
 5. **Faithful replication:** The source's rule first: rank by the announcement-period return (Brandt, Kishore, Santa-Clara and Venkatachalam 2008) and hold the top bucket; the screener is ED4b.
 6. **Expected size and sample:** The drift is largest in the smallest names and has decayed in large caps since the 1990s (Martineau 2022). Bars start 2024-10-03 (2018 for the event scope names, ADR 0050): about eight reports per name, thousands of events, but clustered in about eight reporting seasons, so independent sessions are the binding count.
 7. **Capacity and costs:** Small caps trade with wide spreads and thin volume: the outcome deducts 20 bps (an assumption) and the harness reports by cap bucket; an individual can trade the liquid end.
@@ -115,7 +115,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Status:** candidate. **Thesis:** Option implied volatility on liquid names tends to exceed the volatility that follows, so selling premium where implied is richest earns the gap.
 
-- **Outcome:** hit target, over 20 sessions, hit when realised_to_implied_vol is below 1, max drawdown 0.5
+- **Outcome:** hit target, over 20 sessions, entered 1 session after the decision session, hit when realised_to_implied_vol is below 1, max drawdown 0.5
 - **Schedule:** every session
 - **Universe:** preset `liquid_optionable`
 - **Top K:** 20
@@ -129,7 +129,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 1. **Mechanism:** Holders of stock pay for crash and variance protection; the dealers who sell it ask a premium for jump and variance risk they cannot diversify (Carr and Wu 2009; Bakshi and Kapadia 2003).
 2. **Persistence:** A risk premium, not a mispricing: the seller is paid for losses that cluster in crashes, when capital is scarce, so being known does not remove it.
 3. **Outcome:** Realised below implied over the option's horizon, with a drawdown cap on a short straddle proxy: how a short-premium trade is held, to expiry, with a stop (the PRD's proposal, ADR 0053 open decisions).
-4. **Trigger timing:** IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of S; the first session we act is S+1, so no window may start before S's close.
+4. **Trigger timing:** IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of the decision session D, so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1). The screen and the implied vol are read at D, the outcome at S.
 5. **Faithful replication:** The screens as they are: short_premium_liquidity (tradable put and call wings, option_liquidity@v1) and vrp_scanner v3 (IV30 at least 50%, IV30 minus HV30 at least 10 points, IV30 / HV30 at least 1.25). The published setting is index variance (Carr and Wu 2009); single names are a step away from it.
 6. **Expected size and sample:** Implied variance exceeds realised on average for the S&P 500 and most large stocks (Carr and Wu 2009); the single-name premium is smaller than the index's (Driessen, Maenhout and Vilkov 2009). IV30 history covers 502 sessions (ibkr_iv@v1, roadmap): 20-session windows spaced a horizon apart give about 25 independent sessions, under the 40 the bar asks, unless ED4a counts names within a session; chains are stored from 2026-10-02 only (docs/screeners/vrp-scanner.md), so short_premium_liquidity has days of history.
 7. **Capacity and costs:** The cost is the option bid-ask spread, judged live; vrp_scanner (from v2) scores the put's stored spread (under 15% of mid), open interest and volume (over 1,000 each), and v3 requires $50M of 20-day dollar volume. An individual's size is far below the open interest.
@@ -148,7 +148,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Why rejected:** Intraday: the flow moves prices in the last minutes and reverses, which daily bars cannot see or trade, and what is left is weak after costs (Ivanov and Lenkey 2014; Shum et al. 2016); checked 2026-10-07.
 
-- **Outcome:** excess return, over 1 session, vs SPY
+- **Outcome:** excess return, over 1 session, vs SPY, entered 1 session after the decision session
 - **Schedule:** every session
 - **Universe:** `instrument.is_leveraged eq True`
 - **Top K:** all qualified names
@@ -179,7 +179,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Why rejected:** Under 1% since 2010 (Greenwood and Sammon, The Disappearing Index Effect), inside costs and the announcement-to-inclusion window; checked 2026-10-07.
 
-- **Outcome:** excess return, over 20 sessions, vs SPY
+- **Outcome:** excess return, over 20 sessions, vs SPY, starting +1 sessions from the event
 - **Schedule:** on each `index_change` (an S&P 500 membership change (events/index_change); anchor: the session it is first stored)
 - **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'`
 - **Top K:** all qualified names
@@ -210,7 +210,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Why blocked:** Alive, but one event a year gives at most two in the stored bars, under the 40 independent events the bar asks, and we hold no Russell membership (events/index_change is the S&P 500 only); ED6 (listing history from 2010) unblocks it.
 
-- **Outcome:** excess return, over 20 sessions, vs SPY
+- **Outcome:** excess return, over 20 sessions, vs SPY, starting +1 sessions from the event
 - **Schedule:** on each `index_change` (an S&P 500 membership change (events/index_change); anchor: the session it is first stored)
 - **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'`
 - **Top K:** all qualified names

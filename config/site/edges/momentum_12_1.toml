@@ -25,14 +25,16 @@ starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment)."""
 kind = "excess_return"
 horizon_sessions = [20]
 benchmark = "SPY"
+start_offset_sessions = 1
 cost_bps = 10
 
 [quality_bar]
-outcome = """Excess return over SPY over the 20 sessions after a month-end close, net of 10 bps a
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a
 round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions)."""
-trigger_timing = """mom_12_1 is computed from the close of S (rollups, nightly), so the first session
-we act is S+1; the window starts at S's close, before the trade, a slight overstatement the
-cost assumption absorbs."""
+trigger_timing = """mom_12_1 is computed from the close of the decision session D (rollups,
+nightly), so the first fill is the next session's close: the entry session is S = D + 1
+(start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the
+outcome at S."""
 replication = """The published rule: rank by the return from 12 months to 1 month back and hold
 the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid common stocks (liquid_common_stocks)."""
 expected_size = """Historically about 1% a month for the winner-minus-loser decile spread in large

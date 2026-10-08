@@ -1,10 +1,18 @@
-"""The start sessions an edge is evaluated on: its schedule's sessions, spaced at least one
-horizon apart so the windows do not overlap and the sessions are independent (ADR 0053).
+"""The sessions an edge is evaluated on (ADR 0053 and its amendment of 2026-10-08).
+
+A row has a decision session D (the screen, the eligible names, the implied vol and the event
+set are read at D) and an entry session S > D (the outcome is the partition at S: the window
+starts at S's close). ``decision_sessions`` gives the D of a schedule, spaced at least one
+horizon apart so the windows do not overlap and the sessions are independent:
 
 - ``every_session``: the first session, then every ``h``-th session after it
 - ``month_end``: the last session of each calendar month, thinned greedily so consecutive
   ones are at least ``h`` sessions apart (a month cut short by the range's end is not one)
-- ``on_event:<class>``: arrives with ED4 (the events and their ``known_from``)
+- ``on_event:<class>``: every session is a candidate; ``events.py`` says which have events and
+  ``event_blocks`` pools them into blocks of ``h`` sessions
+
+``entry_session`` is S = D + the document's ``start_offset_sessions``; for an event schedule
+S = anchor + offset and D = S - 1, so S = D + 1.
 """
 
 from collections.abc import Sequence
@@ -15,13 +23,13 @@ from algotrade.core.time.calendar import next_session
 from algotrade.engines.selection.schedule import rebalance_sessions
 
 
-def edge_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> list[date]:
-    """The start sessions of ``schedule`` among ``sessions`` (ascending exchange sessions),
-    for windows of ``horizon`` sessions."""
+def decision_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> list[date]:
+    """The decision sessions D of a non-event ``schedule`` among ``sessions`` (ascending
+    exchange sessions), for windows of ``horizon`` sessions."""
     if horizon < 1:
         raise ConfigurationError(f"horizon must be >= 1 session, got {horizon}")
     if schedule.startswith("on_event:"):
-        raise ConfigurationError(f"schedule {schedule!r} arrives with ED4 (event schedules)")
+        raise ConfigurationError(f"schedule {schedule!r} is read through events.py, not here")
     if not sessions:
         return []
     if schedule == "every_session":
@@ -29,6 +37,35 @@ def edge_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> list
     if schedule == "month_end":
         return _spaced(_month_ends(sessions), sessions, horizon)
     raise ConfigurationError(f"unknown schedule {schedule!r}")
+
+
+def entry_session(decision: date, offset: int) -> date:
+    """S: ``offset`` (>= 1) sessions after the decision session D."""
+    if offset < 1:
+        raise ConfigurationError(f"the entry session is at least 1 after the decision: {offset}")
+    day = decision
+    for _ in range(offset):
+        day = next_session(day)
+    return day
+
+
+def event_blocks(
+    event_days: Sequence[date], sessions: Sequence[date], horizon: int
+) -> list[list[date]]:
+    """``event_days`` (ascending decision sessions with events) pooled into blocks: a block
+    starts at its first day and takes every event day fewer than ``horizon`` sessions after it,
+    so a block's windows are not counted as independent sessions of their own (one statistic
+    per block)."""
+    if horizon < 1:
+        raise ConfigurationError(f"horizon must be >= 1 session, got {horizon}")
+    position = {day: i for i, day in enumerate(sessions)}
+    blocks: list[list[date]] = []
+    for day in sorted(event_days):
+        if blocks and position[day] - position[blocks[-1][0]] < horizon:
+            blocks[-1].append(day)
+        else:
+            blocks.append([day])
+    return blocks
 
 
 def _month_ends(sessions: Sequence[date]) -> list[date]:

@@ -1,8 +1,9 @@
 """Every open site edge document can be scored by the harness against what is stored (ADR 0053): its
 measure and drawdown fields are outcome fields, its horizons and benchmark are ones the outcomes
 task writes, the implied vol a ratio measure divides by is in the catalogue, and its schedule is
-one the harness runs (an event schedule only while the edge has no screeners: ED4). And among
-the services/evaluation modules only the harness reads outcomes, so the picks cannot see one."""
+one the harness runs (an event schedule with screeners only once its event field's group is in
+the catalogue). And among the services/evaluation modules only the harness reads outcomes, so the
+picks cannot see one."""
 
 import ast
 from datetime import date
@@ -15,8 +16,9 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data.outcomes import OUTCOME_FIELDS
 from algotrade.services.configs import field_catalog
+from algotrade.services.evaluation.cross_section.events import EVENT_FIELDS
 from algotrade.services.evaluation.cross_section.hit import IMPLIED_VOL_FIELD, MEASURE_FIELDS
-from algotrade.services.evaluation.cross_section.sessions import edge_sessions
+from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade_ingestion.tasks.derived.outcomes import horizons_and_benchmarks
 from tests.conftest import REPO_ROOT
@@ -56,18 +58,45 @@ def test_the_implied_vol_a_ratio_measure_divides_by_is_in_the_catalogue() -> Non
     field_catalog(STORE).check_field(IMPLIED_VOL_FIELD, "IMPLIED_VOL_FIELD")
 
 
+def _stored(field: str) -> bool:
+    """Whether ``field`` is in the catalogue (its group has been added)."""
+    try:
+        field_catalog(STORE).check_field(field, field)
+    except ConfigurationError:
+        return False
+    return True
+
+
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
 def test_the_schedule_is_one_the_harness_runs(edge: Edge) -> None:
-    try:
-        edge_sessions(edge.schedule, sessions_between(date(2026, 1, 2), date(2026, 3, 31)), 5)
-    except ConfigurationError:
-        assert edge.event_class is not None, f"{edge.id}: {edge.schedule} is not an event class"
-        assert not edge.screeners and not edge.baselines, (
-            f"{edge.id}: an event schedule with screeners needs ED4's sessions"
+    """The entry session S is always after the decision session D (the offset validators); a
+    plain schedule gives decision sessions; an event schedule needs a declared field whose
+    group is in the catalogue, else the edge waits with no screeners (earnings_reaction@v1 and
+    earnings_expected@v1 arrive with ED4b and ED4e)."""
+    event = edge.event_class
+    if event is None:
+        days = sessions_between(date(2026, 1, 2), date(2026, 3, 31))
+        decision_sessions(edge.schedule, days, 5)
+        assert edge.outcome.start_offset_sessions >= 1, f"{edge.id}: S must be after D"
+        return
+    if event not in ANNOUNCED_AHEAD:
+        assert edge.outcome.start_offset_sessions >= 1, (
+            f"{edge.id}: {event} is known when it happens"
         )
-    assert ANNOUNCED_AHEAD  # the offsets are ED4's: no site edge sets one the harness ignores
-    if edge.event_class is None:
-        assert edge.outcome.start_offset_sessions == 0
+    spec = EVENT_FIELDS.get(event)
+    if spec is None or not all(_stored(f) for f in (spec.count, spec.date)):
+        assert not edge.screeners and not edge.baselines, (
+            f"{edge.id}: the field of {event} is not in the catalogue yet: no screeners until "
+            "its feature group exists"
+        )
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_the_variants_horizons_and_benchmark_are_written_by_the_outcomes_task(edge: Edge) -> None:
+    horizons, benchmarks = horizons_and_benchmarks(STORE)
+    for v in edge.variants:
+        assert set(v.outcome.horizon_sessions) <= set(horizons), f"{edge.id}/{v.id}: {horizons}"
+        assert v.outcome.benchmark in {*benchmarks, "none"}
 
 
 def test_only_the_harness_reads_outcomes_within_services_evaluation() -> None:

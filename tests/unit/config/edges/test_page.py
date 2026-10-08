@@ -21,7 +21,7 @@ def test_the_page_lists_edges_by_status_with_their_answers() -> None:
                 "start_offset_sessions": -5,
                 "cost_bps": 20,
             },
-            schedule="on_event:earnings_scheduled",
+            schedule="on_event:earnings_expected",
             universe={"where": {"any": [RULE, {"not": RULE}]}},
             screeners=["vrp_scanner"],
             notes="A proxy.",
@@ -45,6 +45,7 @@ def test_the_page_lists_edges_by_status_with_their_answers() -> None:
                 "measure": "realised_to_implied_vol",
                 "direction": "below",
                 "max_drawdown": 0.5,
+                "start_offset_sessions": 1,
             },
             sources=[{"title": "A paper", "url": "https://example.org"}],
         ),
@@ -56,10 +57,10 @@ def test_the_page_lists_edges_by_status_with_their_answers() -> None:
     assert "excess return, over 6 sessions, vs SPY, starting -5 sessions from the event" in page
     assert "costs 20 bps" in page
     assert (
-        "hit target, over 1 session, hit when realised_to_implied_vol is below 1, max drawdown 0.5"
-        in page
+        "hit target, over 1 session, entered 1 session after the decision session, "
+        "hit when realised_to_implied_vol is below 1, max drawdown 0.5" in page
     )
-    assert "on each `earnings_scheduled` (a next report date known" in page
+    assert "on each `earnings_expected` (a next report expected" in page
     universe = "`instrument.status eq 'ACTIVE'` or (not `instrument.status eq 'ACTIVE'`)"
     assert f"**Universe:** {universe}" in page
     assert "**Universe:** preset `liquid_optionable`" in page

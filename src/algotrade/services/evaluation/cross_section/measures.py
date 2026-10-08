@@ -3,7 +3,8 @@
 A ``SessionStat`` is what one session said about one variant at one horizon: the picks, the
 eligible names with a closed outcome, the decile means. ``slice_measures`` pools the stats of
 each slice (all, a year, a regime label, the frozen period) into a ``SliceMeasure``, with the
-number of independent ``sessions`` beside every number. Values are *oriented* (higher is
+number of independent ``sessions`` beside every number (an event schedule's block of event days
+is one session: ``pool_stats``). Values are *oriented* (higher is
 better: ``hit.apply_outcome``): the returns of an ``excess_return`` edge, the negated ratio of
 a ``below`` one. Every count is explicit; nothing is dropped silently by a statistic.
 """
@@ -51,6 +52,7 @@ class SessionStat:
     delisted: int = 0
     pre_snapshot: bool = False
     outside_universe: int = 0  # qualified names the edge's universe does not contain
+    no_entry_bar: int = 0  # names eligible at D with no outcome row at S (over the base names)
 
     @property
     def eligible(self) -> int:
@@ -59,6 +61,38 @@ class SessionStat:
     @property
     def pick_mean(self) -> float | None:
         return float(np.mean(self.pick_values)) if self.pick_values else None
+
+
+def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
+    """The block of event days (one decision session each) as one statistic at its first
+    day: values and counts added, the decile figures the mean of the days that had them. A
+    block with a day the screen could not measure (coverage) is not measured at all."""
+    first = legs[0]
+    if len(legs) == 1:
+        return first
+    if any(leg.excluded_coverage for leg in legs):
+        return SessionStat(session=first.session, regime=first.regime, excluded_coverage=1)
+    tops = [leg.top_decile for leg in legs if leg.top_decile is not None]
+    spreads = [leg.spread for leg in legs if leg.spread is not None]
+    return SessionStat(
+        session=first.session,
+        regime=first.regime,
+        pick_values=tuple(v for leg in legs for v in leg.pick_values),
+        pick_hits=sum(leg.pick_hits for leg in legs),
+        rest_values=tuple(v for leg in legs for v in leg.rest_values),
+        base_hits=sum(leg.base_hits for leg in legs),
+        top_decile=float(np.mean(tops)) if tops else None,
+        spread=float(np.mean(spreads)) if spreads else None,
+        ranked=sum(leg.ranked for leg in legs),
+        unscored=sum(leg.unscored for leg in legs),
+        excluded_score_coverage=sum(leg.excluded_score_coverage for leg in legs),
+        excluded_unclosed=sum(leg.excluded_unclosed for leg in legs),
+        excluded_missing=sum(leg.excluded_missing for leg in legs),
+        delisted=sum(leg.delisted for leg in legs),
+        pre_snapshot=any(leg.pre_snapshot for leg in legs),
+        outside_universe=sum(leg.outside_universe for leg in legs),
+        no_entry_bar=sum(leg.no_entry_bar for leg in legs),
+    )
 
 
 @dataclass(frozen=True)
