@@ -30,6 +30,13 @@ benchmark = "SPY"
 start_offset_sessions = 1
 cost_bps = 15
 
+# The decoy: plain 12-1 momentum over the whole universe on the same event sessions; the edge
+# (picks within the event names) must beat it in the frozen period.
+[[variants]]
+id = "plain_momentum"
+base = "universe"
+picks = "universe"
+
 [quality_bar]
 outcome = """Excess return over SPY over 20 and 60 sessions from S's close, net of 15 bps a round trip."""
 trigger_timing = """Reports from events/earnings read by known_from; the anchor is E+1 (the reaction's end)
