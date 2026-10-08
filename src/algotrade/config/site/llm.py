@@ -1,9 +1,10 @@
 """Site settings for natural-language screener drafts (ADR 0041): the text model
-(``config/site/llm.toml``: which OpenAI-compatible endpoint and model answer, how long a request
-may take; off by default, the key only from the environment, ``config/env.py``) and the
-phrasebook (``config/site/phrasebook.toml``: trader vocabulary mapped to catalogue fields with a
-hint on thresholds, listed in the prompt after the catalogue)."""
+(``config/site/llm.toml``: the chain of OpenAI-compatible endpoints and models that answer, how
+long a request may take; off by default, the key only from the environment, ``config/env.py``)
+and the phrasebook (``config/site/phrasebook.toml``: trader vocabulary mapped to catalogue
+fields with a hint on thresholds, listed in the prompt after the catalogue)."""
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -13,31 +14,76 @@ from urllib.parse import urlsplit
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.core.model.errors import ConfigurationError
 
-KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit", "retries", "request")
+KEYS = (
+    "enabled",
+    "base_url",
+    "model",
+    "timeout_s",
+    "answer_limit",
+    "retries",
+    "request",
+    "deadline_s",
+    "provider",
+)
+PROVIDER_KEYS = ("id", "base_url", "model", "timeout_s", "answer_limit", "retries", "request")
 RESERVED_REQUEST_KEYS = ("model", "messages", "temperature", "max_tokens", "response_format")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
 PHRASE_KEYS = ("say", "fields", "hint")
+LEGACY_ID = "default"  # the one provider of a file without [[provider]]
+_ID = re.compile(r"[a-z][a-z0-9_]{0,31}")
 
 
 @dataclass(frozen=True)
-class LlmSettings:
-    """``llm.toml``: ``base_url`` is the provider's OpenAI-compatible root (the one with
-    ``/chat/completions`` under it: Gemini, Groq, OpenRouter, Ollama, Anthropic's compatibility
-    endpoint); ``model`` its model id; ``timeout_s`` the longest one request may take;
-    ``answer_limit`` the longest answer asked for, in tokens (a draft is a few hundred, but a
-    model that thinks first, Gemini 3.x, spends thinking tokens from the same budget: ~2,000);
-    ``retries`` how many times a busy provider (429, 5xx) or a dropped connection is retried
-    before "drafting unavailable" (0: never); ``request`` extra fields sent with every request
-    as given (``[request] reasoning_effort = "low"`` tells Gemini to think briefly): strings,
-    numbers and booleans only, never the ones the adapter sets; read-only."""
+class ProviderSettings:
+    """One text-model provider: ``id`` (lower-case letters, digits and ``_``; names its key
+    ``ALGOTRADE_LLM_API_KEY_<ID upper>``, ``config/env.py``), ``base_url`` its OpenAI-compatible
+    root (the one with ``/chat/completions`` under it: Gemini, Groq, OpenRouter, Ollama,
+    Anthropic's compatibility endpoint), ``model`` its model id, ``timeout_s`` the longest one
+    request may take, ``answer_limit`` the longest answer asked for, in tokens (a draft is a
+    few hundred, but a model that thinks first, Gemini 3.x, spends thinking tokens from the same
+    budget: ~2,000), ``retries`` how many times a busy provider (429, 5xx) or a dropped
+    connection is retried before the chain moves on (0: never), ``request`` extra fields sent
+    with every request as given (``reasoning_effort = "low"`` tells Gemini to think briefly):
+    strings, numbers and booleans only, never the ones the adapter sets."""
 
-    enabled: bool = False
-    base_url: str = "http://localhost:11434/v1"  # Ollama's default: nothing leaves the machine
-    model: str = "llama3.1"
+    id: str
+    base_url: str
+    model: str
     timeout_s: float = 60.0
     answer_limit: int = 8000
     retries: int = 2
     request: Mapping[str, str | float | bool] = field(default_factory=lambda: MappingProxyType({}))
+
+    @property
+    def worst_case_s(self) -> float:
+        """The longest this provider can keep a chain waiting: every attempt timing out, plus
+        the pauses between them (a bare 429 waits 20 s; a ``Retry-After`` may wait longer)."""
+        pauses: float = sum(max(20.0, 3.0 * 2.0**a) for a in range(self.retries))
+        return self.timeout_s * (self.retries + 1) + pauses
+
+    @property
+    def local(self) -> bool:
+        """Served from this machine: needs no key."""
+        return urlsplit(self.base_url).hostname in LOOPBACK
+
+
+@dataclass(frozen=True)
+class LlmSettings:
+    """``llm.toml``: the text model behind screener drafts and regime explanations (ADR 0041,
+    amended 2026-10-08). ``providers`` is the chain in the order tried: the ``[[provider]]``
+    tables, whose ``timeout_s``, ``answer_limit``, ``retries`` and ``request`` fall back to the
+    file's top-level values; a file without them is one provider from the top-level
+    ``base_url`` and ``model`` (``legacy``: its key is ``$ALGOTRADE_LLM_API_KEY``). Both forms
+    in one file is a ``ConfigurationError``. ``deadline_s``: once a chain has spent this long, it
+    starts no further provider. Read-only."""
+
+    enabled: bool = False
+    providers: tuple[ProviderSettings, ...] = (
+        # Ollama's default: nothing leaves the machine
+        ProviderSettings(LEGACY_ID, "http://localhost:11434/v1", "llama3.1"),
+    )
+    deadline_s: float = 120.0
+    legacy: bool = True
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "LlmSettings":
@@ -46,15 +92,85 @@ class LlmSettings:
         t = Table(doc, where)
         t.only(KEYS)
         d = cls()
-        return cls(
-            enabled=t.boolean("enabled", d.enabled),
-            base_url=_endpoint(t.text("base_url", d.base_url), f"{where} base_url"),
-            model=t.text("model", d.model),
-            timeout_s=t.number("timeout_s", d.timeout_s, 1),
-            answer_limit=t.integer("answer_limit", d.answer_limit, 1),
-            retries=t.integer("retries", d.retries, 0),
+        shared = ProviderSettings(
+            LEGACY_ID,
+            "",
+            "",
+            timeout_s=t.number("timeout_s", 60.0, 1),
+            answer_limit=t.integer("answer_limit", 8000, 1),
+            retries=t.integer("retries", 2, 0),
             request=_request(t),
         )
+        raw = t.raw("provider")
+        if raw is None:
+            legacy = ProviderSettings(
+                LEGACY_ID,
+                _endpoint(t.text("base_url", d.providers[0].base_url), f"{where} base_url"),
+                t.text("model", d.providers[0].model),
+                shared.timeout_s,
+                shared.answer_limit,
+                shared.retries,
+                shared.request,
+            )
+            providers: tuple[ProviderSettings, ...] = (legacy,)
+            is_legacy = True
+        else:
+            clash = [k for k in ("base_url", "model") if k in t.names()]
+            if clash:
+                raise ConfigurationError(
+                    f"{where}: {clash} at the top level and [[provider]] tables: use one form "
+                    "(each provider names its own base_url and model)"
+                )
+            providers, is_legacy = _providers(raw, shared, where), False
+        # The deadline must leave every provider but the last its whole worst case, or a
+        # hanging primary would use up the time and the fallback never gets its turn. Unset: the
+        # sum of every provider's worst case (the chain is then bounded, never cut short).
+        needed = sum(p.worst_case_s for p in providers[:-1])
+        total = needed + providers[-1].worst_case_s
+        deadline = t.number("deadline_s", total, 1)
+        if deadline <= needed:
+            raise ConfigurationError(
+                f"{where} deadline_s: {deadline:g} s is shorter than the providers before the "
+                f"last can take ({needed:g} s: timeout_s x (retries + 1) plus the pauses); "
+                "raise it, or lower their timeout_s / retries, so the fallback is reached"
+            )
+        return cls(
+            enabled=t.boolean("enabled", d.enabled),
+            providers=providers,
+            deadline_s=deadline,
+            legacy=is_legacy,
+        )
+
+
+def _providers(raw: Any, shared: ProviderSettings, where: str) -> tuple[ProviderSettings, ...]:
+    if not isinstance(raw, list) or not raw or not all(isinstance(e, Mapping) for e in raw):
+        raise ConfigurationError(f"{where} provider: expected a list of tables ([[provider]])")
+    out: list[ProviderSettings] = []
+    for i, entry in enumerate(raw):
+        t = Table(entry, f"{where} [[provider]][{i}]")
+        t.only(PROVIDER_KEYS)
+        pid = t.text("id", "")
+        if not _ID.fullmatch(pid):
+            raise ConfigurationError(
+                f"{t.where} id: expected lower-case letters, digits and _ (starting with a "
+                f"letter), got {pid!r}"
+            )
+        if any(p.id == pid for p in out):
+            raise ConfigurationError(f"{t.where} id: {pid!r} is used twice")
+        if "base_url" not in t.names() or "model" not in t.names():
+            raise ConfigurationError(f"{t.where}: base_url and model are required")
+        out.append(
+            ProviderSettings(
+                pid,
+                _endpoint(t.text("base_url", ""), f"{t.where} base_url"),
+                t.text("model", ""),
+                t.number("timeout_s", shared.timeout_s, 1),
+                t.integer("answer_limit", shared.answer_limit, 1),
+                t.integer("retries", shared.retries, 0),
+                _request(t) if "request" in t.names() else shared.request,
+            )
+        )
+    return tuple(out)
 
 
 def _request(t: Table) -> Mapping[str, str | float | bool]:

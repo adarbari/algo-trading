@@ -1,5 +1,6 @@
 """``ChatCompletions``: one request to an OpenAI-compatible ``/chat/completions`` endpoint
-(ADR 0041). System text and user text in, the assistant's text out, at temperature 0 and asking
+(ADR 0041). System text and user text in, a ``Completion`` out (the assistant's text, the model
+that answered, the tokens the provider reported, how long it took), at temperature 0 and asking
 for a JSON object, so the same prompt gets the same draft (as far as the provider allows). A
 provider that is busy (429, 500, 502, 503, 504) or unreachable is retried ``retries`` times
 with a doubling pause (``Retry-After`` wins); anything else, or the last failure, is a
@@ -7,10 +8,12 @@ with a doubling pause (``Retry-After`` wins); anything else, or the last failure
 answers 503 with it."""
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from algotrade.core.model.completion import Completion
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.http import HttpError, JsonTransport
 
@@ -34,10 +37,13 @@ class ChatCompletions:
     backoff_s: float = 3.0  # the wait before the first retry; doubled each time
     throttle_s: float = 20.0  # the wait after a 429 without Retry-After (a per-minute quota)
     extra: Mapping[str, Any] = field(default_factory=dict)  # provider fields sent as given
+    provider: str = "default"  # the ``llm.toml`` id this client answers as
+    clock: Callable[[], float] = time.monotonic
 
     @property
-    def name(self) -> str:
-        return self.model
+    def names(self) -> tuple[str, ...]:
+        """The model this answers as: part of a cache key."""
+        return (self.model,)
 
     @property
     def url(self) -> str:
@@ -58,7 +64,8 @@ class ChatCompletions:
         # The configured extras follow the standard keys and never replace them.
         return body | {k: v for k, v in self.extra.items() if k not in body}
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self, system: str, user: str) -> Completion:
+        started = self.clock()
         body = json.dumps(self.request(system, user), separators=(",", ":")).encode()
         where = f"{self.model} at {self.base_url}"
         attempts = self.retries + 1
@@ -81,7 +88,9 @@ class ChatCompletions:
                     raise ModelUnavailableError(f"{where}{tried}: {exc}") from exc
                 delay = self.backoff_s * 2**attempt
             else:
-                return content_of(raw, where)
+                text = content_of(raw, where)
+                tokens = usage_of(raw)
+                return Completion(text, self.model, self.provider, *tokens, self.clock() - started)
             self.pause(delay)
         raise AssertionError("unreachable")  # pragma: no cover
 
@@ -111,3 +120,16 @@ def content_of(raw: bytes, where: str) -> str:
     if not isinstance(content, str) or not content.strip():
         raise ModelUnavailableError(f"{where}: the answer is empty")
     return content
+
+
+def usage_of(raw: bytes) -> tuple[int | None, int | None]:
+    """``(usage.prompt_tokens, usage.completion_tokens)`` of a response body that
+    ``content_of`` accepted; ``None`` for a count the provider left out (never ``0``)."""
+    usage = json.loads(raw).get("usage")
+    if not isinstance(usage, dict):
+        return None, None
+    return _count(usage.get("prompt_tokens")), _count(usage.get("completion_tokens"))
+
+
+def _count(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
