@@ -21,11 +21,14 @@ def test_saves_and_clears_the_split_for_that_user_only(writer: MemoryConfigWrite
     assert load_evaluation(writer, "alice").split_from is None
 
 
-@pytest.mark.parametrize("split", [date(2026, 10, 1), date(1999, 12, 31)])
+@pytest.mark.parametrize(
+    "split",
+    [date(2026, 10, 1), date(1999, 12, 31), date(2026, 4, 4), date(2026, 4, 3), date(2026, 7, 3)],
+)
 def test_a_date_outside_the_stored_range_is_refused_and_nothing_is_written(
     writer: MemoryConfigWriter, split: date
 ) -> None:
-    with pytest.raises(ConfigurationError, match="stored session"):
+    with pytest.raises(ConfigurationError, match="trading session"):
         save_split(writer, "alice", split, LATEST)
     assert writer.load("alice", "evaluation", "evaluation") is None
 

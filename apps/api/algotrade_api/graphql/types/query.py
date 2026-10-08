@@ -397,7 +397,9 @@ class Query:
     )
     def evaluation_split(self, info: Ctx) -> EvaluationSplit | None:
         ctx = info.context.read(None)
-        return EvaluationSplit.of(split_reads.load_evaluation_split(ctx)) if ctx else None
+        return (
+            EvaluationSplit.of(split_reads.load_evaluation_split(ctx)) if ctx is not None else None
+        )
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every committed evaluation run of the edge `edgeId` the user sees (theirs, "

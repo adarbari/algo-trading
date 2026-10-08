@@ -29,6 +29,13 @@ export function EvaluationSplitForm({ renderTermHelp }: EvaluationSplitFormProps
   const [text, setText] = useState('');
   const [said, setSaid] = useState<string | null>(null);
   const read = split.data ?? null;
+  if (split.isPending) return <Panel title="Train / test split" state="loading" />;
+  if (split.isError)
+    return (
+      <Banner tone="negative" title="Could not load your split">
+        {errorDetail(split.error)}
+      </Banner>
+    );
   if (read === null) return null;
   const typed = text.trim();
   const problem =

@@ -36,6 +36,14 @@ beforeEach(() => {
 });
 
 describe('EvaluationSplitForm', () => {
+  it('shows a loading panel, then an error banner when the read fails', async () => {
+    GQL.mockRejectedValue(new Error('boom'));
+    setup();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(await screen.findByText('Could not load your split')).toBeInTheDocument();
+    expect(screen.getByText('boom')).toBeInTheDocument();
+  });
+
   it('shows the site frozen period, no personal split, and the exploratory help', async () => {
     GQL.mockResolvedValue(read(null));
     const { baseElement } = setup();
