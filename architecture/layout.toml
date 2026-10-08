@@ -520,7 +520,7 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 
 [[dir]]
 path = "apps/api/algotrade_api/ops"
-purpose = "operating the API on a host: the launchd agent that keeps it serving (ADR 0044)"
+purpose = "operating the API on a host: the launchd agents (the API kept serving, the auto-deploy poll) and the deploy cycle (ADR 0044, ADR 0057)"
 
 [[dir]]
 path = "apps/api/algotrade_api/routes"
@@ -579,7 +579,7 @@ purpose = "algotrade-ingest: argument parsing (main) and command bodies (command
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/ops"
-purpose = "operating the app on a host: scheduling the nightly run"
+purpose = "operating the app on a host: scheduling the nightly run, the deploy hold (ADR 0057)"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks"
