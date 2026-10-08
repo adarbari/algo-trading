@@ -6,6 +6,8 @@
 # Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),
 # and every ingestion task in tasks/framework/registry.py declares exactly the tables its module produces.
 # `also_written_by` lists today's extra writers: each is restructure work, not precedent.
+# `per_session = false` marks a table under a session-grain prefix that is not written every
+# session (an evaluation run on request): the read model never lists it as missing for a session.
 
 [[table]]
 name = "universe"
@@ -317,6 +319,7 @@ note = "every rule screen's per-criterion values (ADR 0029), published with resu
 [[table]]
 name = "results/edge_eval"
 owner = "src/algotrade/storage/tables/result_writer.py"
+per_session = false
 note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py"
 
 [[table]]

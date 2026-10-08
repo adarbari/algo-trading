@@ -127,6 +127,8 @@ def test_expected_tables_are_the_declared_nightly_session_tables() -> None:
     assert all(grain_of(t) is Grain.SESSION for t in EXPECTED_TABLES)
     never = ("verification/", "live/", "events/", "instruments/", "holdings/", "rollups/daily/")
     assert not [t for t in EXPECTED_TABLES if t.startswith(never) or "*" in t]
+    # an evaluation on request, partitioned by its range end: never missing for a session
+    assert "results/edge_eval" not in EXPECTED_TABLES
 
 
 def test_expected_tables_skip_families_and_other_grains(tmp_path: Path) -> None:
@@ -137,6 +139,7 @@ def test_expected_tables_skip_families_and_other_grains(tmp_path: Path) -> None:
             for name in ("results/*", "results/a", "chains/status", "live/option_quotes",
                          "verification/ibkr", "instruments/reference", "rollups/instrument/x@v1")
         )
+        + '[[table]]\nname = "results/eval"\nowner = "x.py"\nper_session = false\n'
     )  # fmt: skip
     assert expected_tables(tables) == (
         "bars/1d", "chains/status", "results/a", "rollups/instrument/x@v1",
