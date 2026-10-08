@@ -129,22 +129,29 @@ class ClaudeCli:
         raise failure
 
     def _once(self, system: str, user: str, where: str) -> Completion:
+        # One attempt, the wait for the lock and the run together, takes at most ``timeout_s``
+        # (``ProviderSettings.worst_case_s`` and the chain's deadline rely on it).
+        begun = self.clock()
         if not _LOCK.acquire(timeout=self.timeout_s):
+            raise ModelUnavailableError(f"{where}: busy with another request")
+        left = self.timeout_s - (self.clock() - begun)
+        if left <= 0:
+            _LOCK.release()
             raise ModelUnavailableError(f"{where}: busy with another request")
         try:
             with tempfile.TemporaryDirectory(
                 prefix="algotrade-claude-", ignore_cleanup_errors=True
             ) as cwd:
-                done = self._run(system, user, Path(cwd), where)
+                done = self._run(system, user, Path(cwd), where, left)
         finally:
             _LOCK.release()
         return self._completion(done, where)
 
     def _run(
-        self, system: str, user: str, cwd: Path, where: str
+        self, system: str, user: str, cwd: Path, where: str, timeout: float
     ) -> "subprocess.CompletedProcess[str]":
         try:
-            return self.runner(self.argv(system), user, cwd, self.env, self.timeout_s)
+            return self.runner(self.argv(system), user, cwd, self.env, timeout)
         except subprocess.TimeoutExpired as exc:
             raise ModelUnavailableError(f"{where}: timed out after {self.timeout_s:g} s") from exc
         except OSError as exc:

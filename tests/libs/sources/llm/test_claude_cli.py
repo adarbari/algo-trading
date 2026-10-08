@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from algotrade.config.env import claude_cli_env
+from algotrade.config.site.llm import ProviderSettings
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.registry import build_claude_cli
 from algotrade_sources.llm import claude_cli
@@ -70,7 +71,7 @@ def test_the_command_line_always_carries_the_lockdown_and_never_skips_permission
     assert "--bare" not in argv  # --bare skips the keychain read: the login would not be found
     assert not any("dangerously" in a or "permission" in a for a in argv)
     assert stdin == "the sentence" and "the sentence" not in argv  # the prompt is on stdin
-    assert timeout == 60.0
+    assert 59.0 < timeout <= 60.0
 
 
 def test_the_child_gets_the_given_environment_and_a_fresh_empty_directory() -> None:
@@ -233,3 +234,28 @@ def test_lock_contention_between_threads_serialises_runs() -> None:
     for t in threads:
         t.join()
     assert peak[0] == 1
+
+
+def test_an_attempt_that_waited_for_the_lock_runs_with_only_the_time_left() -> None:
+    runner = Runner(json.dumps(OK))
+    model = ClaudeCli("/c", "haiku", {}, timeout_s=2.0, runner=runner)
+    claude_cli._LOCK.acquire()
+    threading.Timer(0.5, claude_cli._LOCK.release).start()
+    model.complete("s", "u")
+    ((*_, timeout),) = runner.runs
+    assert 0 < timeout <= 1.5 + 0.1  # the wait and the run together stay within timeout_s
+
+
+def test_an_attempt_with_no_time_left_after_the_lock_is_busy() -> None:
+    ticks = iter([0.0, 5.0])  # the lock came at 5 s of a 2 s budget
+    runner = Runner(json.dumps(OK))
+    model = ClaudeCli("/c", "haiku", {}, timeout_s=2.0, runner=runner, clock=lambda: next(ticks))
+    with pytest.raises(ModelUnavailableError, match="busy"):
+        model._once("s", "u", "claude-cli haiku")
+    assert runner.runs == [] and claude_cli._LOCK.acquire(timeout=0.1)  # and the lock is free
+    claude_cli._LOCK.release()
+
+
+def test_the_providers_worst_case_is_one_timeout_per_attempt() -> None:
+    cli = ProviderSettings("c", "", "haiku", 60.0, 8000, 1, kind="claude-cli")
+    assert cli.worst_case_s == 120.0  # timeout_s x (retries + 1): wait and run share one timeout_s
