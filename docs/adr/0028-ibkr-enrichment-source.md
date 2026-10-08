@@ -155,3 +155,26 @@ class-level source.
   most while a page refreshes), so it is kept for 7 days (`sources.toml live_retention_days`,
   default 7): the nightly `purge-raw` task deletes its partitions dated before
   `session - 7` (`TableStore.purge_before`); no other table is touched.
+
+## Amendment 2026-10-08: IB vols that are not vols are stored null, with the reason
+
+The store held 5,487 IBKR IVs above 5 (up to 31,420) and 173 at 0.0 out of 2.0M rows. The
+scale was right throughout (decimal; history and snapshot agree; 99.6% of values sit on IB's
+lattice of `k * 1e-4 * sqrt(252)`), so they are IB's own answers, not a parsing mix-up: its IV
+solver blowing up after a reverse split (MNTS, HSDT, SKYA, NAKA: a fixed set of 997.5, 1975.6,
+3943.4, 15731, 31420), 5 to 30 on names whose options barely trade (LZM near 10 for months
+with an HV of 0.55), and 0.0 for a history bar without a value.
+
+- `ibkr-iv` checks every vol before it stages it: a vol at or below zero, or an IV above
+  `MAX_IV = 5` (500%), is stored **null** with the reason in the new column
+  `volatility/ibkr_iv30.vol_reject`, never as a number. HV has no upper bound: a realised vol
+  above 5 is real on a stock that moves that much (ADR 0023's 12.3).
+- The bound is the ingestion's own, not `ibkr_iv@v1`'s `valid_range`: feature ranges stay
+  flags (ADR 0023). A fitness test keeps the bound no looser than the declared range.
+- The nightly `ibkr-iv` step has an acceptance check: FAIL above `[quality]
+  max_ibkr_vol_rejected` (2%) of the session's rows rejected (a unit or field change at IB),
+  WARN on any (about 0.3% a night). The step stays non-critical.
+- Stored history is corrected by `ibkr-iv-repair --from --to`: the same check over the stored
+  rows, rewriting only those it rejects as a new run (no request to IB). The rewrite wins the
+  merge; reads as of an earlier time still see what was stored then (ADR 0007). `ibkr_iv@v1`
+  keeps its version (its definition did not change, its input did) and is recomputed in place.

@@ -302,7 +302,9 @@ IBKR_CONTRACTS = _fixed(
 # L2: IBKR's 30-day implied and historical vol of each underlying, one partition per session
 # (ADR 0028). Runs merge per instrument (a backfill writes many sessions, the nightly one):
 # the latest run's row wins. ``source_kind``: ``history`` (IB's daily bar) or ``snapshot``
-# (the streamed value after the close). Licence: personal use (IBKR market data).
+# (the streamed value after the close). ``vol_reject``: why a vol IB sent is null (zero, or an
+# IV above 5; ``tasks/market/ibkr_iv.py``, ADR 0028), null when both were kept.
+# Licence: personal use (IBKR market data).
 IBKR_IV30 = _fixed(
     "volatility/ibkr_iv30",
     "volatility",
@@ -311,6 +313,7 @@ IBKR_IV30 = _fixed(
     "symbol string",
     *_floats("iv30_ibkr", "hv30_ibkr"),
     "source_kind string!",
+    "vol_reject string",
     runs="merge",
 )
 # Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):

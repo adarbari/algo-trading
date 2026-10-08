@@ -29,6 +29,7 @@ from algotrade.data.chains import (
 from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
+from algotrade.data.volatility import ibkr_iv30
 from algotrade.services.features import site_features
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import PUBLISHED, IngestRun, TaskContext
@@ -285,6 +286,31 @@ def check_verification(reader: StoreReader, session: date, s: SourcesSettings) -
             status,
             f"{share:.1%} of {graded} graded checks failed vs IBKR "
             f"(max {s.max_verify_failures:.0%}); {breakdown}{worst}",
+        )
+    ]
+
+
+def check_ibkr_vols(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
+    """IBKR's vols for the session (``ibkr-iv``): FAIL above ``max_ibkr_vol_rejected`` of the
+    rows with a vol IB sent that is not one (stored null, ``vol_reject``; a unit or field
+    change at IB nulls most of them), WARN on any. Nothing when ``[ibkr]`` is disabled or no
+    row was written (the step was skipped, with its own WARN)."""
+    if not s.vendor("ibkr").enabled:
+        return []
+    frame = ibkr_iv30(reader, session, session)
+    if frame.empty:
+        return []
+    rejected = frame[frame["vol_reject"].notna()]
+    share = len(rejected) / len(frame)
+    status = "FAIL" if share > s.max_ibkr_vol_rejected else "WARN" if len(rejected) else "PASS"
+    names = ", ".join(rejected["symbol"].astype(str).unique()[:5])
+    return [
+        Check(
+            "ibkr_vols_in_range",
+            status,
+            f"{len(rejected)} of {len(frame)} rows ({share:.1%}) had a vol out of bounds "
+            f"(zero, or an IV above 5), stored null (max {s.max_ibkr_vol_rejected:.0%})"
+            + (f"; e.g. {names}" if names else ""),
         )
     ]
 

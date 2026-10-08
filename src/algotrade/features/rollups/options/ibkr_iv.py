@@ -49,14 +49,17 @@ FEATURES = (
         "iv30_ibkr", "float32", "decimal",
         "IBKR's 30-day implied vol of the underlying's options for the session (IB's daily "
         "OPTION_IMPLIED_VOLATILITY bar, or the streamed tick 106 after the close)",
-        "IBKR had no implied vol for the underlying (no listed options, no quotes)",
+        "IBKR had no implied vol for the underlying (no listed options, no quotes); or IB's "
+        "value was not a vol (zero, or above 5 = 500%: ingestion stores it null, "
+        "volatility/ibkr_iv30.vol_reject says why)",
         valid_range=(0, 5), inputs=(_IV,), licence=_P,
     ),
     Feature(
         "hv30_ibkr", "float32", "decimal",
         "IBKR's 30-day historical (realised) vol of the underlying for the session",
         "IBKR had no historical vol for the session; or the session has no nightly snapshot "
-        "(the IV history backfill fetches no HV: it comes from the snapshot only)",
+        "(the IV history backfill fetches no HV: it comes from the snapshot only); or IB's "
+        "value was zero (stored null, volatility/ibkr_iv30.vol_reject)",
         valid_range=(0, 5), inputs=(_HV,),
         licence=_P,
     ),
