@@ -1,0 +1,31 @@
+# L3 site setting: the Guide's playbook for the site preset size_small (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "size_small"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable stock by its market value, smallest first: the size effect of the finance literature. It is a yardstick, not a trade idea: an edge that picks small companies must do better than simply buying the smallest names."
+hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and it has a market cap. Every such name qualifies; the order is the point, smallest first."
+not_checked = "It does not check trend, quality, earnings or valuation. It is the edge harness's size baseline, not a trade signal."
+before_acting = [
+  "Small names trade with wide spreads: compare rollup.price_stats@v2.adv_usd_20d with the size you would trade before reading any return.",
+  "The size effect has been weak or absent in US stocks for decades outside the smallest names; a baseline that loses money is still the bar to beat.",
+]
+sources = [
+  "Banz, The Relationship Between Return and Market Value of Common Stocks (1981)",
+  "Fama and French, The Cross-Section of Expected Stock Returns (1992)",
+]
+related = [
+  { id = "momentum_12_1", reason = "the other baseline every edge is compared with" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $3"
+adv = "Trades at least $2M a day"
+market_cap = "Has a market cap"

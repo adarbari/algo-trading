@@ -1,0 +1,48 @@
+# Size baseline: every tradeable common stock or ADR with a market cap, smallest first (the size
+# effect of Banz 1981 and Fama and French 1992). A baseline for the edge harness (ADR 0053,
+# quality bar 9: the decoys): an edge whose picks are small names must beat this ranking on the
+# same sessions. The one criterion only asks that the value exists (a missing market cap never
+# passes, ADR 0030). What it does not check: trend, quality, liquidity beyond the base gates.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "size_small"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Size (small first)"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# stocks only: an ETF has no market cap of its own)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 3
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 2_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.market_cap]
+field = "feature.market_cap"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+market_cap = "feature.market_cap"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "feature.market_cap"
+tie_break_order = "asc"
