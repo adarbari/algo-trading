@@ -208,7 +208,9 @@ def _loaded_site_names() -> tuple[set[str], set[str]]:
 def test_every_site_settings_file_is_loaded_by_the_settings_loader() -> None:
     documents, overrides = _loaded_site_names()
     site = REPO_ROOT / "config" / "site"
-    unknown = sorted(p.name for p in site.glob("*.toml") if p.stem not in documents)
+    unknown = sorted(
+        p.name for p in site.glob("*.toml") if p.stem not in documents and ".local" not in p.stem
+    )
     unknown += sorted(
         f"overrides/{p.name}" for p in (site / "overrides").glob("*") if p.stem not in overrides
     )

@@ -413,7 +413,7 @@ def check_main_checkout(p: Probes) -> list[Result]:
 
 def check_running_checks(p: Probes) -> Result:
     """Other `make check` runs on this machine (each takes 30-40 min; two at once time out)."""
-    rc, out = p.run(["pgrep", "-f", "make check"])
+    rc, out = p.run(["pgrep", "-f", "check_lock.sh"])  # once per run, not make + make check-gates
     pids = [x for x in out.split() if rc == 0 and x.isdigit() and int(x) != os.getpid()]
     if not pids:
         return Result(OK, "make check", "no other run in progress")
