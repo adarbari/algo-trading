@@ -2,18 +2,21 @@
 (one family listing ``alpha`` and a preset that does not exist), ``alpha``'s playbook prose
 (a related id that is no playbook, one criterion without ``asks``), and three site presets:
 ``alpha`` (two versions: v2 is read), ``zeta`` (in no family) and ``broken`` (not a rule
-screen). The catalogue is the site's (a store without feature files sees the site's)."""
+screen); apart (``regime``), one regime card over three episodes. The catalogue is the
+site's (a store without feature files sees the site's)."""
 
 from collections.abc import Mapping
+from datetime import date
 from typing import Any
 
 import pytest
 
-from algotrade.config.user import UserContext
+from algotrade.config.user import SITE_USER, UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
+from tests.conftest import REPO_ROOT
 
 ADV = "rollup.price_stats@v2.adv_usd_20d"
 CLOSE = "rollup.price_stats@v2.close"
@@ -124,3 +127,50 @@ def stores(documents: Mapping[tuple[str, str, str], Mapping[str, Any]]) -> Store
 @pytest.fixture
 def ctx() -> StoreContext:
     return stores(DOCUMENTS)
+
+
+# The regime: one card (``before`` labels for one episode, two episodes and none) over three
+# episodes, two of them in 2011.
+EPISODE = {
+    "key": "gfc", "name": "Financial crisis", "peak": date(2007, 10, 9),
+    "trough": date(2009, 3, 9), "recovered": date(2013, 3, 28), "spx_drawdown": -0.57,
+    "nasdaq_drawdown": -0.56, "recession": True, "nber_start": date(2007, 12, 1),
+    "nber_end": date(2009, 6, 1), "kind": "recession",
+    "cause": f"Housing; {ADV} dried up.", "known_from": date(2009, 3, 9), "notes": "Curve.",
+}  # fmt: skip
+SHOCK = {
+    "key": "eu", "name": "Euro", "peak": date(2011, 4, 29), "trough": date(2011, 10, 3),
+    "spx_drawdown": -0.19, "nasdaq_drawdown": -0.18, "recession": False, "kind": "shock",
+    "cause": "Debt.", "known_from": date(2011, 10, 3), "notes": "Spreads.",
+}  # fmt: skip
+CARD = {
+    "key": "curve", "technical_name": "10y minus 3m (T10Y3M)", "pace": "slow",
+    "feature": "market.regime_indicators@v1.curve_10y3m",
+    "plain_name": "Are long rates below short ones?", "one_liner": "The 10y minus the 3m.",
+    "why_it_matters": f"Banks earn less; see {CLOSE}.", "what_on_means": "On below zero.",
+    "lead_time": "6 to 18 months.", "false_alarms": "1998.",
+    "links": [{"title": "FRED T10Y3M", "url": "https://fred.stlouisfed.org/series/T10Y3M"}],
+    "before": {"2008": "Inverted in 2006.", "2011": "Flat.", "1999": "Before any episode."},
+    "range": {"min": -0.02, "max": 0.04}, "how": "The 10-year yield minus the 3-month bill.",
+    "terms": [{"text": "3-month bill", "url": "https://fred.stlouisfed.org/series/DGS3MO"}],
+}  # fmt: skip
+REGIME: dict[tuple[str, str, str], Mapping[str, Any]] = {
+    ("site", "regime", "cards"): {"card": [CARD]},
+    ("site", "regime", "episodes"): {
+        "episode": [EPISODE, SHOCK, {**SHOCK, "key": "eu2", "name": "Euro again"}]
+    },
+}
+
+
+@pytest.fixture
+def regime() -> StoreContext:
+    return stores(REGIME)
+
+
+SHIPPED = FileConfigStore(REPO_ROOT / "config")
+
+
+@pytest.fixture(scope="module")
+def site() -> StoreContext:
+    """The repo's site configs (for the fitness tests over the shipped files)."""
+    return open_stores(StoreReader(MemoryBackend()), SHIPPED, UserContext(SITE_USER))

@@ -89,7 +89,10 @@ class GuideFamily:
         return cls(id=d.id, title=d.title, playbooks=[GuidePlaybook.of(p) for p in d.playbooks])
 
 
-@strawberry.type(description="A regime indicator card: its key and plain-language name")
+@strawberry.type(
+    description="A regime indicator card: its key (`Query.guideIndicator(key)`) and "
+    "plain-language name"
+)
 class GuideIndicator:
     key: str
     plain_name: str
@@ -99,7 +102,10 @@ class GuideIndicator:
         return cls(key=d.key, plain_name=d.plain_name)
 
 
-@strawberry.type(description="A reference market fall: its key and name")
+@strawberry.type(
+    description="A reference market fall: its key (its page's slug, `Query.guideEpisode(slug)`) "
+    "and name"
+)
 class GuideEpisode:
     key: str
     name: str

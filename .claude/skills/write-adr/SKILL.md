@@ -18,4 +18,4 @@ description: Record an architectural decision (new layer, boundary change, stora
 5. Update whatever it affects: `docs/architecture.md`, specs in `docs/data/` or
    `docs/ui/`, `CLAUDE.md`'s settled-decisions list, `pyproject.toml` import-linter
    contracts, and `docs/roadmap.md`.
-6. Run `make check`.
+6. Run `make changed`, then push: CI is the full gate.

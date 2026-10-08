@@ -71,7 +71,11 @@ def _known(r: RecessionConfig, day: date) -> tuple[bool, bool]:
     return (r.announced_start or r.start) <= day, (r.announced_end or r.end) <= day
 
 
-def _episode(e: EpisodeConfig, day: date, chronology: tuple[RecessionConfig, ...]) -> Episode:
+def episode_known_by(
+    e: EpisodeConfig, day: date, chronology: tuple[RecessionConfig, ...]
+) -> Episode:
+    """``e`` as of ``day``: the recession and the recovery only once known (the one mapping;
+    the Guide passes ``date.max`` for the whole record)."""
     started = ended = True  # an episode with no recession: nothing to gate
     if e.recession:
         match = next(
@@ -114,7 +118,9 @@ def load_regime_episodes(ctx: ReadContext) -> RegimeEpisodes:
     config = load_episodes(ctx.configs)
     return RegimeEpisodes(
         episodes=tuple(
-            _episode(e, day, config.recessions) for e in config.episodes if e.known_from <= day
+            episode_known_by(e, day, config.recessions)
+            for e in config.episodes
+            if e.known_from <= day
         ),
         recessions=tuple(r for c in config.recessions if (r := _recession(c, day)) is not None),
     )

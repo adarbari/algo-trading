@@ -159,7 +159,7 @@ purpose = "the route tree: root, the section-route builder, one route group per 
 
 [[web_dir]]
 path = "apps/web/src/app/routes/*"
-purpose = "one workspace's route group (trader, admin): its layout route, guard and section routes"
+purpose = "one route group (trader, admin, guide): its layout route, guard and routes"
 
 [[web_dir]]
 path = "apps/web/src/app/workspaces"

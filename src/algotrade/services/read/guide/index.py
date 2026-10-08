@@ -77,7 +77,8 @@ class GuideFamily:
 
 @dataclass(frozen=True)
 class GuideIndicator:
-    """A regime indicator card: its key and plain-language name."""
+    """A regime indicator card: its key (its Guide page's, ``indicator.py``) and plain-language
+    name."""
 
     key: str
     plain_name: str
@@ -85,7 +86,7 @@ class GuideIndicator:
 
 @dataclass(frozen=True)
 class GuideEpisode:
-    """A reference market fall: its key and name."""
+    """A reference market fall: its key (its Guide page's slug, ``episode.py``) and name."""
 
     key: str
     name: str

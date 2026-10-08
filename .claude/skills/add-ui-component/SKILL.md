@@ -47,4 +47,4 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
    code renders no HTML elements and passes no `className` / `style` (ESLint fails it).
 6. **Style check:** dense but calm. No gradients, glows, decorative shadows, emoji icons,
    or numbers wrapped in big cards. One accent colour. Borders, not shadows.
-7. Run `make web-check` (or `npm run check`), `make web-visual`, and `make check`.
+7. Run `make changed` (it maps the web checks), `make web-visual` when the design system changed, then push: CI is the full gate.

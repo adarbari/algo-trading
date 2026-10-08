@@ -62,4 +62,4 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    must drive code (`tests/architecture/test_ownership.py`). Environment variables are read
    only in `src/algotrade/config/env.py`. A new table column is declared with its type in
    `src/algotrade/storage/tables/schemas.py`.
-8. Run `make check`.
+8. Run `make changed`, then push: CI is the full gate.

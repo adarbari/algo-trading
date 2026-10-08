@@ -46,5 +46,5 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    in the same PR (the test fails until you do); tick the row in docs/ui/guide.md section 4.
 6. **Checks**: `.venv/bin/python -m pytest tests/architecture/test_layout_web.py -q -k prose`
    (explanatory prose in `apps/web/src` against the shrink-only baseline), the field-guide
-   tests in `tests/architecture/test_features.py`, then `make check`. A false finding of the
+   tests in `tests/architecture/test_features.py`, then `make changed` and push (CI is the full gate). A false finding of the
    prose test (a long label, say) is shortened, never added to the baseline.

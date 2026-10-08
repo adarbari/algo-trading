@@ -12,7 +12,8 @@ import { WORKSPACES } from '../src/app/workspaces/workspaces';
 import { expectAccessible, settled } from './a11y';
 import { mockApi } from './mock-api';
 
-const ROUTES = WORKSPACES.flatMap((w) => w.sections.map((s) => s.path));
+/** Every section, and the Guide (its own layout, outside the workspaces). */
+const ROUTES = [...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)), '/guide'];
 /**
  * The top bar's height bound: the two-row grid under 720 px (brand, Guide and the end slot,
  * then the nav; the workspace switch is in the account menu) measures about 100 px at 390 px.

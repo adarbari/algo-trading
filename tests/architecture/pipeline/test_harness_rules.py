@@ -18,11 +18,15 @@ def test_claude_md_forbids_the_broad_pkills() -> None:
 
 def test_make_check_runs_the_gates_under_the_lock() -> None:
     makefile = (REPO / "Makefile").read_text()
-    assert re.search(
-        r"^check:\n\tscripts/ops/check_lock\.sh \$\(MAKE\) check-gates$", makefile, re.M
+    check = re.search(r"^check:.*?(?=^\S)", makefile, re.S | re.M)
+    assert check and re.search(
+        r"^\tscripts/ops/check_lock\.sh \$\(MAKE\) .*check-gates$", check.group(0), re.M
     )
     gates = re.search(r"^check-gates:(.*)$", makefile, re.M)
-    assert gates and {"lint", "test", "web-check", "web-real"} <= set(gates.group(1).split())
+    assert gates and "$(CHECK_TARGETS)" in gates.group(1)  # scope-aware: docs/ci.md
+    for var, members in (("CHECK_PY", {"lint", "test"}), ("CHECK_WEB", {"web-check", "web-real"})):
+        line = re.search(rf"^{var} = (.*)$", makefile, re.M)
+        assert line and members <= set(line.group(1).split()), var
     assert (REPO / "scripts" / "ops" / "check_lock.sh").stat().st_mode & 0o111
 
 
@@ -32,3 +36,34 @@ def test_web_servers_read_the_worktree_port_base() -> None:
         assert "ALGOTRADE_PORT_BASE" in (WEB / name).read_text(), name
     script = (REPO / "scripts" / "worktree.sh").read_text()
     assert "ALGOTRADE_PORT_BASE=" in script  # worktree.env sets it
+
+
+def _flat(*parts: str) -> str:
+    return " ".join(REPO.joinpath(*parts).read_text().split())
+
+
+def test_needs_owner_label_is_in_the_rules_and_in_start() -> None:
+    assert "`needs-owner`" in _flat("CLAUDE.md")
+    assert "`needs-owner`" in _flat(".claude", "commands", "start.md")
+
+
+def test_agent_briefs_demand_foreground_checks_and_a_last_action_hand_back() -> None:
+    for name in ("implementer", "checker"):
+        text = _flat(".claude", "agents", f"{name}.md")
+        assert "foreground" in text, f"{name}.md must say checks run in the foreground"
+        assert "no command may still be running" in text, name
+
+
+def test_only_the_label_setter_removes_the_label() -> None:
+    for parts in (("CLAUDE.md",), (".claude", "agents", "implementer.md")):
+        text = _flat(*parts)
+        assert "Only the session that set `no-automerge` or `needs-owner` removes it" in text
+        assert "an agent never removes a label it did not set" in text, parts
+
+
+def test_claude_md_names_the_four_model_tiers() -> None:
+    text = _flat("CLAUDE.md")
+    section = text[text.index("## Agents, models and tokens") :]
+    for tier in ("Haiku = `checker`", "Sonnet = `implementer`", "Opus = `architect`",
+                 "orchestrating session"):  # fmt: skip
+        assert tier in section, f"CLAUDE.md must name the tier: {tier}"

@@ -63,7 +63,7 @@ the product?
 ### Placement
 
 A **utility link on the right of the top bar**: book icon and "Guide", before the session date
-and the account menu, in both workspaces (no role gating). `?` opens `/guide`, ⌘K searches it
+and the account menu, in both workspaces (no role gating; the Guide has its own route group and keeps the workspace you came from). `?` opens `/guide`, ⌘K searches it
 from anywhere. Not a workspace section (sections are where work happens; Linear, Stripe,
 Notion, IBKR and tastytrade keep help as a utility on the right or a "?" button) and not in the
 account menu (GitHub and TradingView do that; it is the least discoverable place, wrong for an
@@ -78,7 +78,10 @@ for depth. The original recommendation (a TRADER section after Explore) was supe
    sentence; later: read Explore, read the Regime page.
 2. **Market regime**: the eight indicators as their plain-language questions
    (`config/site/regime/cards.toml`), then the reference episodes (`episodes.toml`); a link to
-   today's readings on the Regime page.
+   today's readings on the Regime page. Read as `Query.guideIndicator(key)` (the card without a
+   session value) and `Query.guideEpisode(slug)` (the episode's key; as the file holds it, with
+   the cards whose `before` label means it) from `services/read/guide/{indicator,episode}.py`
+   over the same config loaders as the Regime page (GD5a).
 3. **Playbooks**, one per site preset screen, grouped by family and ordered within it: Trend
    (Trend continuation, Pullback), Breakouts in lifecycle order (Range breakout, Breakout,
    Failed breakout), Reversals (Support reversal, Oversold reversal, Exhaustion), Option
