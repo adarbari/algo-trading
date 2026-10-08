@@ -273,5 +273,15 @@ probit is the same model class with the precedent already in place. LightGBM (AD
    `fitted_through` strictly before it, and reads exactly the features the document declares.
 5. **Refusals.** A fit needs at least 40 independent decision sessions before the frozen period (the quality bar's count) and refuses with the count it has: no scorer file is committed while the stored history gives fewer (momentum_12_1 has 3). A declared `rollup.<group>@v<n>` must be the registry's current version of its group (a fitness test and the renderer check it), and the description records `horizon` and `fitted_through`, which must precede the purge cutoff.
 6. **Not yet.** Event schedules and outcomes that read an implied vol are not fitted (the
-   command refuses). The `impl = "model"` screener, labelling pre-split slices IN_SAMPLE and
-   promotion by site config are ED7b and ED7c.
+   command refuses). Shipped in ED7b and ED7c (7 and 8 below).
+7. **The model screener (ED7b).** `impl = "model"` is a rule screen (same base gates) with
+   `score = "feature.edge_score_<edge>"`: the score is a last gate (`>= 0`: a missing score never
+   passes) and the only rank. Every slice of a model screener that holds a session before
+   `frozen_from` (all, year, regime, an earlier exploratory split) carries `in_sample = true` on
+   its `results/edge_eval` rows; only the frozen slice is evidence, and the track record skips
+   in-sample rows. A fitness test requires its score's `fitted_through` before the purge cutoff.
+8. **Promotion (ED7c).** `[implementation] promoted = "<screener>"` on an edge document is allowed
+   only for a model screener the edge lists, on an evidenced or live edge citing its frozen run,
+   with a rule screener to beat. The model beats them when, at every horizon of the frozen slice
+   of that run, its lift and its decile spread are both strictly higher than each rule
+   screener's (`services/read/evaluation/promotion.py`); a missing number or row fails.

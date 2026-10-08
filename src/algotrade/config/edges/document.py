@@ -37,6 +37,10 @@ and the key.
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
     notes             optional: a proxy, an open decision
+    [implementation]  optional: ``promoted``, the one of ``screeners`` that implements the edge
+                      for use (ED7c). A learned (``impl = "model"``) screener is promoted only
+                      with evidence that it beat the edge's rule screeners in the frozen
+                      period: ``tests/architecture/data/test_edge_promotion.py``
     [scorer]          optional: ``features``, the selection fields (``rollup.<group>@v<n>.<column>``
                       or ``feature.<name>``) a learned scorer is fitted on (ED7)
 
@@ -96,7 +100,7 @@ QUALITY_BAR = (
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
-    "notes", "frozen_from", "base", "variants", "evidence", "scorer",
+    "notes", "frozen_from", "base", "variants", "evidence", "scorer", "implementation",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -180,6 +184,7 @@ class Edge:
     variants: tuple[EdgeVariant, ...] = ()
     scorer_features: tuple[str, ...] = ()  # the fields a learned scorer reads (ADR 0053, ED7)
     evidence: Evidence | None = None
+    promoted: str | None = None  # the screener that implements the edge for use (ED7c)
 
     @property
     def event_class(self) -> str | None:
@@ -242,7 +247,13 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         variants=_variants(t, schedule, edge_id, universe),
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
+        promoted=_promoted(t),
     )
+    if edge.promoted is not None and edge.promoted not in edge.screeners:
+        raise ConfigurationError(
+            f"{where} implementation.promoted: {edge.promoted!r} is not one of the screeners "
+            f"{list(edge.screeners)}"
+        )
     if edge.evidence is not None and status not in EVIDENCE_STATUSES:
         raise ConfigurationError(
             f"{where} evidence: only an evidenced, live or retired edge cites a run"
@@ -481,6 +492,13 @@ def _scorer_features(t: Table) -> tuple[str, ...]:
     if not found or len(set(found)) != len(found):
         raise ConfigurationError(f"{t.where} scorer.features: one or more distinct fields")
     return found
+
+
+def _promoted(t: Table) -> str | None:
+    if t.raw("implementation") is None:
+        return None
+    sub = t.table("implementation", ("promoted",))
+    return validate_id("screener", sub.text("promoted", "") or _missing(sub, "promoted"))
 
 
 def _ids(t: Table, key: str) -> tuple[str, ...]:

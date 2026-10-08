@@ -41,7 +41,7 @@ from algotrade.config.edges.document import MAIN, Edge, job_name
 from algotrade.config.edges.evaluation import load_evaluation
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
-from algotrade.config.strategy.schema import Selection, parse_selection
+from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
@@ -354,15 +354,26 @@ def effective_split(
     return split, split != edge.frozen_from
 
 
-def _slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
-    slices = [Slice("all", "all", _always)]
+def _slices(
+    stats: Sequence[SessionStat],
+    split: date | None,
+    exploratory: bool,
+    model: bool = False,
+    frozen_from: date | None = None,
+) -> list[Slice]:
+    """The slices of one variant's sessions. A ``model`` screener's score was fitted on sessions
+    before ``frozen_from`` (a fitness test): every slice that holds one is IN_SAMPLE (labelled
+    on its rows, never evidence); only the frozen slice, and an exploratory split at or after
+    ``frozen_from``, hold none."""
+    slices = [Slice("all", "all", _always, model)]
     for year in sorted({s.session.year for s in stats}):
-        slices.append(Slice("year", str(year), partial(_in_year, year)))
+        slices.append(Slice("year", str(year), partial(_in_year, year), model))
     for label in sorted({s.regime for s in stats}):
-        slices.append(Slice("regime", label, partial(_in_regime, label)))
+        slices.append(Slice("regime", label, partial(_in_regime, label), model))
     if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
         kind = "split" if exploratory else "frozen"
-        slices.append(Slice(kind, kind, partial(_since, split)))
+        seen = model and (frozen_from is None or split < frozen_from)
+        slices.append(Slice(kind, kind, partial(_since, split), seen))
     return slices
 
 
@@ -495,7 +506,12 @@ def evaluate_edge(
                 for block in plan.blocks
                 if any(leg.entry in closed for leg in block)
             )
-            measures = tuple(slice_measures(block_stats, _slices(block_stats, split, exploratory)))
+            model = variant.config.config.impl == MODEL_IMPL
+            measures = tuple(
+                slice_measures(
+                    block_stats, _slices(block_stats, split, exploratory, model, edge.frozen_from)
+                )
+            )
             results.append(
                 VariantResult(
                     variant.id,

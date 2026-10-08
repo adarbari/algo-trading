@@ -99,3 +99,31 @@ def test_a_bigger_miss_never_scores_higher(x: float, y: float) -> None:
                              "EQ:F": {"a": 1.0, "b": far, "c": 1.0, "d": 0.5}})  # fmt: skip
     rows = {r.instrument_id: r for r in evaluate_screen(SPEC, view).rows}
     assert rows["EQ:N"].score >= rows["EQ:F"].score  # type: ignore[operator]
+
+
+MODEL = parse_screen_spec(
+    "m",
+    {"criteria": {"a": {"field": "a", "op": "gt", "value": 0.0}}, "score": "feature.edge_score_x"},
+    "m",
+)
+scored = st.dictionaries(
+    st.from_regex(r"EQ:[A-Z]{1,3}", fullmatch=True),
+    st.fixed_dictionaries(
+        {"a": st.floats(-3, 4)}, optional={"feature.edge_score_x": st.floats(0, 1)}
+    ),
+    max_size=12,
+)
+
+
+@given(scored, st.randoms())
+def test_a_model_screen_is_deterministic_and_a_missing_score_never_qualifies(  # type: ignore[no-untyped-def, type-arg]
+    data: dict, rnd
+) -> None:
+    items = list(data.items())
+    rnd.shuffle(items)
+    first = evaluate_screen(MODEL, FeatureView(DAY, data))
+    second = evaluate_screen(MODEL, FeatureView(DAY, dict(items)))
+    assert first.rows == second.rows
+    for r in first.rows:
+        if "feature.edge_score_x" not in data[r.instrument_id]:
+            assert r.decision is not Decision.QUALIFIED

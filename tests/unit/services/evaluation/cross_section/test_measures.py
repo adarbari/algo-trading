@@ -5,6 +5,7 @@ from datetime import date
 
 import pytest
 
+from algotrade.services.evaluation.cross_section.harness import _slices
 from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     Slice,
@@ -100,3 +101,20 @@ def test_deciles_need_ten_names_and_split_best_first() -> None:
     assert decile_means([0.1] * 9) is None
     top, spread = decile_means([float(v) for v in range(20, 0, -1)])  # 20 names, 2 per decile
     assert top == pytest.approx(19.5) and spread == pytest.approx(19.5 - 1.5)
+
+
+def test_a_model_screeners_slices_are_in_sample_except_the_frozen_one() -> None:
+    frozen = date(2026, 4, 1)
+    flags = lambda **kw: {  # noqa: E731
+        (s.kind, s.value): s.in_sample for s in _slices([A, B], frozen, **kw, frozen_from=frozen)
+    }
+    model = flags(exploratory=False, model=True)
+    assert model[("all", "all")] and model[("frozen", "frozen")] is False
+    assert all(v for k, v in model.items() if k[0] in ("year", "regime"))
+    assert not any(flags(exploratory=False, model=False).values())  # a rule screener: never
+    # An exploratory split before frozen_from holds fitted sessions; one after it does not.
+    assert flags(exploratory=True, model=True)[("split", "split")] is False
+    early = _slices([A], date(2026, 1, 5), True, True, frozen)
+    assert [s.in_sample for s in early if s.kind == "split"] == [True]
+    (m,) = slice_measures([A], [Slice("all", "all", lambda _: True, True)])
+    assert m.in_sample is True

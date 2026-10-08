@@ -11,7 +11,12 @@ from collections.abc import Mapping
 from typing import Any
 
 from algotrade.config.strategy.catalog import FieldCatalog
-from algotrade.config.strategy.schema import RULES_IMPL, StrategyConfig, parse_group, parse_rule
+from algotrade.config.strategy.schema import (
+    RULE_IMPLS,
+    StrategyConfig,
+    parse_group,
+    parse_rule,
+)
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.core.model.predicates import NUMERIC_OPS, Group, Rule
@@ -27,6 +32,8 @@ from algotrade.core.model.screen_spec import (
 _CRITERION_KEYS = frozenset(
     {"field", "op", "value", "mode", "tolerance", "on_miss", "label", "enabled"}
 )
+SCORE_PREFIX = "feature.edge_score_"  # a learned scorer's feature (training/render.py)
+SCORE_CRITERION = "score"
 _NAME = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _NUMERIC_TYPES = frozenset({"float", "float32", "int"})
 
@@ -127,14 +134,29 @@ def _rank(raw: Any, path: str) -> tuple[str | None, bool]:
     return tie_break, order == "desc"
 
 
+def _score_criterion(score: Any, path: str) -> Criterion:
+    """A model screen's last gate: its score exists. A probit lies in [0, 1], so ``>= 0`` is
+    "has a value" and a missing score never passes (ADR 0030); the rank is the score itself."""
+    if (
+        not isinstance(score, str)
+        or not score.startswith(SCORE_PREFIX)
+        or len(score) == len(SCORE_PREFIX)
+    ):
+        raise _fail(f"{path}.score", f"expected a field named {SCORE_PREFIX}<edge>, got {score!r}")
+    return Criterion(SCORE_CRITERION, Rule(score, "gte", 0))
+
+
 def parse_screen_spec(config_id: str, raw: Mapping[str, Any], path: str) -> ScreenSpec:
     """``raw``: the rule-screen keys of a merged config (``StrategyConfig.rules``)."""
-    criteria_raw = _table(raw.get("criteria"), f"{path}.criteria")
+    criteria_raw = _table(raw.get("criteria", {} if "score" in raw else None), f"{path}.criteria")
     parsed = (
         parse_criterion(cid, _table(c, f"{path}.criteria.{cid}"), f"{path}.criteria.{cid}")
         for cid, c in criteria_raw.items()
     )
     criteria = tuple(c for c in parsed if c is not None)
+    score = raw.get("score")
+    if score is not None:
+        criteria = (*criteria, _score_criterion(score, path))
     if not criteria:
         raise _fail(f"{path}.criteria", "needs at least one enabled criterion")
     version = raw.get("version")
@@ -147,6 +169,10 @@ def parse_screen_spec(config_id: str, raw: Mapping[str, Any], path: str) -> Scre
         for name, f in _table(raw.get("columns", {}), f"{path}.columns").items()
     )
     tie_break, descending = _rank(raw.get("rank", {}), f"{path}.rank")
+    if score is not None:
+        if tie_break is not None:
+            raise _fail(f"{path}.rank.tie_break", "a model screen ranks by its score alone")
+        tie_break, descending = score, True
     return ScreenSpec(
         id=config_id,
         criteria=criteria,
@@ -159,8 +185,8 @@ def parse_screen_spec(config_id: str, raw: Mapping[str, Any], path: str) -> Scre
 
 
 def screen_spec(config: StrategyConfig) -> ScreenSpec:
-    """The ``ScreenSpec`` of a rule-screen config (``impl = "rules"``)."""
-    if config.impl != RULES_IMPL:
+    """The ``ScreenSpec`` of a rule-screen config (``impl = "rules"`` or ``"model"``)."""
+    if config.impl not in RULE_IMPLS:
         raise ConfigurationError(f"{config.id} is not a rule screen (impl = {config.impl!r})")
     return parse_screen_spec(config.id, config.rules, config.id)
 

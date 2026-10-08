@@ -11,7 +11,7 @@ words (``docs/screeners/rules.md``): ``gte 50000000 soft tolerance relative 0.2`
 from dataclasses import dataclass, fields
 
 from algotrade.config.site.guide.sections import load_guide_sections
-from algotrade.config.strategy.schema import RULES_IMPL
+from algotrade.config.strategy.schema import RULE_IMPLS
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import NO_VALUE_OPS
@@ -50,7 +50,7 @@ def _playbook(ctx: Stores, preset: str, family: str | None) -> SitePlaybook | No
     except ConfigurationError:
         return None
     config = resolved.config
-    if config.kind != SCREENER or config.impl != RULES_IMPL:
+    if config.kind != SCREENER or config.impl not in RULE_IMPLS:
         return None
     name = (config.name or "").strip() or preset
     return SitePlaybook(preset, name, family, resolved.screen_spec)

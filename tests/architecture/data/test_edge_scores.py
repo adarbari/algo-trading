@@ -88,3 +88,46 @@ def test_the_check_passes_a_fit_before_the_cutoff_and_fails_one_after() -> None:
     unknown = replace(_fit("nope", date(2026, 1, 30)))
     with pytest.raises(AssertionError, match="no edge document"):
         check_scorer("edge_score_nope", _table(unknown), EDGES)
+
+
+# --- ED7b: every model screener's score is a scorer fitted before its edge's purge cutoff ---------
+
+MODEL_FILES = sorted((REPO_ROOT / "config" / "site" / "presets" / "screeners").glob("*/v*.toml"))
+MODELS = {
+    f"{p.parent.name}/{p.stem}": doc
+    for p in MODEL_FILES
+    if (doc := tomllib.loads(p.read_text())).get("impl") == "model"
+}
+
+
+def check_model_screener(
+    name: str, doc: Mapping[str, Any], scores: Mapping[str, Any], edges: Mapping[str, Any]
+) -> None:
+    """``doc``'s ``score`` is a fitted ``edge_score_<edge>`` of ``scores`` (``check_scorer``:
+    fitted_through before the purge cutoff), and that edge lists the screener."""
+    feature = str(doc["score"]).removeprefix("feature.")
+    assert feature in scores, f"{name}: no fitted scorer {feature!r} in edge_scores.toml"
+    check_scorer(feature, scores[feature], edges)
+    edge = edges[feature.removeprefix(PREFIX)]
+    assert doc["id"] in edge.screeners, f"{name}: edge {edge.id} does not list {doc['id']}"
+
+
+@pytest.mark.parametrize("name", sorted(MODELS))
+def test_every_model_screener_scores_with_a_scorer_fitted_before_the_cutoff(name: str) -> None:
+    check_model_screener(name, MODELS[name], SCORES, EDGES)
+
+
+def test_the_model_check_passes_a_fitted_score_and_fails_an_unfitted_or_late_one() -> None:
+    edge = EDGES["momentum_12_1"]
+    listed = replace(edge, screeners=(*edge.screeners, "mom_model"))
+    edges = {**EDGES, edge.id: listed}
+    doc = {"id": "mom_model", "impl": "model", "score": "feature.edge_score_momentum_12_1"}
+    good = {"edge_score_momentum_12_1": _table(_fit("momentum_12_1", date(2026, 1, 30)))}
+    check_model_screener("m", doc, good, edges)
+    with pytest.raises(AssertionError, match="no fitted scorer"):
+        check_model_screener("m", doc, {}, edges)  # a score nobody fitted
+    late = {"edge_score_momentum_12_1": _table(_fit("momentum_12_1", date(2026, 3, 31)))}
+    with pytest.raises(AssertionError, match="purge cutoff"):
+        check_model_screener("m", doc, late, edges)
+    with pytest.raises(AssertionError, match="does not list"):
+        check_model_screener("m", doc, good, EDGES)

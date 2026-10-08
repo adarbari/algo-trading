@@ -101,11 +101,13 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
 
 @dataclass(frozen=True)
 class Slice:
-    """A set of sessions reported on its own: ``kind`` ("all", "year", "regime", "frozen")."""
+    """A set of sessions reported on its own: ``kind`` ("all", "year", "regime", "frozen").
+    ``in_sample``: a model screener's score was fitted on sessions this slice holds."""
 
     kind: str
     value: str
     keep: Callable[[SessionStat], bool]
+    in_sample: bool = False
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,7 @@ class SliceMeasure:
     pbo: float | None = field(default=None)
     reference_rate: float | None = field(default=None)  # expires_otm: mean risk-neutral N(d2)
     touch_rate: float | None = field(default=None)  # expires_otm: picks whose strike was touched
+    in_sample: bool = field(default=False)  # a model screener's fit saw sessions of this slice
 
 
 def decile_means(values_in_rank_order: Sequence[float]) -> tuple[float, float] | None:
@@ -176,6 +179,7 @@ def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
     return SliceMeasure(
         slice_kind=sl.kind,
         slice_value=sl.value,
+        in_sample=sl.in_sample,
         sessions=len(rows),
         picks=picks,
         hits=hits,
