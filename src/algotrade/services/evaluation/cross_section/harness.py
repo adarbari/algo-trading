@@ -18,6 +18,11 @@ An edge's ``[[variants]]`` are evaluated like the edge itself under their own id
 (edge variant, variant, config hash, horizon) tried in earlier runs of the edge plus this one
 (the trial log, ``results.py``); the probability of backtest overfitting compares the variants'
 per-session pick means over the same sessions.
+
+The test slice starts at the run's effective split: the run's ``split_from``, else the user's
+``evaluation.toml`` (``config/edges/evaluation.py``), else the edge's ``frozen_from`` (the site's
+split, ADR 0053 amendment ED5a). A run whose split is not the edge's ``frozen_from`` is
+EXPLORATORY: its rows carry its split in their key and the flag, and the split joins the run hash.
 """
 
 import hashlib
@@ -32,6 +37,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import MAIN, Edge
+from algotrade.config.edges.evaluation import load_evaluation
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -121,6 +127,8 @@ class EdgeEvaluation:
     start_sessions: Mapping[int, int]  # horizon -> decision blocks the schedule gave
     unclosed_sessions: Mapping[int, int]  # horizon -> of those, blocks with no closed window
     event_unknown: Mapping[str, int] = field(default_factory=dict)  # reason -> names excluded
+    split_from: date | None = None  # the test slice's first session (None: no split)
+    exploratory: bool = False  # the split is not the edge's frozen_from: never evidence
 
 
 def job_name(edge_id: str, user_id: str) -> str:
@@ -135,15 +143,18 @@ def run_hash(
     end: date,
     as_of: datetime,
     iv_field: str = IMPLIED_VOL_FIELD,
+    split_from: date | None = None,
 ) -> str:
     """Identity of one evaluation: the parsed document, each variant's config hash, the range,
-    the outcomes' ``as_of``, the run's implied-vol field and the harness version."""
+    the outcomes' ``as_of``, the run's implied-vol field, its effective split and the harness
+    version."""
     payload = {
         "edge": asdict(edge),
         "iv_field": iv_field,
         "variants": [(v.id, v.config.hash) for v in variants],
         "range": [start, end],
         "as_of": as_of,
+        "split_from": split_from,
         "version": HARNESS_VERSION,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
@@ -159,7 +170,7 @@ def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Varia
     return found
 
 
-def _universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
+def edge_universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
     if isinstance(edge.universe, Selection):
         return edge.universe
     for scope in (user.user_id, "site"):
@@ -297,14 +308,24 @@ def _stat(
     )
 
 
-def _slices(edge: Edge, stats: Sequence[SessionStat]) -> list[Slice]:
+def effective_split(
+    run: date | None, configs: ConfigStore, user: UserContext, edge: Edge
+) -> tuple[date | None, bool]:
+    """(split, exploratory): the run's split, else the user's (site < user, ``evaluation.toml``),
+    else the edge's ``frozen_from``. Exploratory when it differs from ``frozen_from``."""
+    split = run or load_evaluation(configs, user.user_id).split_from or edge.frozen_from
+    return split, split != edge.frozen_from
+
+
+def _slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
     slices = [Slice("all", "all", _always)]
     for year in sorted({s.session.year for s in stats}):
         slices.append(Slice("year", str(year), partial(_in_year, year)))
     for label in sorted({s.regime for s in stats}):
         slices.append(Slice("regime", label, partial(_in_regime, label)))
-    if edge.frozen_from is not None:  # fixed by the document, never rolling
-        slices.append(Slice("frozen", "frozen", partial(_since, edge.frozen_from)))
+    if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
+        kind = "split" if exploratory else "frozen"
+        slices.append(Slice(kind, kind, partial(_since, split)))
     return slices
 
 
@@ -388,13 +409,16 @@ def evaluate_edge(
     end: date,
     as_of: datetime,
     iv_field: str = IMPLIED_VOL_FIELD,
+    split_from: date | None = None,
 ) -> EdgeEvaluation:
     """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
     horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
     one implied-vol field of the run (an outcome that reads one; its source and licence are
-    recorded). Raises ``ConfigurationError`` for an event class with no declared field and
+    recorded); ``split_from``: the run's own split over the user's and the edge's. Raises
+    ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon."""
     variants = _variants(configs, user, edge)
+    split, exploratory = effective_split(split_from, configs, user, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
     session = _Session(reader, label)
     days = sessions_between(start, end)
@@ -427,7 +451,7 @@ def evaluate_edge(
             )
             for variant in variants:
                 stats = _block_stats(scope, session, variant, blocks, closed, events)
-                measures = tuple(slice_measures(stats, _slices(scope.edge, stats)))
+                measures = tuple(slice_measures(stats, _slices(stats, split, exploratory)))
                 results.append(
                     VariantResult(
                         variant.id,
@@ -449,7 +473,7 @@ def evaluate_edge(
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(
         edge_id=edge.id,
-        run_hash=run_hash(edge, variants, start, end, as_of, iv_field),
+        run_hash=run_hash(edge, variants, start, end, as_of, iv_field, split),
         user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,
@@ -461,6 +485,8 @@ def evaluate_edge(
         start_sessions=starts,
         unclosed_sessions=unclosed,
         event_unknown=unknown,
+        split_from=split,
+        exploratory=exploratory,
     )
 
 
@@ -492,7 +518,8 @@ def _block_stats(
 def _trial_hash(scope: _Scope, variant: Variant) -> str:
     """The trial's identity: the screener's config hash, the edge variant's id and the resolved
     outcome and universe (the edge's own for ``main``), so an edited override, offset or
-    horizon is another trial."""
+    horizon is another trial. The split is not part of it: an exploratory run adds no trial (its
+    "all" slice, which the deflated Sharpe ratio reads, does not depend on the split)."""
     payload = [variant.config.hash, scope.key, asdict(scope.edge.outcome), scope.edge.universe]
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
@@ -500,11 +527,13 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
 def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) -> list[_Scope]:
     """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides. Each
     reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
-    scopes = [_Scope(MAIN, edge, _universe(configs, user, edge), edge.outcome.iv_field or iv_field)]
+    scopes = [
+        _Scope(MAIN, edge, edge_universe(configs, user, edge), edge.outcome.iv_field or iv_field)
+    ]
     for v in edge.variants:
         applied = replace(edge, outcome=v.outcome, universe=v.universe, variants=())
         field_name = v.outcome.iv_field or iv_field
-        scopes.append(_Scope(v.id, applied, _universe(configs, user, applied), field_name))
+        scopes.append(_Scope(v.id, applied, edge_universe(configs, user, applied), field_name))
     return scopes
 
 

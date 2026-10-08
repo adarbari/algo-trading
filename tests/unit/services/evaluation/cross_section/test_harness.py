@@ -604,3 +604,51 @@ def test_a_variant_may_override_the_offset_and_reads_its_own_entry_partition() -
     assert main_bad.stats == main_clean.stats  # the edge's own entries are untouched
     assert late_bad.stats != late_clean.stats and late_bad.stats[0].pick_values[0] == -9.0
     assert [s.session for s in late_clean.stats] == [DAYS[0], DAYS[2], DAYS[4]]  # DAYS[6]: no S
+
+
+# ---- ED5a: the train / test split
+
+
+def _user_world(split: str | None) -> World:
+    w = build_world()
+    if split:
+        w.configs._docs[("alice", "evaluation", "evaluation")] = {"split_from": split}
+    return w
+
+
+def _split_run(w: World, user: str = "alice", **kw: Any) -> EdgeEvaluation:
+    return evaluate_edge(
+        w.reader, w.results, w.configs, UserContext(user), edge(frozen_from="2026-09-04"),
+        DAYS[0], DAYS[-1], AS_OF, **kw,
+    )  # fmt: skip
+
+
+def test_the_site_split_is_the_edges_frozen_from_and_not_exploratory(world: World) -> None:
+    ev = _split_run(world, "site")
+    assert (ev.split_from, ev.exploratory) == (date(2026, 9, 4), False)
+    assert ev.results[0].measures[-1].slice_kind == "frozen"
+
+
+def test_a_users_split_makes_the_run_exploratory_with_its_own_test_slice() -> None:
+    ev = _split_run(_user_world("2026-09-09"))
+    assert (ev.split_from, ev.exploratory) == (date(2026, 9, 9), True)
+    test = ev.results[0].measures[-1]
+    assert (test.slice_kind, test.sessions) == ("split", 1)  # only the Sept 9 or later start
+    assert not any(m.slice_kind == "frozen" for m in ev.results[0].measures)
+
+
+def test_the_run_split_beats_the_users_which_beats_the_edges() -> None:
+    w = _user_world("2026-09-09")
+    assert _split_run(w).split_from == date(2026, 9, 9)  # user over the edge
+    assert _split_run(w, split_from=date(2026, 9, 2)).split_from == date(2026, 9, 2)  # run wins
+    assert _split_run(w, "bob").split_from == date(2026, 9, 4)  # another user: the edge's
+    same = _split_run(w, split_from=date(2026, 9, 4))
+    assert not same.exploratory  # the run restating the frozen_from is the site's split
+
+
+def test_the_split_joins_the_run_hash() -> None:
+    w = _user_world(None)
+    hashes = {
+        _split_run(w, split_from=d).run_hash for d in (None, date(2026, 9, 2), date(2026, 9, 9))
+    }
+    assert len(hashes) == 3

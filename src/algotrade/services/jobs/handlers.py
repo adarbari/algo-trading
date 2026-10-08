@@ -18,13 +18,16 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section.harness import evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import edge_universe, evaluate_edge
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     records,
     survivorship,
     write_edge_eval,
 )
+from algotrade.services.evaluation.training.fit import fit_scorer
+from algotrade.services.evaluation.training.frame import training_frame
+from algotrade.services.evaluation.training.render import render_scorer
 from algotrade.services.jobs.runner import JobContext, JobKind
 from algotrade.services.screening.exports import run_exports
 from algotrade.services.screening.run import run_screener
@@ -99,7 +102,9 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
 def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``edge`` (id), ``start``, ``end`` (ISO dates), optional ``as_of`` (ISO instant:
     the outcomes known by then; default now), ``iv_field`` (the one implied-vol field of the run;
-    default our IV30). The harness's rows land in ``results/edge_eval``."""
+    default our IV30), ``split_from`` (ISO date: the run's test split, over the user's and the
+    edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory). The harness's rows
+    land in ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -115,6 +120,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         date.fromisoformat(params["end"]),
         as_of,
         **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
+        split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
     )
     record = write_edge_eval(ctx.resources["writer"], evaluation, now)
     rows = edge_eval_frame(evaluation, record.run_id, now)
@@ -123,6 +129,8 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "run_id": record.run_id,
         "run_hash": evaluation.run_hash,
         "as_of": as_of.isoformat(),
+        "split_from": evaluation.split_from.isoformat() if evaluation.split_from else None,
+        "exploratory": evaluation.exploratory,
         "trials": evaluation.trials,
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
         "survivorship": {str(h): list(v) for h, v in survivorship(evaluation).items()},
@@ -132,8 +140,36 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     }
 
 
+def edge_score_fit_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+    """params: ``edge`` (id), ``start`` and ``until`` (ISO dates: the decision sessions; the
+    fit also stops before the edge's frozen period). The result's ``table`` is the TOML
+    expression feature of the fit (``fit-edge-scorer`` writes it; nothing is stored here)."""
+    configs = ctx.resources["configs"]
+    edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
+    if params["edge"] not in edges:
+        raise ConfigurationError(f"unknown edge {params['edge']!r}; known: {sorted(edges)}")
+    edge = edges[params["edge"]]
+    training = training_frame(
+        ctx.resources["reader"],
+        edge,
+        edge_universe(configs, ctx.user, edge),
+        date.fromisoformat(params["start"]),
+        date.fromisoformat(params["until"]),
+    )
+    fit = fit_scorer(training)
+    return {
+        "edge": edge.id,
+        "table": render_scorer(fit),
+        "rows": fit.rows,
+        "sessions": fit.sessions,
+        "positives": fit.positives,
+        "fitted_through": fit.fitted_through.isoformat() if fit.fitted_through else None,
+    }
+
+
 LIBRARY_HANDLERS: Mapping[str, JobKind] = {
     "backtest": JobKind(backtest_job, backtest_identity),
     "screen": JobKind(screen_job, screen_identity),
     "edge-eval": JobKind(edge_eval_job),
+    "edge-score-fit": JobKind(edge_score_fit_job),
 }

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade_backtest.cli import main
+from algotrade_backtest.cli import build_parser, main
 from algotrade_ingestion.cli.main import main as ingest_main
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 
@@ -222,3 +222,11 @@ def test_evaluate_edges_needs_stored_outcomes_and_a_known_edge(cli: Cli) -> None
     assert "no outcomes stored" in proc.stderr
     unknown = cli("evaluate-edges", "--edge", "nope")
     assert unknown.returncode == 2 and "no edge to evaluate" in unknown.stderr
+
+
+def test_evaluate_edges_takes_a_split_flag_that_is_a_date(cli: Cli) -> None:
+    proc = cli("evaluate-edges", "--split-from", "2026-06-01")  # parsed, then the empty store
+    assert proc.returncode == 2 and "no outcomes stored" in proc.stderr
+    assert build_parser().parse_args(["evaluate-edges", "--split-from", "2026-06-01"]).split_from
+    with pytest.raises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+        build_parser().parse_args(["evaluate-edges", "--split-from", "soon"])

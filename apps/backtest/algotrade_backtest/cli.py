@@ -7,7 +7,9 @@ algotrade-backtest [--user U] config validate|show sma_trend
 algotrade-backtest [--user U] config validate-features   (the user's expression features)
 algotrade-backtest evaluate [--update-baseline] [--report scorecard.md]
 algotrade-backtest regime-scorecard [--report regime-scorecard.txt]   (the regime episodes)
+algotrade-backtest fit-edge-scorer --edge ID [--from D] [--until D] [--out FILE]
 algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [--iv-field F]
+                                    [--split-from D]
                                   [--report edges.md]
 """
 
@@ -25,6 +27,7 @@ from algotrade_backtest.commands import (
     cmd_datasets,
     cmd_evaluate,
     cmd_evaluate_edges,
+    cmd_fit_edge_scorer,
     cmd_regime_scorecard,
 )
 
@@ -83,7 +86,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--iv-field",
         help="the one implied-vol field of the run (default: our IV30, rollup.iv30@v1.iv30)",
     )
+    ee.add_argument(
+        "--split-from",
+        type=date.fromisoformat,
+        help="first session of the test slice (default: the user's evaluation.toml, else each "
+        "edge's frozen_from); another split than frozen_from is exploratory",
+    )
     ee.add_argument("--report", type=Path, help="also write the report here")
+    fs = sub.add_parser(
+        "fit-edge-scorer", help="fit an edge's learned scorer (probit) and write its TOML feature"
+    )
+    fs.add_argument("--edge", required=True, help="the edge id (its document has [scorer])")
+    fs.add_argument("--from", dest="start", type=date.fromisoformat, help="first decision session")
+    fs.add_argument("--until", type=date.fromisoformat, help="last decision session")
+    fs.add_argument("--out", type=Path, help="the features file (default edge_scores.toml)")
     return parser
 
 
@@ -96,6 +112,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "evaluate": cmd_evaluate,
         "regime-scorecard": cmd_regime_scorecard,
         "evaluate-edges": cmd_evaluate_edges,
+        "fit-edge-scorer": cmd_fit_edge_scorer,
         "config": cmd_config,
     }
     try:
