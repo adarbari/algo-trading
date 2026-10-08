@@ -755,7 +755,7 @@ purpose = "cross-source reconciliation: our features recomputed from recorded ra
 
 [[test_dir]]
 path = "tests/scripts"
-purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests, changed_web)"
+purpose = "tests for the machine and store maintenance scripts in scripts/ (doctor, status, worktree, export_catalogue, check_rest_allowlist, session_friction)"
 
 [[test_dir]]
 path = "tests/scripts/gates"

@@ -46,7 +46,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 | CI critical path on a web PR | 12 min: one serial Web job (lint, types, unit, build, Storybook, e2e, 760 screenshots + axe) | #280: 6.0 min (Storybook 30 s, then two screenshot shards of 5.3 min); #286: 3.0 min (four shards of ~2.5 min) |
 | CI critical path on a Python PR | 12 min (the Web job; the tests job 5 min) | #280: 9.0 min, all of it the one pytest job (5 142 tests with branch coverage, 8 min 34 s); #286: 6.1 min (shards unit 5.6, apps 3.3, rest 1.7 min, then the combine); #292 (P1c): 5.0 min (unit-a 4.5 with all of `features/`); P1d spreads the rollup groups over three unit shards |
 | CI on a docs-only PR | quality 1 min + tests 5 min + web 12 min | the tests job runs `tests/architecture` only (~1 min) |
-| Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR | narrowed by `make changed` (Local fast path below); the full pass still runs once per PR |
+| Local full pass (`make check WORKERS=2 WEB_WORKERS=2`) | 30–40 min, run 2–3 times per PR (396 runs in the week to 2026-10-07, 4.5 per PR, three to five at once on the shared machine) | narrowed by `make changed` (Local fast path below), then the push: CI is the full gate (rule 9). A deliberate local `make check` is scope-aware (below): python-only measured 11 min 48 s on 2026-10-08 (pytest 10 min 45 s of it, 5,174 tests at `-n auto`, another session's pytest running alongside), web-only = the web gates in parallel with no pytest, mixed = the longer side, not the sum; `FULL=1` is the old 30–40 min |
 | `VITEST_MAX_WORKERS=2 npm run test` (242 files) | 142 s | 35 s (`pool: 'vmThreads'`) |
 | Several sessions on one machine | web servers fought over 8000 / 5173 / 4173 / 5801-5802 / 8801-8802 / 6007; two `make check` runs timed each other out; `pkill -f node` killed other sessions' runs | each worktree has its own port block (`ALGOTRADE_PORT_BASE` in `worktree.env`); `make check` refuses a second run in a worktree; `make doctor` lists the other runs and warns when the main checkout is off `main` or has local `config/site` edits |
 | Flaky reruns | a standing list in the roadmap; one PR (#196) existed only for a flake | `apps/web/quarantine.json` (below); one Playwright retry in CI; 20 s timeout for integration-style vitest files |
@@ -58,9 +58,29 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 maps from the changed `apps/web` files (slice or component folder -> vitest; page or route ->
 the e2e spec named after it, else `smoke`; story or CSS module -> that component's screenshots,
 printed as a Docker command off Linux; any `.ts` / `.tsx` -> `npm run typecheck`), then the
-fast gates. Run the full `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a
-failure rerun only the failed gate. The vitest pool is `vmThreads`: jsdom is created once per
+fast gates. Then push: CI is the full gate (owner decision 2026-10-08: the machine never
+runs the full `make check`); after a CI failure rerun only the failed gate locally. The vitest pool is `vmThreads`: jsdom is created once per
 worker instead of once per file.
+
+### Scope-aware `make check` (the release, and a deliberate full run)
+
+A bare `make check` refuses and prints rule 9 (the mechanical side of "CI is the gate": an
+agent that types it out of habit is stopped by the Makefile). `make check SCOPED=1` gates the areas the branch changed vs `origin/main` (`make check-scope` prints
+them; `scripts/changed_tests.py --areas`, the rule of CI's "Changed areas" job: `apps/web/*`
+is web; `docs/`, `.claude/`, `*.md` are docs; the CI workflow and the API's exported schemas
+are both; everything else is python; a branch with no change is every area). The python side
+(`lock-check` … `test evaluate`) and the web side (`web-check web-real`) run side by side
+(`CHECK_JOBS=2`); docs-only runs the architecture fitness tests (`make fitness`). The web gates
+are make targets (`web-generated` first, then `web-ds web-lint web-typecheck web-unit
+web-storybook web-e2e` in parallel), so `tsc -b` runs once (typecheck) and `vite build` once
+(the e2e's web server); `npm run check` stays the serial form. `FULL=1` runs every gate
+whatever changed: CI runs the gates per job and the release runs `make check FULL=1`.
+`CHECK_SCOPE="python web"` overrides the detection. The outputs interleave (GNU make 3.81 on
+macOS has no `-O`); make names the failed target at the end. It runs under the per-worktree
+lock below. With rule 9 (sessions push after `make changed`; CI gates) full local runs are
+rare, so the `WORKERS=2 WEB_WORKERS=2` caps go: a run gets every core (10, 4 performance;
+16 GB). The caps dated from the overloads of #94 / #95 / #98, when three to five full checks
+ran side by side.
 
 Shared machine (several sessions, one Mac):
 

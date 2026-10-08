@@ -51,5 +51,5 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
 8. **Every query ends in data, empty or error**: render all three states, never an infinite
    loading. Verify with the real-app smoke (`make web-real`).
 9. **Test:** unit tests next to each module; extend `e2e/smoke.spec.ts` (or add an e2e spec)
-   for the route. Run `make web-check` and `make check`. Every lint message names its rule
+   for the route. Run `make changed`, then push: CI is the full gate. Every lint message names its rule
    and the fix.

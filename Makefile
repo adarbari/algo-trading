@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: test-shard coverage-combine check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering roadmap-check unit property integration e2e test \
+.PHONY: test-shard coverage-combine check-gates check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -164,8 +164,31 @@ $(WEB)/node_modules/.package-lock.json: $(WEB)/package-lock.json
 web-install: $(WEB)/node_modules/.package-lock.json  ## web deps + the Playwright browser
 	cd $(WEB) && npx playwright install chromium
 
-web-check: $(WEB)/node_modules/.package-lock.json  ## generated files fresh, ds:check, lint, types, unit, build, storybook, e2e (WEB_WORKERS=N caps vitest)
-	cd $(WEB) && $(if $(WEB_WORKERS),VITEST_MAX_WORKERS=$(WEB_WORKERS) )$(NPM) run check
+# The web gates as make targets so `make check -j` runs them side by side (npm run check is the
+# serial form). generated:check rewrites the generated files, so every other gate waits for it;
+# the e2e's Playwright web server does the one `vite build` (typecheck is the one `tsc -b`).
+web-generated: $(WEB)/node_modules/.package-lock.json  ## generated files (tokens, COMPONENTS.md, API client) are fresh
+	cd $(WEB) && $(NPM) run generated:check
+
+web-ds: web-generated      ## design-system check
+	cd $(WEB) && $(NPM) run ds:check
+
+web-lint: web-generated    ## eslint, stylelint, prettier
+	cd $(WEB) && $(NPM) run lint
+
+web-typecheck: web-generated  ## tsc -b, the one type gate
+	cd $(WEB) && $(NPM) run typecheck
+
+web-unit: web-generated    ## vitest (WEB_WORKERS=N caps its workers)
+	cd $(WEB) && $(if $(WEB_WORKERS),VITEST_MAX_WORKERS=$(WEB_WORKERS) )$(NPM) run test
+
+web-storybook: web-generated  ## the Storybook build
+	cd $(WEB) && $(NPM) run storybook:build
+
+web-e2e: web-typecheck     ## production build (once, by Playwright's web server) + e2e
+	cd $(WEB) && $(NPM) run e2e
+
+web-check: web-ds web-lint web-typecheck web-unit web-storybook web-e2e  ## every web gate (in parallel under `make check`; serial: npm run check)
 
 web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke: Vite dev + the real API, empty and golden stores, every route
 	cd $(WEB) && ALGOTRADE_PY=$(abspath $(PY)) npx playwright test -c playwright.real.config.ts
@@ -180,11 +203,38 @@ WEB_DIST ?= var/web
 web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build the API serves (ALGOTRADE_WEB_DIST=var/web); redo after a web change
 	cd $(WEB) && VITE_API_BASE_URL= $(NPM) run build -- --outDir $(abspath $(WEB_DIST)) --emptyOutDir
 
-# One full check per worktree: a second concurrent run refuses (scripts/ops/check_lock.sh).
-check:
-	scripts/ops/check_lock.sh $(MAKE) check-gates
+# ----------------------------------------------------------------------------- the gate (docs/ci.md "Scope-aware make check")
+# `make check` runs the gates for the areas changed vs BASE (python / web / docs, CI's rule:
+# scripts/changed_tests.py --areas), the python and web sides side by side (CHECK_JOBS=2), under
+# the per-worktree lock (scripts/ops/check_lock.sh: a second run here refuses and names the first).
+# FULL=1 runs every gate whatever changed, as the release does. CHECK_SCOPE overrides the detection.
+# Rule 9: sessions run `make changed` and push; CI is the gate. A bare `make check` refuses;
+# SCOPED=1 runs the detected areas, FULL=1 every gate (the release).
+FULL ?=
+SCOPED ?=
+CHECK_JOBS ?= 2
+CHECK_SCOPE ?= $(if $(FULL),python web,$(shell $(PY) scripts/changed_tests.py --areas $(BASE)))
+CHECK_PY = lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering roadmap-check datasets-verify test evaluate
+CHECK_WEB = web-check web-real
+CHECK_DOCS = fitness
+CHECK_TARGETS = $(if $(filter python,$(CHECK_SCOPE)),$(CHECK_PY)) $(if $(filter web,$(CHECK_SCOPE)),$(CHECK_WEB)) $(if $(filter docs,$(CHECK_SCOPE)),$(if $(filter python,$(CHECK_SCOPE)),,$(CHECK_DOCS)))
 
-check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering roadmap-check datasets-verify test evaluate web-check web-real
+check-scope:     ## which areas `make check` would gate for this branch (python / web / docs vs BASE)
+	@echo "$(strip $(CHECK_SCOPE))"
+
+fitness:         ## the architecture fitness tests only (what CI runs for a docs-only change)
+	$(PY) -m pytest -q -n $(WORKERS) tests/architecture
+
+check:           ## refuses by default (rule 9: `make changed`, push, CI gates); SCOPED=1 = the gates of the areas changed vs BASE in parallel, FULL=1 = every gate (the release); one run per worktree
+	@if [ -z "$(FULL)$(SCOPED)" ]; then \
+	  echo "refusing: rule 9 (CLAUDE.md, owner decision 2026-10-08): run \`make changed\` for what changed, push, and let CI gate; the machine never runs the full check." >&2; \
+	  echo "  a deliberate run: \`make check SCOPED=1\` (the areas changed vs $(BASE); \`make check-scope\` lists them) or \`make check FULL=1\` (every gate, the release)." >&2; \
+	  exit 1; \
+	fi
+	scripts/ops/check_lock.sh $(MAKE) --no-print-directory -j$(CHECK_JOBS) check-gates
+
+check-gates: $(strip $(CHECK_TARGETS))  ## the gates of the detected scope (CHECK_SCOPE / FULL=1), run by `make check` under the lock
+	@echo "make check: scope [$(strip $(CHECK_SCOPE))] vs $(BASE); gates run: $^"
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

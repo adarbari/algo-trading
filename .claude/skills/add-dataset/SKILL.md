@@ -44,4 +44,4 @@ settings owner and must drive code (a test checks).
    declaration; add a `Step` to `workflows/nightly/nightly.py` `NIGHTLY` if it runs nightly.
    Helpers it needs stay in the same domain folder (`tests/architecture/test_layout.py`).
    `tests/architecture/test_task_registry.py` checks tables and CLI reachability.
-8. Update `docs/data/storage.md` and run `make check`.
+8. Update `docs/data/storage.md`, run `make changed`, push (CI is the full gate).

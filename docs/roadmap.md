@@ -16,7 +16,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - **Identity (ID, ADR 0040) and hosting (H1, ADR 0044):** ID1-ID4 and H1 done; owner actions (Supabase, Tailscale Funnel, `make web-build`), next ID5 ([ID / H details](#identity-and-hosting-id--h-details)).
 - **Backfills pending** (past sessions read UNKNOWN until run): volume, financials, TA bands and trend, options positioning, call wing and dividends ([Backfills details](#backfills-pending-details)).
 - **Mobile UI (MU, ADR 0052): MU1 and MU2 done** (MU2 in review: the phone follow-ups and the workspace switch moved into the account menu); owner action: `make web-build`, a second phone pass; next MU3 ([MU details](#mobile-ui-mu-details)).
-- **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1, P1b, P2, P3a, P4 done; P3b in review, P4b open; next P5 harness ([Pipeline details](#pipeline-details)).
+- **Pipeline (CI and local speed, [ci.md](ci.md) "Pipeline"):** P1, P1b, P2, P2b (the scope-aware `make check`; rule 9: `make changed`, push, CI is the gate, 2026-10-08), P3a, P4 done; P3b in review, P4b open; next P5 harness ([Pipeline details](#pipeline-details)).
 - **Edges (ED, ADR 0053; plan [edges-plan.md](edges-plan.md)): ED0, ED1 done** (six edge documents, [edges.md](edges.md)); next ED2, the outcomes grain; `architect` reviews ED2 and ED3 ([ED details](#edges-ed-details)).
 
 **Facts**

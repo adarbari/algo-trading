@@ -47,4 +47,4 @@ Before opening the PR (or when the owner wraps up), for each candidate:
    propose that instead of (or with) the wording.
 6. **Show the owner** a short list: each learning, its classification, its home and the
    exact wording. Push nothing until they approve; then one harness PR
-   (`scripts/worktree.sh`, `make check`), never mixed into feature work.
+   (`scripts/worktree.sh`, `make changed`, push; CI gates), never mixed into feature work.

@@ -18,11 +18,15 @@ def test_claude_md_forbids_the_broad_pkills() -> None:
 
 def test_make_check_runs_the_gates_under_the_lock() -> None:
     makefile = (REPO / "Makefile").read_text()
-    assert re.search(
-        r"^check:\n\tscripts/ops/check_lock\.sh \$\(MAKE\) check-gates$", makefile, re.M
+    check = re.search(r"^check:.*?(?=^\S)", makefile, re.S | re.M)
+    assert check and re.search(
+        r"^\tscripts/ops/check_lock\.sh \$\(MAKE\) .*check-gates$", check.group(0), re.M
     )
     gates = re.search(r"^check-gates:(.*)$", makefile, re.M)
-    assert gates and {"lint", "test", "web-check", "web-real"} <= set(gates.group(1).split())
+    assert gates and "$(CHECK_TARGETS)" in gates.group(1)  # scope-aware: docs/ci.md
+    for var, members in (("CHECK_PY", {"lint", "test"}), ("CHECK_WEB", {"web-check", "web-real"})):
+        line = re.search(rf"^{var} = (.*)$", makefile, re.M)
+        assert line and members <= set(line.group(1).split()), var
     assert (REPO / "scripts" / "ops" / "check_lock.sh").stat().st_mode & 0o111
 
 
