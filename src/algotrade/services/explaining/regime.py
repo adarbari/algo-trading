@@ -8,6 +8,7 @@ question is never free text from the page: it is one of the fixed ones or a card
 
 from dataclasses import dataclass
 
+from algotrade.core.model.completion import CallTag
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.explaining.answer import Explanation, ask, verify
 from algotrade.services.explaining.cache import TextCache, cache_key
@@ -54,15 +55,17 @@ def explain_regime(
     asked = WHAT_IS_HAPPENING if chosen is None else chosen.plain_name
     facts = regime_facts(regime, chosen)
     # An answer is kept under the model that gave it (``Completion.model``), and looked up under
-    # each model the chain may answer as, in order: a fallback's answer is never the primary's.
-    for name in model.names:
+    # each model the chain may answer this user as, in order: a fallback's answer is never the
+    # primary's, and a provider limited to some users (the owner's Claude login) never has its
+    # answer served to anyone else.
+    for name in model.names_for(user):
         kept = cache.get(cache_key(regime, asked, name))
         if kept is not None:
             explanation = verify(kept, facts)
             if explanation.checked:
                 return Explained(explanation, True)
     limiter.take(user, "regime explanations")
-    answer = ask(model, facts, asked)
+    answer = ask(model, facts, asked, CallTag("regime-explain", user))
     explanation = verify(answer.text, facts)
     if explanation.checked:
         cache.put(cache_key(regime, asked, answer.model), answer.text)

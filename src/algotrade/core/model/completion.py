@@ -1,7 +1,7 @@
 """``Completion``: what one text-model call returned (ADR 0041, amended 2026-10-08): the text
 and where it came from (the model and provider that answered, the provider the chain fell back
 from, if any), what it cost (tokens as the provider reported them, ``None`` when it did not:
-never ``0``) and how long it took."""
+never ``0``) and how long it took; ``CallTag``: who asks and for what."""
 
 from dataclasses import dataclass
 
@@ -15,3 +15,16 @@ class Completion:
     output_tokens: int | None = None
     latency_s: float = 0.0  # the whole call, retries and fall-backs included
     fell_back_from: str | None = None  # the first provider that failed before this one answered
+    cost_usd: float | None = (
+        None  # a notional cost the provider reported (a subscription's), else None
+    )
+
+
+@dataclass(frozen=True)
+class CallTag:
+    """Who asks and for what, passed by keyword to ``TextModel.complete``: ``use_case``
+    ("screener-draft", "regime-explain") and ``user`` (a registry user id). A provider restricted
+    with ``only_users`` answers only a tagged call by one of them; no user is no one."""
+
+    use_case: str
+    user: str | None = None

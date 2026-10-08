@@ -13,7 +13,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from algotrade.core.model.completion import Completion
+from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.http import HttpError, JsonTransport
 
@@ -45,6 +45,10 @@ class ChatCompletions:
         """The model this answers as: part of a cache key."""
         return (self.model,)
 
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        """Every user may be answered by an unrestricted provider (the chain limits)."""
+        return self.names
+
     @property
     def url(self) -> str:
         return self.base_url.rstrip("/") + COMPLETIONS
@@ -64,7 +68,7 @@ class ChatCompletions:
         # The configured extras follow the standard keys and never replace them.
         return body | {k: v for k, v in self.extra.items() if k not in body}
 
-    def complete(self, system: str, user: str) -> Completion:
+    def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
         started = self.clock()
         body = json.dumps(self.request(system, user), separators=(",", ":")).encode()
         where = f"{self.model} at {self.base_url}"
