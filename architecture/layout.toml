@@ -745,16 +745,16 @@ path = "tests/property"
 purpose = "Hypothesis invariants across every registered strategy and screener"
 
 [[test_dir]]
-path = "tests/scripts/ops"
-purpose = "tests for the operator scripts in scripts/ops/ (deploy)"
-
-[[test_dir]]
 path = "tests/reconciliation"
 purpose = "cross-source reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values (marker reconciliation)"
 
 [[test_dir]]
 path = "tests/scripts"
 purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests, changed_web)"
+
+[[test_dir]]
+path = "tests/scripts/ops"
+purpose = "tests for the operator scripts in scripts/ops/ (deploy)"
 
 # --------------------------------------------------------------------------- config (config/)
 # Every config/site/*.toml is loaded by the one settings loader (config/site/settings.py;
