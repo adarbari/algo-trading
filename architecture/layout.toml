@@ -720,6 +720,10 @@ path = "tests/architecture/api"
 purpose = "fitness tests for the API surface and the read model"
 
 [[test_dir]]
+path = "tests/architecture/pipeline"
+purpose = "fitness tests over the delivery pipeline: the CI workflow's shape, the flaky-spec quarantine list, the local gates that keep a measured speed-up (docs/ci.md Pipeline)"
+
+[[test_dir]]
 path = "tests/contract"
 purpose = "contract suites every implementation of a protocol must pass, one folder per protocol"
 holds = "folders"

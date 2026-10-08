@@ -1,8 +1,15 @@
 /** Vite: dev server, production build and the Vitest runner (ADR 0025). */
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
+
+// Unit test files listed as `skipped` in quarantine.json do not run (docs/ci.md "Flaky specs").
+const quarantine = JSON.parse(
+  readFileSync(new URL('./quarantine.json', import.meta.url), 'utf8'),
+) as { skipped: { kind: string; file: string }[] };
+const quarantinedUnitFiles = quarantine.skipped.filter((q) => q.kind === 'unit').map((q) => q.file);
 
 export default defineConfig({
   plugins: [react()],
@@ -34,6 +41,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'design-system/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
+    exclude: ['**/node_modules/**', ...quarantinedUnitFiles],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     restoreMocks: true,
   },
