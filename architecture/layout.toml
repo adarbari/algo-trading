@@ -742,7 +742,11 @@ purpose = "a real store and engine across every golden dataset"
 
 [[test_dir]]
 path = "tests/scripts"
-purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests, changed_web)"
+purpose = "tests for the machine and store maintenance scripts in scripts/ (doctor, status, worktree, export_catalogue, check_rest_allowlist, session_friction)"
+
+[[test_dir]]
+path = "tests/scripts/gates"
+purpose = "tests for the delivery-pipeline scripts in scripts/ (changed_tests, changed_web, check_lock, check_numbering, merge_main) and the Makefile's gates (split from tests/scripts, at its module cap)"
 
 [[test_dir]]
 path = "tests/reconciliation"

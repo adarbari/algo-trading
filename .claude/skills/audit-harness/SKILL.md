@@ -24,6 +24,6 @@ Read-only until the owner approves. Token figures are chars / 4. Work from `orig
    decision, a process gate).
 5. **Report to the owner** (table form, short), with the savings after the proposed changes
    and the new `CLAUDE.md` size.
-6. **After approval, one harness PR** (worktree `harness/<topic>`, `make check` once). Record
+6. **After approval, one harness PR** (worktree `harness/<topic>`, `make changed`, push; CI gates). Record
    the date: update the "Harness audit: last YYYY-MM-DD" line in `docs/roadmap.md` Now / Next.
    Never merge it yourself.

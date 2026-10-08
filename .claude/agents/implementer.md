@@ -28,7 +28,7 @@ denied), then write `worktree.env` yourself with
 Python with it instead: `env PYTHONPATH=... make check ...`, `env PYTHONPATH=... git commit`
 (the hooks run Python). Check with `python -c "import algotrade; print(algotrade.__file__)"`
 that it imports this worktree's code, not main's. On the shared machine run
-`make check WORKERS=2 WEB_WORKERS=2` (and `pytest -n 2` when running tests directly).
+`make changed` (tests run directly: `pytest -n auto`; never the full `make check`, CI gates).
 
 While writing:
 
@@ -37,7 +37,8 @@ While writing:
 - Verify narrow first: the mirrored test file, then the gate for what you touched
   (`make arch`, `make layout`, `make ownership`, `make dupes`, `make filelen`; web:
   `npm run lint` and `npm run test` in `apps/web`), or `make changed` for both at once. Pipe
-  long output through `tail`. Run `make check` once, before you push.
+  long output through `tail`. Then push: CI is the full gate (CLAUDE.md rule 9); never run
+  the full `make check` on the machine. After a CI failure rerun only that gate locally.
 - Check a web page through its text and accessibility tree first; take a screenshot only
   for a visual state those cannot show, once, at reduced scale.
 

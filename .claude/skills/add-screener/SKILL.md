@@ -45,4 +45,4 @@ Owners are listed in `architecture/ownership.toml`.
    "screener"`, `impl`, `params`, a `selection` preset or inline selection; `schedule =
    "nightly"` if it should run every night). Never filter instruments inside the screener
    itself; that is the selection's job. Check it with `algotrade-backtest config validate <id>`.
-9. Run `make check`.
+9. Run `make changed`, then push: CI is the full gate.

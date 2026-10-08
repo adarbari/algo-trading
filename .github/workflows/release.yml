@@ -17,7 +17,7 @@ jobs:
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-packages --locked
       - name: Full gate
-        run: make check
+        run: make check FULL=1
       - name: Version must match tag
         run: |
           version=$(.venv/bin/python -c "import algotrade; print(algotrade.__version__)")
