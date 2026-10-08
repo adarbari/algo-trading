@@ -71,6 +71,7 @@ jobs:
       - run: make ownership
       - run: make dupes
       - run: make filelen
+      - run: make numbering
       - run: make datasets-verify
       - name: Run every strategy on every golden dataset vs the baseline
         run: make evaluate

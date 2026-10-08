@@ -132,13 +132,17 @@ the skill with the fix.
 8. Secrets come only from environment variables. Never commit credentials.
    Dependencies go in the pyproject of the package that needs them (an app's own, not the
    library's), then `uv lock`; commit `uv.lock`.
-9. Before finishing any change, run `make check`.
+9. Check narrow first (`make changed`: mirrored tests, mapped web checks, fast gates), then run the full
+   `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a failure rerun only the failed
+   gate (`make <gate>` / `npm run <script>`), never the whole `make check` again.
 10. **Push and open the PR yourself, then move on.** When `make check` passes, push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start
     the next work item; do not ask the owner first and do not wait for CI (owner decision
     2026-10-04). Only merging is off limits (below). A harness-learning PR still follows
-    `capture-learning`.
+    `capture-learning`. ADR and web-rule numbers are checked against origin/main
+    (`make numbering`): take the next free number right before the push; `scripts/merge_main.sh`
+    does the merge of main, regenerating generated files on conflict.
     **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
     it `no-automerge`, to keep it open for review. **Never merge yourself**: no
@@ -212,6 +216,9 @@ The owner and CI use the defaults (`WORKERS=auto`).
 
 Token habits (every session):
 
+- **Never `pkill -f make`, `pkill -f node`, `pkill -f vite` or `pkill -f playwright`**: it kills
+  another session's 30-40 min run. Stop your own run by its PID or job; `make check` holds a
+  per-worktree lock (`scripts/ops/check_lock.sh`) and `make doctor` lists the other runs.
 - **One fresh session per work item**; batch related bugs into it. Sonnet for scoped fixes,
   Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
   Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
