@@ -205,9 +205,12 @@ user's expression features with `config validate-features`.
 
 ## Agents, models and tokens (spend tokens where mistakes are expensive)
 
-Match the model to the risk of the task, not its size. Subagents in `.claude/agents/`
-(`scout`, `checker`, `implementer`, `architect`; their descriptions say when) pin their
-model; delegate by name (for an ad hoc agent, pass `model` explicitly).
+Match the model to the risk of the task; subagents in `.claude/agents/` pin theirs, delegate by name:
+- Haiku = `checker` (and `scout` for read-only lookups): runs gates, tails logs, reports failures; never fixes.
+- Sonnet = `implementer`: a scoped change with a known owner and pattern.
+- Opus = `architect`: design and review in architect areas, a bug that survived two fixes.
+- The orchestrating session (Fable or Opus) coordinates, decides design and triages unclear failures; it never runs a long check or rerun itself, it hands them to `checker`.
+No open-source or free model is available for agent work (agents pin Claude models); free models apply only to the product's text-model seam (`config/site/llm.toml`).
 
 Quality is not traded for tokens: the cheaper model never decides design, `make check`
 gates every change whatever wrote it, a change in an `architect` area (new responsibility /

@@ -55,3 +55,11 @@ def test_only_the_label_setter_removes_the_label() -> None:
         text = _flat(*parts)
         assert "Only the session that set `no-automerge` or `needs-owner` removes it" in text
         assert "an agent never removes a label it did not set" in text, parts
+
+
+def test_claude_md_names_the_four_model_tiers() -> None:
+    text = _flat("CLAUDE.md")
+    section = text[text.index("## Agents, models and tokens") :]
+    for tier in ("Haiku = `checker`", "Sonnet = `implementer`", "Opus = `architect`",
+                 "orchestrating session"):  # fmt: skip
+        assert tier in section, f"CLAUDE.md must name the tier: {tier}"
