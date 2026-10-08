@@ -1,0 +1,129 @@
+/* StatusStrip: a slim full-width line under the top bar; its list is one row per issue. */
+.strip {
+  container-type: inline-size;
+  border-block-end: var(--border-width-thin) solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.bar {
+  display: flex;
+  gap: var(--space-2-5);
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--density-control-height);
+  margin: 0;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+}
+
+.bar[data-action] {
+  cursor: pointer;
+}
+
+.bar[data-action]:hover {
+  background: var(--color-row);
+}
+
+.summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more {
+  flex: none;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.chevron {
+  display: inline-flex;
+  flex: none;
+  margin-inline-start: auto;
+  transition: transform var(--duration-fast) var(--easing-standard);
+}
+
+.bar[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding-block: var(--space-1) var(--space-3);
+  padding-inline: var(--space-4);
+  list-style: none;
+}
+
+.issue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-inline-start-width: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.issue[data-severity='failing'] {
+  border-inline-start-color: var(--color-negative);
+}
+
+.issue[data-severity='warning'] {
+  border-inline-start-color: var(--color-warning);
+}
+
+.text {
+  display: flex;
+  flex: 1 1 var(--size-search);
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.detail {
+  color: var(--color-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+@container (width < 480px) {
+  .bar {
+    padding-inline: var(--space-3);
+  }
+
+  .more {
+    display: none;
+  }
+
+  .list {
+    padding-inline: var(--space-3);
+  }
+
+  .text {
+    flex-basis: 100%;
+  }
+}

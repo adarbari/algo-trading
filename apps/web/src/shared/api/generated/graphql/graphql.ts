@@ -418,6 +418,11 @@ export type ScreenerResultsQueryVariables = Exact<{
 
 export type ScreenerResultsQuery = { session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, latestRun: { runId: string, session: string, previousSession: string | null, status: string | null, coverage: string | null, regime: string | null, paused: number, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, kindTexts: Array<{ kind: UnavailableKind, text: string }>, results: Array<{ instrumentId: string, rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
 
+export type StatusScreensQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type StatusScreensQuery = { ideas: { session: string, screeners: Array<{ screener: { id: string, name: string }, notRun: { code: UnknownCode, kindText: string } | null }> } | null };
+
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -2395,6 +2400,23 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenerResultsQuery, ScreenerResultsQueryVariables>;
+export const StatusScreensDocument = new TypedDocumentString(`
+    query StatusScreens {
+  ideas(limit: 1) {
+    session
+    screeners {
+      screener {
+        id
+        name
+      }
+      notRun {
+        code
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<StatusScreensQuery, StatusScreensQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {
