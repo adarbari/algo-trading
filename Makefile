@@ -20,6 +20,9 @@ doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web d
 status:          ## PRs + CI, running ingest jobs, last nightly, store latest session, dev servers (~15 lines, read-only)
 	@$(if $(wildcard $(PY)),$(PY),python3) scripts/status.py
 
+friction:        ## what slowed the last sessions down (SINCE=YYYY-MM-DD, default 7 days): blocked / failing tool calls, gate runs vs failures, retries, owner corrections; report under var/harness/friction/ (read-only)
+	@$(if $(wildcard $(PY)),$(PY),python3) scripts/session_friction.py $(if $(SINCE),--since $(SINCE))
+
 install: no-shared-venv  ## library + every app + dev tools into .venv, exactly as locked
 	$(UV) sync --all-packages --locked
 	$(BIN)pre-commit install
