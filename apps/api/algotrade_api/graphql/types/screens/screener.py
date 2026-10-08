@@ -21,6 +21,7 @@ from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.availability import Unavailable
+from algotrade_api.graphql.types.evaluation.track_record import TrackRecord
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.screens.result import ChangeCount, ScreenResultPage
 
@@ -198,3 +199,12 @@ class Screener:
     async def not_run(self, info: Info) -> Unknown | None:
         found = await self.ctx.loaders.screener_latest_run.load((self.owner, self.id))
         return Unknown.of(found.not_run) if found.not_run is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Its record over the frozen period of each edge that lists it, by edge id, "
+        "from that edge's canonical run (never an exploratory run); an edge without one has an "
+        "entry whose `notRun` says why; empty: no edge lists it"
+    )
+    async def track_records(self, info: Info) -> list[TrackRecord]:
+        found = await self.ctx.loaders.track_records.load((self.id,))
+        return [TrackRecord.of(t) for t in found]

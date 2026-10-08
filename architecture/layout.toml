@@ -324,6 +324,11 @@ purpose = "why a fact is not available, and who may know (ADR 0056): the public 
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/evaluation"
+purpose = "read objects over the edge evaluation (ADR 0053): the edge documents with their status, an edge's committed evaluation runs and their rows (read by run: results/edge_eval is partitioned by the range end), and a screener's track record from the canonical run's frozen slice"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/events"
 purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -481,6 +486,11 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types"
 purpose = "GraphQL object types, one module per domain read object, split by area (instruments/, events/, screens/, ops/); here only the Query root, Session and the shared Unavailable / Cause (availability.py, ADR 0056): fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/evaluation"
+purpose = "GraphQL types over the edge evaluation (mirrors services/read/evaluation): Edge, EdgeRun, EdgeRow, TrackRecord"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
