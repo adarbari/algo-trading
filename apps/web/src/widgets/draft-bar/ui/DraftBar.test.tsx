@@ -73,6 +73,27 @@ describe('DraftBar', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('links a copy of a site preset, and the preset itself, to the preset’s playbook', () => {
+    const { unmount } = setup();
+    expect(screen.getByRole('link', { name: 'Playbook' })).toHaveAttribute(
+      'href',
+      '/guide/playbooks/vrp',
+    );
+    unmount();
+    state.builder = builder({ id: 'vrp_scanner', preset: { id: 'vrp_scanner', version: 1 } });
+    setup();
+    expect(screen.getByRole('link', { name: 'Playbook' })).toHaveAttribute(
+      'href',
+      '/guide/playbooks/vrp_scanner',
+    );
+  });
+
+  it('has no playbook link on a screen that copies no preset', () => {
+    state.builder = builder({}, { preset: null });
+    setup();
+    expect(screen.queryByRole('link', { name: 'Playbook' })).toBeNull();
+  });
+
   it('says unsaved changes and saves or discards them', async () => {
     state.builder = builder({ dirty: true });
     setup();

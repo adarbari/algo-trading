@@ -53,7 +53,8 @@ in `index.ts`; inner folders are segments named for their kind (`ui`, `model`, `
 `config`). Every folder is declared as a `[[web_dir]]` in `architecture/web_layout.toml`.
 
 ### Workspaces and routes
-Two workspaces, switched in a **horizontal top bar** (not a sidebar):
+Two workspaces, each with its sections in a **horizontal top bar** (not a sidebar); the switch
+between them sits in the account menu (ADR 0052 amendment, 2026-10-07), not in the bar:
 - **TRADER** (default): Ideas (home: screeners in the user's priority order + a combined ranked
   top-ideas list), Screeners (builder: hard / soft criteria, thresholds, weights, live preview,
   save / finalize), Explore (one page replacing separate universe / instrument / chain /

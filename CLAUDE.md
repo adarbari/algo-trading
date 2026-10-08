@@ -39,6 +39,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Natural-language screener drafts**: a sentence becomes a draft rule screen through one `TextModel` protocol (`services/text_model`, also behind the on-demand regime explanation in `services/explaining`) and the one OpenAI-compatible adapter in `algotrade_sources/llm` (provider by `config/site/llm.toml` `base_url`; key only from `ALGOTRADE_LLM_API_KEY`; off by default); the prompt is the sentence, the catalogue, the phrasebook and the field guide (`config/site/field_guide/*.toml`: how to read each field, the criterion per intent, the caveats; rendered to `docs/data/field-guide.md` by `make features-doc`); invented fields are dropped with a reason, the rest validated as finalise; a draft the Builder loads, never a write or a run. (ADR 0041)
 - **The Guide** (`/guide`, a utility link on the right of the top bar): every explanation is written once as a Guide entry in site config (fields, situations, regime indicators and episodes, playbooks, glossary, how-to) and a page shows it only through `InfoButton` + `HelpDrawer` given an entry reference, never text; no explanatory prose in `apps/web/src` (shrink-only baseline `architecture/web_prose.toml`); spec `docs/ui/guide.md`, mechanics `.claude/skills/add-guide-content`. (ADR 0051)
 - **Event sensitivity**: what moves a name is measured per event class (own, peer, macro, market structure, unscheduled, factor-dated) as catalogue features over the scope list `config/site/events/scope.toml` plus tier A / B names; every event row carries `known_from` (read as `known_from <= S`; statistics only over events complete by S); unscheduled moves are attributed from 8-K items, then capped headlines through the text-model seam, then the owner-run deep-dive skill whose dossier enters through `dossier-import` (ingestion stays the writer); plan `docs/event-sensitivity-plan.md`. (ADR 0050)
+- **Edges**: an edge is a typed document `config/site/edges/<id>.toml` (thesis, persistence reason, outcome, schedule, frozen period) whose screeners are its implementations; outcomes are a grain `outcomes/instrument/<name>@v1` (`session_date` = start session, `knowledge_ts` = window close) written only by ingestion and read only by `data/outcomes`, importable only from `services/evaluation` (the one exception to the one-session rule); one cross-section harness scores each screener point in time (hit rate vs base rate, lift, decile spread, frozen period, trial log; statistics in `quant/`); ML proposes and implements, never judges; plan `docs/edges-plan.md`. (ADR 0053)
 - **Ingestion workflows** by cadence: `market-daily` (gates screens), weekly `reference`, `enrichment`. A step declares `needs` and runs only when they SUCCEEDED; it SUCCEEDS or FAILS by its acceptance checks (thresholds in `sources.toml [quality]`), never PARTIAL; a failed critical step holds back the workflow and every later session until it succeeds or is waived by hand (`--waive`). (ADR 0039)
 
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
@@ -98,9 +99,9 @@ entities -> shared -> @algotrade/ui`: it imports only downward, other slices onl
 `index.ts`, never a sibling slice; it renders no HTML elements and passes no `className` /
 `style`; no CSS files, colours or px outside the design system; only `src/shared/api` talks HTTP
 (client generated from the API's OpenAPI document), data through Query hooks in entities /
-features; only `src/app` routes. Two workspaces in a horizontal top bar: TRADER (Ideas,
-Screeners, Explore, Backtests) and ADMIN (Ingestion, Screener runs, Users & configs); role
-gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (FINAL, approved
+features; only `src/app` routes. Two workspaces, their sections in a horizontal top bar, the switch
+in the account menu: TRADER (Ideas, Screeners, Explore, Backtests) and ADMIN (Ingestion,
+Screener runs, Users & configs); role gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (FINAL, approved
 mockups 2026-10-03) -> primitives -> components -> screens; screens lay out and set text only
 with the primitives (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden).
 Every folder is a `[[web_dir]]` in `architecture/web_layout.toml`. Lint messages name the rule and
@@ -175,6 +176,7 @@ the skill with the fix.
 | New REST endpoint (writes, jobs, live, files only) | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
+| Start of day: what slowed the last sessions down, top 3 fixed before new work | `.claude/skills/review-sessions` (`/review-sessions`, `make friction`) |
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
@@ -223,6 +225,10 @@ Token habits (every session):
   Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
   Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
   separate tasks.
+- **Never `sleep` to poll a log** (28 blocked calls in one week): run a check in the
+  foreground piped through `tail` (timeout up to 10 min), or background it and wait for the
+  harness's completion notice; judge a backgrounded make by its log tail, not the task exit
+  code. `Monitor` is a deferred tool: load it with `ToolSearch` (`select:Monitor`) first.
 - **Ingestion / backfill runs longer than ~2 h run detached** (`nohup` script writing a status
   file under `var/logs/`; README "Long runs"), never as a tool background command (killed at
   its limit).
@@ -247,3 +253,5 @@ Token habits (every session):
 
 Harness audit: `/audit-harness` (`.claude/skills/audit-harness`); `/start` flags one older than
 30 days (date in `docs/roadmap.md` Now / Next), `/wrap-up` triggers it at CLAUDE.md >= 290 lines.
+Session review: `/review-sessions` (`make friction` over the transcripts, then the top 3 fixed in
+one harness PR); `/start` runs it when the "Session review: last" date is before today.

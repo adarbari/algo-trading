@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import { useGuideField, useGuideIndex } from './hooks';
+import { useGuideField, useGuideIndex, useGuidePlaybook, useGuideSituation } from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -45,5 +45,31 @@ describe('guide hooks', () => {
     const [document, variables] = GQL.mock.calls[0] ?? [];
     expect(String(document)).toContain('query GuideField');
     expect(variables).toEqual({ name: 'feature.x' });
+  });
+
+  it('reads a playbook by its preset id', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({ guidePlaybook: { id: 'breakout', criteria: [] } });
+    const { result } = renderHook(() => useGuidePlaybook('breakout'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data?.id).toBe('breakout');
+    const [document, variables] = GQL.mock.calls[0] ?? [];
+    expect(String(document)).toContain('query GuidePlaybook');
+    expect(variables).toEqual({ id: 'breakout' });
+  });
+
+  it('reads a situation by its slug', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({ guideSituation: null });
+    const { result } = renderHook(() => useGuideSituation('earnings-gap'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data).toBeNull();
+    const [document, variables] = GQL.mock.calls[0] ?? [];
+    expect(String(document)).toContain('query GuideSituation');
+    expect(variables).toEqual({ slug: 'earnings-gap' });
   });
 });
