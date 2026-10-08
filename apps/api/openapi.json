@@ -347,6 +347,50 @@
         "title": "DroppedCriterion",
         "type": "object"
       },
+      "EvaluationSplitBody": {
+        "properties": {
+          "split_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the first session of the test slice (a stored session); null: clear it",
+            "title": "Split From"
+          }
+        },
+        "required": [
+          "split_from"
+        ],
+        "title": "EvaluationSplitBody",
+        "type": "object"
+      },
+      "EvaluationSplitSaved": {
+        "properties": {
+          "split_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the split now saved (null: none)",
+            "title": "Split From"
+          }
+        },
+        "required": [
+          "split_from"
+        ],
+        "title": "EvaluationSplitSaved",
+        "type": "object"
+      },
       "ExplainBody": {
         "properties": {
           "card": {
@@ -2058,6 +2102,67 @@
         "summary": "Live Chain",
         "tags": [
           "chains"
+        ]
+      }
+    },
+    "/evaluation/split": {
+      "put": {
+        "operationId": "save_split_evaluation_split_put",
+        "parameters": [
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationSplitBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationSplitSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Split",
+        "tags": [
+          "edges"
         ]
       }
     },
