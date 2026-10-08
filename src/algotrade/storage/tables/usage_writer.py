@@ -1,6 +1,6 @@
-"""Writer limited to ``usage/*`` tables: what the API's text model spent (ADR 0057).
+"""Writer limited to ``usage/*`` tables: what the API's text model spent (ADR 0058).
 
-The API's fifth write (ADR 0005, amended by ADR 0028 for ``live/*`` and ADR 0057):
+The API's fifth write (ADR 0005, amended by ADR 0028 for ``live/*`` and ADR 0058):
 it records every text-model attempt, and only through this writer, which refuses every table
 outside ``usage/``. Each write belongs to a run and is published atomically: pending until the
 run commits its partitions together, dropped if it fails (``publishing``, ADR 0022).

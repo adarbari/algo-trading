@@ -2,7 +2,7 @@
 and where it came from (the model and provider that answered, the provider the chain fell back
 from, if any), what it cost (tokens as the provider reported them, ``None`` when it did not:
 never ``0``) and how long it took; ``CallTag``: who asks and for what; ``Attempt``: one
-provider asked once, what the usage log records (ADR 0057)."""
+provider asked once, what the usage log records (ADR 0058)."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -37,7 +37,7 @@ class CallTag:
 
 @dataclass(frozen=True)
 class Attempt:
-    """One provider asked once for one call (ADR 0057): when (UTC), who answered or failed
+    """One provider asked once for one call (ADR 0058): when (UTC), who answered or failed
     (``provider``, ``model``), for whom and what (``use_case``, ``user``), the ``outcome``
     (``OUTCOMES``: ``ok``, ``failed``, ``fell_back`` = answered after an earlier provider
     failed, ``skipped_budget`` = not asked: the budget is spent), how long the attempt took,

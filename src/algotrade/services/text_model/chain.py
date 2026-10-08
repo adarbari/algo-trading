@@ -11,7 +11,7 @@ worst case, so the fallback always gets its turn). A member restricted to some u
 (``only_users``, ADR 0041 amended 2026-10-08, the Claude Code login) is skipped, without being
 asked, for any other user and for a call with no user; ``names_for(user)`` lists only the
 models that user may be answered by, so a cache never serves them another user's answer.
-An optional ``CallLedger`` (ADR 0057) sees every attempt, the failed ones too, and may refuse
+An optional ``CallLedger`` (ADR 0058) sees every attempt, the failed ones too, and may refuse
 a call or skip the members that spend when the budget is used up; it never raises into the
 chain (a bug in recording must not stop an answer)."""
 

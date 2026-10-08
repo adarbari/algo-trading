@@ -1,4 +1,4 @@
-# ADR 0057: LLM usage log, prices and budget
+# ADR 0058: LLM usage log, prices and budget
 
 **Status:** accepted (2026-10-08, owner ask: track text-model tokens and cost so spend never
 blows up). Amends [0005](0005-ingestion-is-the-only-writer.md) (a new API write, after

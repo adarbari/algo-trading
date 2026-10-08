@@ -1,5 +1,5 @@
 """Record text-model usage in the background: ``usage/llm_calls``, one atomic run per batch
-(ADR 0057), as the live-quote recorder does (``services/live/recorder.py``, ADR 0028).
+(ADR 0058), as the live-quote recorder does (``services/live/recorder.py``, ADR 0028).
 
 The chain answers first and records afterwards: ``submit`` puts a row on a bounded queue and
 returns at once (a full queue drops the row, logged, and a recorder that raises is caught: a

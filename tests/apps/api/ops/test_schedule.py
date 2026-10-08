@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from algotrade_api import cli
-from algotrade_api.ops.schedule import LABEL, api_plist
+from algotrade_api.ops.schedule import DEPLOY_LABEL, LABEL, api_plist, deploy_plist
 
 
 def test_the_agent_serves_on_loopback_and_is_kept_alive() -> None:
@@ -53,3 +53,46 @@ def test_schedule_warns_when_authentication_is_off(
     monkeypatch.setenv("ALGOTRADE_AUTH", "off")
     cli.main(["schedule"])
     assert "ALGOTRADE_AUTH=supabase" in json.loads(capsys.readouterr().out)["note"]
+
+
+def _tools(tmp_path: Path, *names: str) -> str:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    for name in names:
+        (bin_dir / name).write_text("#!/bin/sh\n")
+        (bin_dir / name).chmod(0o755)
+    return str(bin_dir)
+
+
+def test_the_deploy_agent_polls_origin_main_every_five_minutes(tmp_path: Path) -> None:
+    path = _tools(tmp_path, "uv", "npm", "git")
+    agent = plistlib.loads(deploy_plist(Path("/repo"), path))
+    assert agent["Label"] == DEPLOY_LABEL == "com.algotrade.deploy"
+    assert agent["ProgramArguments"] == ["/bin/bash", "/repo/scripts/ops/deploy.sh", "--auto"]
+    assert agent["StartInterval"] == 300 and agent["RunAtLoad"] is True
+    assert agent["WorkingDirectory"] == "/repo"
+    assert agent["StandardOutPath"] == agent["StandardErrorPath"] == "/repo/var/logs/deploy.log"
+    assert agent["EnvironmentVariables"] == {"PATH": path}
+    assert "KeepAlive" not in agent
+
+
+def test_the_deploy_agent_refuses_a_path_without_the_tools(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="npm"):
+        deploy_plist(Path("/repo"), _tools(tmp_path, "uv", "git"))
+    with pytest.raises(ValueError, match="interval"):
+        deploy_plist(Path("/repo"), _tools(tmp_path, "uv", "npm", "git"), 0)
+
+
+def test_schedule_agent_deploy_writes_its_own_plist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    monkeypatch.setenv("PATH", _tools(tmp_path, "uv", "npm", "git"))
+    cli.main(["schedule", "--agent", "deploy"])
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["written"] == str(Path("var") / f"{DEPLOY_LABEL}.plist")
+    assert (tmp_path / plan["written"]).exists() and not (
+        tmp_path / "var" / f"{LABEL}.plist"
+    ).exists()
+    assert any(line.startswith("launchctl bootstrap") for line in plan["install"])

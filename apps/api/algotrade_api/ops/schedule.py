@@ -8,13 +8,20 @@ exactly as the nightly does; it binds a loopback address only (Tailscale Funnel 
 it), starts at login (``RunAtLoad``) and is restarted by launchd whenever it exits
 (``KeepAlive``). Logs go to ``var/logs/api.log`` and ``api.err.log``. ``restart_command``
 is the one way to name the restart (printed, never run, by the build-identity checks).
+
+``deploy_plist`` is the second agent (ADR 0057): every five minutes it runs
+``scripts/ops/deploy.sh --auto`` from the checkout, which deploys what origin/main gained.
 """
 
 import os
 import plistlib
+import shutil
 from pathlib import Path
 
 LABEL = "com.algotrade.api"
+DEPLOY_LABEL = "com.algotrade.deploy"
+DEPLOY_INTERVAL_S = 300
+DEPLOY_TOOLS = ("uv", "npm", "git")  # the deploy runs these; launchd's PATH has none of them
 HOST = "127.0.0.1"  # loopback only: Funnel (or a browser on this Mac) is the way in
 DEFAULT_PORT = 8000
 
@@ -38,6 +45,28 @@ def api_plist(repo: Path, port: int = DEFAULT_PORT) -> bytes:
         "KeepAlive": True,  # restarted whenever it exits (launchd throttles a crash loop)
         "StandardOutPath": str(logs / "api.log"),
         "StandardErrorPath": str(logs / "api.err.log"),
+    }
+    return plistlib.dumps(agent)
+
+
+def deploy_plist(repo: Path, path: str, interval_s: int = DEPLOY_INTERVAL_S) -> bytes:
+    """The deploy agent for the checkout at ``repo``: ``deploy.sh --auto`` every ``interval_s``
+    seconds (and at load) with ``path`` as its PATH. Refuses a PATH without uv, npm and git."""
+    if interval_s < 1:
+        raise ValueError(f"invalid interval {interval_s}")
+    missing = [t for t in DEPLOY_TOOLS if shutil.which(t, path=path) is None]
+    if missing:
+        raise ValueError(f"{', '.join(missing)} not found on PATH {path!r}: the deploy needs them")
+    log = repo / "var" / "logs" / "deploy.log"
+    agent: dict[str, object] = {
+        "Label": DEPLOY_LABEL,
+        "ProgramArguments": ["/bin/bash", str(repo / "scripts" / "ops" / "deploy.sh"), "--auto"],
+        "WorkingDirectory": str(repo),
+        "RunAtLoad": True,
+        "StartInterval": interval_s,
+        "StandardOutPath": str(log),
+        "StandardErrorPath": str(log),
+        "EnvironmentVariables": {"PATH": path},
     }
     return plistlib.dumps(agent)
 

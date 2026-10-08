@@ -144,7 +144,7 @@ contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR
 
 [[dir]]
 path = "src/algotrade/data/usage"
-purpose = "reads of the usage grain (usage/, ADR 0057): what the API's text model spent, over a date range; seeds the budget ledger and feeds the Admin usage page"
+purpose = "reads of the usage grain (usage/, ADR 0058): what the API's text model spent, over a date range; seeds the budget ledger and feeds the Admin usage page"
 
 [[dir]]
 path = "src/algotrade/engines"
@@ -269,11 +269,15 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/)"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); learned edge scorers (training/)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
 purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them) and its results/edge_eval rows and report"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/training"
+purpose = "learned edge scorers (ADR 0053 amendment, ED7): the training frame (frame.py, with the harness the only importer of outcomes: features at D, the edge's hit at S, windows closed before frozen_from less one horizon), the probit fit on standardised features (fit.py) and the TOML expression feature that carries its coefficients (render.py)"
 
 [[dir]]
 path = "src/algotrade/services/events"
@@ -324,6 +328,11 @@ purpose = "why a fact is not available, and who may know (ADR 0056): the public 
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/evaluation"
+purpose = "read objects over the edge evaluation (ADR 0053): the edge documents with their status, an edge's committed evaluation runs and their rows (read by run: results/edge_eval is partitioned by the range end), and a screener's track record from the canonical run's frozen slice"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/events"
 purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -370,10 +379,10 @@ contracts = ["Layout: use-case packages are independent (backtests, screening, a
 
 [[dir]]
 path = "src/algotrade/services/text_model"
-purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08), with the usage ledger (prices, budget) and the background recorder of usage/llm_calls (ADR 0057); no vendor, no market-data writer, no jobs"
+purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08), with the usage ledger (prices, budget) and the background recorder of usage/llm_calls (ADR 0058); no vendor, no market-data writer, no jobs"
 contracts = [
-    "Text-model usage writes only usage/* tables: no market-data writer, no jobs (ADR 0057)",
-    "Only the text-model usage recorder imports the usage writer (ADR 0057)",
+    "Text-model usage writes only usage/* tables: no market-data writer, no jobs (ADR 0058)",
+    "Only the text-model usage recorder imports the usage writer (ADR 0058)",
 ]
 
 [[dir]]
@@ -488,6 +497,11 @@ purpose = "GraphQL object types, one module per domain read object, split by are
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
+path = "apps/api/algotrade_api/graphql/types/evaluation"
+purpose = "GraphQL types over the edge evaluation (mirrors services/read/evaluation): Edge, EdgeRun, EdgeRow, TrackRecord"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/graphql/types/events"
 purpose = "GraphQL types about events (mirrors services/read/events): Event, InstrumentEvents (ahead, filings, expiry ladder, fund reference, gaps) and EventCalendar"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
@@ -524,7 +538,7 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 
 [[dir]]
 path = "apps/api/algotrade_api/ops"
-purpose = "operating the API on a host: the launchd agent that keeps it serving (ADR 0044)"
+purpose = "operating the API on a host: the launchd agents (the API kept serving, the auto-deploy poll) and the deploy cycle (ADR 0044, ADR 0057)"
 
 [[dir]]
 path = "apps/api/algotrade_api/routes"
@@ -583,7 +597,7 @@ purpose = "algotrade-ingest: argument parsing (main) and command bodies (command
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/ops"
-purpose = "operating the app on a host: scheduling the nightly run"
+purpose = "operating the app on a host: scheduling the nightly run, the deploy hold (ADR 0057)"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks"
@@ -814,7 +828,7 @@ purpose = "L3 field guide, one <theme>.toml per theme plus situations.toml: how 
 
 [[config_dir]]
 path = "config/site/features"
-purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3)"
+purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3); ; fit-edge-scorer (ADR 0053, ED7) writes edge_scores.toml here once a fit has 40 sessions"
 
 [[config_dir]]
 path = "config/site/edges"

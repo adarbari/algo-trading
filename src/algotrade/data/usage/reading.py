@@ -1,7 +1,7 @@
 """Read the text-model usage log (``usage/llm_calls``, written by the API's usage recorder) for
 a range of exchange calendar dates: every attempt, and the money spent per day. A day with no
 partition has nothing recorded; a null ``cost_usd`` (a call whose cost is unknown) adds nothing
-to a sum and is never read as $0 anywhere else (ADR 0057)."""
+to a sum and is never read as $0 anywhere else (ADR 0058)."""
 
 from datetime import date, datetime
 from typing import cast

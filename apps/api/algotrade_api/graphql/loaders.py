@@ -16,6 +16,7 @@ from anyio import to_thread
 from strawberry.dataloader import DataLoader
 
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.evaluation.track_record import TrackRecord, load_track_records_for
 from algotrade.services.read.events.instrument_events import (
     InstrumentEvents,
     load_instrument_events,
@@ -109,6 +110,10 @@ class Loaders:
         self.series: DataLoader[SeriesKey, FeatureSeries] = _loader(load_series, ctx)
         self.screener_hits: DataLoader[tuple[str], tuple[ScreenerHit, ...]] = _loader(
             load_screener_hits, ctx
+        )
+
+        self.track_records: DataLoader[tuple[str], tuple[TrackRecord, ...]] = _loader(
+            load_track_records_for, ctx
         )
 
         async def latest_runs(keys: list[RunKey]) -> list[LatestRun]:

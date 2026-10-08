@@ -1,5 +1,5 @@
 """``UsageLedger``: what every text-model attempt cost, and whether the budget allows the next
-one (ADR 0057). The chain (``chain.py``) asks it before each provider (``admit``) and tells it
+one (ADR 0058). The chain (``chain.py``) asks it before each provider (``admit``) and tells it
 each ``Attempt`` (``record``). Every ambiguity fails closed for a provider that spends; a free
 provider keeps answering.
 

@@ -1,5 +1,5 @@
 """``UsageWriter``: only ``usage/*`` tables, every write pending until its run commits (ADR 0022,
-ADR 0057); the table's schema keeps unknown tokens and cost null."""
+ADR 0058); the table's schema keeps unknown tokens and cost null."""
 
 from datetime import UTC, date, datetime
 

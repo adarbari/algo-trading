@@ -17,7 +17,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 ## Settled decisions (one line each; the ADR has the detail)
 
 - **Four apps, one repo** (`apps/{ingestion,backtest,api,web}`): they never import each other; they share `src/algotrade/` and talk through storage (HTTP for web to api). (ADR 0004)
-- **Writes**: ingestion writes market and feature data. The API writes only user configs (ADR 0029), its live-quote log (ADR 0028) and the results of a screener run on request (ADR 0033), a derived cache of regime explanations (ADR 0041) and its text-model usage log (ADR 0057). (ADR 0005)
+- **Writes**: ingestion writes market and feature data. The API writes only user configs (ADR 0029), its live-quote log (ADR 0028) and the results of a screener run on request (ADR 0033), a derived cache of regime explanations (ADR 0041) and its text-model usage log (ADR 0058). (ADR 0005)
 - **Vendor sources are a shared package** `libs/sources/algotrade_sources/` (vendor SDKs live there): ingestion uses it for batch pulls, the API for live quotes; backtests and the library never import it. (ADR 0027)
 - **Storage by grain** behind `Protocol` interfaces, Parquet locally; no code outside `storage/backends/` builds a path. (ADR 0006)
 - **Point-in-time**: rows carry `ts`, `session_date`, `knowledge_ts`, `source`, `run_id`; features are `name@version`, precomputed nightly. (ADR 0007)

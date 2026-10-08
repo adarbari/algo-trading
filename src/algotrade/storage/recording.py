@@ -1,5 +1,5 @@
 """``BatchRecorder``: the background batch writer both of the API's recorders are (the live
-quotes, ADR 0028; the text-model usage, ADR 0057). Written once here.
+quotes, ADR 0028; the text-model usage, ADR 0058). Written once here.
 
 The caller answers first and records afterwards: ``submit`` puts an item on a bounded queue and
 returns at once (a full queue drops the item, logged; a request never waits on storage). One

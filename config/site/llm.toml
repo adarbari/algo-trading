@@ -77,7 +77,7 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 # model = "gemini-2.5-flash"
 
-# Prices and budget (ADR 0057). Every call is logged (usage/llm_calls: tokens, latency, cost).
+# Prices and budget (ADR 0058). Every call is logged (usage/llm_calls: tokens, latency, cost).
 # A remote provider's model needs a [[price]] (USD per million tokens) or `free = true` (a free
 # tier): a model without one makes this file refuse to load, because a missing price must not
 # count as $0. A local server (Ollama) is free without one; `claude-cli` counts the notional cost

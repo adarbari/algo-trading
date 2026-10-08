@@ -98,7 +98,7 @@ class ProviderSettings:
 
 @dataclass(frozen=True)
 class Rate:
-    """What a provider's calls cost (ADR 0057): ``basis`` ``price`` (per million tokens, the
+    """What a provider's calls cost (ADR 0058): ``basis`` ``price`` (per million tokens, the
     ``[[price]]`` of its model), ``reported`` (a subscription login, ``claude-cli``: the notional
     cost Claude Code reports) or ``free`` (a local server, or a model declared ``free = true``)."""
 
@@ -173,7 +173,7 @@ class LlmSettings:
             raise ConfigurationError(
                 f"llm.toml provider {provider.id}: no [[price]] for model {provider.model!r}; "
                 "add its price per million tokens, or `free = true` for a free tier (a missing "
-                "price must not count as $0, ADR 0057)"
+                "price must not count as $0, ADR 0058)"
             )
         if price.free:
             return Rate(FREE)

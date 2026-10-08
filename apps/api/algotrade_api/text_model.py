@@ -11,7 +11,7 @@ reason. A ``llm.toml`` that does not load, or a chain with no usable provider, i
 logged at ERROR, the text model off with the message as the reason, and the rest of the API
 starts. A ``claude-cli`` provider (the owner's own Claude Code login, run headless) needs no
 key and is wired with ``only_users``: the chain skips it for every other user. Every attempt
-goes through one ``UsageLedger`` (ADR 0057): priced from ``[[price]]`` (a paid remote provider
+goes through one ``UsageLedger`` (ADR 0058): priced from ``[[price]]`` (a paid remote provider
 without one is a ``ConfigurationError``), recorded in the background to ``usage/llm_calls`` when
 the store's ``data_url`` is given, and held to ``[budget]``, its counters seeded from the store
 at startup; so even a single provider is wrapped in the chain."""

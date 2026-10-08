@@ -317,7 +317,7 @@ LIVE_OPTION_QUOTES = _fixed(
     runs="merge",
     retention_days=7,  # [sources] live_retention_days overrides the window
 )
-# The text-model usage log (ADR 0057, the API's fifth write): one row per provider
+# The text-model usage log (ADR 0058, the API's fifth write): one row per provider
 # attempt of a call (the failed and the budget-skipped ones too), one partition per exchange
 # calendar date of the call. Runs merge (each is a batch of attempts; all kept). Tokens, cost
 # and ``fell_back_from`` are null when unknown or not applicable, never 0: ``cost_basis`` says
