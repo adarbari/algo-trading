@@ -14,6 +14,15 @@ vi.mock('@/entities/screen', async (importOriginal) => ({
   useScreeners: hooks.useScreeners,
   useMyScreeners: hooks.useMyScreeners,
 }));
+vi.mock('@/entities/edge', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    ScreenerTrackChip: ({ screenerId }: { screenerId: string }) => (
+      <Text>{`record of ${screenerId}`}</Text>
+    ),
+  };
+});
+vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null }));
 vi.mock('@/features/screener-copy', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
@@ -117,6 +126,14 @@ describe('ScreenerList', () => {
         .querySelector('button'),
     ).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it("shows each rule screener's track-record chip in both tables", () => {
+    setup();
+    const mine = within(screen.getByRole('grid', { name: 'Your screeners' }));
+    expect(mine.getByText('record of my-vrp')).toBeInTheDocument();
+    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
+    expect(presets.getAllByText(/^record of /).length).toBeGreaterThan(0);
   });
 
   it('links every rule-screen preset to its playbook in the Guide, and Python screeners to none', () => {

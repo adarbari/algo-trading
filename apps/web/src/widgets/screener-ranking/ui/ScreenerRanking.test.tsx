@@ -15,6 +15,14 @@ vi.mock('@/entities/idea', async (importOriginal) => ({
   useIdeas: hooks.useIdeas,
 }));
 
+vi.mock('@/entities/edge', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    ScreenerOdds: ({ screenerId }: { screenerId: string }) => <Text>{`odds ${screenerId}`}</Text>,
+  };
+});
+vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null }));
+
 const data: IdeasData = {
   session: '2026-10-02',
   total: 2,
@@ -91,6 +99,12 @@ describe('ScreenerRanking', () => {
     expect(items[2]).toHaveTextContent('Not run for this session');
     expect(items[2]).toHaveTextContent('not run');
     await expectNoA11yViolations(container);
+  });
+
+  it("shows each screener's odds line", () => {
+    setup();
+    expect(screen.getByText('odds vrp-scanner')).toBeInTheDocument();
+    expect(screen.getByText('odds near-low')).toBeInTheDocument();
   });
 
   it("opens a screener's results from its name", async () => {

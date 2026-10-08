@@ -241,3 +241,14 @@ test('Guide search: the rail button opens the dialog inside the viewport, a tapp
   await result.tap();
   await expect(page).toHaveURL(/\/guide\/glossary\/session$/);
 });
+
+test('Edges: a tapped edge opens its detail as a sheet', async ({ page }) => {
+  await page.goto('/edges');
+  await page.getByRole('row', { name: /Momentum 12-1/ }).tap();
+  const sheet = page.getByRole('dialog', { name: 'momentum_12_1' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('58.0%').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()?.width ?? 0,
+  );
+});

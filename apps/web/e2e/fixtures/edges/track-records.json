@@ -1,0 +1,82 @@
+{
+  "data": {
+    "edges": [
+      {
+        "id": "momentum_12_1",
+        "status": "candidate"
+      },
+      {
+        "id": "earnings_drift",
+        "status": "evidenced"
+      }
+    ],
+    "screeners": [
+      {
+        "id": "momentum_12_1",
+        "trackRecords": [
+          {
+            "screenerId": "momentum_12_1",
+            "edgeId": "momentum_12_1",
+            "edgeName": "Momentum 12-1",
+            "runLabel": "momentum_12_1 from 2024-01-01 to 2026-10-02",
+            "afterSession": false,
+            "notRun": null,
+            "horizons": [
+              {
+                "horizonSessions": 21,
+                "hitRate": 0.58,
+                "baseRate": 0.51,
+                "lift": 1.14,
+                "sessions": 120,
+                "picks": 2400
+              }
+            ]
+          },
+          {
+            "screenerId": "momentum_12_1",
+            "edgeId": "earnings_drift",
+            "edgeName": "Earnings drift",
+            "runLabel": "earnings_drift from 2024-01-01 to 2026-10-02",
+            "afterSession": false,
+            "notRun": null,
+            "horizons": [
+              {
+                "horizonSessions": 21,
+                "hitRate": 0.58,
+                "baseRate": 0.51,
+                "lift": 1.14,
+                "sessions": 80,
+                "picks": 2400
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "vrp_scanner",
+        "trackRecords": [
+          {
+            "screenerId": "vrp_scanner",
+            "edgeId": "vrp",
+            "edgeName": "VRP",
+            "runLabel": null,
+            "afterSession": false,
+            "notRun": {
+              "code": "NOT_RUN",
+              "reason": null,
+              "kind": "NOT_RUN",
+              "guideTerm": "not_run",
+              "kindText": "not run yet",
+              "cause": null
+            },
+            "horizons": []
+          }
+        ]
+      },
+      {
+        "id": "plain",
+        "trackRecords": []
+      }
+    ]
+  }
+}
