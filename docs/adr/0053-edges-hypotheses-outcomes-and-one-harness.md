@@ -218,7 +218,8 @@ corrected it on point-in-time grounds.
    `iv_source`, and the licence comes from the catalogue's `Feature.licence` (personal for
    IBKR's).
 7. **Event schedules.** `on_event:<class>` takes the event names at D from a declared field per
-   class:
+   class (the classes are `earnings_reaction` and `earnings_expected`, replacing `earnings` and
+   `earnings_scheduled`):
    - `earnings_reaction@v1.sessions_since_reaction == offset - 1`;
    - `earnings_expected@v1.sessions_to_expected_report == 1 - offset`.
    Both read at D = S - 1, consistent with item 1. Events are deduplicated by (name, quarter)
