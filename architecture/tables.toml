@@ -130,6 +130,10 @@ name = "rollups/instrument/earnings_expected@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/earnings_reaction@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/earnings_schedule@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
