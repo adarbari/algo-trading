@@ -4,7 +4,9 @@ Screens run through the job runner (``services/jobs``), never inline (ADR 0019, 
 screener (every site preset as ``site``, then each user's finalised ones) becomes a ``screen``
 job for its owner; exports are that job's output. The step SUCCEEDS when every job is
 COMPLETE (each screener reached its coverage threshold, ADR 0039), else it FAILS naming the
-screeners that did not.
+screeners that did not. A screener that ran without an optional source's table
+(``missing_optional_tables``, e.g. ``ibkr_iv@v1`` with IB Gateway down) is a WARN check on
+the step, never its failure (ADR 0055).
 """
 
 from collections.abc import Callable
@@ -27,6 +29,19 @@ def _summary(config_id: str, job: JobRecord) -> dict[str, Any]:
     return {**out, **job.result}
 
 
+def _optional_warnings(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One WARN check per screener that went without an optional source's table."""
+    return [
+        {
+            "name": "optional_sources",
+            "status": "WARN",
+            "detail": f"{s['config']} ran without {', '.join(missing)} (optional)",
+        }
+        for s in summaries
+        if (missing := s.get("missing_optional_tables"))
+    ]
+
+
 def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) -> ScreenStep:
     """The screens step, submitting through ``jobs`` (run in the nightly's own thread)."""
 
@@ -43,9 +58,10 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
             if job.status is not JobStatus.COMPLETE:
                 short.append(f"{config.config.id} {job.status.value}")
         result = {"screens": summaries}
+        warnings = _optional_warnings(summaries)
         if short:
             reason = f"screeners not complete: {', '.join(short)}"
-            return Outcome(StepStatus.FAILED, result, reason)
-        return Outcome(StepStatus.SUCCEEDED, result)
+            return Outcome(StepStatus.FAILED, result, reason, warnings)
+        return Outcome(StepStatus.SUCCEEDED, result, None, warnings)
 
     return run
