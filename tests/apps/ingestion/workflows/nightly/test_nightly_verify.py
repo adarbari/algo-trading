@@ -83,6 +83,9 @@ def test_disabled_ibkr_skips_verify_and_the_night_stays_complete() -> None:
             "critical": False,
             "duration_s": 0.0,
             "reason": "skipped: [ibkr] is disabled in sources.toml",
+            "tables": list(
+                registry.TASKS[name].tables
+            ),  # recorded for the admin cause chain (ADR 0056)
         }
     assert summary["status"] == "SUCCEEDED"
 

@@ -26,6 +26,8 @@ import pandas as pd
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.framework.feature import NullReason
+from algotrade.services.read.availability.cause import Unavailable
+from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import cell_codes, load_feature_values
@@ -141,7 +143,8 @@ class ResultPage:
     catalogue ``columns`` the reader added for them, columnar as a ``FeatureTable``
     (``rows[i][j]`` is ``columns[j]`` for ``results[i]``, None exactly when ``unknown[i][j]``
     says why). ``total``: rows matching (every page); ``missing``: the tables the search and
-    the sort read with nothing for the session."""
+    the sort read with nothing for the session; ``unavailable``: what they leave out, in
+    public words (ADR 0056)."""
 
     run_id: str
     sort: str
@@ -154,6 +157,7 @@ class ResultPage:
     unknown: tuple[tuple[UnknownCode | None, ...], ...]
     reasons: tuple[tuple[NullReason | None, ...], ...]  # the NullReason of each EXPLAINED cell
     missing: tuple[str, ...]
+    unavailable: tuple[Unavailable, ...] = ()
 
 
 def _records(frame: pd.DataFrame) -> list[Mapping[str, Any]]:
@@ -454,4 +458,5 @@ def load_result_page(
         unknown=codes[0],
         reasons=codes[1],
         missing=order.missing,
+        unavailable=unavailable_tables(order.missing, ctx.session.date),
     )

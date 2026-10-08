@@ -12,6 +12,8 @@ from strawberry.scalars import JSON
 from algotrade.services.read import values
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import results as stored
+from algotrade_api.graphql.permissions import AdminCause
+from algotrade_api.graphql.types.availability import Unavailable
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 
@@ -112,8 +114,8 @@ class ChangeCount:
     description="One page of a run's rows matching the filters, in the sort order (`total`: "
     "every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null "
     "exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). "
-    "`missing`: tables the search and sort read with "
-    "nothing for the session"
+    "`unavailable`: what the tables the search and sort read have nothing for the session "
+    "leave out; `missing` lists those tables (legacy, admins only: empty for anyone else)"
 )
 class ScreenResultPage:
     run_id: str
@@ -126,7 +128,8 @@ class ScreenResultPage:
     rows: list[list[JSON | None]]
     unknown: list[list[values.UnknownCode | None]]
     reasons: list[list[values.NullReason | None]]
-    missing: list[str]
+    missing: list[str] = strawberry.field(extensions=[AdminCause([])])
+    unavailable: list[Unavailable]
 
     @classmethod
     def of(cls, d: stored.ResultPage, ctx: ReadContext) -> Self:
@@ -142,4 +145,5 @@ class ScreenResultPage:
             unknown=[list(row) for row in d.unknown],
             reasons=[list(row) for row in d.reasons],
             missing=list(d.missing),
+            unavailable=[Unavailable.of(u) for u in d.unavailable],
         )

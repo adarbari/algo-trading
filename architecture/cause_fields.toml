@@ -1,0 +1,31 @@
+# Fields that carry words about why something is not available, and why each may be read by a
+# trader (ADR 0056). `tests/apps/api/graphql/test_causes.py` and
+# `tests/architecture/api/test_rest_causes.py` fail for a string field named detail / error /
+# message / problems / unresolved / missing* that is neither role-scoped on the server
+# (`AdminCause` on a GraphQL field, `ADMIN_CAUSE` on a REST field, an `AdminOnly` / ops type) nor
+# listed here. A new gap is `Unavailable` / `Unknown` with a public kind, never a line here.
+#
+# [[fact]]   a fact about the request or the caller's own document, not a cause: stays.
+# [[legacy]] a field the server already makes role-aware in its resolver, kept until the web
+#            reads `Unknown.cause` / `kind` (PR-3 of ADR 0056 empties this list).
+# Names are `Type.field` (GraphQL) or `Model.field` (REST schema).
+
+[[fact]]
+name = "EventCalendar.missing"
+reason = "the instrument ids the caller asked for that the reference snapshot lacks: an echo of the request"
+
+[[fact]]
+name = "EventCalendar.unresolved"
+reason = "the scope list's symbols the reference snapshot does not know: site config, not a gap in the data"
+
+[[fact]]
+name = "Config.error"
+reason = "the validation error of the caller's own config document"
+
+[[fact]]
+name = "ScreenDetail.error"
+reason = "the validation error of the caller's own screen document"
+
+[[legacy]]
+name = "Unknown.detail"
+reason = "a resolver: the chain as one line for an admin, the generic words for anyone else"

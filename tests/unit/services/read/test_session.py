@@ -61,10 +61,14 @@ def test_latest_session_is_the_latest_bars_else_the_reference_snapshot() -> None
 
 def test_a_requested_date_is_served_even_when_nothing_is_stored_for_it() -> None:
     _, reader = store()
-    assert resolve_session(reader, D2, EXPECTED) == Session(
+    found = resolve_session(reader, D2, EXPECTED)
+    assert found == Session(
         date=D2, requested=D2, is_latest=False, latest_with_bars=None,
         reference_snapshot=None, pre_snapshot=False, present=(), missing=EXPECTED,
+        unavailable=found.unavailable,
     )  # fmt: skip
+    tables = [u.cause.links[0].subject for u in found.unavailable]
+    assert tables == sorted(EXPECTED)  # one per table, its features after it
 
 
 def test_no_date_resolves_to_the_latest_bars_partition() -> None:

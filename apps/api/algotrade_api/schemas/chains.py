@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from pydantic import Field
 
+from algotrade.services.read.availability.cause import ADMIN_CAUSE, GENERIC
 from algotrade_api.schemas.health import Schema
 
 
@@ -32,7 +33,10 @@ class LiveOptionChain(Schema):
         description="LIVE, CACHED (a live answer under live_cache_s old), DISABLED, "
         "UNAVAILABLE (gateway down, busy or slow), ERROR: the last three serve the stored chain"
     )
-    detail: str | None = Field(description="why the stored chain was served")
+    detail: str | None = Field(
+        description="why the stored chain was served (admins; anyone else: generic words)",
+        json_schema_extra={ADMIN_CAUSE: GENERIC},
+    )
     as_of: datetime | None = Field(description="when the quotes were taken (UTC)")
     delayed: bool = Field(description="IB's delayed data, or the stored end-of-day chain")
     session: date = Field(description="the stored chain the contracts come from")

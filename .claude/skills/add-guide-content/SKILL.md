@@ -32,6 +32,11 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    a loader in the Guide read model, a page template in docs/ui/guide.md), not as page text.
    Until a kind's phase ships, write the entry in the spec's migration table and leave the
    page's old text where it is (it is in the baseline); never add new text to a page.
+   **Why a value is not available** (a gap on a page) is a glossary term per public kind
+   (`unavailable_system`, `unavailable_not_stored`, ..., `not_run`; ADR 0056). A new
+   `UnavailableKind` needs its term in `config/site/guide/glossary.toml` and a line in
+   `GUIDE_TERMS` (`services/read/availability/cause.py`); the fitness test fails without one.
+   The chain behind a gap (a table, a step, a source) is an admin's cause, never Guide text.
 3. **Write the entry for someone who does not follow markets**: what it is, how to read it from
    low to high (thresholds with units), what to use it for, when it lies, sources. Name other
    fields by their catalogue name so the server can link them; never derive in the browser

@@ -20,6 +20,8 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.services.read.availability.cause import Unavailable, run_cause
+from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import ReadContext, at_session, partition, previous_session
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import result_table
@@ -76,6 +78,7 @@ class ScreenerRun:
     coverage: str | None = None
     missing_tables: tuple[str, ...] = ()
     missing_optional_tables: tuple[str, ...] = ()
+    unavailable: tuple[Unavailable, ...] = ()  # what those tables leave out (ADR 0056)
 
 
 @dataclass(frozen=True)
@@ -152,6 +155,7 @@ def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> Sc
         coverage=coverage,
         missing_tables=missing_tables,
         missing_optional_tables=missing_optional,
+        unavailable=unavailable_tables([*missing_tables, *missing_optional], ctx.session.date),
     )
 
 
@@ -160,7 +164,7 @@ def load_latest_runs(ctx: ReadContext, keys: Sequence[RunKey]) -> dict[RunKey, L
     day = ctx.session.date.isoformat()
     stored = screen_rows(ctx)
     if isinstance(stored, Unknown):
-        why = Unknown(UnknownCode.NOT_RUN, stored.detail)
+        why = Unknown(UnknownCode.NOT_RUN, stored.cause)
         return {k: LatestRun(None, why) for k in keys}
     groups = {
         (str(o), str(c)): rows
@@ -171,7 +175,8 @@ def load_latest_runs(ctx: ReadContext, keys: Sequence[RunKey]) -> dict[RunKey, L
         rows = groups.get((owner, config_id))
         if rows is None:
             detail = f"{config_id} ({owner}) has no run in {RULE_SCREEN} for {day}"
-            out[(owner, config_id)] = LatestRun(None, Unknown(UnknownCode.NOT_RUN, detail))
+            cause = run_cause(config_id, detail, ctx.session.date)
+            out[(owner, config_id)] = LatestRun(None, Unknown(UnknownCode.NOT_RUN, cause))
         else:
             out[(owner, config_id)] = LatestRun(_run(ctx, owner, config_id, rows), None)
     return out

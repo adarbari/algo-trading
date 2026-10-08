@@ -127,7 +127,7 @@ def test_the_macro_calendar_with_nothing_known_by_the_session_is_a_gap() -> None
     assert gap.instrument_id is None and gap.unknown.code is UnknownCode.NO_PARTITION
     assert (
         "events/macro_release has no release dates known by the session 2026-09-01"
-        in gap.unknown.detail
+        in gap.unknown.cause.text
     )
 
 
@@ -137,5 +137,5 @@ def test_no_future_release_known_by_the_session_is_a_gap() -> None:
     found = load_instrument_events(context(store_with(), date(2026, 11, 15)), ["EQ:AAA"])
     gap = next(g for g in found["EQ:AAA"].gaps if g.part == MACRO_RELEASE)
     assert gap.unknown.code is UnknownCode.NO_ROW
-    assert "no future release dates known by the session 2026-11-15" in gap.unknown.detail
+    assert "no future release dates known by the session 2026-11-15" in gap.unknown.cause.text
     assert MACRO_RELEASE not in {e.kind for e in found["EQ:AAA"].ahead}

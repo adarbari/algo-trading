@@ -170,6 +170,13 @@ def _runs(writer: StoreWriter) -> None:
         "steps": {
             "bars": {"status": "COMPLETE", "duration_s": 1.5, "result": {"rows": 11}},
             "chains": {"status": "PARTIAL", "duration_s": 9.0, "result": {"statuses": {"OK": 1}}},
+            # a step that did not deliver its table: the admin's cause chain follows it (ADR 0056)
+            "ibkr-iv": {
+                "status": "SKIPPED",
+                "duration_s": 0.0,
+                "reason": "skipped: IB Gateway unreachable",
+                "tables": ["rollups/instrument/ibkr_iv@v1"],
+            },
         },
         "partial": ["steps not complete: chains"],
     }

@@ -85,6 +85,32 @@ type Category {
   count: Int!
 }
 
+"""Why a fact is not available, root cause first. Admins only"""
+type Cause {
+  links: [CauseLink!]!
+}
+
+"""What one link of a cause chain is"""
+enum CauseLevel {
+  SOURCE
+  STEP
+  TABLE
+  FEATURE
+  RUN
+}
+
+"""
+One link of a cause chain: `subject` is the thing (a step, a table, a feature), `status` its state as recorded, `message` the stored words, `runId` the run record it came from
+"""
+type CauseLink {
+  level: CauseLevel!
+  subject: String!
+  status: String!
+  message: String!
+  runId: String
+  session: Date
+}
+
 """
 One completeness cell with the reasons behind it: `job` the ingestion task that writes the dataset, `groups` its items not OK grouped by reason (chains: per underlying), `runs` the runs that wrote the partition and the job's runs that session
 """
@@ -292,7 +318,7 @@ type FeatureSeries {
 }
 
 """
-Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `missing`: tables the filters and sort read with nothing for the session (no row passes a filter on them); the nightly tables missing for it are `session.missing`
+Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the filters and sort read have nothing for the session leave out (no row passes a filter on them); `missing` lists those tables (legacy, admins only: empty for anyone else)
 """
 type FeatureTable {
   session: Session!
@@ -308,6 +334,7 @@ type FeatureTable {
   page: Int!
   size: Int!
   missing: [String!]!
+  unavailable: [Unavailable!]!
 }
 
 """
@@ -1612,7 +1639,7 @@ type ScreenResult {
 }
 
 """
-One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `missing`: tables the search and sort read with nothing for the session
+One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `unavailable`: what the tables the search and sort read have nothing for the session leave out; `missing` lists those tables (legacy, admins only: empty for anyone else)
 """
 type ScreenResultPage {
   runId: String!
@@ -1626,6 +1653,7 @@ type ScreenResultPage {
   unknown: [[UnknownCode]!]!
   reasons: [[NullReason]!]!
   missing: [String!]!
+  unavailable: [Unavailable!]!
 }
 
 """A finalised (immutable) version of a screen and its document"""
@@ -1673,7 +1701,7 @@ type ScreenerHit {
 }
 
 """
-A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown); `coverage` / `missingTables`: the run record's own coverage (COMPLETE, PARTIAL; null: not recorded) and the tables that had no rows when it ran, not the session's missing tables as read now
+A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown); `coverage`: the run record's own coverage (COMPLETE, PARTIAL; null: not recorded); `unavailable`: what the tables that had no rows when it ran leave out, not the session's as read now; `missingTables` / `missingOptionalTables` list those tables (legacy, admins only: empty for anyone else)
 """
 type ScreenerRun {
   runId: String!
@@ -1687,10 +1715,15 @@ type ScreenerRun {
   picked: Int!
   paused: Int!
   regime: String
-  audit: JSON!
   coverage: String
   missingTables: [String!]!
   missingOptionalTables: [String!]!
+  unavailable: [Unavailable!]!
+
+  """
+  The run record's audit (coverage, the selection's audit); without the tables the run went without unless the caller is an admin
+  """
+  audit: JSON!
 
   """
   The session of the previous run it is compared with; null: none (nothing is new or dropped)
@@ -1725,7 +1758,7 @@ type SeriesPoint {
 }
 
 """
-The session a read serves: every value in the response is for `date` (ADR 0036). `missing` lists the nightly tables with no partition for it; identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: one taken later).
+The session a read serves: every value in the response is for `date` (ADR 0036). `unavailable` says what the nightly tables with no partition for it leave out; `present` / `missing` list those tables (legacy, admins only: empty for anyone else); identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: one taken later).
 """
 type Session {
   date: Date!
@@ -1736,6 +1769,7 @@ type Session {
   preSnapshot: Boolean!
   present: [String!]!
   missing: [String!]!
+  unavailable: [Unavailable!]!
 }
 
 """
@@ -1759,12 +1793,47 @@ type TextPart {
 }
 
 """
-A value not known for the session: why, and where it looked; `reason` is set exactly when `code` is EXPLAINED
+Features a page cannot show, and why in public words: `kind`, the Guide glossary term `guideTerm` that explains it. `cause` is the chain behind it: admins only (null for anyone else)
+"""
+type Unavailable {
+  kind: UnavailableKind!
+  features: [String!]!
+  guideTerm: String!
+
+  """
+  The chain behind it, source to features; null unless the caller is an admin
+  """
+  cause: Cause
+}
+
+"""Why a gap is there, in public words"""
+enum UnavailableKind {
+  SYSTEM
+  NOT_STORED
+  NOT_APPLICABLE
+  ILLIQUID
+  LICENCE
+  NOT_RUN
+}
+
+"""
+A value not known for the session: `code` and, in public words, `kind` (with its Guide term `guideTerm`); `reason` is set exactly when `code` is EXPLAINED. `cause` is the chain behind it, source to table: admins only (null for anyone else). `detail` is legacy: the chain as one line for an admin, the generic words for anyone else
 """
 type Unknown {
   code: UnknownCode!
-  detail: String!
   reason: NullReason
+  kind: UnavailableKind!
+  guideTerm: String!
+
+  """
+  Legacy (ADR 0056; the web moves to `cause` / `kind`): why and where it looked, as one line for an admin; the generic words for anyone else
+  """
+  detail: String!
+
+  """
+  The chain behind it, source to table; null unless the caller is an admin
+  """
+  cause: Cause
 }
 
 """Why a value is UNKNOWN for the session"""

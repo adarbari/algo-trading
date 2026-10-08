@@ -26,6 +26,7 @@ from datetime import date
 import pandas as pd
 
 from algotrade.data.events import ALL_TIME, known_from, read_events
+from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.events.market_days import MarketDay, market_days
 from algotrade.services.read.events.reference import FundReference, load_fund_references
@@ -149,7 +150,8 @@ def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown
             if anything.empty
             else (UnknownCode.NO_ROW, "no future release dates known by")
         )
-        return (), Unknown(code, f"{MACRO_TABLE} has {detail} the session {day.isoformat()}")
+        message = f"{MACRO_TABLE} has {detail} the session {day.isoformat()}"
+        return (), Unknown(code, table_cause(MACRO_TABLE, message, code.value, day))
     days = pd.to_datetime(frame["release_date"]).dt.date
     frame = frame[days <= end]
     events = tuple(

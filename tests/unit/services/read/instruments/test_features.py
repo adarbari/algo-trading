@@ -7,6 +7,7 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
+from algotrade.services.read.availability.cause import feature_cause
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.services.read.instruments.catalogue import (
     FeatureFormat,
@@ -52,7 +53,9 @@ def test_an_older_partition_is_never_shown(ctx: ReadContext) -> None:
     [value] = load_feature_values(ctx, ["EQ:AAA"], [NEXT])["EQ:AAA"]
     assert value.value is None  # earnings@v1 has a D0 partition only
     assert value.unknown is not None and value.unknown.code is UnknownCode.NO_PARTITION
-    assert value.unknown.detail == "rollups/instrument/earnings@v1 has no partition for 2026-10-01"
+    assert (
+        value.unknown.cause.text == "rollups/instrument/earnings@v1 has no partition for 2026-10-01"
+    )
     assert value.info.format is FeatureFormat.DATE
 
 
@@ -100,7 +103,7 @@ def test_company_facts_from_a_later_snapshot_are_not_known(reader: StoreReader) 
     before = open_context(reader, MemoryConfigStore({}), UserContext("local"), date(2026, 9, 29))
     got = load_feature_values(before, ["EQ:AAA"], [SECTOR])["EQ:AAA"][0]
     assert got.unknown is not None and got.unknown.code is UnknownCode.NO_PARTITION
-    assert got.unknown.detail == "instruments/company has no snapshot on or before 2026-09-29"
+    assert got.unknown.cause.text == "instruments/company has no snapshot on or before 2026-09-29"
 
 
 def test_an_expression_names_the_inputs_without_a_row(reader: StoreReader) -> None:
@@ -111,7 +114,7 @@ def test_an_expression_names_the_inputs_without_a_row(reader: StoreReader) -> No
     ctx = open_context(reader, MemoryConfigStore({}), UserContext("local"))
     [value] = load_feature_values(ctx, ["EQ:AAA"], ["feature.iv_hv_ratio"])["EQ:AAA"]
     assert value.unknown is not None and value.unknown.code is UnknownCode.NO_ROW
-    assert value.unknown.detail.startswith("rollups/instrument/iv_history@v2 has no row")
+    assert value.unknown.cause.text.startswith("rollups/instrument/iv_history@v2 has no row")
 
 
 IV30 = "rollup.iv30@v1.iv30"
@@ -135,7 +138,7 @@ def test_a_non_optionable_instrument_is_not_applicable_not_unknown() -> None:
     ctx = context(_chain_rows("WIDE_SPREADS"))
     [etf] = load_feature_values(ctx, ["EQ:ETFX"], [IV30])["EQ:ETFX"]  # no row in iv30@v1
     assert etf.unknown is not None and etf.unknown.code is UnknownCode.NOT_APPLICABLE
-    assert "EQ:ETFX is not optionable (reference snapshot 2026-09-30)" in etf.unknown.detail
+    assert "EQ:ETFX is not optionable (reference snapshot 2026-09-30)" in etf.unknown.cause.text
     aaa = values(ctx, "EQ:AAA", FROM_HIGH)
     assert aaa[FROM_HIGH][1] is None  # a feature that applies to every instrument is unaffected
 
@@ -144,7 +147,7 @@ def test_an_etf_has_no_earnings_but_a_stock_with_none_is_unknown(reader: StoreRe
     earlier = open_context(reader, MemoryConfigStore({}), UserContext("local"), D0)
     assert values(earlier, "EQ:ETFX", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)
     [etf] = load_feature_values(earlier, ["EQ:ETFX"], [NEXT])["EQ:ETFX"]
-    assert etf.unknown is not None and "ETF" in etf.unknown.detail
+    assert etf.unknown is not None and "ETF" in etf.unknown.cause.text
     assert values(earlier, "EQ:AAA", NEXT)[NEXT] == (D1.isoformat(), None)  # a value always wins
 
 
@@ -152,7 +155,9 @@ def test_a_thin_chain_is_illiquid_and_inherited_by_expressions() -> None:
     ctx = context(_chain_rows("WIDE_SPREADS"))
     [value] = load_feature_values(ctx, ["EQ:AAA"], [IV30])["EQ:AAA"]
     assert value.unknown is not None and value.unknown.code is UnknownCode.ILLIQUID
-    assert value.unknown.detail.startswith("iv30_status is WIDE_SPREADS for EQ:AAA on 2026-10-01")
+    assert value.unknown.cause.text.startswith(
+        "iv30_status is WIDE_SPREADS for EQ:AAA on 2026-10-01"
+    )
     got = values(ctx, "EQ:AAA", "feature.iv_hv_ratio")
     assert got["feature.iv_hv_ratio"] == (None, UnknownCode.ILLIQUID)
 
@@ -209,7 +214,7 @@ def test_earnings_apply_only_to_operating_companies() -> None:
     assert values(ctx, "EQ:PREF", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)
     assert values(ctx, "EQ:SPAC", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)
     [spac] = load_feature_values(ctx, ["EQ:SPAC"], [NEXT])["EQ:SPAC"]
-    assert spac.unknown is not None and "blank-check" in spac.unknown.detail
+    assert spac.unknown is not None and "blank-check" in spac.unknown.cause.text
     assert values(ctx, "EQ:NOSIC", NEXT)[NEXT] == (None, UnknownCode.NO_ROW)  # never a false n/a
 
 
@@ -242,7 +247,9 @@ NO_TRADE = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE"}), PRICE_STATS)
 def test_an_explained_status_names_its_reason() -> None:
     why = _why({BAR_STATUS: "NO_TRADE"}, frozenset(), NO_TRADE)  # no price_stats row either
     assert (why.code, why.reason) == (UnknownCode.EXPLAINED, NullReason.NO_TRADE)
-    assert why.detail == "bar_status is NO_TRADE for EQ:AAA on 2026-10-01: no bar on the session"
+    assert (
+        why.cause.text == "bar_status is NO_TRADE for EQ:AAA on 2026-10-01: no bar on the session"
+    )
 
 
 def test_a_status_that_explains_nothing_leaves_the_gap() -> None:
@@ -272,10 +279,17 @@ def test_absence_precedence_not_applicable_then_illiquid_then_explained() -> Non
 def test_cell_codes_carry_the_reason_of_explained_cells() -> None:
     ctx = context(_chain_rows("OK"))
     info = feature_infos(ctx.features, [CLOSE])[CLOSE]
-    explained = Unknown(UnknownCode.EXPLAINED, "x", NullReason.NEW_LISTING)
+    explained = Unknown(
+        UnknownCode.EXPLAINED, feature_cause(CLOSE, "x", "NEW_LISTING"), NullReason.NEW_LISTING
+    )
     cells = {
         "A": (FeatureValue(CLOSE, None, explained, info), FeatureValue(CLOSE, 1.0, None, info)),
-        "B": (FeatureValue(CLOSE, None, Unknown(UnknownCode.NULL, "y"), info),) * 2,
+        "B": (
+            FeatureValue(
+                CLOSE, None, Unknown(UnknownCode.NULL, feature_cause(CLOSE, "y", "NULL")), info
+            ),
+        )
+        * 2,
     }
     unknown, reasons = cell_codes(cells, ["A", "B", "C"])
     assert unknown == ((UnknownCode.EXPLAINED, None), (UnknownCode.NULL, UnknownCode.NULL), ())
@@ -298,7 +312,7 @@ def test_no_bar_on_the_session_reads_no_trade_and_the_since_listing_high(
     ctx = open_context(reader, MemoryConfigStore({}), UserContext("local"))
     [close] = load_feature_values(ctx, ["EQ:ETFX"], [CLOSE])["EQ:ETFX"]  # no price_stats row
     assert close.unknown is not None and close.unknown.reason is NullReason.NO_TRADE
-    assert close.unknown.detail.startswith("bar_status is NO_TRADE for EQ:ETFX on 2026-10-01")
+    assert close.unknown.cause.text.startswith("bar_status is NO_TRADE for EQ:ETFX on 2026-10-01")
     avail = values(ctx, "EQ:AAA", "feature.pct_from_high_avail", FROM_HIGH)
     assert avail["feature.pct_from_high_avail"] == (None, UnknownCode.EXPLAINED)  # NEW_LISTING
     assert avail[FROM_HIGH][1] is None  # the 52-week value is still served
@@ -317,7 +331,7 @@ def test_a_next_report_not_in_the_calendar_reads_not_announced(reader: StoreRead
     ctx = open_context(reader, MemoryConfigStore({}), UserContext("local"))
     [nxt] = load_feature_values(ctx, ["EQ:AAA"], [NEXT])["EQ:AAA"]
     assert nxt.unknown is not None and nxt.unknown.reason is NullReason.NOT_ANNOUNCED
-    assert nxt.unknown.detail.endswith("the next report date is not announced")
+    assert nxt.unknown.cause.text.endswith("the next report date is not announced")
     assert values(ctx, "EQ:ETFX", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)  # still n/a
 
 
@@ -350,5 +364,7 @@ def test_fund_reference_applies_to_leveraged_and_inverse_funds_only() -> None:
     assert values(ctx, "EQ:TSLQ", LINK)[LINK] == (None, UnknownCode.NULL)  # a basket: a stored null
     assert values(ctx, "EQ:AAA", LINK)[LINK] == (None, UnknownCode.NOT_APPLICABLE)
     [stock] = load_feature_values(ctx, ["EQ:AAA"], [LINK])["EQ:AAA"]
-    assert stock.unknown is not None and "not a leveraged or inverse fund" in stock.unknown.detail
+    assert (
+        stock.unknown is not None and "not a leveraged or inverse fund" in stock.unknown.cause.text
+    )
     assert values(ctx, "EQ:UNK", LINK)[LINK] == (None, UnknownCode.NO_ROW)  # unknown: never n/a

@@ -5,11 +5,18 @@ A response is 200 with ``data`` and ``errors[]``. "No such thing" is a null fiel
 "nothing stored yet" is never an error (UNKNOWN values, empty lists, ``session.missing``);
 a code says what went wrong with the request itself."""
 
+from typing import Any
+
 from graphql import GraphQLError
 from strawberry.http import GraphQLHTTPResponse
 from strawberry.types import ExecutionResult
 
 from algotrade.core.model.errors import ConfigurationError, MissingDataError, PermissionDeniedError
+from algotrade.services.read.availability.cause import (
+    GENERIC_REASONS,
+    UnavailableKind,
+    names_a_table,
+)
 from algotrade.services.read.context import NotFoundError
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 
@@ -44,14 +51,22 @@ def code_of(error: GraphQLError) -> str:
     return INTERNAL
 
 
-def response_of(result: ExecutionResult) -> GraphQLHTTPResponse:
-    """The JSON body for ``result``: ``data``, and ``errors`` each with ``extensions.code``."""
+def _worded(error: GraphQLError, code: str, admin: bool) -> dict[str, Any]:
+    """``error`` as the response shows it: for a caller who is not an admin, a NO_DATA error
+    (a stored table is unreadable) or any text that names a stored table says only that the
+    data is not available because of a system error (ADR 0056); the admin reads the cause."""
+    formatted: dict[str, Any] = dict(error.formatted)
+    if not admin and (code == NO_DATA or names_a_table(error.message)):
+        formatted["message"] = GENERIC_REASONS[UnavailableKind.SYSTEM]
+    return {**formatted, "extensions": {**(error.extensions or {}), "code": code}}
+
+
+def response_of(result: ExecutionResult, admin: bool = False) -> GraphQLHTTPResponse:
+    """The JSON body for ``result``: ``data``, and ``errors`` each with ``extensions.code``,
+    worded for the caller's role (``admin``: the full text)."""
     body: GraphQLHTTPResponse = {"data": result.data}
     if result.errors:
-        body["errors"] = [
-            {**e.formatted, "extensions": {**(e.extensions or {}), "code": code_of(e)}}
-            for e in result.errors
-        ]
+        body["errors"] = [_worded(e, code_of(e), admin) for e in result.errors]
     if result.extensions:
         body["extensions"] = result.extensions
     return body

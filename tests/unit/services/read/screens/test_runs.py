@@ -11,7 +11,7 @@ from algotrade.services.read.screens.runs import (
     load_previous_run,
     run_rows,
 )
-from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord
@@ -40,9 +40,8 @@ def test_the_latest_run_of_the_session_wins(ctx: ReadContext) -> None:
 def test_no_run_for_the_session_is_not_run_never_an_older_one(ctx: ReadContext) -> None:
     found = latest_run(ctx, "me", "gamma")  # gamma ran on D0 only
     assert found.run is None
-    assert found.not_run == Unknown(
-        UnknownCode.NOT_RUN, "gamma (me) has no run in results/rule_screen for 2026-10-01"
-    )
+    assert found.not_run is not None and found.not_run.code is UnknownCode.NOT_RUN
+    assert found.not_run.cause.text == "gamma (me) has no run in results/rule_screen for 2026-10-01"
 
 
 def test_a_run_without_a_record_has_no_status(ctx: ReadContext) -> None:
@@ -57,7 +56,7 @@ def test_a_session_with_no_results_partition_is_not_run(reader: StoreReader) -> 
     found = latest_run(_on(reader, D1 + timedelta(days=1)), "site", "alpha")
     assert found.run is None and found.not_run is not None
     assert found.not_run.code is UnknownCode.NOT_RUN
-    assert found.not_run.detail == "results/rule_screen has no partition for 2026-10-02"
+    assert found.not_run.cause.text == "results/rule_screen has no partition for 2026-10-02"
 
 
 def test_an_earlier_session_reads_its_own_runs(reader: StoreReader) -> None:

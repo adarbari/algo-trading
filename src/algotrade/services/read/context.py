@@ -29,6 +29,7 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import Snapshot, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
+from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.configs.store import ConfigStore
@@ -212,7 +213,10 @@ def partition(
     if grain is not Grain.SESSION:
         raise ValueError(f"{table} is {grain} grain: read it by its own rule, not partition()")
     day = ctx.session.date
-    absent = Unknown(UnknownCode.NO_PARTITION, f"{table} has no partition for {day.isoformat()}")
+    absent = Unknown(
+        UnknownCode.NO_PARTITION,
+        table_cause(table, f"{table} has no partition for {day.isoformat()}", session=day),
+    )
     if columns is None and instruments is None:
         whole = ctx.reader.table(table, day)
         return absent if whole is None else whole

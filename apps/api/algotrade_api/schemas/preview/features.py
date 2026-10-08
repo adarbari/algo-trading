@@ -5,6 +5,8 @@ from datetime import date
 
 from pydantic import BaseModel, Field
 
+from algotrade.services.read.availability.cause import ADMIN_CAUSE
+from algotrade_api.schemas.availability import Unavailable
 from algotrade_api.schemas.health import Schema
 
 
@@ -32,7 +34,13 @@ class ExpressionCheck(Schema):
         description="the session sampled (None: an input has no partition for it, see missing)"
     )
     missing: list[str] = Field(
-        description="the inputs' tables with no partition for the session (their values UNKNOWN)"
+        description="the inputs' tables with no partition for the session (their values "
+        "UNKNOWN; legacy, admins only: empty for anyone else)",
+        json_schema_extra={ADMIN_CAUSE: []},
+    )
+    unavailable: list[Unavailable] = Field(
+        default_factory=list,
+        description="what the inputs' tables with no partition for the session leave out",
     )
     rows: int
     non_null: int

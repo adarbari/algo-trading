@@ -327,6 +327,24 @@ export interface components {
             /** Schema Hash */
             schema_hash: string;
         };
+        /** CauseLink */
+        CauseLink: {
+            /**
+             * Level
+             * @description SOURCE, STEP, TABLE, FEATURE or RUN
+             */
+            level: string;
+            /** Message */
+            message: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Session */
+            session: string | null;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject: string;
+        };
         /** CheckBody */
         CheckBody: {
             /**
@@ -453,7 +471,7 @@ export interface components {
             licence: string;
             /**
              * Missing
-             * @description the inputs' tables with no partition for the session (their values UNKNOWN)
+             * @description the inputs' tables with no partition for the session (their values UNKNOWN; legacy, admins only: empty for anyone else)
              */
             missing: string[];
             /** Non Null */
@@ -472,6 +490,11 @@ export interface components {
              * @description num, bool, str or date
              */
             type: string;
+            /**
+             * Unavailable
+             * @description what the inputs' tables with no partition for the session leave out
+             */
+            unavailable?: components["schemas"]["Unavailable"][];
         };
         /** Finalised */
         Finalised: {
@@ -560,7 +583,7 @@ export interface components {
             delayed: boolean;
             /**
              * Detail
-             * @description why the stored chain was served
+             * @description why the stored chain was served (admins; anyone else: generic words)
              */
             detail: string | null;
             /**
@@ -751,7 +774,7 @@ export interface components {
             min_coverage: number;
             /**
              * Missing Tables
-             * @description tables with no rows for the session
+             * @description tables with no rows for the session (legacy, admins only: empty for anyone else; `unavailable` says what they leave out)
              */
             missing_tables: string[];
             /**
@@ -768,7 +791,7 @@ export interface components {
             selected: number;
             /**
              * Selection
-             * @description the selection's audit
+             * @description the selection's audit (without the tables it went without, unless an admin)
              */
             selection: {
                 [key: string]: unknown;
@@ -778,6 +801,11 @@ export interface components {
              * @description always 0 for a rule screen; kept for stored runs
              */
             skipped: number;
+            /**
+             * Unavailable
+             * @description what the tables with no rows for the session leave out, in public words
+             */
+            unavailable?: components["schemas"]["Unavailable"][];
             /**
              * Universe Snapshot
              * Format: date
@@ -1071,6 +1099,26 @@ export interface components {
              * @description a column id ('-' prefix: descending); null: the table's default
              */
             sort?: string | null;
+        };
+        /** Unavailable */
+        Unavailable: {
+            /**
+             * Cause
+             * @description the chain behind it, root cause first (admins only: null for anyone else)
+             */
+            cause: components["schemas"]["CauseLink"][] | null;
+            /** Features */
+            features: string[];
+            /**
+             * Guide Term
+             * @description the Guide glossary term that explains the kind
+             */
+            guide_term: string;
+            /**
+             * Kind
+             * @description SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_RUN
+             */
+            kind: string;
         };
         /** UserFeatureBody */
         UserFeatureBody: {

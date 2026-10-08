@@ -13,6 +13,7 @@ from algotrade.config.site.users import Role
 from algotrade.config.user import UserContext
 from algotrade.services.ondemand.screens import READY, RunRequest
 from algotrade_api.deps import Caller, OnDemand, User
+from algotrade_api.redact import redact
 
 router = APIRouter(prefix="/screens", tags=["screens"])
 
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/screens", tags=["screens"])
 @router.post("/{config_id}/run")
 def run(
     runner: OnDemand,
+    caller: Caller,
     response: Response,
     config_id: str,
     user: User,
@@ -29,11 +31,12 @@ def run(
 ) -> RunRequest:
     request = runner.request(config_id, UserContext(user), on)
     response.status_code = 200 if request.state in (READY, "complete", "partial") else 202
-    return request
+    return redact(request, caller.role)
 
 
 @router.get("/{config_id}/run/{job_id}")
 def run_status(runner: OnDemand, caller: Caller, config_id: str, job_id: str) -> RunRequest:
     """403 for another user's job unless the caller is an admin (the job's owner is its user)."""
     viewer = UserContext(caller.user_id)
-    return runner.status(config_id, job_id, viewer, admin=caller.role is Role.ADMIN)
+    found = runner.status(config_id, job_id, viewer, admin=caller.role is Role.ADMIN)
+    return redact(found, caller.role)

@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date
 from functools import partial
+from typing import cast
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +34,11 @@ from algotrade.services.explaining.cache import open_text_cache
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
+from algotrade.services.read.availability.cause import (
+    GENERIC_REASONS,
+    UnavailableKind,
+    names_a_table,
+)
 from algotrade.services.read.context import (
     NotFoundError,
     ReadContext,
@@ -58,8 +64,23 @@ from algotrade_api.web import web_router
 TITLE = "algotrade API"
 
 
+def _is_admin(request: Request) -> bool:
+    """Whether the caller of ``request`` is an admin (an error handler runs outside the route's
+    dependencies, so it asks the authenticator again; any failure reads as not an admin)."""
+    try:
+        caller = cast(Authenticator, request.app.state.authenticator).authenticate(request)
+    except Exception:  # unauthenticated, forbidden, a key fetch failing: not an admin
+        return False
+    return caller.role is Role.ADMIN
+
+
 def _not_found(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
+    """404 with the text for an admin; for anyone else the data behind a missing table or a
+    stored table's path is "not available because of a system error" (ADR 0056)."""
+    text = str(exc)
+    if (isinstance(exc, MissingDataError) or names_a_table(text)) and not _is_admin(request):
+        text = GENERIC_REASONS[UnavailableKind.SYSTEM]
+    return JSONResponse(status_code=404, content={"detail": text})
 
 
 def _bad_request(request: Request, exc: Exception) -> JSONResponse:

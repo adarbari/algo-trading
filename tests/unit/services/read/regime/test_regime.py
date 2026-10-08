@@ -109,7 +109,7 @@ def test_a_session_with_no_partition_never_shows_an_older_one() -> None:
     assert found.session == D0 and found.label is RegimeLabel.UNKNOWN
     assert found.unknown_reason is not None
     assert found.unknown_reason.code is UnknownCode.NO_PARTITION
-    assert str(D0) in found.unknown_reason.detail
+    assert str(D0) in found.unknown_reason.cause.text
     assert found.scores.macro_risk.value is None
     assert {i.status for i in found.indicators} == {IndicatorStatus.UNKNOWN}
     assert found.indicators[0].unknown is not None
@@ -124,7 +124,8 @@ def test_a_label_outside_the_four_is_unknown_not_guessed() -> None:
     found = load_regime(with_regime(context(store_with(odd))))
     assert found.label is RegimeLabel.UNKNOWN and found.unknown_reason is not None
     assert (
-        found.unknown_reason.code is UnknownCode.NULL and "'SUNNY'" in found.unknown_reason.detail
+        found.unknown_reason.code is UnknownCode.NULL
+        and "'SUNNY'" in found.unknown_reason.cause.text
     )
 
 

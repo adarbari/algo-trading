@@ -73,6 +73,17 @@ as `date: Day = None`; it opens the read context with `info.context.read(date)`.
 
 Verify: `make typecheck arch`.
 
+### A field that says why something is not available (ADR 0056)
+
+Never a free `detail` / `error` / `message` / `missing*` string, and never a table list. A gap
+is an `Unavailable` (`kind`, `features`, `guideTerm`) or an `Unknown` (`code`, `kind`,
+`guideTerm`, `reason`), mirrored from the read dataclass; the chain behind it is a `cause`
+field returning `Cause | None` with `extensions=[AdminCause()]` and
+`await info.context.cause_of(leaf)` (null for anyone who is not an admin; the server withholds
+it, the browser never filters). `tests/apps/api/graphql/test_causes.py` fails a `Cause`-typed
+field without `AdminCause` and a cause-worded string field that is neither role-scoped nor a fact
+listed with its reason in `architecture/cause_fields.toml` (that list only shrinks).
+
 ## Step 5: the schema snapshot
 
 `.venv/bin/python scripts/export_graphql_schema.py`, commit `apps/api/schema.graphql`

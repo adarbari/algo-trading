@@ -13,11 +13,14 @@ from anyio import to_thread
 from strawberry.scalars import JSON
 from strawberry.types import Info
 
+from algotrade.services.read.availability.cause import public_audit
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.table import DEFAULT_SIZE
 from algotrade.services.read.screens import results, runs, screeners
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.scalars import FeatureName
+from algotrade_api.graphql.types.availability import Unavailable
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.screens.result import ChangeCount, ScreenResultPage
 
@@ -37,9 +40,10 @@ class DecisionCount:
     "status and `audit` (coverage, the selection's audit), and every decision with its count "
     "over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate "
     "held back, never counted as picked; `regime`: the label the run stamped, null when the "
-    "gate was off or the label unknown); `coverage` / `missingTables`: the run record's own "
-    "coverage (COMPLETE, PARTIAL; null: not recorded) and the tables that had no rows when it "
-    "ran, not the session's missing tables as read now"
+    "gate was off or the label unknown); `coverage`: the run record's own coverage (COMPLETE, "
+    "PARTIAL; null: not recorded); `unavailable`: what the tables that had no rows when it "
+    "ran leave out, not the session's as read now; `missingTables` / `missingOptionalTables` "
+    "list those tables (legacy, admins only: empty for anyone else)"
 )
 class ScreenerRun:
     run_id: str
@@ -53,10 +57,10 @@ class ScreenerRun:
     picked: int
     paused: int
     regime: str | None
-    audit: JSON
     coverage: str | None
-    missing_tables: list[str]
-    missing_optional_tables: list[str]
+    missing_tables: list[str] = strawberry.field(extensions=[AdminCause([])])
+    missing_optional_tables: list[str] = strawberry.field(extensions=[AdminCause([])])
+    unavailable: list[Unavailable]
     run: strawberry.Private[runs.ScreenerRun]
     ctx: strawberry.Private[ReadContext]
 
@@ -74,13 +78,21 @@ class ScreenerRun:
             picked=d.picked,
             paused=d.paused,
             regime=d.regime,
-            audit=JSON(dict(d.audit)),
             coverage=d.coverage,
             missing_tables=list(d.missing_tables),
             missing_optional_tables=list(d.missing_optional_tables),
+            unavailable=[Unavailable.of(u) for u in d.unavailable],
             run=d,
             ctx=ctx,
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The run record's audit (coverage, the selection's audit); without the "
+        "tables the run went without unless the caller is an admin",
+        extensions=[AdminCause(public=lambda _, audit: JSON(public_audit(audit)))],
+    )
+    def audit(self) -> JSON:
+        return JSON(dict(self.run.audit))
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session of the previous run it is compared with; null: none (nothing "

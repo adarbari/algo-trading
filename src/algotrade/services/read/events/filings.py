@@ -17,6 +17,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.data.events import ALL_TIME, known_from, read_events
+from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.values import Unknown, UnknownCode
 
@@ -102,8 +103,13 @@ def load_filings(
     gaps = {
         iid: Unknown(
             UnknownCode.NO_ROW,
-            f"{FILING_TABLE} has no filings of {iid} known by {day.isoformat()} "
-            "(filings are fetched for the event-study scope only)",
+            table_cause(
+                FILING_TABLE,
+                f"{FILING_TABLE} has no filings of {iid} known by {day.isoformat()} "
+                "(filings are fetched for the event-study scope only)",
+                "NO_ROW",
+                day,
+            ),
         )
         for iid in ids
         if iid not in seen
