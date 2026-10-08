@@ -5,10 +5,10 @@ from tests.apps.api.graphql.conftest import Graph
 
 CHECKS = """query Q($date: Date) {
   quality(date: $date) {
-    session runId status finishedAt checks { name status detail } unknown { code detail }
+    session runId status finishedAt checks { name status detail } unknown { code kind }
   }
   verification(date: $date) {
-    session runIds instruments counts byCheck { check counts } failing unknown { code detail }
+    session runIds instruments counts byCheck { check counts } failing unknown { code kind }
   }
 }"""
 

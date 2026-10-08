@@ -35,7 +35,7 @@ for (const theme of ['dark', 'light'] as const) {
     }, theme);
     await expect(page.getByRole('heading', { level: 1, name: 'Regime' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 3, name: 'Not computed' })).toBeVisible();
-    await expect(page.getByText(/has no partition for/).first()).toBeVisible();
+    await expect(page.getByText(/not available because of a system error/).first()).toBeVisible();
     const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
     const fast = page.getByRole('region', { name: 'Fast-moving market signs' });
     await expect(slow.getByRole('listitem')).toHaveCount(5);

@@ -125,9 +125,9 @@ def test_partition_reads_exactly_the_session(stored: tuple[StoreWriter, StoreRea
 
 
 def test_an_older_partition_exists_and_is_ignored(stored: tuple[StoreWriter, StoreReader]) -> None:
-    assert partition(open_for(stored[1]), EARNINGS) == Unknown(
-        UnknownCode.NO_PARTITION, f"{EARNINGS} has no partition for 2026-10-01"
-    )
+    found = partition(open_for(stored[1]), EARNINGS)
+    assert isinstance(found, Unknown) and found.code is UnknownCode.NO_PARTITION
+    assert found.cause.text == f"{EARNINGS} has no partition for 2026-10-01"
 
 
 def test_inventory_reads_name_their_dates(stored: tuple[StoreWriter, StoreReader]) -> None:
@@ -155,9 +155,9 @@ def test_partition_prunes_columns_and_instruments(stored: tuple[StoreWriter, Sto
     assert "next_earnings_date" not in frame.columns
     none = partition(ctx, EARNINGS, ["days_to_earnings"], ["EQ:ZZZ"])  # stored, none asked
     assert isinstance(none, pd.DataFrame) and none.empty
-    assert partition(open_for(reader, date(2026, 10, 2)), EARNINGS, ["x"]) == Unknown(
-        UnknownCode.NO_PARTITION, f"{EARNINGS} has no partition for 2026-10-02"
-    )
+    found = partition(open_for(reader, date(2026, 10, 2)), EARNINGS, ["x"])
+    assert isinstance(found, Unknown) and found.code is UnknownCode.NO_PARTITION
+    assert found.cause.text == f"{EARNINGS} has no partition for 2026-10-02"
 
 
 @pytest.mark.parametrize(

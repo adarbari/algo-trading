@@ -8,7 +8,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from algotrade_api.deps import Context, Live
+from algotrade_api.deps import Caller, Context, Live
+from algotrade_api.redact import redact
 from algotrade_api.schemas.chains import LiveOptionChain
 
 router = APIRouter(prefix="/chains", tags=["chains"])
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/chains", tags=["chains"])
 @router.get("/{underlying_id}/live")
 def live_chain(
     ctx: Context,
+    caller: Caller,
     live: Live,
     underlying_id: str,
     expiry: date,
@@ -30,4 +32,5 @@ def live_chain(
 ) -> LiveOptionChain:
     """Live quotes from IB Gateway (read-only, cached briefly); the stored delayed chain with
     a status when the gateway cannot answer. Each live answer is recorded (``live/*``)."""
-    return LiveOptionChain.model_validate(live.chain(ctx, underlying_id, expiry, strikes))
+    found = LiveOptionChain.model_validate(live.chain(ctx, underlying_id, expiry, strikes))
+    return redact(found, caller.role)

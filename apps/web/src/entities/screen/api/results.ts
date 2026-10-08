@@ -25,7 +25,21 @@ const ScreenerResults = graphql(`
   ) {
     session {
       date
-      missing
+      unavailable {
+        kind
+        features
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
     }
     screener(id: $id) {
       id
@@ -41,7 +55,18 @@ const ScreenerResults = graphql(`
       }
       notRun {
         code
-        detail
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
       latestRun {
         runId
@@ -49,8 +74,21 @@ const ScreenerResults = graphql(`
         previousSession
         status
         coverage
-        missingTables
-        missingOptionalTables
+        unavailable {
+          kind
+          features
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
         regime
         paused
         decisions {
@@ -74,7 +112,21 @@ const ScreenerResults = graphql(`
           total
           page
           size
-          missing
+          unavailable {
+            kind
+            features
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
+          }
           columns {
             name
             description
@@ -88,6 +140,11 @@ const ScreenerResults = graphql(`
           rows
           unknown
           reasons
+          kinds
+          kindTexts {
+            kind
+            text
+          }
           results {
             instrumentId
             rank

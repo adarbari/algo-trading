@@ -16,7 +16,7 @@ vi.mock('@/features/screener-builder', async (importOriginal) => ({
 const DATA = {
   session: '2026-10-02',
   decisions: { QUALIFIED: 2, WATCH: 1, REJECT: 4200 },
-  coverage: { coverage: 'PARTIAL', selected: 4203, coverage_pct: 0.425, missing_tables: [] },
+  coverage: { coverage: 'PARTIAL', selected: 4203, coverage_pct: 0.425, unavailable: [] },
   summary: {
     passed: 2,
     missing: 2416,
@@ -88,12 +88,26 @@ describe('ScreenSummary', () => {
     expect(screen.getByText('Running the preview…')).toBeInTheDocument();
   });
 
-  it('names the tables with no rows when coverage is incomplete', () => {
+  it('tells what the preview lacks, by kind, when coverage is incomplete', () => {
     state.preview = {
       ...ready,
-      data: { ...DATA, coverage: { ...DATA.coverage, missing_tables: ['iv30'] } },
+      data: {
+        ...DATA,
+        coverage: {
+          ...DATA.coverage,
+          unavailable: [
+            {
+              kind: 'SYSTEM',
+              features: ['rollup.iv30@v1.iv30'],
+              guide_term: 'unavailable_system',
+              kind_text: 'not available because of a system error',
+              cause: null,
+            },
+          ],
+        },
+      },
     };
     render(<ScreenSummary />);
-    expect(screen.getByText('No rows stored for iv30 on 2026-10-02.')).toBeInTheDocument();
+    expect(screen.getByText('Not available: system error')).toBeInTheDocument();
   });
 });

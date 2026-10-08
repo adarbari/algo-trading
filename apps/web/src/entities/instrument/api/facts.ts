@@ -12,7 +12,21 @@ const InstrumentFacts = graphql(`
     session {
       date
       isLatest
-      missing
+      unavailable {
+        kind
+        features
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
       referenceSnapshot
       preSnapshot
     }
@@ -30,8 +44,19 @@ const InstrumentFacts = graphql(`
         value
         unknown {
           code
-          detail
           reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
         info {
           format

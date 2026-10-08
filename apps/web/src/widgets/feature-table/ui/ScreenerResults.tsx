@@ -28,6 +28,7 @@ import {
   useTableView,
   ViewControls,
 } from '@/features/table-view';
+import { UnknownNote } from '@/entities/availability';
 import { byName, useFeatureCatalogue, type CriterionInfo, type TableRow } from '@/entities/feature';
 import { RunRegimeChip } from '@/entities/regime';
 import {
@@ -165,19 +166,19 @@ export function ScreenerResults({
         results.data?.session && run
           ? {
               session: results.data.session.date,
-              missing: [...results.data.session.missing, ...run.results.missing],
+              unavailable: [...results.data.session.unavailable, ...run.results.unavailable],
               preSnapshot: false,
               run: {
                 session: run.session,
                 partial: run.status === 'partial' || run.coverage === 'PARTIAL',
-                missing: run.missingTables,
-                missingOptional: run.missingOptionalTables,
+                unavailable: run.unavailable,
               },
             }
           : null
       }
       header={
         <Stack gap={2}>
+          {screener?.notRun ? <UnknownNote unknown={screener.notRun} /> : null}
           <SearchInput
             aria-label="Find a ticker"
             placeholder="Ticker or name…"

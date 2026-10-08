@@ -8,9 +8,14 @@ from typing import Self
 
 import strawberry
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
 from algotrade.services.read import values
+from algotrade.services.read.availability.cause import UnavailableKind
 from algotrade.services.read.instruments import catalogue, features
+from algotrade_api.graphql.context import RequestContext
+from algotrade_api.graphql.permissions import AdminCause
+from algotrade_api.graphql.types.availability import Cause
 
 strawberry.enum(values.UnknownCode, description="Why a value is UNKNOWN for the session")
 strawberry.enum(
@@ -20,17 +25,34 @@ strawberry.enum(catalogue.FeatureFormat, description="How a client shows a featu
 
 
 @strawberry.type(
-    description="A value not known for the session: why, and where it looked; `reason` is "
-    "set exactly when `code` is EXPLAINED"
+    description="A value not known for the session: `code` and, in public words, `kind` (with "
+    "its Guide term `guideTerm`, `kindText` in generic words); `reason` is set exactly when "
+    "`code` is EXPLAINED. `cause` is "
+    "the chain behind it, source to table: admins only (null for anyone else)"
 )
 class Unknown:
     code: values.UnknownCode
-    detail: str
     reason: values.NullReason | None
+    kind: UnavailableKind
+    guide_term: str
+    unknown: strawberry.Private[values.Unknown]
 
     @classmethod
     def of(cls, d: values.Unknown) -> Self:
-        return cls(code=d.code, detail=d.detail, reason=d.reason)
+        return cls(code=d.code, reason=d.reason, kind=d.kind, guide_term=d.guide_term, unknown=d)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The kind in generic words: never a table, vendor or step"
+    )
+    def kind_text(self) -> str:
+        return self.unknown.public_reason
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The chain behind it, source to table; null unless the caller is an admin",
+        extensions=[AdminCause()],
+    )
+    async def cause(self, info: Info[RequestContext, None]) -> Cause | None:
+        return Cause.of(await info.context.cause_of(self.unknown.cause))
 
 
 @strawberry.type(

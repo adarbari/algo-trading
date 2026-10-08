@@ -13,6 +13,7 @@ from strawberry.http import GraphQLHTTPResponse
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionResult
 
+from algotrade.config.site.users import Role
 from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, context_getter
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
@@ -39,7 +40,8 @@ class _Router(GraphQLRouter[RequestContext, None]):
     async def process_result(
         self, request: Request, result: ExecutionResult
     ) -> GraphQLHTTPResponse:
-        return response_of(result)
+        viewer = getattr(request.state, "viewer", None)
+        return response_of(result, viewer is not None and viewer.role is Role.ADMIN)
 
 
 def graphql_router(

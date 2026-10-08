@@ -1,16 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  codeReason,
-  isUnknown,
-  reasonLabel,
-  shownValue,
-  unknownLabel,
-  unknownReason,
-  valueFormat,
-  type NullReasonName,
-  type ServedValue,
-} from './value';
+import { isUnknown, shownValue, valueFormat, type ServedValue } from './value';
 
 describe('valueFormat', () => {
   it('follows the server format, the unit choosing currency and digits', () => {
@@ -40,22 +30,18 @@ describe('valueFormat', () => {
 
 describe('unknown values', () => {
   const value = (
-    code: 'NO_PARTITION' | 'NO_ROW' | 'NULL' | 'LICENCE' | 'NOT_APPLICABLE' | 'ILLIQUID',
+    code: 'NO_PARTITION' | 'NO_ROW' | 'NULL' | 'LICENCE' | 'NOT_APPLICABLE',
   ): ServedValue => ({
     name: 'rollup.earnings@v1.next_earnings_date',
     value: null,
-    unknown: { code, detail: 'rollups/instrument/earnings@v1 has no partition for 2026-10-02' },
+    unknown: {
+      code,
+      kind: 'SYSTEM',
+      guideTerm: 'unavailable_system',
+      kindText: 'not available because of a system error',
+      cause: null,
+    },
     info: { format: 'DATE', nullMeaning: 'no report date on or after the session' },
-  });
-
-  it('says why, in words', () => {
-    expect(unknownReason(value('NO_PARTITION'))).toBe(
-      'not stored for this session (rollups/instrument/earnings@v1 has no partition for 2026-10-02)',
-    );
-    expect(unknownReason(value('NO_ROW'))).toBe('no row for this instrument in this session');
-    expect(unknownReason(value('NULL'))).toBe('no report date on or after the session');
-    expect(unknownReason(value('LICENCE'))).toMatch(/has no partition/);
-    expect(unknownReason(undefined)).toBe('not known');
   });
 
   it('tells a known value from an unknown one and shows flags in words', () => {
@@ -63,52 +49,5 @@ describe('unknown values', () => {
     expect(isUnknown(undefined)).toBe(true);
     expect(isUnknown({ ...value('NULL'), value: 0, unknown: null })).toBe(false);
     expect([shownValue(true), shownValue(false), shownValue(3)]).toEqual(['Yes', 'No', 3]);
-  });
-
-  it('labels n/a and Illiquid cells apart from a real gap, with a reason for each', () => {
-    expect(unknownLabel('NOT_APPLICABLE')).toBe('n/a');
-    expect(unknownLabel('ILLIQUID')).toBe('Illiquid');
-    expect([unknownLabel('NULL'), unknownLabel('NO_ROW'), unknownLabel(null)]).toEqual([
-      'Unknown',
-      'Unknown',
-      'Unknown',
-    ]);
-    expect(codeReason('NOT_APPLICABLE', null)).toMatch(/does not apply/);
-    expect(codeReason('ILLIQUID', null)).toMatch(/too thin to price/);
-    expect(unknownReason(value('ILLIQUID'))).toMatch(/has no partition/); // the server's detail
-  });
-
-  it('words each explained absence, exhaustively (ADR 0046)', () => {
-    const reasons: NullReasonName[] = ['NO_TRADE', 'NOT_ANNOUNCED', 'NEW_LISTING', 'FEW_BARS'];
-    expect(reasons.map(reasonLabel)).toEqual([
-      'No trade',
-      'Not announced',
-      'New listing',
-      'Too few trades',
-    ]);
-    expect(reasons.map((r) => unknownLabel('EXPLAINED', r))).toEqual(reasons.map(reasonLabel));
-    expect(codeReason('EXPLAINED', null, 'NO_TRADE')).toBe('no trade on this session: no bar');
-    expect(codeReason('EXPLAINED', null, 'NOT_ANNOUNCED')).toBe(
-      'the next report date is not announced',
-    );
-    expect(codeReason('EXPLAINED', null, 'NEW_LISTING')).toBe('listed too recently for the window');
-    expect(codeReason('EXPLAINED', null, 'FEW_BARS')).toBe('trades too rarely to fill the window');
-  });
-
-  it('reads an EXPLAINED cell without a reason as Unknown, and keeps the server detail', () => {
-    expect(unknownLabel('EXPLAINED')).toBe('Unknown');
-    expect(unknownLabel('EXPLAINED', null)).toBe('Unknown');
-    expect(codeReason('EXPLAINED', null)).toBe('not known for this session');
-    const explained: ServedValue = {
-      name: 'rollup.earnings@v1.next_earnings_date',
-      value: null,
-      unknown: {
-        code: 'EXPLAINED',
-        detail: 'the next report is not announced',
-        reason: 'NOT_ANNOUNCED',
-      },
-      info: { format: 'DATE' },
-    };
-    expect(unknownReason(explained)).toBe('the next report is not announced');
   });
 });

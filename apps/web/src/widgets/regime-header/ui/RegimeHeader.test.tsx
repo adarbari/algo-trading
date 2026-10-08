@@ -55,7 +55,7 @@ describe('RegimeHeader', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(unknownRegimeFixture()));
     render(<RegimeHeader />);
     expect(screen.getByRole('heading', { level: 3, name: 'Not computed' })).toBeVisible();
-    expect(screen.getByText('The regime is not in the catalogue yet.')).toBeVisible();
+    expect(screen.getAllByText('not available because of a system error')[0]).toBeVisible();
     expect(screen.getByText('Nothing to compare: the regime is not computed.')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Explain the regime' })).toBeNull();
   });

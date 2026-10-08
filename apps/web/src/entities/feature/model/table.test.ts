@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { tableVariables, toTableData } from './table';
 
+const gap = (kind: 'SYSTEM' | 'NOT_STORED', features: string[]) => ({
+  kind,
+  features,
+  guideTerm: kind === 'SYSTEM' ? 'unavailable_system' : 'unavailable_not_stored',
+  kindText: kind === 'SYSTEM' ? 'system' : 'not stored',
+  cause: null,
+});
+
 const column = (name: string) => ({
   name,
   description: name,
@@ -16,14 +24,14 @@ const column = (name: string) => ({
 describe('feature table', () => {
   it('turns the columnar response into rows of cells by catalogue name', () => {
     const data = toTableData({
-      session: { date: '2026-10-02', missing: ['rollups/instrument/earnings@v1'] },
+      session: { date: '2026-10-02', unavailable: [gap('SYSTEM', ['rollup.earnings@v1.x'])] },
       universeSnapshot: '2026-10-02',
       preSnapshot: false,
       sort: '-a.b',
       total: 11_427,
       page: 2,
       size: 100,
-      missing: ['instruments/company'],
+      unavailable: [gap('NOT_STORED', ['feature.y'])],
       columns: [column('rollup.a@v1.x'), column('feature.y')],
       instruments: [
         { instrumentId: 'EQ:A', symbol: 'AAPL', name: 'Apple Inc.' },
@@ -41,21 +49,30 @@ describe('feature table', () => {
         [null, null],
         [null, 'NO_TRADE'],
       ],
+      kinds: [
+        [null, null],
+        ['SYSTEM', 'NOT_APPLICABLE'],
+      ],
+      kindTexts: [{ kind: 'SYSTEM' as const, text: 'system words' }],
     });
     expect(data.rows.map((r) => r.symbol)).toEqual(['AAPL', 'MRVL']);
     expect(data.rows[0]?.cells).toEqual({
-      'rollup.a@v1.x': { value: 1.5, unknown: null, reason: null },
-      'feature.y': { value: 'HIGH', unknown: null, reason: null },
+      'rollup.a@v1.x': { value: 1.5, unknown: null, reason: null, kind: null, kindText: null },
+      'feature.y': { value: 'HIGH', unknown: null, reason: null, kind: null, kindText: null },
     });
     expect(data.rows[1]?.cells['rollup.a@v1.x']).toEqual({
       value: null,
       unknown: 'NO_PARTITION',
       reason: null,
+      kind: 'SYSTEM',
+      kindText: 'system words',
     });
     expect(data.rows[1]?.cells['feature.y']).toEqual({
       value: null,
       unknown: 'EXPLAINED',
       reason: 'NO_TRADE',
+      kind: 'NOT_APPLICABLE',
+      kindText: null,
     });
     expect([data.session, data.total, data.page, data.size]).toEqual([
       '2026-10-02',
@@ -63,7 +80,7 @@ describe('feature table', () => {
       2,
       100,
     ]);
-    expect(data.missing).toEqual(['rollups/instrument/earnings@v1', 'instruments/company']);
+    expect(data.unavailable.map((u) => u.kind)).toEqual(['SYSTEM', 'NOT_STORED']);
   });
 
   it('sends the query as the operation variables, absent parts as null', () => {

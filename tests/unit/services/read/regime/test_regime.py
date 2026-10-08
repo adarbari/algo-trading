@@ -10,6 +10,7 @@ from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.strategy.regime import DEFAULT_MULTIPLIERS
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.features import catalogue
+from algotrade.services.read.availability.cause import UnavailableKind
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.regime.fields import (
     FRAGILITY,
@@ -109,7 +110,7 @@ def test_a_session_with_no_partition_never_shows_an_older_one() -> None:
     assert found.session == D0 and found.label is RegimeLabel.UNKNOWN
     assert found.unknown_reason is not None
     assert found.unknown_reason.code is UnknownCode.NO_PARTITION
-    assert str(D0) in found.unknown_reason.detail
+    assert str(D0) in found.unknown_reason.cause.text
     assert found.scores.macro_risk.value is None
     assert {i.status for i in found.indicators} == {IndicatorStatus.UNKNOWN}
     assert found.indicators[0].unknown is not None
@@ -124,8 +125,10 @@ def test_a_label_outside_the_four_is_unknown_not_guessed() -> None:
     found = load_regime(with_regime(context(store_with(odd))))
     assert found.label is RegimeLabel.UNKNOWN and found.unknown_reason is not None
     assert (
-        found.unknown_reason.code is UnknownCode.NULL and "'SUNNY'" in found.unknown_reason.detail
+        found.unknown_reason.code is UnknownCode.NULL
+        and "'SUNNY'" in found.unknown_reason.cause.text
     )
+    assert found.unknown_reason.kind is UnavailableKind.SYSTEM  # a label we do not know: a fault
 
 
 def test_a_null_label_is_unknown_with_the_stored_null() -> None:

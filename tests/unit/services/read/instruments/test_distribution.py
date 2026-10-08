@@ -40,7 +40,7 @@ def test_other_features_count_their_values(ctx: ReadContext) -> None:
 def test_no_partition_for_the_session_is_unknown(ctx: ReadContext) -> None:
     found = load_distribution(ctx, NEXT)  # earnings@v1 is stored for D0 only
     assert found.unknown is not None and found.unknown.code is UnknownCode.NO_PARTITION
-    assert "earnings@v1" in found.unknown.detail
+    assert "earnings@v1" in found.unknown.cause.text
     assert (found.count, found.categories, found.histogram) == (0, (), ())
 
 

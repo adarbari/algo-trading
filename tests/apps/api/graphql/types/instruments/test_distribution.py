@@ -18,7 +18,7 @@ DISTRIBUTION = """query D($name: FeatureName!, $date: Date) {
   distribution(name: $name, date: $date) {
     name session count nulls info { dtype format }
     quantiles { q value } histogram { lo hi count } categories { value count }
-    unknown { code detail }
+    unknown { code kind }
   }
 }"""
 

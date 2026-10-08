@@ -4,6 +4,7 @@ backtest run)."""
 
 from fastapi.testclient import TestClient
 
+from algotrade_api.graphql.types.ops.backtest import _public
 from tests.apps.api.graphql.conftest import Graph
 
 RUNS = "{ backtests { runId configId user status start end startedAt finishedAt metrics } }"
@@ -48,3 +49,13 @@ def test_not_a_backtest_run_is_null(graph: Graph, ids: dict[str, str]) -> None:
 
 def test_the_backtests_page_reads_no_rest(client: TestClient) -> None:
     assert client.get("/backtests").status_code == 404
+
+
+def test_a_traders_copy_of_a_backtest_document_has_no_tables() -> None:
+    audit = {"instruments": ["EQ:AAA"], "missing_tables": ["rollups/x@v1"]}
+    assert _public(None, audit) == {"instruments": ["EQ:AAA"]}
+
+
+def test_a_traders_backtest_data_names_no_table() -> None:
+    data = {"as_of": "2026-10-02", "data_versions": {"bars/daily@v1": "r1"}}
+    assert _public(None, data) == {"as_of": "2026-10-02"}

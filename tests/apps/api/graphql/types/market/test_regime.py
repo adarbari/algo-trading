@@ -10,7 +10,7 @@ from tests.helpers.api_store import END, PREVIOUS
 
 REGIME = """query R($date: Date) {
   regime(date: $date) {
-    session label plainLabel headline unknownReason { code detail }
+    session label plainLabel headline unknownReason { code kind }
     scores { macroRisk { value unknown { code } feature coverageFeature threshold }
              marketStress { value unknown { code } feature coverageFeature threshold }
              fragility { value unknown { code } }

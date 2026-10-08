@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from algotrade.services.preview import screens
 from algotrade_api.deps import Caller, Context, Store, Users, acting_user
+from algotrade_api.redact import redact, unavailable_for
 from algotrade_api.schemas.preview.screeners import PreviewBody, ScreenPreview
 
 router = APIRouter(prefix="/screeners", tags=["screeners"])
@@ -16,4 +17,7 @@ def preview(
 ) -> ScreenPreview:
     who = acting_user(caller, users, body.user)
     result = screens.preview_screen(ctx, store.preview_cache, body.spec, who, body.limit)
-    return ScreenPreview.model_validate(result)
+    out = ScreenPreview.model_validate(result)
+    gaps = unavailable_for(ctx, result.coverage.missing_tables, ctx.session.date, caller.role)
+    coverage = out.coverage.model_copy(update={"unavailable": gaps})
+    return redact(out.model_copy(update={"coverage": coverage}), caller.role)

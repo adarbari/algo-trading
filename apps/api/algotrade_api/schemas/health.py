@@ -4,7 +4,9 @@ and the shared base model every area uses."""
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from algotrade.services.read.availability.cause import ADMIN_CAUSE
 
 
 class Schema(BaseModel):
@@ -31,6 +33,9 @@ class Health(Schema):
     status: str = "ok"
     storage: str
     latest_session: date | None
-    tables: list[str]
+    tables: list[str] = Field(
+        description="the stored tables (admins only: empty for anyone else, ADR 0056)",
+        json_schema_extra={ADMIN_CAUSE: []},
+    )
     versions: dict[str, str]
     build: Build

@@ -135,14 +135,14 @@ function featureTable(variables: Record<string, unknown>): Json {
   return {
     data: {
       table: {
-        session: { date: tickers['session'], missing: [] },
+        session: { date: tickers['session'], unavailable: [] },
         universeSnapshot: keys ? null : tickers['snapshot_date'],
         preSnapshot: false,
         sort,
         total: rows.length,
         page: keys ? 1 : page,
         size: keys ? 100 : size,
-        missing: [],
+        unavailable: [],
         columns: columns.map(columnInfo),
         instruments: shown.map((r) => ({
           instrumentId: r['instrument_id'],
@@ -152,6 +152,8 @@ function featureTable(variables: Record<string, unknown>): Json {
         rows: shown.map((r) => columns.map((c) => valueOf(r, c))),
         unknown: shown.map((r) => columns.map((c) => (valueOf(r, c) === null ? 'NULL' : null))),
         reasons: shown.map(() => columns.map(() => null)),
+        kinds: shown.map((r) => columns.map((c) => (valueOf(r, c) === null ? 'NOT_STORED' : null))),
+        kindTexts: [{ kind: 'NOT_STORED', text: 'not available for this instrument' }],
       },
     },
   };
@@ -207,7 +209,13 @@ function featureValues(names: readonly string[]): Json[] {
       VALUES.values[name] ?? {
         name,
         value: null,
-        unknown: { code: 'NULL', detail: `${name} not recorded` },
+        unknown: {
+          code: 'NULL',
+          kind: 'NOT_STORED',
+          guideTerm: 'unavailable_not_stored',
+          kindText: 'not available for this instrument',
+          cause: null,
+        },
         info: { format: 'NUMBER', unit: null, dtype: 'float', nullMeaning: '' },
       },
   );
@@ -540,7 +548,10 @@ function withEpisodeFeatures(facts: Json): Json {
     value('dd_hikes_2022', -0.31, 'PERCENT', 'decimal'),
     value('dd_covid_2020', null, 'PERCENT', 'decimal', {
       code: 'NO_PARTITION',
-      detail: 'rollups/instrument/episode_behaviour@v1',
+      kind: 'SYSTEM',
+      guideTerm: 'unavailable_system',
+      kindText: 'not available because of a system error',
+      cause: null,
     }),
   );
   return facts;

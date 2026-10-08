@@ -26,14 +26,36 @@ const RegimeQuery = graphql(`
       headline
       unknownReason {
         code
-        detail
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
       scores {
         macroRisk {
           value
           unknown {
             code
-            detail
+            kind
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
           }
           feature
           coverageFeature
@@ -43,7 +65,18 @@ const RegimeQuery = graphql(`
           value
           unknown {
             code
-            detail
+            kind
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
           }
           feature
           coverageFeature
@@ -53,7 +86,18 @@ const RegimeQuery = graphql(`
           value
           unknown {
             code
-            detail
+            kind
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
           }
           feature
           coverageFeature
@@ -97,7 +141,18 @@ const RegimeQuery = graphql(`
         value
         unknown {
           code
-          detail
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
         format
         status

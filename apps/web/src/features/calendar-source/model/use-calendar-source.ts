@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 
+import { unknownText } from '@/entities/availability';
 import {
   DEFAULT_DECISIONS,
   useScreenerResults,
@@ -59,7 +60,9 @@ export function useCalendarSource(): CalendarSource {
   if (!isScope && !results.isPending && !results.isError) {
     if (!screener) message = 'This screener is not available.';
     else if (!screener.latestRun)
-      message = screener.notRun?.detail || 'This screener has no run for the session.';
+      message = screener.notRun
+        ? `This screener: ${unknownText(screener.notRun)}.`
+        : 'This screener has no run for the session.';
     else if (ids.length === 0) message = 'This screener picked no names in its latest run.';
   }
   return {

@@ -3,15 +3,38 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.users import Role
 from algotrade.config.user import UserContext
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api import __version__
+from algotrade_api.auth.protocol import UnauthenticatedError
 from algotrade_api.deps import ApiSettings
 from algotrade_api.graphql.schema import sdl
 from algotrade_api.main import create_app
 from algotrade_api.ops.build import STAMP, schema_hash
 from tests.helpers.api_store import as_user, store_over
+
+
+class Anonymous:
+    def authenticate(self, request: object) -> None:
+        raise UnauthenticatedError("no credentials")
+
+
+def test_only_an_admin_reads_the_stored_table_names(
+    api_golden: tuple[object, dict[str, str]],
+) -> None:
+    """ADR 0056: anyone else gets the status without table names (health is public)."""
+    store = api_golden[0]
+    settings = ApiSettings("memory://", "config")
+    admin = TestClient(create_app(settings, store, authenticator=as_user())).get("/health")  # type: ignore[arg-type]
+    trader = TestClient(create_app(settings, store, authenticator=as_user("bob", Role.TRADER)))  # type: ignore[arg-type]
+    anonymous = TestClient(create_app(settings, store, authenticator=Anonymous()))  # type: ignore[arg-type]
+    assert "bars/1d" in admin.json()["tables"]
+    for client in (trader, anonymous):
+        body = client.get("/health").json()
+        assert body["status"] == "ok" and body["tables"] == []
+        assert "rollups/" not in json.dumps(body) and "bars/" not in json.dumps(body)
 
 
 def test_health_reports_store_latest_session_and_versions(client: TestClient) -> None:

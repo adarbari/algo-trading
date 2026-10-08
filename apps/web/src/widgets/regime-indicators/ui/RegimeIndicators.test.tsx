@@ -129,15 +129,15 @@ describe('RegimeIndicators', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
     render(<RegimeIndicators />);
     expect(screen.getByText(/Turned on this week/)).toBeInTheDocument();
-    expect(screen.getByText(/Unknown: no market row for 2026-10-02/)).toBeVisible();
+    expect(screen.getByText(/Unknown: not available because of a system error/)).toBeVisible();
   });
 
   it('shows every card UNKNOWN with its reason when the regime is not computed', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(unknownRegimeFixture()));
     render(<RegimeIndicators />);
-    expect(screen.getAllByText(/Unknown: not stored for this session/)).toHaveLength(3);
+    expect(screen.getAllByText(/Unknown: not available because of a system error/)).toHaveLength(3);
     expect(
-      screen.getAllByRole('img', { name: /: unknown\. not stored for this session/ }),
+      screen.getAllByRole('img', { name: /: unknown\. not available because of a system error/ }),
     ).toHaveLength(3);
     expect(screen.queryByRole('meter')).toBeNull();
   });

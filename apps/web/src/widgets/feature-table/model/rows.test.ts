@@ -9,6 +9,8 @@ describe('resultRows', () => {
       rows: [[null]],
       unknown: [['EXPLAINED']],
       reasons: [['NEW_LISTING']],
+      kinds: [['NOT_APPLICABLE']],
+      kindTexts: [{ kind: 'NOT_APPLICABLE', text: 'does not apply to this instrument' }],
       results: [
         {
           instrumentId: 'EQ:N',
@@ -27,6 +29,8 @@ describe('resultRows', () => {
       value: null,
       unknown: 'EXPLAINED',
       reason: 'NEW_LISTING',
+      kind: 'NOT_APPLICABLE',
+      kindText: 'does not apply to this instrument',
     });
   });
 });

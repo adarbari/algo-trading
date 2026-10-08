@@ -352,3 +352,68 @@ tolerance 100; the score stops at 0. It is for ordering the list, not a probabil
 by score, then by the screen's tie-break field, then by instrument.
 """
 see_also = ["near_miss", "score_mode", "qualified"]
+
+# ------------------------------------------------------------- why a value is not available (ADR 0056)
+# One term per public kind (`UnavailableKind`, src/algotrade/services/read/availability/cause.py;
+# the fitness test tests/unit/services/read/availability/test_cause.py keeps every kind mapped).
+# A trader reads the kind and the feature names; the chain behind it is for admins.
+
+[[term]]
+id = "unavailable_system"
+term = "Not available: system error"
+short = "The value could not be shown because something in the app's own data pipeline did not deliver it."
+body = """
+A source was down, a nightly step did not finish, or a stored table is missing for the session.
+The value is not an empty value and not a zero: it is simply not there, and the app never fills
+it from an earlier day. A screen that needs it treats it as missing data, so a hard criterion
+rejects the row and a soft or score criterion costs points. It normally clears on the next
+nightly run; the owner sees the exact cause.
+"""
+see_also = ["unknown", "session", "unavailable_not_stored"]
+
+[[term]]
+id = "unavailable_not_stored"
+term = "Not available for this instrument"
+short = "Nothing is stored for this instrument for the session, and nothing went wrong: the data does not exist for it."
+body = """
+The instrument has no row in the data behind the field for that day, or the field is stored
+empty. A stock with no listed options has no option chain, a recent listing has no history,
+a company that has not reported has no report date. No failure stands behind it, so waiting
+does not change it. A screen treats it as missing data, like any other UNKNOWN value.
+"""
+see_also = ["unknown", "unavailable_not_applicable", "unavailable_system"]
+
+[[term]]
+id = "unavailable_not_applicable"
+term = "Does not apply to this instrument"
+short = "The field is not defined for this kind of instrument, so there is no value to show."
+body = """
+Some fields describe only some instruments: earnings dates exist for operating companies, not
+for funds; a fund's holdings exist only for funds. The app shows the field as not applicable
+and, where the data says so, the precise reason (a new listing, a blank-check company). It is a
+fact about the instrument, not a gap in the data.
+"""
+see_also = ["unknown", "unavailable_not_stored"]
+
+[[term]]
+id = "unavailable_illiquid"
+term = "Not available: too thinly traded"
+short = "An option value is left out because the instrument's options are too thinly quoted to trust."
+body = """
+Option values such as implied volatility are computed from near-the-money quotes. When the
+quotes are missing or their spread is too wide, the app shows no value rather than a number
+built from noise. It is the market's state on the day, not an error, and it can change by the
+next session.
+"""
+see_also = ["unknown", "liquidity_risk"]
+
+[[term]]
+id = "unavailable_licence"
+term = "Not available under your data licence"
+short = "The field comes from a personal-licence source that only its owner may read."
+body = """
+Some data (from the owner's brokerage connection) is licensed for personal use. Another user
+sees the field as unavailable, and a formula over it inherits the same licence. It is a rule
+of the data, not a fault.
+"""
+see_also = ["unknown"]

@@ -4,7 +4,9 @@ the position)."""
 from fastapi import APIRouter
 
 from algotrade.services.preview import expressions
+from algotrade.services.read.context import ReadContext
 from algotrade_api.deps import Caller, Reads, Users, acting_user
+from algotrade_api.redact import redact, unavailable_for
 from algotrade_api.schemas.preview.features import CheckBody, ExpressionCheck
 
 router = APIRouter(prefix="/features", tags=["features"])
@@ -14,4 +16,10 @@ router = APIRouter(prefix="/features", tags=["features"])
 def check(ctx: Reads, caller: Caller, users: Users, body: CheckBody) -> ExpressionCheck:
     who = acting_user(caller, users, body.user)
     result = expressions.check_expression(ctx, body.expr, who, body.sample)
-    return ExpressionCheck.model_validate(result)
+    out = ExpressionCheck.model_validate(result)
+    gaps = (
+        unavailable_for(ctx, result.missing, ctx.session.date, caller.role)
+        if isinstance(ctx, ReadContext)
+        else []
+    )
+    return redact(out.model_copy(update={"unavailable": gaps}), caller.role)

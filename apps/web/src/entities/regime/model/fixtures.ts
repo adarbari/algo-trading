@@ -5,6 +5,13 @@
 import type { Regime } from './regime';
 
 const NO_UNKNOWN = null;
+const SYSTEM_UNKNOWN = {
+  code: 'NOT_IN_CATALOGUE' as const,
+  kind: 'SYSTEM' as const,
+  guideTerm: 'unavailable_system',
+  kindText: 'not available because of a system error',
+  cause: null,
+};
 
 export function regimeFixture(overrides: Partial<Regime> = {}): Regime {
   return {
@@ -178,7 +185,7 @@ export function regimeFixture(overrides: Partial<Regime> = {}): Regime {
         falseAlarms: 'Several a year.',
         links: [{ title: 'Chicago Fed NFCI', url: 'https://www.chicagofed.org/nfci' }],
         value: null,
-        unknown: { code: 'NO_PARTITION', detail: 'no market row for 2026-10-02' },
+        unknown: SYSTEM_UNKNOWN,
         format: 'NUMBER',
         status: 'UNKNOWN',
         changed: null,
@@ -205,25 +212,25 @@ export function unknownRegimeFixture(): Regime {
       macroRisk: {
         ...known.scores.macroRisk,
         value: null,
-        unknown: { code: 'NOT_IN_CATALOGUE', detail: 'regime not built' },
+        unknown: SYSTEM_UNKNOWN,
       },
       marketStress: {
         ...known.scores.marketStress,
         value: null,
-        unknown: { code: 'NOT_IN_CATALOGUE', detail: 'regime not built' },
+        unknown: SYSTEM_UNKNOWN,
       },
       fragility: {
         ...known.scores.fragility,
         value: null,
-        unknown: { code: 'NOT_IN_CATALOGUE', detail: 'regime not built' },
+        unknown: SYSTEM_UNKNOWN,
       },
     },
     sizing: { ...known.sizing, label: 'UNKNOWN', multiplier: null },
-    unknownReason: { code: 'NOT_IN_CATALOGUE', detail: 'The regime is not in the catalogue yet.' },
+    unknownReason: SYSTEM_UNKNOWN,
     indicators: known.indicators.map((i) => ({
       ...i,
       value: null,
-      unknown: { code: 'NOT_IN_CATALOGUE', detail: 'not stored for this session' },
+      unknown: SYSTEM_UNKNOWN,
       status: 'UNKNOWN' as const,
       changed: null,
     })),

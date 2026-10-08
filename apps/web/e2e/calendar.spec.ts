@@ -70,9 +70,9 @@ test('a fund tracks its reference and says what is not known', async ({ page }) 
   await page.goto('/explore?focus=SOXS&tab=events');
   await expect(page.getByText('Tracks NVDA')).toBeVisible();
   await expect(
-    page.getByText('Expiry ladder: Unknown (no option chain stored for the session)'),
+    page.getByText('Expiry ladder: not available because of a system error'),
   ).toBeVisible();
-  await expect(page.getByText('Filings: n/a (a fund files no 8-Ks)')).toBeVisible();
+  await expect(page.getByText('Filings: does not apply to this instrument')).toBeVisible();
   await page.getByRole('button', { name: 'Open NVDA' }).click();
   await expect(page).toHaveURL(/focus=NVDA/);
 });

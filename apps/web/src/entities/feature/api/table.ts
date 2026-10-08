@@ -38,7 +38,21 @@ const FeatureTable = graphql(`
     ) {
       session {
         date
-        missing
+        unavailable {
+          kind
+          features
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
       }
       universeSnapshot
       preSnapshot
@@ -46,7 +60,21 @@ const FeatureTable = graphql(`
       total
       page
       size
-      missing
+      unavailable {
+        kind
+        features
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
       columns {
         name
         description
@@ -65,6 +93,11 @@ const FeatureTable = graphql(`
       rows
       unknown
       reasons
+      kinds
+      kindTexts {
+        kind
+        text
+      }
     }
   }
 `);

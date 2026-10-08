@@ -6,8 +6,9 @@
  */
 import { formatValue } from '@algotrade/ui';
 
+import { unknownText, unknownWord } from '@/entities/availability';
 import { factOf, IDEA_FACTS, type Idea } from '@/entities/idea';
-import { isUnknown, unknownLabel, unknownReason } from '@/entities/feature';
+import { isUnknown } from '@/entities/feature';
 
 /** The label of a value the server does not have for the session. */
 export const UNKNOWN_LABEL = 'Unknown';
@@ -39,9 +40,13 @@ export function earningsCell(idea: Idea): FactCell {
   const last = text(factOf(idea, IDEA_FACTS.lastEarnings)?.value);
   const shown = last
     ? `Last ${formatValue(last, { kind: 'date', style: 'day' }).text}`
-    : unknownLabel(nextFact?.unknown?.code, nextFact?.unknown?.reason);
+    : unknownWord(nextFact?.unknown);
   return isUnknown(nextFact)
-    ? { text: shown, muted: true, title: unknownReason(nextFact) }
+    ? {
+        text: shown,
+        muted: true,
+        title: unknownText(nextFact?.unknown, nextFact?.info.nullMeaning),
+      }
     : { text: shown, muted: true };
 }
 
@@ -57,7 +62,7 @@ export function expiryDte(idea: Idea): number | null {
 
 export function dteReason(idea: Idea): string | undefined {
   const fact = factOf(idea, IDEA_FACTS.expiryDte);
-  return isUnknown(fact) ? unknownReason(fact) : undefined;
+  return isUnknown(fact) ? unknownText(fact?.unknown, fact?.info.nullMeaning) : undefined;
 }
 
 /** The VRP gate's IV30 (a fraction); null: not known. */

@@ -403,12 +403,20 @@ describe('GuideField states', () => {
       fakeQuery({
         ...distribution,
         count: 0,
-        unknown: { code: 'NO_PARTITION', detail: 'bands@v2 has no partition for 2026-10-06' },
+        unknown: {
+          code: 'NO_PARTITION',
+          kind: 'SYSTEM',
+          guideTerm: 'unavailable_system',
+          kindText: 'not available because of a system error',
+          cause: null,
+        },
         passing: [],
       }),
     );
     setup();
-    expect(screen.getByText('bands@v2 has no partition for 2026-10-06')).toBeInTheDocument();
+    expect(
+      screen.getByText('Nothing is counted: not available because of a system error.'),
+    ).toBeInTheDocument();
   });
 
   it('shows the server-derived parts loading and failing on their own', async () => {

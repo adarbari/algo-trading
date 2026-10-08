@@ -51,8 +51,19 @@ const IdeasPage = graphql(`
         }
         notRun {
           code
-          detail
           reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
         picked
         top {
@@ -75,7 +86,18 @@ const IdeasPage = graphql(`
             value
             unknown {
               code
-              detail
+              kind
+              guideTerm
+              kindText
+              cause {
+                links {
+                  level
+                  subject
+                  status
+                  message
+                  runId
+                }
+              }
             }
             info {
               format

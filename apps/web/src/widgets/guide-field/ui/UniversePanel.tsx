@@ -6,6 +6,7 @@
  */
 import { BarList, Distribution, Panel, Select, Stack, Text } from '@algotrade/ui';
 
+import { unknownText } from '@/entities/availability';
 import {
   distributionBins,
   distributionMarkers,
@@ -65,7 +66,9 @@ export function UniversePanel({ feature, useIndex, onUseChange }: UniversePanelP
       errorMessage="The distribution failed to load."
       onRetry={() => void distribution.refetch()}
       emptyMessage={
-        data?.unknown?.detail ?? 'This field is not stored for the session, so nothing is counted.'
+        data?.unknown
+          ? `Nothing is counted: ${unknownText(data.unknown)}.`
+          : 'This field is not stored for the session, so nothing is counted.'
       }
     >
       {data && (
