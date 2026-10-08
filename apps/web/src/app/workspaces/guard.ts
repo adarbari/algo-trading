@@ -32,24 +32,38 @@ function go(to: string, reason?: LoginReason): never {
   throw redirect({ to, search: () => (reason ? { reason } : {}) });
 }
 
+/** The registered viewer, or a redirect to `/login` (with the reason when there is one). */
+async function requireViewer(queryClient: QueryClient): Promise<Viewer> {
+  let viewer: Viewer | null;
+  try {
+    viewer = await ensureViewer(queryClient);
+  } catch (error) {
+    // A valid token the registry does not know: sign-in again is pointless, say why.
+    if (error instanceof ApiError && error.status === 403) {
+      return go('/login', 'unregistered');
+    }
+    throw error;
+  }
+  return viewer ?? go('/login');
+}
+
 /** `beforeLoad` for a workspace's layout route. */
 export function workspaceGuard(
   workspace: WorkspaceId,
 ): (args: { context: { queryClient: QueryClient } }) => Promise<void> {
   return async ({ context }) => {
-    let viewer: Viewer | null;
-    try {
-      viewer = await ensureViewer(context.queryClient);
-    } catch (error) {
-      // A valid token the registry does not know: sign-in again is pointless, say why.
-      if (error instanceof ApiError && error.status === 403) {
-        return go('/login', 'unregistered');
-      }
-      throw error;
-    }
-    if (!viewer) return go('/login');
+    const viewer = await requireViewer(context.queryClient);
     if (canEnter(viewer, workspace)) return;
     const home = homeFor(viewer);
     return home === null ? go('/login', 'unregistered') : go(home);
   };
+}
+
+/** `beforeLoad` for a route every registered viewer may open whatever their role (the Guide). */
+export async function viewerGuard({
+  context,
+}: {
+  context: { queryClient: QueryClient };
+}): Promise<void> {
+  await requireViewer(context.queryClient);
 }

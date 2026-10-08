@@ -34,4 +34,4 @@ them. Shared signal maths belongs in one helper: `make dupes` must pass.
    "Rebalancing selections"): the set in `view.instruments` can then change between bars, so
    size from `view.instruments` on each call and do not assume an instrument stays (one that
    leaves is closed by the engine). Check it with `algotrade-backtest config validate <id>`.
-8. Run `make check`.
+8. Run `make changed`, then push: CI is the full gate.

@@ -9,7 +9,7 @@ import { CompareSetBar } from './CompareSetBar';
 describe('CompareSetBar', () => {
   it('shows the set in series order, removes, clears and refocuses', async () => {
     const user = userEvent.setup();
-    const handlers = { onRemove: vi.fn(), onClear: vi.fn(), onFocus: vi.fn() };
+    const handlers = { onRemove: vi.fn(), onClear: vi.fn(), onFocus: vi.fn(), onOpen: vi.fn() };
     const { container } = render(
       <CompareSetBar symbols={['AAPL', 'MSFT']} focused="KO" {...handlers} />,
     );
@@ -24,6 +24,22 @@ describe('CompareSetBar', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('opens the detail for the focused ticker, else the first, labelled by the count', async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    const base = { onRemove: vi.fn(), onClear: vi.fn(), onFocus: vi.fn(), onOpen };
+    const { rerender } = render(
+      <CompareSetBar symbols={['AAPL', 'MSFT']} focused="MSFT" {...base} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Compare 2' }));
+    expect(onOpen).toHaveBeenLastCalledWith('MSFT');
+    rerender(<CompareSetBar symbols={['AAPL', 'MSFT']} focused={null} {...base} />);
+    await user.click(screen.getByRole('button', { name: 'Compare 2' }));
+    expect(onOpen).toHaveBeenLastCalledWith('AAPL');
+    rerender(<CompareSetBar symbols={['KO']} focused={null} {...base} />);
+    expect(screen.getByRole('button', { name: 'Open detail' })).toBeInTheDocument();
+  });
+
   it('explains how to fill an empty set', () => {
     render(
       <CompareSetBar
@@ -32,6 +48,7 @@ describe('CompareSetBar', () => {
         onRemove={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
+        onOpen={vi.fn()}
       />,
     );
     expect(screen.getByText(/Tick up to 6 tickers/)).toBeInTheDocument();

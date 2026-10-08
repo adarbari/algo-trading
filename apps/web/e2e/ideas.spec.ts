@@ -50,6 +50,16 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
+test('a field header in Top ideas opens its Guide drawer', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/ideas');
+  const header = grid(page).getByRole('columnheader', { name: /IV30/ }).first();
+  await header.getByRole('button', { name: /^What is .*\?$/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('feature.vrp_iv30');
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('filters by decision', async ({ page }) => {
   await page.goto('/ideas');
   await page.getByRole('button', { name: 'Event risk' }).click();

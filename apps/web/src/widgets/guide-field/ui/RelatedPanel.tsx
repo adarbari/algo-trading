@@ -1,10 +1,10 @@
 /**
  * Related fields (links to their pages) and the playbooks that use the field, both derived by
- * the server (ADR 0038). A playbook is plain text with its rules until the playbook pages exist.
+ * the server (ADR 0038); a playbook links to its page.
  */
 import { Grid, Heading, Mono, Panel, Stack, Text, TextLink } from '@algotrade/ui';
 
-import { fieldPath } from '@/entities/guide';
+import { fieldPath, playbookPath } from '@/entities/guide';
 
 export interface RelatedPlaybook {
   id: string;
@@ -52,7 +52,9 @@ export function RelatedPanel({ related, playbooks, state, onRetry }: RelatedPane
           ) : (
             playbooks.map((playbook) => (
               <Stack key={playbook.id} gap={0}>
-                <Text size="sm">{playbook.name}</Text>
+                <TextLink href={playbookPath(playbook.id)} size="sm">
+                  {playbook.name}
+                </TextLink>
                 {playbook.rules.map((rule) => (
                   <Mono key={rule} size="sm" tone="muted">
                     {rule}

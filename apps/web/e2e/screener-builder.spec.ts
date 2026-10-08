@@ -48,8 +48,27 @@ test('the list shows your screeners and the site presets', async ({ page }) => {
   await expect(
     presets.getByRole('row', { name: /short_premium_liquidity/ }).getByRole('button'),
   ).toHaveCount(0);
+  // Every rule-screen preset links to its playbook in the Guide.
+  await expect(
+    presets.getByRole('row', { name: /vrp_scanner/ }).getByRole('link', { name: 'Playbook' }),
+  ).toHaveAttribute('href', '/guide/playbooks/vrp_scanner');
   await expectAccessible(page);
   expect(errors).toEqual([]);
+});
+
+test('the list’s Playbook link and the Builder header’s link open the preset’s playbook', async ({
+  page,
+}) => {
+  await page.goto('/screeners');
+  await page
+    .getByRole('grid', { name: 'Site presets' })
+    .getByRole('row', { name: /vrp_scanner/ })
+    .getByRole('link', { name: 'Playbook' })
+    .click();
+  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+  await page.goto('/screeners/vrp_scanner/edit');
+  await page.getByRole('link', { name: 'Playbook' }).click();
+  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
 });
 
 for (const width of [800, 1024, 1280]) {

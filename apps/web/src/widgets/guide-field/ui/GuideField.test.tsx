@@ -138,7 +138,25 @@ const distribution = {
   ],
 };
 
+const plain = (text: string) => ({ segments: [{ text }] });
+
 const derived = {
+  readsLinked: {
+    segments: [
+      { text: 'Where today’s bandwidth sits against ', field: null },
+      { text: SQUEEZE, field: SQUEEZE },
+      { text: ', 0 to 1.', field: null },
+    ],
+  },
+  caveatsLinked: [
+    {
+      segments: [
+        { text: 'Twenty sessions after a shock day, check ', field: null },
+        { text: SECTOR, field: SECTOR },
+        { text: ' first.', field: null },
+      ],
+    },
+  ],
   related: [SQUEEZE],
   playbooks: [
     {
@@ -152,9 +170,8 @@ const derived = {
   situations: [
     {
       name: 'Earnings gap inside the window',
-      signs: 'a gap resets the bands',
-      do: 'x',
-      affects: [],
+      slug: 'earnings-gap',
+      signsLinked: plain('a gap resets the bands'),
     },
   ],
 };
@@ -206,9 +223,7 @@ describe('GuideField sections', () => {
     const hero = screen.getByRole('region', { name: 'What this field means' });
     expect(within(hero).getByText(BB)).toBeInTheDocument();
     expect(within(hero).getByRole('heading', { level: 1 })).toBeInTheDocument();
-    expect(
-      within(hero).getByText(/Where today’s bandwidth sits against the last year/),
-    ).toBeInTheDocument();
+    expect(within(hero).getByText(/Where today’s bandwidth sits against/)).toBeInTheDocument();
     for (const tag of [
       'fraction (shown as %) · 0 to 1',
       'rollup · bands@v2',
@@ -247,11 +262,35 @@ describe('GuideField sections', () => {
   it('warns when it lies and names the situations that fool it', () => {
     setup();
     const lies = anchor('lies');
-    expect(
-      within(lies).getByText('Twenty sessions after a shock day the bands snap shut.'),
-    ).toBeInTheDocument();
+    expect(within(lies).getByText(/Twenty sessions after a shock day, check/)).toBeInTheDocument();
     expect(within(lies).getByText('Situations that fool it')).toBeInTheDocument();
-    expect(within(lies).getByText('Earnings gap inside the window')).toBeInTheDocument();
+    expect(
+      within(lies).getByRole('link', { name: 'Earnings gap inside the window' }),
+    ).toHaveAttribute('href', '/guide/situations/earnings-gap');
+  });
+
+  it('links the field names in how to read it and in the caveats to their pages', () => {
+    setup();
+    expect(within(anchor('reads')).getByRole('link', { name: SQUEEZE })).toHaveAttribute(
+      'href',
+      `/guide/fields/${encodeURIComponent(SQUEEZE)}`,
+    );
+    expect(within(anchor('lies')).getByRole('link', { name: SECTOR })).toHaveAttribute(
+      'href',
+      `/guide/fields/${encodeURIComponent(SECTOR)}`,
+    );
+  });
+
+  it('shows the guide’s plain text for reads and caveats until the server’s linked text arrives', () => {
+    hooks.useGuideField.mockReturnValue(fakeQuery(undefined));
+    setup();
+    expect(
+      within(anchor('reads')).getByText(/Where today’s bandwidth sits against the last year/),
+    ).toBeInTheDocument();
+    expect(
+      within(anchor('lies')).getByText('Twenty sessions after a shock day the bands snap shut.'),
+    ).toBeInTheDocument();
+    expect(within(anchor('reads')).queryByRole('link')).toBeNull();
   });
 
   it('says how it is computed, without the sources (they have their own section)', () => {
@@ -267,16 +306,18 @@ describe('GuideField sections', () => {
     expect(within(sources).getByText('Bollinger (2001)')).toBeInTheDocument();
   });
 
-  it('links related fields to their pages and lists the playbooks that use it as text', () => {
+  it('links related fields and the playbooks that use it to their pages', () => {
     setup();
     const related = screen.getByRole('region', { name: 'Related fields and playbooks' });
     expect(within(related).getByRole('link', { name: SQUEEZE })).toHaveAttribute(
       'href',
       `/guide/fields/${encodeURIComponent(SQUEEZE)}`,
     );
-    expect(within(related).getByText('Breakout')).toBeInTheDocument();
+    expect(within(related).getByRole('link', { name: 'Breakout' })).toHaveAttribute(
+      'href',
+      '/guide/playbooks/breakout',
+    );
     expect(within(related).getByText('lte 0.1 soft')).toBeInTheDocument();
-    expect(within(related).queryByRole('link', { name: 'Breakout' })).toBeNull();
   });
 
   it('asks for a symbol, then draws its year and links to Explore with the field', async () => {
@@ -318,7 +359,15 @@ describe('GuideField sections', () => {
         passing: [],
       }),
     );
-    hooks.useGuideField.mockReturnValue(fakeQuery({ related: [], playbooks: [], situations: [] }));
+    hooks.useGuideField.mockReturnValue(
+      fakeQuery({
+        readsLinked: null,
+        caveatsLinked: [],
+        related: [],
+        playbooks: [],
+        situations: [],
+      }),
+    );
     setup(SECTOR);
     expect(screen.getByText('The guide lists no caveat for this field yet.')).toBeInTheDocument();
     expect(

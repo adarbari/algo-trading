@@ -80,11 +80,12 @@ function setup() {
 }
 
 describe('WorkspaceLayout top bar', () => {
-  it('shows an admin both workspaces and their name', async () => {
+  it('shows an admin their name, and both workspaces in the account menu', async () => {
     vi.mocked(gql).mockResolvedValue({ viewer: ADMIN_VIEWER });
     setup();
-    expect(await screen.findByText('Bo')).toBeVisible();
-    expect(screen.getByRole('radio', { name: 'Trader' })).toBeVisible();
+    expect(screen.queryByRole('radio', { name: 'Admin' })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bo' }));
+    expect(await screen.findByRole('radio', { name: 'Trader' })).toBeVisible();
     expect(screen.getByRole('radio', { name: 'Admin' })).toBeVisible();
   });
 
@@ -121,25 +122,28 @@ describe('WorkspaceLayout top bar', () => {
     expect(await screen.findByText('guide page')).toBeVisible();
   });
 
-  it('hides the admin workspace from a trader', async () => {
+  it('offers a trader no workspace switch at all', async () => {
     vi.mocked(gql).mockResolvedValue({ viewer: TRADER_VIEWER });
     setup();
-    expect(await screen.findByText('Ann')).toBeVisible();
-    expect(screen.getByRole('radio', { name: 'Trader' })).toBeVisible();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ann' }));
+    expect(await screen.findByText('Signed in as Ann')).toBeVisible();
+    expect(screen.queryByRole('radio', { name: 'Trader' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Admin' })).not.toBeInTheDocument();
   });
 
   it('offers no sign-out without a Supabase session (the API runs with auth off)', async () => {
     vi.mocked(gql).mockResolvedValue({ viewer: ADMIN_VIEWER });
     setup();
-    await screen.findByText('Bo');
+    await userEvent.click(await screen.findByRole('button', { name: 'Bo' }));
+    await screen.findByText('Signed in as Bo');
     expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
   });
 
-  it('signs out and goes to the login page', async () => {
+  it('signs out from the account menu and goes to the login page', async () => {
     vi.mocked(gql).mockResolvedValue({ viewer: TRADER_VIEWER });
     vi.mocked(currentSession).mockResolvedValue({ email: 'ann@example.com' });
     setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ann' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
     expect(signOutSession).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('login page')).toBeVisible();

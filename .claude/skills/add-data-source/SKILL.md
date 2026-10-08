@@ -65,4 +65,4 @@ must pass with `architecture/known_violations.toml` still empty.
    sanity checks (for example bid ≤ ask, open interest ≥ 0).
 9. **Docs:** update the table in `docs/data/vendors.md`. If the vendor changes a decision,
    write an ADR.
-10. Run `make check`.
+10. Run `make changed`, then push: CI is the full gate.

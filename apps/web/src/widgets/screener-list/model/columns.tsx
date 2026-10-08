@@ -1,10 +1,11 @@
 /**
  * The screeners list's columns. Site presets: name, kind (rules or Python), universe,
- * state and Open / Copy. Your screeners: name, state (DRAFT or vN finalized, a working copy
- * beside it), the preset it copies, universe, Results, Edit and Delete.
+ * state, Playbook (its Guide page), Open and Copy. Your screeners: name, state (DRAFT or vN
+ * finalized, a working copy beside it), the preset it copies, universe, Results, Edit and Delete.
  */
-import { Button, Stack, StatusBadge, type DataTableColumn } from '@algotrade/ui';
+import { Button, Stack, StatusBadge, TextLink, type DataTableColumn } from '@algotrade/ui';
 
+import { playbookPath } from '@/entities/guide';
 import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
 
 export interface ScreenerActions {
@@ -61,7 +62,10 @@ export function presetColumns(actions: ScreenerActions): DataTableColumn<Screene
       width: '2xl', // Open + Copy to my screeners: narrower clips the buttons
       cell: ({ row }) =>
         isRules(row) ? (
-          <Stack direction="row" gap={2} justify="end">
+          <Stack direction="row" gap={3} justify="end" align="center">
+            <TextLink href={playbookPath(row.configId)} icon="book" size="sm">
+              Playbook
+            </TextLink>
             <Button
               size="sm"
               onClick={() => {

@@ -1,0 +1,42 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Rejected 2026-10-07; kept so it is not filed again.
+id = "leveraged_etf_rebalancing"
+name = "Leveraged ETF rebalancing"
+thesis = "Leveraged and inverse funds trade with the day's move near the close, pushing their underlying further the same way into the close."
+mechanism = """A fund with daily leverage L must trade L(L-1) times the day's return on its assets,
+buying after up days and selling after down days, near the close (Cheng and Madhavan 2009)."""
+persistence = """The mandate fixes the trade, so it is predictable; but it is small next to
+closing volume and offset by the funds' own creations and redemptions (Ivanov and Lenkey 2014)."""
+schedule = "every_session"
+top_k = "all"
+screeners = []
+status = "rejected"
+rejection_reason = """Intraday: the flow moves prices in the last minutes and reverses, which daily
+bars cannot see or trade, and what is left is weak after costs (Ivanov and Lenkey 2014; Shum et
+al. 2016); checked 2026-10-07."""
+
+[universe.where]
+all = [{ field = "instrument.is_leveraged", op = "eq", value = true }]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [1]
+benchmark = "SPY"
+
+[quality_bar]
+outcome = "Excess return of the funds' underlying over SPY over one session; the real window is minutes."
+trigger_timing = "The day's move is known only in the last hour of S; a daily close is too late to act."
+replication = "Cheng and Madhavan's rebalancing demand, L(L-1) times the day's return times assets."
+expected_size = "Small next to closing volume after creations and redemptions net out (Ivanov and Lenkey 2014)."
+capacity_costs = "Needs intraday execution at the close; spreads and impact take what is left."
+failure_modes = "Reversal the next morning; fund flows that offset the rebalance."
+decoys = "Plain intraday momentum on volatile days, which needs no fund at all."
+
+[[sources]]
+title = "Cheng, M. and Madhavan, A., The Dynamics of Leveraged and Inverse Exchange-Traded Funds, Journal of Investment Management, 2009"
+
+[[sources]]
+title = "Ivanov, I. and Lenkey, S., Are Concerns About Leveraged ETFs Overblown?, Federal Reserve FEDS working paper, 2014"
+
+[[sources]]
+title = "Shum, P., Hejazi, W., Haryanto, E. and Rodier, A., Intraday Share Price Volatility and Leveraged ETF Rebalancing, Review of Finance, 2016"

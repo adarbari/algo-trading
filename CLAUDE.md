@@ -39,6 +39,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Natural-language screener drafts**: a sentence becomes a draft rule screen through one `TextModel` protocol (`services/text_model`, also behind the on-demand regime explanation in `services/explaining`) and the one OpenAI-compatible adapter in `algotrade_sources/llm` (provider by `config/site/llm.toml` `base_url`; key only from `ALGOTRADE_LLM_API_KEY`; off by default); the prompt is the sentence, the catalogue, the phrasebook and the field guide (`config/site/field_guide/*.toml`: how to read each field, the criterion per intent, the caveats; rendered to `docs/data/field-guide.md` by `make features-doc`); invented fields are dropped with a reason, the rest validated as finalise; a draft the Builder loads, never a write or a run. (ADR 0041)
 - **The Guide** (`/guide`, a utility link on the right of the top bar): every explanation is written once as a Guide entry in site config (fields, situations, regime indicators and episodes, playbooks, glossary, how-to) and a page shows it only through `InfoButton` + `HelpDrawer` given an entry reference, never text; no explanatory prose in `apps/web/src` (shrink-only baseline `architecture/web_prose.toml`); spec `docs/ui/guide.md`, mechanics `.claude/skills/add-guide-content`. (ADR 0051)
 - **Event sensitivity**: what moves a name is measured per event class (own, peer, macro, market structure, unscheduled, factor-dated) as catalogue features over the scope list `config/site/events/scope.toml` plus tier A / B names; every event row carries `known_from` (read as `known_from <= S`; statistics only over events complete by S); unscheduled moves are attributed from 8-K items, then capped headlines through the text-model seam, then the owner-run deep-dive skill whose dossier enters through `dossier-import` (ingestion stays the writer); plan `docs/event-sensitivity-plan.md`. (ADR 0050)
+- **Edges**: an edge is a typed document `config/site/edges/<id>.toml` (thesis, persistence reason, outcome, schedule, frozen period) whose screeners are its implementations; outcomes are a grain `outcomes/instrument/<name>@v1` (`session_date` = start session, `knowledge_ts` = window close) written only by ingestion and read only by `data/outcomes`, importable only from `services/evaluation` (the one exception to the one-session rule); one cross-section harness scores each screener point in time (hit rate vs base rate, lift, decile spread, frozen period, trial log; statistics in `quant/`); ML proposes and implements, never judges; plan `docs/edges-plan.md`. (ADR 0053)
 - **Ingestion workflows** by cadence: `market-daily` (gates screens), weekly `reference`, `enrichment`. A step declares `needs` and runs only when they SUCCEEDED; it SUCCEEDS or FAILS by its acceptance checks (thresholds in `sources.toml [quality]`), never PARTIAL; a failed critical step holds back the workflow and every later session until it succeeds or is waived by hand (`--waive`). (ADR 0039)
 
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
@@ -98,9 +99,9 @@ entities -> shared -> @algotrade/ui`: it imports only downward, other slices onl
 `index.ts`, never a sibling slice; it renders no HTML elements and passes no `className` /
 `style`; no CSS files, colours or px outside the design system; only `src/shared/api` talks HTTP
 (client generated from the API's OpenAPI document), data through Query hooks in entities /
-features; only `src/app` routes. Two workspaces in a horizontal top bar: TRADER (Ideas,
-Screeners, Explore, Backtests) and ADMIN (Ingestion, Screener runs, Users & configs); role
-gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (FINAL, approved
+features; only `src/app` routes. Two workspaces, their sections in a horizontal top bar, the switch
+in the account menu: TRADER (Ideas, Screeners, Explore, Backtests) and ADMIN (Ingestion,
+Screener runs, Users & configs); role gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (FINAL, approved
 mockups 2026-10-03) -> primitives -> components -> screens; screens lay out and set text only
 with the primitives (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden).
 Every folder is a `[[web_dir]]` in `architecture/web_layout.toml`. Lint messages name the rule and
@@ -132,10 +133,16 @@ the skill with the fix.
 8. Secrets come only from environment variables. Never commit credentials.
    Dependencies go in the pyproject of the package that needs them (an app's own, not the
    library's), then `uv lock`; commit `uv.lock`.
-9. Check narrow first (`make changed`: mirrored tests, mapped web checks, fast gates), then run the full
-   `make check WORKERS=2 WEB_WORKERS=2` once before the push; after a failure rerun only the failed
-   gate (`make <gate>` / `npm run <script>`), never the whole `make check` again.
-10. **Push and open the PR yourself, then move on.** When `make check` passes, push the
+9. **Check locally only what changed, then push; CI is the gate** (owner decision
+   2026-10-08: CI has the hardware, the machine does not). Before the push run `make changed`
+   (the mirrored tests of the changed files, the mapped web checks, the fast gates) and the
+   one gate for what you touched when `changed` cannot map it; never the full `make check`
+   on the machine (396 runs in one week, 30-40 min each, were the bottleneck). After a CI
+   failure rerun only the failed gate locally (`make <gate>` / `npm run <script>`), fix, push
+   again. A bare `make check` refuses; `make check SCOPED=1` is a deliberate run of the areas
+   changed vs `origin/main` (`make check-scope`; the two sides in parallel, one run per
+   worktree) and `make check FULL=1` every gate (the release).
+10. **Push and open the PR yourself, then move on.** When `make changed` passes, push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start
     the next work item; do not ask the owner first and do not wait for CI (owner decision
@@ -181,6 +188,7 @@ the skill with the fix.
 | New REST endpoint (writes, jobs, live, files only) | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
+| Start of day: what slowed the last sessions down, top 3 fixed before new work | `.claude/skills/review-sessions` (`/review-sessions`, `make friction`) |
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
@@ -195,7 +203,7 @@ the nightly refuses to start. An agent worktree (`.claude/worktrees/`) links `.v
 (`.claude/agents/implementer.md`). Never `--no-verify` / `SKIP=`: the hooks work in a worktree.
 
 Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make perf` (strict timing budgets; run on an idle machine), `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
-Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
+Web (need Node 24): `make web-install`, `make web-check` (the web gates; `make web-lint|web-typecheck|web-unit|web-storybook|web-e2e` one at a time), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
 Ingestion: `algotrade-ingest --help` lists the commands; `algotrade-ingest run <task>` runs any registry task, e.g. `run ibkr-contracts`, `run ibkr-iv --from D1 --to D2 [--limit N]` (the resumable IBKR IV backfill; see `README.md`).
 API: `algotrade-api [--reload]` (127.0.0.1:8000; reads, plus user-config writes via `services/authoring`); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.
@@ -209,29 +217,39 @@ Match the model to the risk of the task; subagents in `.claude/agents/` pin thei
 - Haiku = `checker` (and `scout` for read-only lookups): runs gates, tails logs, reports failures; never fixes.
 - Sonnet = `implementer`: a scoped change with a known owner and pattern.
 - Opus = `architect`: design and review in architect areas, a bug that survived two fixes.
-- The orchestrating session (Fable or Opus) coordinates, decides design and triages unclear failures; it never runs a long check or rerun itself, it hands them to `checker`.
-No open-source or free model is available for agent work (agents pin Claude models); free models apply only to the product's text-model seam (`config/site/llm.toml`).
+- The orchestrating session (Sonnet by default; Fable or Opus only for design or research) coordinates, decides design and triages unclear failures; it never runs a long check or rerun itself, it hands them to `checker`.
+No free or open-source model serves agent work (agents pin Claude models); free models only serve the text-model seam (`config/site/llm.toml`).
 
-Quality is not traded for tokens: the cheaper model never decides design, `make check`
+Quality is not traded for tokens: the cheaper model never decides design, CI's full check
 gates every change whatever wrote it, a change in an `architect` area (new responsibility /
 folder / table / ADR, layer boundaries, point-in-time, `quant/` maths, atomic publish, locks
 and jobs, the IBKR read-only boundary, a bug that survived two fixes) gets an `architect`
 review of the diff before it is finished, and an agent that hits ambiguity or fails the same
 check twice escalates one tier instead of retrying.
 
-Shared machine: at most 2 agents at once, and agents run `make check WORKERS=2 WEB_WORKERS=2`
-(`pytest -n 2`, `vitest --maxWorkers=2`; overload caused false timeouts on #94 / #95 / #98).
-The owner and CI use the defaults (`WORKERS=auto`).
+Shared machine: at most 2 agents at once. Rule 9 keeps full checks off the machine, so nobody
+passes `WORKERS=2` / `WEB_WORKERS=2` any more (the cap dated from overloads on #94 / #95 / #98,
+when full checks ran side by side); tests run directly use `pytest -n auto`.
 
 Token habits (every session):
 
 - **Never `pkill -f make`, `pkill -f node`, `pkill -f vite` or `pkill -f playwright`**: it kills
   another session's 30-40 min run. Stop your own run by its PID or job; `make check` holds a
   per-worktree lock (`scripts/ops/check_lock.sh`) and `make doctor` lists the other runs.
-- **One fresh session per work item**; batch related bugs into it. Sonnet for scoped fixes,
-  Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
-  Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
-  separate tasks.
+- **One fresh session per work item, on the tier the item needs** (owner ask 2026-10-08;
+  `make friction` reports spend by tier): a work item runs from a **Sonnet** session, which
+  delegates lookups, inventories, test and CI-log runs to `scout` / `checker` (Haiku), scoped
+  changes to `implementer` (Sonnet), design and the architect-area review to `architect`
+  (Opus), and open-ended research or content needing outside sources to an agent with
+  `model: "fable"`. Never orchestrate implementation from a Fable or Opus session: the week
+  to 2026-10-07 spent $1,051, 70% of it on Fable and Opus orchestrating PR work. Free
+  open-source models (`config/site/llm.toml`: Ollama, Groq, Gemini) serve only the app's
+  TextModel seam; no Claude Code agent runs on them. Batch related bugs into the item; plan
+  before code on new work; close the session when its PR is up; spin side issues off.
+- **Never `sleep` to poll a log** (28 blocked calls in one week): run a check in the
+  foreground piped through `tail` (timeout up to 10 min), or background it and wait for the
+  harness's completion notice; judge a backgrounded make by its log tail, not the task exit
+  code. `Monitor` is a deferred tool: load it with `ToolSearch` (`select:Monitor`) first.
 - **Ingestion / backfill runs longer than ~2 h run detached** (`nohup` script writing a status
   file under `var/logs/`; README "Long runs"), never as a tool background command (killed at
   its limit).
@@ -242,7 +260,7 @@ Token habits (every session):
   `apps/api/openapi.json`, `datasets/golden/**`, `tests/fixtures/**`, `__screenshots__/`.
 - **Verify narrow first**: `make changed` (the mirrored tests of every file changed vs
   `origin/main`, then `arch`, `layout`, `ownership`), or one test file (`.venv/bin/python -m
-  pytest <path> -q -x`); then `make check` once before pushing. Send long runs to `checker`
+  pytest <path> -q -x`); then push (rule 9: no full `make check` locally). Send long runs to `checker`
   or pipe through `tail`. Re-run `make web-visual` only when the design system changed.
 - **Brief by pointer, report in the PR**: brief a subagent with paths, the owner, the skill
   and the acceptance check, not pasted file contents. A subagent's hand-back is at most 150
@@ -256,3 +274,5 @@ Token habits (every session):
 
 Harness audit: `/audit-harness` (`.claude/skills/audit-harness`); `/start` flags one older than
 30 days (date in `docs/roadmap.md` Now / Next), `/wrap-up` triggers it at CLAUDE.md >= 290 lines.
+Session review: `/review-sessions` (`make friction` over the transcripts, then the top 3 fixed in
+one harness PR); `/start` runs it when the "Session review: last" date is before today.

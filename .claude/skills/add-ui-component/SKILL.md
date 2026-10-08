@@ -42,10 +42,9 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
    - `Name.test.tsx` with `expectNoA11yViolations` (from `../../testing`)
    - export it from `components/index.ts` (and so from `@algotrade/ui`)
 4. **Regenerate and verify** (in `apps/web`): `npm run components:md`, `npm run ds:check`,
-   `npm run storybook` to look at it, `npm run visual:update` (Docker) to write the
-   light / dark screenshots into `__screenshots__/`; commit them.
+   `npm run storybook` to look at it (a story that imports `design-system/testing` only renders in the built Storybook: `npm run storybook:build`, then serve `storybook-static`); screenshots: rebuild Storybook first (`npm run storybook:build`: the visual suite reads the local `storybook-static/index.json`, so a stale build silently skips new stories), then update only the changed stories, `scripts/in-playwright-docker.sh "npm run visual -- --update-snapshots -g '<story ids>'"` (about 3 minutes; the full `npm run visual:update` re-renders all 770 and takes about an hour); commit the `__screenshots__/` files.
 5. **Use it** from the app layer that owns the need, importing only from `@algotrade/ui`. App
    code renders no HTML elements and passes no `className` / `style` (ESLint fails it).
 6. **Style check:** dense but calm. No gradients, glows, decorative shadows, emoji icons,
    or numbers wrapped in big cards. One accent colour. Borders, not shadows.
-7. Run `make web-check` (or `npm run check`), `make web-visual`, and `make check`.
+7. Run `make changed` (it maps the web checks), `make web-visual` when the design system changed, then push: CI is the full gate.

@@ -37,7 +37,14 @@ While writing:
 - Verify narrow first: the mirrored test file, then the gate for what you touched
   (`make arch`, `make layout`, `make ownership`, `make dupes`, `make filelen`; web:
   `npm run lint` and `npm run test` in `apps/web`), or `make changed` for both at once. Pipe
-  long output through `tail`. Run `make check` once, before you push.
+  long output through `tail`. Then push: CI is the full gate; never run the full `make check`
+  on the machine (the week to 2026-10-07 averaged 4.5 full checks per PR, at 30-40 min each).
+- Never `sleep` to poll a backgrounded command (the harness blocks it): run the check in the
+  foreground piped through `tail` with a long timeout, or background it and wait for the
+  completion notice, then read the log tail.
+- Shell slips that cost retries: `sed -n` needs a range (`sed -n '1,80p' <file>`; macOS sed
+  reads a bare path as a label), quote globs for zsh (`--include='*.py'`), the tool is
+  `Bash` (case-sensitive), and `Edit` needs a `Read` of the file first.
 - Check a web page through its text and accessibility tree first; take a screenshot only
   for a visual state those cannot show, once, at reduced scale.
 

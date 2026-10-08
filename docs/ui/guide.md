@@ -63,7 +63,7 @@ the product?
 ### Placement
 
 A **utility link on the right of the top bar**: book icon and "Guide", before the session date
-and the account menu, in both workspaces (no role gating). `?` opens `/guide`, ⌘K searches it
+and the account menu, in both workspaces (no role gating; the Guide has its own route group and keeps the workspace you came from). `?` opens `/guide`, ⌘K searches it
 from anywhere. Not a workspace section (sections are where work happens; Linear, Stripe,
 Notion, IBKR and tastytrade keep help as a utility on the right or a "?" button) and not in the
 account menu (GitHub and TradingView do that; it is the least discoverable place, wrong for an
@@ -154,7 +154,7 @@ Inventory of 2026-10-07. Each row moves in the phase named; the PR that moves it
 | Explore "Field guide" tab and its panels (`widgets/field-guide`, `pages/trader-explore`) | `/guide/fields`, `/guide/fields/<name>`; the tab redirects for one release | 1 (done in GD3b: the panels live in `widgets/guide-field`, the route redirects `tab=guide`; remove the redirect and the tab one release later) |
 | Feature table column headers (`widgets/feature-table`, column factories in `entities/feature`), Ideas columns | `InfoButton` in every field header, opening the field's drawer | 1 |
 | Builder "How to read it" Disclosure (`features/screener-builder/ui/FieldGuideHelp.tsx`) | `InfoButton` beside the criterion's field; the drawer's "Use this" fills the row | 2 (done in GD4c: the widget gives `CriterionRow` the drawer through `renderFieldHelp`; the picker's options show the guide's `summary`) |
-| Preset descriptions in TOML comments; Screeners list rows, the Builder header of a preset | playbook pages; a "Playbook" link on every preset | 2 |
+| Preset descriptions in TOML comments; Screeners list rows, the Builder header of a preset | playbook pages; a "Playbook" link on every preset | 2 (done in GD4b: the Screeners list rows of a rule-screen preset and the Builder header of a preset or its copy link to `/guide/playbooks/<id>`; the TOML comments are not removed here) |
 | Drafter "Left out ... (reason)" lines (`features/screener-describe`) | the field name opens its drawer, a kept criterion its intent card | 2 (done in GD4c: a left-out field in the catalogue and every kept criterion's field carry the help button; an intent card per kept criterion is not built) |
 | Regime cards' "Why it matters, what it did before" Disclosure (`widgets/regime-indicators`), the reading list (`widgets/reading-list`) | indicator pages; `InfoButton` on each card opening its drawer (text stays in `cards.toml`, written once) | 2 |
 | Regime "Market falls we compare with" (`widgets/regime-episodes`) | episode pages; a row opens its drawer; the table of live drawdowns stays | 2 |

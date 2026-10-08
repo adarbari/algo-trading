@@ -17,7 +17,7 @@ import {
   type ValueFormat,
 } from '@algotrade/ui';
 
-import { valueFormat } from '@/entities/feature';
+import { fieldColumn, valueFormat, type HelpedColumn } from '@/entities/feature';
 import { earningsBeforeExpiry, factOf, IDEA_FACTS, type Idea } from '@/entities/idea';
 import { DecisionBadge } from '@/entities/screen';
 
@@ -94,21 +94,21 @@ function metricColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
 }
 
 /** IV30 as the server formats it (`info.format` of the first idea that has one). */
-function ivColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
+function ivColumns(ideas: readonly Idea[]): HelpedColumn<Idea>[] {
   const served = ideas.map((idea) => factOf(idea, IDEA_FACTS.iv30)).find((v) => v?.info);
   if (!served || !anyValue(ideas, iv30)) return [];
   return [
-    {
+    fieldColumn<Idea>(IDEA_FACTS.iv30, {
       id: 'iv30',
       header: 'IV30',
       description: "30-day implied volatility (the VRP gate's: the lower of IBKR's and Cboe's)",
       value: iv30,
       format: valueFormat(served.info),
-    },
+    }),
   ];
 }
 
-const earningsColumn: DataTableColumn<Idea> = {
+const earningsColumn = fieldColumn<Idea>(IDEA_FACTS.nextEarnings, {
   id: 'earnings',
   header: 'Earnings',
   description: 'The next earnings date; muted: none scheduled, when the last one was',
@@ -122,9 +122,9 @@ const earningsColumn: DataTableColumn<Idea> = {
       </Text>
     );
   },
-};
+});
 
-const dteColumn: DataTableColumn<Idea> = {
+const dteColumn = fieldColumn<Idea>(IDEA_FACTS.expiryDte, {
   id: 'dte',
   header: 'Expiry DTE',
   description:
@@ -145,7 +145,7 @@ const dteColumn: DataTableColumn<Idea> = {
         {formatted.text}
       </Mono>
     ),
-};
+});
 
 const watchOutColumn: DataTableColumn<Idea> = {
   id: 'watch-out',

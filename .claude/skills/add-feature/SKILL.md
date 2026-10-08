@@ -125,5 +125,5 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    reading, criterion per intent, caveats, sources). `make features-doc` lists what is
    still unguided; screened or phrased fields must be guided.
 9. **Baseline:** if strategies or screeners use it, run `make baseline` and explain the diff.
-10. Run `make check`; after merge, backfill with `algotrade-ingest rollups --from D --to D
+10. Run `make changed`, push (CI is the full gate); after merge, backfill with `algotrade-ingest rollups --from D --to D
     --only <name>@v1`.

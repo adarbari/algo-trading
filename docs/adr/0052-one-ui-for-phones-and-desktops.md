@@ -50,5 +50,17 @@ to the space and the pointer it has.
 - A page cannot know whether it is narrow (no hook in app code): what differs by width is a
   prop on a design-system component (`summary` on MasterDetail, `collapse` on Grid). A need no
   component covers is a design-system change first (ADR 0011), never a media query in a page.
-- Admin pages are covered by the same rules but their master-detail (ingestion drilldown) keeps
-  page state for now; it moves to `MasterDetail` when the admin workspace is reviewed on phones.
+- Admin pages are covered by the same rules; the ingestion drilldown is a `MasterDetail` (MU2).
+
+## Amendment 2026-10-07 (MU2, owner's phone test)
+- **The workspace switch leaves the top bar** (owner decision: not in the bar's prime space).
+  It lives in the `AccountMenu` behind the viewer's name, shown only to a viewer who may enter
+  more than one workspace; the bar is brand, sections, the Guide, the status chips and the
+  name, a two-row grid under 720 px (about 100 px on a phone; the phone e2e bounds it at 112 px).
+  ADR 0025's "switched in a horizontal top bar" reads with this amendment.
+- **Narrow tables (under `sm`, 480 px: a phone, not a desktop's aside column) show their
+  `essential` columns** (else the first three) and the column picker,
+  so the user adds the rest; the catalogue columns are hideable there.
+- **Tooltips open on a tap** under a coarse pointer; **keyboard hints** are a `KeyHints` row the
+  design system hides under a coarse pointer; a table row that opens something takes a tap
+  (`onRowActivate`); Explore's compare set has a Compare button that opens the detail sheet.

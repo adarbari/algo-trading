@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: test-shard coverage-combine check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering roadmap-check unit property integration e2e test \
+.PHONY: test-shard coverage-combine check-gates check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -19,6 +19,9 @@ doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web d
 
 status:          ## PRs + CI, running ingest jobs, last nightly, store latest session, dev servers (~15 lines, read-only)
 	@$(if $(wildcard $(PY)),$(PY),python3) scripts/status.py
+
+friction:        ## what slowed the last sessions down (SINCE=YYYY-MM-DD, default 7 days): blocked / failing tool calls, gate runs vs failures, retries, owner corrections; report under var/harness/friction/ (read-only)
+	@$(if $(wildcard $(PY)),$(PY),python3) scripts/session_friction.py $(if $(SINCE),--since $(SINCE))
 
 install: no-shared-venv  ## library + every app + dev tools into .venv, exactly as locked
 	$(UV) sync --all-packages --locked
@@ -73,7 +76,7 @@ rest-allowlist:  ## REST GET routes only shrink (ADR 0037): architecture/rest_al
 rest-allowlist-update: ## after retiring GET routes (removing their entries): lower the committed count
 	$(PY) scripts/check_rest_allowlist.py --update
 
-features-doc:    ## regenerate docs/data/features.md (catalogue) and docs/data/field-guide.md (field guide)
+features-doc:    ## regenerate docs/data/features.md (catalogue), docs/data/field-guide.md (field guide) and docs/edges.md (edges)
 	$(PY) scripts/features_doc.py
 
 roadmap-check:   ## docs/roadmap.md opens with a Now / Next of at most 25 lines (the one counter: tests/architecture/test_docs.py)
@@ -108,15 +111,17 @@ test:            ## everything, with the coverage gate, one worker per CPU (WORK
 
 # CI runs the suite as three parallel shards (docs/ci.md "Pipeline"); together they are `make test`.
 # A fitness test (tests/architecture/pipeline) checks the shards cover every tests/ folder.
-TEST_SHARDS = unit-a unit-b apps rest
-# tests/unit split in two by subfolder (the #286 run: unit 5.6 min, apps 3.3, rest 1.7)
-TEST_SHARD_unit-a = tests/unit/features tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
-TEST_SHARD_unit-b = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
+TEST_SHARDS = unit-a unit-b unit-c apps rest
+# tests/unit split three ways (the #292 run: unit-a 4.5 min with all of features/, unit-b 1.6):
+# the rollup groups are the slow unit tests, so they are spread over unit-a and unit-b
+TEST_SHARD_unit-a = tests/unit/features/rollups/market tests/unit/features/rollups/price tests/unit/features/rollups/corporate tests/unit/features/rollups/options tests/unit/features/rollups/activity
+TEST_SHARD_unit-b = tests/unit/features/rollups/positioning tests/unit/features/rollups/levels tests/unit/features/rollups/reference tests/unit/features/rollups/relative tests/unit/features/rollups/patterns tests/unit/features/expressions tests/unit/features/framework tests/unit/features/test_catalogue.py tests/unit/features/test_guide.py tests/unit/features/test_site.py tests/unit/features/test_site_fundamentals.py tests/unit/features/test_site_patterns.py tests/unit/features/test_site_positioning.py tests/unit/features/test_site_relative.py tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
+TEST_SHARD_unit-c = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
 TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
 # rest: few tests, the slow ones
 TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation
 
-test-shard:      ## one CI shard (SHARD=unit-a|unit-b|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
+test-shard:      ## one CI shard (SHARD=unit-a|unit-b|unit-c|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
 	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }
 	COVERAGE_FILE=.coverage.$(SHARD) $(PY) -m pytest -n $(WORKERS) --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
 
@@ -159,8 +164,31 @@ $(WEB)/node_modules/.package-lock.json: $(WEB)/package-lock.json
 web-install: $(WEB)/node_modules/.package-lock.json  ## web deps + the Playwright browser
 	cd $(WEB) && npx playwright install chromium
 
-web-check: $(WEB)/node_modules/.package-lock.json  ## generated files fresh, ds:check, lint, types, unit, build, storybook, e2e (WEB_WORKERS=N caps vitest)
-	cd $(WEB) && $(if $(WEB_WORKERS),VITEST_MAX_WORKERS=$(WEB_WORKERS) )$(NPM) run check
+# The web gates as make targets so `make check -j` runs them side by side (npm run check is the
+# serial form). generated:check rewrites the generated files, so every other gate waits for it;
+# the e2e's Playwright web server does the one `vite build` (typecheck is the one `tsc -b`).
+web-generated: $(WEB)/node_modules/.package-lock.json  ## generated files (tokens, COMPONENTS.md, API client) are fresh
+	cd $(WEB) && $(NPM) run generated:check
+
+web-ds: web-generated      ## design-system check
+	cd $(WEB) && $(NPM) run ds:check
+
+web-lint: web-generated    ## eslint, stylelint, prettier
+	cd $(WEB) && $(NPM) run lint
+
+web-typecheck: web-generated  ## tsc -b, the one type gate
+	cd $(WEB) && $(NPM) run typecheck
+
+web-unit: web-generated    ## vitest (WEB_WORKERS=N caps its workers)
+	cd $(WEB) && $(if $(WEB_WORKERS),VITEST_MAX_WORKERS=$(WEB_WORKERS) )$(NPM) run test
+
+web-storybook: web-generated  ## the Storybook build
+	cd $(WEB) && $(NPM) run storybook:build
+
+web-e2e: web-typecheck     ## production build (once, by Playwright's web server) + e2e
+	cd $(WEB) && $(NPM) run e2e
+
+web-check: web-ds web-lint web-typecheck web-unit web-storybook web-e2e  ## every web gate (in parallel under `make check`; serial: npm run check)
 
 web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke: Vite dev + the real API, empty and golden stores, every route
 	cd $(WEB) && ALGOTRADE_PY=$(abspath $(PY)) npx playwright test -c playwright.real.config.ts
@@ -175,11 +203,38 @@ WEB_DIST ?= var/web
 web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build the API serves (ALGOTRADE_WEB_DIST=var/web); redo after a web change
 	cd $(WEB) && VITE_API_BASE_URL= $(NPM) run build -- --outDir $(abspath $(WEB_DIST)) --emptyOutDir
 
-# One full check per worktree: a second concurrent run refuses (scripts/ops/check_lock.sh).
-check:
-	scripts/ops/check_lock.sh $(MAKE) check-gates
+# ----------------------------------------------------------------------------- the gate (docs/ci.md "Scope-aware make check")
+# `make check` runs the gates for the areas changed vs BASE (python / web / docs, CI's rule:
+# scripts/changed_tests.py --areas), the python and web sides side by side (CHECK_JOBS=2), under
+# the per-worktree lock (scripts/ops/check_lock.sh: a second run here refuses and names the first).
+# FULL=1 runs every gate whatever changed, as the release does. CHECK_SCOPE overrides the detection.
+# Rule 9: sessions run `make changed` and push; CI is the gate. A bare `make check` refuses;
+# SCOPED=1 runs the detected areas, FULL=1 every gate (the release).
+FULL ?=
+SCOPED ?=
+CHECK_JOBS ?= 2
+CHECK_SCOPE ?= $(if $(FULL),python web,$(shell $(PY) scripts/changed_tests.py --areas $(BASE)))
+CHECK_PY = lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering roadmap-check datasets-verify test evaluate
+CHECK_WEB = web-check web-real
+CHECK_DOCS = fitness
+CHECK_TARGETS = $(if $(filter python,$(CHECK_SCOPE)),$(CHECK_PY)) $(if $(filter web,$(CHECK_SCOPE)),$(CHECK_WEB)) $(if $(filter docs,$(CHECK_SCOPE)),$(if $(filter python,$(CHECK_SCOPE)),,$(CHECK_DOCS)))
 
-check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering roadmap-check datasets-verify test evaluate web-check web-real
+check-scope:     ## which areas `make check` would gate for this branch (python / web / docs vs BASE)
+	@echo "$(strip $(CHECK_SCOPE))"
+
+fitness:         ## the architecture fitness tests only (what CI runs for a docs-only change)
+	$(PY) -m pytest -q -n $(WORKERS) tests/architecture
+
+check:           ## refuses by default (rule 9: `make changed`, push, CI gates); SCOPED=1 = the gates of the areas changed vs BASE in parallel, FULL=1 = every gate (the release); one run per worktree
+	@if [ -z "$(FULL)$(SCOPED)" ]; then \
+	  echo "refusing: rule 9 (CLAUDE.md, owner decision 2026-10-08): run \`make changed\` for what changed, push, and let CI gate; the machine never runs the full check." >&2; \
+	  echo "  a deliberate run: \`make check SCOPED=1\` (the areas changed vs $(BASE); \`make check-scope\` lists them) or \`make check FULL=1\` (every gate, the release)." >&2; \
+	  exit 1; \
+	fi
+	scripts/ops/check_lock.sh $(MAKE) --no-print-directory -j$(CHECK_JOBS) check-gates
+
+check-gates: $(strip $(CHECK_TARGETS))  ## the gates of the detected scope (CHECK_SCOPE / FULL=1), run by `make check` under the lock
+	@echo "make check: scope [$(strip $(CHECK_SCOPE))] vs $(BASE); gates run: $^"
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

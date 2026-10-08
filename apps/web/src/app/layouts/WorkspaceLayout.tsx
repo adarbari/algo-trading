@@ -1,16 +1,17 @@
 /**
- * A workspace's layout route: the app shell with the horizontal top bar (product, workspace
- * switch, the workspace's sections) above the page. Composition only: AppShell, TopBar,
- * WorkspaceSwitch and NavTabs come from the design system; this file supplies the router's
- * current path, its Link and navigation (the design system knows no routes). The switch lists
- * only the workspaces the viewer may enter; the end slot shows their name and, when they signed
- * in through Supabase, a sign-out action; the regime chip (ADR 0047) sits before the name, on both
- * workspaces, and opens the Regime page. A viewer that turns null (the API refused the token)
- * goes back to the login page.
+ * A workspace's layout route: the app shell with the horizontal top bar (product, the
+ * workspace's sections, the Guide, the regime chip and the account menu) above the page.
+ * Composition only: AppShell, TopBar, AccountMenu, WorkspaceSwitch and NavTabs come from the
+ * design system; this file supplies the router's current path, its Link and navigation (the
+ * design system knows no routes). The account menu (the viewer's name) holds the workspace
+ * switch, listing only the workspaces the viewer may enter (hidden when there is one), and,
+ * when they signed in through Supabase, a sign-out action; the regime chip (ADR 0047) sits
+ * before the name, on both workspaces, and opens the Regime page. A viewer that turns null (the
+ * API refused the token) goes back to the login page.
  */
 import {
+  AccountMenu,
   AppShell,
-  Button,
   LinkProvider,
   Mono,
   NavTabs,
@@ -26,7 +27,13 @@ import { useEffect } from 'react';
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
 
-import { canEnter, WORKSPACES, type Workspace, type WorkspaceId } from '../workspaces';
+import {
+  canEnter,
+  rememberWorkspace,
+  WORKSPACES,
+  type Workspace,
+  type WorkspaceId,
+} from '../workspaces';
 
 import { renderRouterLink } from './router-link';
 import { useGuideShortcut } from './use-guide-shortcut';
@@ -44,6 +51,9 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
   const signOut = useSignOut();
   useGuideShortcut();
   useEffect(() => {
+    rememberWorkspace(workspace);
+  }, [workspace]);
+  useEffect(() => {
     if (viewer === null) void navigate({ to: '/login', search: {} });
   }, [viewer, navigate]);
   const options = WORKSPACES.filter((w) => canEnter(viewer ?? null, w.id)).map((w) => ({
@@ -60,9 +70,6 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
         topBar={
           <TopBar
             brand={<Mono weight="medium">algotrade</Mono>}
-            workspace={
-              <WorkspaceSwitch workspaces={options} value={workspace.id} onValueChange={enter} />
-            }
             utility={
               <TextLink
                 href="/guide"
@@ -77,12 +84,23 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
               viewer && (
                 <Stack direction="row" gap={2} align="center">
                   <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
-                  <Text size="sm">{viewer.name}</Text>
-                  {session && (
-                    <Button variant="ghost" size="sm" onClick={() => void signOut()}>
-                      Sign out
-                    </Button>
-                  )}
+                  <AccountMenu
+                    name={viewer.name}
+                    {...(session ? { onSignOut: () => void signOut() } : {})}
+                  >
+                    {options.length > 1 ? (
+                      <Stack gap={1}>
+                        <Text size="xs" tone="muted">
+                          Workspace
+                        </Text>
+                        <WorkspaceSwitch
+                          workspaces={options}
+                          value={workspace.id}
+                          onValueChange={enter}
+                        />
+                      </Stack>
+                    ) : null}
+                  </AccountMenu>
                 </Stack>
               )
             }

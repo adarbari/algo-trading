@@ -1,6 +1,7 @@
 /**
- * Tooltip: a short description of a control, shown on hover (after a delay) and immediately on
- * keyboard focus; Escape hides it. The text is the trigger's accessible description: the
+ * Tooltip: a short description of a control, shown on hover (after a delay), immediately on
+ * keyboard focus, and on a tap under a coarse pointer (a finger has no hover: the tap toggles
+ * it, a tap elsewhere or Escape hides it; the mouse never toggles, hover does that). The text is the trigger's accessible description: the
  * trigger is rendered through `children(props)` and receives `aria-describedby`, so it must be
  * focusable (a Button, IconButton, link). Never put essential information or interactive
  * content in a tooltip. Positioned with Floating UI above the trigger (flips when there is no
@@ -12,6 +13,7 @@ import {
   FloatingPortal,
   offset,
   shift,
+  useClick,
   useDismiss,
   useFloating,
   useFocus,
@@ -81,11 +83,14 @@ export function Tooltip({
   );
   const hover = useHover(context, {
     move: false,
+    mouseOnly: true,
     delay: { open: delay === 'none' ? 0 : duration.base * 4, close: 0 },
   });
+  // Touch and pen: a tap toggles the tooltip (hover is mouse-only above, so the two never fight).
+  const tap = useClick(context, { ignoreMouse: true });
   const focus = useFocus(context);
   const dismiss = useDismiss(context);
-  const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, dismiss]);
+  const { getReferenceProps, getFloatingProps } = useInteractions([hover, tap, focus, dismiss]);
 
   return (
     <>
