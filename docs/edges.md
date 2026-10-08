@@ -11,6 +11,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 |---|---|---|---|---|
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps | `eap_all`, `eap_volume` |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
+| 12-1 momentum among names that just reported (`momentum_at_earnings`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 15 bps | `momentum_12_1` |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps | `pead_small_cap` |
 | Volatility risk premium (`vrp_short_premium`) | candidate | every session | expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon | `vrp_iv_hv` |
 | Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | rejected | every session | excess return, over 1 session, vs SPY, entered 1 session after the decision session | none yet |
@@ -78,6 +79,42 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993
 - Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016
 - Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998
+
+## 12-1 momentum among names that just reported (`momentum_at_earnings`)
+
+**Status:** candidate. **Thesis:** Past-year winners keep outperforming the market in the weeks after they report earnings, because the report confirms the news the price had under-reacted to.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 15 bps
+- **Schedule:** on each `earnings_reaction` (a reported result's two-session reaction (earnings_reaction@v1); anchor: the reaction's last session, E+1 (E: the report date))
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 20
+- **Screeners:** `momentum_12_1`
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Found by the harness 2026-10-08 in the small_cap_earnings_drift run (momentum baseline among event names: decile spread +13.1%, t 2.84, 9 decile sessions; frozen +8.3%, 4 sessions). One universe snapshot (2026-10-02) serves all history. The decoy (plain momentum_12_1 on all liquid names on the same sessions) is not a variant: a variant overrides only the outcome and the universe, never `base`, so it would still pick among event names; the plain-momentum comparison stays the edge_momentum_12_1 document's own run (month-end sessions), left to a later PR.
+
+**Quality bar**
+
+1. **Mechanism:** Investors and analysts respond slowly to firm-specific news; price momentum is largely the earnings-news component of past returns (Chan, Jegadeesh and Lakonishok 1996; Novy-Marx 2015), and the part earned around announcements predicts returns without reversing (Gerard and Jehl 2025).
+2. **Persistence:** Limits to arbitrage: liquidity risk (Sadka 2006), momentum crashes (Daniel and Moskowitz 2016) and attenuation since decimalisation (Chordia, Subrahmanyam and Tong 2014).
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions from S's close, net of 15 bps a round trip.
+4. **Trigger timing:** Reports from events/earnings read by known_from; the anchor is E+1 (the reaction's end) and S = E+2 (start_offset_sessions = 1); mom_12_1 is read at D = S-1.
+5. **Faithful replication:** Rank the event names by rollup.trend_stats@v2.mom_12_1 and hold the top_k; compare with the same ranking over all liquid names on the same sessions (Jegadeesh and Titman 1993, applied to the announcement component of Gerard and Jehl 2025).
+6. **Expected size and sample:** Published momentum is about 1% a month, halved since 2000; the +13% per 20 sessions seen in the first run should shrink.
+7. **Capacity and costs:** Liquid names; one trade per report held 20 sessions; 15 bps a round trip assumed.
+8. **Failure modes and retirement:** Momentum crashes; the 1-5 session post-report reversal if the offset slips. Retire if the frozen decile spread is not above plain momentum on the same event names after costs, or the top decile does not beat the mean of the eligible event names.
+9. **Decoys:** Plain 12-1 momentum on all liquid names; size; the 2-session reaction; survivorship from one universe snapshot (rerun on per-session snapshots before evidenced).
+
+**Sources**
+
+- Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance 51(5), 1996
+- Chordia, T. and Shivakumar, L., Earnings and Price Momentum, Journal of Financial Economics 80(3), 2006
+- Novy-Marx, R., Fundamentally, Momentum is Fundamental Momentum, NBER working paper 20984, 2015
+- Gerard, B. and Jehl, T., The Many Facets of Stock Momentum, Financial Analysts Journal, 2025
+- Sadka, R., Momentum and Post-Earnings-Announcement Drift Anomalies: The Role of Liquidity Risk, Journal of Financial Economics 80(2), 2006
+- Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies 29(1), 2016
+- Chordia, T., Subrahmanyam, A. and Tong, Q., Have Capital Market Anomalies Attenuated in the Recent Era of High Liquidity and Trading Activity?, Journal of Accounting and Economics 58(1), 2014
+- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993
 
 ## Small-cap post-earnings drift (`small_cap_earnings_drift`)
 
