@@ -53,6 +53,8 @@ class SessionStat:
     pre_snapshot: bool = False
     outside_universe: int = 0  # qualified names the edge's universe does not contain
     no_entry_bar: int = 0  # names eligible at D with no outcome row at S (over the base names)
+    pick_reference: tuple[float, ...] = ()  # expires_otm: risk-neutral chance of a hit, per pick
+    pick_touches: int = 0  # expires_otm: counted picks whose strike was touched intraday
 
     @property
     def eligible(self) -> int:
@@ -92,6 +94,8 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         pre_snapshot=any(leg.pre_snapshot for leg in legs),
         outside_universe=sum(leg.outside_universe for leg in legs),
         no_entry_bar=sum(leg.no_entry_bar for leg in legs),
+        pick_reference=tuple(v for leg in legs for v in leg.pick_reference),
+        pick_touches=sum(leg.pick_touches for leg in legs),
     )
 
 
@@ -134,6 +138,8 @@ class SliceMeasure:
     deflated_sharpe: float | None = field(default=None)
     trials: int | None = field(default=None)
     pbo: float | None = field(default=None)
+    reference_rate: float | None = field(default=None)  # expires_otm: mean risk-neutral N(d2)
+    touch_rate: float | None = field(default=None)  # expires_otm: picks whose strike was touched
 
 
 def decile_means(values_in_rank_order: Sequence[float]) -> tuple[float, float] | None:
@@ -161,6 +167,7 @@ def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
     base_hits = sum(r.base_hits for r in rows)
     pick_values = _pooled([r.pick_values for r in rows])
     rest_values = _pooled([r.rest_values for r in rows])
+    n_ref = sum(len(r.pick_reference) for r in rows)  # picks with an expires_otm reference
     hit_rate, base_rate = _mean(hits, picks), _mean(base_hits, eligible)
     spreads = [r.spread for r in rows if r.spread is not None]
     tops = [r.top_decile for r in rows if r.top_decile is not None]
@@ -192,6 +199,8 @@ def _measure(sl: Slice, kept: Sequence[SessionStat]) -> SliceMeasure:
         excluded_coverage=sum(r.excluded_coverage for r in kept),
         delisted=sum(r.delisted for r in rows),
         pre_snapshot_sessions=sum(1 for r in rows if r.pre_snapshot),
+        reference_rate=_mean(float(sum(sum(r.pick_reference) for r in rows)), n_ref),
+        touch_rate=_mean(sum(r.pick_touches for r in rows), n_ref),
     )
 
 

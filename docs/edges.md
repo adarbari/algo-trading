@@ -12,7 +12,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event | none yet |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | none yet |
-| Volatility risk premium (`vrp_short_premium`) | candidate | every session | hit target, over 20 sessions, entered 1 session after the decision session, hit when realised_to_implied_vol is below 1, max drawdown 0.5 | `short_premium_liquidity`, `vrp_scanner` |
+| Volatility risk premium (`vrp_short_premium`) | candidate | every session | expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon | `short_premium_liquidity`, `vrp_scanner` |
 | Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | rejected | every session | excess return, over 1 session, vs SPY, entered 1 session after the decision session | none yet |
 | S&P 500 index changes (`sp500_index_changes`) | rejected | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
 | Russell reconstitution (`russell_reconstitution`) | blocked | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
@@ -115,20 +115,20 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Status:** candidate. **Thesis:** Option implied volatility on liquid names tends to exceed the volatility that follows, so selling premium where implied is richest earns the gap.
 
-- **Outcome:** hit target, over 20 sessions, entered 1 session after the decision session, hit when realised_to_implied_vol is below 1, max drawdown 0.5
+- **Outcome:** expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon
 - **Schedule:** every session
 - **Universe:** preset `liquid_optionable`
 - **Top K:** 20
 - **Screeners:** `short_premium_liquidity`, `vrp_scanner`
 - **Baselines:** `momentum_12_1`, `size_small`
 - **Frozen period:** from 2026-04-01
-- **Notes:** Hit: realised volatility over the window divided by the IV30 at S (measure realised_to_implied_vol) is below target 1.0. IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of the premium it collected in the window. ED4a fixes the proxy (ADR 0053 open decisions).
+- **Notes:** Hit (ED4a, owner intent 2026-10-08): the short put is not assigned, struck at a 0.30 delta at the entry close on the IBKR IV30 read at D, held to the horizon's close (15, 21 or 31 sessions: the 21 to 45 DTE the owner trades, the horizon the tenor). The strike is the exact Black-Scholes delta strike (r = q = 0): K = P exp(-z iv sqrt(T) + iv^2 T / 2), z = N^-1(1 - 0.30), T = horizon / 252, P the entry close; the hit is the window's return above K / P - 1. Reported beside the hit rate, never in it: reference_rate (the mean risk-neutral N(d2), the win rate an efficient premium would give) and touch_rate (the strike reached intraday). No premium and no P&L is modelled: a win rate overstates expectancy, because the rare losses are large. IBKR's IV is personal-use (licence recorded on the result rows), fine for this private evaluation. Variants: delta 0.16, strangle, call, our own IV30, windows with no report expected, and the older realised-to-implied ratio below 1. IV30 (a 30-day tenor) is applied to the 15- and 31-session horizons too: a term-structure approximation, the same in the hit and in the reference rate.
 
 **Quality bar**
 
 1. **Mechanism:** Holders of stock pay for crash and variance protection; the dealers who sell it ask a premium for jump and variance risk they cannot diversify (Carr and Wu 2009; Bakshi and Kapadia 2003).
 2. **Persistence:** A risk premium, not a mispricing: the seller is paid for losses that cluster in crashes, when capital is scarce, so being known does not remove it.
-3. **Outcome:** Realised below implied over the option's horizon, with a drawdown cap on a short straddle proxy: how a short-premium trade is held, to expiry, with a stop (the PRD's proposal, ADR 0053 open decisions).
+3. **Outcome:** The short put is not assigned at the horizon's close (expires_otm): how often the option the owner sells finishes out of the money, beside the risk-neutral rate and the share of windows whose strike was touched on the way.
 4. **Trigger timing:** IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of the decision session D, so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1). The screen and the implied vol are read at D, the outcome at S.
 5. **Faithful replication:** The screens as they are: short_premium_liquidity (tradable put and call wings, option_liquidity@v1) and vrp_scanner v3 (IV30 at least 50%, IV30 minus HV30 at least 10 points, IV30 / HV30 at least 1.25). The published setting is index variance (Carr and Wu 2009); single names are a step away from it.
 6. **Expected size and sample:** Implied variance exceeds realised on average for the S&P 500 and most large stocks (Carr and Wu 2009); the single-name premium is smaller than the index's (Driessen, Maenhout and Vilkov 2009). IV30 history covers 502 sessions (ibkr_iv@v1, roadmap): 20-session windows spaced a horizon apart give about 25 independent sessions, under the 40 the bar asks, unless ED4a counts names within a session; chains are stored from 2026-10-02 only (docs/screeners/vrp-scanner.md), so short_premium_liquidity has days of history.

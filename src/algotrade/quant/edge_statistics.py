@@ -22,62 +22,16 @@ import math
 import numpy as np
 import numpy.typing as npt
 
-from algotrade.quant.black_scholes import norm_cdf
+from algotrade.quant.black_scholes import inverse_normal_cdf, norm_cdf
 
 type Array = npt.NDArray[np.float64]
 type ArrayLike = npt.ArrayLike
 
 _EULER_GAMMA = 0.5772156649015329
-_ACKLAM_A = (
-    -3.969683028665376e1,
-    2.209460984245205e2,
-    -2.759285104469687e2,
-    1.383577518672690e2,
-    -3.066479806614716e1,
-    2.506628277459239,
-)
-_ACKLAM_B = (
-    -5.447609879822406e1,
-    1.615858368580409e2,
-    -1.556989798598866e2,
-    6.680131188771972e1,
-    -1.328068155288572e1,
-)
-_ACKLAM_C = (
-    -7.784894002430293e-3,
-    -3.223964580411365e-1,
-    -2.400758277161838,
-    -2.549732539343734,
-    4.374664141464968,
-    2.938163982698783,
-)
-_ACKLAM_D = (7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416)
-_ACKLAM_SPLIT = 0.02425
 
 
 def _cdf(x: float) -> float:
     return float(norm_cdf(x))
-
-
-def _inverse_normal_cdf(p: float) -> float:
-    """Phi^-1(p) for 0 < p < 1: Acklam's rational approximation plus one Halley step."""
-    a, b, c, d = _ACKLAM_A, _ACKLAM_B, _ACKLAM_C, _ACKLAM_D
-    if p < _ACKLAM_SPLIT or p > 1.0 - _ACKLAM_SPLIT:
-        q = math.sqrt(-2.0 * math.log(min(p, 1.0 - p)))
-        x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
-            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
-        )
-        x = x if p < 0.5 else -x
-    else:
-        q = p - 0.5
-        r = q * q
-        x = (
-            (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5])
-            * q
-            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
-        )
-    u = (_cdf(x) - p) * math.sqrt(2.0 * math.pi) * math.exp(x * x / 2.0)
-    return x - u / (1.0 + x * u / 2.0)
 
 
 def _finite(values: ArrayLike) -> Array:
@@ -156,8 +110,8 @@ def deflated_sharpe(x: ArrayLike, n_trials: int, sr_variance: float) -> float | 
     else:
         n = float(n_trials)
         sr0 = math.sqrt(sr_variance) * (
-            (1.0 - _EULER_GAMMA) * _inverse_normal_cdf(1.0 - 1.0 / n)
-            + _EULER_GAMMA * _inverse_normal_cdf(1.0 - 1.0 / (n * math.e))
+            (1.0 - _EULER_GAMMA) * inverse_normal_cdf(1.0 - 1.0 / n)
+            + _EULER_GAMMA * inverse_normal_cdf(1.0 - 1.0 / (n * math.e))
         )
     z = (v - v.mean()) / v.std(ddof=0)
     skew, kurt = float(np.mean(z**3)), float(np.mean(z**4))

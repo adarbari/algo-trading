@@ -249,3 +249,62 @@ def test_variants_override_the_outcome_and_the_universe_each_with_its_own_id() -
 def test_a_variant_is_checked_like_the_edge(variants: Any, message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         parse(variants=variants)
+
+
+# ---- expires_otm and kind-changing variants (ED4a) --------------------------------------
+
+OTM = {
+    "kind": "expires_otm", "horizon_sessions": [15, 21], "benchmark": "none", "structure": "put",
+    "strike_delta": 0.3, "iv_field": "rollup.ibkr_iv@v1.iv30_ibkr", "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def otm(**changes: Any) -> dict[str, Any]:
+    return document(schedule="every_session", outcome={**OTM, **changes})
+
+
+def test_an_expires_otm_outcome_types_its_structure_strike_and_iv_field() -> None:
+    o = parse_edge(otm(), "drift", WHERE).outcome
+    assert (o.structure, o.strike_delta, o.otm_pct) == ("put", 0.3, None)
+    assert o.iv_field == "rollup.ibkr_iv@v1.iv30_ibkr" and o.target is None
+
+
+@pytest.mark.parametrize(
+    "changes,match",
+    [
+        ({"strike_delta": None}, "exactly one of strike_delta and otm_pct"),
+        ({"otm_pct": 0.05}, "exactly one of strike_delta and otm_pct"),
+        ({"strike_delta": 1.2}, "strike_delta: expected a fraction in"),
+        ({"structure": "straddle"}, "structure"),
+        ({"structure": None}, "structure: required"),
+        ({"iv_field": None}, "iv_field: required"),
+        ({"target": 1.0}, "target: only a hit_target outcome has one"),
+    ],
+)
+def test_an_expires_otm_outcome_fails_closed(changes: dict[str, Any], match: str) -> None:
+    body = {k: v for k, v in {**OTM, **changes}.items() if v is not None}
+    with pytest.raises(ConfigurationError, match=match):
+        parse_edge(document(schedule="every_session", outcome=body), "drift", WHERE)
+
+
+def test_only_an_expires_otm_outcome_has_a_structure_or_strike() -> None:
+    plain = {"kind": "excess_return", "horizon_sessions": [5], "benchmark": "SPY",
+             "start_offset_sessions": 1}  # fmt: skip
+    with pytest.raises(ConfigurationError, match="only an expires_otm outcome has one"):
+        parse_edge(
+            document(schedule="every_session", outcome={**plain, "otm_pct": 0.1}), "drift", WHERE
+        )
+
+
+def test_a_variant_overrides_the_strike_and_a_variant_of_another_kind_drops_the_old_keys() -> None:
+    doc = otm()
+    doc["variants"] = [
+        {"id": "d16", "outcome": {"strike_delta": 0.16}},
+        {"id": "ratio", "outcome": {"kind": "hit_target", "measure": "realised_to_implied_vol",
+                                    "direction": "below", "target": 1.0}},
+    ]  # fmt: skip
+    d16, ratio = parse_edge(doc, "drift", WHERE).variants
+    assert d16.outcome.strike_delta == 0.16 and d16.outcome.structure == "put"
+    assert ratio.outcome.kind == "hit_target" and ratio.outcome.structure is None
+    assert ratio.outcome.iv_field == "rollup.ibkr_iv@v1.iv30_ibkr"  # shared keys survive
+    assert ratio.outcome.horizon_sessions == (15, 21)
