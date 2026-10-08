@@ -1,6 +1,6 @@
 # ADR 0039: Ingestion workflows by cadence; steps succeed or fail by an acceptance rule; a failed critical step holds the workflow back
 
-**Status:** accepted (2026-10-05; owner decisions; implementation: roadmap WF1-WF5), amended 2026-10-05 (below) and by [0043](0043-waiting-on-publication-tiered-and-coverage-acceptance.md). Amends the nightly workflow of R5
+**Status:** accepted (2026-10-05; owner decisions; implementation: roadmap WF1-WF5), amended 2026-10-05 (below) by [0043](0043-waiting-on-publication-tiered-and-coverage-acceptance.md) and by [0054](0054-optional-source-tables-warn.md) (a screen without an optional source's table is a warning on `screens`). Amends the nightly workflow of R5
 (`docs/architecture.md`, "The nightly workflow"), [0033](0033-screeners-run-nightly-and-on-request.md)
 (when the screens step runs), [0034](0034-instrument-descriptions.md) and
 [0035](0035-etf-holdings.md) (descriptions and ETF holdings leave the nightly), and

@@ -130,6 +130,10 @@ class FeatureSet:
         e = self.expressions[name]
         return rollup_table(e.feature.entity, f"{e.name}@v{e.feature.version}")
 
+    def optional_tables(self) -> frozenset[str]:
+        """The stored tables of the optional groups (``FeatureGroup.optional``, ADR 0054)."""
+        return frozenset(g.table for g in self.code.values() if g.optional)
+
     def applicability(self, name: str) -> tuple[frozenset[str], tuple[StatusRule, ...]]:
         """What a value's absence may be put down to (ADRs 0042, 0046), inherited by an
         expression from everything it reads like its licence: -> (the non-``any``

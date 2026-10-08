@@ -273,7 +273,9 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
 - **Screens are jobs**: one `screen` job per scheduled screener config, for its owner;
   exports are that job's output. The step SUCCEEDS only when every screener's job is
   COMPLETE (its coverage threshold met). The screen audit records `universe_pre_snapshot`
-  (survivorship).
+  (survivorship). A table of an optional group (`FeatureGroup.optional`, e.g. `ibkr_iv@v1`
+  with IB Gateway down) missing for the session leaves the run COMPLETE: it is audited as
+  `missing_optional_tables` and the step carries an `optional_sources` WARN (ADR 0054).
 - **Notification** (`notify.py`): every run writes its summary to
   `var/logs/nightly-latest.json`, then hands a `Notice` to the `Notifier` (one interface;
   `notify(notice)` returns a warning instead of raising). The macOS notifier (`osascript`,

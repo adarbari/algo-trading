@@ -195,7 +195,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0054), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
@@ -626,7 +626,7 @@ detect = [{ string_prefix = "regime=" }, { call = "MarketFeatures" }, { call = "
 
 [[responsibility]]
 id = "screen-execution"
-description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
+description = "Run a configured screen (select, screen, audit, write results; coverage counts required tables only, an optional source's missing table is audited apart, ADR 0054); nightly submits `screen` jobs (workflows/nightly/screens.py) and warns on optional misses"
 owner = [
     "src/algotrade/services/screening/run.py",
     "src/algotrade/services/screening/rule_results.py",  # a rule screen's result frames
