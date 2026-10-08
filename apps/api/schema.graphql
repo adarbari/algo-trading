@@ -250,7 +250,7 @@ type EdgeRow {
 }
 
 """
-A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read
+A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one)
 """
 type EdgeRun {
   runId: String!
@@ -264,6 +264,7 @@ type EdgeRun {
   knowledgeTs: DateTime!
   asOf: String
   trialsCounted: Int
+  afterSession: Boolean!
 
   """
   The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none
@@ -1922,7 +1923,7 @@ type TrackHorizon {
 }
 
 """
-A screener's record over one edge's frozen period, from the edge's canonical run (the latest site run whose split is the edge's `frozenFrom`); never an exploratory run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose it. `notRun` says why there is none (NOT_RUN); null: it has one
+A screener's record over one edge's frozen period, from the edge's canonical run (the latest site run whose split is the edge's `frozenFrom`); never an exploratory run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose it; `afterSession`: the run committed after the request's session. `notRun` says why there is none (NOT_RUN); null: it has one
 """
 type TrackRecord {
   screenerId: String!
@@ -1936,6 +1937,7 @@ type TrackRecord {
   splitFrom: Date
   knowledgeTs: DateTime
   horizons: [TrackHorizon!]!
+  afterSession: Boolean!
 }
 
 """

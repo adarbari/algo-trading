@@ -11,7 +11,14 @@ from algotrade.services.read.evaluation.track_record import load_track_records
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
-from tests.unit.services.read.evaluation.conftest import DOCS, EDGE, FROZEN, stores, write_run
+from tests.unit.services.read.evaluation.conftest import (
+    DOCS,
+    EDGE,
+    FROZEN,
+    session_ctx,
+    stores,
+    write_run,
+)
 
 
 def one(backend: MemoryBackend, screener: str = "momo"):  # type: ignore[no-untyped-def]
@@ -54,3 +61,11 @@ def test_a_screener_in_two_edges_gets_two_entries_by_edge_id(backend: MemoryBack
     first, second = load_track_records(ctx, "momo")
     assert (first.edge_id, first.edge_name, first.not_run is not None) == ("alpha", "Alpha", True)
     assert (second.edge_id, second.run_id, second.not_run) == ("drift", "canon", None)
+
+
+def test_after_session_is_disclosed_on_the_track_record(backend: MemoryBackend) -> None:
+    write_run(backend, "canon", FROZEN, 0.6)  # committed 2026-10-02
+    (before,) = load_track_records(session_ctx(stores(backend), date(2026, 9, 30)), "momo")
+    assert before.after_session is True
+    (without,) = load_track_records(stores(backend), "momo")
+    assert without.after_session is False

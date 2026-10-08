@@ -11,7 +11,8 @@ import pytest
 from algotrade.config.edges.document import QUALITY_BAR
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.read.context import StoreContext, open_stores
+from algotrade.services.read.context import ReadContext, StoreContext, open_stores
+from algotrade.services.read.session import Session
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -65,11 +66,13 @@ def write_run(
     minutes: int = 0,
     status: RunStatus = RunStatus.COMPLETE,
     exploratory: bool | None = None,
+    finished_minutes: int | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T."""
     writer = ResultWriter(backend)
     at = T + timedelta(minutes=minutes)
+    done = T + timedelta(minutes=minutes if finished_minutes is None else finished_minutes)
     kind = "frozen" if split == FROZEN else "split"
     rows = [
         row("momo", "all", 0.3, split, user_id=owner),
@@ -83,9 +86,9 @@ def write_run(
         "trials_counted": 1,
     }  # fmt: skip
     record = RunRecord(run_id, f"edge-eval:drift:{owner}", END, at)
-    with writer.publishing(run_id, at):
+    with writer.publishing(run_id, done):
         writer.write_result("edge_eval", END, run_id, frame, pending=True)
-        writer.save_run(record.finish(at, complete=status is RunStatus.COMPLETE, stats=stats))
+        writer.save_run(record.finish(done, complete=status is RunStatus.COMPLETE, stats=stats))
     if status not in (RunStatus.COMPLETE, RunStatus.PARTIAL):
         record.status = status
         writer.save_run(record)
@@ -94,6 +97,12 @@ def write_run(
 @pytest.fixture
 def backend() -> MemoryBackend:
     return MemoryBackend()
+
+
+def session_ctx(ctx: StoreContext, day: date) -> ReadContext:
+    """``ctx`` as a read context whose session is ``day`` (nothing else stored for it)."""
+    session = Session(day, None, True, None, None, False, (), ())
+    return ReadContext(ctx.reader, ctx.configs, ctx.user, session, ctx.features, ctx.cache)
 
 
 def stores(backend: MemoryBackend, user: str = "me") -> StoreContext:

@@ -6,6 +6,7 @@ an exploratory run, whatever its split, never reaches it. An edge with no canoni
 without rows for the screener, yields a ``NOT_RUN`` entry with the reason, never an older value.
 Outcomes are not read here: the numbers are the stored rows of ``results/edge_eval``."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -48,6 +49,7 @@ class TrackRecord:
     split_from: date | None = None
     knowledge_ts: datetime | None = None
     horizons: tuple[TrackHorizon, ...] = ()
+    after_session: bool = False
 
 
 def _horizon(row: runs.EdgeRow) -> TrackHorizon:
@@ -61,14 +63,15 @@ def _horizon(row: runs.EdgeRow) -> TrackHorizon:
     )
 
 
-def _from(ctx: Stores, edge: Edge, screener_id: str) -> TrackRecord:
-    found = runs.load_canonical_run(ctx, edge)
+def _entry(
+    edge: Edge, screener_id: str, found: runs.CanonicalRun, stored: Sequence[runs.EdgeRow]
+) -> TrackRecord:
     if found.run is None:
         return TrackRecord(screener_id, edge.id, edge.name, not_run=found.not_run)
     run = found.run
     rows = [
         r
-        for r in runs.load_run_rows(ctx, run)
+        for r in stored
         if r.variant == screener_id
         and r.role == "screener"
         and r.edge_variant == runs.MAIN
@@ -92,9 +95,28 @@ def _from(ctx: Stores, edge: Edge, screener_id: str) -> TrackRecord:
         split_from=run.split_from,
         knowledge_ts=run.knowledge_ts,
         horizons=tuple(sorted((_horizon(r) for r in rows), key=lambda h: h.horizon_sessions)),
+        after_session=run.after_session,
     )
+
+
+def load_track_records_for(
+    ctx: Stores, screener_ids: Sequence[str]
+) -> dict[str, tuple[TrackRecord, ...]]:
+    """The track records of every screener of ``screener_ids`` in one pass: the edges are read
+    once and each edge's canonical run once, however many screeners it lists."""
+    wanted = set(screener_ids)
+    out: dict[str, list[TrackRecord]] = {i: [] for i in wanted}
+    for edge in load_edges(ctx):
+        listed = wanted.intersection(edge.screeners)
+        if not listed:
+            continue
+        found = runs.load_canonical_run(ctx, edge)
+        stored = runs.load_run_rows(ctx, found.run) if found.run is not None else ()
+        for screener_id in sorted(listed):
+            out[screener_id].append(_entry(edge, screener_id, found, stored))
+    return {i: tuple(entries) for i, entries in out.items()}
 
 
 def load_track_records(ctx: Stores, screener_id: str) -> tuple[TrackRecord, ...]:
     """One entry per edge (by id) that lists ``screener_id``; none when no edge does."""
-    return tuple(_from(ctx, e, screener_id) for e in load_edges(ctx) if screener_id in e.screeners)
+    return load_track_records_for(ctx, [screener_id])[screener_id]

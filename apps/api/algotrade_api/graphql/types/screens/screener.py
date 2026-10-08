@@ -15,7 +15,6 @@ from strawberry.types import Info
 
 from algotrade.services.read.availability.cause import public_audit
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.evaluation import track_record
 from algotrade.services.read.instruments.table import DEFAULT_SIZE
 from algotrade.services.read.screens import results, runs, screeners
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
@@ -206,5 +205,6 @@ class Screener:
         "from that edge's canonical run (never an exploratory run); an edge without one has an "
         "entry whose `notRun` says why; empty: no edge lists it"
     )
-    def track_records(self, info: Info) -> list[TrackRecord]:
-        return [TrackRecord.of(t) for t in track_record.load_track_records(self.ctx, self.id)]
+    async def track_records(self, info: Info) -> list[TrackRecord]:
+        found = await self.ctx.loaders.track_records.load((self.id,))
+        return [TrackRecord.of(t) for t in found]

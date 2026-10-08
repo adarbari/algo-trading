@@ -11,11 +11,10 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.edges.document import MAIN
+from algotrade.config.edges.document import MAIN, job_name
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
-    job_name,
 )
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.result_writer import ResultWriter

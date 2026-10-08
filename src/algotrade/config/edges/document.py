@@ -196,6 +196,12 @@ class Edge:
         )
 
 
+def job_name(edge_id: str, user_id: str) -> str:
+    """The run-record ``job`` whose records hold one user's trial log of an edge (ADR 0015):
+    written by the harness, read by the read model."""
+    return f"edge-eval:{edge_id}:{user_id}"
+
+
 def event_class(schedule: str) -> str | None:
     """The event class of an ``on_event:<class>`` schedule, else None."""
     return schedule.removeprefix(ON_EVENT) if schedule.startswith(ON_EVENT) else None

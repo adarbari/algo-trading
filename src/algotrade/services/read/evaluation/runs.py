@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
+from algotrade.config.edges.document import job_name
 from algotrade.config.user import SITE_USER
-from algotrade.services.evaluation.cross_section.harness import job_name
 from algotrade.services.read.availability.cause import run_cause
-from algotrade.services.read.context import Stores, run_partition
+from algotrade.services.read.context import ReadContext, Stores, run_partition
 from algotrade.services.read.evaluation.edges import Edge, load_edges
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -32,7 +32,9 @@ class EdgeRun:
     ``range_from`` / ``range_to``: the sessions it covered; ``split_from``: the split the
     frozen slice was measured at (None: a run from before splits were recorded);
     ``exploratory``: its split is not the edge's ``frozen_from``; ``knowledge_ts``: when it
-    committed; ``as_of``: the data version it read (ISO)."""
+    committed; ``as_of``: the data version it read (ISO); ``after_session``: it committed
+    after the request's session (a session-bound read only; always False without one): its
+    numbers were not knowable on that session."""
 
     run_id: str
     edge_id: str
@@ -45,6 +47,7 @@ class EdgeRun:
     knowledge_ts: datetime
     as_of: str | None
     trials_counted: int | None
+    after_session: bool = False
 
 
 @dataclass(frozen=True)
@@ -89,30 +92,34 @@ def _day(value: Any) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
-def _run(record: RunRecord, edge_id: str, owner: str, frozen_from: date | None) -> EdgeRun:
+def _run(ctx: Stores, record: RunRecord, edge: Edge, owner: str) -> EdgeRun:
     stats = record.stats
+    frozen_from = edge.frozen_from
+    committed = record.finished_at or record.started_at
+    session = ctx.session.date if isinstance(ctx, ReadContext) else None
     split = _day(stats.get("split_from"))
     start = (stats.get("range") or [None])[0]
     return EdgeRun(
         run_id=record.run_id,
-        edge_id=edge_id,
+        edge_id=edge.id,
         owner=owner,
         status=record.status.value,
         range_from=_day(start),
         range_to=record.session_date,
         split_from=split,
         exploratory=split != frozen_from or bool(stats.get("exploratory")),
-        knowledge_ts=record.finished_at or record.started_at,
+        knowledge_ts=committed,
         as_of=stats.get("as_of"),
         trials_counted=stats.get("trials_counted"),
+        after_session=session is not None and committed.date() > session,
     )
 
 
 def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
     records = ctx.reader.runs(job_name(edge.id, owner))
     done = [r for r in records if r.status is RunStatus.COMPLETE]
-    ordered = sorted(done, key=lambda r: r.started_at, reverse=True)
-    return [_run(r, edge.id, owner, edge.frozen_from) for r in ordered]
+    ordered = sorted(done, key=lambda r: r.finished_at or r.started_at, reverse=True)
+    return [_run(ctx, r, edge, owner) for r in ordered]
 
 
 def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:

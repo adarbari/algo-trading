@@ -38,7 +38,8 @@ class TrackHorizon:
     description="A screener's record over one edge's frozen period, from the edge's canonical "
     "run (the latest site run whose split is the edge's `frozenFrom`); never an exploratory "
     "run. `runLabel` names the run; `runId`, the range, `splitFrom` and `knowledgeTs` disclose "
-    "it. `notRun` says why there is none (NOT_RUN); null: it has one"
+    "it; `afterSession`: the run committed after the request's session. "
+    "`notRun` says why there is none (NOT_RUN); null: it has one"
 )
 class TrackRecord:
     screener_id: str
@@ -52,6 +53,7 @@ class TrackRecord:
     split_from: dt.date | None
     knowledge_ts: dt.datetime | None
     horizons: list[TrackHorizon]
+    after_session: bool
 
     @classmethod
     def of(cls, d: track_record.TrackRecord) -> Self:
@@ -67,4 +69,5 @@ class TrackRecord:
             split_from=d.split_from,
             knowledge_ts=d.knowledge_ts,
             horizons=[TrackHorizon.of(h) for h in d.horizons],
+            after_session=d.after_session,
         )

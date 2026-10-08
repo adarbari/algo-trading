@@ -3,8 +3,9 @@ by run: its id, range, split, ``knowledgeTs`` and ``asOf`` disclosed) and ``Edge
 stored row of it). ``Edge.canonicalRun`` is the latest site run at the edge's frozen period, else
 ``canonicalNotRun`` says why (NOT_RUN, ADR 0036)."""
 
+import asyncio
 import datetime as dt
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from anyio import to_thread
@@ -77,7 +78,9 @@ class EdgeRow:
     description="A committed evaluation run of an edge, read as the run left it: `owner` whose "
     "run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice "
     "was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track "
-    "record), `knowledgeTs` when it committed, `asOf` the data version it read"
+    "record), `knowledgeTs` when it committed, `asOf` the data version it read, "
+    "`afterSession` it committed "
+    "after the request's session (false without one)"
 )
 class EdgeRun:
     run_id: str
@@ -91,6 +94,7 @@ class EdgeRun:
     knowledge_ts: dt.datetime
     as_of: str | None
     trials_counted: int | None
+    after_session: bool
     run: strawberry.Private[runs.EdgeRun]
     ctx: strawberry.Private[Stores]
 
@@ -108,6 +112,7 @@ class EdgeRun:
             knowledge_ts=d.knowledge_ts,
             as_of=d.as_of,
             trials_counted=d.trials_counted,
+            after_session=d.after_session,
             run=d,
             ctx=ctx,
         )
@@ -154,6 +159,7 @@ class Edge:
     rejection_reason: str
     edge: strawberry.Private[edges.Edge]
     ctx: strawberry.Private[Stores]
+    cache: strawberry.Private[dict[str, Any]]
 
     @classmethod
     def of(cls, d: edges.Edge, ctx: Stores) -> Self:
@@ -174,26 +180,37 @@ class Edge:
             rejection_reason=d.rejection_reason,
             edge=d,
             ctx=ctx,
+            cache={},
         )
+
+    async def _canonical(self) -> runs.CanonicalRun:
+        """The canonical run, read once per Edge object (off the event loop)."""
+        if "canonical" not in self.cache:
+            self.cache["canonical"] = asyncio.ensure_future(
+                to_thread.run_sync(runs.load_canonical_run, self.ctx, self.edge)
+            )
+        found: runs.CanonicalRun = await self.cache["canonical"]
+        return found
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The latest committed site run whose split is `frozenFrom`; null: none "
         "(see `canonicalNotRun`). An exploratory or older split is never shown here"
     )
-    def canonical_run(self, info: Info) -> EdgeRun | None:
-        found = runs.load_canonical_run(self.ctx, self.edge)
+    async def canonical_run(self, info: Info) -> EdgeRun | None:
+        found = await self._canonical()
         return EdgeRun.of(found.run, self.ctx) if found.run is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Why it has no canonical run (NOT_RUN); null: it has one"
     )
-    def canonical_not_run(self, info: Info) -> Unknown | None:
-        found = runs.load_canonical_run(self.ctx, self.edge)
+    async def canonical_not_run(self, info: Info) -> Unknown | None:
+        found = await self._canonical()
         return Unknown.of(found.not_run) if found.not_run is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every committed run of the edge the user sees (theirs, then the site's), "
         "newest first, exploratory ones flagged"
     )
-    def runs(self, info: Info) -> list[EdgeRun]:
-        return [EdgeRun.of(r, self.ctx) for r in runs.load_edge_runs(self.ctx, self.edge)]
+    async def runs(self, info: Info) -> list[EdgeRun]:
+        found = await to_thread.run_sync(runs.load_edge_runs, self.ctx, self.edge)
+        return [EdgeRun.of(r, self.ctx) for r in found]

@@ -13,7 +13,7 @@ from algotrade.services.read.evaluation.runs import (
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
-from tests.unit.services.read.evaluation.conftest import FROZEN, stores, write_run
+from tests.unit.services.read.evaluation.conftest import FROZEN, session_ctx, stores, write_run
 
 
 def test_the_edge_document_and_its_status(backend: MemoryBackend) -> None:
@@ -76,3 +76,30 @@ def test_rows_are_read_by_run_id(backend: MemoryBackend) -> None:
     assert frozen.hit_rate == 0.66 and frozen.edge_variant == "main"
     assert (run.run_id, run.range_to, run.split_from) == ("canon", date(2026, 9, 30), FROZEN)
     assert run.as_of is not None and run.knowledge_ts is not None
+
+
+def test_after_session_is_set_for_a_run_committed_after_the_session(
+    backend: MemoryBackend,
+) -> None:
+    write_run(backend, "canon", FROZEN, 0.6)  # committed 2026-10-02, after the session
+    store = stores(backend)
+    edge = load_edge(store, "drift")
+    assert edge is not None
+    run = load_canonical_run(store, edge).run
+    assert run is not None and run.after_session is False  # a StoreContext has no session
+    read = session_ctx(store, date(2026, 9, 30))
+    run = load_canonical_run(read, edge).run
+    assert run is not None and run.after_session is True
+    read = session_ctx(store, date(2026, 10, 2))
+    run = load_canonical_run(read, edge).run
+    assert run is not None and run.after_session is False
+
+
+def test_latest_is_by_commit_time_not_start_time(backend: MemoryBackend) -> None:
+    write_run(backend, "long", FROZEN, 0.5, minutes=0, finished_minutes=50)  # started first
+    write_run(backend, "short", FROZEN, 0.6, minutes=10, finished_minutes=20)
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None and run.run_id == "long"

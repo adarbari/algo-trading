@@ -36,7 +36,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from algotrade.config.edges.document import MAIN, Edge
+from algotrade.config.edges.document import MAIN, Edge, job_name
 from algotrade.config.edges.evaluation import load_evaluation
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
@@ -129,11 +129,6 @@ class EdgeEvaluation:
     event_unknown: Mapping[str, int] = field(default_factory=dict)  # reason -> names excluded
     split_from: date | None = None  # the test slice's first session (None: no split)
     exploratory: bool = False  # the split is not the edge's frozen_from: never evidence
-
-
-def job_name(edge_id: str, user_id: str) -> str:
-    """The run-record ``job`` whose records hold one user's trial log of an edge (ADR 0015)."""
-    return f"edge-eval:{edge_id}:{user_id}"
 
 
 def run_hash(
