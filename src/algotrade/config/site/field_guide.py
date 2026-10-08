@@ -94,14 +94,8 @@ class FieldGuideSettings:
             reject_secrets(doc or {}, where)
             root = Table(doc, where)
             root.only(("field", "situation"))
-            fields += [
-                _entry(Table(e, f"{where} [[field]][{i}]"))
-                for i, e in enumerate(_tables(root, "field"))
-            ]
-            situations += [
-                _situation(Table(e, f"{where} [[situation]][{i}]"))
-                for i, e in enumerate(_tables(root, "situation"))
-            ]
+            fields += [_entry(t) for t in root.tables("field")]
+            situations += [_situation(t) for t in root.tables("situation")]
         names = [f.name for f in fields]
         if len(set(names)) != len(names):
             dupes = sorted({n for n in names if names.count(n) > 1})
@@ -122,38 +116,17 @@ class FieldGuideSettings:
         return next((f for f in self.fields if f.name == name), None)
 
 
-def _tables(t: Table, key: str) -> list[Mapping[str, Any]]:
-    raw = t.raw(key) or []
-    if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
-        raise ConfigurationError(f"{t.where} {key}: expected a list of tables ([[{key}]])")
-    return raw
-
-
-def _required(t: Table, key: str) -> str:
-    value = t.text(key, "").strip()
-    if not value:
-        raise ConfigurationError(f"{t.where} {key}: expected a non-empty string")
-    return value
-
-
-def _lines(t: Table, key: str) -> tuple[str, ...]:
-    values = tuple(" ".join(s.split()) for s in t.strings(key, ()))
-    if not all(values):
-        raise ConfigurationError(f"{t.where} {key}: expected non-empty strings")
-    return values
-
-
 def _entry(t: Table) -> FieldGuideEntry:
     t.only(FIELD_KEYS)
-    name = _required(t, "name")
-    uses = tuple(_use(Table(u, f"{t.where} [[use]][{i}]")) for i, u in enumerate(_tables(t, "use")))
+    name = t.line("name")
+    uses = tuple(_use(u) for u in t.tables("use"))
     return FieldGuideEntry(
         name=name,
-        theme=_required(t, "theme"),
-        reads=" ".join(_required(t, "reads").split()),
+        theme=t.line("theme"),
+        reads=t.line("reads"),
         uses=uses,
-        caveats=_lines(t, "caveats"),
-        sources=_lines(t, "sources"),
+        caveats=t.lines("caveats", required=False),
+        sources=t.lines("sources", required=False),
     )
 
 
@@ -178,7 +151,7 @@ def _use(t: Table) -> GuideUse:
     if on_miss and mode != "soft":
         raise ConfigurationError(f"{t.where} on_miss: soft criteria only")
     return GuideUse(
-        intent=_required(t, "for"),
+        intent=t.line("for"),
         op=op,
         value=value,
         mode=mode,
@@ -205,12 +178,12 @@ def _tolerance(t: Table) -> Tolerance:
 
 def _situation(t: Table) -> Situation:
     t.only(SITUATION_KEYS)
-    affects = _lines(t, "affects")
+    affects = t.lines("affects", required=False)
     if not affects:
         raise ConfigurationError(f"{t.where} affects: expected one or more catalogue field names")
     return Situation(
-        name=_required(t, "name"),
-        signs=" ".join(_required(t, "signs").split()),
+        name=t.line("name"),
+        signs=t.line("signs"),
         affects=affects,
-        do=" ".join(_required(t, "do").split()),
+        do=t.line("do"),
     )

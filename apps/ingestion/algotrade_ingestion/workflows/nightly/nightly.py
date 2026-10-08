@@ -186,8 +186,15 @@ NIGHTLY: tuple[Step, ...] = (
     # after the instrument rollups they read. Optional: a failure here never holds back the
     # screens. Not `needs=("macro",)`: a FAILED (or skipped, no FRED key) macro step would hold
     # the regime back (ADR 0039), while its groups read whatever macro/series holds, each value
-    # point in time by vintage, and say UNKNOWN for what is missing.
-    Step("market-rollups", needs=("rollups",), critical=False, accept=(check_market_rollups,)),
+    # point in time by vintage, and say UNKNOWN for what is missing. When macro succeeds in a
+    # later attempt, they re-run on its series (``reruns_after``).
+    Step(
+        "market-rollups",
+        needs=("rollups",),
+        reruns_after=("macro",),
+        critical=False,
+        accept=(check_market_rollups,),
+    ),
     # Forward outcomes of the windows the session closes (ADR 0053), read only by the edge
     # harness: bars and the splits that adjust them. Optional: never holds back the screens.
     Step("outcomes", needs=("bars", "corporate-actions"), critical=False, accept=(check_outcomes,)),

@@ -1,0 +1,354 @@
+# L3 site setting: the Guide's glossary (ADR 0051, docs/ui/guide.md section 3, "Glossary"): the
+# app's own words and the rule grammar of docs/screeners/rules.md, written for someone who does
+# not follow markets. One [[term]] each: id (its page's key), term (as the app writes it),
+# short (one sentence: the help button's hover and the drawer's first line), body (a short
+# paragraph; catalogue names in it are linked) and see_also (other term ids). Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests in
+# tests/unit/config/site/guide/test_glossary.py (see_also resolves, catalogue names exist,
+# short is one sentence, every term the spec lists is here).
+
+# ---------------------------------------------------------------- how the app thinks about a day
+
+[[term]]
+id = "session"
+term = "Session"
+short = "The trading day a page is reading: every value on it is for exactly that day."
+body = """
+A page reads one session, by default the latest trading day with stored daily prices, and
+says which one it is. Every daily value on the page is the one stored for that day. A value
+the app did not compute or pull for that day is shown as UNKNOWN with the reason; it is never
+filled in from an earlier day, so two numbers side by side are always about the same day. The
+list of instruments and their company details come from snapshots taken from time to time:
+the page uses the latest snapshot on or before the session and says which.
+"""
+see_also = ["unknown", "not_run", "knowledge_time"]
+
+[[term]]
+id = "knowledge_time"
+term = "Knowledge time"
+short = "When the app stored a fact, as opposed to the day the fact is about."
+body = """
+Every stored row carries the market day it describes (its session date) and its knowledge
+time (knowledge_ts), the moment the app learned it. A vendor's correction is added as a new
+row with a later knowledge time, never written over the old one, so a backtest records which
+version of the data it read and can be repeated exactly. Dated events such as earnings
+announcements carry the day they became known (known_from), and a page for a session only
+uses the events known by that day.
+"""
+see_also = ["session", "run"]
+
+[[term]]
+id = "unknown"
+term = "UNKNOWN"
+short = "A value that is not known for the session, always shown with the reason why."
+body = """
+The app shows UNKNOWN instead of guessing. The reason says which case it is: nothing of that
+kind was stored for the session, the instrument has no row that day, the value is stored
+empty (the field's null meaning says what empty means for it), the field does not apply to
+the instrument, or it is a personal-licence field you cannot read. UNKNOWN is about one value;
+NOT_RUN is about a whole screen. In a screen, missing data never passes: a hard criterion with
+no value rejects the row, a soft or score criterion with no value costs points.
+"""
+see_also = ["not_run", "session", "hard"]
+
+[[term]]
+id = "not_run"
+term = "NOT_RUN"
+short = "A screen with no run for the session: nothing was screened that day, which is not the same as a run that found nothing."
+body = """
+A screen's results always belong to one session. When the screen has no run for the session
+the page reads, it is NOT_RUN: the app never shows an older run's picks in its place. Ideas
+lists only the screens that ran for the session and names the others NOT_RUN. A run that found
+nothing is different: it ran, and every row was rejected. The nightly data-quality check is
+NOT_RUN the same way on a day it did not run.
+"""
+see_also = ["run", "unknown", "session"]
+
+[[term]]
+id = "run"
+term = "Run"
+short = "One execution of a job that writes results, recorded with its own id."
+body = """
+The nightly runs every finalised screen and every site preset screen for the session, and a
+screen can also be run on request. Each result row carries its run's id and the screen's id,
+version and a hash of its settings, so you can always tell which rules produced it. A Builder
+preview is not a run: it evaluates the same rules on the latest session and saves nothing.
+Data loads and backtests are runs too, each with its own record.
+"""
+see_also = ["not_run", "draft", "preset"]
+
+[[term]]
+id = "selection"
+term = "Selection"
+short = "Typed rules that pick which instruments a strategy or a backtest looks at."
+body = """
+A selection is a list of rules (a field, a comparison and a value, combined with all, any and
+not) checked against the field catalogue. Missing data counts as unknown and is left out,
+never passed. Rule screens have no selection: who is screened (the security type, an ACTIVE
+listing, having options) is written as hard criteria like any other, so it shows in the funnel
+with the rest.
+"""
+see_also = ["criterion", "hard", "gating_criterion"]
+
+[[term]]
+id = "draft"
+term = "Draft"
+short = "A screen's working copy: you can edit, save and preview it, but it is never run."
+body = """
+The Builder keeps your edits to a screen as its draft (Save draft). A draft is never run;
+Finalize checks it (every field exists, every value fits its field) and turns it into the next
+numbered version, which cannot change and runs every night from then on. A screen drafted from
+a sentence (Describe it) is a draft too: the criteria the text model proposes load as unsaved
+edits, and nothing is saved or run until you save and finalise.
+"""
+see_also = ["preset", "run", "criterion"]
+
+[[term]]
+id = "preset"
+term = "Preset"
+short = "A screen the site ships, reviewed and versioned with the app, that runs every night."
+body = """
+A preset's versions are numbered and never change: a new rule is a new version, and the
+latest is the highest number. You cannot edit a preset itself; your first edit in the Builder
+makes your own copy, which extends the preset at the version you started from. When the site
+publishes a newer version, the Builder offers to rebase your copy onto it. Each site preset
+has a playbook in the Guide.
+"""
+see_also = ["playbook", "draft", "run"]
+
+[[term]]
+id = "playbook"
+term = "Playbook"
+short = "The Guide's page for one site preset screen: the setup it looks for, what it checks and what it leaves to you."
+body = """
+There is one playbook per site preset, grouped by family (trend, breakouts, reversals, option
+income). It says what a hit looks like and what the screen does not check, lists each
+criterion in plain words with its field and rule, gives the caveats to read before acting on a
+hit and the situations that fool its fields, and links to related playbooks. Open in Builder
+shows the preset in the Builder, where your first edit makes your own copy.
+"""
+see_also = ["preset", "criterion"]
+
+# ---------------------------------------------------------------------------- the rule grammar
+
+[[term]]
+id = "criterion"
+term = "Criterion"
+short = "One rule of a screen: a field, a comparison, a threshold and a mode."
+body = """
+A criterion compares one catalogue field with a threshold, for example the closing price
+rollup.price_stats@v2.close greater than 5. Its mode says what a miss does (hard, soft or
+score), a soft or score criterion may have a tolerance, and a soft one an on_miss. The
+funnel shows the criteria in the order written. A criterion can be switched off without
+deleting it.
+"""
+see_also = ["op", "mode", "tolerance", "on_miss"]
+
+[[term]]
+id = "op"
+term = "op"
+short = "The comparison a criterion makes, such as gte (greater than or equal to) or between."
+body = """
+The operators are eq (equals), ne (not equal), in and not_in (one of a list, or none of it),
+gt and gte (greater than; or equal to), lt and lte (less than; or equal to), between (within
+two bounds, both included), and is_null and not_null, which take no value. A tolerance works
+only with the numeric comparisons gt, gte, lt, lte and between. A value that is absent, not a
+number, or of the wrong type for the comparison counts as missing, and missing never passes.
+"""
+see_also = ["criterion", "tolerance"]
+
+[[term]]
+id = "mode"
+term = "mode"
+short = "What a criterion's miss does to a row: hard rejects it, soft may keep it as a near miss, score only lowers its score."
+body = """
+Every criterion has a mode, hard unless it says otherwise. A hard criterion must pass. A soft
+one may miss by up to its tolerance and keep the row as a near miss. A score criterion never
+removes a row; it only moves it down the list. Hard and soft criteria are the gating ones, the
+steps of the screen's funnel.
+"""
+see_also = ["hard", "soft", "score_mode", "gating_criterion"]
+
+[[term]]
+id = "hard"
+term = "hard"
+short = "A criterion that must pass: a miss, or no value, rejects the row."
+body = """
+A hard criterion is strict: with the closing price required to be greater than 5, a close of
+4.99 is a REJECT. A row with no value for it is rejected too, with the reason no <field>. A
+hard criterion takes no tolerance, and each hard miss costs the row 100 points of score.
+"""
+see_also = ["mode", "reject", "soft"]
+
+[[term]]
+id = "soft"
+term = "soft"
+short = "A criterion that may miss by a little: within its tolerance the row stays in as a near miss."
+body = """
+A soft criterion needs a tolerance. A value that passes is fine; one that misses by no more
+than the tolerance is a near miss and gives the row the decision its on_miss names (WATCH by
+default); one that misses by more is a REJECT. A row with no value for it stays in, loses the
+full near-miss penalty of 10 points, and its reasons list no <field>.
+"""
+see_also = ["tolerance", "on_miss", "near_miss", "mode"]
+
+[[term]]
+id = "score_mode"
+term = "score (mode)"
+short = "A criterion that never removes a row: a miss only lowers the row's score."
+body = """
+Use score for a preference rather than a requirement: names that meet it rise, the others stay
+in lower down. Its tolerance is optional: a miss within it costs 0 to 10 points by how far it
+missed; a miss beyond it, or without one, or no value at all, costs 10.
+"""
+see_also = ["score", "mode", "tolerance"]
+
+[[term]]
+id = "tolerance"
+term = "tolerance"
+short = "How far a value may miss a soft or score criterion's threshold and still count as a near miss."
+body = """
+A tolerance is either a number in the field's own unit (a tolerance of 0.02 on a threshold of
+0.10 makes 0.08 to 0.10 a near miss) or relative, a share of the threshold: relative 0.2 on an
+average daily dollar volume of at least $50M (rollup.price_stats@v2.adv_usd_20d) makes $40M to
+$50M a near miss. It is required for soft, optional for score, not allowed for hard, and works
+only with numeric comparisons.
+"""
+see_also = ["near_miss", "soft", "score_mode"]
+
+[[term]]
+id = "on_miss"
+term = "on_miss"
+short = "What a soft criterion's near miss makes the row: WATCH (the default), LIQUIDITY_RISK or EVENT_RISK."
+body = """
+A row can nearly miss several soft criteria; it gets the most severe of their on_miss
+decisions, EVENT_RISK above LIQUIDITY_RISK above WATCH, and every reason is listed. Only soft
+criteria have an on_miss: a hard miss is always a REJECT and a score miss changes only the
+score.
+"""
+see_also = ["watch", "liquidity_risk", "event_risk", "near_miss"]
+
+# ------------------------------------------------------------------------ reading a screen's result
+
+[[term]]
+id = "near_miss"
+term = "Near miss"
+short = "A value that missed a soft or score criterion's threshold by no more than its tolerance."
+body = """
+A near miss costs points by how close it came: 10 times the distance divided by the
+tolerance, so 0 to 10. On a soft criterion it also sets the row's decision through on_miss; on
+a score criterion it only lowers the score. Every run and preview lists its narrow misses: the
+rows that missed only within tolerance, with each criterion, the value, the threshold and the
+distance, which is where a threshold set a little too tight shows up.
+"""
+see_also = ["tolerance", "on_miss", "watch", "score"]
+
+[[term]]
+id = "gating_criterion"
+term = "Gating criterion"
+short = "A hard or soft criterion: one that can remove a row (a score criterion never does)."
+body = """
+The Builder's funnel shows the gating criteria in order: the universe at the top, then for
+each one how many rows enter it, pass, miss narrowly, fail and have no value, and how many are
+left for the next. A row with no value for a soft criterion stays in; for a hard one it is
+removed.
+"""
+see_also = ["hard", "soft", "mode", "selection"]
+
+[[term]]
+id = "qualified"
+term = "QUALIFIED"
+short = "The decision of a row that met every hard and soft criterion."
+body = """
+A QUALIFIED row passed every gating criterion. Its score can still be below 100: score
+criteria it missed, or a soft criterion with no value (listed among its reasons), cost
+points.
+"""
+see_also = ["score", "watch", "reject"]
+
+[[term]]
+id = "watch"
+term = "WATCH"
+short = "The default decision of a near miss: close enough to keep an eye on, not a pass."
+body = """
+A row is WATCH when it passed every hard criterion and nearly missed at least one soft
+criterion whose on_miss is WATCH, and no near miss gave it anything more severe. It is a name
+that may qualify on a later day if the value moves a little.
+"""
+see_also = ["near_miss", "on_miss", "qualified"]
+
+[[term]]
+id = "liquidity_risk"
+term = "LIQUIDITY_RISK"
+short = "A near miss on a criterion about how much a name trades, so it may be harder to buy and sell than the screen wants."
+body = """
+A screen gives LIQUIDITY_RISK when a soft criterion with on_miss = LIQUIDITY_RISK nearly
+misses. Every site preset uses it on the average daily dollar volume
+(rollup.price_stats@v2.adv_usd_20d); one also uses it on option volume. It is more severe than
+WATCH and less than EVENT_RISK: the setup is there, but check the spread and the size you can
+trade.
+"""
+see_also = ["on_miss", "near_miss", "event_risk"]
+
+[[term]]
+id = "event_risk"
+term = "EVENT_RISK"
+short = "The most severe near-miss decision, meant for a criterion that keeps names away from an event such as earnings."
+body = """
+A screen gives EVENT_RISK when a soft criterion with on_miss = EVENT_RISK nearly misses, for
+example one asking for no earnings report within the next few days. It outranks LIQUIDITY_RISK
+and WATCH when a row has several near misses. No site preset uses it today; your own screens
+can.
+"""
+see_also = ["on_miss", "near_miss", "liquidity_risk"]
+
+[[term]]
+id = "reject"
+term = "REJECT"
+short = "The decision of a row that failed a hard criterion, had no value for one, or missed a soft one by more than its tolerance."
+body = """
+Rejected rows are still scored and kept with the run, so the funnel and the narrow misses can
+show why a name did not make it. Many hard misses tie at a score of 0.
+"""
+see_also = ["hard", "soft", "score"]
+
+[[term]]
+id = "paused"
+term = "PAUSED"
+short = "A pick the regime gate held back: it met the screen, but the market's regime is one the screen pauses in."
+body = """
+With the regime gate on, the [regime] settings (the site's defaults or your own config) list
+the regimes each screen pauses in, and on a session in one of them its QUALIFIED and WATCH rows become PAUSED, with the rule that paused them as the first
+reason. The VRP scanner, which sells option volatility, pauses in Storm and Severe storm. The
+gate fails closed: when the regime is UNKNOWN for the session, every QUALIFIED and WATCH row
+of a gated screen is paused. A paused pick stays visible with its reason (Ideas, Paused by regime), never silently
+dropped. The gate is off unless the site or your settings turn it on.
+"""
+see_also = ["regime", "qualified", "watch"]
+
+[[term]]
+id = "regime"
+term = "Regime"
+short = "The market's weather for the session: Clear, Clouds building, Storm or Severe storm."
+body = """
+The regime comes from two scores from 0 to 100: macro risk, the slow warning signs in the
+economy, and market stress, the fast ones in prices. Clear (CALM) is neither high, Clouds
+building (CAUTION) macro risk only, Storm (STRESS) market stress only, Severe storm (CRISIS)
+both. It is UNKNOWN when either score cannot be computed, never Clear for lack of data. To
+avoid flickering, the label is the most severe one of the last five sessions, so a regime is
+left only after five sessions below it. It can size new positions and drive the regime gate,
+both off unless turned on.
+"""
+see_also = ["paused", "unknown"]
+
+[[term]]
+id = "score"
+term = "Score"
+short = "A row's number from 0 to 100 for sorting: 100 when every threshold is met, less a penalty for each miss."
+body = """
+A near miss costs 0 to 10 points by how close it came, a score criterion missed beyond its
+tolerance or a soft or score criterion with no value 10, and a hard miss or a soft miss beyond
+tolerance 100; the score stops at 0. It is for ordering the list, not a probability. Rows sort
+by score, then by the screen's tie-break field, then by instrument.
+"""
+see_also = ["near_miss", "score_mode", "qualified"]

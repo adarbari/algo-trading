@@ -1,6 +1,7 @@
 /**
  * The frame every table of the widget shares: a panel (title, actions, states), the session
- * notes (a stale session, nightly tables missing for it, a universe snapshot from after it),
+ * notes (a stale session, nightly tables missing for it, a universe snapshot from after it; for a
+ * screener's run, the run's own coverage: a PARTIAL run and the tables it ran without),
  * the caller's header (filters), and the design system's `DataTable` over `TableRow`s with a
  * toolbar: the summary, the pager (server paging) and the caller's controls (column picker,
  * views). The columns are a `ColumnPlan` from the factories (ADR 0038); a field column's
@@ -25,10 +26,20 @@ import { helped } from '@/features/guide-help';
 
 import { missingTables } from '../model/plan';
 
+/** A screener run's own coverage, as its run record says (not the session as read now). */
+export interface RunNotes {
+  session: string;
+  partial: boolean;
+  /** The tables that had no rows when it ran. */
+  missing: readonly string[];
+}
+
 export interface SessionNotes {
   session: string;
   missing: readonly string[];
   preSnapshot: boolean;
+  /** The run the rows come from (absent: not a run). */
+  run?: RunNotes | null | undefined;
 }
 
 export interface Pager {
@@ -74,12 +85,34 @@ function Notes({ notes }: { notes: SessionNotes }) {
             : ''}
         </Banner>
       ) : null}
+      {notes.run && runShows(notes.run) ? <RunBanner run={notes.run} /> : null}
     </>
   );
 }
 
+function runShows(run: RunNotes): boolean {
+  return run.partial || run.missing.length > 0;
+}
+
+function RunBanner({ run }: { run: RunNotes }) {
+  const missing = missingTables(run.missing);
+  return (
+    <Banner tone="warning" title="Partial run">
+      {missing.length > 0
+        ? `The run for ${run.session} is PARTIAL, run without ${missing.join(', ')}; Run now re-runs it.`
+        : `The run for ${run.session} is PARTIAL; Run now re-runs it.`}
+    </Banner>
+  );
+}
+
 function shows(notes: SessionNotes | null | undefined): notes is SessionNotes {
-  return !!notes && (isStale(notes.session) || notes.missing.length > 0 || notes.preSnapshot);
+  return (
+    !!notes &&
+    (isStale(notes.session) ||
+      notes.missing.length > 0 ||
+      notes.preSnapshot ||
+      (!!notes.run && runShows(notes.run)))
+  );
 }
 
 export function TableFrame({

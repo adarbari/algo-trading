@@ -426,7 +426,7 @@ type GuideField {
 }
 
 """
-What the Guide holds (ADR 0051): the sections in order with entry counts, the field theme groups, the intents (most fields first), the situations, the playbooks by family, the regime indicators and the reference episodes
+What the Guide holds (ADR 0051): the sections in order with entry counts, the field theme groups, the intents (most fields first), the situations, the playbooks by family, the regime indicators, the reference episodes, the Start here pages in order and the glossary terms
 """
 type GuideIndex {
   sections: [GuideSection!]!
@@ -436,6 +436,8 @@ type GuideIndex {
   families: [GuideFamily!]!
   indicators: [GuideIndicator!]!
   episodes: [GuideEpisode!]!
+  startPages: [GuideStartEntry!]!
+  terms: [GuideTermEntry!]!
 }
 
 """
@@ -481,6 +483,15 @@ An intent a trader has and the number of fields with a criterion for it
 type GuideIntent {
   intent: String!
   fields: Int!
+}
+
+"""
+A Guide entry a page links to: `kind` (start, indicator, episode, playbook, field, situation or term), `id` (its page's key: a field's catalogue name, a situation's slug) and its title
+"""
+type GuideLink {
+  kind: String!
+  id: String!
+  title: String!
 }
 
 """A playbook: a site rule-screen preset's id and name"""
@@ -563,6 +574,30 @@ type GuideRelatedPlaybook {
 }
 
 """
+Guide search results for `query`, grouped by kind; the groups by their best result (exact name, then name or title, then intent or theme, then prose)
+"""
+type GuideSearch {
+  query: String!
+  groups: [GuideSearchGroup!]!
+}
+
+"""The results of one kind, best first"""
+type GuideSearchGroup {
+  kind: String!
+  hits: [GuideSearchHit!]!
+}
+
+"""
+A search result: the entry (`kind`, `id`: its page's key), its title and a snippet of its text
+"""
+type GuideSearchHit {
+  kind: String!
+  id: String!
+  title: String!
+  snippet: String!
+}
+
+"""
 A Guide section in order: `entries`, how many entries it has (0: none yet)
 """
 type GuideSection {
@@ -611,6 +646,49 @@ type GuideSituationPlaybook {
   id: String!
   name: String!
   fields: [String!]!
+}
+
+"""
+A Start here page: its id (`Query.guideStartPage(id)`), number, title and one-line summary
+"""
+type GuideStartEntry {
+  id: String!
+  order: Int!
+  title: String!
+  summary: String!
+}
+
+"""
+A Start here page: its index entry, the sections in reading order and the Guide entries it links to
+"""
+type GuideStartPage {
+  entry: GuideStartEntry!
+  sections: [GuideStartSection!]!
+  links: [GuideLink!]!
+}
+
+"""A section of a Start here page, its body linked"""
+type GuideStartSection {
+  title: String!
+  body: GuideProse!
+}
+
+"""
+A glossary term's page: its index entry, the body linked and the terms it sends the reader on to
+"""
+type GuideTerm {
+  entry: GuideTermEntry!
+  body: GuideProse!
+  seeAlso: [GuideTermEntry!]!
+}
+
+"""
+A glossary term: its id (`Query.guideTerm(id)`), the term as the app writes it and `short`, one sentence (the help button's hover)
+"""
+type GuideTermEntry {
+  id: String!
+  term: String!
+  short: String!
 }
 
 """A field-guide theme and the number of fields it guides"""
@@ -1208,6 +1286,21 @@ type Query {
   guideEpisode(slug: String!): GuideEpisodeDetail
 
   """
+  The glossary term `id` (ADR 0051): its entry, the body linked and the terms it refers to; null: no such term
+  """
+  guideTerm(id: String!): GuideTerm
+
+  """
+  The Start here page `id` (ADR 0051): its entry, the sections linked and the Guide entries it links to; null: no such page
+  """
+  guideStartPage(id: String!): GuideStartPage
+
+  """
+  Search every Guide entry for `q` (ADR 0051): at most `limit` results per kind, grouped by kind, ranked exact name, then name or title, then intent or theme, then prose (case-insensitive); not session data
+  """
+  guideSearch(q: String!, limit: Int! = 5): GuideSearch
+
+  """
   Every strategy and screener config the user sees: site presets, then their own (`kind`: only `strategy` or `screener`)
   """
   configs(kind: String = null): [Config!]!
@@ -1580,7 +1673,7 @@ type ScreenerHit {
 }
 
 """
-A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown)
+A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown); `coverage` / `missingTables`: the run record's own coverage (COMPLETE, PARTIAL; null: not recorded) and the tables that had no rows when it ran, not the session's missing tables as read now
 """
 type ScreenerRun {
   runId: String!
@@ -1595,6 +1688,8 @@ type ScreenerRun {
   paused: Int!
   regime: String
   audit: JSON!
+  coverage: String
+  missingTables: [String!]!
 
   """
   The session of the previous run it is compared with; null: none (nothing is new or dropped)
