@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
+.PHONY: check-gates changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -82,6 +82,9 @@ features-doc:    ## regenerate docs/data/features.md (catalogue) and docs/data/f
 filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
 
+numbering:       ## ADR numbers not taken on origin/main; web rule numbers 1..n and cited ones exist
+	$(PY) scripts/check_numbering.py
+
 unit:
 	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/libs tests/apps tests/scripts
 
@@ -153,7 +156,11 @@ WEB_DIST ?= var/web
 web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build the API serves (ALGOTRADE_WEB_DIST=var/web); redo after a web change
 	cd $(WEB) && VITE_API_BASE_URL= $(NPM) run build -- --outDir $(abspath $(WEB_DIST)) --emptyOutDir
 
-check: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen datasets-verify test evaluate web-check web-real
+# One full check per worktree: a second concurrent run refuses (scripts/ops/check_lock.sh).
+check:
+	scripts/ops/check_lock.sh $(MAKE) check-gates
+
+check-gates: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen numbering datasets-verify test evaluate web-check web-real
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

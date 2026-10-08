@@ -20,6 +20,10 @@
 # the nightly and API run) to this worktree's code; `make install` refuses, `make doctor`
 # flags it. Never symlink node_modules: `make check` runs `npm ci`, which through a link
 # empties main's install (breaking its dev server and every linked worktree).
+# worktree.env also sets ALGOTRADE_PORT_BASE = 10000 + cksum(<wt path>) % 500 * 10: this
+# worktree's own block of ports, read by apps/web (vite.config.ts and the playwright configs):
+# API +0, Vite dev +1, real-app api/web pairs +2..+5, Storybook preview +6, vite preview +7.
+# Unset (CI, the main checkout) the web keeps its usual 8000 / 5173 / 4173 / 6007 / 88xx / 58xx.
 # Then: `source <wt>/worktree.env`.
 set -euo pipefail
 
@@ -29,7 +33,7 @@ for a in "$@"; do
     --dry-run) dry=1 ;;
     --remove) remove=1 ;;
     --prune-merged) prune=1 ;;
-    -h | --help) sed -n '2,22p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,25p' "$0"; exit 0 ;;
     *) args+=("$a") ;;
   esac
 done
@@ -140,13 +144,17 @@ fi
 [ ! -e "$wt" ] || { echo "already exists: $wt" >&2; exit 1; }
 run git -C "$main" fetch -q origin "$base"
 run git -C "$main" worktree add -b "$branch" "$wt" "origin/$base"
+# a reused stale resolution dropped two changes on 2026-10-07: never replay recorded conflicts
+run git -C "$wt" config rerere.enabled false
 run ln -s "$main/.venv" "$wt/.venv"
 
 pp="$wt/src:$wt/libs/sources:$wt/apps/ingestion:$wt/apps/api:$wt/apps/backtest"
+port_base=$((10000 + $(printf %s "$wt" | cksum | cut -d' ' -f1) % 500 * 10))
 if [ "$dry" = 1 ]; then
   echo "[dry-run] write $wt/worktree.env: export PYTHONPATH=$pp"
+  echo "[dry-run] write $wt/worktree.env: export ALGOTRADE_PORT_BASE=$port_base"
 else
-  printf 'export PYTHONPATH=%s\n' "$pp" >"$wt/worktree.env"
+  printf 'export PYTHONPATH=%s\nexport ALGOTRADE_PORT_BASE=%s\n' "$pp" "$port_base" >"$wt/worktree.env"
 fi
 
 run npm ci --prefix "$wt/apps/web"

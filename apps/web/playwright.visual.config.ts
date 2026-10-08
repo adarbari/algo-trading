@@ -6,6 +6,11 @@
  */
 import { defineConfig, devices } from '@playwright/test';
 
+const port =
+  process.env['ALGOTRADE_PORT_BASE'] === undefined
+    ? 6007
+    : Number(process.env['ALGOTRADE_PORT_BASE']) + 6;
+
 export default defineConfig({
   testDir: './visual',
   snapshotPathTemplate: '{arg}{ext}',
@@ -14,7 +19,7 @@ export default defineConfig({
   retries: process.env['CI'] ? 1 : 0, // a story that redraws after its play function; the rule in docs/ci.md
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0, animations: 'disabled', caret: 'hide' } },
-  use: { baseURL: 'http://127.0.0.1:6007', viewport: { width: 640, height: 360 } },
+  use: { baseURL: `http://127.0.0.1:${String(port)}`, viewport: { width: 640, height: 360 } },
   projects: [
     {
       name: 'chromium',
@@ -22,8 +27,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx vite preview --outDir storybook-static --host 127.0.0.1 --port 6007 --strictPort',
-    url: 'http://127.0.0.1:6007/index.json',
+    command: `npx vite preview --outDir storybook-static --host 127.0.0.1 --port ${String(port)} --strictPort`,
+    url: `http://127.0.0.1:${String(port)}/index.json`,
     reuseExistingServer: !process.env['CI'],
   },
 });
