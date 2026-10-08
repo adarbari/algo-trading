@@ -26,7 +26,7 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    | situation (fools many fields at once) | `config/site/field_guide/situations.toml` `[[situation]]` | |
    | regime indicator, episode | `config/site/regime/cards.toml`, `episodes.toml` | |
    | playbook (one per site preset screen) | `config/site/guide/playbooks/<id>.toml` (`[asks]`: one line per criterion of the latest version) | `add-screener` for a site preset |
-   | glossary term, how-to page | the Guide's glossary and how-to sources (GD6) | |
+   | glossary term, how-to page | `config/site/guide/glossary.toml` `[[term]]`, `start.toml` `[[page]]`; the button takes `{ kind: 'term' | 'start', id }` | |
 
    A kind the table does not have yet: stop and add it through `add-responsibility` (an owner,
    a loader in the Guide read model, a page template in docs/ui/guide.md), not as page text.

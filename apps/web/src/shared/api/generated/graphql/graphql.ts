@@ -127,7 +127,21 @@ export type FeatureTableQuery = { table: { universeSnapshot: string | null, preS
 export type GuideIndexQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, playbooks: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }>, indicators: Array<{ key: string, plainName: string, pace: string }>, episodes: Array<{ key: string, name: string }> } | null };
+export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, playbooks: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }>, indicators: Array<{ key: string, plainName: string, pace: string }>, episodes: Array<{ key: string, name: string }>, startPages: Array<{ id: string, order: number, title: string, summary: string }>, terms: Array<{ id: string, term: string, short: string }> } | null };
+
+export type GuideTermQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type GuideTermQuery = { guideTerm: { entry: { id: string, term: string, short: string }, body: { segments: Array<{ text: string, field: string | null }> }, seeAlso: Array<{ id: string, term: string, short: string }> } | null };
+
+export type GuideStartPageQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type GuideStartPageQuery = { guideStartPage: { entry: { id: string, order: number, title: string, summary: string }, sections: Array<{ title: string, body: { segments: Array<{ text: string, field: string | null }> } }>, links: Array<{ kind: string, id: string, title: string }> } | null };
 
 export type GuideFieldQueryVariables = Exact<{
   name: string;
@@ -362,6 +376,14 @@ export type GuideHelpFieldQueryVariables = Exact<{
 
 
 export type GuideHelpFieldQuery = { guideField: { info: { name: string, unit: string | null, guide: { theme: string, reads: string, summary: string, caveats: Array<string>, uses: Array<{ intent: string, op: string, value: unknown, mode: string, tolerance: unknown, onMiss: string | null, note: string }> } | null } } | null };
+
+export type GuideSearchQueryVariables = Exact<{
+  q: string;
+  limit: number;
+}>;
+
+
+export type GuideSearchQuery = { guideSearch: { query: string, groups: Array<{ kind: string, hits: Array<{ kind: string, id: string, title: string, snippet: string }> }> } | null };
 
 export type TableViewQueryVariables = Exact<{
   scope: string;
@@ -734,9 +756,68 @@ export const GuideIndexDocument = new TypedDocumentString(`
       key
       name
     }
+    startPages {
+      id
+      order
+      title
+      summary
+    }
+    terms {
+      id
+      term
+      short
+    }
   }
 }
     `) as unknown as TypedDocumentString<GuideIndexQuery, GuideIndexQueryVariables>;
+export const GuideTermDocument = new TypedDocumentString(`
+    query GuideTerm($id: String!) {
+  guideTerm(id: $id) {
+    entry {
+      id
+      term
+      short
+    }
+    body {
+      segments {
+        text
+        field
+      }
+    }
+    seeAlso {
+      id
+      term
+      short
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideTermQuery, GuideTermQueryVariables>;
+export const GuideStartPageDocument = new TypedDocumentString(`
+    query GuideStartPage($id: String!) {
+  guideStartPage(id: $id) {
+    entry {
+      id
+      order
+      title
+      summary
+    }
+    sections {
+      title
+      body {
+        segments {
+          text
+          field
+        }
+      }
+    }
+    links {
+      kind
+      id
+      title
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideStartPageQuery, GuideStartPageQueryVariables>;
 export const GuideFieldDocument = new TypedDocumentString(`
     query GuideField($name: FeatureName!) {
   guideField(name: $name) {
@@ -1725,6 +1806,22 @@ export const GuideHelpFieldDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideHelpFieldQuery, GuideHelpFieldQueryVariables>;
+export const GuideSearchDocument = new TypedDocumentString(`
+    query GuideSearch($q: String!, $limit: Int!) {
+  guideSearch(q: $q, limit: $limit) {
+    query
+    groups {
+      kind
+      hits {
+        kind
+        id
+        title
+        snippet
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideSearchQuery, GuideSearchQueryVariables>;
 export const TableViewDocument = new TypedDocumentString(`
     query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) {

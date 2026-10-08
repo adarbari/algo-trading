@@ -1,9 +1,9 @@
 /**
  * The catalogue grouped for browsing by the field guide's themes (Momentum and trend, Volatility,
  * ...): a field with no guide entry falls under "Other", listed last. Pure readers over the
- * catalogue the server serves; search matches names, titles, descriptions and the guide's text.
+ * catalogue the server serves (searching is the server's: `Query.guideSearch`, ADR 0038).
  */
-import { featureTitle, type CatalogueFeature } from './catalogue';
+import type { CatalogueFeature } from './catalogue';
 
 /** Where a field with no field guide entry goes. */
 export const OTHER_THEME = 'Other';
@@ -37,35 +37,6 @@ export function themeFields(
   theme: string,
 ): CatalogueFeature[] {
   return catalogue.filter((f) => themeOf(f) === theme);
-}
-
-/** The text a search looks in: name, title, description, how to read it, the intents and the caveats. */
-function haystack(feature: CatalogueFeature): string {
-  const guide = feature.guide;
-  return [
-    feature.name,
-    featureTitle(feature.name),
-    feature.description,
-    guide?.reads,
-    ...(guide?.uses.flatMap((u) => [u.intent, u.note]) ?? []),
-    ...(guide?.caveats ?? []),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-}
-
-/** The fields every word of `query` appears in (case-insensitive; an empty query keeps all). */
-export function searchFields(
-  catalogue: readonly CatalogueFeature[],
-  query: string,
-): CatalogueFeature[] {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [...catalogue];
-  return catalogue.filter((f) => {
-    const text = haystack(f);
-    return words.every((w) => text.includes(w));
-  });
 }
 
 /** One line on what the field is: the guide's first sentence, else the definition's. */

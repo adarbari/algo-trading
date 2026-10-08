@@ -1,6 +1,6 @@
 /**
- * The Guide's home: one block per section that has pages today, in the spec's order (sections of
- * later phases stay out). Each block is the section's title and purpose as the server gives
+ * The Guide's home: one block per section, in the spec's order (Start here first, Glossary
+ * last). Start here lists its numbered pages with their summaries, the Glossary its terms. Each block is the section's title and purpose as the server gives
  * them; Market regime lists the warning signs and the market falls, Playbooks lists the families with their playbooks, Fields the theme groups in the order
  * a screen uses them (with the field count of every theme, and links to the by-intent and A to Z
  * views), Situations the situations with how many fields each fools.
@@ -20,12 +20,16 @@ import {
   BUILT_SECTIONS,
   episodePath,
   fieldsPath,
+  GUIDE_GLOSSARY_PATH,
   GUIDE_PLAYBOOKS_PATH,
   GUIDE_REGIME_PATH,
   GUIDE_SITUATIONS_PATH,
+  GUIDE_START_PATH,
   indicatorPath,
   playbookPath,
   situationPath,
+  startPath,
+  termPath,
   themeTitle,
   useGuideIndex,
 } from '@/entities/guide';
@@ -37,7 +41,8 @@ export function GuideHome() {
   }
   if (index.isPending) return <Skeleton variant="rect" height="lg" label="Loading the Guide" />;
   if (!index.data) return <EmptyState bordered title="The Guide has no entries." />;
-  const { sections, themeGroups, families, situations, indicators, episodes } = index.data;
+  const { sections, themeGroups, families, situations, indicators, episodes, startPages, terms } =
+    index.data;
   return (
     <Stack gap={6}>
       <Stack gap={1}>
@@ -57,6 +62,16 @@ export function GuideHome() {
                 {section.title}
               </Heading>
               <Text tone="muted">{`${section.entries.toLocaleString('en-US')} entries`}</Text>
+              {section.id === 'start' && (
+                <TextLink href={GUIDE_START_PATH} size="sm">
+                  All the steps
+                </TextLink>
+              )}
+              {section.id === 'glossary' && (
+                <TextLink href={GUIDE_GLOSSARY_PATH} size="sm">
+                  All the terms
+                </TextLink>
+              )}
               {section.id === 'regime' && (
                 <TextLink href={GUIDE_REGIME_PATH} size="sm">
                   The warning signs and the falls
@@ -86,6 +101,32 @@ export function GuideHome() {
             <Text as="p" tone="secondary">
               {section.purpose}
             </Text>
+            {section.id === 'start' && (
+              <Stack as="ol" gap={2} aria-label="Start here pages, in reading order">
+                {startPages.map((p) => (
+                  <Stack as="li" key={p.id} direction="row" gap={3} align="baseline">
+                    <Text tone="muted" mono>
+                      {String(p.order)}
+                    </Text>
+                    <Stack gap={0}>
+                      <TextLink href={startPath(p.id)}>{p.title}</TextLink>
+                      <Text size="sm" tone="muted">
+                        {p.summary}
+                      </Text>
+                    </Stack>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+            {section.id === 'glossary' && (
+              <Grid columns={2} gap={2} collapse="md" align="start">
+                {terms.map((t) => (
+                  <TextLink key={t.id} href={termPath(t.id)}>
+                    {t.term}
+                  </TextLink>
+                ))}
+              </Grid>
+            )}
             {section.id === 'regime' && (
               <Grid columns={2} gap={5} collapse="md" align="start">
                 <Stack gap={2} as="section" aria-label="Warning signs">

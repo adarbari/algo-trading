@@ -17,6 +17,8 @@ import { mockApi } from './mock-api';
 const ROUTES = [
   ...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)),
   '/guide',
+  '/guide/start/how_the_app_thinks',
+  '/guide/glossary',
   '/guide/regime',
   '/guide/regime/indicators/curve_10y3m',
   '/guide/regime/episodes/gfc_2007',
@@ -217,4 +219,25 @@ test('the top bar keeps every button on screen with a long viewer name', async (
     // Hidden ones (a collapsed menu's items) have no box.
     if (box) expect(box.x + box.width).toBeLessThanOrEqual(innerWidth);
   }
+});
+
+test('Guide search: the rail button opens the dialog inside the viewport, a tapped result opens its page', async ({
+  page,
+}) => {
+  await page.goto('/guide/glossary');
+  await page.getByRole('button', { name: 'Search the Guide' }).tap();
+  const dialog = page.getByRole('dialog', { name: 'Search the Guide' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('searchbox').fill('session');
+  const result = dialog.getByRole('link', { name: /^Session/ });
+  await expect(result).toBeVisible();
+  const box = await dialog.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    width,
+  );
+  await expectAccessible(page);
+  await result.tap();
+  await expect(page).toHaveURL(/\/guide\/glossary\/session$/);
 });

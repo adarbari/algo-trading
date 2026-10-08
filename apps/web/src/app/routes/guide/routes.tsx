@@ -4,7 +4,9 @@
  * page; the name is the catalogue name), `/guide/playbooks` and `/guide/playbooks/$id` (a site
  * preset's playbook; its buttons open that screener's results and Builder) and
  * `/guide/situations` and `/guide/situations/$slug`, `/guide/regime`, `/guide/regime/indicators/$key`
- * and `/guide/regime/episodes/$key` (the market regime's indicators and reference falls). No role gating (`viewerGuard`: any registered
+ * and `/guide/regime/episodes/$key` (the market regime's indicators and reference falls),
+ * `/guide/start` and `/guide/start/$id` (the how-tos in order) and `/guide/glossary` and
+ * `/guide/glossary/$id` (the app's words A to Z). No role gating (`viewerGuard`: any registered
  * viewer) and no workspace: the layout shows the top bar of the workspace the user came from
  * (`GuideLayout`), so an admin stays in ADMIN.
  */
@@ -15,6 +17,7 @@ import {
   GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
+  GuideGlossaryPage,
   GuideHomePage,
   GuideIndicatorPage,
   GuidePlaybookPage,
@@ -22,6 +25,9 @@ import {
   GuideRegimePage,
   GuideSituationPage,
   GuideSituationsPage,
+  GuideStartIndexPage,
+  GuideStartPage,
+  GuideTermPage,
 } from '@/pages/guide';
 
 import { GuideLayout } from '../../layouts';
@@ -144,8 +150,44 @@ const episodeRoute = createRoute({
   component: EpisodeRoute,
 });
 
+const startIndexRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'start',
+  component: GuideStartIndexPage,
+});
+
+function StartRoute() {
+  const { id } = startRoute.useParams();
+  return <GuideStartPage id={id} />;
+}
+
+const startRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'start/$id',
+  component: StartRoute,
+});
+
+const glossaryRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'glossary',
+  component: GuideGlossaryPage,
+});
+
+function TermRoute() {
+  const { id } = termRoute.useParams();
+  return <GuideTermPage id={id} />;
+}
+
+const termRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'glossary/$id',
+  component: TermRoute,
+});
+
 export const guideRoutes = guideRoute.addChildren([
   homeRoute,
+  startIndexRoute,
+  startRoute,
   fieldsRoute,
   fieldRoute,
   playbooksRoute,
@@ -155,4 +197,6 @@ export const guideRoutes = guideRoute.addChildren([
   regimeIndexRoute,
   indicatorRoute,
   episodeRoute,
+  glossaryRoute,
+  termRoute,
 ]);

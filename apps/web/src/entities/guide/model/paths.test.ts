@@ -6,12 +6,15 @@ import {
   exploreFieldPath,
   fieldPath,
   fieldsPath,
+  guideEntryPath,
   indicatorPath,
   parseFieldsSearch,
   playbookPath,
   screenerBuilderPath,
   screenerResultsPath,
   situationPath,
+  startPath,
+  termPath,
   themeTitle,
 } from './paths';
 
@@ -28,8 +31,31 @@ describe('guide paths', () => {
     expect(episodePath('gfc_2007')).toBe('/guide/regime/episodes/gfc_2007');
   });
 
-  it('has pages for the market regime, playbooks, fields and situations, in the Guide’s order', () => {
-    expect(BUILT_SECTIONS).toEqual(['regime', 'playbooks', 'fields', 'situations']);
+  it('has pages for every section, Start here first and the Glossary last', () => {
+    expect(BUILT_SECTIONS).toEqual([
+      'start',
+      'regime',
+      'playbooks',
+      'fields',
+      'situations',
+      'glossary',
+    ]);
+  });
+
+  it('builds the Start here and glossary paths', () => {
+    expect(startPath('read_a_result')).toBe('/guide/start/read_a_result');
+    expect(termPath('not_run')).toBe('/guide/glossary/not_run');
+  });
+
+  it('resolves an entry by the kind and id the server gives, else the home', () => {
+    expect(guideEntryPath('start', 'how_the_app_thinks')).toBe('/guide/start/how_the_app_thinks');
+    expect(guideEntryPath('term', 'session')).toBe('/guide/glossary/session');
+    expect(guideEntryPath('field', 'a@v1.b')).toBe('/guide/fields/a%40v1.b');
+    expect(guideEntryPath('playbook', 'breakout')).toBe('/guide/playbooks/breakout');
+    expect(guideEntryPath('situation', 'earnings-gap')).toBe('/guide/situations/earnings-gap');
+    expect(guideEntryPath('indicator', 'k')).toBe('/guide/regime/indicators/k');
+    expect(guideEntryPath('episode', 'gfc')).toBe('/guide/regime/episodes/gfc');
+    expect(guideEntryPath('other', 'x')).toBe('/guide');
   });
 
   it('encodes a catalogue name in a field path', () => {

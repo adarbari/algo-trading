@@ -1,5 +1,6 @@
 /**
- * The Guide's pages (ADR 0051): the home (`/guide`), the field index (`/guide/fields`) and one
+ * The Guide's pages (ADR 0051): the home (`/guide`), Start here (the index and a how-to page),
+ * the glossary (the A to Z index and a term's page), the field index (`/guide/fields`) and one
  * field's page (`/guide/fields/$name`), the playbook index and a playbook's page, the situation
  * index and a situation's page, the Market regime index and an indicator's and a market fall's page. Each is the reference frame (a rail on the side, the article,
  * and on a field page the "On this page" list) around one widget; the choices (view, theme,
@@ -11,12 +12,14 @@ import { DocLayout } from '@algotrade/ui';
 import type { FieldsSearch, FieldsView } from '@/entities/guide';
 import { GuideFieldsIndex } from '@/widgets/guide-fields';
 import { FieldOutline, GuideField } from '@/widgets/guide-field';
+import { GuideGlossaryIndex, GuideTerm } from '@/widgets/guide-glossary';
 import { GuideHome } from '@/widgets/guide-home';
 import { GuidePlaybook } from '@/widgets/guide-playbook';
 import { GuidePlaybooksIndex } from '@/widgets/guide-playbooks';
 import { GuideRail } from '@/widgets/guide-rail';
 import { GuideEpisode, GuideIndicator, GuideRegimeIndex } from '@/widgets/guide-regime';
 import { GuideSituation, GuideSituationsIndex } from '@/widgets/guide-situations';
+import { GuideStart, GuideStartIndex } from '@/widgets/guide-start';
 
 export function GuideHomePage() {
   return (
@@ -114,6 +117,38 @@ export function GuideEpisodePage({ slug }: { slug: string }) {
   return (
     <DocLayout rail={<GuideRail page="episode" episode={slug} />}>
       <GuideEpisode slug={slug} />
+    </DocLayout>
+  );
+}
+
+export function GuideStartIndexPage() {
+  return (
+    <DocLayout rail={<GuideRail page="start" />}>
+      <GuideStartIndex />
+    </DocLayout>
+  );
+}
+
+export function GuideStartPage({ id }: { id: string }) {
+  return (
+    <DocLayout rail={<GuideRail page="start_page" startPage={id} />}>
+      <GuideStart id={id} />
+    </DocLayout>
+  );
+}
+
+export function GuideGlossaryPage() {
+  return (
+    <DocLayout rail={<GuideRail page="glossary" />}>
+      <GuideGlossaryIndex />
+    </DocLayout>
+  );
+}
+
+export function GuideTermPage({ id }: { id: string }) {
+  return (
+    <DocLayout rail={<GuideRail page="term" />}>
+      <GuideTerm id={id} />
     </DocLayout>
   );
 }

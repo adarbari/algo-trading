@@ -23,6 +23,7 @@ import {
   REGIME_INDEX,
   SITUATION,
 } from './guide-pages-api';
+import { guideSearch, guideStartPage, guideTerm, START_INDEX } from './guide-start-api';
 
 type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -344,8 +345,10 @@ function guideIndex(): Json {
   return {
     data: {
       guideIndex: {
+        startPages: START_INDEX.startPages,
+        terms: START_INDEX.terms,
         sections: [
-          { id: 'start', title: 'Start here', purpose: 'How the app thinks.', entries: 4 },
+          START_INDEX.sections[0],
           {
             id: 'regime',
             title: 'Market regime',
@@ -360,6 +363,7 @@ function guideIndex(): Json {
             purpose: 'States that fool fields.',
             entries: 1,
           },
+          START_INDEX.sections[1],
         ],
         families: FAMILIES,
         indicators: REGIME_INDEX.indicators,
@@ -431,6 +435,11 @@ function graphqlAnswer(operation: Operation): Json | null {
   if (name === 'GuideIndicator') return guideIndicator(String(operation.variables?.['key']));
   if (name === 'GuideEpisode') return guideEpisode(String(operation.variables?.['slug']));
   if (name === 'GuideSituation') return guideSituation(String(operation.variables?.['slug']));
+  if (name === 'GuideStartPage') return guideStartPage(String(operation.variables?.['id']));
+  if (name === 'GuideTerm') return guideTerm(String(operation.variables?.['id']));
+  if (name === 'GuideSearch') {
+    return guideSearch(String(operation.variables?.['q']), Number(operation.variables?.['limit']));
+  }
   if (name === 'GuideField') return guideField(String(operation.variables?.['name']));
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
   if (name === 'GuideHelpField') return guideHelp(String(operation.variables?.['name']));

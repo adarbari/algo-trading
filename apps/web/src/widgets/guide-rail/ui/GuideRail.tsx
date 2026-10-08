@@ -1,17 +1,14 @@
 /**
- * The Guide's compact rail: a search over field names, display names and what they say (it
- * filters what the catalogue already returned, in the browser), and under it the sections that
- * have pages today with their entry counts from the server; Fields expands to its themes, and
- * the theme of the current field to its fields; Market regime (indicators, then market falls),
- * Playbooks (in family order) and Situations list their pages while one of theirs is open. While a query is typed the rail lists the matching
- * fields instead.
+ * The Guide's compact rail: the search button (it opens the one search dialog, whose results the
+ * server ranks), and under it the sections with their entry counts from the server, in the
+ * spec's order (Start here first, Glossary last); Fields expands to its themes, and the theme of
+ * the current field to its fields; Start here, Market regime (indicators, then market falls),
+ * Playbooks (in family order) and Situations list their pages while one of theirs is open.
  */
-import { NavList, SearchInput, Stack, Text, type NavListItem } from '@algotrade/ui';
-import { useMemo, useState } from 'react';
+import { NavList, Stack, type NavListItem } from '@algotrade/ui';
 
 import {
   byName,
-  searchFields,
   themeFields,
   useFeatureCatalogue,
   type CatalogueFeature,
@@ -22,21 +19,23 @@ import {
   fieldPath,
   fieldsPath,
   GUIDE_FIELDS_PATH,
+  GUIDE_GLOSSARY_PATH,
   GUIDE_PATH,
   GUIDE_PLAYBOOKS_PATH,
   GUIDE_REGIME_PATH,
   GUIDE_SITUATIONS_PATH,
+  GUIDE_START_PATH,
   indicatorPath,
   playbookPath,
   situationPath,
+  startPath,
   themeTitle,
   useGuideIndex,
 } from '@/entities/guide';
+import { GuideSearchButton } from '@/features/guide-search';
 
 /** Fields listed under the current theme before "N more". */
 const THEME_FIELDS_SHOWN = 8;
-/** Matches listed while searching. */
-const MATCHES_SHOWN = 30;
 
 export interface GuideRailProps {
   /** Which Guide page is open. */
@@ -50,7 +49,11 @@ export interface GuideRailProps {
     | 'situation'
     | 'regime'
     | 'indicator'
-    | 'episode';
+    | 'episode'
+    | 'start'
+    | 'start_page'
+    | 'glossary'
+    | 'term';
   /** The theme the field index is narrowed to. */
   theme?: string | undefined;
   /** The field whose page is open (catalogue name). */
@@ -63,6 +66,8 @@ export interface GuideRailProps {
   indicator?: string | undefined;
   /** The market fall whose page is open (its slug). */
   episode?: string | undefined;
+  /** The Start here page that is open (its id). */
+  startPage?: string | undefined;
 }
 
 export function GuideRail({
@@ -73,15 +78,11 @@ export function GuideRail({
   situation,
   indicator,
   episode,
+  startPage,
 }: GuideRailProps) {
   const index = useGuideIndex();
   const catalogue = useFeatureCatalogue();
-  const [query, setQuery] = useState('');
   const all = catalogue.data;
-  const matches = useMemo(
-    () => (query.trim() ? searchFields(all ?? [], query) : null),
-    [all, query],
-  );
   const openField = field && all ? byName(all).get(field) : undefined;
   const openTheme = openField?.guide?.theme ?? theme;
 
@@ -175,7 +176,31 @@ export function GuideRail({
         : [],
   });
 
+  const startSection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_START_PATH,
+    label: s.title,
+    count: s.entries,
+    current: page === 'start',
+    children:
+      page === 'start' || page === 'start_page'
+        ? (index.data?.startPages ?? []).map((p) => ({
+            href: startPath(p.id),
+            label: `${String(p.order)}. ${p.title}`,
+            current: page === 'start_page' && p.id === startPage,
+          }))
+        : [],
+  });
+
+  const glossarySection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_GLOSSARY_PATH,
+    label: s.title,
+    count: s.entries,
+    current: page === 'glossary' || page === 'term',
+  });
+
   const sectionItem: Record<string, (s: { title: string; entries: number }) => NavListItem> = {
+    start: startSection,
+    glossary: glossarySection,
     regime: regimeSection,
     playbooks: playbooksSection,
     fields: fieldsSection,
@@ -192,39 +217,8 @@ export function GuideRail({
 
   return (
     <Stack gap={3}>
-      <SearchInput
-        aria-label="Search the guide"
-        placeholder="Search fields"
-        size="sm"
-        value={query}
-        onValueChange={setQuery}
-      />
-      {matches ? (
-        <Stack gap={2}>
-          <Text size="sm" tone="muted">
-            {matches.length === 0
-              ? `No field matches “${query}”.`
-              : `${String(matches.length)} ${matches.length === 1 ? 'field' : 'fields'}`}
-          </Text>
-          <NavList
-            aria-label="Search results"
-            size="sm"
-            items={matches.slice(0, MATCHES_SHOWN).map((f) => ({
-              href: fieldPath(f.name),
-              label: f.name,
-              mono: true,
-              current: f.name === field,
-            }))}
-          />
-          {matches.length > MATCHES_SHOWN && (
-            <Text size="sm" tone="muted">
-              {`${String(matches.length - MATCHES_SHOWN)} more: narrow the search.`}
-            </Text>
-          )}
-        </Stack>
-      ) : (
-        <NavList aria-label="Guide" items={sections} />
-      )}
+      <GuideSearchButton />
+      <NavList aria-label="Guide" items={sections} />
     </Stack>
   );
 }

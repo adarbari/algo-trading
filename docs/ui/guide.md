@@ -220,9 +220,18 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   and drafter hooks.
 - **GD5**: market regime pages (indicators, episodes) and the Regime page's drawers.
 - **GD6**: Start here, glossary, grouped search behind ⌘K, the remaining migrations, the
-  baseline at its floor. GD6a (server side and content): `glossary.toml`, `start.toml`,
-  `Query.guideTerm` / `guideStartPage` / `guideSearch`, the index's terms and pages; GD6b the
-  pages, the drawer for terms, ⌘K and the migrations.
+  baseline at its floor. GD6a (server side and content, done): `glossary.toml`, `start.toml`,
+  `Query.guideTerm` / `guideStartPage` / `guideSearch`, the index's terms and pages. **GD6b
+  (done)**: `/guide/start` and `/guide/start/<id>` (numbered, in order, each with its links and
+  the next step), `/guide/glossary` (A to Z under letters) and `/guide/glossary/<id>`; the home and
+  the rail list every section in the server's order (Start here first, Glossary last); the help
+  drawer takes the kinds `term` (short line and body) and `start` (summary and first section);
+  one search dialog (`SearchDialog` in `@algotrade/ui`, `features/guide-search`, mounted once in
+  the workspace layout) opens on Ctrl+K / ⌘K anywhere and from the rail's button, sends the query
+  about 200 ms after the last keystroke to `Query.guideSearch`, shows the server's groups in its
+  order, moves with the arrows and opens the entry's page on Enter; the rail's client-side field
+  filter and `searchFields` are gone (ADR 0038). GD6c: the remaining migrations (section 4,
+  phase 3) and the baseline at its floor.
 
 Not recommended: a separate docs site (duplicates the read model and loses session-aware
 distributions), a guided tour (the drawer is cheaper and persistent), beginner / advanced

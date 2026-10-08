@@ -9,6 +9,7 @@ import {
   GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
+  GuideGlossaryPage,
   GuideHomePage,
   GuideIndicatorPage,
   GuidePlaybookPage,
@@ -16,6 +17,9 @@ import {
   GuideRegimePage,
   GuideSituationPage,
   GuideSituationsPage,
+  GuideStartIndexPage,
+  GuideStartPage,
+  GuideTermPage,
 } from './GuidePages';
 
 const widgets = vi.hoisted(() => ({
@@ -26,6 +30,8 @@ const widgets = vi.hoisted(() => ({
   situation: vi.fn(),
   indicator: vi.fn(),
   episode: vi.fn(),
+  start: vi.fn(),
+  term: vi.fn(),
 }));
 
 vi.mock('@/widgets/guide-rail', () => ({
@@ -74,6 +80,21 @@ vi.mock('@/widgets/guide-situations', () => ({
   GuideSituation: (props: Record<string, unknown>) => {
     widgets.situation(props);
     return <Text>situation page</Text>;
+  },
+}));
+
+vi.mock('@/widgets/guide-start', () => ({
+  GuideStartIndex: () => <Text>start index</Text>,
+  GuideStart: (props: Record<string, unknown>) => {
+    widgets.start(props);
+    return <Text>start page</Text>;
+  },
+}));
+vi.mock('@/widgets/guide-glossary', () => ({
+  GuideGlossaryIndex: () => <Text>glossary index</Text>,
+  GuideTerm: (props: Record<string, unknown>) => {
+    widgets.term(props);
+    return <Text>term page</Text>;
   },
 }));
 
@@ -134,6 +155,27 @@ describe('Guide pages', () => {
     render(<GuideEpisodePage slug="gfc_2007" />);
     expect(widgets.episode).toHaveBeenLastCalledWith({ slug: 'gfc_2007' });
     expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'episode', episode: 'gfc_2007' });
+  });
+
+  it('frames Start here and a how-to page with the rail on it', () => {
+    render(<GuideStartIndexPage />);
+    expect(screen.getByText('start index')).toBeInTheDocument();
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'start' });
+    render(<GuideStartPage id="read_a_result" />);
+    expect(widgets.start).toHaveBeenLastCalledWith({ id: 'read_a_result' });
+    expect(widgets.rail).toHaveBeenLastCalledWith({
+      page: 'start_page',
+      startPage: 'read_a_result',
+    });
+  });
+
+  it('frames the glossary and a term’s page with the rail on the glossary', () => {
+    render(<GuideGlossaryPage />);
+    expect(screen.getByText('glossary index')).toBeInTheDocument();
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'glossary' });
+    render(<GuideTermPage id="not_run" />);
+    expect(widgets.term).toHaveBeenLastCalledWith({ id: 'not_run' });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'term' });
   });
 
   it('has no accessibility violations', async () => {
