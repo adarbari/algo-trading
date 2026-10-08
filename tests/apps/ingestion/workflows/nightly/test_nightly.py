@@ -503,6 +503,23 @@ def test_rollups_rerun_when_ibkr_iv_succeeds_in_a_later_attempt(
     assert calls.sessions("ibkr-iv") == [D, D] and calls.sessions("rollups") == [D, D]
 
 
+def test_market_rollups_rerun_when_macro_succeeds_in_a_later_attempt(
+    fake: Callable[..., Calls],
+) -> None:
+    # The same gap as ibkr-iv: macro (optional, not a need) succeeding only in a retry left
+    # the market rollups (breadth, macro, regime) computed without the session's series.
+    calls, screens = fake(fail=("macro",)), Screens()
+    writer = store()
+    first = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert statuses(first)["macro"] == "FAILED"
+    assert statuses(first)["market-rollups"] == "SUCCEEDED"
+    calls.fail, screens.short = (), False  # FRED is back
+    second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    assert second["status"] == "SUCCEEDED" and statuses(second)["macro"] == "SUCCEEDED"
+    assert calls.sessions("market-rollups") == [D, D]  # recomputed with the macro series
+    assert calls.sessions("rollups") == [D]  # macro is not one of its inputs: reused
+
+
 def test_an_optional_input_never_holds_back_the_rollups(fake: Callable[..., Calls]) -> None:
     fake(fail=("ibkr-iv",))
     summary = run_nightly(task_ctx(store()), Plan([D]))
