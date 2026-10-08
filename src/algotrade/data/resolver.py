@@ -18,6 +18,7 @@ from datetime import date
 
 import pandas as pd
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.instruments import equity_id
 
 
@@ -30,6 +31,9 @@ class SymbolResolver:
     snapshot: date | None = None  # the reference snapshot used; None = no reference yet
     ids: Mapping[str, str] = field(default_factory=dict)  # symbol -> instrument_id
     symbols: Mapping[str, str] = field(default_factory=dict)  # instrument_id -> symbol
+    # Set by ``from_listings``: an unknown symbol raises instead of falling back to
+    # ``EQ:<SYMBOL>``, which would merge two companies on a recycled ticker.
+    strict: bool = False
 
     @classmethod
     def from_reference(
@@ -58,12 +62,13 @@ class SymbolResolver:
         several qualify the latest start wins). ``snapshot`` is left ``None``: the listing
         snapshot is chosen by the caller (``data.listings``)."""
         if listings is None or listings.empty:
-            return cls()
+            return cls(strict=True)
         frame = listings[listings["instrument_id"].notna() & listings["ticker"].notna()]
         frame = frame[frame["instrument_id"].astype(str).str.strip() != ""]
-        start = pd.to_datetime(frame["start_date"]).dt.date
-        end = pd.to_datetime(frame["end_date"]).dt.date
-        live = frame[(start <= session) & (end.isna() | (end >= session))]
+        day = pd.Timestamp(session)
+        start = pd.to_datetime(frame["start_date"])
+        end = pd.to_datetime(frame["end_date"])
+        live = frame[(start <= day) & (end.isna() | (end >= day))]
         ordered = live.assign(_start=start[live.index]).sort_values("_start", kind="stable")
         ids = {
             _clean(t): str(i)
@@ -72,14 +77,23 @@ class SymbolResolver:
         symbols = {
             str(i): _clean(t) for i, t in zip(live["instrument_id"], live["ticker"], strict=True)
         }
-        return cls(None, ids, symbols)
+        return cls(None, ids, symbols, strict=True)
 
     def knows(self, symbol: str) -> bool:
         return _clean(symbol) in self.ids
 
     def id_for(self, symbol: str) -> str:
         clean = _clean(symbol)
-        return self.ids.get(clean) or equity_id(clean)
+        found = self.ids.get(clean)
+        if found:
+            return found
+        if self.strict:
+            raise MissingDataError(
+                "instruments/listing_history",
+                f"no listing of {clean!r} with an id covers the session",
+                "a symbol never falls back to EQ:<SYMBOL> here (ADR 0018 amendment)",
+            )
+        return equity_id(clean)
 
     def ids_for(self, symbols: Iterable[str]) -> dict[str, str]:
         return {s: self.id_for(s) for s in symbols}
@@ -89,9 +103,15 @@ class SymbolResolver:
 
     def resolve(self, frame: pd.DataFrame, column: str = "symbol") -> tuple[pd.DataFrame, int]:
         """-> (copy with ``instrument_id`` from ``column`` as the first column, symbols that
-        fell back to a symbol id because the snapshot does not know them)."""
+        fell back to a symbol id because the snapshot does not know them; a strict resolver
+        drops those rows instead and counts them)."""
         out = frame.drop(columns="instrument_id", errors="ignore")
         symbols = out[column].map(_clean)
+        if self.strict:
+            known = symbols.isin(list(self.ids))
+            out, symbols = out[known].copy(), symbols[known]
+            out.insert(0, "instrument_id", [self.ids[s] for s in symbols])
+            return out, int((~known).sum())
         out.insert(0, "instrument_id", [self.id_for(s) for s in symbols])
         unknown = int((~symbols.isin(list(self.ids))).sum()) if len(symbols) else 0
         return out, unknown

@@ -12,8 +12,9 @@ member at S (``sp500_members``, ids; the history comes with ED6b-3) or its excha
 NASDAQ. ETFs are all in.
 
 ``end_date`` is the vendor's last trading day, which exists only for names that have since
-delisted: used as a feature, label or sort key it leaks the future. It is read **here and
-only here**, to test membership at S, and is not returned.
+delisted: used as a feature, label or sort key it leaks the future. It is read **here and in
+``SymbolResolver.from_listings``** (both identity reads: is this listing alive on S), nowhere
+else, and is not returned. The adapter stores a live name's end as null (open).
 """
 
 from collections.abc import Collection
@@ -44,9 +45,10 @@ class Universe:
 
 def listed_asof(listings: pd.DataFrame, session: date, sp500_members: Collection[str]) -> Universe:
     """The rule on a frame of listing rows (``snapshot`` is filled by ``universe_asof``)."""
-    start = pd.to_datetime(listings["start_date"]).dt.date
-    end = pd.to_datetime(listings["end_date"]).dt.date
-    window = listings[(start <= session) & (end.isna() | (end >= session))]
+    day = pd.Timestamp(session)
+    start = pd.to_datetime(listings["start_date"])
+    end = pd.to_datetime(listings["end_date"])
+    window = listings[(start <= day) & (end.isna() | (end >= day))]
     has_id = window["instrument_id"].notna() & (window["instrument_id"].astype(str) != "")
     usable = window[has_id]
     is_etf = usable["asset_type"].astype(str).str.upper().eq(ETF)

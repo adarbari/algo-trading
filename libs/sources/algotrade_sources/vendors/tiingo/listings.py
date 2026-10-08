@@ -69,6 +69,7 @@ def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
     currency = raw["priceCurrency"].str.strip().str.upper()
     start = pd.to_datetime(raw["startDate"].str.strip(), errors="coerce")
     end = pd.to_datetime(raw["endDate"].str.strip(), errors="coerce")
+    end = end.where(end != end.max())  # the file's latest day: still listed (open)
     reasons = {
         "not_usd": currency != "USD",
         "other_exchange": exchange.isna(),

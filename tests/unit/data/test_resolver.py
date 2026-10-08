@@ -1,7 +1,9 @@
 """``SymbolResolver``: one place that turns tickers into ids (ADR 0018)."""
 
 import pandas as pd
+import pytest
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data.resolver import SymbolResolver
 
 
@@ -68,6 +70,21 @@ def test_from_listings_skips_rows_without_an_id_and_gaps() -> None:
     from datetime import date  # noqa: PLC0415
 
     gap = SymbolResolver.from_listings(_listings(), date(2014, 1, 6))  # between the two ABCs
-    assert not gap.knows("ABC") and gap.id_for("ABC") == "EQ:ABC"
-    assert not gap.knows("ZZZ")  # no id yet
+    assert not gap.knows("ABC") and not gap.knows("ZZZ")  # a gap; a listing with no id yet
+    for symbol in ("ABC", "ZZZ", "NEVER"):
+        with pytest.raises(MissingDataError):  # never EQ:<SYMBOL>
+            gap.id_for(symbol)
+    with pytest.raises(MissingDataError):
+        gap.ids_for(["OPEN", "ABC"])
     assert SymbolResolver.from_listings(None, date(2020, 1, 2)).ids == {}
+
+
+def test_a_strict_resolver_drops_unknown_rows_and_counts_them() -> None:
+    from datetime import date  # noqa: PLC0415
+
+    resolver = SymbolResolver.from_listings(_listings(), date(2016, 5, 3))
+    frame = pd.DataFrame({"symbol": ["abc", "ZZZ", "OPEN"], "x": [1, 2, 3]})
+    out, dropped = resolver.resolve(frame)
+    assert list(out["instrument_id"]) == ["EQ:TIINGO:NEW2", "EQ:TIINGO:OPEN3"]
+    assert list(out["x"]) == [1, 3] and dropped == 1
+    assert SymbolResolver.from_listings(None, date(2016, 5, 3)).strict
