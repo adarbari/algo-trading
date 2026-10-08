@@ -19,6 +19,7 @@ from algotrade_api.auth.mode import AuthConfig, AuthMode, open_authenticator
 from algotrade_api.auth.protocol import UnauthenticatedError
 from algotrade_api.deps import DEV_ORIGINS, ApiSettings, ReadStore
 from algotrade_api.main import create_app, openapi_json
+from algotrade_api.ops.schedule import MAX_CONNECTIONS, OPEN_FILES
 from tests.apps.api.conftest import SUPABASE_URL, Tokens
 from tests.helpers.api_store import as_user
 
@@ -116,8 +117,10 @@ def test_cli_runs_uvicorn_on_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: calls.append((app, kw)))
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    monkeypatch.setattr(cli, "raise_open_files", lambda: OPEN_FILES)
     cli.main(["--reload"])
-    assert calls == [(cli.APP, {"host": "127.0.0.1", "port": 8000, "reload": True})]
+    served = {"host": "127.0.0.1", "port": 8000, "reload": True}
+    assert calls == [(cli.APP, served | {"limit_concurrency": MAX_CONNECTIONS})]
 
 
 def test_cli_serves_on_the_worktrees_port_block(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -129,6 +132,7 @@ def test_cli_serves_on_the_worktrees_port_block(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("ALGOTRADE_PORT_BASE", "12340")
     monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: calls.append((app, kw)))
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    monkeypatch.setattr(cli, "raise_open_files", lambda: OPEN_FILES)
     cli.main([])
     assert calls[0][1]["port"] == 12340
 
