@@ -177,6 +177,35 @@ def test_a_null_or_zero_implied_vol_is_excluded_with_a_reason_never_a_hit_or_a_m
         apply_outcome(edge(outcome=OTM), otm_rows([0.0]))
 
 
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("structure", ["put", "call", "strangle"])
+def test_an_absurd_or_non_finite_implied_vol_is_excluded_never_a_miss_and_never_warns(
+    structure: str,
+) -> None:
+    """Real IBKR rows hold IV30 up to 31420 (a 5 > range): exp overflowed, the strike went
+    inf / 0 and the put "missed". Out of the declared (0, 5] range is excluded as invalid."""
+    out = apply_outcome(
+        edge(outcome={**OTM, "structure": structure}),
+        otm_rows([0.0] * 6),
+        {f"EQ:{i}": v for i, v in enumerate((1e3, 31420.0, float("inf"), NAN, 5.01, 5.0))},
+    )
+    assert list(out["excluded"]) == ["invalid_implied_vol"] * 3 + ["no_implied_vol"] + [
+        "invalid_implied_vol",
+        "",
+    ]
+    assert not out["hit"].iloc[:5].any()  # excluded rows never hit; IV = 5.0 still counts
+    assert np.isnan(out["value"].iloc[:5]).all() and np.isnan(out["reference"].iloc[:5]).all()
+
+
+@pytest.mark.filterwarnings("error")
+def test_an_absurd_implied_vol_is_excluded_from_the_vol_ratio_too() -> None:
+    out = apply_outcome(
+        edge(outcome=VRP, schedule="every_session"), rows(fwd_excess_return=[0.0] * 2),
+        {"EQ:0": 1e3, "EQ:1": 0.3},
+    )  # fmt: skip
+    assert list(out["excluded"]) == ["invalid_implied_vol", ""]
+
+
 def test_a_higher_vol_puts_the_strike_further_out_so_the_same_return_hits() -> None:
     low = apply_outcome(edge(outcome=OTM), otm_rows([-0.05]), ivs(1, 0.2))
     high = apply_outcome(edge(outcome=OTM), otm_rows([-0.05]), ivs(1, 0.6))
