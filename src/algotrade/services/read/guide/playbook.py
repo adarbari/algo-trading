@@ -1,7 +1,7 @@
 """``GuidePlaybookDetail`` (ADR 0051; spec ``docs/ui/guide.md`` "The playbook page"): one
 site playbook's page, what the server derives for it (ADR 0038: never the browser):
 
-- ``prose``: its ``config/site/guide/playbooks/<id>.toml`` (summary, what a hit looks like,
+- ``prose``: its ``config/site/guide/playbooks/<family>/<id>.toml`` (summary, what a hit looks like,
   what it does not check, the caveats before acting, split at the catalogue names they
   mention; the sources as written); ``None`` without a file (a fitness test forbids that for
   a shipped preset);

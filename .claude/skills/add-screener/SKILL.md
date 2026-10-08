@@ -11,7 +11,7 @@ versioned site preset `config/site/presets/screeners/<id>/v<N>.toml` (model it o
 `vrp_scanner/v2.toml`; a missing field is SKIPPED, never a pass) and its sha256 line in
 `architecture/preset_versions.toml` (versions are immutable: change = add `v<N+1>.toml`).
 A new preset goes in a family of `config/site/guide/sections.toml` and gets its playbook
-`config/site/guide/playbooks/<id>.toml`; a new version updates that file's `[asks]` to its
+`config/site/guide/playbooks/<family>/<id>.toml`; a new version updates that file's `[asks]` to its
 criteria (`add-guide-content`; fitness tests fail otherwise). A formula the criteria need is an expression feature (`add-feature`). Check it with
 `algotrade-backtest config validate <id>`; a test goes with it. Write a **Python screener**
 (steps below) only when the rules cannot express it; say why in the PR.

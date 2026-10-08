@@ -1,0 +1,51 @@
+# Earnings announcement premium, every name (ADR 0053, the ED4c amendment; edge
+# earnings_announcement_premium): the Frazzini-Lamont rule, every tradeable name whose next report
+# date is expected, announced (SCHEDULED) or the year-ago report plus 364 days (PRIOR_YEAR); an
+# UNKNOWN date never passes (ADR 0030). The edge holds all of them, equal weight, from five sessions
+# before the expected report to one after, so the order does not matter (ranked by dollar volume
+# only to be stable). What it does not check: that the date is confirmed (PRIOR_YEAR is a guess),
+# the premium itself (the harness measures it), or the option tier.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "eap_all"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Earnings announcement premium: all"
+
+# ------------------------------------------------ who is screened and tradeable (the liquid base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.expected_basis]
+field = "rollup.earnings_expected@v1.expected_basis"
+op = "in"
+value = ["SCHEDULED", "PRIOR_YEAR"]
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+expected_report_date = "rollup.earnings_expected@v1.expected_report_date"
+expected_basis = "rollup.earnings_expected@v1.expected_basis"
+sessions_to_expected_report = "rollup.earnings_expected@v1.sessions_to_expected_report"
+
+[rank]
+tie_break = "rollup.price_stats@v2.adv_usd_20d"
+tie_break_order = "desc"
