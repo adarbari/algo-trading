@@ -60,21 +60,55 @@ def test_presets_that_do_not_exist_fail_with_the_file(
 def test_a_user_document_layers_over_the_site_and_adds_drafts() -> None:
     site = document()
     over = {"screeners": ["mine"], "outcome": {"horizon_sessions": [20]}}
-    draft = document(id="idea", status="candidate")
+    draft = document(id="idea", status=None)
     configs = store(site__drift=site, alice__drift=over, alice__idea=draft)
     by_id = {e.id: e for e in load_edges(configs, "alice")}
     assert by_id["drift"].screeners == ("mine",)  # the user's own screen counts for the user
     assert by_id["drift"].outcome.horizon_sessions == (20,)  # tables merge, lists replace
     assert by_id["drift"].outcome.kind == "excess_return"  # the site's key stays
     assert set(by_id) == {"drift", "idea"}
+    assert by_id["idea"].status == "candidate"  # a draft is a candidate
     site_only = load_edges(configs)
     assert [e.id for e in site_only] == ["drift"]
     assert site_only[0].screeners == ()
 
 
+@pytest.mark.parametrize(
+    ("site_doc", "user_doc", "message"),
+    [
+        ({}, {"status": "live"}, "\\['status'\\] are the site's to set"),
+        (
+            {"status": "rejected", "rejection_reason": "Gone."},
+            {"rejection_reason": "Back."},
+            "\\['rejection_reason'\\] are the site's to set",
+        ),
+    ],
+)
+def test_a_user_never_sets_what_the_site_decides(
+    site_doc: dict[str, Any], user_doc: dict[str, Any], message: str
+) -> None:
+    configs = store(site__drift=document(**site_doc), alice__drift=user_doc)
+    with pytest.raises(ConfigurationError, match=message):
+        load_edges(configs, "alice")
+
+
+def test_a_user_draft_is_only_a_candidate() -> None:
+    configs = store(alice__idea=document(id="idea", status="evidenced"))
+    with pytest.raises(ConfigurationError, match="a user's draft edge is a 'candidate'"):
+        load_edges(configs, "alice")
+
+
+def test_with_a_catalog_inline_universe_fields_must_exist() -> None:
+    rule = {"field": "feature.no_such_field", "op": "eq", "value": 1}
+    configs = store(site__drift=document(universe={"where": {"all": [rule]}}))
+    assert load_edges(configs)[0].id == "drift"  # shape only without a catalogue
+    with pytest.raises(ConfigurationError, match=r"drift\.toml universe"):
+        load_edges(configs, catalog=field_catalog(SHIPPED))
+
+
 def test_an_invalid_user_layer_names_the_user_file() -> None:
-    configs = store(site__drift=document(), alice__drift={"status": "maybe"})
-    with pytest.raises(ConfigurationError, match=r"config/users/alice/edges/drift\.toml status"):
+    configs = store(site__drift=document(), alice__drift={"top_k": 0})
+    with pytest.raises(ConfigurationError, match=r"config/users/alice/edges/drift\.toml top_k"):
         load_edges(configs, "alice")
 
 
@@ -103,7 +137,5 @@ def test_every_open_shipped_edge_answers_the_whole_quality_bar() -> None:
 
 
 def test_every_shipped_inline_universe_names_catalogue_fields() -> None:
-    catalog = field_catalog(SHIPPED)
-    for edge in load_edges(SHIPPED):
-        if isinstance(edge.universe, Selection):
-            catalog.check(edge.universe.where, f"config/site/edges/{edge.id}.toml universe")
+    edges = load_edges(SHIPPED, catalog=field_catalog(SHIPPED))
+    assert any(isinstance(e.universe, Selection) for e in edges)

@@ -422,8 +422,9 @@ An edge (ADR 0053, plan [edges-plan.md](edges-plan.md)) is a typed document
 `config/site/edges/<id>.toml`, loaded by `algotrade.config.edges.loading.load_edges` (the
 `edge-documents` owner): `id` (the file name), `name`, a one-sentence `thesis`, `mechanism`,
 `persistence`, `[outcome]` (`kind` `excess_return` | `hit_target`, `horizon_sessions`,
-`benchmark` `SPY` | `none`, `start_offset_sessions` (negative only before an event announced
-ahead), optional `target`, `max_drawdown`, `cost_bps`), `schedule` (`every_session`,
+`benchmark` `SPY` | `none`, `start_offset_sessions` (the start session S is the event's anchor
+plus this; negative only before an event announced ahead), optional `target`, `max_drawdown`,
+`cost_bps`; a `hit_target` also names its `measure` and `direction`), `schedule` (`every_session`,
 `month_end` or `on_event:<class>`), `universe` (a selection preset name, or `[universe] where`
 in the selection grammar), `top_k` (an integer or `"all"`), `screeners` and `baselines`
 (screener presets that exist), `status` (`candidate`, `evidenced`, `live`, `retired`,
@@ -431,7 +432,8 @@ in the selection grammar), `top_k` (an integer or `"all"`), `screeners` and `bas
 seven of the plan's nine answers), `rejection_reason` (required when rejected or blocked) and
 `notes`. Everything fails closed with the file and key. A user's
 `config/users/<id>/edges/<id>.toml` is merged over the site document of that id (tables
-deeply, lists replaced) or is a new draft; the `site` user reads the site's only.
+deeply, lists replaced; never `status` or `rejection_reason`) or is a new draft, always a
+`candidate`; the `site` user reads the site's only.
 `make features-doc` renders [edges.md](edges.md).
 
 ## Vendor pacing

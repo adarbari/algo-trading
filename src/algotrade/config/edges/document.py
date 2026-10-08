@@ -8,9 +8,10 @@ and the key.
     mechanism         quality bar 1: who is forced, constrained or systematically wrong
     persistence       quality bar 2: why it survives being known
     [outcome]         kind (``excess_return`` | ``hit_target``), horizon_sessions (one or more),
-                      benchmark (``SPY`` | ``none``), start_offset_sessions (where the window
-                      starts from the trigger session; negative only before an event announced
-                      ahead), optional target, max_drawdown (a fraction), cost_bps
+                      benchmark (``SPY`` | ``none``), start_offset_sessions (S = the event's
+                      anchor session + this; negative only before an event announced ahead),
+                      optional target, max_drawdown (a fraction), cost_bps; a hit_target also
+                      names its measure (MEASURES) and direction (``below`` | ``above``)
     schedule          ``every_session`` | ``month_end`` | ``on_event:<class>`` (EVENT_CLASSES)
     universe          a selection preset name, or an inline selection (``[universe] where``)
     top_k             an integer >= 1, or ``"all"`` (every qualified name)
@@ -41,16 +42,26 @@ OUTCOME_KINDS = ("excess_return", "hit_target")
 BENCHMARKS = ("SPY", "none")
 SCHEDULES = ("every_session", "month_end")
 ON_EVENT = "on_event:"
-# The event classes a schedule may trigger on, each with the stored rows that date it (ADR 0050).
+# The event classes a schedule may trigger on: the stored rows that date each, and its ANCHOR
+# session. The start session is S = anchor + start_offset_sessions, the outcome's horizons count
+# from S's close, and the event must be known by S (``known_from <= S``, ADR 0050): the harness
+# skips an event that is not, never reads it early.
 EVENT_CLASSES: Mapping[str, str] = {
-    "earnings": "a reported result: events/earnings, from its known_from",
-    "earnings_scheduled": "a next report date is known: earnings_schedule@v1 reads SCHEDULED",
-    "ex_dividend": "an ex-dividend date: events/dividend",
-    "index_change": "an S&P 500 membership change: events/index_change",
-    "macro_release": "a scheduled macro release: events/macro_release",
+    "earnings": "a reported result (events/earnings); anchor: the reaction session, the first "
+    "to trade after the report time (an after-close report: the next session)",
+    "earnings_scheduled": "a next report date known (earnings_schedule@v1 reads SCHEDULED); "
+    "anchor: the scheduled report date's session",
+    "ex_dividend": "an ex-dividend date (events/dividend); anchor: the ex-date",
+    "index_change": "an S&P 500 membership change (events/index_change); anchor: the session "
+    "it is first stored",
+    "macro_release": "a scheduled macro release (events/macro_release); anchor: the release "
+    "session",
 }
 ANNOUNCED_AHEAD = ("earnings_scheduled", "macro_release")  # a window may start before these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
+# What a hit_target compares with its target over the window (ED2 stores each as a field).
+MEASURES = ("excess_return", "realised_to_implied_vol")
+DIRECTIONS = ("below", "above")
 QUALITY_BAR = (
     "outcome",
     "trigger_timing",
@@ -67,14 +78,16 @@ KEYS = (
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
-    "cost_bps",
+    "cost_bps", "measure", "direction",
 )  # fmt: skip
 _SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
 
 
 @dataclass(frozen=True)
 class Outcome:
-    """What counts as the edge working for one (instrument, start session)."""
+    """What counts as the edge working for one (instrument, start session S): returns from S's
+    close to the close ``h`` sessions later, for each horizon ``h``; a hit_target holds when
+    ``measure`` is ``direction`` the ``target`` (and the path stays within ``max_drawdown``)."""
 
     kind: str
     horizon_sessions: tuple[int, ...]
@@ -83,6 +96,8 @@ class Outcome:
     target: float | None = None
     max_drawdown: float | None = None
     cost_bps: float | None = None
+    measure: str | None = None
+    direction: str | None = None
 
 
 @dataclass(frozen=True)
@@ -225,8 +240,14 @@ def _outcome(t: Table, schedule: str) -> Outcome:
             f"it is announced ahead ({list(ANNOUNCED_AHEAD)}); {event!r} is known when it happens"
         )
     target = o.number("target", None)
-    if kind == "hit_target" and target is None:
-        raise ConfigurationError(f"{o.where} target: required for a hit_target outcome")
+    measure = o.choice("measure", "", MEASURES) if "measure" in o.names() else None
+    direction = o.choice("direction", "", DIRECTIONS) if "direction" in o.names() else None
+    hit = {"target": target, "measure": measure, "direction": direction}
+    for key, value in hit.items():
+        if kind == "hit_target" and value is None:
+            raise ConfigurationError(f"{o.where} {key}: required for a hit_target outcome")
+        if kind != "hit_target" and value is not None:
+            raise ConfigurationError(f"{o.where} {key}: only a hit_target outcome has one")
     drawdown = o.number("max_drawdown", None, 0)
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
@@ -238,6 +259,8 @@ def _outcome(t: Table, schedule: str) -> Outcome:
         target=target,
         max_drawdown=drawdown,
         cost_bps=o.number("cost_bps", None, 0),
+        measure=measure,
+        direction=direction,
     )
 
 

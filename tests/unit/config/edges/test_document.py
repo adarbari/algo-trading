@@ -74,10 +74,13 @@ def test_a_hit_target_with_a_drawdown_cap_and_no_benchmark() -> None:
         "horizon_sessions": [20],
         "benchmark": "none",
         "target": 1.0,
+        "measure": "realised_to_implied_vol",
+        "direction": "below",
         "max_drawdown": 0.5,
     }
     edge = parse(outcome=outcome, schedule="every_session")
     assert (edge.outcome.target, edge.outcome.max_drawdown) == (1.0, 0.5)
+    assert (edge.outcome.measure, edge.outcome.direction) == ("realised_to_implied_vol", "below")
 
 
 def test_a_window_may_start_before_an_event_announced_ahead() -> None:
@@ -144,6 +147,12 @@ def _outcome(**changes: Any) -> dict[str, Any]:
         ({"outcome": _outcome(horizon_sessions=[60, 20])}, "ascending, distinct"),
         ({"outcome": _outcome(horizon_sessions=[0])}, "integers >= 1"),
         ({"outcome": _outcome(kind="hit_target")}, "target: required for a hit_target"),
+        (
+            {"outcome": _outcome(kind="hit_target", target=1, direction="below")},
+            "measure: required for a hit_target",
+        ),
+        ({"outcome": _outcome(target=1)}, "target: only a hit_target outcome has one"),
+        ({"outcome": _outcome(measure="sharpe")}, "measure: expected one of"),
         ({"outcome": _outcome(max_drawdown=1.5)}, "max_drawdown: expected a fraction"),
         ({"outcome": _outcome(cost_bps=-1)}, "cost_bps: expected a number >= 0"),
         (

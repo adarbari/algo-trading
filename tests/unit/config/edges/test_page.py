@@ -42,6 +42,8 @@ def test_the_page_lists_edges_by_status_with_their_answers() -> None:
                 "horizon_sessions": [1],
                 "benchmark": "none",
                 "target": 1,
+                "measure": "realised_to_implied_vol",
+                "direction": "below",
                 "max_drawdown": 0.5,
             },
             sources=[{"title": "A paper", "url": "https://example.org"}],
@@ -53,8 +55,11 @@ def test_the_page_lists_edges_by_status_with_their_answers() -> None:
     assert page.index("| Drift (`drift`) | candidate") < page.index("| Drift (`gone`) | rejected")
     assert "excess return, over 6 sessions, vs SPY, starting -5 sessions from the event" in page
     assert "costs 20 bps" in page
-    assert "hit target, over 1 session, target 1, max drawdown 0.5" in page
-    assert "on each `earnings_scheduled` (a next report date is known" in page
+    assert (
+        "hit target, over 1 session, hit when realised_to_implied_vol is below 1, max drawdown 0.5"
+        in page
+    )
+    assert "on each `earnings_scheduled` (a next report date known" in page
     universe = "`instrument.status eq 'ACTIVE'` or (not `instrument.status eq 'ACTIVE'`)"
     assert f"**Universe:** {universe}" in page
     assert "**Universe:** preset `liquid_optionable`" in page

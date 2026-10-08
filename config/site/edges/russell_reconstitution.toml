@@ -7,11 +7,14 @@ mechanism = """Funds tracking the Russell 2000 must buy names that enter it and 
 leave on the reconstitution date, ranked on a known date before (Madhavan 2003; Chang, Hong and
 Liskovich 2015)."""
 persistence = """The assets tracking the Russell indexes keep the demand large and the date fixed;
-competition shrinks it but it remains (about 1% over 20 sessions, checked 2026-10-07)."""
+competition shrinks it, but it was still measurable in the 2000s (Chang, Hong and Liskovich
+2015)."""
 schedule = "on_event:index_change"
 top_k = "all"
 screeners = []
 status = "blocked"
+notes = """The schedule is a placeholder: index_change is the S&P 500 only; ED6 adds a Russell
+membership source and its event class."""
 rejection_reason = """Alive, but one event a year gives at most two in the stored bars, under the
 40 independent events the bar asks, and we hold no Russell membership (events/index_change is the
 S&P 500 only); ED6 (listing history from 2010) unblocks it."""
@@ -31,7 +34,7 @@ benchmark = "SPY"
 outcome = "Excess return over SPY over 20 sessions around the reconstitution date."
 trigger_timing = "Membership is predictable from the rank day's market caps, weeks before the date."
 replication = "Madhavan's additions and deletions around the rank day and reconstitution date."
-expected_size = "About 1% over 20 sessions (checked 2026-10-07); one event a year."
+expected_size = "Measurable but shrinking in the published studies (Madhavan 2003; Chang et al. 2015); one event a year."
 capacity_costs = "Small caps at the 1000 / 2000 boundary; a crowded trade on one day."
 failure_modes = "Front-running moves the pressure earlier each year; a semiannual schedule changes the dates."
 decoys = "Size and past returns decide membership: the size and momentum baselines."

@@ -1,9 +1,11 @@
 """Load the edge documents a user sees (ADR 0053 decision 1, ADR 0015 layering): the site's
 ``config/site/edges/<id>.toml``, then the user's ``config/users/<user>/edges/<id>.toml`` over
-them (a user document with a site id is merged over it, tables deeply, lists replaced; a new id
-is the user's draft). Each layered document is typed by ``document.parse_edge``, then checked
+them (a user document with a site id is merged over it, tables deeply, lists replaced, but never
+its ``status`` or ``rejection_reason``, which are the site's to decide; a new id is the user's
+draft and a ``candidate``). Each layered document is typed by ``document.parse_edge``, then checked
 against the store: every screener and baseline must name a screener preset that exists (a site
-preset, or the user's own screen), and a universe given by name a selection preset that exists.
+preset, or the user's own screen), a universe given by name a selection preset that exists, and,
+given the caller's field catalogue, an inline universe only catalogue fields.
 
 The ``site`` user reads the site documents only.
 """
@@ -12,6 +14,7 @@ from collections.abc import Mapping
 from typing import Any, Protocol
 
 from algotrade.config.edges.document import Edge, parse_edge
+from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import deep_merge
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
@@ -23,6 +26,8 @@ SITE = "site"
 RULE_SCREENS = "screeners"
 CONFIGS = "strategies"
 SELECTIONS = "selections"
+SITE_DECIDES = ("status", "rejection_reason")  # a user layer never sets these
+DRAFT_STATUS = "candidate"
 
 
 class Documents(Protocol):
@@ -33,14 +38,19 @@ class Documents(Protocol):
     def names(self, scope: str, kind: str) -> list[str]: ...
 
 
-def load_edges(configs: Documents, user: str = SITE_USER) -> tuple[Edge, ...]:
-    """Every edge ``user`` sees, by id; none without files."""
+def load_edges(
+    configs: Documents, user: str = SITE_USER, catalog: FieldCatalog | None = None
+) -> tuple[Edge, ...]:
+    """Every edge ``user`` sees, by id; none without files. With ``catalog`` (the user's
+    ``services.configs.field_catalog``) every inline universe's fields are checked too."""
     scopes = (SITE,) if user == SITE_USER else (SITE, user)
     layered: dict[str, tuple[dict[str, Any], str]] = {}
     for scope in scopes:
         for name in configs.names(scope, KIND):
             doc = configs.load(scope, KIND, name) or {}
             where = f"{_folder(scope)}/{name}.toml"
+            if scope != SITE:
+                doc = _user_layer(doc, where, site=name in layered)
             base = layered.get(name, ({}, ""))[0]
             layered[name] = (deep_merge(base, doc), where)
     screeners = _screeners(configs, scopes)
@@ -49,8 +59,23 @@ def load_edges(configs: Documents, user: str = SITE_USER) -> tuple[Edge, ...]:
     for name, (doc, where) in sorted(layered.items()):
         edge = parse_edge(doc, name, where)
         _check_presets(edge, where, screeners, selections)
+        if catalog is not None and not isinstance(edge.universe, str):
+            catalog.check(edge.universe.where, f"{where} universe")
         edges.append(edge)
     return tuple(edges)
+
+
+def _user_layer(doc: Mapping[str, Any], where: str, site: bool) -> Mapping[str, Any]:
+    """A user's document: over a site edge it may not set what the site decides; a draft of its
+    own is a candidate (the status it gets when none is given)."""
+    if site:
+        decided = [k for k in SITE_DECIDES if k in doc]
+        if decided:
+            raise ConfigurationError(f"{where}: {decided} are the site's to set, not a user's")
+        return doc
+    if doc.get("status", DRAFT_STATUS) != DRAFT_STATUS:
+        raise ConfigurationError(f"{where} status: a user's draft edge is a {DRAFT_STATUS!r}")
+    return {**doc, "status": DRAFT_STATUS}
 
 
 def _folder(scope: str) -> str:

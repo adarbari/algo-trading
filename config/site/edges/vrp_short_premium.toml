@@ -14,15 +14,18 @@ universe = "liquid_optionable"
 top_k = 20
 screeners = ["short_premium_liquidity", "vrp_scanner"]
 status = "candidate"
-notes = """Hit: realised volatility over the window divided by the IV30 at S is below target 1.0.
-IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a
-short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of its premium in
+notes = """Hit: realised volatility over the window divided by the IV30 at S (measure
+realised_to_implied_vol) is below target 1.0. IV30 spans 30 calendar days, about 21 sessions; 20 is the nearest horizon ED2 stores. Path: a
+short straddle proxy struck at the money at S loses at most max_drawdown 0.5 of the premium it
+collected in
 the window. ED4a fixes the proxy (ADR 0053 open decisions)."""
 
 [outcome]
 kind = "hit_target"
 horizon_sessions = [20]
 benchmark = "none"
+measure = "realised_to_implied_vol"
+direction = "below"
 target = 1.0
 max_drawdown = 0.5
 

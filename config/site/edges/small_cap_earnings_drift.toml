@@ -35,7 +35,8 @@ outcome = """Excess return over SPY over 20 and 60 sessions after the reaction s
 20 bps a round trip (the PRD's proposal, ADR 0053 open decisions): drift is held for weeks."""
 trigger_timing = """A report is known from its events/earnings known_from session; the reaction
 session is the first one after the release (an after-close report reacts the next day); we act
-on the session after the reaction, so the window starts at the reaction session's close."""
+on the session after the reaction, so S is the reaction session (the class's anchor) and the
+window starts at its close, after the return the surprise is measured on."""
 replication = """The source's rule first: rank by the announcement-period return (Brandt,
 Kishore, Santa-Clara and Venkatachalam 2008) and hold the top bucket; the screener is ED4b."""
 expected_size = """The drift is largest in the smallest names and has decayed in large caps since

@@ -86,7 +86,7 @@ def _outcome(o: Outcome) -> str:
     if o.start_offset_sessions:
         parts.append(f"starting {o.start_offset_sessions:+d} sessions from the event")
     if o.target is not None:
-        parts.append(f"target {o.target:g}")
+        parts.append(f"hit when {o.measure} is {o.direction} {o.target:g}")
     if o.max_drawdown is not None:
         parts.append(f"max drawdown {o.max_drawdown:g}")
     if o.cost_bps is not None:
