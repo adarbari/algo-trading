@@ -179,6 +179,13 @@ class _Bars:
 BARS = "bars/1d"
 
 
+def first_stored_session(reader: StoreReader, table: str) -> date | None:
+    """The first session with a stored partition of ``table`` (None: never stored): when an input
+    of a feature began, which a study of old sessions needs to tell a value known then from one
+    a later snapshot would put on it."""
+    return min(reader.dates(table), default=None)
+
+
 def _bars(
     reader: StoreReader,
     sessions: Sequence[date],

@@ -30,10 +30,21 @@ section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
 detect = [{ call_regex = "(^|\\.)linalg\\.(eigh|eigvalsh|eig|eigvals|pinv|svd|inv)$" }, { call = "cov" }]
 
 [[responsibility]]
+id = "quant-discovery-statistics"
+description = "The statistics behind the winners study's tells (ADR 0053 amendment 2026-10-09): sign stability over blocks and halves, average ranks and the pairwise rank correlation of features, single-linkage clusters above a correlation, labels shuffled within strata (the permutation null's draw) and the count-against-null test"
+owner = ["src/algotrade/quant/discovery_statistics.py"]
+allowed = ["src/algotrade/services/evaluation/discovery/tells.py"]  # the gate runs these over the session frames
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "sign_stability" }, { call = "correlated_clusters" }, { call = "permute_within" }, { call = "exceeds_percentile" }]
+
+[[responsibility]]
 id = "quant-edge-statistics"
 description = "The statistics that judge a screener's picks (ADR 0053): lift, Hedges' g, decile spread and its t, Sharpe, the deflated Sharpe ratio and the probability of backtest overfitting (CSCV)"
 owner = ["src/algotrade/quant/edge_statistics.py"]
-allowed = ["src/algotrade/services/evaluation/cross_section/measures.py"]  # the harness calls these statistics (ADR 0053)
+allowed = [
+    "src/algotrade/services/evaluation/cross_section/measures.py",  # the harness calls these statistics (ADR 0053)
+    "src/algotrade/services/evaluation/discovery/tells.py",  # the effect of a tell at a session (ED6)
+]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "decile_spread" }, { call = "standardised_effect" }]
 

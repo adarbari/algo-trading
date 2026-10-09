@@ -246,7 +246,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/quant"
-purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, edge statistics (lift, effect size, deciles, deflated Sharpe, PBO)"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, edge statistics (lift, effect size, deciles, deflated Sharpe, PBO), discovery statistics (sign stability, rank-correlation clusters, the permutation null)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -273,11 +273,15 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); learned edge scorers (training/)"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); learned edge scorers (training/); the winners study's discovery (discovery/)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
 purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), the report-containment diagnostic of an earnings_expected edge (report_containment.py) and its results/edge_eval rows and report"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/discovery"
+purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): the session grid and the eligible names at each (grid.py), the winners from a stored outcome (labels.py, with the harness and the training frame the only importer of outcomes), the matched controls (controls.py), the features of both read at the grid session only (frame.py), the effects, sign stability, tell clusters and the gate against the permutation null (tells.py), the probit proposer (proposer.py) and the typed result (results.py); pure over frames except the reads"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/training"
