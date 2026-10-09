@@ -29,7 +29,7 @@ its minimum bars and the annualisation.
 
 v2 (ADR 0023 step 3) stores the same values as v1 as 32-bit floats and drops the columns
 computed from other columns: ``pct_from_high_52w`` / ``pct_from_low_52w`` are expression
-features (``config/site/features/price.toml``), computed on read.
+features (``config/site/features/technical/price.toml``), computed on read.
 """
 
 from collections.abc import Callable, Iterable, Mapping

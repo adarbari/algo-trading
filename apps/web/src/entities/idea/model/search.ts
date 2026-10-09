@@ -12,6 +12,14 @@ export const IDEA_VIEWS = [
 
 export type IdeaViewId = (typeof IDEA_VIEWS)[number]['id'];
 
+/** The column sets of the table: stock facts (default), or the options set (volatility, expiry, best put). */
+export const IDEA_COLUMN_SETS = [
+  { id: 'stocks', label: 'Stocks columns' },
+  { id: 'options', label: 'Options columns' },
+] as const;
+
+export type IdeaColumnSet = (typeof IDEA_COLUMN_SETS)[number]['id'];
+
 /** The filter chips, each a search key. */
 export const IDEA_FILTER_KEYS = ['screener', 'decision', 'liq', 'regime'] as const;
 export type IdeaFilterKey = (typeof IDEA_FILTER_KEYS)[number];
@@ -22,6 +30,8 @@ export const LIQUIDITY_VALUES = ['ok', 'risk'] as const;
 /** The raw search params (what the URL holds). */
 export interface IdeasSearch {
   view?: IdeaViewId;
+  /** The column set in use (absent: stocks). */
+  columns?: IdeaColumnSet;
   /** A screener's config id: ideas it picked. */
   screener?: string;
   /** A best decision (`QUALIFIED`, ...). */
@@ -48,6 +58,11 @@ export function parseIdeasSearch(raw: Record<string, unknown>): IdeasSearch {
     raw['view'],
   );
   if (view && view !== 'top') out.view = view;
+  const columns = oneOf(
+    IDEA_COLUMN_SETS.map((c) => c.id),
+    raw['columns'],
+  );
+  if (columns && columns !== 'stocks') out.columns = columns;
   const screener = text(raw['screener']);
   if (screener) out.screener = screener;
   const decision = text(raw['decision']);

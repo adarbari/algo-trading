@@ -24,7 +24,15 @@ from algotrade_ingestion.tasks.derived.outcomes import (
     horizons_and_benchmarks,
 )
 from tests.helpers.ingest_fakes import task_ctx
-from tests.helpers.rollup_store import END, SPY, series, store, write_bars, write_rows
+from tests.helpers.rollup_store import (
+    END,
+    SPY,
+    series,
+    store,
+    write_bars,
+    write_rows,
+    write_split,
+)
 from tests.helpers.stored_frames import universe_rows
 
 N = 70  # sessions of bars: room for the 60-session horizon
@@ -122,6 +130,24 @@ def test_a_delisting_the_reference_notices_later_turns_a_reason_into_a_row() -> 
     ]
 
 
+def test_a_two_for_one_split_inside_a_window_is_not_a_fifty_percent_return() -> None:
+    """ED6: a delisted-name id (``EQ:TIINGO:``) has Tiingo's split row; the raw bars halve on the
+    ex-date and the outcome reads them split-adjusted (flat), not -50%."""
+    writer, reader, days = _store()
+    tid = "EQ:TIINGO:US0001"
+    start = sessions_ending(END, 7)[0]
+    ex_date = days[days.index(start) + 3]
+    raw = [100.0 if d < ex_date else 50.0 for d in days]  # a 2-for-1 on ex_date, price flat
+    write_bars(writer, {tid: raw})
+    rows = universe_rows(["A", "B", "D"]) + universe_rows(["SPY"], instrument_id=SPY)
+    write_rows(writer, "universe", days[0], rows + universe_rows(["T"], instrument_id=tid))
+    write_split(writer, tid, ex_date, 2.0, END)
+    compute_outcomes(task_ctx(writer), END)
+    part = _partition(reader, start, END)
+    row = part[part["instrument_id"] == tid]
+    assert row["fwd_return"].iloc[0] == pytest.approx(0.0)  # not -0.5
+
+
 def _partition(reader: StoreReader, start: date, end: date) -> pd.DataFrame:
     part = reader.table(TABLE, start)
     assert part is not None
@@ -161,3 +187,13 @@ def test_acceptance_fails_without_a_run() -> None:
     _, reader, _ = _store()
     [check] = check_outcomes(reader, END, task_ctx(StoreWriter(reader._backend)).settings)
     assert check.status == "FAIL"
+
+
+def test_a_reference_delisting_noticed_after_the_recheck_span_is_not_counted() -> None:
+    writer, _reader, days = _store()
+    noticed = days[-1]
+    for _ in range(RECHECK):
+        noticed = next_session(noticed)  # the notice is RECHECK sessions after END: too late for -3
+    write_rows(writer, "instruments/reference", days[0], _reference(next_session(noticed)))
+    record = compute_outcomes(task_ctx(writer), days[-3])
+    assert record.stats["h6"]["examples"] == {"EQ:D": NO_END_BAR}

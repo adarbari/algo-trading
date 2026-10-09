@@ -636,7 +636,7 @@ TASKS: dict[str, Task] = {
             "unadjusted daily bars from Tiingo since 2018 for the scope list and its funds' "
             "references (resumable backfill: 50 requests an hour on the free tier)",
             bars_history,
-            ("bars/1d",),
+            ("bars/1d", "events/split"),
             _bars_history,
             sources=("tiingo_prices",),
             settings="sources.toml [tiingo]; events/scope.toml",

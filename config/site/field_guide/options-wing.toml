@@ -346,7 +346,7 @@ value = 5
 mode = "soft"
 tolerance = 2
 
-# The short put against the chart (config/site/features/swing.toml): how much technical room
+# The short put against the chart (config/site/features/technical/swing.toml): how much technical room
 # sits between the strike put_wing@v1 picked and the support swing_levels@v1 found.
 
 [[field]]
@@ -668,7 +668,7 @@ value = 0.015
 mode = "score"
 tolerance = 0.01
 
-# The covered call against the chart and the calendar (config/site/features/wings.toml, swing.toml).
+# The covered call against the chart and the calendar (config/site/features/options/wings.toml, swing.toml).
 
 [[field]]
 name = "feature.call_otm_pct"

@@ -45,9 +45,10 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Frazzini, A. and Lamont, O., The Earnings Announcement Premium and Trading Volume, NBER working paper, 2007
-- Savor, P. and Wilson, M., Earnings Announcements and Systematic Risk, Journal of Finance, 2016
-- Barber, B., De George, E., Lehavy, R. and Trueman, B., The Earnings Announcement Premium Around the Globe, Journal of Financial Economics, 2013
+- Frazzini, A. and Lamont, O., The Earnings Announcement Premium and Trading Volume, NBER working paper, 2007 <https://www.nber.org/papers/w13090>
+- Savor, P. and Wilson, M., Earnings Announcements and Systematic Risk, Journal of Finance, 2016 <https://doi.org/10.1111/jofi.12361>
+- Barber, B., De George, E., Lehavy, R. and Trueman, B., The Earnings Announcement Premium Around the Globe, Journal of Financial Economics, 2013 <https://doi.org/10.1016/j.jfineco.2012.10.006>
+- Quantpedia, Earnings Announcement Premium (strategy page) <https://quantpedia.com/strategies/earnings-announcement-premium/>
 
 ## 12-1 momentum (`momentum_12_1`)
 
@@ -76,9 +77,11 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993
-- Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016
-- Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998
+- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993 <https://doi.org/10.1111/j.1540-6261.1993.tb04702.x>
+- Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016 <https://doi.org/10.1016/j.jfineco.2015.12.002>
+- Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998 <https://doi.org/10.1016/S0304-405X(98)00027-0>
+- Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014 <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
+- Quantpedia, Momentum Factor Effect in Stocks (strategy page) <https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/>
 
 ## 12-1 momentum among names that just reported (`momentum_at_earnings`)
 
@@ -107,14 +110,14 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance 51(5), 1996
-- Chordia, T. and Shivakumar, L., Earnings and Price Momentum, Journal of Financial Economics 80(3), 2006
-- Novy-Marx, R., Fundamentally, Momentum is Fundamental Momentum, NBER working paper 20984, 2015
-- Gerard, B. and Jehl, T., The Many Facets of Stock Momentum, Financial Analysts Journal, 2025
-- Sadka, R., Momentum and Post-Earnings-Announcement Drift Anomalies: The Role of Liquidity Risk, Journal of Financial Economics 80(2), 2006
-- Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies 29(1), 2016
-- Chordia, T., Subrahmanyam, A. and Tong, Q., Have Capital Market Anomalies Attenuated in the Recent Era of High Liquidity and Trading Activity?, Journal of Accounting and Economics 58(1), 2014
-- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993
+- Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance 51(5), 1996 <https://doi.org/10.1111/j.1540-6261.1996.tb05222.x>
+- Chordia, T. and Shivakumar, L., Earnings and Price Momentum, Journal of Financial Economics 80(3), 2006 <https://doi.org/10.1016/j.jfineco.2005.05.005>
+- Novy-Marx, R., Fundamentally, Momentum is Fundamental Momentum, NBER working paper 20984, 2015 <https://www.nber.org/papers/w20984>
+- Gerard, B. and Jehl, T., The Many Facets of Stock Momentum, Financial Analysts Journal, 2025 <https://doi.org/10.1080/0015198X.2025.2562790>
+- Sadka, R., Momentum and Post-Earnings-Announcement Drift Anomalies: The Role of Liquidity Risk, Journal of Financial Economics 80(2), 2006 <https://doi.org/10.1016/j.jfineco.2005.04.005>
+- Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies 29(1), 2016 <https://doi.org/10.1093/rfs/hhv063>
+- Chordia, T., Subrahmanyam, A. and Tong, Q., Have Capital Market Anomalies Attenuated in the Recent Era of High Liquidity and Trading Activity?, Journal of Accounting and Economics 58(1), 2014 <https://doi.org/10.1016/j.jacceco.2014.06.001>
+- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993 <https://doi.org/10.1111/j.1540-6261.1993.tb04702.x>
 
 ## Small-cap post-earnings drift (`small_cap_earnings_drift`)
 
@@ -143,10 +146,11 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Bernard, V. and Thomas, J., Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research, 1989
-- Brandt, M., Kishore, R., Santa-Clara, P. and Venkatachalam, M., Earnings Announcements are Full of Surprises, working paper, 2008
-- Chordia, T., Goyal, A., Sadka, G., Sadka, R. and Shivakumar, L., Liquidity and the Post-Earnings-Announcement Drift, Financial Analysts Journal, 2009
-- Martineau, C., Rest in Peace Post-Earnings Announcement Drift, Critical Finance Review, 2022
+- Bernard, V. and Thomas, J., Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research, 1989 <https://doi.org/10.2307/2491062>
+- Brandt, M., Kishore, R., Santa-Clara, P. and Venkatachalam, M., Earnings Announcements are Full of Surprises, working paper, 2008 <https://doi.org/10.2139/ssrn.909563>
+- Chordia, T., Goyal, A., Sadka, G., Sadka, R. and Shivakumar, L., Liquidity and the Post-Earnings-Announcement Drift, Financial Analysts Journal, 2009 <https://doi.org/10.2469/faj.v65.n4.3>
+- Martineau, C., Rest in Peace Post-Earnings Announcement Drift, Critical Finance Review, 2022 <https://doi.org/10.1561/104.00000122>
+- Quantpedia, Post-Earnings Announcement Effect (strategy page) <https://quantpedia.com/strategies/post-earnings-announcement-effect/>
 
 ## Volatility risk premium (`vrp_short_premium`)
 
@@ -175,9 +179,11 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Carr, P. and Wu, L., Variance Risk Premiums, Review of Financial Studies, 2009
-- Bakshi, G. and Kapadia, N., Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies, 2003
-- Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk: Evidence from Equity Options, Journal of Finance, 2009
+- Carr, P. and Wu, L., Variance Risk Premiums, Review of Financial Studies, 2009 <https://doi.org/10.1093/rfs/hhn038>
+- Bakshi, G. and Kapadia, N., Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies, 2003 <https://doi.org/10.1093/rfs/hhg002>
+- Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk: Evidence from Equity Options, Journal of Finance, 2009 <https://doi.org/10.1111/j.1540-6261.2009.01467.x>
+- AQR, Understanding the Volatility Risk Premium (white paper) <https://www.aqr.com/Insights/Research/White-Papers/Understanding-the-Volatility-Risk-Premium>
+- Quantpedia, Volatility Risk Premium Effect (strategy page) <https://quantpedia.com/strategies/volatility-risk-premium-effect/>
 
 ## Leveraged ETF rebalancing (`leveraged_etf_rebalancing`)
 
@@ -206,9 +212,10 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Cheng, M. and Madhavan, A., The Dynamics of Leveraged and Inverse Exchange-Traded Funds, Journal of Investment Management, 2009
-- Ivanov, I. and Lenkey, S., Are Concerns About Leveraged ETFs Overblown?, Federal Reserve FEDS working paper, 2014
-- Shum, P., Hejazi, W., Haryanto, E. and Rodier, A., Intraday Share Price Volatility and Leveraged ETF Rebalancing, Review of Finance, 2016
+- Cheng, M. and Madhavan, A., The Dynamics of Leveraged and Inverse Exchange-Traded Funds, Journal of Investment Management, 2009 <https://joim.com/article/the-dynamics-of-leveraged-and-inverse-exchange-traded-funds/>
+- Ivanov, I. and Lenkey, S., Are Concerns About Leveraged ETFs Overblown?, Federal Reserve FEDS working paper, 2014 <https://doi.org/10.17016/FEDS.2014.106>
+- Shum, P., Hejazi, W., Haryanto, E. and Rodier, A., Intraday Share Price Volatility and Leveraged ETF Rebalancing, Review of Finance, 2016 <https://doi.org/10.1093/rof/rfv061>
+- CXO Advisory, Front-running Leveraged ETFs at the End of the Day? <https://www.cxoadvisory.com/volatility-effects/front-running-leveraged-etfs-at-the-end-of-the-day/>
 
 ## S&P 500 index changes (`sp500_index_changes`)
 
@@ -237,9 +244,10 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Greenwood, R. and Sammon, M., The Disappearing Index Effect, 2022
-- Shleifer, A., Do Demand Curves for Stocks Slope Down?, Journal of Finance, 1986
-- Harris, L. and Gurel, E., Price and Volume Effects Associated with Changes in the S&P 500 List, Journal of Finance, 1986
+- Greenwood, R. and Sammon, M., The Disappearing Index Effect, 2022 <https://www.nber.org/papers/w30748>
+- Shleifer, A., Do Demand Curves for Stocks Slope Down?, Journal of Finance, 1986 <https://doi.org/10.1111/j.1540-6261.1986.tb04518.x>
+- Harris, L. and Gurel, E., Price and Volume Effects Associated with Changes in the S&P 500 List, Journal of Finance, 1986 <https://doi.org/10.1111/j.1540-6261.1986.tb04550.x>
+- CXO Advisory, Revisiting Effects of S&P 500 Additions and Deletions <https://www.cxoadvisory.com/equity-premium/revisiting-effects-of-sp-500-additions-and-deletions/>
 
 ## Russell reconstitution (`russell_reconstitution`)
 
@@ -269,5 +277,6 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Sources**
 
-- Madhavan, A., The Russell Reconstitution Effect, Financial Analysts Journal, 2003
-- Chang, Y.-C., Hong, H. and Liskovich, I., Regression Discontinuity and the Price Effects of Stock Market Indexing, Review of Financial Studies, 2015
+- Madhavan, A., The Russell Reconstitution Effect, Financial Analysts Journal, 2003 <https://doi.org/10.2469/faj.v59.n4.2545>
+- Chang, Y.-C., Hong, H. and Liskovich, I., Regression Discontinuity and the Price Effects of Stock Market Indexing, Review of Financial Studies, 2015 <https://doi.org/10.1093/rfs/hhu041>
+- CXO Advisory, Strategies for Exploiting Index Rebalancing? <https://www.cxoadvisory.com/miscellaneous/strategies-for-exploiting-index-rebalancing/>

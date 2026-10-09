@@ -312,7 +312,7 @@ interest, so they follow the open-interest rule; a 0-DTE contract is left out). 
 | `max_vol_oi_ratio` | chain | float32 | ratio | >= 0 | the largest `volume / open_interest` among contracts with `open_interest >= 1` and `volume >= min_unusual_volume` | NO_CHAIN, or no such contract |
 | `unusual_premium_usd` | chain | float32 | usd | >= 0 | sum over the unusual contracts of `volume x mid x 100`, two-sided quotes only | NO_CHAIN, or no unusual contract has a two-sided quote |
 
-**Ratios (Decided), expression features** in `config/site/features/positioning.toml`, all
+**Ratios (Decided), expression features** in `config/site/features/options/positioning.toml`, all
 **put over call**, unit `ratio`, range `>= 0`, null when the denominator is 0 or either side is
 null (never 0, never infinity; division by zero is null in the expression language):
 
@@ -426,7 +426,7 @@ still has a next expiry); `ne_skew` is null without a spot. (6) Spot is the shar
 close), where `iv30@v1` reads the price. (7) The wing deltas (0.25) and the ATM deltas (0.50)
 are constants of the definition, not params.
 
-Expression feature (`config/site/features/positioning.toml`): `skew_rr25` = `skew.iv_25p -
+Expression feature (`config/site/features/options/positioning.toml`): `skew_rr25` = `skew.iv_25p -
 skew.iv_25c`, the raw risk reversal in vol (decimal).
 
 The rank is UNKNOWN for every name until 60 sessions with a skew exist: chains are stored from
@@ -496,7 +496,7 @@ fixed basis. A one-standard-deviation move, if wanted, is the expression
 Spot is the shared rule (`close`, else `price`). The group reads `earnings@v1`'s
 `next_earnings_date` and `earnings_time` for the session.
 
-Expression features (`config/site/features/positioning.toml`): `implied_move_1sd` =
+Expression features (`config/site/features/options/positioning.toml`): `implied_move_1sd` =
 `implied_move x 1.2533` (`params.sd_factor`); `implied_move_vs_hv` =
 `implied_move x sd_factor / (price_stats.hv20 x sqrt(move_dte / 365))` (`sd_factor` 1.2533, as
 `implied_move_1sd`), how much more the straddle prices than recent realised movement would: a
@@ -560,7 +560,7 @@ and Parquet size per new table, and the backfill time per stored chain session.
   `skew` and later `put_wing`'s `our_deltas`: one owner module, an `ownership.toml` entry, no
   copies (`make dupes`). The pdf-only gamma belongs in `quant/` (architect review).
 - New tables need `[[table]]` entries; expression features go in
-  `config/site/features/positioning.toml`; params in `config/site/rollups.toml`.
+  `config/site/features/options/positioning.toml`; params in `config/site/rollups.toml`.
 
 ## Validation plan
 

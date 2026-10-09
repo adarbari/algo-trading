@@ -23,6 +23,12 @@ describe('ideas search params', () => {
     expect(parseIdeasSearch({ view: 'top', liq: 'maybe', screener: '  ', regime: 4 })).toEqual({});
   });
 
+  it('keeps the options column set, and drops the default and unknown ones', () => {
+    expect(parseIdeasSearch({ columns: 'options' })).toEqual({ columns: 'options' });
+    expect(parseIdeasSearch({ columns: 'stocks' })).toEqual({});
+    expect(parseIdeasSearch({ columns: 'futures' })).toEqual({});
+  });
+
   it('lists the filter chips in force, never the view', () => {
     expect(activeFilterKeys({ view: 'conviction', liq: 'ok', regime: 'X' })).toEqual([
       'liq',

@@ -37,11 +37,14 @@ for (const theme of ['dark', 'light'] as const) {
     ).toBeVisible();
     await expect(page.getByRole('list', { name: 'Screener priority' })).toHaveCount(0);
     const aapl = grid(page).getByRole('row', { name: /AAPL/ });
-    await expect(aapl).toContainText('Short premium liquidity');
-    await expect(aapl).toContainText('Earnings first');
-    await expect(grid(page).getByRole('row', { name: /NVDA/ })).not.toContainText('Earnings first');
+    await expect(aapl).toContainText('Apple Inc. · XLK');
+    await expect(aapl).toContainText('VRP scanner');
+    await expect(aapl).toContainText('+1 more');
+    await expect(aapl).toContainText('226.80');
+    await expect(aapl.getByRole('img', { name: /^Criteria: / })).toHaveAccessibleName(
+      /Trend up: Passed, Iv rank: Near miss/,
+    );
     await expect(grid(page).getByRole('row', { name: /NVDA/ })).toContainText('Last 27 Aug');
-    await expect(aapl).toContainText('Thu 29 Oct');
     await expectAccessible(page);
     expect(errors).toEqual([]);
   });
@@ -49,7 +52,7 @@ for (const theme of ['dark', 'light'] as const) {
 
 test('a field header in Top ideas opens its Guide drawer', async ({ page }) => {
   const errors = collectErrors(page);
-  await page.goto('/ideas');
+  await page.goto('/ideas?columns=options');
   const header = grid(page).getByRole('columnheader', { name: /IV30/ }).first();
   await header.getByRole('button', { name: /^What is .*\?$/ }).click();
   await expect(page.getByRole('dialog')).toContainText('feature.vrp_iv30');
@@ -91,8 +94,22 @@ test('a link with filters opens the filtered table', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Remove Decision: Event risk' })).toBeVisible();
 });
 
-test('shows the stored display values and the watch-outs', async ({ page }) => {
+test('the column switch swaps the stock columns for the options set, kept in the URL', async ({
+  page,
+}) => {
   await page.goto('/ideas');
+  await expect(grid(page).getByRole('columnheader')).toContainText(["Why it's here", 'Criteria']);
+  await page.getByRole('radio', { name: 'Options columns' }).click();
+  await expect(page).toHaveURL(/columns=options/);
+  const aapl = grid(page).getByRole('row', { name: /AAPL/ });
+  await expect(aapl).toContainText('Earnings first');
+  await expect(grid(page).getByRole('row', { name: /NVDA/ })).not.toContainText('Earnings first');
+  await page.getByRole('radio', { name: 'Stocks columns' }).click();
+  await expect(page).not.toHaveURL(/columns=/);
+});
+
+test('shows the stored display values and the watch-outs', async ({ page }) => {
+  await page.goto('/ideas?columns=options');
   // A retrying assertion: a one-shot read of the headers can run before the grid mounts.
   await expect(grid(page).getByRole('columnheader')).toContainText([
     'IV30',

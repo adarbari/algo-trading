@@ -14,7 +14,7 @@ group (stateless: a backfill equals the nightly).
 A verdict is null (UNKNOWN) when a value it needs is null; an "either" rule (the high-yield
 spread) is on as soon as one side is on. ``_changed`` is null unless both verdicts are known.
 The expression language has no look-back across sessions, so the verdicts live here, not in
-``config/site/features/regime.toml``.
+``config/site/features/market/regime.toml``.
 
 Licence (ADR 0047, on ADR 0028): a ``<key>`` value keeps its source's licence (the high-yield
 spread, the VIX ratio and the S&P 500 trend, which can come from the index level, are

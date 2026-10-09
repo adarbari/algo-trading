@@ -83,6 +83,11 @@ also_written_by = [
 [[table]]
 name = "events/split"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
+also_written_by = [
+    # ADR 0053 ED6: Tiingo's splitFactor for EQ:TIINGO: ids only (listings outside symbol_history, which Massive's
+    # ticker-resolved splits never reach), published with the same run's bars; never for a FIGI id.
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",
+]
 
 [[table]]
 name = "events/dividend"
@@ -174,7 +179,7 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 [[table]]
 name = "rollups/instrument/div_yield@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "the materialised expression feature div_yield (config/site/features/fundamentals.toml)"
+note = "the materialised expression feature div_yield (config/site/features/company/fundamentals.toml)"
 
 [[table]]
 name = "rollups/instrument/iv30@v1"

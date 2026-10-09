@@ -30,12 +30,7 @@ export function useRunEvaluation(id: string) {
   });
   const status = useQuery({
     queryKey: queryKeys.edges.evaluation(id, jobId ?? ''),
-    queryFn: () =>
-      unwrap(
-        api.GET('/edges/{edge_id}/evaluate/{job_id}', {
-          params: { path: { edge_id: id, job_id: jobId ?? '' } },
-        }),
-      ),
+    queryFn: () => unwrap(api.GET('/jobs/{job_id}', { params: { path: { job_id: jobId ?? '' } } })),
     enabled: jobId !== null,
     refetchInterval: (query) => (isActive(query.state.data) ? EVALUATION_POLL_MS : false),
     retry: false,

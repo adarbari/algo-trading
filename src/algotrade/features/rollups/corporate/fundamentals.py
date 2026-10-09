@@ -40,7 +40,7 @@ dilution. The expression ``shares_change_yoy`` is the ratio minus one.
 
 v2 (ADR 0023 step 3) stores ``shares_outstanding`` as a 32-bit float and drops
 ``market_cap``: it is the expression feature ``market_cap`` (``shares_outstanding x close``
-when the status is OK; ``config/site/features/fundamentals.toml``), computed on read. The
+when the status is OK; ``config/site/features/company/fundamentals.toml``), computed on read. The
 status stays here: it needs the count's period end against the session date.
 """
 

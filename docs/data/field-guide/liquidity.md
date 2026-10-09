@@ -53,7 +53,7 @@ Sources: Broker and index conventions (the $5 penny-stock line)
 - It bundles option liquidity: a very liquid stock with no options is LOW. For a stock-only screen use rollup.price_stats@v2.adv_usd_20d instead.
 - UNKNOWN, not LOW, when the chain run did not cover the session; a hard 'in [HIGH, MEDIUM]' rejects those names on a day the chains failed.
 
-Sources: Site thresholds (config/site/features/liquidity.toml)
+Sources: Site thresholds (config/site/features/company/liquidity.toml)
 
 ### `feature.option_tier`
 
@@ -225,7 +225,7 @@ Sources: docs/screeners/vrp-scanner.md (owner decision 2026-10-04: strike choice
 
 - Null when the chains step did not run for the session at all; the option fields are then null for every name, and a hard option criterion empties the screen. A soft criterion lists the names instead.
 
-Sources: ADR 0043 (the chains step's acceptance); config/site/features/liquidity.toml
+Sources: ADR 0043 (the chains step's acceptance); config/site/features/company/liquidity.toml
 
 ### `feature.liquidity_high`
 
@@ -242,7 +242,7 @@ Sources: ADR 0043 (the chains step's acceptance); config/site/features/liquidity
 - Null (not false) when a threshold cannot be checked because an input is unknown, usually the options on a day the chain fetch failed; feature.liquidity_class says UNKNOWN then.
 - Stock-only screens do not need the option conditions: use rollup.price_stats@v2.adv_usd_20d.
 
-Sources: config/site/features/liquidity.toml (the HIGH params)
+Sources: config/site/features/company/liquidity.toml (the HIGH params)
 
 ### `feature.liquidity_medium`
 
@@ -259,4 +259,4 @@ Sources: config/site/features/liquidity.toml (the HIGH params)
 - A name that is HIGH is MEDIUM too (the thresholds nest); 'MEDIUM but not HIGH' needs both flags.
 - Null when an input is unknown.
 
-Sources: config/site/features/liquidity.toml (the MEDIUM params)
+Sources: config/site/features/company/liquidity.toml (the MEDIUM params)

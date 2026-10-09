@@ -1,5 +1,5 @@
 # L3 site setting: the field guide (ADR 0041), the volume theme: volume@v1 and the expression
-# features over it (config/site/features/volume.toml). The keys and the rules each entry
+# features over it (config/site/features/technical/volume.toml). The keys and the rules each entry
 # follows are in the header of momentum.toml. Values are in the field's unit: shares take
 # 1000000 for a million shares, a ratio 1.3 for 30% busier, a decimal 0.6 for 60%.
 

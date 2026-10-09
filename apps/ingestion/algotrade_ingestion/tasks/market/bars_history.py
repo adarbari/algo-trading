@@ -68,6 +68,7 @@ from typing import cast
 
 import pandas as pd
 
+from algotrade.core.model.instruments import is_perma_id
 from algotrade.data.events import read_events
 from algotrade.data.listings.universe import listings_over
 from algotrade.services.events.fill import FillCandidate, fill_order
@@ -201,6 +202,25 @@ def split_findings(
     return found
 
 
+def tiingo_split_rows(
+    instrument_id: str, tiingo: pd.DataFrame, stored: pd.DataFrame, first: date, last: date
+) -> pd.DataFrame:
+    """The ``events/split`` rows (``ts``, ``split_from``, ``split_to``, ``ratio``) to write for
+    one instrument from Tiingo's ``actions`` (``ts``, ``split_factor``) over ``first..last``:
+    only for an ``EQ:TIINGO:`` id (module docstring), and not for a day ``stored`` (the stored
+    ``events/split`` rows of the instrument) already has."""
+    rows = []
+    if is_perma_id(instrument_id):
+        known = set() if stored.empty else {pd.Timestamp(t).date() for t in stored["ts"]}
+        for t, factor in zip(tiingo["ts"], tiingo["split_factor"], strict=True):
+            day = pd.Timestamp(t).date()
+            if factor != 1.0 and factor > 0 and first <= day <= last and day not in known:
+                rows.append({"ts": pd.Timestamp(day, tz="UTC"), "split_from": 1.0,
+                             "split_to": float(factor), "ratio": float(factor)})  # fmt: skip
+    cols = ["ts", "split_from", "split_to", "ratio"]
+    return pd.DataFrame(rows, columns=cols).assign(instrument_id=instrument_id)
+
+
 def _fetch_name(
     run: IngestRun,
     source: Source,
@@ -232,7 +252,13 @@ def _fetch_name(
     frame = bars.drop(columns="symbol").assign(session_date=days)
     run.stage_sessions(BARS, f"hist_{name.instrument_id}", frame, source.name)
     mine = stored_splits[stored_splits["instrument_id"] == name.instrument_id]
-    found = split_findings(normalized.parsed["actions"], mine, days.min(), days.max())
+    actions = normalized.parsed["actions"]
+    if is_perma_id(name.instrument_id):  # no other source's splits: write ours
+        splits = tiingo_split_rows(name.instrument_id, actions, mine, days.min(), days.max())
+        if not splits.empty:
+            run.stage(SPLITS, f"split_{name.instrument_id}", splits, source.name)
+        return f"OK: {_window(since, until)}"
+    found = split_findings(actions, mine, days.min(), days.max())
     if found:
         shown = "; ".join(found[:3]) + ("; ..." if len(found) > 3 else "")
         run.record_item(f"split:{name.instrument_id}", f"{SPLIT_MISMATCH}: {len(found)} {shown}")
@@ -377,6 +403,7 @@ def ingest_bars_history(
         todo = pending[: remaining if limit is None else min(remaining, max(0, limit))]
         _fetch_pending(run, source, todo, since, until)
         run.stats.update(_publish(run, source.name))
+        run.stats["tiingo_split_rows"] = run.publish(SPLITS)  # pending, committed with the bars
         mismatches, shown = _mismatches(run.items)
         statuses = [status_label(run.items.get(f"hist:{n.instrument_id}", "")) for n in todo]
         left = len(pending) - sum(1 for s in statuses if s in DONE)

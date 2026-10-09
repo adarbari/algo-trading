@@ -2,7 +2,7 @@
 
 import pytest
 
-from algotrade.core.model.instruments import equity_id, key_of
+from algotrade.core.model.instruments import equity_id, is_perma_id, key_of
 
 
 def test_figi_beats_perma_ticker_beats_symbol() -> None:
@@ -21,3 +21,10 @@ def test_a_symbol_never_contains_a_colon() -> None:
 
 def test_a_namespaced_id_keeps_its_key() -> None:
     assert key_of(equity_id("OLD", None, "000000042")) == "TIINGO:000000042"
+
+
+def test_is_perma_id_only_for_the_tiingo_namespace() -> None:
+    assert is_perma_id("EQ:TIINGO:US000000041372")
+    assert not any(
+        is_perma_id(i) for i in ("EQ:AAPL", "EQ:BBG000B9XRY4", "EQ:TIINGO:", "FUT:TIINGO:X")
+    )

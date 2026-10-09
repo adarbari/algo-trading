@@ -1,6 +1,6 @@
 """Learned scorers never see the frozen period (ADR 0053 amendment, ED7): every
-``edge_score_<edge>`` expression feature in ``config/site/features/edge_scores.toml`` (none is
-committed until a fit has the minimum independent sessions) names an edge that declares
+``edge_score_<edge>`` expression feature in ``config/site/features/scores/edge_scores.toml``
+(none is committed until a fit has the minimum independent sessions) names an edge that declares
 ``[scorer]`` features and a ``frozen_from``, records ``fitted_through`` before the purge cutoff
 of its horizon, and reads exactly the declared features. Every declared ``@v<n>`` is its group's
 current registry version. The checks run on a rendered table too, so an empty file is not a pass
@@ -29,7 +29,7 @@ from tests.conftest import REPO_ROOT
 
 STORE = FileConfigStore(REPO_ROOT / "config", local=False)
 EDGES = {e.id: e for e in load_edges(STORE)}
-FILE = REPO_ROOT / "config" / "site" / "features" / "edge_scores.toml"
+FILE = REPO_ROOT / "config" / "site" / "features" / "scores" / "edge_scores.toml"
 SCORES = tomllib.loads(FILE.read_text()) if FILE.exists() else {}
 FITTED = re.compile(r"fitted_through=(\d{4}-\d{2}-\d{2})")
 HORIZON = re.compile(r"horizon=(\d+) sessions")

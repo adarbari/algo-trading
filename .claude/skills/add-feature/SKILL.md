@@ -15,8 +15,11 @@ description: Add a computed feature to the feature store: a formula over existin
 high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is an
 **expression feature: a TOML entry, no code** (ADR 0023 step 3):
 
-1. Add `[name]` to the theme file in `config/site/features/` (`price.toml`,
-   `volatility.toml`, `fundamentals.toml`, `liquidity.toml`, `vrp.toml`; a new theme is a new file):
+1. Add `[name]` to the theme file in its kind's folder of `config/site/features/` (`technical/`:
+   `price.toml`, `swing.toml`; `options/`: `volatility.toml`, `vrp.toml`; `company/`:
+   `fundamentals.toml`, `liquidity.toml`; `market/`: `regime.toml`; `scores/`: learned scorers,
+   ED7; a theme name is unique across folders; a new theme is a new file, a new kind a new
+   folder declared in `architecture/layout.toml`; 12 files per folder):
    `expr`, `dtype`, `unit`, `description`, `null_meaning`, and as needed `kind = "label"` +
    `categories`, `valid_range = [min, max]` (`inf` open; a flag, never a clip), `params = {...}`
    (thresholds as named constants), `version` (bump it when the formula changes). The language

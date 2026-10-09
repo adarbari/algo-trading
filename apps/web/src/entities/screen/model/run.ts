@@ -5,7 +5,11 @@
  */
 import type { components } from '@/shared/api';
 
-export type ScreenRun = components['schemas']['RunRequest'];
+/** The POST's answer (`RunRequest`) or the job's status (`JobStatus`): both carry these. */
+export type ScreenRun = Pick<
+  components['schemas']['RunRequest'] | components['schemas']['JobStatus'],
+  'state' | 'session' | 'error'
+>;
 
 /** Still going: poll it. */
 export const isActive = (run: ScreenRun | undefined): boolean =>

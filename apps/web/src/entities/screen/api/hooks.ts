@@ -194,12 +194,7 @@ export function useRunScreener(id: string) {
   });
   const status = useQuery({
     queryKey: queryKeys.screeners.run(id, jobId ?? ''),
-    queryFn: () =>
-      unwrap(
-        api.GET('/screens/{config_id}/run/{job_id}', {
-          params: { path: { config_id: id, job_id: jobId ?? '' } },
-        }),
-      ),
+    queryFn: () => unwrap(api.GET('/jobs/{job_id}', { params: { path: { job_id: jobId ?? '' } } })),
     enabled: jobId !== null && isActive(start.data),
     refetchInterval: (query) => (isActive(query.state.data) ? RUN_POLL_MS : false),
     retry: false,

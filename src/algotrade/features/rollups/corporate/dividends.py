@@ -20,7 +20,7 @@ the bars history for a zero to mean "pays nothing".
 
 v2 (ADR 0023 step 3) stores ``div_ttm`` as a 32-bit float and drops ``div_yield``: the yield
 (``div_ttm / close``, the continuous ``q`` in option pricing) is the expression feature
-``div_yield`` (``config/site/features/fundamentals.toml``), materialised as
+``div_yield`` (``config/site/features/company/fundamentals.toml``), materialised as
 ``rollups/instrument/div_yield@v1`` because ``iv30@v1`` reads it.
 """
 
