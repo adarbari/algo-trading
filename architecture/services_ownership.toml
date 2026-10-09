@@ -242,3 +242,10 @@ description = "Read expression features on read (selections, FeatureView, series
 owner = ["src/algotrade/services/features.py", "src/algotrade/data/rollups.py"]
 section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
 detect = [{ call = "feature_rows" }]
+
+[[responsibility]]
+id = "winners-discovery"
+description = "Find what was true of the big winners before they won (ADR 0053 amendment 2026-10-09, ED6): the session grid (every step_sessions from min_history_sessions of bars while the window closes before frozen_from), the eligible stocks at each (universe at S with a bar, price and 20-session dollar volume floors), the winners (top top_fraction of the stored excess return over COMPLETE and DELISTED rows; a session with too many missing rows refused), five matched controls per winner from the same liquidity x listing-age cell (seeded, order invariant), every usable catalogue feature read at the partition of S only (learned edge scores, the matching variable and features whose input table was not yet stored left out with the reason; UNKNOWN dropped and counted, never imputed), Hedges' g per (feature, session) counted only with matching coverage, block means, sign stability, rank-correlation clusters, the gate against a permutation null, and the probit proposer's ranking (proposed_by model, no verdict); returns a typed result the job persists (PR W3)"
+owner = ["src/algotrade/services/evaluation/discovery/*"]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "find_tells" }, { call = "label_winners" }, { call = "draw_controls" }]
