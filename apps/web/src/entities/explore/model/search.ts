@@ -46,6 +46,8 @@ export interface ExploreSearch {
   strikes?: 'all';
   /** The feature whose distribution the Features tab shows. */
   feature?: string;
+  /** The screener (config id) that surfaced the ticker, set when Ideas opens it. */
+  via?: string;
 }
 
 /** The mockup's columns: close, our IV30, IV / HV, distance from the 52-week high, earnings. */
@@ -112,6 +114,7 @@ export function parseExploreSearch(raw: Record<string, unknown>): ExploreSearch 
   set('right', oneOf(['P', 'C'] as const, raw['right']));
   set('strikes', oneOf(['all'] as const, raw['strikes']));
   set('feature', text(raw['feature']));
+  set('via', text(raw['via']));
   return out;
 }
 

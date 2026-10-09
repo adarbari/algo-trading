@@ -1,0 +1,4 @@
+/* ViewChips: the row wraps inside its container, never past it. */
+.root {
+  min-width: 0;
+}

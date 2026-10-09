@@ -107,6 +107,12 @@ export {
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
 export { FilterBar, type FilterBarProps } from './FilterBar';
+export {
+  FilterChips,
+  type FilterChipsProps,
+  type FilterDefinition,
+  type FilterValues,
+} from './FilterChips';
 export { KeyHints, type KeyHint, type KeyHintsProps } from './KeyHints';
 export { NavList, type NavListItem, type NavListProps } from './NavList';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
@@ -175,6 +181,7 @@ export {
 } from './StatusStrip';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { TickerTag, type TickerTagProps } from './TickerTag';
+export { ViewChips, type ViewChipsProps, type ViewOption } from './ViewChips';
 export {
   Timeline,
   timelineDomain,

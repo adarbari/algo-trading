@@ -643,6 +643,19 @@ Source: `design-system/components/FilterBar`
 | `label` | `string` | no | Accessible name of the bar (default "Filters"). |
 | `defaultOpen` | `boolean` | no | The narrow filters sheet starts open (a story's open state). |
 
+### FilterChips
+
+FilterChips: the filters of a table as chips. A filter in force is a removable chip ("Screener: VRP scanner", an × named "Remove Screener: VRP scanner"); one not in force is a dashed "+ Name" button that opens its values; "Clear filters" appears only while one is in force. The row wraps, so it fits a phone. The caller owns the values (usually search params) and what each filter means; this only shows and edits them.
+
+Source: `design-system/components/FilterChips`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `filters` | `readonly FilterDefinition[]` | yes |  |
+| `values` | `FilterValues` | yes |  |
+| `onChange` | `(id: string, value: string \| undefined) => void` | yes | Set a filter's value, or remove it (`undefined`). |
+| `onClear` | `() => void` | yes | Remove every filter in force. |
+
 ### HeatGrid
 
 HeatGrid: a rows x columns grid of status cells, e.g. ingestion completeness (datasets x sessions). Each cell is complete / partial / failed / not collected, with optional value text (`99.7`); a header row names the columns, a header column names the rows, and a Legend explains the colours. One cell can be selected (accent outline) to drill in. An ARIA grid: arrow keys move between cells, Home / End to the row ends, Ctrl+Home / Ctrl+End to the corners, Enter or Space (or a click) selects; only one cell is in the Tab order.
@@ -1379,6 +1392,18 @@ Source: `design-system/components/TrackRecordChip`
 | `status` | `TrackRecordStatus` | yes | `evidenced`, `candidate` or `not-run`. |
 | `sessions` | `number` | no | Independent sessions behind a `candidate` (written as "Candidate · 42 sessions"). |
 | `exploratory` | `boolean` | no | The record comes from an exploratory run: nothing is rendered. |
+
+### ViewChips
+
+ViewChips: a row of saved views of a table or list (presets such as "Top today", a user's own views), exactly one in use. Each view is a toggle chip (pressed when in use) and the row wraps, so it never overflows a phone. Pass the views and the one in use; the caller owns what a view means. For two to four short mutually exclusive options in a toolbar use SegmentedControl.
+
+Source: `design-system/components/ViewChips`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `views` | `readonly ViewOption<V>[]` | yes | The views, in display order. |
+| `value` | `V` | yes | The view in use. |
+| `onValueChange` | `(value: V) => void` | yes |  |
 
 ### WorkspaceSwitch
 

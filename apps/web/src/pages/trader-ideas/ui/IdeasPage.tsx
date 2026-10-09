@@ -1,23 +1,25 @@
 /**
- * Trader > Ideas (home): the user's screeners in priority order beside the combined, ranked
- * list of top ideas across them. Tickers open in Explore (single, or a compare set).
+ * Trader > Ideas (home): the ticker-level ideas table across the user's screeners, full width,
+ * under the regime strip, the paused picks, the preset views and the filter chips (search
+ * params). A row opens its ticker in Explore (or a compare set) with the screener that surfaced it.
  */
-import { Grid, Stack, Text } from '@algotrade/ui';
+import { Stack } from '@algotrade/ui';
 
 import type { IdeaCompareSearch } from '@/features/idea-compare';
+import type { IdeasSearch, IdeasSearchPatch } from '@/entities/idea';
 import { IdeasHeading } from '@/widgets/ideas-heading';
 import { PausedIdeas } from '@/widgets/paused-ideas';
 import { RegimeStrip } from '@/widgets/regime-strip';
-import { ScreenerRanking } from '@/widgets/screener-ranking';
 import { TopIdeas } from '@/widgets/top-ideas';
 
 export interface IdeasPageProps {
+  /** The view in use and the filter chips (the URL's search params). */
+  search: IdeasSearch;
+  onSearchChange: (patch: IdeasSearchPatch) => void;
   /** Open the chosen tickers in Explore as a compare set. */
   onCompare: (search: IdeaCompareSearch) => void;
-  /** Open one ticker in Explore. */
-  onOpen: (symbol: string) => void;
-  /** Open the screener Builder for a new screener. */
-  onNewScreener: () => void;
+  /** Open one ticker in Explore, with the screener (config id) that surfaced it. */
+  onOpen: (symbol: string, via: string) => void;
   /** Open the Screeners list. */
   onScreeners: () => void;
   /** Open one screener's results. */
@@ -27,32 +29,27 @@ export interface IdeasPageProps {
 }
 
 export function IdeasPage({
+  search,
+  onSearchChange,
   onCompare,
   onOpen,
-  onNewScreener,
   onScreeners,
   onOpenScreener,
   onOpenRegime,
 }: IdeasPageProps) {
   return (
     <Stack gap={3}>
-      <Stack gap={1}>
-        <IdeasHeading />
-        <Text size="sm" tone="secondary">
-          Ranked by your screener priority, then score. Reorder the screeners to change the ranking.
-        </Text>
-      </Stack>
+      <IdeasHeading />
       <RegimeStrip onOpen={onOpenRegime} />
       <PausedIdeas onOpen={onOpen} onOpenScreener={onOpenScreener} />
-      <Grid columns="sidebar-start" gap={4} collapse="lg" align="start">
-        <ScreenerRanking onNewScreener={onNewScreener} onOpenScreener={onOpenScreener} />
-        <TopIdeas
-          onCompare={onCompare}
-          onOpen={onOpen}
-          onOpenScreener={onOpenScreener}
-          onScreeners={onScreeners}
-        />
-      </Grid>
+      <TopIdeas
+        search={search}
+        onSearchChange={onSearchChange}
+        onCompare={onCompare}
+        onOpen={onOpen}
+        onOpenScreener={onOpenScreener}
+        onScreeners={onScreeners}
+      />
     </Stack>
   );
 }

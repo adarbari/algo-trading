@@ -1,2 +1,2 @@
-/** Widget: the combined ranked list of ideas across the user's screeners. */
+/** Widget: the ranked ideas table with its preset views and filter chips. */
 export { TopIdeas, type TopIdeasProps } from './ui/TopIdeas';
