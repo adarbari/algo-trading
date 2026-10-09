@@ -41,7 +41,7 @@ from algotrade.config.edges.loading import Documents, load_edges
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
-from algotrade.core.time.calendar import close_time, sessions_between, sessions_ending
+from algotrade.core.time.calendar import close_time, next_session, sessions_between, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.listings.universe import delisted_by, universe_asof
 from algotrade.data.prices import SessionBars, bars, session_bars
@@ -124,7 +124,14 @@ def _one(
     listed: dict[str, date],
     nightly: bool,
 ) -> RunRecord:
-    left = {i: d for i, d in (listed | gone).items() if d <= end}  # known by ``end`` only
+    noticed = end
+    for _ in range(RECHECK):
+        noticed = next_session(noticed)
+    # a last trading day counts when on or before ``end``; a reference stamp (the notice date)
+    # when within the ``RECHECK`` sessions after it, the nights that recheck this window
+    left = {i: d for i, d in listed.items() if d <= end} | {
+        i: d for i, d in gone.items() if d <= noticed
+    }
     with IngestRun(ctx, TASK, end) as run:
         for h in horizons:
             if nightly and h > NIGHTLY_MAX_HORIZON:

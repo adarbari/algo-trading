@@ -113,7 +113,7 @@ def test_a_delisting_the_reference_notices_later_turns_a_reason_into_a_row() -> 
     start = sessions_ending(days[-3], 7)[0]
     assert "EQ:D" not in set(_partition(reader, start, days[-3])["instrument_id"])
     # the weekly build notices on days[-1]; that night rechecks the window ending days[-3]
-    write_rows(writer, "instruments/reference", days[-1], _reference(days[-4]))
+    write_rows(writer, "instruments/reference", days[-1], _reference(days[-1]))
     compute_outcomes(task_ctx(writer), days[-1])
     d = _partition(reader, start, days[-3])
     assert d.loc[d["instrument_id"] == "EQ:D", "outcome_status"].tolist() == ["DELISTED"]
@@ -163,8 +163,11 @@ def test_acceptance_fails_without_a_run() -> None:
     assert check.status == "FAIL"
 
 
-def test_a_reference_delisting_after_the_window_end_is_not_known_then() -> None:
+def test_a_reference_delisting_noticed_after_the_recheck_span_is_not_counted() -> None:
     writer, _reader, days = _store()
-    write_rows(writer, "instruments/reference", days[0], _reference(days[-1]))  # after T
+    noticed = days[-1]
+    for _ in range(RECHECK):
+        noticed = next_session(noticed)  # the notice is RECHECK sessions after END: too late for -3
+    write_rows(writer, "instruments/reference", days[0], _reference(next_session(noticed)))
     record = compute_outcomes(task_ctx(writer), days[-3])
     assert record.stats["h6"]["examples"] == {"EQ:D": NO_END_BAR}
