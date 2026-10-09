@@ -140,25 +140,25 @@ describe('with Supabase configured', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('a SIGNED_OUT heard before any listener exists reaches the first listener, once, until the next sign-in', async () => {
-    const callbacks: ((event: string) => void)[] = [];
-    auth.onAuthStateChange.mockImplementation((cb: (event: string) => void) => {
+  it('only a SIGNED_OUT without a session signs this tab out; SIGNED_IN, TOKEN_REFRESHED and INITIAL_SESSION never do', async () => {
+    const callbacks: ((event: string, session: unknown) => void)[] = [];
+    auth.onAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
       callbacks.push(cb);
       return { data: { subscription: { unsubscribe: vi.fn() } } };
     });
-    const { accessToken, onUnauthorized, signInWithPassword } = await load(CONFIGURED);
+    const { accessToken, onUnauthorized } = await load(CONFIGURED);
     await accessToken();
-    callbacks[0]?.('SIGNED_OUT'); // another tab signed out before this tab's page mounted
-    const late = vi.fn();
-    const off = onUnauthorized(late);
-    expect(late).toHaveBeenCalledTimes(1);
-    off();
-    const later = vi.fn();
-    onUnauthorized(later);
-    expect(later).not.toHaveBeenCalled();
-    callbacks[0]?.('SIGNED_OUT');
-    expect(later).toHaveBeenCalledTimes(1);
-    await signInWithPassword('a@b.co', 'pw');
+    const listener = vi.fn();
+    onUnauthorized(listener);
+    const session = { user: { email: 'a@b.co' } };
+    callbacks[0]?.('SIGNED_OUT', session);
+    callbacks[0]?.('SIGNED_IN', session);
+    callbacks[0]?.('TOKEN_REFRESHED', session);
+    callbacks[0]?.('INITIAL_SESSION', session);
+    callbacks[0]?.('INITIAL_SESSION', null);
+    expect(listener).not.toHaveBeenCalled();
+    callbacks[0]?.('SIGNED_OUT', null);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('on a 401 signs out locally and tells the listeners', async () => {
