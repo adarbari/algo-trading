@@ -329,7 +329,7 @@ const regimeQuery = () =>
 
 /** Start reading the regime before the page opens (a link was hovered): a no-op while fresh. */
 export function prefetchRegime(client: QueryClient): void {
-  void client.prefetchQuery(regimeQuery());
+  void client.query(regimeQuery()).catch(() => undefined);
 }
 
 /**

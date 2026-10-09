@@ -97,7 +97,7 @@ const edgesQuery = () =>
 
 /** Start reading the edges before the page opens (a link was hovered): a no-op while fresh. */
 export function prefetchEdges(client: QueryClient): void {
-  void client.prefetchQuery(edgesQuery());
+  void client.query(edgesQuery()).catch(() => undefined);
 }
 
 /** Read the edges (and their runs) again, after an evaluation finished. */

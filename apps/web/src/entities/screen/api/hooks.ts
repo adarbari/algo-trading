@@ -115,7 +115,7 @@ const screenerConfigsQuery = () =>
 
 /** Start reading the screener list before the page opens (a link was hovered): a no-op while fresh. */
 export function prefetchScreeners(client: QueryClient): void {
-  void client.prefetchQuery(screenerConfigsQuery());
+  void client.query(screenerConfigsQuery()).catch(() => undefined);
 }
 
 /** The user's own screens: finalized ones and draft-only ones (status DRAFT). */

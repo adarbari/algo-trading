@@ -7,12 +7,7 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
-import {
-  parseIdeasSearch,
-  prefetchIdeas,
-  type IdeasSearch,
-  type IdeasSearchPatch,
-} from '@/entities/idea';
+import { parseIdeasSearch, type IdeasSearch, type IdeasSearchPatch } from '@/entities/idea';
 
 import { traderRoute } from './layout-route';
 import { lazyPage } from '@/shared/lib/lazy';
@@ -51,9 +46,5 @@ export const ideasRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'ideas',
   validateSearch: parseIdeasSearch,
-  // A hovered link starts the read; the page's own hook then finds it in flight or fresh.
-  loader: ({ context }) => {
-    prefetchIdeas(context.queryClient);
-  },
   component: IdeasRoute,
 });

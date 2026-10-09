@@ -1,6 +1,6 @@
 /**
  * The date of the session the API reads now (`Query.session`), the one stamp the app has of
- * what the nightly run published: the persisted page cache is valid for exactly one such date.
+ * what the nightly run published: the saved page cache is valid for exactly one such date.
  */
 import { gql, graphql } from '@/shared/api';
 

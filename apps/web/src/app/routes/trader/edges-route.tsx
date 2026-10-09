@@ -4,8 +4,6 @@
  */
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
-import { prefetchEdges } from '@/entities/edge';
-
 import { traderRoute } from './layout-route';
 import { lazyPage } from '@/shared/lib/lazy';
 
@@ -36,8 +34,5 @@ export const edgesRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'edges',
   validateSearch: validateEdgesSearch,
-  loader: ({ context }) => {
-    prefetchEdges(context.queryClient);
-  },
   component: EdgesRoute,
 });

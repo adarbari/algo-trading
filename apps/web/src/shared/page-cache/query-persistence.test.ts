@@ -233,6 +233,7 @@ describe('startQueryPersistence', () => {
       fetchSession: () => Promise.resolve('s1'),
       now: () => Date.now(),
     });
-    expect(stop()).toBeUndefined();
+    stop();
+    expect(client.getQueryCache().getAll()).toEqual([]);
   });
 });

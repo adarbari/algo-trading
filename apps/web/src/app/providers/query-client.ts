@@ -2,7 +2,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
 import { forgetUser } from '@/entities/viewer';
-import { ApiError, GraphQLRequestError, onUnauthorized } from '@/shared/api';
+import { active, ApiError, GraphQLRequestError, onUnauthorized } from '@/shared/api';
 
 /** GraphQL error codes about the request itself: asking again gets the same answer. */
 const REQUEST_CODES = new Set(['BAD_REQUEST', 'NOT_FOUND', 'UNKNOWN_FEATURE']);
@@ -24,16 +24,11 @@ export function createQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
       // A short staleTime: a page restored from the browser's saved cache (query-persistence.ts)
-      // is read again in the background at once; gcTime keeps visited pages in memory (and so in
-      // the saved cache) for half an hour instead of five minutes.
-      queries: {
-        staleTime: 60_000,
-        gcTime: 30 * 60_000,
-        retry: shouldRetry,
-        refetchOnWindowFocus: false,
-      },
+      // is read again in the background at once.
+      queries: { staleTime: 60_000, retry: shouldRetry, refetchOnWindowFocus: false },
     },
   });
+  active.client = client;
   onUnauthorized(() => {
     forgetUser(client);
   });

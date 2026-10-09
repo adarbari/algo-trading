@@ -10,10 +10,10 @@
 import { dehydrate, hashKey, hydrate, type QueryClient } from '@tanstack/react-query';
 import { createStore, del, get, set } from 'idb-keyval';
 
-import { fetchSessionDate } from '@/entities/system-status';
 import { queryKeys } from '@/shared/api';
 
 import { fitToCap, isPersistableKey, type StoredQuery } from './persist-cap';
+import { fetchSessionDate } from './session-date';
 
 /** Where the record lives (one key, one value: a JSON text, so its size is measured exactly). */
 export const CACHE_KEY = 'page-cache';
@@ -90,6 +90,9 @@ function parseRecord(text: string | undefined): PersistedRecord | null {
   }
 }
 
+/** The persistence now running, so a second start for the same client does nothing. */
+let running: { client: QueryClient; stop: () => void } | undefined;
+
 /**
  * Starts saving and restoring `client`'s page cache; the returned function stops it. Never
  * throws and never blocks: the restore runs after the caller returns.
@@ -99,6 +102,9 @@ export function startQueryPersistence(
   deps: PersistDeps = defaultDeps(),
 ): () => void {
   const { store, fetchSession, now } = deps;
+  if (running?.client === client) return running.stop; // one per client, however many pages ask
+  running?.stop();
+  running = undefined;
   if (!store) return () => undefined;
 
   const lastUsed = new Map<string, number>();
@@ -167,8 +173,8 @@ export function startQueryPersistence(
   const learnUser = (data: unknown) => {
     if (data === null) {
       forget(); // signed out: nothing of the user stays in the browser
-    } else if (typeof data === 'object' && data !== undefined && 'id' in data) {
-      user = String((data as { id: unknown }).id);
+    } else if (typeof data === 'object' && 'id' in data) {
+      user = String(data.id);
       reconcile();
       schedule();
     }
@@ -241,10 +247,13 @@ export function startQueryPersistence(
   void restore();
   learnUser(client.getQueryData(queryKeys.gql('Viewer', {})) ?? undefined);
 
-  return () => {
+  const stop = () => {
     stopped = true;
+    if (running?.client === client) running = undefined;
     unsubscribe();
     if (timer !== undefined) clearTimeout(timer);
     document.removeEventListener('visibilitychange', onHidden);
   };
+  running = { client, stop };
+  return stop;
 }

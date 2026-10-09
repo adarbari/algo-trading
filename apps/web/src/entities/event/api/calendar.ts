@@ -85,5 +85,5 @@ function calendarQuery(instrumentIds: readonly string[], scope: boolean) {
 
 /** Start reading the scope list's calendar (the page's default) before the page opens. */
 export function prefetchCalendar(client: QueryClient): void {
-  void client.prefetchQuery(calendarQuery([], true));
+  void client.query(calendarQuery([], true)).catch(() => undefined);
 }

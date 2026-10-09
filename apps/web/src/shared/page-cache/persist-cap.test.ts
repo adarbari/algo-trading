@@ -55,7 +55,7 @@ describe('fitToCap', () => {
   it('measures serialized bytes (multi-byte text), not characters', () => {
     const wide = { ...query('w', 1), state: { dataUpdatedAt: 1, data: '€'.repeat(300) } };
     // 300 characters are 900 bytes: under 1500 by length alone, over it in bytes.
-    const fitted = fitToCap([wide as StoredQuery], new Map(), 1024 + 500);
+    const fitted = fitToCap([wide], new Map(), 1024 + 500);
     expect(fitted.kept).toBe(0);
     expect(byteLength('€')).toBe(3);
   });
