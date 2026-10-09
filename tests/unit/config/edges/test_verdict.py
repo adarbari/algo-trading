@@ -11,14 +11,14 @@ from algotrade.core.model.errors import ConfigurationError
 
 def test_defaults_are_the_owners_thresholds() -> None:
     d = VerdictSettings.from_document(None)
-    assert (d.min_trades, d.works_trades, d.works_oos_trades) == (40, 100, 40)
+    assert (d.min_oos_trades, d.works_trades, d.works_oos_trades) == (40, 100, 40)
     assert (d.not_working_t, d.promising_t, d.works_t) == (1.0, 2.0, 3.0)
     assert (d.not_working_dsr, d.promising_dsr, d.works_dsr) == (0.5, 0.8, 0.95)
     assert (d.max_pbo, d.works_max_pbo, d.oos_lift_share) == (0.5, 0.2, 0.5)
 
 
 def test_a_document_overrides_and_an_unknown_key_fails() -> None:
-    assert VerdictSettings.from_document({"min_trades": 60}).min_trades == 60
+    assert VerdictSettings.from_document({"min_oos_trades": 60}).min_oos_trades == 60
     with pytest.raises(ConfigurationError, match="unknown keys"):
         VerdictSettings.from_document({"min_trade": 1})
     with pytest.raises(ConfigurationError, match="max_pbo"):

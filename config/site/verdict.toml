@@ -2,7 +2,7 @@
 # Waiting on data), read by services/read/evaluation/verdict.py. A "trade" is an independent
 # session of the official result. Out-of-sample (OOS) is the slice from the edge's split date.
 
-min_trades = 40          # fewer trades than this: Not enough data
+min_oos_trades = 40      # fewer out-of-sample trades than this: Not enough data (owner, 2026-10-09)
 works_trades = 100       # Works needs this many trades ...
 works_oos_trades = 40    # ... of which this many out-of-sample
 

@@ -103,7 +103,8 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
 
 @dataclass(frozen=True)
 class Slice:
-    """A set of sessions reported on its own: ``kind`` ("all", "year", "regime", "frozen")."""
+    """A set of sessions reported on its own: ``kind`` ("all", "year", "regime", "in_sample",
+    "frozen")."""
 
     kind: str
     value: str

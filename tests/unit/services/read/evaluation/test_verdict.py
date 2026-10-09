@@ -41,8 +41,13 @@ def result(
     oos: dict[str, object] | None = None,
     whole: dict[str, object] | None = None,
     baselines: tuple[float, ...] = (1.05, 1.1),
+    insample: dict[str, object] | None = None,
 ) -> list[EdgeRow]:
-    rows = [row(kind="frozen", **(oos or {})), row(kind="all", **{"sessions": 70, **(whole or {})})]
+    rows = [
+        row(kind="frozen", **(oos or {})),
+        row(kind="all", **{"sessions": 70, **(whole or {})}),
+        row(kind="in_sample", **{"hit_rate": 0.60, "base_rate": 0.50, **(insample or {})}),
+    ]
     rows += [
         row(variant=f"b{i}", role="baseline", lift=x, decile_spread=0.01 * i)
         for i, x in enumerate(baselines)
@@ -65,10 +70,16 @@ def test_a_run_without_out_of_sample_rows_is_waiting_and_names_lost_inputs() -> 
     assert "rollup (3 sessions)" in v.rationale
 
 
-def test_fewer_than_40_trades_is_not_enough_at_the_boundary() -> None:
-    short = verdict(result(whole={"sessions": 39}))
-    assert (short.verdict, short.rationale) == (NOT_ENOUGH, "Only 39 trades; 40 are needed")
-    assert verdict(result(whole={"sessions": 40})).verdict == PROMISING
+def test_fewer_oos_trades_than_the_minimum_is_not_enough_at_the_boundary() -> None:
+    short = verdict(result(oos={"sessions": 39}))
+    assert (short.verdict, short.rationale) == (
+        NOT_ENOUGH,
+        "Only 39 out-of-sample trades; 40 are needed",
+    )
+    assert verdict(result(oos={"sessions": 40})).verdict == PROMISING
+    assert (
+        verdict(result(whole={"sessions": 5})).verdict == PROMISING
+    )  # whole history is not the gate
 
 
 def test_promising_names_what_works_still_needs() -> None:
@@ -98,8 +109,8 @@ def test_works_boundaries() -> None:
     assert verdict(result(oos=strong, whole=short), random_beaten=True).verdict == PROMISING
     thin = {**strong, "decile_t": 2.99}
     assert verdict(result(oos=thin, whole=whole), random_beaten=True).verdict == PROMISING
-    few_oos = {**strong, "sessions": 39}
-    assert verdict(result(oos=few_oos, whole=whole), random_beaten=True).verdict == PROMISING
+    few_oos = {**strong, "sessions": 39}  # below the Promising minimum too (both are 40)
+    assert verdict(result(oos=few_oos, whole=whole), random_beaten=True).verdict == NOT_ENOUGH
 
 
 def test_win_rate_not_above_base_is_not_working() -> None:
@@ -122,8 +133,10 @@ def test_a_missed_promising_criterion_is_not_working_and_says_which() -> None:
     assert v.verdict == NOT_WORKING and "Deflated Sharpe" in v.rationale
     v = verdict(result(oos={"lift": 1.07}, baselines=(1.0, 1.1)))  # above the median, not all
     assert v.verdict == NOT_WORKING and "baseline" in v.rationale
-    v = verdict(result(oos={"hit_rate": 0.52}, whole={"hit_rate": 0.70}))
+    v = verdict(result(oos={"hit_rate": 0.52}, insample={"hit_rate": 0.70}))
     assert v.verdict == NOT_WORKING and "keeps its size" in v.rationale
+    # 5 pts out of sample against 10 in sample is exactly half: passes
+    assert verdict(result(oos={"hit_rate": 0.55})).verdict == PROMISING
 
 
 def test_a_criterion_not_stored_never_passes() -> None:
@@ -180,7 +193,10 @@ def test_a_short_official_result_is_not_enough_data(backend: MemoryBackend) -> N
     edge = load_edge(ctx, "drift")
     assert edge is not None
     found = load_edge_verdict(ctx, edge)
-    assert (found.verdict, found.rationale) == (NOT_ENOUGH, "Only 12 trades; 40 are needed")
+    assert (found.verdict, found.rationale) == (
+        NOT_ENOUGH,
+        "Only 12 out-of-sample trades; 40 are needed",
+    )
     assert found.basis == "momo, 20 trading days" and found.edge_id == "drift"
 
 
@@ -197,3 +213,35 @@ def test_the_definition_sources_and_lost_inputs_are_served(backend: MemoryBacken
     lost = [{"variant": "main/momo", "horizon": 20, "table": "rollup", "sessions": 3}]
     assert _lost({"lost_sessions": lost}) == ("main/momo: rollup (3 sessions)",)
     assert _lost({}) == ()
+
+
+def test_a_run_without_the_in_sample_slice_reports_the_ratio_not_measured() -> None:
+    rows = [r for r in result() if r.slice_kind != "in_sample"]
+    v = verdict(rows)
+    assert v.verdict == NOT_ENOUGH and "keeps its size is not measured yet" in v.rationale
+
+
+def test_lost_inputs_for_the_screen_make_the_edge_wait_even_with_rows() -> None:
+    v = verdict(result(), lost_inputs=("main/scr: rollup (3 sessions)",))
+    assert v.verdict == WAITING and "rollup (3 sessions)" in v.rationale
+    assert v.basis == "scr, 20 trading days"
+    other = verdict(result(), lost_inputs=("main/other: rollup (3 sessions)",))
+    assert other.verdict == PROMISING
+
+
+def test_a_zero_lift_candidate_is_ranked_above_a_missing_one() -> None:
+    rows = [
+        *result(),
+        row(variant="blank", kind="frozen", hit_rate=None, base_rate=None),
+        row(variant="blank", kind="all"),
+    ]
+    assert verdict(rows).basis == "scr, 20 trading days"
+
+
+def test_no_declared_baselines_do_not_block_promising_and_say_so() -> None:
+    v = verdict(result(baselines=()), decoys=False)
+    assert v.verdict == PROMISING
+    decoy = next(c for c in v.criteria if c.id == "baselines")
+    assert (decoy.status, decoy.value) == ("pass", "no decoys declared")
+    # a declared baseline with no stored row stays not measured
+    assert verdict(result(baselines=())).verdict == NOT_ENOUGH

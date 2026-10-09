@@ -84,6 +84,12 @@ class EdgeRow:
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
 
 
+def lift_points(hit_rate: float | None, base_rate: float | None) -> float | None:
+    """Win rate minus base rate, in points (None when either is not stored): the one place the
+    served lift in points is computed."""
+    return None if hit_rate is None or base_rate is None else (hit_rate - base_rate) * 100
+
+
 @dataclass(frozen=True)
 class CanonicalRun:
     """The canonical run of an edge, or why it has none (``not_run``: ``NOT_RUN``)."""

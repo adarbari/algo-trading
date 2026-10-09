@@ -453,10 +453,10 @@ short = "What the official result says about an edge: Works, Promising, Not work
 body = """
 The verdict is judged by one fixed rule on the edge's official result, using its best screen and
 holding period (the page says which). Waiting on data: there is no official result, or it could
-not read what it needed. Not enough data: fewer than 40 trades, or a figure the rule needs was
+not read what it needed. Not enough data: too few out-of-sample trades, or a figure the rule needs was
 not measured. Not working: the out-of-sample win rate is not above the base rate, or the top
 vs bottom decile, the deflated Sharpe ratio or the overfitting chance is poor, or it does not
-beat the plain baselines. Promising: it passes all of those with 40 or more trades. Works: more
+beat the plain baselines. Promising: it passes all of those with enough out-of-sample trades. Works: more
 trades, stricter thresholds and a win over the best of many random-pick backtests, which are not
 measured yet, so no edge can read Works for now. The reason line names the first test it fails;
 the details list every test with its value and its threshold.

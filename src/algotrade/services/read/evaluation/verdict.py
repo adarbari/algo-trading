@@ -5,9 +5,10 @@ The candidates are the main edge variant's implementation rows (role not ``basel
 (screen, holding period) with its out-of-sample (``frozen``) and whole-history (``all``) rows;
 the edge's verdict is its best candidate's, and names the screen and holding period it rests on.
 First match wins: Waiting on data (no official result, or no candidate rows); Not enough data
-(fewer trades than ``min_trades``, or a criterion that is not measured); Not working (a hard
-failure: out-of-sample win rate not above the base rate, t, overfitting probability, deflated
-Sharpe, or worse than the median baseline; then any criterion of Promising missed); Promising;
+(fewer out-of-sample trades than ``min_oos_trades``, or a criterion that is not measured);
+Not working (a hard failure: out-of-sample win rate not above the base rate, t, overfitting
+probability, deflated Sharpe, or worse than the median baseline; then any criterion of
+Promising missed); Promising;
 Works (more trades, stricter thresholds, and a win over the best random-pick backtest, which
 does not exist yet: it is "not measured" and caps the verdict at Promising). The statistics are
 the stored rows' (``quant/edge_statistics.py``), never recomputed; the thresholds are site data
@@ -95,10 +96,6 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x * 100:.0f}%"
 
 
-def _pts(win: float | None, base: float | None) -> float | None:
-    return None if win is None or base is None else (win - base) * 100
-
-
 def _num(x: float | None, digits: int = 2) -> str:
     return "not stored" if x is None else f"{x:.{digits}f}"
 
@@ -124,6 +121,7 @@ class _Candidate:
     horizon: int
     oos: EdgeRow
     whole: EdgeRow
+    insample: EdgeRow | None
     baselines: tuple[EdgeRow, ...]
     years: tuple[EdgeRow, ...]
 
@@ -141,6 +139,7 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
         mine = [r for r in main if r.variant == variant and r.horizon_sessions == horizon]
         oos = [r for r in mine if r.slice_kind == "frozen"]
         whole = [r for r in mine if r.slice_kind == "all"]
+        before = [r for r in mine if r.slice_kind == "in_sample"]  # absent in older runs
         if len(oos) != 1 or len(whole) != 1:
             continue
         base = tuple(
@@ -149,7 +148,17 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
             if r.role == "baseline" and r.horizon_sessions == horizon and r.slice_kind == "frozen"
         )
         years = tuple(sorted((r for r in mine if r.slice_kind == "year"), key=_by_year))
-        found.append(_Candidate(variant, horizon, oos[0], whole[0], base, years))
+        found.append(
+            _Candidate(
+                variant,
+                horizon,
+                oos[0],
+                whole[0],
+                before[0] if len(before) == 1 else None,
+                base,
+                years,
+            )
+        )
     return found
 
 
@@ -164,22 +173,27 @@ def _words(x: VerdictCriterion) -> str:
 
 
 def _criteria(
-    c: _Candidate, t: VerdictSettings, random_beaten: bool | None
+    c: _Candidate, t: VerdictSettings, random_beaten: bool | None, decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
     oos, whole = c.oos, c.whole
     trades = whole.sessions
-    oos_pts, whole_pts = _pts(oos.hit_rate, oos.base_rate), _pts(whole.hit_rate, whole.base_rate)
+    oos_pts = runs.lift_points(oos.hit_rate, oos.base_rate)
+    in_pts = runs.lift_points(c.insample.hit_rate, c.insample.base_rate) if c.insample else None
     pbo = whole.pbo if whole.pbo is not None else oos.pbo
     dsr = whole.deflated_sharpe if whole.deflated_sharpe is not None else oos.deflated_sharpe
     lifts = [b.lift for b in c.baselines if b.lift is not None]
     spreads = [b.decile_spread for b in c.baselines if b.decile_spread is not None]
-    beats_all = None if oos.lift is None or not lifts else oos.lift > max(lifts)
+    beats_all = (
+        True if not decoys else None if oos.lift is None or not lifts else oos.lift > max(lifts)
+    )
     beats_spread = (
-        None if oos.decile_spread is None or not spreads else oos.decile_spread > max(spreads)
+        True
+        if not decoys
+        else None
+        if oos.decile_spread is None or not spreads
+        else oos.decile_spread > max(spreads)
     )
-    keeps = (
-        None if oos_pts is None or whole_pts is None else oos_pts >= t.oos_lift_share * whole_pts
-    )
+    keeps = None if oos_pts is None or in_pts is None else oos_pts >= t.oos_lift_share * in_pts
     win_ok = None if oos_pts is None else oos_pts > 0
     enough = (
         None
@@ -187,10 +201,16 @@ def _criteria(
         else trades >= t.works_trades and oos.sessions >= t.works_oos_trades
     )
     versus = f"{_pct(oos.hit_rate)} against {_pct(oos.base_rate)}"
-    best = f"{_num(oos.lift)} vs best {_num(max(lifts))}" if lifts else "not stored"
+    best = (
+        "no decoys declared"
+        if not decoys
+        else f"{_num(oos.lift)} vs best {_num(max(lifts))}"
+        if lifts
+        else "not stored"
+    )
     return (
-        _crit("trades", "Trades", str(trades), f"at least {t.min_trades}",
-              None if trades is None else trades >= t.min_trades, PROMISING),
+        _crit("trades", "Out-of-sample trades", str(oos.sessions), f"at least {t.min_oos_trades}",
+              None if oos.sessions is None else oos.sessions >= t.min_oos_trades, PROMISING),
         _crit("win_rate", "Out-of-sample win rate above the base rate", versus,
               "above the base rate", win_ok, PROMISING),
         _crit("decile_t", "Top vs bottom decile t", _num(oos.decile_t),
@@ -202,8 +222,8 @@ def _criteria(
         _crit("baselines", "Lift against every baseline", best,
               "beats every baseline", beats_all, PROMISING),
         _crit("oos_lift", "Out-of-sample lift keeps its size",
-              f"{_num(oos_pts, 1)} pts vs {_num(whole_pts, 1)} pts whole history",
-              f"at least {t.oos_lift_share:g} of the whole-history lift", keeps, PROMISING),
+              f"{_num(oos_pts, 1)} pts vs {_num(in_pts, 1)} pts in-sample",
+              f"at least {t.oos_lift_share:g} of the in-sample lift", keeps, PROMISING),
         _crit("works_trades", "Trades, and out-of-sample trades", f"{trades} and {oos.sessions}",
               f"at least {t.works_trades} and {t.works_oos_trades}", enough, WORKS),
         _crit("works_t", "Top vs bottom decile t", _num(oos.decile_t),
@@ -213,7 +233,9 @@ def _criteria(
         _crit("works_pbo", "Chance the result is overfitting", _num(pbo),
               f"at most {t.works_max_pbo:g}", _at_most(pbo, t.works_max_pbo), WORKS),
         _crit("works_spread", "Decile spread against every baseline",
-              _num(oos.decile_spread, 3), "beats every baseline", beats_spread, WORKS),
+              _num(oos.decile_spread, 3),
+              "no decoys declared" if not decoys else "beats every baseline",
+              beats_spread, WORKS),
         _crit("random", "Beats the best random-pick backtest", "not measured yet",
               "beats it", random_beaten, WORKS),
     )  # fmt: skip
@@ -222,10 +244,13 @@ def _criteria(
 def _level(c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings) -> tuple[str, str]:
     oos, whole = c.oos, c.whole
     by = {x.id: x for x in crit}
-    trades = whole.sessions
-    if trades is None or trades < t.min_trades:
-        return NOT_ENOUGH, f"Only {trades or 0} trades; {t.min_trades} are needed"
-    pts = _pts(oos.hit_rate, oos.base_rate)
+    trades = oos.sessions
+    if trades is None or trades < t.min_oos_trades:
+        return (
+            NOT_ENOUGH,
+            f"Only {trades or 0} out-of-sample trades; {t.min_oos_trades} are needed",
+        )
+    pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     pbo = whole.pbo if whole.pbo is not None else oos.pbo
     dsr = whole.deflated_sharpe if whole.deflated_sharpe is not None else oos.deflated_sharpe
     lifts = [b.lift for b in c.baselines if b.lift is not None]
@@ -250,11 +275,13 @@ def _level(c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings) 
     return (WORKS, "") if gap is None else (PROMISING, _words(gap))
 
 
-def _judge_one(c: _Candidate, t: VerdictSettings, random_beaten: bool | None) -> EdgeVerdict:
-    crit = _criteria(c, t, random_beaten)
+def _judge_one(
+    c: _Candidate, t: VerdictSettings, random_beaten: bool | None, decoys: bool
+) -> EdgeVerdict:
+    crit = _criteria(c, t, random_beaten, decoys)
     level, reason = _level(c, crit, t)
     oos, whole = c.oos, c.whole
-    pts = _pts(oos.hit_rate, oos.base_rate)
+    pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     basis = f"{c.variant}, {c.horizon} trading days"
     body = (
         f"Out-of-sample, {basis}: win rate {_pct(oos.hit_rate)} against a base rate of "
@@ -298,7 +325,7 @@ def _years(c: _Candidate, split: date | None) -> tuple[YearRow, ...]:
     return tuple(
         YearRow(
             r.slice_value, _period(r.slice_value, split), r.hit_rate, r.base_rate,
-            _pts(r.hit_rate, r.base_rate), r.decile_spread, r.sessions,
+            runs.lift_points(r.hit_rate, r.base_rate), r.decile_spread, r.sessions,
         )
         for r in c.years
     )  # fmt: skip
@@ -308,6 +335,26 @@ def _waiting(edge_id: str, reason: str) -> EdgeVerdict:
     return EdgeVerdict(edge_id, WAITING, reason, reason, reason)
 
 
+def _rank(lift_pts: float | None) -> float:
+    return float("-inf") if lift_pts is None else lift_pts
+
+
+def _judge_candidate(
+    c: _Candidate,
+    t: VerdictSettings,
+    random_beaten: bool | None,
+    decoys: bool,
+    lost_inputs: Sequence[str],
+) -> EdgeVerdict:
+    """A candidate that lost inputs (its own screen could not read a table on some decision
+    sessions) is Waiting on data even when it has rows: the figures are not the whole test."""
+    lost = [x for x in lost_inputs if x.startswith(f"{runs.MAIN}/{c.variant}:")]
+    if lost:
+        reason = f"The result lost inputs for {c.variant}: {'; '.join(lost)}"
+        return replace(_waiting("", reason), basis=f"{c.variant}, {c.horizon} trading days")
+    return _judge_one(c, t, random_beaten, decoys)
+
+
 def judge(
     edge_id: str,
     rows: Sequence[EdgeRow] | None,
@@ -315,6 +362,7 @@ def judge(
     t: VerdictSettings,
     lost_inputs: Sequence[str] = (),
     random_beaten: bool | None = None,
+    decoys: bool = True,
 ) -> EdgeVerdict:
     """The verdict of ``edge_id`` from its official result's ``rows`` (None: it has no official
     result); ``split``: the out-of-sample start; ``random_beaten``: whether it beat the best
@@ -325,18 +373,24 @@ def judge(
     if not found:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs else ""
         return _waiting(edge_id, f"The official result has no out-of-sample figures{lost}")
-    judged = [(c, _judge_one(c, t, random_beaten)) for c in found]
-    best_c, best = max(
-        judged, key=lambda p: (ORDER.index(p[1].verdict), p[1].lift_pts or float("-inf"))
-    )
+    judged = [(c, _judge_candidate(c, t, random_beaten, decoys, lost_inputs)) for c in found]
+    best_c, best = max(judged, key=lambda p: (ORDER.index(p[1].verdict), _rank(p[1].lift_pts)))
     return replace(best, edge_id=edge_id, years=_years(best_c, split))
 
 
 def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
-    """The verdict of ``edge`` from its canonical run's stored rows."""
+    """The verdict of ``edge`` from its canonical run's stored rows. Like ``canonicalRun`` it
+    ignores ``after_session`` (ADR 0036: runs are read by run, not by session)."""
     settings = load_verdict(ctx.configs)
     found = runs.load_canonical_run(ctx, edge)
     if found.run is None:
         return judge(edge.id, None, edge.frozen_from, settings)
     rows = runs.load_run_rows(ctx, found.run)
-    return judge(edge.id, rows, edge.frozen_from, settings, found.run.lost_inputs)
+    return judge(
+        edge.id,
+        rows,
+        edge.frozen_from,
+        settings,
+        found.run.lost_inputs,
+        decoys=bool(edge.baselines),
+    )
