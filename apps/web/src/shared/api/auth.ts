@@ -33,6 +33,7 @@ export interface AuthSession {
 type Auth = InstanceType<typeof AuthClient>;
 
 let client: Auth | null | undefined;
+let signingOut = false;
 
 /** The project's base URL: https, or http only for a local Supabase (the e2e mock, `supabase start`). */
 function baseUrl(raw: string): URL {
@@ -57,6 +58,12 @@ function authClient(): Auth | null {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
+      });
+      // The session ended somewhere else (another tab signed out, or the refresh token was
+      // refused): this tab leaves too, at once. Our own sign-out is ignored here: its callers
+      // already notify.
+      client.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT' && !signingOut) notifyUnauthorized();
       });
     } else {
       client = null;
@@ -111,7 +118,12 @@ export async function signInWithPassword(email: string, password: string): Promi
 
 /** Ends the browser session. Local scope: this session only; the stored session goes even when the revoke call fails. */
 export async function signOutSession(): Promise<void> {
-  await authClient()?.signOut({ scope: 'local' });
+  signingOut = true;
+  try {
+    await authClient()?.signOut({ scope: 'local' });
+  } finally {
+    signingOut = false;
+  }
 }
 
 const unauthorizedListeners = new Set<() => void>();
@@ -127,6 +139,10 @@ export function onUnauthorized(listener: () => void): () => void {
 /** The API refused the token: drop the session and tell the app, which shows the login page. */
 export async function handleUnauthorized(): Promise<void> {
   await signOutSession();
+  notifyUnauthorized();
+}
+
+function notifyUnauthorized(): void {
   unauthorizedListeners.forEach((listener) => {
     listener();
   });

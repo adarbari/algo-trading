@@ -3,8 +3,7 @@
  * grant to `/auth/v1/token`; the session lives in localStorage under `sb-<project ref>-auth-token`
  * (the key supabase-js used, so existing sessions survive); the API calls carry the bearer; an
  * expired token is refreshed through the refresh grant; sign-out is local scope and, in one
- * tab, ends the session in the other on its next load (the open tab keeps its cached viewer
- * until the API refuses it; that is how the app behaved under supabase-js too).
+ * tab, ends the session in the other at once (auth-js broadcasts it; auth.ts routes it to onUnauthorized).
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -113,10 +112,7 @@ test('sign-out is local scope (this session only) and removes the stored session
   expect(await stored(page)).toBeNull();
 });
 
-test('signing out in one tab ends the session in the other (on its next load)', async ({
-  page,
-  context,
-}) => {
+test('signing out in one tab ends the session in the other at once', async ({ page, context }) => {
   await withAuth(page);
   await signIn(page);
   const other = await context.newPage();
@@ -126,6 +122,7 @@ test('signing out in one tab ends the session in the other (on its next load)', 
   await page.getByRole('button', { name: 'Tess Trader' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);
-  await other.reload();
+  // A tab in the background renders when it is shown; the session is already gone from storage.
+  await other.bringToFront();
   await expect(other).toHaveURL(/\/login$/);
 });

@@ -32,6 +32,7 @@ beforeEach(() => {
   });
   auth.signInWithPassword.mockResolvedValue({ error: null });
   auth.signOut.mockResolvedValue({ error: null });
+  auth.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
 });
 
 afterEach(() => {
@@ -115,6 +116,28 @@ describe('with Supabase configured', () => {
     expect(seen).toEqual([{ email: 'a@b.co' }, null]);
     stop();
     expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it('a SIGNED_OUT from elsewhere (another tab) tells the listeners; our own sign-out does not', async () => {
+    const callbacks: ((event: string) => void)[] = [];
+    auth.onAuthStateChange.mockImplementation((cb: (event: string) => void) => {
+      callbacks.push(cb);
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    });
+    const { accessToken, onUnauthorized, signOutSession } = await load(CONFIGURED);
+    await accessToken();
+    const listener = vi.fn();
+    onUnauthorized(listener);
+    callbacks[0]?.('TOKEN_REFRESHED');
+    expect(listener).not.toHaveBeenCalled();
+    callbacks[0]?.('SIGNED_OUT');
+    expect(listener).toHaveBeenCalledTimes(1);
+    auth.signOut.mockImplementation(() => {
+      callbacks[0]?.('SIGNED_OUT'); // auth-js emits it for the tab's own sign-out too
+      return Promise.resolve({ error: null });
+    });
+    await signOutSession();
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('on a 401 signs out locally and tells the listeners', async () => {
