@@ -376,12 +376,15 @@ def match_perma(
     -> (a string per listing of ``listings``, ``""`` when none, stats).
 
     A listing is matched only when the match is unique, ticker by ticker over ALL ``listings`` of
-    the ticker (those in ``need`` and those that already have an id), never by a guess:
-    one listing and one meta row; else the one open listing (null ``end_date``) takes the one
-    active row, and the one delisted listing takes the one inactive row. Anything else (two or
-    more delisted listings or inactive rows on either side, extra rows) leaves the delisted
-    listings without a ``permaTicker`` (``ambiguous``), a ticker with no meta row too
-    (``no_meta``). Stats: ``perma_matched``, ``perma_no_meta``, ``perma_ambiguous``."""
+    the ticker (those in ``need`` and those that already have an id), never by a guess: the one
+    open listing (null ``end_date``) takes the one active row, the one delisted listing the one
+    inactive row (a delisted listing never takes an active row). Anything else (two or more
+    delisted listings or inactive rows, extra rows) leaves the listings without a ``permaTicker``
+    (``ambiguous``), a ticker with no meta row too (``no_meta``). The result holds the
+    ``permaTicker`` of every matched listing of a ticker that has a listing in ``need`` (one that
+    already has an id keeps it: ``assign_listing_ids`` prefers ``symbol_history``); the stats
+    count only the listings in ``need``. Stats: ``perma_matched``, ``perma_no_meta``,
+    ``perma_ambiguous``."""
     wanted = pd.Series(True, index=listings.index) if need is None else need.astype(bool)
     found = pd.Series("", index=listings.index, dtype=object)
     stats = {"perma_matched": 0, f"perma_{NO_META}": 0, f"perma_{AMBIGUOUS}": 0}
@@ -396,17 +399,13 @@ def match_perma(
             continue
         open_ = group["end_date"].isna()
         active = rows["is_active"].astype(bool)
-        if len(group) == 1 and len(rows) == 1:
-            pairs = [(group.index[0], rows["perma_ticker"].iloc[0])]
-        else:
-            pairs = []
-            for listed, row_mask in ((group[open_], active), (group[~open_], ~active)):
-                chosen = rows[row_mask]
-                if len(listed) == 1 and len(chosen) == 1:
-                    pairs.append((listed.index[0], chosen["perma_ticker"].iloc[0]))
-        for index, perma in pairs:
-            if wanted.loc[index]:
-                found.loc[index] = str(perma)
+        pairs = []
+        for listed, row_mask in ((group[open_], active), (group[~open_], ~active)):
+            chosen = rows[row_mask]  # an open listing takes only an active row, and vice versa
+            if len(listed) == 1 and len(chosen) == 1:
+                pairs.append((listed.index[0], chosen["perma_ticker"].iloc[0]))
+        for index, perma in pairs:  # every matched listing of the ticker, with an id or not
+            found.loc[index] = str(perma)
         matched = sum(1 for i, _ in pairs if wanted.loc[i])
         stats["perma_matched"] += matched
         stats[f"perma_{AMBIGUOUS}"] += len(mine) - matched

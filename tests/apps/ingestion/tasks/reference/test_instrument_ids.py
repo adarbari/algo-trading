@@ -265,4 +265,12 @@ def test_a_listing_that_already_has_an_id_is_not_matched_but_still_counts() -> N
     listings = _listings(("PRM", date(2008, 5, 1)), ("PRM", None))
     meta = _meta(("PRM", "US000000041372", False), ("PRM", "US000000101493", True))
     perma, stats = match_perma(listings, meta, pd.Series([True, False]))
-    assert list(perma) == ["US000000041372", ""] and stats["perma_matched"] == 1
+    # the open one is not asked for, but its permaTicker is known: the twin stays unambiguous
+    assert list(perma) == ["US000000041372", "US000000101493"] and stats["perma_matched"] == 1
+
+
+def test_single_delisted_listing_never_takes_active_row() -> None:
+    perma, stats = match_perma(_listings(("OLD", date(2012, 1, 3))), _meta(("OLD", "US9", True)))
+    assert list(perma) == [""] and stats["perma_ambiguous"] == 1
+    perma, _ = match_perma(_listings(("LIVE", None)), _meta(("LIVE", "US8", False)))
+    assert list(perma) == [""]  # an open listing never takes an inactive row either

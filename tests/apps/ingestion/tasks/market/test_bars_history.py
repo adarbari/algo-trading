@@ -453,3 +453,17 @@ def test_rows_are_clipped_to_the_listing_dates_and_the_request_asks_only_for_the
 def test_from_listings_and_fill_are_exclusive(writer: StoreWriter) -> None:
     with pytest.raises(ValueError, match="use one"):
         run(writer, Vendor({}), (), from_listings=True, fill=3)
+
+
+def test_a_current_listing_with_a_symbol_history_id_is_fetched_by_its_perma_ticker(
+    writer: StoreWriter,
+) -> None:
+    """PRM: the open listing already has a FIGI id (symbol_history) and its permaTicker too, so
+    it is not sent to NO_PERMA beside its delisted twin."""
+    write_listings(writer, [
+        ("EQ:TIINGO:US0001", "PRM", "US0001", "2019-06-03", "2020-01-03"),
+        ("EQ:BBG000PRM", "PRM", "US0002", "2020-01-06", None),
+    ])  # fmt: skip
+    vendor = Vendor({"US0001": payloads.prices(rows(10)), "US0002": payloads.prices(rows(20))})
+    record = run(writer, vendor, (), from_listings=True)
+    assert sorted(vendor.asked) == ["US0001", "US0002"] and record.stats["no_perma"] == 0

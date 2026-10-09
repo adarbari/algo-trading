@@ -135,3 +135,30 @@ def test_listings_over_a_window_marks_reused_tickers_and_keeps_the_listing_dates
     assert not by_id.loc["EQ:TIINGO:A", "reused"]
     assert by_id.loc["EQ:TIINGO:OLD", "end_date"] == date(2010, 12, 31)
     assert by_id.loc["EQ:TIINGO:A", "end_date"] is None
+
+
+def test_listings_over_catches_a_listing_and_a_membership_between_month_starts() -> None:
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    now, day = pd.Timestamp("2026-10-05", tz="UTC"), date(2026, 10, 5)
+    rows = [  # id, ticker, exchange, start, end
+        ("EQ:TIINGO:SHORT", "SHT", "NASDAQ", date(2012, 3, 8), date(2012, 3, 20)),  # inside a month
+        ("EQ:TIINGO:MID", "MID", "NYSE", date(2000, 1, 3), None),  # a member 03-08..03-20 only
+        ("EQ:TIINGO:OUT", "OUT", "NYSE", date(2000, 1, 3), None),  # never a member
+    ]
+    frame = pd.DataFrame(
+        rows, columns=["instrument_id", "ticker", "exchange", "start_date", "end_date"]
+    )
+    frame = frame.assign(asset_type="Stock", price_currency="USD", perma_ticker="", ts=now,
+                         session_date=day, knowledge_ts=now, source="tiingo",
+                         run_id="l")  # fmt: skip
+    frame["end_date"] = frame["end_date"].astype(object).where(frame["end_date"].notna(), None)
+    members = pd.DataFrame({"index_name": ["SP500"], "ticker": ["MID"],
+                            "start_date": [date(2012, 3, 8)], "end_date": [date(2012, 3, 20)],
+                            "ts": [now], "session_date": [day], "knowledge_ts": [now],
+                            "source": ["x"], "run_id": ["m"]})  # fmt: skip
+    writer = StoreWriter(MemoryBackend())
+    writer.write_table("instruments/listing_history", day, "l", frame)
+    writer.write_table("instruments/index_membership", day, "m", members)
+    out, _ = listings_over(StoreReader(writer._backend), date(2012, 1, 4), date(2012, 6, 1))
+    assert set(out["instrument_id"]) == {"EQ:TIINGO:SHORT", "EQ:TIINGO:MID"}
