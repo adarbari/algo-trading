@@ -64,7 +64,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges"
-purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, and the user's evaluation split (evaluation.py, ADR 0015 layering)"
+purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, and the user's evaluation split (evaluation.py, ADR 0015 layering), and the winners study's settings (winners.py, ADR 0053 amendment 2026-10-09)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
@@ -862,6 +862,10 @@ purpose = "expression features of the market entity: regime.toml (the context si
 [[config_dir]]
 path = "config/site/edges"
 purpose = "edge documents, one <id>.toml per edge: thesis, mechanism, persistence, outcome, schedule, universe, the screeners that implement it, status and the quality-bar answers (typed by src/algotrade/config/edges; ADR 0053); rendered to docs/edges.md by make features-doc"
+
+[[config_dir]]
+path = "config/site/studies"
+purpose = "research-study settings, one <name>.toml per study: winners.toml, the ED6 winners study's outcome window, grid, winner and control definitions, discovery thresholds and gate (typed by src/algotrade/config/edges/winners.py; ADR 0053 amendment 2026-10-09)"
 
 [[config_dir]]
 path = "config/site/events"

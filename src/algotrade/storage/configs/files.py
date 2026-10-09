@@ -52,13 +52,15 @@ SITE_FOLDERS = {
     "field_guide": "field_guide",
     "regime": "regime",
     "events": "events",
+    "studies": "studies",
     "guide": "guide",
     "guide_playbooks": "guide/playbooks",
     "edges": "edges",
 }
 NESTED = (PLAYBOOKS, "features")  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
-    "defaults", "settings", "field_guide", "regime", "events", "guide", "guide_playbooks",
+    "defaults", "settings", "field_guide", "regime", "events", "studies", "guide",
+    "guide_playbooks",
 )  # fmt: skip
 DRAFT = "draft.toml"
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens

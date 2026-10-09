@@ -74,6 +74,12 @@ def test_horizons_come_from_the_open_edge_documents() -> None:
     assert benchmarks == ["SPY"]
 
 
+def test_horizons_include_study_horizon() -> None:
+    horizons, benchmarks = horizons_and_benchmarks()
+    assert 504 in horizons  # the winners study's (config/site/studies/winners.toml), backfill-only
+    assert "SPY" in benchmarks
+
+
 def test_backfill_rows_equal_nightly_rows() -> None:
     nightly_writer, nightly_reader, days = _store()
     for day in days[-3:]:

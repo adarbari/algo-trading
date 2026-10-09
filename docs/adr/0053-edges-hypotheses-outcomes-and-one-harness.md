@@ -308,3 +308,37 @@ It is a diagnostic: never a pick, filter, weight, hit or status input; it is rep
 record trial log, job result, CLI report). It is an allowed reuse under `feature-input-loading`,
 like the forward outcomes' bar read. A fitness test keeps `stored_events` out of every other
 module of `services/evaluation/cross_section/`.
+
+## Amendment 2026-10-09: ED6, the winners study
+
+ED6 asks what was true of the biggest winners before they won: instruments in the top 2% of
+excess return over SPY across 504 sessions, against matched controls, over a grid of start
+sessions. Plan: `docs/edges-plan.md`. W1 (this change) is configuration and the horizon; the study
+itself follows.
+
+1. **The study is a second reader of outcomes.** Besides the edge harness, the winners study reads
+   `outcomes/instrument/forward_returns@v1` (through `data/outcomes`, from `services/evaluation`
+   only: the exception to the one-session rule stays confined to that package). Its horizon (504)
+   and benchmark (SPY) are declared in `config/site/studies/winners.toml` (typed by
+   `config/edges/winners.py`), and the outcomes task's `horizons_and_benchmarks` adds them to those
+   of the open edge documents. 504 exceeds `NIGHTLY_MAX_HORIZON`, so it is computed only in a
+   `--from/--to` backfill.
+2. **Results are a table, `results/winners_study`.** One run per table version, rows per
+   feature x block plus pooled; written atomically by the backtest app (point 4). Its schema and
+   `architecture/tables.toml` entry arrive with the job (W3).
+3. **Drafts live in `var/`, never `config/site/`.** The study may propose edge documents
+   (`var/edge_drafts/<id>.toml`, status `candidate`, `frozen_from` 2026-04-01, the nine answers
+   left TODO); the owner promotes one by hand into `config/site/edges/`. A draft declares a 63 or
+   252 session outcome, not 504, so it is evaluable by the harness.
+4. **The proposer lives in the backtest app.** Decided by the orchestrator on the architect's
+   advice, overturnable by the owner: the study, its probit proposer (`quant/probit.py`, rows
+   `proposed_by=model`, no verdict) and its drafts run in `apps/backtest`
+   (`algotrade-backtest study-winners`, job kind `winners-study`), not in ingestion. Ingestion must
+   not write results (ADR 0005); this narrows the 2026-10-08 amendment that put learned scorers in
+   ingestion, which stays for scorers that write stored features. LightGBM only if the probit
+   proposes nothing.
+5. **Lookahead in history.** The edge documents' universe filter `instrument.status = ACTIVE` is
+   today's status: used over past sessions it removes the delisted and is lookahead. The study's
+   eligible set is `universe_asof(S)` (survivors and the delisted alike) with a bar at S. Company
+   snapshots start in 2026, so sector is never a control; Russell reconstitution stays blocked (no
+   historical membership).
