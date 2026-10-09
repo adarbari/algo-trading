@@ -25,7 +25,8 @@ from algotrade.engines.backtest.universe import Schedule
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.engines.selection.schedule import Rebalance, diff, rebalance_sessions
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.services.selection import select
+from algotrade.services.features import site_features
+from algotrade.services.selection import select, selection_fields
 
 ROLLUPS_HINT = "algotrade-ingest rollups --from <first rebalance session> --to <end>"
 
@@ -42,13 +43,19 @@ def evaluate_sessions(
     """The selection on ``start`` and on every rebalance session up to ``end``.
 
     A rebalance session whose rollups are missing is an error (ADR 0008): evaluating it would
-    select nothing and close every position."""
+    select nothing and close every position. A missing table is tolerated only as the screens
+    do (``FeatureSet.coverage``, ADR 0055): when every field the selection reads from it has a
+    covered coalesce leg."""
+    catalogue = features if features is not None else site_features()
+    fields = selection_fields(selection)
     out = []
     for session in rebalance_sessions(start, sessions_between(start, end), frequency):
         result = select(reader, selection, session, as_of=as_of, features=features)
         if session != start and result.missing_tables:
-            table = result.missing_tables[0]
-            raise MissingDataError(table, f"no rows for rebalance session {session}", ROLLUPS_HINT)
+            blocking, _ = catalogue.coverage(fields, result.missing_tables)
+            if blocking:
+                msg = f"no rows for rebalance session {session}"
+                raise MissingDataError(blocking[0], msg, ROLLUPS_HINT)
         out.append((session, result))
     return out
 

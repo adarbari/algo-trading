@@ -62,8 +62,8 @@ function authClient(): Auth | null {
       // The session ended somewhere else (another tab signed out, or the refresh token was
       // refused): this tab leaves too, at once. Our own sign-out is ignored here: its callers
       // already notify.
-      client.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT' && !signingOut) notifyUnauthorized();
+      client.onAuthStateChange((event, session) => {
+        if (!session && event === 'SIGNED_OUT' && !signingOut) notifyUnauthorized();
       });
     } else {
       client = null;

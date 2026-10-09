@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "description": "The algotrade web UI (ADR 0011, ADR 0025). Layered, component-only: see docs/ui/architecture.md.",
   "engines": {
     "node": ">=24"
@@ -33,14 +36,15 @@
     "components:md": "tsx scripts/generate-components-md.ts",
     "api:generate": "tsx scripts/generate-api.ts && graphql-codegen --config codegen.ts",
     "ds:check": "tsx scripts/check-design-system.ts",
+    "audit:check": "tsx scripts/check-audit.ts",
     "generated:check": "npm run tokens && npm run components:md && npm run api:generate && git diff --exit-code -- design-system/tokens/tokens.css design-system/COMPONENTS.md src/shared/api/generated",
     "check": "npm run generated:check && npm run ds:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run storybook:build && npm run e2e"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.39.5",
-    "@graphql-codegen/cli": "^7.4.4",
-    "@graphql-codegen/client-preset": "^6.2.1",
+    "@graphql-codegen/cli": "^7.4.5",
+    "@graphql-codegen/client-preset": "^6.2.2",
     "@playwright/test": "^1.63.0",
     "@storybook/addon-a11y": "^10.6.1",
     "@storybook/addon-docs": "^10.6.1",
@@ -77,6 +81,12 @@
     "typescript-eslint": "^8.71.0",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
+  },
+  "//": [
+    "overrides.handlebars: @boundaries/elements@3.1.1 (the latest, via eslint-plugin-boundaries@7.2.0) pins handlebars 4.7.9, affected by GHSA-8r5x-fm3f-whwj, GHSA-p8wg-vrv2-v86f (critical) and GHSA-xw65-4hp5-5hc7; 4.7.10 is the patch release that fixes them. Drop the override when @boundaries/elements ships with handlebars >= 4.7.10 (added 2026-10-08)."
+  ],
+  "overrides": {
+    "handlebars": "^4.7.10"
   },
   "dependencies": {
     "@algotrade/ui": "^0.0.0",

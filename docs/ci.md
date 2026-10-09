@@ -119,7 +119,26 @@ How the web jobs are cut:
   matrix entry plus the `/2` in the command.
 - All four share one `apps/web/node_modules` cache keyed on the lockfile (`npm ci` only on a
   miss); the real-app job uses the same cache. `npm audit` (44 s) runs only when a package
-  file changed (`changes.web_deps`): nothing else can alter its answer.
+  file or the audit allow-list changed (`changes.web_deps`; every push to main runs it).
+
+### Dependency audit
+
+web-static gates the npm dependencies in three steps: `npm audit --omit=dev --audit-level=high`
+(nothing high or critical ships to users), `npm run audit:check` (nothing high or critical in
+any dependency, dev tools included: a compromised codegen or lint tool runs on the Mac and in
+CI), and `npm audit signatures` (registry signatures and provenance). `audit:check`
+(`apps/web/scripts/check-audit.ts`) fails on every high or critical advisory that is not an
+entry of `apps/web/audit-allowlist.json`.
+
+- **Fix it first**: upgrade the direct dependency that pulls the package in; when its latest
+  release still pins a vulnerable version, add an npm `overrides` entry and name the advisory
+  in package.json's `"//"` note (today: `handlebars` under `@boundaries/elements`, the
+  GHSA-8r5x-fm3f-whwj / GHSA-p8wg-vrv2-v86f criticals). Never `npm audit fix --force`.
+- **Allow-list only what has no fixed release**: an entry names the GHSA id, the package,
+  the reason the risk is accepted, the date added and an expiry at most 90 days later
+  (`tests/architecture/pipeline/test_audit_allowlist.py`). An expired entry fails the gate
+  (re-review it with new dates, or upgrade); so does an entry whose advisory is no longer
+  reported (drop it).
 
 How the Python tests are cut (`make test` locally is unchanged):
 
