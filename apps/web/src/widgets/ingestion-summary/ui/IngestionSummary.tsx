@@ -1,11 +1,11 @@
 /**
- * The Admin › Ingestion headline: a stale-data Banner when the exchange closed a session the
- * store does not have yet, then the StatStrip (completeness of the latest session, quality
- * checks, the latest nightly run's duration, open issues to review).
+ * The Admin › Ingestion headline: the StatStrip (completeness of the latest session, quality
+ * checks, the latest nightly run's duration, open issues to review). A session the exchange
+ * closed that the store lacks is the app status strip's issue, not repeated here.
  */
-import { Banner, formatValue, StatStrip, Stack, type StatItem } from '@algotrade/ui';
+import { formatValue, StatStrip, type StatItem } from '@algotrade/ui';
 
-import { completenessSummary, staleSince, useCompleteness } from '@/entities/ingestion';
+import { completenessSummary, useCompleteness } from '@/entities/ingestion';
 import { useFigiReview, useLeveragedReview } from '@/entities/review';
 import {
   formatDuration,
@@ -66,7 +66,6 @@ export function IngestionSummary() {
   const leveraged = useLeveragedReview();
 
   const summary = completeness.data ? completenessSummary(completeness.data) : null;
-  const stale = completeness.data ? staleSince(completeness.data) : null;
   const figiCount = figi.data?.items.length ?? 0;
   const leveragedCount = leveraged.data?.items.length ?? 0;
   const failedChecks = quality.data?.checks.filter((c) => c.status === 'FAIL').length ?? 0;
@@ -101,19 +100,11 @@ export function IngestionSummary() {
   ];
 
   return (
-    <Stack gap={3}>
-      {stale && completeness.data && (
-        <Banner asOf={stale} title="Latest session not ingested">
-          The exchange closed {weekday(completeness.data.lastClosed)}; the newest stored session is{' '}
-          {weekday(stale)}. Check the nightly run below.
-        </Banner>
-      )}
-      <StatStrip
-        label="Ingestion summary"
-        items={items}
-        loading={completeness.isPending || quality.isPending || runs.isPending}
-        error={completeness.isError ? 'The completeness summary could not load.' : undefined}
-      />
-    </Stack>
+    <StatStrip
+      label="Ingestion summary"
+      items={items}
+      loading={completeness.isPending || quality.isPending || runs.isPending}
+      error={completeness.isError ? 'The completeness summary could not load.' : undefined}
+    />
   );
 }

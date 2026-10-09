@@ -1,20 +1,21 @@
 /**
- * Recent nightly runs (session, start, status, duration, steps, problems) and the timing of the
- * chosen run: each step's duration as a bar with its share of the run, longest first.
+ * Recent nightly runs, one expandable row each (session, status, steps complete, duration); the
+ * open row (one at a time, the newest first) shows the run's problems and its timing: each
+ * step's duration as a bar with its share of the run, longest first.
  */
 import {
   BarList,
   Button,
-  DataTable,
+  ExpandableRow,
   EmptyState,
   ErrorState,
   formatValue,
+  Mono,
   Panel,
   Skeleton,
   Stack,
   Text,
   Tooltip,
-  type DataTableColumn,
 } from '@algotrade/ui';
 import { useState } from 'react';
 
@@ -29,53 +30,15 @@ import {
 
 const started = (run: NightlyRun) => `${run.startedAt.replace('T', ' ').slice(0, 16)} UTC`;
 
-const COLUMNS: DataTableColumn<NightlyRun>[] = [
-  {
-    id: 'session',
-    header: 'Session',
-    value: (r) => r.session,
-    format: { kind: 'date', style: 'weekday' },
-    width: 'sm',
-  },
-  { id: 'started', header: 'Started', value: started, mono: true, width: 'md' },
-  {
-    id: 'status',
-    header: 'Status',
-    value: (r) => r.status,
-    cell: ({ row }) => <RunStatusBadge status={row.status} />,
-    width: 'sm',
-  },
-  {
-    id: 'duration',
-    header: 'Duration',
-    value: (r) => r.durationS,
-    cell: ({ row }) => formatDuration(row.durationS),
-    align: 'end',
-    width: 'sm',
-  },
-  {
-    id: 'steps',
-    header: 'Steps complete',
-    value: (r) => r.steps.length - incompleteSteps(r).length,
-    cell: ({ row }) =>
-      `${String(row.steps.length - incompleteSteps(row).length)} of ${String(row.steps.length)}`,
-    align: 'end',
-    width: 'sm',
-  },
-  {
-    id: 'problems',
-    header: 'Problems',
-    value: (r) => r.problems.join('; '),
-    tone: 'secondary',
-    grow: true,
-    sortable: false,
-  },
-];
-
 function RunTiming({ run }: { run: NightlyRun }) {
   const timings = stepTimings(run);
   return (
     <Stack gap={2}>
+      {run.problems.length > 0 && (
+        <Text size="sm" tone="secondary">
+          {run.problems.join('; ')}
+        </Text>
+      )}
       <Text size="sm" tone="muted">
         {`Run timing · ${formatValue(run.session, { kind: 'date', style: 'weekday' }).text} · started ${started(run)} · ${formatDuration(run.durationS)}`}
       </Text>
@@ -101,12 +64,13 @@ function RunTiming({ run }: { run: NightlyRun }) {
 
 export function RecentRunsPanel() {
   const runs = useNightlyRuns();
-  const [chosen, setChosen] = useState<string | null>(null);
-  const run = runs.data?.find((r) => r.runId === chosen) ?? runs.data?.[0];
+  // undefined: the newest run is open; null: the user closed it.
+  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
+  const openId = chosen === undefined ? runs.data?.[0]?.runId : chosen;
   return (
     <Panel
       title="Recent nightly runs"
-      description="select a run to see its timing"
+      description="open a run to see its timing"
       actions={
         <Tooltip content="Coming with the jobs API: the API is read-only for now.">
           {(props) => (
@@ -134,18 +98,32 @@ export function RecentRunsPanel() {
           description="algotrade-ingest nightly records one per session."
         />
       ) : (
-        <Stack gap={4}>
-          <DataTable
-            label="Recent nightly runs"
-            columns={COLUMNS}
-            rows={runs.data}
-            getRowId={(r) => r.runId}
-            onRowActivate={(r) => {
-              setChosen(r.runId);
-            }}
-            visibleRows={Math.min(runs.data.length, 10)}
-          />
-          {run && <RunTiming run={run} />}
+        <Stack gap={0} as="ul" aria-label="Recent nightly runs">
+          {runs.data.map((run) => (
+            <Stack as="li" key={run.runId} gap={0}>
+              <ExpandableRow
+                title={
+                  <>
+                    {formatValue(run.session, { kind: 'date', style: 'weekday' }).text}{' '}
+                    <Mono>{started(run)}</Mono>
+                  </>
+                }
+                badge={<RunStatusBadge status={run.status} />}
+                secondary={
+                  <Text size="sm" tone="secondary">
+                    {`${String(run.steps.length - incompleteSteps(run).length)} of ${String(run.steps.length)} steps complete`}
+                  </Text>
+                }
+                essential={<Mono>{formatDuration(run.durationS)}</Mono>}
+                open={openId === run.runId}
+                onOpenChange={(open) => {
+                  setChosen(open ? run.runId : null);
+                }}
+              >
+                <RunTiming run={run} />
+              </ExpandableRow>
+            </Stack>
+          ))}
         </Stack>
       )}
     </Panel>

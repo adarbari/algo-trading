@@ -48,10 +48,6 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
       },
     ]),
 }));
-vi.mock('@/entities/explore', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  isStale: () => false,
-}));
 
 stubElementSize();
 
