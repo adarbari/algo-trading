@@ -1,7 +1,12 @@
 /** `/admin/harness-runs`: the Admin > Harness runs page. The chosen run lives in the URL (`?run=<id>`). */
 import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/react-router';
 
-import { AdminHarnessRunsPage } from '@/pages/admin-harness-runs';
+import { lazyPage } from '../lazy-page';
+
+const AdminHarnessRunsPage = lazyPage(
+  () => import('@/pages/admin-harness-runs'),
+  'AdminHarnessRunsPage',
+);
 
 interface HarnessRunsSearch {
   run?: string;
