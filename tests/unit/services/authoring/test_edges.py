@@ -248,3 +248,15 @@ def test_a_failed_second_write_never_leaves_two_versions_following(
     assert calls == ["drift", "drift_v2"]  # the old version is retired first
     following = [e.id for e in seen(writer).values() if e.follow.state == "following"]
     assert following == []  # a trial and a retired edge: never two following
+
+
+def test_a_save_that_would_break_an_edge_extending_it_is_refused(
+    writer: MemoryConfigWriter,
+) -> None:
+    edges.save_edge(writer, "alice", "v1", {"extends": "drift", "top_k": 2})
+    edges.save_edge(writer, "alice", "v2", {"extends": "v1", "base": "event"})
+    before = writer.load("alice", "edges", "v1")
+    with pytest.raises(ConfigurationError, match=r"would break \['v2'\]"):
+        edges.save_edge(writer, "alice", "v1", {"extends": "drift", "schedule": "every_session"})
+    assert writer.load("alice", "edges", "v1") == before
+    assert "v2" in seen(writer)

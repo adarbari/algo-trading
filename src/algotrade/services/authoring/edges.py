@@ -94,9 +94,14 @@ def _checked(writer: ConfigWriter, user: str, edge_id: str, document: Mapping[st
     reject_secrets(document, f"users/{user}/edges/{edge_id}")
     overlay = _Overlay(writer, user, edge_id, document)
     found = {e.id: e for e in load_edges(overlay, user)}
+    after = edge_problems(overlay, user)
     if edge_id not in found:  # the loader isolates a user's faulty file; a write must not
+        raise ConfigurationError(after.get(edge_id, f"{edge_id}: not loadable"))
+    broken = sorted(set(after) - set(edge_problems(writer, user)) - {edge_id})
+    if broken:  # an edge that extends this one would silently drop off
         raise ConfigurationError(
-            edge_problems(overlay, user).get(edge_id, f"{edge_id}: not loadable")
+            f"{edge_id}: this change would break {broken} (they extend it): "
+            + "; ".join(after[b] for b in broken)
         )
     return found[edge_id]
 
