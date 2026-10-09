@@ -206,6 +206,11 @@ describe('TopIdeas', () => {
     expect(within(ko).queryByText(/more/)).not.toBeInTheDocument();
   });
 
+  it('gives every row two lines, so the name under a ticker and the move under a price fit', () => {
+    const { grid } = setup();
+    expect(grid()).toHaveAttribute('data-lines', '2');
+  });
+
   it('draws one labelled square per criterion of the best pick', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
