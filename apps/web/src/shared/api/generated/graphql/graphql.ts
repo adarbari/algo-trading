@@ -322,6 +322,11 @@ export type LlmUsageQueryVariables = Exact<{
 
 export type LlmUsageQuery = { llmUsage: { today: string, recorded: boolean, budget: { dailyUsd: number | null, monthlyUsd: number | null, over: string | null, reportedCallUsd: number | null, error: string | null }, windows: Array<{ key: string, start: string, end: string, cap: { kind: string, limitUsd: number | null, usedShare: number | null } | null, tally: { calls: number, inputTokens: number, outputTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number, freeCalls: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, breakdowns: Array<{ by: string, rows: Array<{ key: string | null, provider: string | null, costShare: number | null, tally: { calls: number, inputTokens: number, outputTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number } }> }>, daily: Array<{ day: string, tally: { calls: number, inputTokens: number, outputTokens: number, spentUsd: number, reportedUsd: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, reliability: { attempts: number, ok: number, fellBack: number, failed: number, skippedBudget: number, fallbackRate: number | null, failureRate: number | null }, recent: Array<{ ts: string, provider: string, model: string, useCase: string, user: string | null, inputTokens: number | null, outputTokens: number | null, latencyS: number | null, costUsd: number | null, costBasis: string, outcome: string, fellBackFrom: string | null, runId: string, unknownFields: Array<string>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }> } | null };
 
+export type SessionDateQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SessionDateQuery = { session: { date: string } | null };
+
 export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -486,11 +491,6 @@ export type TableViewQueryVariables = Exact<{
 
 
 export type TableViewQuery = { view: { scope: string, name: string | null, saved: boolean, columns: Array<string>, narrowColumns: Array<string>, sort: string | null, decisions: Array<string>, names: Array<string> } | null };
-
-export type SessionDateQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type SessionDateQuery = { session: { date: string } | null };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -1879,6 +1879,13 @@ export const LlmUsageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<LlmUsageQuery, LlmUsageQueryVariables>;
+export const SessionDateDocument = new TypedDocumentString(`
+    query SessionDate {
+  session {
+    date
+  }
+}
+    `) as unknown as TypedDocumentString<SessionDateQuery, SessionDateQueryVariables>;
 export const RegimeDocument = new TypedDocumentString(`
     query Regime {
   regime {
@@ -2686,10 +2693,3 @@ export const TableViewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<TableViewQuery, TableViewQueryVariables>;
-export const SessionDateDocument = new TypedDocumentString(`
-    query SessionDate {
-  session {
-    date
-  }
-}
-    `) as unknown as TypedDocumentString<SessionDateQuery, SessionDateQueryVariables>;
