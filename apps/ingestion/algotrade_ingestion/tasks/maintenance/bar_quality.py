@@ -30,6 +30,7 @@ a run starts at the instrument's first bar, so the nightly never retracts one. T
 read: segments are judged within it (the full history for a rebuild).
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from itertools import pairwise
@@ -41,6 +42,7 @@ from pandas.api.types import union_categoricals
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import sessions_between
+from algotrade.data import StoreReader
 from algotrade.data.events import read_events
 from algotrade.data.prices import FLAGGED, FLAGS_TABLE, raw_bars
 from algotrade.storage.runs import RunRecord
@@ -377,3 +379,14 @@ def run_bar_quality(
         elif len(plan.write):
             run.write(FLAGS_TABLE, plan.write, TASK)
     return run.record
+
+
+def suspect_instruments(
+    reader: StoreReader, ids: Sequence[str], start: date, end: date, s: SourcesSettings
+) -> list[str]:
+    """The ``ids`` whose stored bars over ``start..end`` hold a bar the detector flags (flagged
+    already or not): a return over it is a bad datum, not a squeeze (``outcomes``' acceptance)."""
+    bars = compact(raw_bars(reader, "1d", start, end, list(ids), None, ("high", "low", "close")))
+    day = timedelta(days=30)  # slack for the split window
+    splits = read_events(reader, "events/split", start - day, end + day, list(ids)).frame
+    return sorted(set(bad_bars(bars, splits, s)["instrument_id"].astype(str)))
