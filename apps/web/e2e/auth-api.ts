@@ -38,6 +38,11 @@ export async function mockViewer(page: Page, options: ViewerMockOptions = {}): P
       await route.fulfill({ json: { data: { ideas: null } } });
       return;
     }
+    // The saved page cache asks which session the API reads (entities/page-cache).
+    if (/query\s+SessionDate\b/.test(body?.query ?? '')) {
+      await route.fulfill({ json: { data: { session: { date: '2026-10-07' } } } });
+      return;
+    }
     if (!/query\s+Viewer\b/.test(body?.query ?? '')) {
       await route.fallback();
       return;

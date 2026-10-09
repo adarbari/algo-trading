@@ -1,13 +1,19 @@
 """The response cache of ``POST /graphql`` and the admission in front of the read pool: a hit
-serves the stored bytes without opening a context, only the allow-listed operations are kept
-(one that reads run records is never cached), a role or user never reads another's entry
+serves the stored bytes without opening a context, only the classified operations are kept (every
+web operation is in exactly one group; one that reads run records is keyed on the runs
+generation, and on the closed session when it reads the clock), a role or user never reads
+another's entry
 (ADR 0056: an admin's answer carries causes), a publish or a write route makes the earlier
 entries unreachable (a probe or preview POST does not), an errored answer is not kept, the
 bytes are bounded; a request past ``MAX_WAITING`` gets 503 + ``Retry-After`` while ``/health``
 and the inline ``viewer`` are never refused."""
 
 import gzip
+import json
+import re
 from collections.abc import Callable
+from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -18,6 +24,9 @@ from algotrade_api import main
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.graphql.offload import MAX_WAITING, READ_THREADS, Admission
 from algotrade_api.graphql.response_cache import (
+    CLOSED_SESSION_OPERATIONS,
+    NEVER_CACHED,
+    RUN_OPERATIONS,
     SHARED_OPERATIONS,
     USER_OPERATIONS,
     ResponseCache,
@@ -31,7 +40,10 @@ from tests.helpers.api_store import as_user
 SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
 VIEWER = "query Day { viewer { id role } }"
 SHARED = "query MarketHistory { viewer { id role } }"  # a SHARED_OPERATIONS name
-RUNS = "query RunRecord { session { date } }"  # reads run records: never cached
+RUNS = "query LlmUsage { session { date } }"  # in NEVER_CACHED
+RUN_OP = "query NightlyRuns { session { date } viewer { id role } }"  # a RUN_OPERATIONS name
+CLOSED_OP = "query IngestionCompleteness { session { date } }"  # also CLOSED_SESSION_OPERATIONS
+GQL_TS = Path(__file__).parents[4] / "apps/web/src/shared/api/generated/graphql/gql.ts"
 
 
 class Harness:
@@ -40,6 +52,9 @@ class Harness:
     def __init__(self, store: ReadStore, monkeypatch: pytest.MonkeyPatch) -> None:
         self.store = store
         self.seq = 1
+        self.runs = (7, 100)  # the runs generation
+        self.closed = date(2026, 10, 8)  # the last closed session
+        self.wired: Any = None  # the runs generation main.py passes
         self.opened = 0
         self.cache = ResponseCache()
         self.admission = Admission(2)
@@ -54,9 +69,20 @@ class Harness:
 
             return counting
 
-        def router(opener: Any, debug: bool, stores: Any, seq: Any, epoch: WriteEpoch) -> Any:
+        def router(
+            opener: Any, debug: bool, stores: Any, seq: Any, epoch: WriteEpoch, runs: Any
+        ) -> Any:
+            self.wired = runs
             return graphql_router(
-                opener, debug, stores, lambda: self.seq, epoch, self.cache, self.admission
+                opener,
+                debug,
+                stores,
+                lambda: self.seq,
+                epoch,
+                self.cache,
+                self.admission,
+                lambda: self.runs,
+                lambda: self.closed,
             )
 
         monkeypatch.setattr(main, "_reads", reads)
@@ -88,8 +114,7 @@ def test_a_repeat_is_served_from_the_cache_without_opening_a_context(harness: Ha
     assert again.content == first.content
 
 
-def test_an_operation_that_reads_run_records_is_never_cached(harness: Harness) -> None:
-    # run records and jobs change without a publish (an on-request run, a failed job)
+def test_an_unclassified_or_never_cached_operation_always_runs(harness: Harness) -> None:
     client = harness.client()
     _post(client, RUNS)
     opened = harness.opened
@@ -153,11 +178,91 @@ def test_an_errored_answer_is_not_kept(harness: Harness) -> None:
     assert harness.cache.held == 0
 
 
-def test_the_allow_list_names_no_operation_that_reads_run_records() -> None:
-    names = SHARED_OPERATIONS | USER_OPERATIONS
-    banned = {"NightlyRuns", "RunRecord", "RunItems", "HarnessRuns", "HarnessRun"}
-    banned |= {"StatusScreens", "ScreenerRuns", "ScreenerResults", "IdeasPage", "EdgesPage"}
-    assert not names & banned and not SHARED_OPERATIONS & USER_OPERATIONS
+def web_operations() -> set[str]:
+    """The names of the operations the web sends (the documents of the generated gql.ts)."""
+    names = set()
+    for m in re.finditer(r'^\s+("(?:[^"\\]|\\.)*"): typeof', GQL_TS.read_text(), re.M):
+        head = re.search(r"\b(?:query|mutation)\s+(\w+)", json.loads(m.group(1)))
+        if head:
+            names.add(head.group(1))
+    return names
+
+
+def test_every_web_operation_is_in_exactly_one_group() -> None:
+    groups = [SHARED_OPERATIONS, USER_OPERATIONS, RUN_OPERATIONS, NEVER_CACHED]
+    names = web_operations()
+    assert len(names) > 40  # the parse found the documents
+    for name in sorted(names):
+        in_groups = [i for i, group in enumerate(groups) if name in group]
+        assert len(in_groups) == 1, f"{name} is in groups {in_groups}: classify it in one"
+    for i, group in enumerate(groups):
+        assert all(not group & other for other in groups[i + 1 :])
+    assert CLOSED_SESSION_OPERATIONS <= RUN_OPERATIONS
+
+
+def test_a_run_operation_is_kept_until_a_run_record_is_saved(harness: Harness) -> None:
+    client = harness.client()
+    first = _post(client, RUN_OP)
+    opened = harness.opened
+    assert _post(client, RUN_OP).content == first.content and harness.opened == opened
+    harness.runs = (7, 101)  # a record was saved (a failed job's, an on-request run)
+    _post(client, RUN_OP)
+    assert harness.opened > opened
+
+
+def test_a_static_operation_ignores_the_runs_generation(harness: Harness) -> None:
+    client = harness.client()
+    _post(client, SESSION)
+    opened = harness.opened
+    harness.runs = (7, 101)
+    _post(client, SESSION)
+    assert harness.opened == opened
+
+
+def test_a_run_operation_is_still_keyed_on_publish_and_writes(harness: Harness) -> None:
+    client = harness.client()
+    _post(client, RUN_OP)
+    opened = harness.opened
+    harness.seq += 1
+    _post(client, RUN_OP)
+    assert harness.opened > opened
+    opened = harness.opened
+    client.delete("/screeners/none/draft")  # a config write: the WriteEpoch
+    _post(client, RUN_OP)
+    assert harness.opened > opened
+
+
+def test_a_run_operation_is_per_role_and_user(harness: Harness) -> None:
+    admin = _post(harness.client("ana", Role.ADMIN), RUN_OP)
+    bob = _post(harness.client("bob", Role.TRADER), RUN_OP)
+    alice = _post(harness.client("alice", Role.TRADER), RUN_OP)
+    assert admin.json()["data"]["viewer"]["role"] == "admin"
+    assert bob.json()["data"]["viewer"]["id"] == "bob"
+    assert alice.json()["data"]["viewer"]["id"] == "alice"
+
+
+def test_the_closed_session_moves_only_the_operations_that_read_the_clock(
+    harness: Harness,
+) -> None:
+    client = harness.client()
+    _post(client, RUN_OP)
+    _post(client, CLOSED_OP)
+    opened = harness.opened
+    harness.closed = date(2026, 10, 9)  # the exchange closed another session
+    _post(client, RUN_OP)
+    assert harness.opened == opened  # NightlyRuns does not read the clock
+    _post(client, CLOSED_OP)
+    assert harness.opened > opened
+
+
+def test_an_errored_run_operation_is_not_kept(harness: Harness) -> None:
+    bad = _post(harness.client(), "query NightlyRuns { nonsense }")
+    assert "errors" in bad.json() and harness.cache.held == 0
+
+
+def test_the_app_keys_on_the_stores_own_runs_generation(harness: Harness) -> None:
+    harness.client()  # builds the app: main.py hands the router the reader's generation
+    assert harness.wired == harness.store.reader.runs_generation
 
 
 def test_the_key_holds_the_variables_and_the_document() -> None:
@@ -168,6 +273,15 @@ def test_the_key_holds_the_variables_and_the_document() -> None:
     assert base != response_key(1, 0, who, "{ b }", {"x": 1, "y": 2}, None)
     assert base != response_key(2, 0, who, "{ a }", {"x": 1, "y": 2}, None)
     assert base != response_key(1, 1, who, "{ a }", {"x": 1, "y": 2}, None)
+    # the runs generation and the closed session count only for the operations that read them
+    assert base == response_key(
+        1, 0, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2), date(2026, 1, 1)
+    )
+    run = response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 2))
+    assert run != response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 3))
+    assert run == response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 2), date(2026, 1, 1))
+    closed = response_key(1, 0, who, "{ a }", None, "StatusStrip", (1, 2), date(2026, 1, 1))
+    assert closed != response_key(1, 0, who, "{ a }", None, "StatusStrip", (1, 2), date(2026, 1, 2))
 
 
 def test_the_cache_is_bounded_by_bytes_and_evicts_the_least_recently_used() -> None:
