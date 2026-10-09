@@ -54,7 +54,7 @@ it reads this checkout's `.env` as the nightly does; logs are `var/logs/api.log`
 `var/logs/api.err.log`. After a change to `.env`, `config/site/users.toml` or an
 `identity.toml` (read at startup), or after pulling API code, restart it. After a change to the code, `scripts/ops/deploy.sh`
 (or the auto-deploy agent below) does it all (main checkout on `main` and clean: `git pull --ff-only`, `make web-build`,
-restart, health; `--dry-run` prints the plan). After only a config change:
+restart, health; `--dry-run` prints the plan). After the restart the API's commit is verified, after the web swap only the served web's, so a web-only deploy leaves the API at its older commit without blocking. After only a config change:
 
 ```bash
 launchctl kickstart -k gui/$(id -u)/com.algotrade.api
