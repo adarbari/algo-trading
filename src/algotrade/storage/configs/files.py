@@ -19,9 +19,9 @@ site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
 users/<user>/selections/<id>.toml
 users/<user>/features/<theme>.toml         L4 expression features (always virtual)
-users/<user>/edges/<id>.toml               L4 a user's edge drafts, layered over the site's
+users/<user>/edges/<id>.toml               L4 a user's edge: a copy (extends = <edge id>), a new
+                                           edge, or only [follow] on a site edge (ADR 0053)
 users/<user>/preferences.toml              L4 the user's page preferences (ADR 0029)
-users/<user>/evaluation.toml               L4 the user's edge-evaluation split (ADR 0053)
 users/<user>/identity.toml                 L4 the user's sign-in email (ADR 0040; never committed)
 site/presets/screeners/<id>/v<N>.toml      L3 rule-screen preset versions: immutable (hash
                                            lock: architecture/preset_versions.toml); latest = max N
@@ -45,7 +45,7 @@ from algotrade.storage.configs.store import KINDS, split_version
 SITE = "site"
 SCREENERS = "screeners"
 PLAYBOOKS = "guide_playbooks"
-USER_FILES = ("preferences", "identity", "evaluation")  # one document per user, never the site's
+USER_FILES = ("preferences", "identity")  # one document per user, never the site's
 # site/<folder>/<name>.toml by kind (the folder is the kind's name unless given)
 SITE_FOLDERS = {
     "features": "features",

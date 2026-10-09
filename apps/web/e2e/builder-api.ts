@@ -137,7 +137,9 @@ export async function mockBuilderApi(
         ],
       };
       const notRun = { kindText: 'not run for this session' };
-      const criteria = [{ id: 'iv30', field: 'iv_rank', mode: 'hard' }];
+      const criteria = [
+        { id: 'iv_hv_ratio', field: 'feature.iv_hv_ratio', mode: 'soft', op: 'gte', value: 1.25 },
+      ];
       const pickHistory = [
         { session: '2026-10-06', picked: 10 },
         { session: '2026-10-07', picked: 12 },

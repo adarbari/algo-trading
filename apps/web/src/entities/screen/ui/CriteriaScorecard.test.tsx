@@ -14,21 +14,21 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
     ],
   }),
 }));
-vi.mock('../api/hooks', () => ({
-  useScreener: () => ({
+vi.mock('../api/runs', () => ({
+  useScreenerRuns: () => ({
     data: {
-      // The canonical config as the API serves it: the criteria sit under `rules`.
-      resolved: {
-        id: 'vrp',
-        kind: 'screener',
-        rules: {
-          version: 1,
-          criteria: {
-            iv30: { field: 'rollup.iv30@v1.iv30', op: 'gte', value: 0.5, mode: 'hard' },
-            ratio: { field: 'feature.iv_hv_ratio', op: 'gte', value: 1.25, mode: 'soft' },
+      // The typed criteria of the `Screener`: op and threshold as the config states them.
+      byId: new Map([
+        [
+          'vrp',
+          {
+            criteria: [
+              { id: 'iv30', field: 'rollup.iv30@v1.iv30', mode: 'hard', op: 'gte', value: 0.5 },
+              { id: 'ratio', field: 'feature.iv_hv_ratio', mode: 'soft', op: 'gte', value: 1.25 },
+            ],
           },
-        },
-      },
+        ],
+      ]),
     },
   }),
 }));

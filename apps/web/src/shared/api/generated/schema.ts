@@ -22,6 +22,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/edges/{edge_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save
+         * @description Replace (or create) the user's own edge; validated as the harness reads it, nothing is
+         *     written on an error (400). A site edge's id is 409: copy it.
+         */
+        put: operations["save_edges__edge_id__put"];
+        post?: never;
+        /**
+         * Delete
+         * @description Archive the user's own edge (its state about a site edge: reset); 404 when they have
+         *     none, 409 while another of their edges extends it.
+         */
+        delete: operations["delete_edges__edge_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edges/{edge_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy
+         * @description A new edge of the user's that extends ``edge_id``; 404 when they see no such edge, 409
+         *     when the new id is taken or was deleted.
+         */
+        post: operations["copy_edges__edge_id__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/edges/{edge_id}/evaluate": {
         parameters: {
             query?: never;
@@ -39,7 +86,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/evaluation/split": {
+    "/edges/{edge_id}/state": {
         parameters: {
             query?: never;
             header?: never;
@@ -47,8 +94,12 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Save Split */
-        put: operations["save_split_evaluation_split_put"];
+        /**
+         * Set State
+         * @description Move the user's state about an edge (follow, reject, retire, replace) and/or show its
+         *     out-of-sample result. The server decides the permanent labels (a warning, never a block).
+         */
+        put: operations["set_state_edges__edge_id__state_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -410,6 +461,20 @@ export interface components {
              */
             preset: string;
         };
+        /** CopyEdgeBody */
+        CopyEdgeBody: {
+            /**
+             * As Version
+             * @description a new version: the copy is a trial that would replace the edge
+             * @default false
+             */
+            as_version: boolean;
+            /**
+             * New Id
+             * @description the id of the copy (1-64 of a-z, 0-9, _ and -)
+             */
+            new_id: string;
+        };
         /** CriterionValue */
         CriterionValue: {
             /** Criterion Id */
@@ -475,6 +540,32 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** EdgeDocument */
+        EdgeDocument: {
+            /** Document */
+            document: {
+                [key: string]: unknown;
+            };
+            /** Edge Id */
+            edge_id: string;
+        };
+        /** EdgeState */
+        EdgeState: {
+            /** Edge Id */
+            edge_id: string;
+            /** Labels */
+            labels: string[];
+            /** Oos Revealed */
+            oos_revealed: boolean;
+            /** Reason */
+            reason: string;
+            /** Replaces */
+            replaces: string | null;
+            /** Since */
+            since: string | null;
+            /** State */
+            state: string;
+        };
         /** EvaluationRequest */
         EvaluationRequest: {
             /** Edge Id */
@@ -491,22 +582,6 @@ export interface components {
             state: string;
             /** User */
             user: string;
-        };
-        /** EvaluationSplitBody */
-        EvaluationSplitBody: {
-            /**
-             * Split From
-             * @description the first session of the test slice (a stored session); null: clear it
-             */
-            split_from: string | null;
-        };
-        /** EvaluationSplitSaved */
-        EvaluationSplitSaved: {
-            /**
-             * Split From
-             * @description the split now saved (null: none)
-             */
-            split_from: string | null;
         };
         /** ExplainBody */
         ExplainBody: {
@@ -1059,6 +1134,16 @@ export interface components {
             /** Theme */
             theme: string;
         };
+        /** SaveEdgeBody */
+        SaveEdgeBody: {
+            /**
+             * Document
+             * @description the edge's TOML keys as JSON: `extends` and the settings it changes (a `[follow]` table in it is ignored: the state has its own call)
+             */
+            document: {
+                [key: string]: unknown;
+            };
+        };
         /** ScreenDraft */
         ScreenDraft: {
             /**
@@ -1130,6 +1215,26 @@ export interface components {
             total: number;
             /** User */
             user: string;
+        };
+        /** StateBody */
+        StateBody: {
+            /**
+             * Reason
+             * @description why: a rejection needs one, a retirement may
+             * @default
+             */
+            reason: string;
+            /**
+             * Reveal Oos
+             * @description show the copy's out-of-sample result (it is hidden until then)
+             * @default false
+             */
+            reveal_oos: boolean;
+            /**
+             * State
+             * @description researching | following | rejected | retired | trial; none keeps it
+             */
+            state?: string | null;
         };
         /** TableView */
         TableView: {
@@ -1321,6 +1426,114 @@ export interface operations {
             };
         };
     };
+    save_edges__edge_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path: {
+                edge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveEdgeBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EdgeDocument"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_edges__edge_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path: {
+                edge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_edges__edge_id__copy_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path: {
+                edge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyEdgeBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EdgeDocument"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     evaluate_edges__edge_id__evaluate_post: {
         parameters: {
             query?: {
@@ -1358,19 +1571,21 @@ export interface operations {
             };
         };
     };
-    save_split_evaluation_split_put: {
+    set_state_edges__edge_id__state_put: {
         parameters: {
             query?: never;
             header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
                 "X-Act-For"?: string | null;
             };
-            path?: never;
+            path: {
+                edge_id: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EvaluationSplitBody"];
+                "application/json": components["schemas"]["StateBody"];
             };
         };
         responses: {
@@ -1380,7 +1595,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EvaluationSplitSaved"];
+                    "application/json": components["schemas"]["EdgeState"];
                 };
             };
             /** @description Validation Error */

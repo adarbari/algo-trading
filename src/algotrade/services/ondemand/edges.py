@@ -17,7 +17,7 @@ left running by a stopped process is failed on start, and one older than ``STALE
 counts as in flight.
 
 The decision sessions are the stored outcome sessions (the CLI's default); the outcomes are those
-known now; the split is the user's ``evaluation.toml``, else the edge's ``frozen_from``.
+known now; the split is the edge's own ``frozen_from``.
 """
 
 import threading

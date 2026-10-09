@@ -120,11 +120,6 @@ export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }> }, canonicalRun: { runId: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
-export type EvaluationSplitQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type EvaluationSplitQuery = { evaluationSplit: { splitFrom: string | null, latestSession: string, frozenPeriods: Array<{ edgeId: string, frozenFrom: string }> } | null };
-
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -410,7 +405,7 @@ export type ScreenDetailQueryVariables = Exact<{
 }>;
 
 
-export type ScreenDetailQuery = { screenDetail: { screenerId: string, user: string, draft: unknown, draftError: string | null, versions: Array<number>, latest: number | null, hash: string | null, layers: Array<string>, resolved: unknown, error: string | null, working: unknown, preset: { presetId: string, pinned: number | null, current: number | null, rebaseAvailable: boolean } | null } | null };
+export type ScreenDetailQuery = { screenDetail: { screenerId: string, user: string, draft: unknown, draftError: string | null, versions: Array<number>, latest: number | null, error: string | null, working: unknown, preset: { presetId: string, pinned: number | null, current: number | null, rebaseAvailable: boolean } | null } | null };
 
 export type ScreenVersionsQueryVariables = Exact<{
   id: string;
@@ -444,7 +439,7 @@ export type ScreenerResultsQuery = { session: { date: string, unavailable: Array
 export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, notRun: { kindText: string } | null, pickHistory: Array<{ session: string, picked: number | null }>, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }> } | null }> };
+export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, criteria: Array<{ id: string, field: string, mode: string, op: string, value: unknown }>, notRun: { kindText: string } | null, pickHistory: Array<{ session: string, picked: number | null }>, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }> } | null }> };
 
 export type StatusStripQueryVariables = Exact<{
   admin: boolean;
@@ -648,18 +643,6 @@ export const EdgesPageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
-export const EvaluationSplitDocument = new TypedDocumentString(`
-    query EvaluationSplit {
-  evaluationSplit {
-    splitFrom
-    latestSession
-    frozenPeriods {
-      edgeId
-      frozenFrom
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<EvaluationSplitQuery, EvaluationSplitQueryVariables>;
 export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
     query ScreenerTrackRecords {
   edges {
@@ -2329,9 +2312,6 @@ export const ScreenDetailDocument = new TypedDocumentString(`
       current
       rebaseAvailable
     }
-    hash
-    layers
-    resolved
     error
     working
   }
@@ -2542,6 +2522,8 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
       id
       field
       mode
+      op
+      value
     }
     notRun {
       kindText

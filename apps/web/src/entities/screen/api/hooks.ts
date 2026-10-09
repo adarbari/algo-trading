@@ -64,9 +64,6 @@ const ScreenDetail = graphql(`
         current
         rebaseAvailable
       }
-      hash
-      layers
-      resolved
       error
       working
     }
@@ -130,7 +127,7 @@ export function useMyScreeners() {
 }
 
 /**
- * One screen: its draft, versions, preset pin and resolved working copy; `null` when the user
+ * One screen: its draft, versions, preset pin and working copy; `null` when the user
  * has no such screen (and there is no preset of that id).
  */
 export function useScreener(id: string | null) {

@@ -10,7 +10,8 @@ response schema. No business logic here (ADR 0024). ``main.create_app`` mounts
 from fastapi import APIRouter
 
 from algotrade_api.routes import chains, health, jobs
-from algotrade_api.routes.authoring import evaluation, preferences, screeners, user_features
+from algotrade_api.routes.authoring import edges as edge_writes
+from algotrade_api.routes.authoring import preferences, screeners, user_features
 from algotrade_api.routes.drafting import screeners as screen_drafting
 from algotrade_api.routes.edges import evaluate as edge_evaluate
 from algotrade_api.routes.preview import features as feature_check
@@ -31,5 +32,5 @@ ROUTERS: tuple[APIRouter, ...] = (
     regime_explain.router,
     screeners.router,
     preferences.router,
-    evaluation.router,
+    edge_writes.router,
 )

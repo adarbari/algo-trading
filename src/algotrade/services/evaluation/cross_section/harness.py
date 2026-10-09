@@ -19,9 +19,10 @@ An edge's ``[[variants]]`` are evaluated like the edge itself under their own id
 (the trial log, ``results.py``); the probability of backtest overfitting compares the variants'
 per-session pick means over the same sessions.
 
-The test slice starts at the run's effective split: the run's ``split_from``, else the user's
-``evaluation.toml`` (``config/edges/evaluation.py``), else the edge's ``frozen_from`` (the site's
-split, ADR 0053 amendment ED5a). A run whose split is not the edge's ``frozen_from`` is
+The test slice starts at the run's effective split: the run's ``split_from``, else the edge's own
+``frozen_from`` (a copy of a site edge may move it: ADR 0053 amendments ED5a and 2026-10-09). A
+run whose split is not the ``frozen_from`` of the site edge the chain started from
+(``Edge.site_frozen_from``), or whose edge carries the label ``split_moved_after_viewing``, is
 EXPLORATORY: its rows carry its split in their key and the flag, and the split joins the run hash.
 """
 
@@ -38,7 +39,6 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import MAIN, Edge, job_name
-from algotrade.config.edges.evaluation import load_evaluation
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -390,13 +390,13 @@ def _stat(
     )
 
 
-def effective_split(
-    run: date | None, configs: ConfigStore, user: UserContext, edge: Edge
-) -> tuple[date | None, bool]:
-    """(split, exploratory): the run's split, else the user's (site < user, ``evaluation.toml``),
-    else the edge's ``frozen_from``. Exploratory when it differs from ``frozen_from``."""
-    split = run or load_evaluation(configs, user.user_id).split_from or edge.frozen_from
-    return split, split != edge.frozen_from
+def effective_split(run: date | None, edge: Edge) -> tuple[date | None, bool]:
+    """(split, exploratory): the run's split, else the edge's own ``frozen_from``. Exploratory
+    when it is not the site edge's (a copy whose split moved), or the user moved the split of
+    an edge whose out-of-sample result they had seen (a permanent label)."""
+    split = run or edge.frozen_from
+    moved = "split_moved_after_viewing" in edge.follow.labels
+    return split, split != edge.site_frozen_from or moved
 
 
 def _slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
@@ -508,11 +508,11 @@ def evaluate_edge(
     """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
     horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
     one implied-vol field of the run (an outcome that reads one; its source and licence are
-    recorded); ``split_from``: the run's own split over the user's and the edge's. Raises
+    recorded); ``split_from``: the run's own split over the edge's. Raises
     ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon."""
     variants = _variants(configs, user, edge)
-    split, exploratory = effective_split(split_from, configs, user, edge)
+    split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
     session = _Session(reader, label)
     days = sessions_between(start, end)

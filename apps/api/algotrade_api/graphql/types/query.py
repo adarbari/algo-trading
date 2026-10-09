@@ -17,7 +17,7 @@ from strawberry.types import Info
 
 from algotrade.services.read.evaluation import edges as edge_reads
 from algotrade.services.read.evaluation import runs as edge_runs
-from algotrade.services.read.evaluation import split as split_reads
+from algotrade.services.read.evaluation import versions
 from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
 from algotrade.services.read.guide import entries as entries_page
@@ -50,7 +50,6 @@ from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeRun
-from algotrade_api.graphql.types.evaluation.split import EvaluationSplit
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.guide.entries import GuideEntries
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
@@ -402,14 +401,15 @@ class Query:
         return Edge.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The user's train / test split (their evaluation.toml), the frozen periods "
-        "of the edges they see and the latest session a split may name; null: nothing stored"
+        description="The edge `id` as one whole TOML document (extends resolved, the user's "
+        "state left out): what an admin lands in config/site/edges/ by pull request to publish "
+        "it site-wide (the site's config changes only by PR); null: no such edge. `user`: "
+        "whose copy (an admin may publish any user's; default: their own)",
+        extensions=[AdminOnly()],
     )
-    def evaluation_split(self, info: Ctx) -> EvaluationSplit | None:
-        ctx = info.context.read(None)
-        return (
-            EvaluationSplit.of(split_reads.load_evaluation_split(ctx)) if ctx is not None else None
-        )
+    def published_edge_document(self, info: Ctx, id: str, user: str | None = None) -> str | None:
+        ctx = info.context.stores_for(user)
+        return versions.load_published_document(ctx, id) if ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every committed evaluation run of the edge `edgeId` the user sees (theirs, "

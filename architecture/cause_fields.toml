@@ -66,6 +66,10 @@ name = "CriterionResult.value"
 reason = "the value a criterion judged"
 
 [[fact]]
+name = "ScreenCriterion.value"
+reason = "the threshold a criterion compares with, as the screen stores it (a number, text or list; null when the operator takes none)"
+
+[[fact]]
 name = "ResultColumn.value"
 reason = "the value of a display column"
 
@@ -91,10 +95,6 @@ reason = "the caller's own saved backtest metrics"
 
 [[fact]]
 name = "ScreenDetail.draft"
-reason = "the caller's own screen document"
-
-[[fact]]
-name = "ScreenDetail.resolved"
 reason = "the caller's own screen document"
 
 [[fact]]
@@ -134,3 +134,17 @@ reason = "the text model's note on the regime explanation"
 name = "Draft.document"
 surface = "rest"
 reason = "the caller's own draft document"
+
+[[fact]]
+name = "EdgeDocument.document"
+surface = "rest"
+reason = "the caller's own edge document as saved (a copy's keys)"
+
+[[fact]]
+name = "EdgeState.reason"
+surface = "rest"
+reason = "the reason the caller gave for rejecting or retiring their own edge"
+
+[[fact]]
+name = "EdgeCompare.reason"
+reason = "a fixed public sentence about the caller's own edge (not run yet, no figures): no source, step or table named"
