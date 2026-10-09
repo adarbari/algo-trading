@@ -37,6 +37,8 @@ export default defineConfig({
     },
   },
   build: {
+    // dist/.vite/manifest.json: the bundle budgets (scripts/check-bundle-budgets.ts) read it.
+    manifest: true,
     rolldownOptions: {
       output: {
         // Vendor code in its own long-lived chunks: it changes far less than the app, so a deploy
