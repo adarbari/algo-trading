@@ -3,7 +3,8 @@
  * did not load, `Query.edgeProblems`), each edge document with the user's state about it and, for
  * their own copy, its comparison with the edge it extends; the
  * verdict (judged by the read model on the official result, the canonical run: the sentence, the
- * figures, the criteria and the year rows), how it is defined, its sources, and every run the
+ * figures, the criteria, the year rows, the in-sample decile means and the lift among random-pick
+ * backtests), whether it is the user's own, how it is defined, its sources, and every run the
  * user sees so exploratory ones can be listed and labelled. The cache holds the response.
  */
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
@@ -51,6 +52,7 @@ const EdgesPage = graphql(`
       horizons
       screeners
       baselines
+      mine
       rejectionReason
       sources {
         title
@@ -79,6 +81,19 @@ const EdgesPage = graphql(`
         sharpe
         deflatedSharpe
         pbo
+        trials
+        deciles
+        robustness {
+          lift
+          draws
+          beats
+          summary
+          bins {
+            start
+            end
+            count
+          }
+        }
         criteria {
           id
           label
@@ -99,6 +114,7 @@ const EdgesPage = graphql(`
       }
       canonicalRun {
         runId
+        knowledgeTs
       }
       runs {
         runId

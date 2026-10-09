@@ -1,12 +1,24 @@
 /**
- * One edge's page: its name, verdict (with the server's reason) and status, the Run backtest
- * button, the headline sentence, the out-of-sample figures, year by year, how the edge is
- * defined, why it should last with its sources, and the details (tests, backtests, figures, the
- * user's own split). Each term carries its Guide button; every word and number is the server's.
+ * One edge's page: its name, verdict (with the server's reason), whose edge it is, its status and
+ * the date of the official result, the Run backtest button, the headline sentence, the
+ * out-of-sample figures, the decile bars beside the robustness against random picks, year by
+ * year, how the edge is defined, why it should last with its sources, and the details (tests,
+ * backtests, figures, the user's own split). Each term carries its Guide button; every word and
+ * number is the server's.
  */
-import { Button, Chip, EmptyState, Heading, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
-
-import { Suspense } from 'react';
+import {
+  Button,
+  Chip,
+  EmptyState,
+  formatValue,
+  Grid,
+  Heading,
+  Panel,
+  Stack,
+  StatusBadge,
+  Text,
+} from '@algotrade/ui';
+import { lazy, Suspense } from 'react';
 
 import {
   labelText,
@@ -20,7 +32,6 @@ import {
 import { EdgeActions } from '@/features/edge-follow';
 import { RunEvaluation } from '@/features/edge-evaluation';
 import { GuideHelp } from '@/features/guide-help';
-
 import { lazyPage } from '@/shared/lib/lazy';
 
 import { EdgeDefinition } from './EdgeDefinition';
@@ -28,6 +39,11 @@ import { EdgeDetails } from './EdgeDetails';
 import { EdgeFigures } from './EdgeFigures';
 import { EdgeYears } from './EdgeYears';
 
+/** The decile bars and the robustness histogram load on demand: their own chunk, so the page's first paint stays small. */
+const EdgeDeciles = lazy(() => import('./EdgeDeciles').then((m) => ({ default: m.EdgeDeciles })));
+const EdgeRobustness = lazy(() =>
+  import('./EdgeRobustness').then((m) => ({ default: m.EdgeRobustness })),
+);
 // A copy's comparison is for the user's own edges only: its chunk loads when there is one.
 const EdgeCompare = lazyPage(() => import('./EdgeCompare'), 'EdgeCompare');
 
@@ -71,15 +87,20 @@ export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
               <StatusBadge tone={verdictTone(v.verdict)}>{verdictLabel(v.verdict)}</StatusBadge>
               <GuideHelp entry={{ kind: 'term', id: 'verdict' }} />
               <Text size="sm" tone="secondary">
-                {edge.mine ? `Your edge · extends ${edge.extends ?? 'nothing'}` : 'Site edge'}
+                {`${edge.mine ? `Your edge · extends ${edge.extends ?? 'nothing'}` : 'Site edge'} · ${statusLabel(edge.status)}`}
               </Text>
               <GuideHelp entry={{ kind: 'term', id: 'edge_copy' }} />
-              <Text size="sm" tone="secondary">
-                {statusLabel(edge.status)}
-              </Text>
               <GuideHelp entry={{ kind: 'term', id: 'edge_status' }} />
               <StatusBadge tone={stateTone(edge.state)}>{stateLabel(edge.state)}</StatusBadge>
               <GuideHelp entry={{ kind: 'term', id: 'edge_state' }} />
+              {edge.canonicalRun && (
+                <>
+                  <Text size="sm" tone="secondary">
+                    {`Last backtest ${formatValue(edge.canonicalRun.knowledgeTs, { kind: 'date', style: 'day' }).text} (official result)`}
+                  </Text>
+                  <GuideHelp entry={{ kind: 'term', id: 'official_result' }} />
+                </>
+              )}
             </Stack>
             {edge.labels.length > 0 && (
               <Stack direction="row" gap={1} align="center" wrap>
@@ -107,6 +128,14 @@ export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
         )}
       </Stack>
       <EdgeFigures verdict={v} />
+      <Grid columns={2} gap={4} collapse="lg" align="start">
+        <Suspense fallback={<Panel title="Top vs bottom decile" state="loading" />}>
+          <EdgeDeciles deciles={v.deciles} />
+        </Suspense>
+        <Suspense fallback={<Panel title="Robustness" state="loading" />}>
+          <EdgeRobustness robustness={v.robustness} />
+        </Suspense>
+      </Grid>
       {edge.compare && (
         <Suspense
           fallback={<Panel title="Compare versions" state="loading" loadingLabel="Loading…" />}

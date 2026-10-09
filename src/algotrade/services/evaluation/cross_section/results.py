@@ -16,6 +16,8 @@ from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
 )
+from algotrade.services.evaluation.cross_section.measures import BUCKETS, SliceMeasure
+from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
 
@@ -35,37 +37,65 @@ def _nan(value: float | None) -> float:
     return float("nan") if value is None else value
 
 
+def _row(
+    evaluation: EdgeEvaluation,
+    m: SliceMeasure,
+    edge_variant: str,
+    variant: str,
+    role: str,
+    horizon: int,
+    result: VariantResult | None = None,
+    config_hash: str = "",
+) -> dict[str, Any]:
+    """One stored row of ``m``; ``result``: the screener or baseline it measured (none for a
+    random draw, which has no config)."""
+    measured = asdict(m)
+    deciles = m.decile_means or (float("nan"),) * BUCKETS  # none: not measured, never zero
+    return {
+        "edge_id": evaluation.edge_id,
+        "user_id": evaluation.user_id,
+        "edge_variant": None if edge_variant == MAIN else edge_variant,
+        "variant": variant,
+        "role": role,
+        "config_hash": result.config_hash if result else config_hash,
+        "run_config_hash": evaluation.run_hash,
+        "benchmark": evaluation.benchmark,
+        "horizon_sessions": horizon,
+        "slice_kind": m.slice_kind,
+        "slice_value": m.slice_value,
+        "range_from": evaluation.start,
+        "split_from": evaluation.split_from,
+        "exploratory": evaluation.exploratory,
+        "in_sample": m.in_sample,
+        "range_to": evaluation.end,
+        "iv_source": result.iv_source if result else None,
+        "licence": result.licence if result else None,
+        # Filled by an expires_otm outcome only (ADR 0053 amendment 2026-10-08).
+        "reference_rate": _nan(m.reference_rate),
+        "touch_rate": _nan(m.touch_rate),
+        **{f"decile_mean_{i:02d}": d for i, d in enumerate(deciles, start=1)},
+        **{c: measured[c] for c in MEASURE_COLUMNS},
+    }
+
+
 def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> pd.DataFrame:
     """The ``results/edge_eval`` rows of ``evaluation``, stamped."""
     rows = []
     for r in evaluation.results:
         for m in r.measures:
-            measured = asdict(m)
+            rows.append(_row(evaluation, m, r.edge_variant, r.variant, r.role, r.horizon, r))
+    for random in evaluation.random_picks:
+        for m in random.draws:
             rows.append(
-                {
-                    "edge_id": evaluation.edge_id,
-                    "user_id": evaluation.user_id,
-                    "edge_variant": None if r.edge_variant == MAIN else r.edge_variant,
-                    "variant": r.variant,
-                    "role": r.role,
-                    "config_hash": r.config_hash,
-                    "run_config_hash": evaluation.run_hash,
-                    "benchmark": evaluation.benchmark,
-                    "horizon_sessions": r.horizon,
-                    "slice_kind": m.slice_kind,
-                    "slice_value": m.slice_value,
-                    "range_from": evaluation.start,
-                    "split_from": evaluation.split_from,
-                    "exploratory": evaluation.exploratory,
-                    "in_sample": m.in_sample,
-                    "range_to": evaluation.end,
-                    "iv_source": r.iv_source,
-                    "licence": r.licence,
-                    # Filled by an expires_otm outcome only (ADR 0053 amendment 2026-10-08).
-                    "reference_rate": _nan(m.reference_rate),
-                    "touch_rate": _nan(m.touch_rate),
-                    **{c: measured[c] for c in MEASURE_COLUMNS},
-                }
+                _row(
+                    evaluation,
+                    m,
+                    random.edge_variant,
+                    f"{RANDOM}:{random.variant}",
+                    RANDOM,
+                    random.horizon,
+                    config_hash=random.config_hash,
+                )
             )
     frame = pd.DataFrame(rows)
     frame["session_date"] = evaluation.end

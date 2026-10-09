@@ -16,10 +16,13 @@ import {
 } from '@/entities/edge';
 import { GuideHelp } from '@/features/guide-help';
 
-const screensOf = (e: Edge): string =>
-  e.screeners.length === 0
-    ? 'no screen yet'
-    : `${e.screeners.length === 1 ? 'screen' : 'screens'}: ${e.screeners.join(', ')}`;
+const screensOf = (e: Edge): string => {
+  const screens =
+    e.screeners.length === 0
+      ? 'no screen yet'
+      : `${e.screeners.length === 1 ? 'screen' : 'screens'}: ${e.screeners.join(', ')}`;
+  return `${screens} · ${e.mine ? 'your edge' : 'site edge'}`;
+};
 
 export function edgeColumns(): DataTableColumn<Edge>[] {
   return [
@@ -36,7 +39,7 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
             {row.name}
           </Text>
           <Text size="xs" tone="muted">
-            {`${row.mine ? 'mine' : 'site edge'} · ${screensOf(row)}`}
+            {screensOf(row)}
           </Text>
         </Stack>
       ),

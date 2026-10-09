@@ -28,6 +28,9 @@ const verdict = (over: Record<string, unknown>) => ({
   sharpe: null,
   deflatedSharpe: null,
   pbo: null,
+  trials: null,
+  deciles: [],
+  robustness: null,
   criteria: [],
   years: [],
   ...over,
@@ -104,10 +107,24 @@ export const EDGES_FIXTURE = {
         sharpe: 1.1,
         deflatedSharpe: 0.9,
         pbo: 0.3,
+        trials: 3,
+        deciles: [0.09, 0.06, 0.04, 0.02, 0.01, -0.005, -0.02, -0.03, -0.05, -0.07],
+        robustness: {
+          lift: 1.09,
+          draws: 1000,
+          beats: 0.96,
+          summary: 'Beats 96% of 1,000 random backtests after 3 variants tried.',
+          bins: [
+            { start: 0.8, end: 0.9, count: 120 },
+            { start: 0.9, end: 1.0, count: 480 },
+            { start: 1.0, end: 1.1, count: 360 },
+            { start: 1.1, end: 1.2, count: 40 },
+          ],
+        },
         criteria: [
           criterion('trades', 'Trades', 'pass'),
           criterion('decile_t', 'Top vs bottom decile t', 'pass'),
-          criterion('random', 'Beats the best random-pick backtest', 'not_measured', 'works'),
+          criterion('random', 'Beats random picks', 'not_measured', 'works'),
           criterion('works_t', 'Top vs bottom decile t', 'fail', 'works'),
         ],
         years: [
@@ -131,7 +148,7 @@ export const EDGES_FIXTURE = {
           },
         ],
       }),
-      canonicalRun: { runId: 'run-frozen' },
+      canonicalRun: { runId: 'run-frozen', knowledgeTs: '2026-10-05T02:00:00+00:00' },
       runs: [
         {
           runId: 'run-frozen',

@@ -43,7 +43,7 @@ describe('EdgeDetail', () => {
     expect(screen.getByText(/Out-of-sample, momentum_12_1, 20 trading days/)).toBeInTheDocument();
     expect(screen.getByText('run momentum_12_1')).toBeInTheDocument();
     expect(screen.getByText('actions momentum_12_1')).toBeInTheDocument();
-    expect(screen.getByText('Site edge')).toBeInTheDocument();
+    expect(screen.getByText(/^Site edge · /)).toBeInTheDocument();
     expect(screen.queryByRole('grid', { name: 'Compare versions' })).not.toBeInTheDocument();
     const strip = screen.getByRole('region', { name: 'Out-of-sample result' });
     expect(within(strip).getByText('57%')).toBeInTheDocument();
@@ -61,6 +61,34 @@ describe('EdgeDetail', () => {
       expect(screen.getAllByText(`help ${id}`).length).toBeGreaterThan(0);
     }
     await expectNoA11yViolations(container);
+  });
+
+  it('shows whose edge it is and the date of the official result in the header', () => {
+    render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} onOpen={vi.fn()} />);
+    expect(screen.getByText('Site edge · Candidate')).toBeInTheDocument();
+    expect(screen.getByText('Last backtest 5 Oct (official result)')).toBeInTheDocument();
+    expect(screen.getAllByText('help official_result').length).toBeGreaterThan(0);
+  });
+
+  it('draws the in-sample decile bars and places the lift among the random-pick backtests', async () => {
+    render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} onOpen={vi.fn()} />);
+    const bars = await screen.findByRole('list', { name: 'Mean outcome by decile' });
+    const rows = within(bars).getAllByRole('listitem');
+    expect(rows).toHaveLength(10);
+    expect(rows[0]).toHaveTextContent('Decile 1+9.0%');
+    expect(rows[9]).toHaveTextContent('Decile 10−7.0%');
+    expect(
+      screen.getByText('Beats 96% of 1,000 random backtests after 3 variants tried.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Lift of random-pick backtests/ })).toBeInTheDocument();
+    expect(screen.getByText('help robustness')).toBeInTheDocument();
+  });
+
+  it('says what is missing instead of drawing zeros when a run stored no deciles or draws', async () => {
+    render(<EdgeDetail id="sp500_index_changes" onBack={vi.fn()} onOpen={vi.fn()} />);
+    expect(await screen.findByText('Not stored for this result.')).toBeInTheDocument();
+    expect(screen.getByText('No random-pick backtests for this result.')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Mean outcome by decile' })).not.toBeInTheDocument();
   });
 
   it('defines the edge in six parts, with screens linked and sources linked only with a url', () => {
@@ -109,7 +137,7 @@ describe('EdgeDetail', () => {
       ),
     );
     render(<EdgeDetail id="my_momentum" onBack={vi.fn()} onOpen={vi.fn()} />);
-    expect(screen.getByText('Your edge · extends momentum_12_1')).toBeInTheDocument();
+    expect(screen.getByText(/^Your edge · extends momentum_12_1/)).toBeInTheDocument();
     expect(screen.getByText('Followed against the verdict')).toBeInTheDocument();
     const table = await screen.findByRole('grid', { name: 'Compare versions' });
     expect(within(table).getByText('Momentum 12-1')).toBeInTheDocument();

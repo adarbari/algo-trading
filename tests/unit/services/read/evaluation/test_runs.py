@@ -4,16 +4,25 @@ the reason, and a run's rows are its own even when another run shares the partit
 
 from datetime import date
 
+import pytest
+
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
     load_canonical_run,
     load_edge_runs,
+    load_run_draws,
     load_run_rows,
 )
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
-from tests.unit.services.read.evaluation.conftest import FROZEN, session_ctx, stores, write_run
+from tests.unit.services.read.evaluation.conftest import (
+    FROZEN,
+    row,
+    session_ctx,
+    stores,
+    write_run,
+)
 
 
 def test_the_edge_document_and_its_status(backend: MemoryBackend) -> None:
@@ -76,6 +85,29 @@ def test_rows_are_read_by_run_id(backend: MemoryBackend) -> None:
     assert frozen.hit_rate == 0.66 and frozen.edge_variant == "main"
     assert (run.run_id, run.range_to, run.split_from) == ("canon", date(2026, 9, 30), FROZEN)
     assert run.as_of is not None and run.knowledge_ts is not None
+
+
+def test_random_draws_never_reach_the_screener_rows_and_deciles_are_empty_when_not_stored(
+    backend: MemoryBackend,
+) -> None:
+    deciles = {f"decile_mean_{i:02d}": 0.1 - i / 100 for i in range(1, 11)}
+    draws = [
+        row("random", "draw", 0.4, FROZEN, role="random", slice_value=str(i), lift=1.0 + i / 10)
+        for i in range(3)
+    ]
+    year_row = row("momo", "year", 0.5, FROZEN, **deciles)
+    write_run(backend, "canon", FROZEN, 0.66, extra=[*draws, year_row])
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None
+    rows = load_run_rows(ctx, run)
+    assert {r.role for r in rows} == {"screener"} and "draw" not in {r.slice_kind for r in rows}
+    assert [d.lift for d in load_run_draws(ctx, run)] == [1.0, 1.1, 1.2]
+    year = next(r for r in rows if r.slice_kind == "year")
+    assert year.decile_means == pytest.approx([0.1 - i / 100 for i in range(1, 11)])
+    assert next(r for r in rows if r.slice_kind == "all").decile_means == ()  # not stored: not 0
 
 
 def test_after_session_is_set_for_a_run_committed_after_the_session(
