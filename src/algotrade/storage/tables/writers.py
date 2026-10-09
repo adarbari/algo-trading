@@ -1,5 +1,6 @@
 """Write facade for market and feature data. Only apps/ingestion may import this (ADR 0005)."""
 
+from collections.abc import Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -48,6 +49,19 @@ class StoreWriter(ResultWriter):
     def table_size(self, table: str) -> int:
         """Bytes ``table`` takes in the store (every run)."""
         return self._backend.tables.size(table)
+
+    def build_history(self, table: str, years: Sequence[int]) -> list[int]:
+        """Make the table's derived history copy hold ``years`` and be current (ADR 0060);
+        -> the years built. Ingestion only (``history-copy``)."""
+        return self._backend.tables.build_history(table, years)
+
+    def history_size(self, table: str) -> int:
+        """Bytes the table's history copy takes."""
+        return self._backend.tables.history_size(table)
+
+    def free_bytes(self) -> int:
+        """Bytes free on the store's volume."""
+        return self._backend.tables.free_bytes()
 
     def purge_table_before(self, table: str, cutoff: date) -> int:
         """Delete ``table``'s partitions dated before ``cutoff`` (retention: ``purge-raw``)."""
