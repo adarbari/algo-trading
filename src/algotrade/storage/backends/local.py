@@ -24,6 +24,7 @@ partition at once (threads or processes) are both indexed. A ``pending`` write i
 only when its run commits, in every partition at once (``local_index.py``).
 """
 
+import glob
 import gzip
 import os
 import shutil
@@ -406,11 +407,16 @@ class LocalRuns:
     def find_many(self, jobs: Collection[str], first: date, last: date) -> list[RunRecord]:
         if not self.root.exists():
             return []
-        quoted = [f'"job": "{job}"' for job in jobs]
-        texts = (p.read_text() for p in self.root.glob("*.json"))
-        # a record of another job (an edge evaluation's runs are large) is never parsed
-        records = [RunRecord.from_json(t) for t in texts if any(q in t for q in quoted)]
-        hits = [r for r in records if r.job in jobs and first <= r.session_date <= last]
+        # run ids are ``{job}-{session}-{time}`` (new_run_id): only a job's own files are
+        # opened, and of those only the sessions asked for (a record of another job, an edge
+        # evaluation's runs are large, is never read)
+        records = [
+            RunRecord.from_json(path.read_text())
+            for job in jobs
+            for path in self.root.glob(f"{glob.escape(safe(job))}-*.json")
+            if (day := run_session(path.stem)) is not None and first <= day <= last
+        ]
+        hits = [r for r in records if r.job in jobs]
         return sorted(hits, key=lambda r: r.started_at)
 
 

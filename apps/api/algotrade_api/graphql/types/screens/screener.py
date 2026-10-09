@@ -236,8 +236,8 @@ class Screener:
         description="Its picked count for each of the last `sessions` (default 30, at most 90) "
         "exchange sessions ending at the session, oldest first, one entry per session: a "
         "session it did not run in has `picked` null and `notRun` says why (never an older "
-        "run); a session with several runs counts the latest; an earlier session counts only "
-        "runs known by the close of the session asked for"
+        "run); a session with several runs counts the latest; each entry is what `latestRun` "
+        "says at that session"
     )
     async def pick_history(
         self, info: Info, sessions: int = picks.DEFAULT_SESSIONS

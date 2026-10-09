@@ -8,6 +8,8 @@ from algotrade.services.read.context import ReadContext, at_session, open_contex
 from algotrade.services.read.screens.pick_history import (
     DEFAULT_SESSIONS,
     MAX_SESSIONS,
+    _counted,
+    _decisions,
     load_pick_histories,
 )
 from algotrade.services.read.screens.runs import latest_run
@@ -18,6 +20,8 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.writers import StoreWriter
 from tests.unit.services.read.screens.conftest import D0, D1, write_run
+from tests.unit.services.screening.test_regime import ON, screen
+from tests.unit.services.screening.test_rule_screens import DAY, configs
 
 Rows = list[tuple[str, str, float | None, float | None]]
 ROWS: Rows = [("AAA", "QUALIFIED", 1.0, None), ("BBB", "WATCH", 2.0, None),
@@ -111,3 +115,34 @@ def test_a_list_of_screeners_is_one_batch_and_ends_at_the_request_session(
     earlier = load_pick_histories(_on(reader, D0), [DELTA], 2)[DELTA]
     assert [p.session for p in earlier] == sessions_ending(D0, 2)  # D1's run is past the window
     assert earlier[-1].picked == 2
+
+
+def test_a_later_record_that_counted_nothing_defers_to_latest_run(
+    backend: MemoryBackend, ctx: ReadContext
+) -> None:
+    """A later run still RUNNING (rows written, no summary) is what ``latestRun`` shows: its
+    counts, not the older finished run's."""
+    _screen(backend, D0, "a", ROWS, 0)  # 2 picked
+    w = StoreWriter(backend)
+    write_run(w, D0, "b", "me", "delta", GATED, knowledge=T0 + timedelta(hours=5))
+    w.save_run(RunRecord("b", run_job_name("delta", "me"), D0, T0 + timedelta(hours=5)))
+    entry = load_pick_histories(ctx, [DELTA], 2)[DELTA][0]
+    run = latest_run(at_session(ctx, D0), *DELTA).run
+    assert run is not None and run.run_id == "b"
+    assert (entry.picked, entry.paused) == (run.picked, run.paused) == (1, 2)
+
+
+def test_a_real_gated_run_is_counted_as_latest_run_counts_it() -> None:
+    """The nightly's own record (``stats["summary"]``) of a run the regime gate paused."""
+    outcome, reader = screen("STRESS", ON)
+    ctx = open_context(reader, configs(), UserContext("site"), DAY)
+    key = ("site", "big_liquid")
+    run = latest_run(ctx, *key).run
+    assert run is not None and run.paused == outcome.audit["decisions"]["PAUSED"] == 2
+    records = reader.runs(run_job_name("big_liquid", "site"))
+    assert len(records) == 1
+    decisions = _decisions(records[0])  # what an earlier session's entry is counted from
+    assert decisions is not None
+    assert _counted(DAY, decisions).picked == run.picked and _counted(DAY, decisions).paused == 2
+    entry = load_pick_histories(ctx, [key], 2)[key]
+    assert [e.picked for e in entry] == [None, run.picked]  # the day before: no run

@@ -4,8 +4,9 @@ sparkline over the screens page.
 A **ranged read** (ADR 0036 allows explicit ranges, as the regime bands and the market history
 do): the window is the ``sessions`` exchange-calendar sessions ending at the request's resolved
 session (``core.time.calendar.sessions_ending``), oldest first, one entry per session, never
-skipped. Entry ``d`` is what ``latestRun`` says at session ``d`` (the same run: the latest, by
-the time it was recorded; the same counts, ``is_picked`` / ``PAUSED``, whole run); a session
+skipped. Entry ``d`` is what ``latestRun`` says at session ``d`` (the latest run; the same
+counts, ``is_picked`` / ``PAUSED``, whole run; where the session's latest record counted
+nothing, ``latestRun`` itself is asked); a session
 with no run of the screener is an entry with ``picked`` null and ``not_run`` saying why
 (``NOT_RUN``), never an older run carried forward. Every session is read as it is stored now
 (no ``as_of``: the same as ``latestRun`` at that session).
@@ -23,12 +24,15 @@ from datetime import date
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.services.read.availability.cause import run_cause
-from algotrade.services.read.context import ReadContext
+from algotrade.services.read.context import ReadContext, at_session
 from algotrade.services.read.screens.runs import (
     PAUSED,
     RULE_SCREEN,
+    LatestRun,
     RunKey,
+    ScreenerRun,
     is_picked,
+    latest_run,
     load_latest_runs,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
@@ -90,26 +94,38 @@ def load_pick_histories(
     today = load_latest_runs(ctx, keys) if days[-1] == ctx.session.date else {}
     jobs = {key: run_job_name(key[1], key[0]) for key in keys}
     records = _records(ctx, frozenset(jobs.values()), days[0], days[-1]) if len(days) > 1 else []
-    latest: dict[tuple[str, date], tuple[RunRecord, Mapping[str, int]]] = {}
-    for record in records:  # the latest record of a session wins (by when it finished)
-        decisions = _decisions(record)
-        held = latest.get((record.job, record.session_date))
-        if decisions is not None and (held is None or _finished(record) >= _finished(held[0])):
-            latest[(record.job, record.session_date)] = (record, decisions)
-    out: dict[RunKey, tuple[PickCount, ...]] = {}
-    for key, job in jobs.items():
-        counts = []
-        for day in days:
-            run = today[key].run if day == ctx.session.date and key in today else None
-            if run is not None:
-                counts.append(PickCount(day, run.picked, run.paused, None))
-            elif (hit := latest.get((job, day))) is not None and day != ctx.session.date:
-                counts.append(_counted(day, hit[1]))
-            else:
-                counts.append(_not_run(key[1], day))
-        out[key] = tuple(counts)
-    return out
+    latest: dict[tuple[str, date], RunRecord] = {}
+    for record in records:  # by start time: the session's latest record is the last
+        latest[(record.job, record.session_date)] = record
+    return {
+        key: tuple(_entry(ctx, key, job, day, today.get(key), latest) for day in days)
+        for key, job in jobs.items()
+    }
 
 
-def _finished(record: RunRecord) -> float:
-    return (record.finished_at or record.started_at).timestamp()
+def _of_run(day: date, config_id: str, run: ScreenerRun | None) -> PickCount:
+    if run is None:
+        return _not_run(config_id, day)
+    return PickCount(day, run.picked, run.paused, None)
+
+
+def _entry(
+    ctx: ReadContext,
+    key: RunKey,
+    job: str,
+    day: date,
+    todays: LatestRun | None,
+    latest: Mapping[tuple[str, date], RunRecord],
+) -> PickCount:
+    """``key``'s entry for ``day``: the request's session is ``latestRun``; an earlier one its
+    latest record's counts, or ``latestRun`` there when that record counted nothing (still
+    running, failed: its rows are what ``latestRun`` shows); no record: ``NOT_RUN``."""
+    if todays is not None and day == ctx.session.date:
+        return _of_run(day, key[1], todays.run)
+    record = latest.get((job, day))
+    if record is None:
+        return _not_run(key[1], day)
+    decisions = _decisions(record)
+    if decisions is not None:
+        return _counted(day, decisions)
+    return _of_run(day, key[1], latest_run(at_session(ctx, day), *key).run)
