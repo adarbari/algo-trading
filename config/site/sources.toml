@@ -191,6 +191,10 @@ max_universe_change = 0.05       # universe-build: FAIL on a >5% day-over-day ch
 max_type_disagreement = 0.10     # universe-build: FAIL if over 10% of ACTIVE rows have a vendor type our name rules
                                  # contradict (ADR 0045; measured 6.3% on 2026-10-05, of which name_over_vendor 0.7%)
 max_name_over_vendor = 0.02      # universe-build: FAIL if over 2% of ACTIVE rows are typed by the name over a generic vendor type (0.7% on 2026-10-05)
+min_bar_close = 0.01             # bar-quality (ADR 0061): a stored close below this (or <= 0) is flagged BELOW_FLOOR
+max_bar_jump = 10                # a one-day close ratio above this, either way, with no split event nearby, cuts the series
+split_window_sessions = 5        # a split event within this many bars of a jump explains it
+max_bad_bar_share = 0.02         # bar-quality: FAIL if over 2% of the bars read are flagged (0.97% on the full history, 2026-10-09)
 max_chain_fetch_failures = 0.02  # chains: FAIL if over 2% of optionable names failed to fetch (FETCH_ERROR,
                                  # incl. an open circuit, or never attempted)
 max_chain_stale_share = 0.20     # chains: FAIL if over 20% of the "rest" tier's chains are STALE_DATA (the feed

@@ -90,6 +90,11 @@ also_written_by = [
 ]
 
 [[table]]
+name = "events/bar_flag"
+owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/bar_quality.py"
+note = "ADR 0061: the stored daily bars that cannot be right (reason, status FLAGGED / CLEARED); data.prices drops FLAGGED bars at read time; no known_from (a fact of record about the stored bar)"
+
+[[table]]
 name = "events/dividend"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
 

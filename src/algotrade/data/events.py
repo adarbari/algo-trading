@@ -31,9 +31,16 @@ from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
 
 ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
-# Read by event date with no knowledge bound (module doc): applied to bars at read time.
+# Read by event date with no knowledge bound (module doc): applied to bars at read time
+# (``events/bar_flag``: the bars the quality check rejects are dropped, ADR 0061).
 FACTS_OF_RECORD = frozenset(
-    {"events/split", "events/dividend", "events/reference_change", "events/index_change"}
+    {
+        "events/split",
+        "events/dividend",
+        "events/reference_change",
+        "events/index_change",
+        "events/bar_flag",
+    }
 )
 
 
