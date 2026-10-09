@@ -29,7 +29,7 @@
     "/screeners": {
       "first_load_js_gzip_bytes": 209200,
       "requests": 48,
-      "dom_nodes": 189
+      "dom_nodes": 191
     },
     "/regime": {
       "first_load_js_gzip_bytes": 301400,
@@ -39,7 +39,7 @@
     "/screeners/vrp_scanner": {
       "first_load_js_gzip_bytes": 254700,
       "requests": 74,
-      "dom_nodes": 296
+      "dom_nodes": 298
     },
     "/admin/ingestion": {
       "first_load_js_gzip_bytes": 233200,
@@ -64,7 +64,7 @@
     "bundle.routes.src/pages/admin-ingestion/index.ts": "2026-10-09 #438 Guide entries in one batched read: the batch document and loader (replacing four single-entry documents) move into this page chunk (+645 B gzip); then 2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
     "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
     "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #440 the page chunk starts its read and the saved page cache when loaded (hover preload); then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +312 B); then 2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
-    "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #452 the typed criteria mapping (+1 node)",
+    "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #452 the typed criteria mapping (+1 node); then 2026-10-09 #454 ED8 PR-A: measured by CI after merging main; this PR's BarList change adds no nodes, so the two come from screener-page changes merged meanwhile",
     "e2e./screeners/vrp_scanner.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too; then 2026-10-09 #454 ED8 PR-A: making the decile and Robustness panels lazy on the Edges page split the shared BarList code into its own chunks, which this route now loads as two more requests",
     "e2e./explore?focus=AAPL&tab=chart.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
     "bundle.routes.src/pages/screener-builder/index.ts": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk; then 2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
@@ -78,6 +78,6 @@
     "e2e./regime.requests": "2026-10-09 #425 ED8 step 1: the shared DataTable / OddsLine code splits into one more chunk on this route (82 -> 83)",
     "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
     "e2e./screeners.requests": "2026-10-09 #452 one more script chunk from the build split; the GraphQL operations are unchanged (8, checked); then 2026-10-09 #454 ED8 PR-A: making the decile and Robustness panels lazy on the Edges page split the shared BarList code into its own chunks, which this route now loads as two more requests",
-    "e2e./screeners/vrp_scanner.dom_nodes": "2026-10-09 #452 the criteria scorecard shows each rule again (it read none before #447)"
+    "e2e./screeners/vrp_scanner.dom_nodes": "2026-10-09 #452 the criteria scorecard shows each rule again (it read none before #447); then 2026-10-09 #454 ED8 PR-A: measured by CI after merging main; this PR's BarList change adds no nodes, so the two come from screener-page changes merged meanwhile"
   }
 }
