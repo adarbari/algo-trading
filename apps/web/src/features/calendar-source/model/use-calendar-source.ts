@@ -1,23 +1,15 @@
 /**
  * The calendar's source and the names it gives: the site's scope list (the default) or the
- * latest results of a chosen screener (its picks: one page of up to 1000). The names are the
+ * latest results of a chosen screener (its picks, ids only: one light read of up to 1000). The names are the
  * server's; `ready` says whether the calendar can be asked for yet.
  */
 import { useState } from 'react';
 
 import { unknownText } from '@/entities/availability';
-import {
-  DEFAULT_DECISIONS,
-  useScreenerResults,
-  useScreeners,
-  type ScreenerResultsResponse,
-} from '@/entities/screen';
+import { useScreenerPicks, useScreeners, type ScreenerPicksResponse } from '@/entities/screen';
 
 /** The source value for the site's scope list. */
 export const SCOPE_SOURCE = 'scope';
-
-/** The most names a page of results holds (the API's page cap). */
-const PAGE = 1000;
 
 export interface CalendarSource {
   /** `SCOPE_SOURCE` or a screener id. */
@@ -39,7 +31,7 @@ export interface CalendarSource {
   failed: boolean;
 }
 
-type Results = ScreenerResultsResponse['screener'];
+type Results = ScreenerPicksResponse['screener'];
 
 function idsOf(screener: Results | undefined): string[] {
   return (screener?.latestRun?.results.results ?? []).map((r) => r.instrumentId);
@@ -49,11 +41,7 @@ export function useCalendarSource(): CalendarSource {
   const [value, setValue] = useState(SCOPE_SOURCE);
   const configs = useScreeners();
   const isScope = value === SCOPE_SOURCE;
-  const results = useScreenerResults(
-    value,
-    { decisions: DEFAULT_DECISIONS, columns: [], size: PAGE },
-    !isScope,
-  );
+  const results = useScreenerPicks(value, !isScope);
   const screener = results.data?.screener;
   const ids = isScope ? [] : idsOf(screener);
   let message: string | null = null;

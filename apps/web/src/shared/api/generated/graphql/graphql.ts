@@ -422,6 +422,15 @@ export type ScreenVersionsQueryVariables = Exact<{
 
 export type ScreenVersionsQuery = { screenVersions: Array<{ version: number, document: unknown }> };
 
+export type ScreenerPicksQueryVariables = Exact<{
+  id: string;
+  decisions?: Array<string> | string | null | undefined;
+  size?: number | null | undefined;
+}>;
+
+
+export type ScreenerPicksQuery = { screener: { id: string, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, latestRun: { runId: string, results: { total: number, results: Array<{ instrumentId: string }> } } | null } | null };
+
 export type ScreenerResultsQueryVariables = Exact<{
   id: string;
   decisions?: Array<string> | string | null | undefined;
@@ -2341,6 +2350,37 @@ export const ScreenVersionsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenVersionsQuery, ScreenVersionsQueryVariables>;
+export const ScreenerPicksDocument = new TypedDocumentString(`
+    query ScreenerPicks($id: String!, $decisions: [String!], $size: Int) {
+  screener(id: $id) {
+    id
+    notRun {
+      code
+      kind
+      guideTerm
+      kindText
+      cause {
+        links {
+          level
+          subject
+          status
+          message
+          runId
+        }
+      }
+    }
+    latestRun {
+      runId
+      results(decisions: $decisions, size: $size) {
+        total
+        results {
+          instrumentId
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenerPicksQuery, ScreenerPicksQueryVariables>;
 export const ScreenerResultsDocument = new TypedDocumentString(`
     query ScreenerResults($id: String!, $decisions: [String!], $change: String, $q: String, $sort: String, $columns: [FeatureName!], $page: Int, $size: Int) {
   session {

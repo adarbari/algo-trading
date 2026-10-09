@@ -10,7 +10,7 @@ import { EventCalendarPanel } from './EventCalendarPanel';
 const hooks = vi.hoisted(() => ({
   useEventCalendar: vi.fn(),
   useScreeners: vi.fn(),
-  useScreenerResults: vi.fn(),
+  useScreenerPicks: vi.fn(),
 }));
 
 vi.mock('@/entities/event', async (importOriginal) => ({
@@ -20,7 +20,7 @@ vi.mock('@/entities/event', async (importOriginal) => ({
 vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreeners: hooks.useScreeners,
-  useScreenerResults: hooks.useScreenerResults,
+  useScreenerPicks: hooks.useScreenerPicks,
 }));
 
 stubElementSize();
@@ -35,7 +35,7 @@ const picks = (ids: string[]) =>
 beforeEach(() => {
   hooks.useEventCalendar.mockReturnValue(fakeQuery(CALENDAR));
   hooks.useScreeners.mockReturnValue(fakeQuery([{ configId: 'vrp_scanner' }]));
-  hooks.useScreenerResults.mockReturnValue(picks(['EQ:A']));
+  hooks.useScreenerPicks.mockReturnValue(picks(['EQ:A']));
 });
 
 describe('EventCalendarPanel', () => {
@@ -60,7 +60,7 @@ describe('EventCalendarPanel', () => {
   });
 
   it('says why a screener without a run has no calendar, and asks for nothing', async () => {
-    hooks.useScreenerResults.mockReturnValue(
+    hooks.useScreenerPicks.mockReturnValue(
       fakeQuery({
         screener: {
           latestRun: null,
