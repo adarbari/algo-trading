@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "description": "The algotrade web UI (ADR 0011, ADR 0025). Layered, component-only: see docs/ui/architecture.md.",
   "engines": {
     "node": ">=24"

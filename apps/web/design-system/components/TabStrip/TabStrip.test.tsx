@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -69,6 +69,27 @@ describe('TabStrip', () => {
     expect(screen.queryByRole('button', { name: /Close/, hidden: true })).toBeNull();
     expect(screen.queryByRole('tabpanel')).toBeNull();
     expect(screen.getAllByRole('tab')[0]).toHaveAttribute('tabindex', '0');
+  });
+
+  it('reveals the selected tab again once the fonts resolve (their widths move the tabs)', async () => {
+    let resolveFonts: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => {
+      resolveFonts = resolve;
+    });
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready } });
+    const reveal = vi.spyOn(Element.prototype, 'scrollIntoView');
+    try {
+      render(<Harness />);
+      expect(reveal).toHaveBeenCalledTimes(1);
+      resolveFonts();
+      await act(async () => {
+        await ready;
+      });
+      expect(reveal).toHaveBeenCalledTimes(2);
+    } finally {
+      reveal.mockRestore();
+      Reflect.deleteProperty(document, 'fonts');
+    }
   });
 
   it('has no accessibility violations', async () => {

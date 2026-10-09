@@ -43,9 +43,19 @@ export function TabStrip({ items, value, onChange, onClose, label, children }: T
   const selectedId = items.some((item) => item.id === value) ? value : null;
 
   useEffect(() => {
-    if (selectedId) {
+    if (!selectedId) return;
+    const reveal = () =>
       refs.current.get(selectedId)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
+    reveal();
+    // The web fonts change the tab widths when they arrive: reveal again so the selected tab is
+    // in view whatever the order of the font and the first render.
+    let live = true;
+    void (document.fonts as FontFaceSet | undefined)?.ready.then(() => {
+      if (live) reveal();
+    });
+    return () => {
+      live = false;
+    };
   }, [selectedId]);
 
   function select(id: string) {
