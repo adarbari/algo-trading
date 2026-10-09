@@ -5,6 +5,8 @@ the GraphiQL IDE only when ``ApiSettings.debug``). Every error in a response car
 ``extensions.code`` (``errors.py``). ``sdl()`` is the committed snapshot
 ``apps/api/schema.graphql`` (``scripts/export_graphql_schema.py``)."""
 
+import asyncio
+import gzip
 import json
 from collections.abc import Callable, Hashable
 from typing import Any, cast
@@ -33,6 +35,7 @@ from algotrade_api.graphql.scalars import SCALARS
 from algotrade_api.graphql.types.query import Query
 
 PATH = "/graphql"
+GZIP_LEVEL = 5  # a cached answer is compressed once and read many times
 
 schema = strawberry.Schema(
     query=Query,
@@ -82,7 +85,7 @@ class _Router(GraphQLRouter[RequestContext, None]):
             key = response_key(self._seq(), self._epoch.value, viewer, document, variables, name)
             body = self._cache.get(key)
             if body is not None:
-                return Response(body, media_type="application/json")
+                return await _served(body, request)
         inline = parsed is not None and only_inline(cast(Hashable, self.schema), parsed[0])
         if not inline:
             self._admission.admit()
@@ -93,8 +96,32 @@ class _Router(GraphQLRouter[RequestContext, None]):
                 self._admission.release()
         failed = getattr(request.state, "failed", True)
         if key is not None and response.status_code == 200 and not failed:
-            self._cache.put(key, bytes(response.body))
+            packed = await asyncio.to_thread(gzip.compress, bytes(response.body), GZIP_LEVEL)
+            self._cache.put(key, packed)
+            return await _served(packed, request)
         return response
+
+
+async def _served(packed: bytes, request: Request) -> Response:
+    """A cached (gzip) body as the answer: as is, with ``Content-Encoding: gzip``, when the
+    client accepts gzip (the ``GZipMiddleware`` leaves an encoded response alone, so nothing
+    is compressed per hit); else inflated off the event loop (bounded: one pass over a body
+    the cache already bounds, and only for a client that cannot read gzip)."""
+    headers = {"Vary": "Accept-Encoding"}
+    if _accepts_gzip(request.headers.get("accept-encoding", "")):
+        headers["Content-Encoding"] = "gzip"
+        return Response(packed, media_type="application/json", headers=headers)
+    body = await asyncio.to_thread(gzip.decompress, packed)
+    return Response(body, media_type="application/json", headers=headers)
+
+
+def _accepts_gzip(header: str) -> bool:
+    """Whether an ``Accept-Encoding`` value allows gzip (a listed ``gzip`` or ``*``, not q=0)."""
+    for item in header.split(","):
+        coding, _, params = item.partition(";")
+        if coding.strip().lower() in ("gzip", "*"):
+            return params.replace(" ", "").lower() not in ("q=0", "q=0.0", "q=0.00", "q=0.000")
+    return False
 
 
 async def _operation(request: Request) -> tuple[str, Any] | None:
