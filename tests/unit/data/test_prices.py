@@ -165,3 +165,10 @@ def test_a_backtest_that_needs_a_flagged_bar_names_the_flag() -> None:
     with pytest.raises(MissingDataError, match="UNEXPLAINED_JUMP") as raised:
         load_price_data(reader, ["EQ:A"], FDAYS[0], FDAYS[2])
     assert "EQ:A" in str(raised.value) and str(FLAGGED_DAY) in str(raised.value)
+
+
+def test_an_open_ended_read_does_not_overflow_the_flag_range() -> None:
+    """Catches: ``date.min`` / ``date.max`` bounds (open-ended reads, the golden suite) widened
+    by a day for the flag read overflowed (``OverflowError``, CI on #450)."""
+    reader = StoreReader(_flagged_store(FLAG))
+    assert len(read_bars(reader, "1d", date.min, date.max)) == 5

@@ -55,7 +55,9 @@ def _split_flagged(
     ``ts``, ``reason``, ``detail``). A flag is read by the bar's close ``ts`` (a day either
     side of the range: the close is on the session's date in UTC)."""
     day = timedelta(days=1)
-    flags = read_events(reader, FLAGS_TABLE, start - day, end + day, instruments, as_of).frame
+    lo = start - day if start > date.min else start  # open-ended reads pass date.min / max
+    hi = end + day if end < date.max else end
+    flags = read_events(reader, FLAGS_TABLE, lo, hi, instruments, as_of).frame
     if flags.empty:
         return frame, _NO_FLAGS
     flags = flags[flags["status"] == FLAGGED]
