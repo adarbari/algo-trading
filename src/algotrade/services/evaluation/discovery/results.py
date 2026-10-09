@@ -100,7 +100,9 @@ class DiscoveryResult:
     ``effect`` per (feature, session), the ``block_effects`` and pooled ``tells``, the
     ``clusters`` of qualifying tells (feature names), what was ``excluded``, the gate
     (``observed_clusters`` against the ``null_counts`` of the permutations, ``passed``), the
-    number of non-overlapping blocks reported as independent sessions and the ``proposals``."""
+    number of ``blocks`` and the ``proposals``. A block is ``block_sessions`` sessions of grid
+    sessions; blocks are not strictly independent: the windows of one block's last sessions
+    overlap the next block's, so report "blocks", never "independent sessions"."""
 
     settings: WinnersStudySettings
     seed: int
@@ -114,5 +116,5 @@ class DiscoveryResult:
     null_counts: tuple[int, ...]
     null_threshold: float
     passed: bool
-    independent_blocks: int
+    blocks: int  # not strictly independent: neighbouring blocks' windows overlap
     proposals: tuple[Proposal, ...]

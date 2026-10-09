@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.winners import WinnersStudySettings
-from algotrade.core.model.fields import NUMERIC_TYPES
+from algotrade.core.model.fields import NUMERIC_TYPES, group_of_table
 from algotrade.data import StoreReader
 from algotrade.data.feature_inputs import first_stored_session
 from algotrade.features.expressions.feature_set import FeatureSet
@@ -78,16 +78,28 @@ def feature_reads(features: FeatureSet, feature: Feature) -> Reads:
     columns: set[str] = set()
     names: set[str] = set()
 
+    by_key = {g.key: g for g in features.code.values()}
+
+    def read_group(key: str) -> None:
+        """The tables of a group's inputs; an input that is itself a group's table adds that
+        group's inputs, transitively (a group built on reference or company data is late)."""
+        for i in by_key[key].inputs:
+            if i.table in tables:
+                continue
+            tables.add(i.table)
+            found = group_of_table(i.table)
+            if found is not None and found[1] in by_key:
+                read_group(found[1])
+
     def visit(f: Feature) -> None:
         if f.group:
-            group = features.code[f.group]
-            tables.update(i.table for i in group.inputs)
-            columns.add(f"{group.name}.{f.name}")
+            columns.add(f"{features.code[f.group].name}.{f.name}")
+            read_group(f.group)
             return
         expression = features.expressions[f.name]
         for ref in expression.refs:
             group_name = ref.partition(".")[0]
-            tables.update(i.table for i in by_name[group_name].inputs)
+            read_group(by_name[group_name].key)
             columns.add(ref)
         for used in expression.uses:
             if used not in names:
@@ -198,7 +210,7 @@ def session_frame(
     eligible = read_eligible(reader, day, settings, features)
     labels = read_labels(reader, day, list(eligible["instrument_id"]), settings)
     cells = assign_cells(eligible, settings)
-    drawn = draw_controls(cells, labels.winners, day, settings)
+    drawn = draw_controls(cells, labels.winners, day, settings, labels.measured_ids)
     candidates = usable_fields(features, day, first_partition)
     ids = sorted(labels.winners | set(drawn.ids))
     view = read_values(reader, day, candidates.fields, ids, features)

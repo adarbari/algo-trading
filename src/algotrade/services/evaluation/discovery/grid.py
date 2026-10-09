@@ -3,7 +3,8 @@
 A grid session S is every ``step_sessions`` from the first session with ``min_history_sessions``
 of bars, while the window that starts at S (``horizon_sessions``) closes before ``frozen_from``
 (S before ``training.frame.purge_cutoff``). Each S belongs to a block of ``block_sessions``
-sessions from the first S: the blocks are what the study counts as independent sessions.
+sessions from the first S: the blocks are what the study counts (not strictly independent:
+a block's last windows overlap the next block's).
 
 The eligible at S are the stocks of ``universe_asof(S)`` (survivors and the delisted alike; its
 membership identity read, never a feature) with a bar at S, a close of at least ``min_price`` and a

@@ -128,3 +128,24 @@ def test_an_unknown_value_stays_nan_in_the_frame() -> None:
     frame = assemble(values, ("f", "absent"), {"A"}, {"B"}, pd.Series({"A": "c", "B": "c"}))
     assert frame["f"].tolist()[0] == 1.5 and np.isnan(frame["f"].tolist()[1])
     assert frame["absent"].isna().all()
+
+
+def test_late_input_feature_excluded_through_group_input() -> None:
+    """A group that reads another group's table inherits that group's inputs: a feature built on
+    a group that reads a late table is late too. Catches: only a group's direct input tables
+    being checked."""
+    from algotrade.services.evaluation.discovery.frame import feature_reads  # noqa: PLC0415
+
+    nested = [
+        f
+        for f in SITE.features.values()
+        if f.group and feature_reads(SITE, f).tables - {i.table for i in SITE.code[f.group].inputs}
+    ]
+    assert nested, "some group reads another group's table"
+    f = nested[0]
+    direct = {i.table for i in SITE.code[f.group].inputs}
+    deep = sorted(feature_reads(SITE, f).tables - direct)[0]
+    first = everywhere(SITE)
+    first[deep] = date(2026, 1, 5)
+    got = usable_fields(SITE, S, first)
+    assert f.field not in got.fields and any(n == f.field and deep in w for n, w in got.excluded)

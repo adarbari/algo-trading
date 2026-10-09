@@ -49,9 +49,14 @@ def draw_controls(
     winners: Collection[str],
     session: date,
     settings: WinnersStudySettings,
+    among: Collection[str] | None = None,
 ) -> Controls:
-    """The controls for ``winners`` among the names of ``cells`` (``assign_cells``)."""
+    """The controls for ``winners`` among the names of ``cells`` (``assign_cells``), only those in
+    ``among`` when given (the names with a COMPLETE or DELISTED outcome: a name with no outcome
+    row cannot be shown not to have won)."""
     won = set(winners)
+    if among is not None:
+        cells = cells[cells.index.isin(set(among) | won)]
     seed = (settings.seed, session.toordinal())
     rng = np.random.default_rng(list(seed))
     wanted = settings.controls_per_winner * len(won)

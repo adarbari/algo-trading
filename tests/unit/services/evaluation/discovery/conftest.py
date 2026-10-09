@@ -38,5 +38,5 @@ def session_frame_of(
     )
     for name, values in columns.items():
         frame[name] = np.asarray(values, dtype=float)
-    labels = Labels(day, frozenset(ids[:winners]), 0.5, n, n, 0.0)
+    labels = Labels(day, frozenset(ids[:winners]), 0.5, n, n, frozenset(ids), 0.0)
     return SessionFrame(GridSession(day, block), labels, controls, (0, day.toordinal()), frame, ())

@@ -38,6 +38,7 @@ class Labels:
     threshold: float
     eligible: int
     measured: int
+    measured_ids: frozenset[str]  # the eligible names with a counted row: the control pool
     missing_fraction: float
 
 
@@ -76,6 +77,7 @@ def label_winners(
         threshold=threshold,
         eligible=len(ids),
         measured=len(counted),
+        measured_ids=frozenset(counted["instrument_id"]),
         missing_fraction=missing,
     )
 

@@ -91,3 +91,16 @@ def test_a_cell_short_of_names_gives_all_it_has() -> None:
     )
     got = draw_controls(assign_cells(eligible, s), ["EQ:5"], S, s)
     assert got.ids == ("EQ:3", "EQ:4") and got.wanted == 5
+
+
+def test_controls_are_drawn_only_from_names_with_an_outcome() -> None:
+    """A name with no COMPLETE or DELISTED row cannot be shown not to have won, so it is never a
+    control. Catches: drawing from every eligible name."""
+    s = settings()
+    eligible = names()
+    cells = assign_cells(eligible, s)
+    winners = winners_of(eligible)
+    measured = set(eligible["instrument_id"].iloc[:250])
+    got = draw_controls(cells, winners, S, s, measured)
+    assert set(got.ids) <= measured and got.ids
+    assert got.ids != draw_controls(cells, winners, S, s).ids

@@ -106,7 +106,7 @@ def test_gate_counts_clusters() -> None:
     dup = find_tells(frames(copies), s)
     assert sorted(len(c) for c in dup.clusters) == [1, 6]  # six copies: one cluster
     assert dup.observed_clusters == 2 and not dup.passed
-    assert len(dup.null_counts) == 25 and dup.independent_blocks == 6
+    assert len(dup.null_counts) == 25 and dup.blocks == 6
 
 
 def test_the_gate_needs_the_minimum_and_a_count_above_the_null() -> None:

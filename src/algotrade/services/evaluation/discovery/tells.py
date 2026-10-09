@@ -4,9 +4,10 @@ Per (feature, grid session) the effect is Hedges' g of the winners over the cont
 (``edge_statistics.standardised_effect``); UNKNOWN values are dropped and counted. A feature counts
 at S only when both groups have at least ``min_coverage`` of it stored and the two coverages differ
 by less than ``max_coverage_gap`` (otherwise missingness itself is the signal, and it is
-refused). The effects are averaged per block of ``block_sessions`` (the non-overlapping horizons,
-reported as the independent sessions), and a feature's sign is *stable* when at least
-``stable_blocks`` blocks share it and the mean of each half (before / from ``split_date``) has it.
+refused). The effects are averaged per block of ``block_sessions`` (reported as "blocks", not
+independent sessions: neighbouring blocks' windows overlap), and a feature's sign is *stable*
+when at least ``stable_blocks`` blocks share it and the mean of each half (before / from
+``split_date``) has it.
 
 A *tell* qualifies when stable with |mean g| above ``min_abs_hedges_g``. Qualifying tells that
 rank-correlate above ``cluster_rank_corr`` are one cluster (single linkage, so fewer clusters:
@@ -224,7 +225,7 @@ def find_tells(frames: Sequence[SessionFrame], settings: WinnersStudySettings) -
         null_counts=null,
         null_threshold=float(np.percentile(null, settings.null_percentile)) if null else 0.0,
         passed=gate_passes(observed, null, settings),
-        independent_blocks=len(blocks.ids),
+        blocks=len(blocks.ids),
         proposals=propose(stacked, winner, fields),
     )
 
