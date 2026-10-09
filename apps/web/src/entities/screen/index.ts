@@ -5,6 +5,7 @@
 export {
   PREVIEW_ROWS,
   forgetScreen,
+  prefetchScreeners,
   refreshScreens,
   useMyScreeners,
   useRunScreener,

@@ -7,6 +7,7 @@
  */
 import {
   keepPreviousData,
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
@@ -103,11 +104,18 @@ export function forgetScreen(client: QueryClient, id: string): void {
 
 /** Every screener config the user sees: site presets and their own (Python and rule screens). */
 export function useScreeners() {
-  return useQuery({
+  return useQuery({ ...screenerConfigsQuery(), select: (data) => data.configs });
+}
+
+const screenerConfigsQuery = () =>
+  queryOptions({
     queryKey: queryKeys.gql('ScreenerConfigs', {}),
     queryFn: () => gql(ScreenerConfigs, {}),
-    select: (data) => data.configs,
   });
+
+/** Start reading the screener list before the page opens (a link was hovered): a no-op while fresh. */
+export function prefetchScreeners(client: QueryClient): void {
+  void client.prefetchQuery(screenerConfigsQuery());
 }
 
 /** The user's own screens: finalized ones and draft-only ones (status DRAFT). */

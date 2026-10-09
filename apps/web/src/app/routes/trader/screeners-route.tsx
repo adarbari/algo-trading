@@ -5,6 +5,7 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
+import { prefetchScreeners } from '@/entities/screen';
 import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
 import { lazyPage } from '@/shared/lib/lazy';
@@ -84,6 +85,9 @@ const indexRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: '/',
   component: ScreenersIndex,
+  loader: ({ context }) => {
+    prefetchScreeners(context.queryClient);
+  },
 });
 const newRoute = createRoute({
   getParentRoute: () => screenersRoute,

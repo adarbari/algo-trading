@@ -446,6 +446,11 @@ export type StatusScreensQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type StatusScreensQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }> };
 
+export type SessionDateQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SessionDateQuery = { session: { date: string } | null };
+
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -2549,6 +2554,13 @@ export const StatusScreensDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<StatusScreensQuery, StatusScreensQueryVariables>;
+export const SessionDateDocument = new TypedDocumentString(`
+    query SessionDate {
+  session {
+    date
+  }
+}
+    `) as unknown as TypedDocumentString<SessionDateQuery, SessionDateQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {

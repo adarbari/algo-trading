@@ -23,7 +23,15 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 export function createQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { staleTime: 60_000, retry: shouldRetry, refetchOnWindowFocus: false },
+      // A short staleTime: a page restored from the browser's saved cache (query-persistence.ts)
+      // is read again in the background at once; gcTime keeps visited pages in memory (and so in
+      // the saved cache) for half an hour instead of five minutes.
+      queries: {
+        staleTime: 60_000,
+        gcTime: 30 * 60_000,
+        retry: shouldRetry,
+        refetchOnWindowFocus: false,
+      },
     },
   });
   onUnauthorized(() => {

@@ -3,7 +3,7 @@
  * 90 days of the names asked for (a screener's results) or of the site's scope list, one entry
  * per day, with the parts not known for the session.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
 
@@ -68,11 +68,22 @@ export type EventCalendarResponse = NonNullable<gqlTypes.EventCalendarQuery['eve
  * stored. `enabled` false waits for the ids (a screener's results still loading).
  */
 export function useEventCalendar(instrumentIds: readonly string[], scope: boolean, enabled = true) {
-  const variables = { instrumentIds: [...instrumentIds], scope };
   return useQuery({
-    queryKey: queryKeys.gql('EventCalendar', variables),
-    queryFn: () => gql(EventCalendar, variables),
+    ...calendarQuery(instrumentIds, scope),
     select: (data: gqlTypes.EventCalendarQuery) => data.eventCalendar ?? null,
     enabled,
   });
+}
+
+function calendarQuery(instrumentIds: readonly string[], scope: boolean) {
+  const variables = { instrumentIds: [...instrumentIds], scope };
+  return queryOptions({
+    queryKey: queryKeys.gql('EventCalendar', variables),
+    queryFn: () => gql(EventCalendar, variables),
+  });
+}
+
+/** Start reading the scope list's calendar (the page's default) before the page opens. */
+export function prefetchCalendar(client: QueryClient): void {
+  void client.prefetchQuery(calendarQuery([], true));
 }

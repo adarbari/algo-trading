@@ -41,6 +41,11 @@ export async function mockViewer(page: Page, options: ViewerMockOptions = {}): P
       await route.fulfill({ json: { data: { ideas: null } } });
       return;
     }
+    // The saved page cache asks which session the API reads (query-persistence.ts).
+    if (/query\s+SessionDate\b/.test(body?.query ?? '')) {
+      await route.fulfill({ json: { data: { session: { date: '2026-10-07' } } } });
+      return;
+    }
     if (/query\s+NightlyRuns\b/.test(body?.query ?? '') && body?.variables?.limit === 1) {
       await route.fulfill({ json: { data: { nightlyRuns: [] } } });
       return;
