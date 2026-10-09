@@ -838,13 +838,22 @@ def load_phrasebook(configs: SiteDocuments) -> PhrasebookSettings:
     return PhrasebookSettings.from_document(site_document(configs.load, "phrasebook"))
 
 
+# By store identity (the store kept alive): site config changes with a release, as the site
+# feature catalogue does (``features.site``); every Guide read and help button needs it, and
+# parsing it each time held the GIL for 0.12 s a request.
+_FIELD_GUIDES: dict[int, tuple[SiteDocuments, FieldGuideSettings]] = {}
+
+
 def load_field_guide(configs: SiteDocuments) -> FieldGuideSettings:
     """``config/site/field_guide/*.toml`` (ADR 0041, amended): how to read each field, in
-    file-name order; none without files."""
-    names = configs.names("site", "field_guide")
-    return FieldGuideSettings.from_documents(
-        {n: configs.load("site", "field_guide", n) for n in names}
-    )
+    file-name order; none without files. Read once per store."""
+    built = _FIELD_GUIDES.get(id(configs))
+    if built is None or built[0] is not configs:
+        names = configs.names("site", "field_guide")
+        documents = {n: configs.load("site", "field_guide", n) for n in names}
+        built = (configs, FieldGuideSettings.from_documents(documents))
+        _FIELD_GUIDES[id(configs)] = built
+    return built[1]
 
 
 def load_macro(configs: SiteDocuments) -> MacroSettings:

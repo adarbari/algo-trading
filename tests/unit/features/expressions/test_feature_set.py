@@ -87,6 +87,18 @@ def test_join_marks_rows_present_absent_and_unknown() -> None:
     assert len(empty_keys) == 0
 
 
+def test_join_narrowed_frames_take_the_sessions_a_group_covers() -> None:
+    # X's rows only: b has rows on D1 and D2 (for others), c on D2 alone, d none at all
+    a = pd.DataFrame({"session_date": [D1, D2], "instrument_id": ["X", "X"], "v": [1.0, 2.0]})
+    b = pd.DataFrame({"session_date": [D1], "instrument_id": ["X"], "w": ["k"]})
+    covered = {"b": {D1, D2}, "c": {D2}}
+    _, cols = join({"a": a, "b": b, "c": None, "d": None},
+                   {"a": {"v"}, "b": {"w"}, "c": set(), "d": set()}, covered)  # fmt: skip
+    assert list(cols["exists:b"]) == [1.0, 0.0]  # D2: b has rows, none of X's
+    assert np.isnan(cols["exists:c"][0]) and cols["exists:c"][1] == 0.0
+    assert np.isnan(cols["exists:d"]).all()
+
+
 def test_evaluate_a_range_and_a_materialised_compute(fs: FeatureSet) -> None:
     ps = pd.DataFrame({"session_date": [D1, D2, D2], "instrument_id": ["X", "X", "Y"],
                        "close": [10.0, 11.0, 0.0], "sma_20": [10.0, 10.0, 5.0]})  # fmt: skip

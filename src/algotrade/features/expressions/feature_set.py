@@ -24,7 +24,7 @@ superseded group (``rollup.price_stats@v1.pct_from_high_52w``) to where it lives
 expression features (``scope == "user"``), checked on top of the site's (never materialised).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from datetime import date
 from functools import partial
 
@@ -304,12 +304,17 @@ class FeatureSet:
         frames: Mapping[str, pd.DataFrame | None],
         names: Sequence[str],
         compute: Sequence[str] = (),
+        covered: Mapping[str, Collection[date]] | None = None,
     ) -> pd.DataFrame:
         """``names`` over stored rows -> ``session_date``, ``instrument_id`` + one typed
-        column per name. ``frames``: rows by stored table (``stored_columns``)."""
+        column per name. ``frames``: rows by stored table (``stored_columns``); ``covered``:
+        the sessions an ``exists`` table has rows for, by table, when ``frames`` are narrowed
+        to some instruments (``join``)."""
         stored, todo = self.plan(names, compute)
         by_group = {g: frames.get(self.table(g)) for g in stored}
-        keys, columns = join(by_group, stored)
+        by_table = covered or {}
+        sessions = {g: by_table[self.table(g)] for g in stored if self.table(g) in by_table}
+        keys, columns = join(by_group, stored, sessions)
         values: dict[str, tuple[np.ndarray, str]] = {}
 
         def lookup(name: str) -> tuple[np.ndarray, str]:
