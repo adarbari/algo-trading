@@ -116,7 +116,7 @@ export async function mockRegimeComputed(page: Page): Promise<void> {
       regime: {
         ...regime,
         label: 'CAUTION',
-        headline: '2 of 5 slow-moving warning signs are on.',
+        headline: '2 of 4 slow-moving warning signs are on.',
         indicators,
       },
     },

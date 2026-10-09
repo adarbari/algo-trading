@@ -236,8 +236,9 @@ is market stress alone, Severe storm is both.
 title = "The indicator cards"
 body = """
 Each card asks one plain question, such as whether long-term interest rates are below
-short-term ones, and says whether its warning signal is on today. Slow cards watch the
-economy; fast cards watch the market. Behind each card: why it matters, what on means, how
+short-term ones, and says whether its warning signal is on today. Slow cards move over
+weeks or months; fast cards move within days or a couple of weeks (pace says how fast a card
+moves, not what it measures: the financial conditions card is fast but still counts toward macro risk). Behind each card: why it matters, what on means, how
 far ahead it has warned before, its false alarms, and what it did before each past market fall.
 """
 

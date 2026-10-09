@@ -473,7 +473,7 @@
         },
         {
           "key": "nfci",
-          "pace": "slow",
+          "pace": "fast",
           "plainName": "Is money getting harder to get?",
           "technicalName": "Chicago Fed National Financial Conditions Index (NFCI)",
           "oneLiner": "The Chicago Fed's National Financial Conditions Index: borrowing costs, credit, leverage and market stress in one weekly number.",

@@ -38,8 +38,8 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByText(/not available because of a system error/).first()).toBeVisible();
     const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
     const fast = page.getByRole('region', { name: 'Fast-moving market signs' });
-    await expect(slow.getByRole('listitem')).toHaveCount(5);
-    await expect(fast.getByRole('listitem')).toHaveCount(3);
+    await expect(slow.getByRole('listitem')).toHaveCount(4);
+    await expect(fast.getByRole('listitem')).toHaveCount(4);
     await expect(page.getByRole('region', { name: 'How to read the charts' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Scores through the cycles' })).toBeVisible();
     await expect(slow.getByRole('img', { name: /: unknown\./ }).first()).toBeVisible();
@@ -154,7 +154,7 @@ test('the explain button is hidden when no text model is configured', async ({ p
   await mockExplain(page, false);
   await page.goto('/regime');
   await expect(page.getByRole('heading', { level: 3, name: 'Clouds building' })).toBeVisible();
-  await expect(page.getByText('2 of 5 slow-moving warning signs are on.')).toBeVisible();
+  await expect(page.getByText('2 of 4 slow-moving warning signs are on.')).toBeVisible();
   await expect(page.getByRole('button', { name: /plain words/ })).toHaveCount(0);
   expect(errors.filter((e) => !e.includes('503'))).toEqual([]);
 });
