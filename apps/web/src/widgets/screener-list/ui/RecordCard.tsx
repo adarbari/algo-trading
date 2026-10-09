@@ -1,6 +1,6 @@
 /**
- * A screener's track record as a compact card in its opened row (ADR 0053): hit rate against the
- * base rate, lift, sessions, horizon and edge from the server's frozen-period record (never an
+ * A screener's track record as a compact card in its opened row (ADR 0053): win rate and base rate, lift (the served ratio),
+ * trades, holding period and edge from the server's frozen-period record (never an
  * exploratory run), with a link to the edge's evidence; the server's words when there is none.
  */
 import { Button, formatValue, Stack, Text } from '@algotrade/ui';
@@ -12,7 +12,7 @@ import { Facts } from './Facts';
 
 const percent = (value: number) => formatValue(value, { kind: 'percent', digits: 1 }).text;
 const lift = (value: number) => `${formatValue(value, { kind: 'number', digits: 2 }).text}×`;
-const sessions = (n: number) => `${formatValue(n, { kind: 'number' }).text} sessions`;
+const trades = (n: number) => formatValue(n, { kind: 'number' }).text;
 
 export interface RecordCardProps {
   screenerId: string;
@@ -48,15 +48,20 @@ export function RecordCard({ screenerId, onOpenEdge }: RecordCardProps) {
         label="Track record"
         facts={[
           {
-            id: 'hit',
-            label: 'Hit rate',
-            value: `${percent(figures.hitRate)} vs ${percent(figures.baseRate)} base`,
+            id: 'win',
+            label: 'Win rate',
+            value: percent(figures.hitRate),
           },
+          { id: 'base', label: 'Base rate', value: percent(figures.baseRate) },
           ...(figures.lift === null
             ? []
             : [{ id: 'lift', label: 'Lift', value: lift(figures.lift) }]),
-          { id: 'sessions', label: 'Sessions', value: sessions(figures.sessions) },
-          { id: 'horizon', label: 'Horizon', value: `${String(figures.horizonSessions)} sessions` },
+          { id: 'trades', label: 'Trades', value: trades(figures.sessions) },
+          {
+            id: 'horizon',
+            label: 'Holding period',
+            value: `${String(figures.horizonSessions)} sessions`,
+          },
           { id: 'edge', label: 'Edge', value: figures.edgeName },
         ]}
       />

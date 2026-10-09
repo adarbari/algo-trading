@@ -118,6 +118,11 @@ const summary = (id: string, picked: number | null): ScreenerRunSummary => ({
   id,
   name: `Name of ${id}`,
   criteria: [{ id: 'iv', field: 'iv_rank', mode: 'hard' }],
+  pickHistory: [
+    { session: '2026-10-06', picked: 1 },
+    { session: '2026-10-07', picked: null },
+    { session: '2026-10-08', picked: picked },
+  ],
   notRun: picked === null ? { kindText: 'not run' } : null,
   latestRun:
     picked === null
@@ -221,6 +226,9 @@ describe('ScreenerList', () => {
     expect(
       within(table).getByRole('img', { name: /Decisions of vrp_scanner: Qualified 12/ }),
     ).toBeInTheDocument();
+    expect(
+      within(table).getByRole('img', { name: /^my-vrp picks, last 3 sessions/ }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText('No run today')).toHaveLength(1);
     expect(toggle(/^Name of broken Mine/)).toHaveTextContent('Does not resolve');
     expect(toggle(/^idea Mine/)).toHaveTextContent('Draft');
@@ -249,7 +257,7 @@ describe('ScreenerList', () => {
     expect(screen.getByText('AAPL')).toBeInTheDocument();
     expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
     expect(screen.getByText('Above the 50d high on volume')).toBeInTheDocument();
-    expect(screen.getByText('60.0% vs 50.0% base')).toBeInTheDocument();
+    expect(screen.getByText('60.0%')).toBeInTheDocument();
     await openRow(/^Name of vrp_scanner/);
     expect(toggle(/^Name of my-vrp/)).toHaveAttribute('aria-expanded', 'false');
     expect(toggle(/^Name of vrp_scanner/)).toHaveAttribute('aria-expanded', 'true');

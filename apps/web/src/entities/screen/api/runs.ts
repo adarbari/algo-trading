@@ -24,6 +24,10 @@ const ScreenerRuns = graphql(`
       notRun {
         kindText
       }
+      pickHistory {
+        session
+        picked
+      }
       latestRun {
         runId
         session

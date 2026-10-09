@@ -1,6 +1,6 @@
 /**
- * A screener's track record in a table cell of the Screeners list (ADR 0053): hit rate against
- * the base rate, then lift, sessions and horizon; "No record yet" without one. Only the server's
+ * A screener's track record in a table cell of the Screeners list (ADR 0053): win rate against
+ * the base rate, then trades and holding period (the lift waits for a served points field); "No record yet" without one. Only the server's
  * frozen-period record is read, never an exploratory one. `ScreenerEdgeName` is the edge a
  * screener implements, or that it is part of none.
  */
@@ -10,8 +10,7 @@ import { useTrackRecords } from '../api/track-records';
 import { recordFigures, type RecordFigures } from '../model/track-records';
 
 const percent = (value: number) => formatValue(value, { kind: 'percent', digits: 0 }).text;
-const lift = (value: number) => `${formatValue(value, { kind: 'number', digits: 2 }).text}×`;
-const sessions = (n: number) => `${formatValue(n, { kind: 'number' }).text} sessions`;
+const trades = (n: number) => `${formatValue(n, { kind: 'number' }).text} trades`;
 
 export interface ScreenerRecordProps {
   screenerId: string;
@@ -33,16 +32,10 @@ function Cell({ figures }: { figures: RecordFigures }) {
   return (
     <>
       <Text size="sm" weight="medium">
-        {`${percent(figures.hitRate)} vs ${percent(figures.baseRate)} base`}
+        {`Win rate ${percent(figures.hitRate)} vs ${percent(figures.baseRate)} base`}
       </Text>
       <Text size="xs" tone="muted">
-        {[
-          figures.lift === null ? null : `lift ${lift(figures.lift)}`,
-          sessions(figures.sessions),
-          `${String(figures.horizonSessions)}d`,
-        ]
-          .filter(Boolean)
-          .join(' · ')}
+        {`${trades(figures.sessions)} · ${String(figures.horizonSessions)}-session hold`}
       </Text>
     </>
   );

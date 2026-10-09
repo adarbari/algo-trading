@@ -11,6 +11,7 @@ import {
   Panel,
   SearchInput,
   SegmentedControl,
+  Sparkline,
   Stack,
   StackedBar,
   StatusBadge,
@@ -52,15 +53,13 @@ export interface ScreenerListProps {
   onOpenEdge: (edgeId: string) => void;
 }
 
-/**
- * The columns. A 30-day pick sparkline (`Screener.pickHistory`) slots in between the track
- * record and the last run once the API serves it, with a `Sparkline` cell.
- */
+/** The columns; the 30-day pick history is the one beyond the phone's three. */
 const COLUMNS: readonly ExpandableTableColumn[] = [
   { id: 'screener', label: 'Screener', grow: 2.2, narrow: true },
   { id: 'picks', label: 'Picks today', align: 'end', narrow: true },
   { id: 'decisions', label: 'Decisions', grow: 1.2 },
   { id: 'record', label: 'Track record', grow: 1.6, narrow: true },
+  { id: 'history', label: '30d picks' },
   { id: 'last', label: 'Last run' },
 ];
 
@@ -266,6 +265,17 @@ function toTableRow(
       ) : (
         none
       ),
+      history:
+        summary && summary.pickHistory.length > 0 ? (
+          <Sparkline
+            label={`${row.id} picks, last ${String(summary.pickHistory.length)} sessions`}
+            tone="muted"
+            values={summary.pickHistory.map((d) => d.picked ?? null)}
+            format={{ kind: 'number', digits: 0 }}
+          />
+        ) : (
+          none
+        ),
       record: row.rules ? <ScreenerRecord screenerId={row.id} /> : none,
       last: noRun ? (
         <StatusBadge tone="warning">No run today</StatusBadge>

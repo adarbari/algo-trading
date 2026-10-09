@@ -137,14 +137,26 @@ export async function mockBuilderApi(
       };
       const notRun = { kindText: 'not run for this session' };
       const criteria = [{ id: 'iv30', field: 'iv_rank', mode: 'hard' }];
+      const pickHistory = [
+        { session: '2026-10-06', picked: 10 },
+        { session: '2026-10-07', picked: 12 },
+      ];
       return {
         session: { date: '2026-10-07' },
         screeners: [
-          { id: 'vrp_scanner', name: 'vrp_scanner', criteria, notRun: null, latestRun: ran12 },
+          {
+            id: 'vrp_scanner',
+            name: 'vrp_scanner',
+            criteria,
+            pickHistory,
+            notRun: null,
+            latestRun: ran12,
+          },
           ...[...own, 'idea-draft'].map((id) => ({
             id,
             name: id,
             criteria,
+            pickHistory,
             notRun,
             latestRun: null,
           })),
