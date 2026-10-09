@@ -74,6 +74,34 @@ describe('MasterDetail', () => {
     expect(screen.getByRole('dialog', { name: 'NVDA' })).toBeInTheDocument();
   });
 
+  it('opens a full-height sheet with back, previous / next and a pinned footer on narrow', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    const onClose = vi.fn();
+    const onNext = vi.fn();
+    const onPrevious = vi.fn();
+    render(
+      <Example
+        onClose={onClose}
+        step={{ onNext, onPrevious, hasNext: true, hasPrevious: false }}
+        detailFooter={<button type="button">Open in Explore</button>}
+      />,
+    );
+    const user = userEvent.setup();
+    const opener = screen.getByRole('button', { name: 'NVDA' });
+    await user.click(opener);
+    const sheet = screen.getByRole('dialog', { name: 'NVDA' });
+    expect(sheet).toHaveAttribute('data-size', 'full');
+    expect(sheet).toContainElement(screen.getByRole('button', { name: 'Open in Explore' }));
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(onNext).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(document.body);
+    await user.click(screen.getByRole('button', { name: 'Back to list' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
   it('does not reopen a dismissed key the caller kept', async () => {
     vi.stubGlobal('innerWidth', 375);
     const props = {

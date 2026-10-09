@@ -37,7 +37,11 @@ export interface ModalProps {
   /** `dialog` (centred) or `drawer` (a full-height sheet on one side). */
   kind: 'dialog' | 'drawer';
   side?: 'start' | 'end';
-  size: 'sm' | 'md' | 'lg';
+  size: 'sm' | 'md' | 'lg' | 'full';
+  /** Before the title in the header (a back button). */
+  headerStart?: ReactNode;
+  /** Before the close button in the header (previous / next). */
+  headerActions?: ReactNode;
   dismissible: boolean;
   initialFocus?: RefObject<HTMLElement | null>;
   /** Extra class for the panel (the Drawer's own widths). */
@@ -56,6 +60,8 @@ export function Modal({
   kind,
   side = 'end',
   size,
+  headerStart,
+  headerActions,
   dismissible,
   initialFocus,
   panelClassName,
@@ -102,6 +108,7 @@ export function Modal({
             {...getFloatingProps()}
           >
             <div className={styles.header}>
+              {headerStart}
               <div className={styles.titles}>
                 {eyebrow && (
                   <Text size="xs" tone="muted" mono>
@@ -119,6 +126,7 @@ export function Modal({
                   </span>
                 )}
               </div>
+              {headerActions}
               <IconButton
                 icon="close"
                 label="Close"

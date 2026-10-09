@@ -40,6 +40,8 @@ export interface PickDetailProps {
   onOpen: (symbol: string) => void;
   onToggleCompare: () => void;
   onDismiss: () => void;
+  /** Draw the action row (default true); off where the host pins the same actions elsewhere (a phone sheet's footer). */
+  showActions?: boolean;
 }
 
 const TONE: Readonly<Record<string, StatusTone>> = {
@@ -70,6 +72,7 @@ export function PickDetail({
   onOpen,
   onToggleCompare,
   onDismiss,
+  showActions = true,
 }: PickDetailProps) {
   const catalogue = useFeatureCatalogue();
   const known = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
@@ -121,32 +124,34 @@ export function PickDetail({
           <Text size="sm" tone="muted">{`Flags: ${row.flags.join(', ')}`}</Text>
         ) : null}
         <KeyValue label="Criteria" items={items} alignValues="end" />
-        <ActionGroup
-          label="Pick actions"
-          actions={[
-            {
-              id: 'open',
-              label: 'Open in Explore',
-              icon: 'external',
-              onClick: () => {
-                onOpen(symbol);
+        {showActions ? (
+          <ActionGroup
+            label="Pick actions"
+            actions={[
+              {
+                id: 'open',
+                label: 'Open in Explore',
+                icon: 'external',
+                onClick: () => {
+                  onOpen(symbol);
+                },
               },
-            },
-            {
-              id: 'compare',
-              label: compared ? 'Remove from compare' : 'Add to compare',
-              icon: compared ? 'minus' : 'plus',
-              onClick: onToggleCompare,
-            },
-            {
-              id: 'dismiss',
-              label: 'Dismiss',
-              icon: 'close',
-              variant: 'ghost',
-              onClick: onDismiss,
-            },
-          ]}
-        />
+              {
+                id: 'compare',
+                label: compared ? 'Remove from compare' : 'Add to compare',
+                icon: compared ? 'minus' : 'plus',
+                onClick: onToggleCompare,
+              },
+              {
+                id: 'dismiss',
+                label: 'Dismiss',
+                icon: 'close',
+                variant: 'ghost',
+                onClick: onDismiss,
+              },
+            ]}
+          />
+        ) : null}
         <KeyHints hints={KEY_HINTS} />
       </Stack>
     </Panel>

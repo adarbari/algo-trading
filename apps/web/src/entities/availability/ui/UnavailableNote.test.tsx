@@ -1,5 +1,6 @@
 import { Button } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { expectNoA11yViolations } from '@/shared/lib/testing';
@@ -44,6 +45,12 @@ const GAPS: ServedUnavailable[] = [
 describe('UnavailableNote', () => {
   it('shows a trader one note per kind with the features, and no table, source or step', async () => {
     const { container } = render(<UnavailableNote gaps={GAPS} />);
+    expect(screen.getByRole('button', { name: /4 unavailable/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.getByText('not available because of a system error')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /4 unavailable/ }));
     expect(screen.getAllByText('Not available: system error')).toHaveLength(1);
     expect(screen.getByText('Not available for this instrument')).toBeVisible();
     expect(screen.queryByRole('list', { name: 'Cause chain' })).toBeNull();
@@ -54,26 +61,32 @@ describe('UnavailableNote', () => {
   it('shows an admin the chain the server sent, one per gap, under its kind', async () => {
     const withCause = GAPS.map((gap, i) => (i < 2 ? { ...gap, cause: CHAIN } : gap));
     const { container } = render(<UnavailableNote gaps={withCause} />);
+    await userEvent.click(screen.getByRole('button', { name: /unavailable/ }));
     expect(screen.getAllByRole('list', { name: 'Cause chain' })).toHaveLength(2);
     expect(screen.getAllByText('IB Gateway')).toHaveLength(2);
     expect(screen.getAllByText('ibkr-iv')).toHaveLength(2);
     await expectNoA11yViolations(container);
   });
 
-  it("draws the app's help button for the kind's Guide term, when the app provides one", () => {
+  it("draws the app's help button for the kind's Guide term, when the app provides one", async () => {
     render(
       <TermHelpProvider render={(id) => <Button>help {id}</Button>}>
         <UnavailableNote gaps={GAPS} />
       </TermHelpProvider>,
     );
+    await userEvent.click(screen.getByRole('button', { name: /unavailable/ }));
     expect(screen.getByRole('button', { name: 'help unavailable_system' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'help unavailable_not_stored' })).toBeVisible();
   });
 
-  it('names a feature as the page says, else by its humanised column', () => {
+  it('names a feature as the page says, else by its humanised column', async () => {
     render(<UnavailableNote gaps={GAPS} titleOf={(name) => `T:${name.length}`} />);
+    await userEvent.click(screen.getByRole('button', { name: /unavailable/ }));
     expect(screen.getByText(/^T:\d+, T:\d+, T:\d+$/)).toBeVisible();
     render(<UnavailableNote gaps={GAPS.slice(2)} />);
+    for (const line of screen.getAllByRole('button', { name: /unavailable/, expanded: false })) {
+      await userEvent.click(line);
+    }
     expect(screen.getByText('Next earnings date')).toBeVisible();
   });
 

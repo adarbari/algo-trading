@@ -3,7 +3,8 @@
  * ticker's detail from a table row, a run's log, filters on a phone). Modal like Dialog: focus
  * moves in, stays inside, and returns to the opener; Escape, the close button and a backdrop
  * click close it; page scroll is locked. Full height on the `end` (default) or `start` side;
- * `sm` / `md` / `lg` widths, never wider than the screen.
+ * `sm` / `md` / `lg` widths, or `full` (the whole screen: a phone's detail sheet), never wider
+ * than the screen. `headerStart` / `headerActions` add controls to the header (back, previous / next).
  */
 import type { ReactNode, RefObject } from 'react';
 
@@ -27,8 +28,12 @@ export interface DrawerProps {
   footer?: ReactNode;
   /** The side it slides in from: `end` (default) or `start`. */
   side?: 'start' | 'end';
-  /** Width: `sm` (a sidebar), `md` (default), `lg`. */
-  size?: 'sm' | 'md' | 'lg';
+  /** Width: `sm` (a sidebar), `md` (default), `lg`, or `full` (the whole screen). */
+  size?: 'sm' | 'md' | 'lg' | 'full';
+  /** Before the title in the header (a back button). */
+  headerStart?: ReactNode;
+  /** Before the close button in the header (previous / next). */
+  headerActions?: ReactNode;
   /** Escape and backdrop clicks close it (default true). */
   dismissible?: boolean;
   /** The element focused on open; default the first focusable element. */
@@ -36,7 +41,12 @@ export interface DrawerProps {
   children?: ReactNode;
 }
 
-const WIDTH = { sm: styles.widthSm, md: styles.widthMd, lg: styles.widthLg } as const;
+const WIDTH = {
+  sm: styles.widthSm,
+  md: styles.widthMd,
+  lg: styles.widthLg,
+  full: styles.widthFull,
+} as const;
 
 export function Drawer({ side = 'end', size = 'md', dismissible = true, ...rest }: DrawerProps) {
   return (

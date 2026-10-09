@@ -162,7 +162,7 @@ describe('FeatureTable', () => {
     expect(screen.getAllByText(/Nothing stored yet/).length).toBeGreaterThan(0);
   });
 
-  it('tells what the session is missing, by kind', () => {
+  it('tells what the session is missing, by kind', async () => {
     hooks.useFeatureTable.mockReturnValue(
       fakeQuery(
         served({
@@ -188,6 +188,8 @@ describe('FeatureTable', () => {
         emptyMessage="none"
       />,
     );
+    for (const line of screen.getAllByRole('button', { name: /unavailable/ }))
+      await userEvent.click(line);
     expect(screen.getByText('Not available: system error')).toBeInTheDocument();
     expect(screen.queryByText(/rollups\//)).toBeNull();
     expect(screen.getByText(/universe snapshot is from after this session/)).toBeInTheDocument();
