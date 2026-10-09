@@ -6,6 +6,7 @@ entries unreachable (a probe or preview POST does not), an errored answer is not
 bytes are bounded; a request past ``MAX_WAITING`` gets 503 + ``Retry-After`` while ``/health``
 and the inline ``viewer`` are never refused."""
 
+import gzip
 from collections.abc import Callable
 from typing import Any
 
@@ -23,7 +24,7 @@ from algotrade_api.graphql.response_cache import (
     WriteEpoch,
     response_key,
 )
-from algotrade_api.graphql.schema import graphql_router
+from algotrade_api.graphql.schema import _accepts_gzip, graphql_router
 from algotrade_api.main import create_app
 from tests.helpers.api_store import as_user
 
@@ -217,3 +218,44 @@ def test_a_request_releases_its_place_even_when_it_fails(harness: Harness) -> No
 
 def test_the_queue_is_a_constant_beyond_the_threads() -> None:
     assert Admission().limit == READ_THREADS + MAX_WAITING
+
+
+def test_a_hit_is_served_as_stored_gzip_without_compressing_again(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = harness.client()
+    gz = {"Accept-Encoding": "gzip"}
+    first = client.post("/graphql", json={"query": SESSION}, headers=gz)
+    assert first.headers["content-encoding"] == "gzip"
+    assert "Accept-Encoding" in first.headers["vary"]
+    calls: list[int] = []
+    real = gzip.compress
+    monkeypatch.setattr(gzip, "compress", lambda *a, **k: calls.append(1) or real(*a, **k))
+    again = client.post("/graphql", json={"query": SESSION}, headers=gz)
+    assert again.headers["content-encoding"] == "gzip"
+    assert "Accept-Encoding" in again.headers["vary"]
+    assert not calls  # neither the handler nor the middleware compressed the hit
+    assert again.json() == first.json()
+
+
+def test_the_byte_bound_counts_the_stored_gzip_size(harness: Harness) -> None:
+    body = _post(harness.client(), SESSION).content
+    assert harness.cache.held == len(gzip.compress(body, 5)) > 0
+    assert harness.cache.held != len(body)  # the compressed size, not the JSON's
+
+
+def test_a_client_without_gzip_gets_the_identity_body(harness: Harness) -> None:
+    client = harness.client()
+    _post(client, SESSION)  # fills the cache
+    plain = client.post(
+        "/graphql", json={"query": SESSION}, headers={"Accept-Encoding": "identity"}
+    )
+    assert "content-encoding" not in plain.headers
+    assert "Accept-Encoding" in plain.headers["vary"]
+    assert plain.json()["data"]["session"]
+
+
+def test_gzip_with_q0_is_refused() -> None:
+    assert _accepts_gzip("br, gzip;q=0.8") and _accepts_gzip("*")
+    assert not _accepts_gzip("gzip;q=0") and not _accepts_gzip("identity")
+    assert not _accepts_gzip("")
