@@ -101,6 +101,7 @@ describe('refreshScreens and forgetScreen', () => {
       ['gql', 'ScreenDetail'],
       ['gql', 'ScreenVersions'],
       ['gql', 'ScreenerResults'],
+      ['gql', 'ScreenerPicks'],
     ]);
     forgetScreen(client, 'my');
     expect(remove).toHaveBeenCalledWith({ queryKey: ['gql', 'ScreenDetail', { id: 'my' }] });
