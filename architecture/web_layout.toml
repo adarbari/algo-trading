@@ -28,7 +28,7 @@ segment_names = ["ui", "model", "api", "lib", "config"]
 
 [[web_dir]]
 path = "apps/web"
-purpose = "the web app root: package, lockfile, Vite / TypeScript / ESLint / Stylelint / Playwright configs, index.html"
+purpose = "the web app root: package, lockfile, Vite / TypeScript / ESLint / Stylelint / Playwright configs, the performance budgets (perf-budgets.json), index.html"
 
 [[web_dir]]
 path = "apps/web/.storybook"
@@ -134,7 +134,7 @@ purpose = "Playwright real-app smoke: the Vite dev server against the real API o
 
 [[web_dir]]
 path = "apps/web/scripts"
-purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the node_modules guard (predev), the Playwright Docker runner"
+purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the node_modules guard (predev), the Playwright Docker runner, the performance budgets check (bundle sizes) and its budgets file reader"
 
 [[web_dir]]
 path = "apps/web/src"

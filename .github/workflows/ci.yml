@@ -201,7 +201,7 @@ jobs:
         with: { name: real-app-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
 
   # ---------------------------------------------------------------------------------- web
-  # Four jobs in parallel instead of one serial job (docs/ci.md "Pipeline"): the static checks
+  # Five jobs in parallel instead of one serial job (docs/ci.md "Pipeline"): the static checks
   # and unit tests; the production build with the e2e suite; the Storybook build, handed as an
   # artifact to the screenshot shards. They share one node_modules cache keyed on the lockfile.
   web-static:
@@ -329,12 +329,48 @@ jobs:
         if: failure()
         with: { name: "playwright-report-screenshots-${{ matrix.shard }}", path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
 
+  # Performance budgets (docs/ci.md "Web performance"): deterministic gates only. The bundle sizes
+  # from the Vite manifest, then requests, script bytes and DOM nodes per main route on the phone;
+  # LCP and blocking time are reported in the job summary, never gated (shared runners are noisy).
+  web-perf:
+    name: Web performance budgets (bundle, requests, DOM)
+    needs: [changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/cache@v6
+        id: node-modules
+        with:
+          path: apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci --no-fund --no-audit
+      - name: Production build (the e2e's Supabase placeholders)
+        run: npx vite build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: e2e-anon-key
+      - name: Bundle budgets (entry chunk, per-page chunks, chart engine stays lazy)
+        run: npm run perf:bundle
+      - name: Request, script and DOM budgets on the phone (LCP and blocking time reported only)
+        run: npm run perf:e2e
+
   # The one web check branch protection requires (its name is the protected context; the four
   # jobs above can change without touching the repo settings). Passes when every web job
   # passed or was skipped (a python-only or docs-only change); fails on any failure.
   web:
     name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
-    needs: [web-static, web-e2e, web-storybook, web-screenshots]
+    needs: [web-static, web-e2e, web-storybook, web-screenshots, web-perf]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:

@@ -14,6 +14,9 @@ export const queryKeys = {
     preview: (spec: unknown) => ['screeners', 'preview', spec] as const,
     run: (id: string, jobId: string) => ['screeners', 'run', id, jobId] as const,
   },
+  edges: {
+    evaluation: (id: string, jobId: string) => ['edges', 'evaluation', id, jobId] as const,
+  },
   features: {
     check: (expr: string) => ['features', 'check', expr] as const,
   },

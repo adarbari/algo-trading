@@ -22,7 +22,7 @@ PROTECTED_CHECKS = {
     "Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)",
     "Real app smoke (Vite dev + real API, empty and golden stores)",
 }
-WEB_JOBS = {"web-static", "web-e2e", "web-storybook", "web-screenshots"}
+WEB_JOBS = {"web-static", "web-e2e", "web-storybook", "web-screenshots", "web-perf"}
 
 
 def _jobs() -> dict[str, dict[str, Any]]:

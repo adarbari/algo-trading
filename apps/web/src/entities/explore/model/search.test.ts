@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  DEFAULT_COLUMNS,
-  formatSort,
-  joinList,
-  parseExploreSearch,
-  parseSort,
-  splitList,
-} from './search';
+import { DEFAULT_DIMENSIONS, joinList, parseExploreSearch, splitList } from './search';
 
 describe('explore search params', () => {
   it('keeps valid values and drops the rest', () => {
@@ -15,51 +8,35 @@ describe('explore search params', () => {
       parseExploreSearch({
         sel: 'aapl,MSFT',
         tab: 'options',
-        lev: 'true',
-        opt: true,
         range: '2Y',
         view: 'weird',
         unknown: 'x',
-        q: 123,
       }),
-    ).toEqual({ sel: 'AAPL,MSFT', tab: 'options', lev: true, opt: true, range: '2Y', q: '123' });
+    ).toEqual({ sel: 'AAPL,MSFT', tab: 'options', range: '2Y' });
     expect(parseExploreSearch({ tab: 'nope', right: 'X', sel: '  ' })).toEqual({});
   });
 
-  it('drops the retired Field guide tab and its theme and field (an old link opens the default tab)', () => {
-    expect(parseExploreSearch({ tab: 'guide', theme: 'volatility', field: 'feature.x' })).toEqual(
-      {},
-    );
+  it('drops the retired table state and Field guide tab (an old link opens the default view)', () => {
+    expect(
+      parseExploreSearch({ tab: 'guide', theme: 'volatility', q: 'x', cols: 'a', lev: true }),
+    ).toEqual({});
   });
 
-  it('keeps the screener that surfaced the ticker (via)', () => {
-    expect(parseExploreSearch({ sel: 'AAPL', via: ' vrp-scanner ' })).toEqual({
+  it('keeps the Why tab and the screener that surfaced the ticker (via)', () => {
+    expect(parseExploreSearch({ sel: 'AAPL', tab: 'why', via: ' vrp-scanner ' })).toEqual({
       sel: 'AAPL',
+      tab: 'why',
       via: 'vrp-scanner',
     });
     expect(parseExploreSearch({ via: '  ' })).toEqual({});
   });
 
-  it('reads the columns added on a narrow table from ncols', () => {
-    expect(parseExploreSearch({ ncols: 'name,change' })).toEqual({ ncols: 'name,change' });
-  });
-
   it('splits and joins lists, leaving defaults out of the URL', () => {
     expect(splitList('a, b,,c')).toEqual(['a', 'b', 'c']);
     expect(splitList(undefined)).toEqual([]);
-    expect(joinList(DEFAULT_COLUMNS, DEFAULT_COLUMNS)).toBeUndefined();
-    expect(joinList(['x', 'y'], DEFAULT_COLUMNS)).toBe('x,y');
-    expect(joinList([], DEFAULT_COLUMNS)).toBe('none');
+    expect(joinList(DEFAULT_DIMENSIONS, DEFAULT_DIMENSIONS)).toBeUndefined();
+    expect(joinList(['x', 'y'], DEFAULT_DIMENSIONS)).toBe('x,y');
+    expect(joinList([], DEFAULT_DIMENSIONS)).toBe('none');
     expect(splitList('none')).toEqual([]);
-  });
-
-  it('round-trips the sort', () => {
-    expect(parseSort('-rollup.iv30@v1.iv30')).toEqual({
-      columnId: 'rollup.iv30@v1.iv30',
-      direction: 'desc',
-    });
-    expect(formatSort({ columnId: 'symbol', direction: 'asc' })).toBe('symbol');
-    expect(parseSort(undefined)).toBeNull();
-    expect(formatSort(null)).toBeUndefined();
   });
 });
