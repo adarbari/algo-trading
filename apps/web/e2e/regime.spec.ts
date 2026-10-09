@@ -7,7 +7,7 @@
  * computed regime shows range meters, sources, history and the market falls. The top-bar chip says "not computed" on every page and opens the
  * Regime page; the Ideas strip says the sizing rule; accessibility in both themes.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
 import { mockApi } from './mock-api';
@@ -20,6 +20,11 @@ function collectErrors(page: Page): string[] {
     if (msg.type() === 'error') errors.push(msg.text());
   });
   return errors;
+}
+
+/** Opens the first card's row of a list (the rows are compact; the detail shows once opened). */
+async function openFirstCard(list: Locator): Promise<void> {
+  await list.getByRole('listitem').first().getByRole('button').first().click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -42,6 +47,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(fast.getByRole('listitem')).toHaveCount(3);
     await expect(page.getByRole('region', { name: 'How to read the charts' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Scores through the cycles' })).toBeVisible();
+    await openFirstCard(slow);
     await expect(slow.getByRole('img', { name: /: unknown\./ }).first()).toBeVisible();
     await expect(page.getByRole('region', { name: 'Reading list' })).toHaveCount(0);
     await expectAccessible(page);
@@ -65,10 +71,9 @@ test('a card opens its indicator in the help drawer, which opens the Guide page'
   await expect(
     page.getByRole('button', { name: /Why it matters, what it did before/ }),
   ).toHaveCount(0);
-  await page
-    .getByRole('region', { name: 'Slow-moving warning signs' })
-    .getByRole('button', { name: /^What is Are long-term rates/ })
-    .click();
+  const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
+  await openFirstCard(slow);
+  await slow.getByRole('button', { name: /^What is Are long-term rates/ }).click();
   const drawer = page.getByRole('dialog');
   await expect(drawer).toContainText('10-year minus 3-month Treasury spread');
   await expect(drawer.getByRole('heading', { level: 3, name: 'Why it matters' })).toBeVisible();
@@ -109,6 +114,7 @@ test('the Regime page teaches: legend, scores through the cycles, range meters, 
     page.getByRole('img', { name: /^Macro risk and market stress scores/ }),
   ).toBeVisible();
   const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
+  await openFirstCard(slow);
   await expect(slow.getByRole('meter').first()).toBeVisible();
   await expect(slow.getByText(/^On when (above|below) /).first()).toBeVisible();
   await expect(slow.getByRole('link', { name: 'FRED T10Y3M' })).toBeVisible();
@@ -125,6 +131,7 @@ test('an indicator opens its history and a market fall sets the range of every c
   await mockExplain(page, false);
   await page.goto('/regime');
   const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
+  await openFirstCard(slow);
   await slow.getByRole('button', { name: 'Show history' }).first().click();
   await expect(slow.getByRole('radiogroup', { name: 'Chart range' }).first()).toBeVisible();
   await expect(slow.getByText(/Colors as in the legend above/).first()).toBeVisible();
@@ -172,4 +179,29 @@ test('with a text model the button explains the regime, with its citation and fo
   await expect(page.getByText(/it may be wrong/)).toBeVisible();
   await expectAccessible(page);
   expect(errors.filter((e) => !e.includes('400'))).toEqual([]);
+});
+
+test('the Regime page has a section nav, and a market fall opens its signal timing', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockRegimeComputed(page);
+  await mockExplain(page, false);
+  await page.goto('/regime');
+  const nav = page.getByRole('navigation', { name: 'Regime sections' });
+  await expect(nav.getByRole('link')).toHaveText(['Now', 'Why', 'History']);
+  await nav.getByRole('link', { name: 'History' }).click();
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'How early did we know' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'When each warning sign first flagged, by market fall' }),
+  ).toBeVisible();
+  const fall = page.getByRole('button', { name: /Global financial crisis/ }).last();
+  await fall.click();
+  const detail = page.getByRole('list', { name: /^Signals around Global financial crisis/ });
+  await expect(detail.getByRole('listitem').first()).toContainText('Screener gate');
+  await expect(page.getByText(/^Unknown: not stored/).first()).toBeVisible();
+  await expectAccessible(page);
+  expect(errors.filter((e) => !e.includes('503'))).toEqual([]);
 });

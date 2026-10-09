@@ -265,3 +265,71 @@ The shading shows the past: each market fall from peak to trough, each recovery 
 to a new high, and the economy's recessions as dated by the NBER, hatched so that overlapping
 spans stay readable. The falls are the reference episodes the indicators are judged on.
 """
+
+# --------------------------------------------------------------------------------------- 6
+[[page]]
+id = "reading_recession_signals"
+order = 6
+title = "Reading recession signals"
+summary = "Slow signs warn months ahead but fire false alarms; fast signs confirm in days; the end is only known after the low."
+links = [
+  { kind = "term", id = "regime" },
+  { kind = "indicator", id = "curve_10y3m" },
+  { kind = "indicator", id = "sahm" },
+  { kind = "indicator", id = "hy_oas" },
+  { kind = "indicator", id = "spx_trend_200d" },
+  { kind = "indicator", id = "breadth_200d" },
+  { kind = "episode", id = "gfc_2007" },
+]
+
+[[page.section]]
+title = "Slow signs and fast signs"
+body = """
+Slow signs read the economy and move over weeks or months. An inverted yield curve has
+preceded every recession since 1968 by 5 to 16 months (August 2006 before December 2007; June
+2019 before February 2020). Unemployment above its 12-month average turns about 3.5 months
+before a recession on average. The Sahm rule turns 1 to 8 months after the recession has begun
+and is published a month later. Fast signs read prices and move in days: the index through its
+200-day average (2 to 6 weeks after a peak), the VIX above the 3-month VIX, breadth collapsing,
+credit spreads gapping. The slow signs tell you how much to hold; the fast ones tell you the
+fall has started.
+"""
+
+[[page.section]]
+title = "Nobody knows it is a recession until later"
+body = """
+The NBER named the December 2007 start in December 2008 and the June 2009 end in September
+2010; it named the February 2020 start in June 2020 and the April 2020 end in July 2021. A
+recession is dated after the fact, so the page never waits for it: the label uses the signs
+themselves.
+"""
+
+[[page.section]]
+title = "The end is confirmed after the low"
+body = """
+Bottoms are only visible in hindsight. The index reclaims its 200-day average 2 to 3 months
+after the low (June 2009, late May 2020, January 2023), and the 50-day average crosses back
+above the 200-day later still (24 June 2009, 9 July 2020, 2 February 2023). Breadth thrusts
+(March 2009, December 2018, April 2023) and credit spreads turning down from their peak come
+sooner. A rule that only turns off late misses the first 10 to 20% of every recovery.
+"""
+
+[[page.section]]
+title = "False alarms are the price"
+body = """
+The curve inverted briefly in 1998, in 2019 (a recession followed only because of the virus)
+and for over two years from late 2022 with no recession. The Sahm rule tripped in July 2024.
+Credit spreads and the VIX widen in shocks that never become recessions (2011, 2015-16, 2018,
+2025). A sign on its own scales the size of the book down; it never switches it off.
+"""
+
+[[page.section]]
+title = "How early did we know (the timeline)"
+body = """
+For a past fall the timeline marks the peak, the day each sign turned on and the day it turned
+off again, in sessions from the peak. Signs left of the peak warned early, often by months;
+signs between the peak and the low confirmed; a sign that turned on after the low was late.
+UNKNOWN means too little stored history to say, and Never fired means every stored verdict
+before the low was off. The gap between the low and the last sign turning off is how long the
+end stayed unknown.
+"""

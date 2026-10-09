@@ -1,5 +1,6 @@
 /**
- * One indicator card (RG7): the plain name and verdict, where today's value sits on its
+ * One indicator card (RG7), a compact row (verdict, plain name, one line, today's value) that
+ * opens in place: where today's value sits on its
  * low-risk to high-risk band with the "on" threshold marked, how it is calculated (the terms
  * linked), where it comes from (the exact series, its cadence and links) with its provenance,
  * a help button that opens the indicator's Guide entry (why it matters, what it did before,
@@ -57,14 +58,15 @@ export function IndicatorCard({
   const thresholds = meterThresholds(indicator);
   const onWhen = onWhenLine(indicator, format);
   return (
-    <Stack gap={0}>
-      <IndicatorRow
-        status={indicatorStatus(indicator.status)}
-        name={indicator.plainName}
-        technicalName={indicator.technicalName}
-        description={reason ? `${indicator.oneLiner} Unknown: ${reason}` : indicator.oneLiner}
-        {...(change ? { changed: change.change, changedLabel: change.label } : {})}
-      />
+    <IndicatorRow
+      status={indicatorStatus(indicator.status)}
+      name={indicator.plainName}
+      technicalName={indicator.technicalName}
+      description={reason ? `${indicator.oneLiner} Unknown: ${reason}` : indicator.oneLiner}
+      value={isNumber(indicator.value) ? indicator.value : null}
+      format={format}
+      {...(change ? { changed: change.change, changedLabel: change.label } : {})}
+    >
       <Box paddingX={3} paddingY={2}>
         <Stack gap={2}>
           <Stack direction="row" gap={2} align="center">
@@ -120,6 +122,6 @@ export function IndicatorCard({
           )}
         </Stack>
       </Box>
-    </Stack>
+    </IndicatorRow>
   );
 }
