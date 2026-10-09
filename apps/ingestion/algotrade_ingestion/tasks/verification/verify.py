@@ -28,7 +28,7 @@ from algotrade.config.site.settings import VerificationSettings, load_verificati
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.chains import option_quotes, underlying_quotes
-from algotrade.data.prices import load_price_data
+from algotrade.data.prices import adjusted_bars, frame_to_series
 from algotrade.data.rollups import rollup_on
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
@@ -76,10 +76,11 @@ def load_ours(reader: StoreReader, session: date, ids: Sequence[str], sessions: 
     start = sessions_ending(session, sessions)[0]
     bars: dict[str, pd.DataFrame] = {}
     try:
-        data = load_price_data(reader, ids, start, session, adjustment="splits", aligned=False)
+        frame, _ = adjusted_bars(reader, "1d", start, session, ids, None, "splits")
+        series_of = frame_to_series(frame)  # flagged bars are dropped, never an error (ADR 0061)
     except LookupError:  # MissingDataError: no bars stored in the window at all
-        data = None
-    for iid, series in (data.series if data else {}).items():
+        series_of = {}
+    for iid, series in series_of.items():
         days = pd.to_datetime(series.timestamps).date
         bars[iid] = pd.DataFrame(
             {"date": days, "high": series.high, "low": series.low, "close": series.close}

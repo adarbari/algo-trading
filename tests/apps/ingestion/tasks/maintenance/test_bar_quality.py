@@ -154,3 +154,37 @@ def test_task_writes_flags_once_and_reads_them_back(tmp_path: Path) -> None:
     assert len(bars(StoreReader(backend), "1d", days[0], days[-1])) == 2
     again = run_bar_quality(ctx, days[-1], days[0], days[-1])
     assert again.stats["written"] == 0  # a rerun writes only changes
+
+
+def test_partial_rerun_keeps_jump_flags() -> None:
+    """A jump flag outside a short range is not cleared (the range shows one segment); the same
+    instrument read from its first bar clears it; a floor flag clears on any run."""
+    stored = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:A"],
+            "ts": pd.to_datetime(["2020-01-06", "2020-01-07"], utc=True),
+            "reason": [UNEXPLAINED_JUMP, BELOW_FLOOR],
+            "detail": ["d", "d"],
+            "status": ["FLAGGED", "FLAGGED"],
+        }
+    )
+    none = pd.DataFrame(columns=["instrument_id", "ts", "reason", "detail"])
+    kept = changes(none, stored, frozenset({"EQ:A"}))
+    assert list(zip(kept["reason"], kept["status"], strict=True)) == [(BELOW_FLOOR, CLEARED)]
+    full = changes(none, stored, frozenset())
+    assert sorted(full["reason"]) == [BELOW_FLOOR, UNEXPLAINED_JUMP]
+
+
+def test_split_like_jumps_are_tagged_and_kept() -> None:
+    frame = pd.concat(
+        [
+            series("EQ:REV", [1.0] * 4 + [20.1] * 4, ["tiingo"] * 8),  # near 20x: split-like
+            series("EQ:JUNK", [1.0] * 4 + [33.3] * 4, ["tiingo"] * 8),
+        ],
+        ignore_index=True,
+    )
+    out = bad_bars(frame, NO_SPLITS, S)
+    detail = out.groupby("instrument_id")["detail"].first()
+    assert "split_like=20" in detail["EQ:REV"]
+    assert "split_like" not in detail["EQ:JUNK"]
+    assert set(out["instrument_id"]) == {"EQ:REV", "EQ:JUNK"}  # still flagged

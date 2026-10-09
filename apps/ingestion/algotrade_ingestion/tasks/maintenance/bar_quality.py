@@ -63,6 +63,24 @@ def _unexplained(jumps: np.ndarray, ex_dates: np.ndarray, ts: np.ndarray, window
     return [int(j) for j in jumps if not np.any(np.abs(at - j) <= window)]
 
 
+def split_like(ratio: float) -> int | None:
+    """The integer ``n`` in 2..50 a jump ratio (either way) is within 2% of, else None: a jump
+    that looks like a split nobody recorded."""
+    r = max(ratio, 1 / ratio) if ratio > 0 else 0.0
+    n = round(r)
+    return n if 2 <= n <= 50 and abs(r / n - 1) <= 0.02 else None
+
+
+def _tag(close: np.ndarray, cuts: list[int], lo: int, hi: int) -> str:
+    """``; split_like=n`` when the largest jump bounding ``lo..hi`` looks like a split."""
+    edges = [c for c in (lo, hi) if 0 < c < len(close) and close[c] > 0 and close[c - 1] > 0]
+    if not edges:
+        return ""
+    edge = max(edges, key=lambda c: abs(np.log(close[c] / close[c - 1])))
+    n = split_like(float(close[edge] / close[edge - 1]))
+    return f"; split_like={n}" if n else ""
+
+
 def _series_flags(
     close: np.ndarray,
     ts: np.ndarray,
@@ -91,6 +109,8 @@ def _series_flags(
         i += 1
     flagged = list(spikes)
     detail = f"one-bar spike beyond {max_jump:g}x with no split event nearby"
+    if spikes:
+        detail += _tag(close, cuts, spikes[0], spikes[0] + 1)
     if kept:
         bounds = [0, *kept, len(close)]
         segments = list(pairwise(bounds))
@@ -108,6 +128,7 @@ def _series_flags(
             f"outside the trusted segment {first}..{last}"
             f" (closes cut by a jump beyond {max_jump:g}x with no split event nearby)"
         )
+        detail += _tag(close, kept, a, b)
     return np.array(sorted(set(flagged)), dtype=int), detail
 
 
@@ -216,9 +237,14 @@ def _unified(pieces: list[pd.DataFrame]) -> list[pd.DataFrame]:
     return pieces
 
 
-def changes(found: pd.DataFrame, stored: pd.DataFrame) -> pd.DataFrame:
+def changes(
+    found: pd.DataFrame, stored: pd.DataFrame, protected: frozenset[str] = frozenset()
+) -> pd.DataFrame:
     """The rows to write: each found flag that is not already ``FLAGGED`` for its reason, and a
-    ``CLEARED`` row for every stored ``FLAGGED`` bar that is not found any more."""
+    ``CLEARED`` row for every stored ``FLAGGED`` bar that is not found any more. An
+    ``UNEXPLAINED_JUMP`` flag is judged against the whole series: it is cleared only for an
+    instrument whose series the read started at (``protected``: instruments with stored bars
+    before the range keep theirs, the jump may lie outside it)."""
     key = ["instrument_id", "ts"]
     held = stored[stored["status"] == FLAGGED] if len(stored) else stored
     held = held.reindex(columns=[*key, "reason"]).assign(
@@ -227,11 +253,35 @@ def changes(found: pd.DataFrame, stored: pd.DataFrame) -> pd.DataFrame:
     new = found.assign(status=FLAGGED).merge(held, on=key, how="left", suffixes=("", "_held"))
     new = new[new["reason_held"].isna() | (new["reason_held"] != new["reason"])]
     gone = held.merge(found[key], on=key, how="left", indicator=True)
-    gone = gone[gone["_merge"] == "left_only"].assign(
+    gone = gone[gone["_merge"] == "left_only"]
+    keep = (gone["reason"] == UNEXPLAINED_JUMP) & gone["instrument_id"].astype(str).isin(protected)
+    gone = gone[~keep].assign(
         reason=lambda f: f["reason"], detail="no longer flagged", status=CLEARED
     )
     columns = [*FLAG_COLUMNS, "status"]
     return pd.concat([new[columns], gone[columns]], ignore_index=True)
+
+
+def _with_earlier_bars(
+    ctx: TaskContext, stored: pd.DataFrame, start: date, instruments: list[str] | None
+) -> frozenset[str]:
+    """The instruments with a stored ``UNEXPLAINED_JUMP`` flag that have bars before ``start``."""
+    if not len(stored):
+        return frozenset()
+    jumped = stored[(stored["status"] == FLAGGED) & (stored["reason"] == UNEXPLAINED_JUMP)]
+    ids = sorted(set(jumped["instrument_id"].astype(str)))
+    if not ids:
+        return frozenset()
+    dates = ctx.reader.dates("bars/1d")
+    if not dates or dates[0] >= start:
+        return frozenset()
+    try:
+        earlier = raw_bars(
+            ctx.reader, "1d", dates[0], start - timedelta(days=1), ids, None, ("close",)
+        )
+    except MissingDataError:
+        return frozenset()
+    return frozenset(earlier["instrument_id"].astype(str))
 
 
 def run_bar_quality(
@@ -257,7 +307,8 @@ def run_bar_quality(
             inside = stored["instrument_id"].astype(str).isin(seen)
             when = pd.to_datetime(stored["ts"], utc=True)
             stored = stored[inside & (when >= first) & (when <= last)]
-        write = changes(found, stored)
+        protected = _with_earlier_bars(ctx, stored, start, instruments)
+        write = changes(found, stored, protected)
         share = len(found) / max(len(bars), 1)
         run.stats.update(
             window=[start.isoformat(), end.isoformat()],
@@ -266,6 +317,9 @@ def run_bar_quality(
             flagged_share=round(share, 6),
             by_reason={k: int(v) for k, v in found["reason"].value_counts().items()},
             instruments_flagged=int(found["instrument_id"].nunique()),
+            split_like_ids=sorted(
+                found.loc[found["detail"].str.contains("split_like="), "instrument_id"].unique()
+            ),
             written=len(write),
             cleared=int((write["status"] == CLEARED).sum()),
         )
