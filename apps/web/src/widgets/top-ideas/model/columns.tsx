@@ -1,33 +1,41 @@
 /**
- * The top-ideas table's columns: rank, ticker, the screeners that picked it (by name; each
- * opens that screener's results), the best decision, score, the regime's size for it (when
- * the run stamped one), the served facts for the session
- * (next earnings, else when the last one was; days to the nearest expiry, flagged when the
- * server says earnings come first; IV30), the screeners' stored display values (HV30, IV / HV
- * and the best put) and the watch-outs. A fact or display-value column appears only when some
- * idea has a value for it.
+ * The top-ideas table's columns, in two sets chosen by the page's `columns` search param. Stocks
+ * (default): rank, ticker, why it is here, decision, score, criteria, price
+ * and the watch-outs. Options: rank, ticker, decision, score, then the served facts for the
+ * session (days to the nearest expiry, flagged when the server says earnings come first; IV30),
+ * the screeners' stored display values (HV30, IV / HV and the best put) and the watch-outs. The
+ * regime's size for the idea shows in both when the run stamped one; a fact or display-value
+ * column appears only when some idea has a value for it.
  */
 import {
   Button,
   Mono,
+  OutcomeDots,
   Stack,
   StatusBadge,
   Text,
   type DataTableColumn,
+  type OutcomeDot,
   type ValueFormat,
 } from '@algotrade/ui';
 
 import { fieldColumn, valueFormat, type HelpedColumn } from '@/entities/feature';
-import { earningsBeforeExpiry, factOf, IDEA_FACTS, type Idea } from '@/entities/idea';
-import { DecisionBadge } from '@/entities/screen';
+import {
+  earningsBeforeExpiry,
+  factOf,
+  IDEA_FACTS,
+  type Idea,
+  type IdeaColumnSet,
+} from '@/entities/idea';
+import { DecisionBadge, decisionLabel, outcomeLabel } from '@/entities/screen';
 
-import { dteReason, earningsCell, expiryDte, iv30, nextEarnings } from './facts';
+import { dteReason, earningsCell, expiryDte, iv30, served } from './facts';
 
 /** A display value a screener may store (`[columns]` or a criterion id), shown when present. */
 interface MetricColumn {
   key: string;
   header: string;
-  description: string;
+  description?: string;
   format: ValueFormat;
 }
 
@@ -47,19 +55,16 @@ const METRIC_COLUMNS: readonly MetricColumn[] = [
   {
     key: 'put_strike',
     header: 'Put strike',
-    description: 'Best put: strike',
     format: { kind: 'currency' },
   },
   {
     key: 'put_delta',
     header: 'Put delta',
-    description: 'Best put: delta',
     format: { kind: 'number', digits: 2 },
   },
   {
     key: 'put_premium',
     header: 'Put premium',
-    description: 'Best put: premium',
     format: { kind: 'currency' },
   },
   {
@@ -87,7 +92,7 @@ function metricColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
   return METRIC_COLUMNS.filter((m) => anyValue(ideas, (idea) => numeric(idea, m.key))).map((m) => ({
     id: m.key,
     header: m.header,
-    description: m.description,
+    description: m.description ?? m.header,
     value: (idea) => numeric(idea, m.key),
     format: m.format,
   }));
@@ -101,34 +106,17 @@ function ivColumns(ideas: readonly Idea[]): HelpedColumn<Idea>[] {
     fieldColumn<Idea>(IDEA_FACTS.iv30, {
       id: 'iv30',
       header: 'IV30',
-      description: "30-day implied volatility (the VRP gate's: the lower of IBKR's and Cboe's)",
+      description: '30-day implied volatility',
       value: iv30,
       format: valueFormat(served.info),
     }),
   ];
 }
 
-const earningsColumn = fieldColumn<Idea>(IDEA_FACTS.nextEarnings, {
-  id: 'earnings',
-  header: 'Earnings',
-  description: 'The next earnings date; muted: none scheduled, when the last one was',
-  value: nextEarnings,
-  format: { kind: 'date', style: 'weekday' },
-  cell: ({ row }) => {
-    const shown = earningsCell(row);
-    return (
-      <Text size="sm" tone={shown.muted ? 'muted' : 'default'} {...titled(shown.title)}>
-        {shown.text}
-      </Text>
-    );
-  },
-});
-
 const dteColumn = fieldColumn<Idea>(IDEA_FACTS.expiryDte, {
   id: 'dte',
   header: 'Expiry DTE',
-  description:
-    'Calendar days to the nearest listed expiry; flagged when earnings come on or before it',
+  description: 'Days to the nearest expiry; flagged when earnings come first',
   value: expiryDte,
   format: { kind: 'number' },
   width: 'md',
@@ -147,112 +135,208 @@ const dteColumn = fieldColumn<Idea>(IDEA_FACTS.expiryDte, {
     ),
 });
 
-const watchOutColumn: DataTableColumn<Idea> = {
-  id: 'watch-out',
-  header: 'Watch out',
-  description: 'Leveraged / inverse, large move, liquidity risk, earnings before expiry',
-  value: (idea) => idea.watchOut.length,
-  width: 'lg',
-  grow: true,
-  cell: ({ row }) => (
-    <Stack direction="row" gap={1} wrap>
-      {row.watchOut.map((w) => (
-        <StatusBadge key={w.id} tone="warning">
-          {w.label}
-        </StatusBadge>
-      ))}
-    </Stack>
-  ),
+const RANK: DataTableColumn<Idea> = {
+  id: 'rank',
+  header: '#',
+  description: 'Your screener priority, then score',
+  value: (idea) => idea.rank,
+  format: { kind: 'number' },
+  width: 'xs',
 };
-
-/** The screeners that picked the ticker, each a button to that screener's results. */
-const screenersColumn = (onOpenScreener: (screenerId: string) => void): DataTableColumn<Idea> => ({
-  id: 'screeners',
-  header: 'Screeners',
-  description:
-    "Every screener that picked the ticker, highest priority first; each opens that screener's results",
-  value: (idea) => idea.picks.length,
-  width: 'lg',
-  grow: true,
-  cell: ({ row }) => (
-    <Stack direction="row" gap={1} wrap>
-      {row.picks.map((pick) => (
-        <Button
-          key={pick.screenerId}
-          size="sm"
-          onClick={() => {
-            onOpenScreener(pick.screenerId);
-          }}
-        >
-          {pick.screenerName}
-        </Button>
-      ))}
-    </Stack>
-  ),
-});
-
-const FRONT: DataTableColumn<Idea>[] = [
-  {
-    id: 'rank',
-    header: '#',
-    description: 'Rank: your screener priority, then score',
-    value: (idea) => idea.rank,
-    format: { kind: 'number' },
-    width: 'xs',
-    hideable: false,
-  },
-  {
-    id: 'symbol',
-    header: 'Ticker',
-    value: (idea) => idea.symbol ?? idea.instrumentId,
-    mono: true,
-    hideable: false,
-  },
-];
-
-const DECISION: DataTableColumn<Idea>[] = [
-  {
-    id: 'decision',
-    header: 'Decision',
-    description: 'The best decision across the screeners that picked it',
-    value: (idea) => idea.best.decision,
-    cell: ({ row }) => <DecisionBadge decision={row.best.decision} />,
-  },
-  {
-    id: 'score',
-    header: 'Score',
-    description: 'Score from the screener behind the best decision',
-    value: (idea) => idea.best.score,
-    format: { kind: 'number', digits: 0 },
-  },
-];
 
 /** The size the regime gives a new position (the best pick's run stamped it): a column when some
  * idea has one. */
 const SIZE: DataTableColumn<Idea> = {
   id: 'size',
   header: 'Size',
-  description:
-    "The share of the normal position size the regime allows for a new position (the best pick's run stamped it)",
+  description: 'Share of the normal size the regime allows',
   value: (idea) => idea.sizeMultiplier,
   format: { kind: 'percent', digits: 0 },
   width: 'sm',
 };
 
-/** The columns for these ideas (the IV and display-value columns depend on what is served). */
+/** The ticker over the company name and its sector (the sector ETF's ticker). */
+const tickerColumn: DataTableColumn<Idea> = {
+  id: 'symbol',
+  header: 'Ticker',
+  value: (idea) => idea.symbol ?? idea.instrumentId,
+  hideable: false,
+  width: 'md',
+  grow: true,
+  cell: ({ row }) => {
+    const under = [row.name, served(row, IDEA_FACTS.sectorEtf)?.text].filter(Boolean).join(' · ');
+    return (
+      <Stack gap={0}>
+        <Mono weight="medium">{row.symbol ?? row.instrumentId}</Mono>
+        {under && (
+          <Text size="xs" tone="muted" truncate title={under}>
+            {under}
+          </Text>
+        )}
+      </Stack>
+    );
+  },
+};
+
+/** Why the idea is here: the best pick's reasons, its screener, and how many others picked it. */
+const whyColumn = (onOpenScreener: (screenerId: string) => void): DataTableColumn<Idea> => ({
+  id: 'why',
+  header: "Why it's here",
+  value: (idea) => idea.best.reasons || null,
+  width: 'xl',
+  grow: true,
+  sortable: false,
+  cell: ({ row }) => (
+    <Stack gap={0}>
+      {row.best.reasons && (
+        <Text size="sm" truncate title={row.best.reasons}>
+          {row.best.reasons}
+        </Text>
+      )}
+      <Stack direction="row" gap={1} align="center">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            onOpenScreener(row.best.screenerId);
+          }}
+        >
+          {row.best.screenerName}
+        </Button>
+        {row.picks.length > 1 && (
+          <Text size="xs" tone="muted">
+            {`+${String(row.picks.length - 1)} more`}
+          </Text>
+        )}
+      </Stack>
+    </Stack>
+  ),
+});
+
+const scoreColumn: DataTableColumn<Idea> = {
+  id: 'score',
+  header: 'Score',
+  description: 'Score of the best pick',
+  value: (idea) => idea.best.score,
+  format: { kind: 'number', digits: 0 },
+  width: 'xs',
+  essential: true,
+};
+
+const decisionColumn: DataTableColumn<Idea> = {
+  id: 'decision',
+  header: 'Decision',
+  description: 'Best decision across the screeners',
+  value: (idea) => idea.best.decision,
+  essential: true,
+  cell: ({ row }) => <DecisionBadge decision={row.best.decision} />,
+};
+
+const OUTCOME_DOT: Readonly<Record<string, OutcomeDot['tone']>> = {
+  PASS: 'positive',
+  NEAR: 'warning',
+  FAIL: 'negative',
+};
+
+/** One square per criterion of the best pick, coloured by the outcome the server stored. */
+function criterionDots(idea: Idea): OutcomeDot[] {
+  return idea.best.criteria.map((c) => ({
+    label: `${decisionLabel(c.id)}: ${outcomeLabel(c.outcome)}`,
+    tone: OUTCOME_DOT[c.outcome] ?? 'muted',
+  }));
+}
+
+const criteriaColumn: DataTableColumn<Idea> = {
+  id: 'criteria',
+  header: 'Criteria',
+  value: (idea) => idea.best.criteria.map((c) => c.outcome).join(),
+  sortable: false,
+  width: 'md',
+  cell: ({ row }) => <OutcomeDots items={criterionDots(row)} label="Criteria" />,
+};
+
+/** The close over the one-session move, each in the format the server sent. */
+const priceColumn: DataTableColumn<Idea> = {
+  id: 'price',
+  header: 'Price',
+  value: (idea) => idea.facts[IDEA_FACTS.close]?.value,
+  width: 'sm',
+  cell: ({ row }) => {
+    const close = served(row, IDEA_FACTS.close);
+    const move = served(row, IDEA_FACTS.ret1d);
+    return (
+      <Stack gap={0} align="end">
+        <Text numeric tone={close ? 'default' : 'muted'}>
+          {close?.text ?? 'Unknown'}
+        </Text>
+        {move && (
+          <Text size="xs" numeric tone={move.tone}>
+            {move.text}
+          </Text>
+        )}
+      </Stack>
+    );
+  },
+};
+
+/** The watch-outs, else the next earnings in muted text. */
+const watchOutColumn: DataTableColumn<Idea> = {
+  id: 'watch-out',
+  header: 'Watch out',
+  description: 'Reasons to look twice',
+  value: (idea) => idea.watchOut.length,
+  width: 'lg',
+  grow: true,
+  cell: ({ row }) => {
+    if (row.watchOut.length === 0) {
+      const shown = earningsCell(row);
+      return (
+        <Text size="sm" tone="muted" {...(shown.title === undefined ? {} : { title: shown.title })}>
+          {shown.text}
+        </Text>
+      );
+    }
+    return (
+      <Stack direction="row" gap={1} wrap>
+        {row.watchOut.map((w) => (
+          <StatusBadge key={w.id} tone="warning">
+            {w.label}
+          </StatusBadge>
+        ))}
+      </Stack>
+    );
+  },
+};
+
+/** The columns for these ideas in the chosen set (what is served decides which facts show). */
 export function ideaColumns(
   ideas: readonly Idea[],
   onOpenScreener: (screenerId: string) => void,
+  set: IdeaColumnSet = 'stocks',
 ): DataTableColumn<Idea>[] {
+  const size = anyValue(ideas, (idea) => idea.sizeMultiplier) ? [SIZE] : [];
+  if (set === 'options') {
+    return [
+      RANK,
+      tickerColumn,
+      decisionColumn,
+      scoreColumn,
+      ...size,
+      dteColumn,
+      ...ivColumns(ideas),
+      ...metricColumns(ideas),
+      watchOutColumn,
+    ];
+  }
   return [
-    ...FRONT,
-    screenersColumn(onOpenScreener),
-    ...DECISION,
-    ...(anyValue(ideas, (idea) => idea.sizeMultiplier) ? [SIZE] : []),
-    earningsColumn,
-    dteColumn,
-    ...ivColumns(ideas),
-    ...metricColumns(ideas),
+    RANK,
+    tickerColumn,
+    whyColumn(onOpenScreener),
+    decisionColumn,
+    scoreColumn,
+    ...size,
+    criteriaColumn,
+    priceColumn,
     watchOutColumn,
   ];
 }
