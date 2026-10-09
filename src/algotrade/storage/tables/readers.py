@@ -5,7 +5,7 @@ bars, adjustments, events and chains are ``algotrade.data``. Consumers get this 
 ``algotrade.data`` and pass it to the functions there.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -76,6 +76,10 @@ class StoreReader:
 
     def runs(self, job: str, session_date: date | None = None) -> list[RunRecord]:
         return self._backend.runs.find(job, session_date)
+
+    def runs_of(self, jobs: Collection[str], first: date, last: date) -> list[RunRecord]:
+        """The records of any of ``jobs`` for the sessions ``first..last`` in one pass."""
+        return self._backend.runs.find_many(jobs, first, last)
 
     def run(self, run_id: str) -> RunRecord | None:
         """One run record by id (``None`` when there is none)."""

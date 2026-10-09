@@ -27,7 +27,7 @@ only when its run commits, in every partition at once (``local_index.py``).
 import gzip
 import os
 import shutil
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date, datetime
 from pathlib import Path
 
@@ -401,6 +401,16 @@ class LocalRuns:
             return []
         records = [RunRecord.from_json(p.read_text()) for p in self.root.glob("*.json")]
         hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]
+        return sorted(hits, key=lambda r: r.started_at)
+
+    def find_many(self, jobs: Collection[str], first: date, last: date) -> list[RunRecord]:
+        if not self.root.exists():
+            return []
+        quoted = [f'"job": "{job}"' for job in jobs]
+        texts = (p.read_text() for p in self.root.glob("*.json"))
+        # a record of another job (an edge evaluation's runs are large) is never parsed
+        records = [RunRecord.from_json(t) for t in texts if any(q in t for q in quoted)]
+        hits = [r for r in records if r.job in jobs and first <= r.session_date <= last]
         return sorted(hits, key=lambda r: r.started_at)
 
 

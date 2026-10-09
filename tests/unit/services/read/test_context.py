@@ -21,7 +21,6 @@ from algotrade.services.read.context import (
     open_read_stores,
     partition,
     partition_on,
-    partition_range,
     previous_session,
     snapshot_on,
     stored_dates,
@@ -171,19 +170,6 @@ def test_partition_refuses_other_grains(
 ) -> None:
     with pytest.raises(ValueError, match="read it by its own rule"):
         partition(open_for(stored[1]), table)
-
-
-def test_partition_range_reads_a_window_ending_at_the_session(
-    stored: tuple[StoreWriter, StoreReader],
-) -> None:
-    ctx = open_for(stored[1], D2)
-    found = partition_range(ctx, EARNINGS, D1, D2)
-    assert found is not None and found["days_to_earnings"].tolist() == [3]
-    assert partition_range(ctx, EARNINGS, D2, D2) is None  # nothing stored in the window
-    with pytest.raises(ValueError, match="after the request's session"):
-        partition_range(open_for(stored[1], D1), EARNINGS, D1, D2)
-    with pytest.raises(ValueError, match="only session-grain tables"):
-        partition_range(ctx, "holdings/etf", D1, D2)
 
 
 def test_the_previous_session_of_a_table_is_named_explicitly(

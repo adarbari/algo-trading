@@ -142,6 +142,13 @@ def test_run_store(backend: Backend) -> None:
     backend.runs.save(later)
     assert [r.run_id for r in backend.runs.find("job")] == [record.run_id, "job-2"]
     assert [r.run_id for r in backend.runs.find("job", D2)] == ["job-2"]
+    other = RunRecord("other-1", "other", D1, T0 + timedelta(2))
+    backend.runs.save(other)
+    assert [r.run_id for r in backend.runs.find_many({"job"}, D1, D2)] == [record.run_id, "job-2"]
+    assert [r.run_id for r in backend.runs.find_many({"job", "other"}, D1, D1)] == [
+        record.run_id, "other-1"
+    ]  # fmt: skip
+    assert backend.runs.find_many({"job"}, D2, D2)[0].run_id == "job-2"
     assert backend.runs.load("missing") is None
 
 

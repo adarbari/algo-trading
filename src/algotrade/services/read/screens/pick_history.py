@@ -4,41 +4,40 @@ sparkline over the screens page.
 A **ranged read** (ADR 0036 allows explicit ranges, as the regime bands and the market history
 do): the window is the ``sessions`` exchange-calendar sessions ending at the request's resolved
 session (``core.time.calendar.sessions_ending``), oldest first, one entry per session, never
-skipped. Each session is read as its own session: a session with no run of the screener is an
-entry with ``picked`` null and ``not_run`` saying why (``NOT_RUN``), never an older run carried
-forward. Several runs in one session resolve by the one run-selection rule of the screen read
-(``runs.last_run_rows``: the latest ``knowledge_ts``), and the counts are the latest run's
-(``is_picked`` / ``PAUSED``, whole run).
+skipped. Entry ``d`` is what ``latestRun`` says at session ``d`` (the same run: the latest, by
+the time it was recorded; the same counts, ``is_picked`` / ``PAUSED``, whole run); a session
+with no run of the screener is an entry with ``picked`` null and ``not_run`` saying why
+(``NOT_RUN``), never an older run carried forward. Every session is read as it is stored now
+(no ``as_of``: the same as ``latestRun`` at that session).
 
-Point in time (ADR 0007): the request's own session is read as ``latestRun`` reads it (its
-nightly run is stored after the close). An earlier session is read ``as_of`` the close of the
-request's session, so a re-run of an old session stored after it is not read back into what
-that session knew. One read of ``results/rule_screen`` (three columns) serves every screener
-asked for (one batch for a list); a request costs that read of a window of partitions, kept in
-the result cache until the next publish."""
+Cost: a screen writes about 13k result rows per screener per session, so the window is NOT
+counted from result rows. The request's own session is ``latestRun`` itself (its rows are read
+already); an earlier session is counted from its run record's decisions (``stats["summary"]``,
+the whole run's count of each decision, written with the rows), the records of every asked
+screener found in one pass over the run store, kept in the result cache until the next
+publish."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-import pandas as pd
-
-from algotrade.core.time.calendar import close_time, sessions_ending
+from algotrade.core.time.calendar import sessions_ending
 from algotrade.services.read.availability.cause import run_cause
-from algotrade.services.read.context import ReadContext, partition_range
+from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens.runs import (
     PAUSED,
     RULE_SCREEN,
     RunKey,
     is_picked,
-    last_run_rows,
-    screen_rows,
+    load_latest_runs,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.services.screening.run import run_job_name
+from algotrade.storage.runs import RunRecord
 
 DEFAULT_SESSIONS = 30
 MAX_SESSIONS = 90  # a window asked for beyond it is cut to it
-COLUMNS = ("user_id", "config_id", "decision")
+FINISHED = frozenset({"complete", "partial"})  # a screen that wrote its rows and its summary
 
 
 @dataclass(frozen=True)
@@ -52,38 +51,34 @@ class PickCount:
     not_run: Unknown | None
 
 
-def _window(ctx: ReadContext, days: Sequence[date]) -> pd.DataFrame:
-    """The window's rows of every rule screen, ``session_date`` as a date: the earlier
-    sessions as the store held them at the close of the request's session (``as_of``: the run
-    selection of the table's run mode, ADR 0007), read once per publish; the request's own
-    session through ``screen_rows`` (the read ``latestRun`` shares)."""
-    key = ("pick_history", days[0], days[-1], ctx.reader.own_run, ctx.reader.visible_seq())
-    found: pd.DataFrame | None = ctx.cache.get(key)  # key read first (ADR 0022)
+def _decisions(record: RunRecord) -> Mapping[str, int] | None:
+    """The run's count of each decision (None: a record that finished no screen)."""
+    if record.finished_at is None or record.status.value not in FINISHED:
+        return None
+    found = (record.stats.get("summary") or {}).get("decisions") or record.stats.get("decisions")
+    return None if found is None else {str(d): int(n) for d, n in found.items()}
+
+
+def _records(ctx: ReadContext, jobs: frozenset[str], first: date, last: date) -> list[RunRecord]:
+    """The screen records of ``jobs`` for ``first..last``, one pass, once per publish."""
+    key = ("pick_history", first, last, tuple(sorted(jobs)), ctx.reader.visible_seq())
+    found: list[RunRecord] | None = ctx.cache.get(key)  # key read first (ADR 0022)
     if found is None:
-        parts: list[pd.DataFrame | None] = []
-        if len(days) > 1:
-            cutoff = close_time(days[-1])
-            parts.append(partition_range(ctx, RULE_SCREEN, days[0], days[-2], cutoff, COLUMNS))
-        today = screen_rows(ctx)
-        parts.append(None if isinstance(today, Unknown) else today)
-        columns = [*COLUMNS, "session_date", "run_id", "knowledge_ts"]
-        frames = [p[columns] for p in parts if p is not None and not p.empty]
-        found = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=columns)
-        found["session_date"] = pd.to_datetime(found["session_date"]).dt.date
+        found = ctx.reader.runs_of(jobs, first, last)
         ctx.cache.put(key, found)
     return found
 
 
-def _count(config_id: str, day: date, rows: pd.DataFrame | None) -> PickCount:
-    if rows is None:
-        detail = f"{config_id} has no run in {RULE_SCREEN} for {day.isoformat()}"
-        why = Unknown(UnknownCode.NOT_RUN, run_cause(config_id, detail, day))
-        return PickCount(day, None, None, why)
-    _, run = last_run_rows(rows)
-    decisions = run["decision"].astype(str)
+def _not_run(config_id: str, day: date) -> PickCount:
+    detail = f"{config_id} has no run in {RULE_SCREEN} for {day.isoformat()}"
     return PickCount(
-        day, int(sum(is_picked(d) for d in decisions)), int((decisions == PAUSED).sum()), None
+        day, None, None, Unknown(UnknownCode.NOT_RUN, run_cause(config_id, detail, day))
     )
+
+
+def _counted(day: date, decisions: Mapping[str, int]) -> PickCount:
+    picked = sum(n for d, n in decisions.items() if is_picked(d))
+    return PickCount(day, picked, decisions.get(PAUSED, 0), None)
 
 
 def load_pick_histories(
@@ -92,14 +87,29 @@ def load_pick_histories(
     """For each ``(owner, config id)`` of ``keys`` its ``PickCount`` per session of the last
     ``sessions`` (cut to ``1..MAX_SESSIONS``) ending at the request's session, oldest first."""
     days = sessions_ending(ctx.session.date, min(max(sessions, 1), MAX_SESSIONS))
-    stored = _window(ctx, days)
-    groups = {
-        (str(o), str(c), d): rows
-        for (o, c, d), rows in stored.groupby(["user_id", "config_id", "session_date"])
-    }
-    return {
-        (owner, config_id): tuple(
-            _count(config_id, d, groups.get((owner, config_id, d))) for d in days
-        )
-        for owner, config_id in keys
-    }
+    today = load_latest_runs(ctx, keys) if days[-1] == ctx.session.date else {}
+    jobs = {key: run_job_name(key[1], key[0]) for key in keys}
+    records = _records(ctx, frozenset(jobs.values()), days[0], days[-1]) if len(days) > 1 else []
+    latest: dict[tuple[str, date], tuple[RunRecord, Mapping[str, int]]] = {}
+    for record in records:  # the latest record of a session wins (by when it finished)
+        decisions = _decisions(record)
+        held = latest.get((record.job, record.session_date))
+        if decisions is not None and (held is None or _finished(record) >= _finished(held[0])):
+            latest[(record.job, record.session_date)] = (record, decisions)
+    out: dict[RunKey, tuple[PickCount, ...]] = {}
+    for key, job in jobs.items():
+        counts = []
+        for day in days:
+            run = today[key].run if day == ctx.session.date and key in today else None
+            if run is not None:
+                counts.append(PickCount(day, run.picked, run.paused, None))
+            elif (hit := latest.get((job, day))) is not None and day != ctx.session.date:
+                counts.append(_counted(day, hit[1]))
+            else:
+                counts.append(_not_run(key[1], day))
+        out[key] = tuple(counts)
+    return out
+
+
+def _finished(record: RunRecord) -> float:
+    return (record.finished_at or record.started_at).timestamp()

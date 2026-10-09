@@ -145,8 +145,7 @@ def test_pick_history_is_one_entry_per_session_oldest_first(graph: Graph) -> Non
     body = graph(PICK_HISTORY, {"id": "vrp_scanner", "sessions": 3})
     assert "errors" not in body, body
     first, second, third = body["data"]["screener"]["pickHistory"]
-    # the golden PREVIOUS run was stored long after END closed: not known by END, so NOT_RUN
-    assert (first["session"], second["session"]) == ("2022-11-21", "2022-11-22")
-    assert (first["picked"], first["paused"]) == (None, None)
-    assert first["notRun"] == second["notRun"] == {"code": "NOT_RUN"}
+    assert (first["session"], first["picked"], first["paused"]) == ("2022-11-21", None, None)
+    assert first["notRun"] == {"code": "NOT_RUN"}  # the run's absence is an entry, not a gap
+    assert (second["session"], second["picked"], second["paused"]) == ("2022-11-22", 2, 0)
     assert (third["session"], third["picked"], third["paused"]) == ("2022-11-23", 2, 1)

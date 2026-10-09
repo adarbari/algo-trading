@@ -1,9 +1,8 @@
 """What every loader reads through: the ``ReadContext`` of one request (the stores, whose
 catalogue, the one resolved ``Session``, the result cache), opened by ``open_context``, and
 ``partition``, the only way a loader reads a session-grain table for the request's session
-(ADR 0036 decision 6), ``partition_range``, a window of sessions ending at it, and
-``run_partition``, a run record's own results (the run names its session: an explicit
-argument, never "latest"), and ``previous_session`` / ``at_session``: the
+(ADR 0036 decision 6), and ``run_partition``, a run record's own results (the run names its
+session: an explicit argument, never "latest"), and ``previous_session`` / ``at_session``: the
 stored session of a table before the request's and a context for it (a loader comparing with
 the previous run names that date explicitly, ADR 0036). The inventory reads (``stored_dates``,
 ``partition_on``, ``snapshot_on``) report what is stored on dates the caller names: only the ops
@@ -19,7 +18,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime
+from datetime import date
 from functools import cached_property
 from pathlib import Path
 from typing import Any
@@ -53,7 +52,6 @@ __all__ = [
     "open_stores",
     "partition",
     "partition_on",
-    "partition_range",
     "previous_session",
     "run_partition",
     "snapshot_on",
@@ -289,26 +287,6 @@ def partition(
     if instruments is not None:  # the read prunes row groups only
         found = found[found["instrument_id"].isin(set(instruments))].reset_index(drop=True)
     return found
-
-
-def partition_range(
-    ctx: ReadContext,
-    table: str,
-    start: date,
-    end: date,
-    as_of: datetime | None = None,
-    columns: Sequence[str] | None = None,
-) -> pd.DataFrame | None:
-    """``table``'s partitions for the sessions ``start..end`` (the one ranged read of a session
-    grain table: a window the loader names, ending at or before ``ctx.session.date``, ADR 0036),
-    as the store held them at ``as_of`` (None: now); ``None``: nothing stored in the window.
-    ``ValueError`` for a window past the request's session or a table that is not session grain."""
-    grain = grain_of(table)
-    if grain is not Grain.SESSION:
-        raise ValueError(f"{table} is {grain} grain: only session-grain tables have a window")
-    if end > ctx.session.date:
-        raise ValueError(f"window ends {end}, after the request's session {ctx.session.date}")
-    return ctx.reader.table_range(table, start, end, as_of, None, columns)
 
 
 def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | None:
