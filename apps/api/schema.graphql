@@ -369,7 +369,7 @@ type EdgeSource {
 }
 
 """
-An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel
+An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests
 """
 type EdgeVerdict {
   verdict: String!
@@ -390,6 +390,9 @@ type EdgeVerdict {
   pbo: Float
   criteria: [VerdictCriterion!]!
   years: [VerdictYear!]!
+  trials: Int
+  deciles: [Float]!
+  robustness: Robustness
 }
 
 """
@@ -1999,6 +2002,26 @@ Which side of its threshold an indicator warns on: HIGHER_IS_RISK (on above it) 
 enum RiskDirection {
   HIGHER_IS_RISK
   LOWER_IS_RISK
+}
+
+"""
+The edge's out-of-sample `lift` among `draws` backtests of random picks (same holding period): `beats` the share of them it is above (0 to 1), `bins` their lifts for the distribution, `summary` the sentence. Null: the run drew none
+"""
+type Robustness {
+  lift: Float!
+  draws: Int!
+  beats: Float!
+  bins: [RobustnessBin!]!
+  summary: String!
+}
+
+"""
+One bin of the random-pick backtests' lifts: `start` (inclusive) to `end` (exclusive; inclusive for the last bin), `count` draws
+"""
+type RobustnessBin {
+  start: Float!
+  end: Float!
+  count: Int!
 }
 
 """

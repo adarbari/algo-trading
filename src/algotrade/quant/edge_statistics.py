@@ -10,6 +10,9 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
     effect_vs_moments    Hedges' g of an array over a side given only as moments
     decile_spread        mean of the best bucket minus mean of the worst, in rank order
     spread_summary       (mean, sd, t, n) of a series of per-session spreads
+    random_pick_sums     per draw, the sum of values and of hits over ``k`` names drawn
+                         uniformly without replacement (the random-pick backtests)
+    percentile_of        the share of a sample a value beats (ties half)
     sharpe               per-period mean over sample sd
     deflated_sharpe      Bailey and Lopez de Prado (2014): the probability the true Sharpe
                          beats what the best of ``n_trials`` noise strategies would show
@@ -108,6 +111,34 @@ def decile_spread(values_in_rank_order: ArrayLike, buckets: int = 10) -> float |
         return None
     parts = np.array_split(v, buckets)
     return float(parts[0].mean() - parts[-1].mean())
+
+
+def random_pick_sums(
+    values: ArrayLike, hits: ArrayLike, k: int, draws: int, rng: np.random.Generator
+) -> tuple[Array, Array] | None:
+    """For each of ``draws`` draws, ``(sum of values, number of hits)`` over ``k`` of the names
+    drawn uniformly without replacement (``values`` and ``hits`` aligned per name; every name
+    must have a finite value). ``k`` above the names is every name. None with no names or no
+    draws. Deterministic given ``rng`` and the order of the names."""
+    v = np.asarray(values, dtype=np.float64).ravel()
+    h = np.asarray(hits, dtype=np.float64).ravel()
+    if v.size == 0 or draws < 1 or k < 1:
+        return None
+    k = min(k, v.size)
+    keys = rng.random((draws, v.size))
+    chosen = np.argpartition(keys, k - 1, axis=1)[:, :k] if k < v.size else None
+    if chosen is None:
+        return np.full(draws, v.sum()), np.full(draws, h.sum())
+    return v[chosen].sum(axis=1), h[chosen].sum(axis=1)
+
+
+def percentile_of(value: float | None, sample: ArrayLike) -> float | None:
+    """The share of the finite ``sample`` that ``value`` beats (a tie counts half), in 0..1;
+    None without a value or a sample."""
+    v = _finite(sample)
+    if value is None or not math.isfinite(value) or v.size == 0:
+        return None
+    return float(((v < value).sum() + 0.5 * (v == value).sum()) / v.size)
 
 
 def spread_summary(x: ArrayLike) -> tuple[float | None, float | None, float | None, int]:

@@ -1,8 +1,9 @@
-"""Read forward outcomes (``outcomes/instrument/forward_returns@v1``, written by the ingestion
+"""Read forward outcomes (``outcomes/instrument/forward_returns@v2``, written by the ingestion
 ``outcomes`` task) for the start sessions a harness evaluates: one row per (instrument, start
 session S, horizon, benchmark). A window not closed, or not computed, has no row: the caller
-excludes it, never counts it a miss. ``as_of`` keeps only rows known by then (row by row, not
-only by run)."""
+excludes it, never counts it a miss; an ``UNMEASURED`` row (a flagged bar in the window, ADR 0061;
+``outcome_reason``) has no returns and is excluded the same way. ``as_of`` keeps only rows
+known by then (row by row, not only by run)."""
 
 from collections.abc import Sequence
 from datetime import date, datetime
@@ -15,7 +16,7 @@ from algotrade.storage.tables.schemas import FORWARD_RETURNS
 
 OUTCOME_FIELDS = (
     "fwd_return", "fwd_excess_return", "fwd_max_return", "fwd_max_drawdown", "fwd_realised_vol",
-    "outcome_status",
+    "outcome_status", "outcome_reason",
 )  # fmt: skip
 _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "window_end")
 
@@ -45,6 +46,8 @@ def read_outcomes(
     if frame is None:
         hint = f"run `algotrade-ingest run outcomes --from ... --to ...` past {wanted[-1]}"
         raise MissingDataError(FORWARD_RETURNS, f"no outcomes for {wanted[0]}..{wanted[-1]}", hint)
+    if "outcome_reason" not in frame.columns:  # a nullable column no row of the partitions set
+        frame = frame.assign(outcome_reason=None)
     starts = pd.to_datetime(frame["session_date"]).dt.date
     keep = starts.isin(set(wanted)) & (frame["horizon_sessions"] == horizon)
     keep &= frame["benchmark"] == benchmark

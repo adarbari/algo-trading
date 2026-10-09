@@ -6,7 +6,7 @@ from typing import Self
 
 import strawberry
 
-from algotrade.services.read.evaluation import edges
+from algotrade.services.read.evaluation import edges, robustness
 from algotrade.services.read.evaluation import verdict as read
 
 
@@ -88,12 +88,52 @@ class VerdictYear:
 
 
 @strawberry.type(
+    description="One bin of the random-pick backtests' lifts: `start` (inclusive) to `end` "
+    "(exclusive; inclusive for the last bin), `count` draws"
+)
+class RobustnessBin:
+    start: float
+    end: float
+    count: int
+
+    @classmethod
+    def of(cls, d: robustness.RobustnessBin) -> Self:
+        return cls(start=d.start, end=d.end, count=d.count)
+
+
+@strawberry.type(
+    description="The edge's out-of-sample `lift` among `draws` backtests of random picks (same "
+    "holding period): `beats` the share of them it is above (0 to 1), `bins` their lifts for "
+    "the distribution, `summary` the sentence. Null: the run drew none"
+)
+class Robustness:
+    lift: float
+    draws: int
+    beats: float
+    bins: list[RobustnessBin]
+    summary: str
+
+    @classmethod
+    def of(cls, d: robustness.Robustness) -> Self:
+        return cls(
+            lift=d.lift,
+            draws=d.draws,
+            beats=d.beats,
+            bins=[RobustnessBin.of(b) for b in d.bins],
+            summary=d.summary,
+        )
+
+
+@strawberry.type(
     description="An edge's verdict, judged on its official result (the canonical run): "
     "`verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` "
     "the first failing criterion in words; `headline` the page's sentence and `result` the "
     "list's one-liner; `basis` the screen and holding period it rests on. The figures are the "
     "basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus "
-    "base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel"
+    "base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; "
+    "`trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth "
+    "of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` "
+    "the lift among random-pick backtests"
 )
 class EdgeVerdict:
     verdict: str
@@ -114,6 +154,9 @@ class EdgeVerdict:
     pbo: float | None
     criteria: list[VerdictCriterion]
     years: list[VerdictYear]
+    trials: int | None
+    deciles: list[float | None]
+    robustness: Robustness | None
 
     @classmethod
     def of(cls, d: read.EdgeVerdict) -> Self:
@@ -136,4 +179,7 @@ class EdgeVerdict:
             pbo=d.pbo,
             criteria=[VerdictCriterion.of(c) for c in d.criteria],
             years=[VerdictYear.of(y) for y in d.years],
+            trials=d.trials,
+            deciles=list(d.deciles),
+            robustness=Robustness.of(d.robustness) if d.robustness else None,
         )

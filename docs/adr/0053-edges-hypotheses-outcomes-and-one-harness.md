@@ -117,7 +117,7 @@ acceptance checks; a stored grain is backfilled once and verified like any table
 
 ## Amendment (2026-10-07, ED2): the grain as built
 Decision 3 holds; ED2 fixes what it left open.
-- **One table, no stored hit.** `outcomes/instrument/forward_returns@v1` (fixed schema in
+- **One table, no stored hit.** `outcomes/instrument/forward_returns@v2` (fixed schema in
   `storage/tables/schemas.py`), one row per (instrument, start session S, horizon, benchmark):
   `window_end` (T, the h-th exchange session after S), `fwd_return`, `fwd_excess_return`,
   `fwd_max_return` and `fwd_max_drawdown` (intraday highs and lows after S: the path a drawdown
@@ -317,7 +317,7 @@ sessions. Plan: `docs/edges-plan.md`. W1 (this change) is configuration and the 
 itself follows.
 
 1. **The study is a second reader of outcomes.** Besides the edge harness, the winners study reads
-   `outcomes/instrument/forward_returns@v1` (through `data/outcomes`, from `services/evaluation`
+   `outcomes/instrument/forward_returns@v2` (through `data/outcomes`, from `services/evaluation`
    only: the exception to the one-session rule stays confined to that package). Its horizon (504)
    and benchmark (SPY) are declared in `config/site/studies/winners.toml` (typed by
    `config/edges/winners.py`), and the outcomes task's `horizons_and_benchmarks` adds them to those
@@ -453,7 +453,12 @@ to 14) on the existing documents, with one new grain still to come.
    90th percentile of the wins `n` closed trades would show if the official win rate held
    (`quant.edge_statistics.win_rate_band`, thresholds `live_min_trades`, `live_low`, `live_high` in
    `config/site/verdict.toml`), and a trial's forward test beside the edge it would replace.
-   Still to come: random-pick backtests and decile means on `results/edge_eval` (D5: 1,000 draws,
-   out-of-sample slice only, Works needs at least 95% beaten), the web follow and builder UI;
-   each lands with its own tests and, where it touches point-in-time reads or jobs, an
-   `architect` review.
+   The web follow and builder UI is still to come; it lands with its own tests.
+
+## Amendment (2026-10-09, ADR 0061): the grain is `forward_returns@v2`
+A window that needs a bar `bar-quality` flagged is `outcome_status = UNMEASURED` with
+`outcome_reason = BAD_BAR` and null returns (the three return columns are nullable); the harness
+counts it per pick (`excluded_unmeasured`, `unmeasured_base`: "unmeasured, not a miss"), and a
+session is `excluded_coverage` only when more than half its picks are UNMEASURED. The table name carries the new version,
+every reader follows it (`data/outcomes`, `services/evaluation`, the winners labels), and the v1
+table is no longer read.

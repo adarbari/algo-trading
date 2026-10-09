@@ -22,6 +22,7 @@ KEYS = (
     "max_pbo",
     "works_max_pbo",
     "oos_lift_share",
+    "random_beat_share",
     "forward_sessions",
     "live_min_trades",
     "live_low",
@@ -33,7 +34,9 @@ KEYS = (
 class VerdictSettings:
     """Trades are independent sessions; ``t`` is the top-vs-bottom decile t statistic, ``dsr`` the
     deflated Sharpe ratio, ``pbo`` the probability of backtest overfitting. ``oos_lift_share``:
-    the out-of-sample lift must keep this share of the whole-history lift."""
+    the out-of-sample lift must keep this share of the whole-history lift. Works needs the
+    out-of-sample lift to beat ``random_beat_share`` of the random-pick backtests' draws (ED8,
+    drawn by the harness)."""
 
     min_oos_trades: int = 40  # owner decision 2026-10-09
     works_trades: int = 100
@@ -47,6 +50,7 @@ class VerdictSettings:
     max_pbo: float = 0.5
     works_max_pbo: float = 0.2
     oos_lift_share: float = 0.5
+    random_beat_share: float = 0.95
     forward_sessions: int = 20  # a new version's forward test, in sessions (ED8; owner 2026-10-09)
     # The live record (paper trades) is judged against the backtest's usual range, the ``live_low``
     # to ``live_high`` quantiles of the wins n closed trades would show if the backtest's win rate
@@ -75,6 +79,7 @@ class VerdictSettings:
             max_pbo=t.fraction("max_pbo", d.max_pbo),
             works_max_pbo=t.fraction("works_max_pbo", d.works_max_pbo),
             oos_lift_share=t.number("oos_lift_share", d.oos_lift_share, 0),
+            random_beat_share=t.fraction("random_beat_share", d.random_beat_share),
             forward_sessions=t.integer("forward_sessions", d.forward_sessions, 1),
             live_min_trades=t.integer("live_min_trades", d.live_min_trades, 1),
             live_low=t.fraction("live_low", d.live_low),

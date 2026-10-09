@@ -47,6 +47,21 @@ export const Tones: Story = {
   },
 };
 
+/** Signed values around a zero axis: the mean return of each tenth of the ranked names. */
+export const Diverging: Story = {
+  args: {
+    label: 'Mean return by decile',
+    diverging: true,
+    max: 0.09,
+    format: { kind: 'delta', digits: 1 },
+    items: [9, 6, 4, 2, 1, -0.5, -2, -3, -5, -7].map((v, i) => ({
+      id: `d${i + 1}`,
+      label: `Decile ${i + 1}`,
+      value: v / 100,
+    })),
+  },
+};
+
 export const Loading: Story = { args: { loading: true } };
 
 export const Empty: Story = { args: { items: [], emptyMessage: 'No hard criteria yet' } };

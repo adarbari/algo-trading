@@ -92,6 +92,10 @@ also_written_by = [
 [[table]]
 name = "events/bar_flag"
 owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/bar_quality.py"
+also_written_by = [
+    # ADR 0061 Q2: the flags of the bars it adds, from bar_quality.plan_flags, published with the same run's bars (all or none).
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",
+]
 note = "ADR 0061: the stored daily bars that cannot be right (reason, status FLAGGED / CLEARED); data.prices drops FLAGGED bars at read time; no known_from (a fact of record about the stored bar)"
 
 [[table]]
@@ -411,6 +415,6 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
 # apps/ingestion/algotrade_ingestion/tasks/maintenance/migrate_ids.py (an admin command, not a producer).
 
 [[table]]
-name = "outcomes/instrument/forward_returns@v1"
+name = "outcomes/instrument/forward_returns@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
 note = "ADR 0053: forward outcomes per (instrument, start session, horizon, benchmark); read only by the edge harness through algotrade.data.outcomes"

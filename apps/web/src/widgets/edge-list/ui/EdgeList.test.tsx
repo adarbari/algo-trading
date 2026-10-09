@@ -32,14 +32,14 @@ describe('EdgeList', () => {
       .map((h) => h.textContent);
     expect(headings).toEqual(['Promising · 1', 'Not working · 1', 'Waiting on data · 1']);
     const momentum = within(table).getByRole('row', { name: /Momentum 12-1/ });
-    expect(within(momentum).getByText('screen: momentum_12_1')).toBeInTheDocument();
+    expect(within(momentum).getByText('screen: momentum_12_1 · site edge')).toBeInTheDocument();
     expect(within(momentum).getByText('Win rate 57% · base rate 52%')).toBeInTheDocument();
     expect(within(momentum).getByText('70')).toBeInTheDocument();
     expect(within(momentum).getByText('Candidate')).toBeInTheDocument();
     const drift = within(table).getByRole('row', { name: /Earnings drift/ });
-    expect(within(drift).getByText('screens: pead, pead_volume')).toBeInTheDocument();
+    expect(within(drift).getByText('screens: pead, pead_volume · site edge')).toBeInTheDocument();
     const waiting = within(table).getByRole('row', { name: /S&P 500 index changes/ });
-    expect(within(waiting).getByText('no screen yet')).toBeInTheDocument();
+    expect(within(waiting).getByText('no screen yet · site edge')).toBeInTheDocument();
     expect(within(waiting).getByText('Rejected')).toBeInTheDocument();
     for (const id of ['verdict', 'edge_status', 'trades', 'out_of_sample']) {
       expect(screen.getByText(`help ${id}`)).toBeInTheDocument();

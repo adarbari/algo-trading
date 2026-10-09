@@ -10,6 +10,10 @@ A name is eligible when it was in the universe at S and has a bar at S. Its row 
   days on or before T): measured to its
   last bar in the window (a name whose last bar is S: a zero return, no volatility); the
   delisting return itself (a cash-out, a final print) is not measured;
+- UNMEASURED, with the reason ``BAD_BAR`` and no return, when a bar of the window S..T (S
+  included) was flagged by ``bar-quality`` (ADR 0061) and dropped at read time: a return over a
+  bad price is not a measurement. A flagged S counts as eligible (a name with a flagged bar at S
+  is not silently dropped); the harness reads the row as "unmeasured, not a miss";
 - otherwise absent, with a reason (a gap at T, or a name not yet recorded as delisted: the
   task recomputes recent windows each night, so a later reference build turns it into a row).
 
@@ -21,18 +25,21 @@ deviation of the daily log close returns (null under two returns). ``fwd_excess_
 storage, no clock.
 """
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
 import numpy as np
 import pandas as pd
 
+from algotrade.storage.tables.schemas import UNMEASURED
+
 TRADING_DAYS = 252  # annualises the realised volatility
+BAD_BAR = "BAD_BAR"  # the outcome_reason of an UNMEASURED row (ADR 0061)
 NO_END_BAR = "no bar at the window end (a gap, or left the universe without a delisting date)"
 _COLUMNS = (
     "instrument_id", "fwd_return", "fwd_excess_return", "fwd_max_return", "fwd_max_drawdown",
-    "fwd_realised_vol", "outcome_status",
+    "fwd_realised_vol", "outcome_status", "outcome_reason",
 )  # fmt: skip
 
 
@@ -61,18 +68,31 @@ def window_rows(
     eligible: Collection[str],
     benchmark: str | None,
     delisted: Mapping[str, date],
+    flagged: Collection[tuple[str, date]] = (),
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     """``bars`` (``instrument_id``, ``session_date``, ``high``, ``low``, ``close``; S..T, adjusted
     as of T) -> (one row per measured name, ``_COLUMNS``; reason per eligible name without one).
     ``eligible``: the universe at S (names without a bar at S are dropped, not reasons);
     ``benchmark``: its instrument id, or None; ``delisted``: id -> delisting date, as the
-    latest reference snapshot records it."""
+    latest reference snapshot records it; ``flagged``: the (instrument, session) of the bars
+    dropped as flagged (``SessionBars.flagged``)."""
     close, high, low = (_wide(bars, window, field) for field in ("close", "high", "low"))
+    bad = {i for i, d in flagged if window.start <= d <= window.end and i in eligible}
+    unmeasured = sorted(
+        i
+        for i in bad
+        if (i, window.start) in flagged
+        or (i in close.columns and pd.notna(close.at[window.start, i]))
+    )
     ids = np.array(
-        [i for i in close.columns if i in eligible and pd.notna(close.at[window.start, i])]
+        [
+            i
+            for i in close.columns
+            if i in eligible and i not in bad and pd.notna(close.at[window.start, i])
+        ]
     )
     if not len(ids):
-        return pd.DataFrame(columns=list(_COLUMNS)), {}
+        return _unmeasured_rows(unmeasured), {}
     c = close[ids].to_numpy(dtype=float)
     complete = ~np.isnan(c[-1])
     gone = np.array([_gone(delisted.get(i), window) for i in ids])
@@ -93,9 +113,25 @@ def window_rows(
             ),
             "fwd_realised_vol": _realised_vol(c, last),
             "outcome_status": np.where(complete, "COMPLETE", "DELISTED"),
+            "outcome_reason": None,
         }
     )
+    if unmeasured:
+        rows = pd.concat([rows, _unmeasured_rows(unmeasured)], ignore_index=True)
     return rows, reasons
+
+
+def _unmeasured_rows(ids: Sequence[str]) -> pd.DataFrame:
+    """The UNMEASURED rows of ``ids``: a reason, no return and no path fields."""
+    return pd.DataFrame(
+        {
+            "instrument_id": list(ids),
+            **dict.fromkeys(_COLUMNS[1:6], np.nan),
+            "outcome_status": UNMEASURED,
+            "outcome_reason": BAD_BAR,
+        },
+        columns=list(_COLUMNS),
+    )
 
 
 def _wide(bars: pd.DataFrame, window: Window, field: str) -> pd.DataFrame:

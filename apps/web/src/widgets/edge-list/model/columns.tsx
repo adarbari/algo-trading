@@ -8,10 +8,13 @@ import { StatusBadge, Stack, Text, type DataTableColumn } from '@algotrade/ui';
 import { statusLabel, statusTone, verdictLabel, verdictTone, type Edge } from '@/entities/edge';
 import { GuideHelp } from '@/features/guide-help';
 
-const screensOf = (e: Edge): string =>
-  e.screeners.length === 0
-    ? 'no screen yet'
-    : `${e.screeners.length === 1 ? 'screen' : 'screens'}: ${e.screeners.join(', ')}`;
+const screensOf = (e: Edge): string => {
+  const screens =
+    e.screeners.length === 0
+      ? 'no screen yet'
+      : `${e.screeners.length === 1 ? 'screen' : 'screens'}: ${e.screeners.join(', ')}`;
+  return `${screens} · ${e.mine ? 'your edge' : 'site edge'}`;
+};
 
 export function edgeColumns(): DataTableColumn<Edge>[] {
   return [

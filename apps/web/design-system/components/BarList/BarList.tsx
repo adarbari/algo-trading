@@ -2,7 +2,9 @@
  * BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a
  * screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top
  * sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the
- * bar (long labels, narrow panels). Bars are decorative: each row reads as "label value".
+ * bar (long labels, narrow panels). `diverging` takes signed values: bars grow right of a zero
+ * axis when positive and left when negative (a return by decile), scaled to the largest
+ * magnitude. Bars are decorative: each row reads as "label value".
  */
 import type { CSSProperties, ReactNode } from 'react';
 
@@ -31,8 +33,10 @@ export interface BarListProps {
   format?: ValueFormat;
   /** `inline` (label | bar | value) or `stacked` (label above bar, value at the end). */
   layout?: 'inline' | 'stacked';
-  /** Bar colour for every row (default `accent`). */
+  /** Bar colour for every row (default `accent`; a `diverging` list's rows are positive or negative). */
   tone?: DataTone;
+  /** Signed values around a zero axis, scaled to the largest magnitude (`max`: the magnitude of a full half). */
+  diverging?: boolean;
   loading?: boolean;
   /** Replaces the rows with this message. */
   error?: ReactNode;
@@ -45,7 +49,8 @@ export function BarList({
   max,
   format = { kind: 'number' },
   layout = 'inline',
-  tone = 'accent',
+  tone,
+  diverging = false,
   loading = false,
   error,
   emptyMessage = 'No data',
@@ -58,18 +63,22 @@ export function BarList({
     );
   }
   if (!loading && items.length === 0) return <p className={styles.message}>{emptyMessage}</p>;
-  const top = Math.max(max ?? 0, ...items.map((i) => i.value), 0);
+  const top = Math.max(max ?? 0, ...items.map((i) => (diverging ? Math.abs(i.value) : i.value)), 0);
   return (
     <ul
       className={styles.list}
       data-layout={layout}
+      data-diverging={diverging || undefined}
       aria-label={label}
       aria-busy={loading || undefined}
     >
       {items.map((item) => {
-        const share = top > 0 ? Math.max(0, item.value) / top : 0;
-        // A non-zero value always shows at least a sliver of bar.
-        const width = item.value > 0 ? Math.max(share, 0.01) : 0;
+        const size = diverging ? Math.abs(item.value) : Math.max(0, item.value);
+        const share = top > 0 ? size / top : 0;
+        // A non-zero value always shows at least a sliver of bar (a diverging half is half the track).
+        const width = size > 0 ? Math.max(share, 0.01) / (diverging ? 2 : 1) : 0;
+        const sign = item.value < 0 ? 'negative' : 'positive';
+        const fill = item.tone ?? tone ?? (diverging ? sign : 'accent');
         return (
           <li key={item.id} className={styles.row}>
             <span className={styles.label}>{item.label}</span>
@@ -77,7 +86,8 @@ export function BarList({
               {!loading && (
                 <span
                   className={`${styles.fill} ${toneStyles.tone}`}
-                  data-tone={item.tone ?? tone}
+                  data-tone={fill}
+                  data-sign={diverging ? sign : undefined}
                   style={{ '--share': `${Number((width * 100).toFixed(3))}%` } as CSSProperties}
                 />
               )}

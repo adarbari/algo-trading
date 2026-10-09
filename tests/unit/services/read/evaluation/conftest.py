@@ -67,6 +67,7 @@ def write_run(
     status: RunStatus = RunStatus.COMPLETE,
     exploratory: bool | None = None,
     finished_minutes: int | None = None,
+    extra: list[dict[str, Any]] | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T."""
@@ -77,6 +78,7 @@ def write_run(
     rows = [
         row("momo", "all", 0.3, split, user_id=owner),
         row("momo", kind, hit_rate, split, user_id=owner, exploratory=split != FROZEN),
+        *(extra or []),
     ]
     frame = stamped(rows, END, run_id, at, "edge-eval")
     stats = {

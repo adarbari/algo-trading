@@ -9,6 +9,8 @@ import pytest
 
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
+from algotrade.data.events import read_events
+from algotrade.data.prices import FLAGS_TABLE
 from algotrade.services.events.fill import IV_HISTORY, PRICE_STATS
 from algotrade.services.events.scope import LIQUIDITY
 from algotrade.storage.backends.local import LocalBackend
@@ -582,3 +584,49 @@ def test_bars_and_tiingo_splits_are_published_together_or_not_at_all(
     assert not reader.dates("events/split")
     run(writer, vendor, (), from_listings=True)  # the retry publishes both
     assert len(stored(writer, DAYS[0])) == 1 and len(_splits(writer)) == 1
+
+
+def _flags(writer: StoreWriter) -> pd.DataFrame:
+    return read_events(StoreReader(writer._backend), FLAGS_TABLE, SINCE, UNTIL).frame
+
+
+def _spiked() -> list[Row]:
+    """AAA's closes: 10.5, then a 0.001 bar (below the floor), then 10.5 again."""
+    good = rows(10)
+    return [good[0], ("2020-01-03", 0.001, 0.002, 0.0005, 0.001, 1000.0), good[2]]
+
+
+def test_bars_history_publishes_flags_atomically(
+    writer: StoreWriter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The flags of the bars a run adds travel with them (ADR 0061): the same run id, a WARN
+    item and stat, and one failing write leaves neither the bars nor the flags."""
+    vendor = Vendor({"AAA": payloads.prices(_spiked()), "BBB": payloads.prices(rows(20))})
+    real = StoreWriter.write_table
+
+    def failing(self: StoreWriter, table: str, *args: object, **kwargs: object) -> None:
+        if table == FLAGS_TABLE:
+            raise OSError("disk full")
+        real(self, table, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(StoreWriter, "write_table", failing)
+    with pytest.raises(OSError, match="disk full"):
+        run(writer, vendor)
+    monkeypatch.undo()
+    reader = StoreReader(writer._backend)
+    assert not any(reader.table(BARS, date.fromisoformat(d)) for d in DAYS)  # no bars either
+    assert not reader.dates(FLAGS_TABLE)
+    record = run(writer, vendor)  # the retry publishes both, in one run
+    flags = _flags(writer)
+    assert list(flags["instrument_id"]) == ["EQ:AAA"] and list(flags["status"]) == ["FLAGGED"]
+    assert list(flags["reason"]) == ["BELOW_FLOOR"] and flags["ts"].dt.date.tolist() == [
+        date.fromisoformat(DAYS[1])
+    ]
+    assert set(flags["run_id"]) == set(stored(writer, DAYS[1])["run_id"]) == {record.run_id}
+    assert record.status is RunStatus.COMPLETE  # a WARN, never a failure
+    assert record.stats["flagged"] == 1 and record.items["bar_flags"].startswith("BAD_BARS: 1 of 6")
+
+
+def test_a_run_without_bad_bars_writes_no_flags(writer: StoreWriter) -> None:
+    run(writer, Vendor({"AAA": payloads.prices(rows(10)), "BBB": payloads.prices(rows(20))}))
+    assert _flags(writer).empty and not StoreReader(writer._backend).dates(FLAGS_TABLE)

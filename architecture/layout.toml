@@ -281,7 +281,11 @@ purpose = "use case: evaluate every strategy on every golden dataset against the
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
-purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), the report-containment diagnostic of an earnings_expected edge (report_containment.py) and its results/edge_eval rows and report"
+purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/cross_section/reporting"
+purpose = "what an edge evaluation reports beyond its stored rows (ADR 0053): the text report of a run (report.py) and the report-containment diagnostic of an earnings_expected edge (report_containment.py, the one module that reads the real report dates)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/discovery"
@@ -690,6 +694,10 @@ purpose = "the nightly workflow: sessions, steps, screens, the summary report an
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/reference/classify.py"
 reason = "the name rules of the security type: the universe build applies them, and `reference_classification` (ADR 0045) re-applies them to measure disagreement with the vendor"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/bar_quality.py"
+reason = "the bad-bar detector and its flag plan (ADR 0061): `bars-history` judges the bars it adds and publishes the flags with them"
 
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py"
