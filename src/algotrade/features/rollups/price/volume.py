@@ -24,7 +24,7 @@ never a shorter window and never zero, unless every session of it has a bar.
 
 The windows named in the columns (5, 20) are part of the definition: changing one is a new
 version. Formulas over these columns (``volume_dry_up``, ``volume_climax``, ``volume_bias``)
-are expression features (``config/site/features/volume.toml``).
+are expression features (``config/site/features/technical/volume.toml``).
 """
 
 from datetime import date

@@ -19,7 +19,7 @@ distance, the band totals, the statuses and the inputs are described there). Wha
 Our delta is the Black-Scholes-Merton CALL delta at the vol its mid implies, with ``q`` the
 dividend yield (``div_yield@v1``): a call before an ex-dividend date is priced as European, so
 ``cc_*`` features say nothing of early exercise (the ``ex_div_before_expiry`` flag in
-``config/site/features/earnings.toml`` does). Spreads are the stored (end-of-day, possibly
+``config/site/features/options/earnings.toml`` does). Spreads are the stored (end-of-day, possibly
 after-hours) quote's: judge the trade's spread on a live quote.
 
 One row per underlying with a chain or an underlying quote. ``wing_status``, first failing

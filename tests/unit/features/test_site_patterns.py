@@ -1,4 +1,4 @@
-"""The site's candle expression features (``config/site/features/swing.toml``):
+"""The site's candle expression features (``config/site/features/technical/swing.toml``):
 ``inside_day_breakout`` and ``strong_close`` by their cases and nulls."""
 
 import numpy as np

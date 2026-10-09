@@ -26,7 +26,7 @@ close (support), an unfilled down gap above it (resistance). So:
 A gap that price has entered but not crossed (the close is inside the zone) is partly filled
 and is neither above nor below the close. The window is the 253 bars read: a gap on the oldest
 bar has no previous bar in it. Distances to the zones (``dist_to_gap_above``,
-``dist_to_gap_below``) are expression features (``config/site/features/swing.toml``).
+``dist_to_gap_below``) are expression features (``config/site/features/technical/swing.toml``).
 """
 
 from datetime import date

@@ -1,5 +1,5 @@
 """The site's fundamentals expression features that read the financials / fundamentals /
-dividends groups (``config/site/features/fundamentals.toml``): ``ps_ratio``, ``net_margin``,
+dividends groups (``config/site/features/company/fundamentals.toml``): ``ps_ratio``, ``net_margin``,
 ``payout_ratio``, the growth rates (``eps_growth_yoy``, ``revenue_growth_qtr_yoy``,
 ``eps_growth_qtr_yoy``) and ``shares_change_yoy``: values, and null on a zero or negative base,
 an unknown input, a stale figure or an ADR. Split from ``test_site.py`` (at its line cap)."""

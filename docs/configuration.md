@@ -101,7 +101,7 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 |---|---|---|
 | `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
 | `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v2.hv30`, `rollup.price_stats@v2.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v3.market_cap_status` |
-| `feature.<name>` | an expression feature (`config/site/features/*.toml`, [below](#expression-features)), computed on read from the stored features it names | `feature.liquidity_class`, `feature.near_52w`, `feature.market_cap`, `feature.iv_hv_spread` |
+| `feature.<name>` | an expression feature (`config/site/features/*/*.toml`, [below](#expression-features)), computed on read from the stored features it names | `feature.liquidity_class`, `feature.near_52w`, `feature.market_cap`, `feature.iv_hv_spread` |
 
 Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules;
 [data/features.md](data/features.md) gives each one's meaning, unit, valid values and when it is null):
@@ -317,8 +317,8 @@ edge's status or the track-record chip.
 ## Expression features
 
 A formula over existing features is a TOML entry, not code (ADR 0023 step 3). Each
-`config/site/features/<theme>.toml` (one per theme: `price`, `volatility`, `fundamentals`,
-`liquidity`, `vrp`, `swing`, `bands`) holds one `[name]` per feature:
+`config/site/features/<kind>/<theme>.toml` (one per theme, in the folder of its kind: `technical/`, `options/`,
+`company/`, `market/`; the theme name is unique across folders) holds one `[name]` per feature:
 
 | Key | Meaning |
 |---|---|
@@ -353,7 +353,7 @@ in the group for the session, false when the group has rows that session but not
 null when the group has none at all (not computed: unknown, not "absent").
 
 **Errors** name the file, the feature and the position, e.g.
-`config/site/features/price.toml [near_52w] expr, line 2 col 4: unknown name 'pct_from_hi'`.
+`config/site/features/technical/price.toml [near_52w] expr, line 2 col 4: unknown name 'pct_from_hi'`.
 A cycle between expression features names its path. Formulas are parsed by our own code;
 nothing is ever passed to Python `eval`.
 

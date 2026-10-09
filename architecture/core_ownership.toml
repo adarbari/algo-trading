@@ -18,7 +18,7 @@ detect = [{ call = "load", arg = "edges" }, { call = "names", arg = "edges" }, {
 
 [[responsibility]]
 id = "feature-definitions"
-description = "Expression feature definitions: config/site/features/*.toml and config/users/<id>/features/*.toml typed by the one settings loader, then resolved against the catalogue (names, params, dependency graph, cycles, dtype and categories, no user feature shadowing a site one) into Features; the site FeatureSet (code groups + expressions + materialised groups) is built once per config store, a user's (site + their virtual features) by FeatureSet.with_user"
+description = "Expression feature definitions: config/site/features/*/*.toml and config/users/<id>/features/*.toml typed by the one settings loader, then resolved against the catalogue (names, params, dependency graph, cycles, dtype and categories, no user feature shadowing a site one) into Features; the site FeatureSet (code groups + expressions + materialised groups) is built once per config store, a user's (site + their virtual features) by FeatureSet.with_user"
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/features/*",

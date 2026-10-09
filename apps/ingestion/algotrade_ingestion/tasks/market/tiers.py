@@ -20,7 +20,7 @@ from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import read_expressions, site_features, site_store
 from algotrade.storage.configs.store import ConfigStore
 
-# Expression features (config/site/features/liquidity.toml), read through services.features
+# Expression features (config/site/features/company/liquidity.toml), read through services.features
 LIQUIDITY_CLASS, CHAIN_OI = "liquidity_class", "option_chain_oi"
 PRICE_GROUP = "price_stats"  # the class is computed for the latest session this group has
 CLASS_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, "UNKNOWN": 3}

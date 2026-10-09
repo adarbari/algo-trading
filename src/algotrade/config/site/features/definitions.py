@@ -1,4 +1,4 @@
-"""Expression-feature definitions (``config/site/features/<theme>.toml`` and a user's
+"""Expression-feature definitions (``config/site/features/<kind>/<theme>.toml`` and a user's
 ``config/users/<id>/features/<theme>.toml``, ADR 0023 step 3): the typed ``FeatureDefinition``
 per ``[<name>]`` section and the one loader that types them (``feature_definitions``). Split
 from ``settings.py`` (at the file-length limit), which loads the documents through
@@ -33,7 +33,8 @@ type ParamValue = float | str | bool
 
 @dataclass(frozen=True)
 class FeatureDefinition:
-    """One ``[<name>]`` section of ``config/site/features/<theme>.toml``: an expression feature.
+    """One ``[<name>]`` section of ``config/site/features/<kind>/<theme>.toml``: an expression
+    feature.
 
     ``expr`` is a formula over stored features (``group.column``), other expression features
     (by name) and ``params`` (named constants, by name); ``algotrade.features.expressions``

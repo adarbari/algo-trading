@@ -83,7 +83,7 @@ def test_the_selection_catalogue_follows_the_store() -> None:
                      "description": "d", "null_meaning": "n"}}  # fmt: skip
     site = {
         ("site", "features", p.stem): tomllib.loads(p.read_text())
-        for p in (REPO_ROOT / "config" / "site" / "features").glob("*.toml")
+        for p in (REPO_ROOT / "config" / "site" / "features").glob("*/*.toml")
     }
     custom = MemoryConfigStore({**site, ("site", "features", "mine"): doc})
     assert field_catalog(custom).fields["feature.twice"] == "float"

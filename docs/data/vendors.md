@@ -577,7 +577,7 @@ gives replaces a free source, and what derives from it carries `licence = person
   HV of their own; a second backfill of a session keeps it too).
 - **Features**: `ibkr_iv@v1` (IV30 / HV30 and the 252-session rank, percentile and status on
   IB's IV, the `iv_history@v2` rules); `iv_rank` / `iv_percentile` prefer it and fall back to
-  ours, `iv_rank_source` says which (`config/site/features/volatility.toml`).
+  ours, `iv_rank_source` says which (`config/site/features/options/volatility.toml`).
 - **Gateway down or `[ibkr]` disabled**: both steps are SKIPPED with a WARN; `iv_rank` falls
   back to ours, labelled `ours`.
 

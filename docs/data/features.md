@@ -1,7 +1,7 @@
 # Feature catalogue
 
 Generated from `src/algotrade/features/registry.py` (code groups) and
-`config/site/features/*.toml` (expression features) by `make features-doc`; do not edit by
+`config/site/features/*/*.toml` (expression features) by `make features-doc`; do not edit by
 hand (a fitness test fails when it is out of date). The model is in
 [ADR 0023](../adr/0023-feature-store.md); how groups are computed and stored is in
 [layers.md](layers.md#rollups-as-built); the expression language is in
@@ -779,7 +779,7 @@ The market regime: macro risk (the higher of its early and confirming tiers) and
 
 ## Expression features
 
-Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unless stored (materialised, by the `rollups` task after its inputs).
+Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on read) unless stored (materialised, by the `rollups` task after its inputs).
 
 ### `bands.toml`
 

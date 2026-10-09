@@ -682,7 +682,7 @@ mode = "soft"
 tolerance = 0
 
 # Realised-volatility bands and the squeeze (bands@v2, trend_stats@v2 and
-# config/site/features/bands.toml): how dispersed the last month's closes are, where that
+# config/site/features/technical/bands.toml): how dispersed the last month's closes are, where that
 # sits against the year, and the compressions that precede a move.
 
 [[field]]

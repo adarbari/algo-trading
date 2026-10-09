@@ -1,4 +1,4 @@
-"""The relative-strength expression features (``config/site/features/price.toml``):
+"""The relative-strength expression features (``config/site/features/technical/price.toml``):
 ``rs_spy_positive``, ``rs_improving`` and ``sector_leader`` over ``relative_strength@v1`` rows."""
 
 import numpy as np
