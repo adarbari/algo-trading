@@ -644,7 +644,11 @@ EDGE_EVAL = _fixed(
 # out of). ``block`` is -1 on every row that is not a block's; ``cluster`` -1 when none. ``blocks``
 # is the count of blocks of the run: not independent sessions, neighbouring blocks' outcome windows
 # overlap. ``run_id`` is in the key, so every run keeps its own rows; a reader picks a run by
-# ``run_id``. Partition ``session_date`` is the run's last grid session.
+# ``run_id``. Partition ``session_date`` is the run's last grid session. Version 2 (W4,
+# 2026-10-09): ``g_WL`` (winners over losers) and ``g_L`` (losers over the winners' controls) on
+# block and tell rows, ``variance_like`` on tell rows; ``mean_g`` stays winners over controls.
+# The columns are nullable and a run of version 1 reads them as unknown, so older runs stay valid
+# but are never compared with version 2 (different controls, a new gate).
 WINNERS_STUDY = _fixed(
     "results/winners_study",
     "results",
@@ -653,8 +657,9 @@ WINNERS_STUDY = _fixed(
     "block int64!",
     *(f"{n} int64" for n in ("sessions", "sign", "agreeing_blocks", "cluster", "rank", "rows",
                              "blocks")),
-    *(f"{n} bool" for n in ("halves_agree", "stable", "qualifies", "converged", "passed")),
-    *_floats("mean_g", "coefficient", "gain"),
+    *(f"{n} bool" for n in ("halves_agree", "stable", "qualifies", "converged", "passed",
+                            "variance_like")),
+    *_floats("mean_g", "g_WL", "g_L", "coefficient", "gain"),
     runs="merge",
     key=("row_kind", "feature", "block", "run_id"),
 )  # fmt: skip

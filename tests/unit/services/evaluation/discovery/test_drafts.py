@@ -71,3 +71,17 @@ def test_an_unknown_run_or_another_jobs_run_writes_nothing(tmp_path: Path) -> No
     with pytest.raises(ConfigurationError, match="not a winners study run"):
         write_draft(writer, "nope", tmp_path / "d")
     assert not (tmp_path / "d").exists()
+
+
+def test_draft_refuses_version_1_run(tmp_path: Path) -> None:
+    """Catches: a draft from a run before W4 (controls matched on two variables, no
+    winners-vs-losers gate), like the first real run that passed on volatility tells."""
+    writer, run_id = stored()
+    record = writer.load_run(run_id)
+    assert record is not None
+    record.stats["table_version"] = 1
+    writer.save_run(record)
+    out = tmp_path / "drafts"
+    with pytest.raises(ConfigurationError, match="version 1 winners study run"):
+        write_draft(writer, run_id, out)
+    assert not out.exists()

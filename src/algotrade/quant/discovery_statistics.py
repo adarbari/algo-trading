@@ -9,12 +9,13 @@ caller seeds. The effect size of one feature at one session is
     rank_columns           average ranks of each column over its finite entries
     rank_correlation       pairwise-complete correlation of column ranks (Spearman's rho)
     correlated_clusters    connected components of the features whose |rho| beats a threshold
-    permute_within         labels shuffled inside each stratum (the permutation null's draw)
+    permute_within         labels (two or more groups) shuffled inside each stratum (the null)
     exceeds_percentile     whether an observed count beats a percentile of the null counts
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -136,11 +137,11 @@ def correlated_clusters(
 
 def permute_within(
     labels: npt.ArrayLike, strata: Sequence[object], rng: np.random.Generator
-) -> npt.NDArray[np.bool_]:
-    """``labels`` shuffled inside each stratum: every stratum keeps its count of True. Strata are
-    visited in sorted order of their label, so one seed gives one result whatever the row order
-    of the strata's first appearance."""
-    flags = np.asarray(labels, dtype=bool)
+) -> npt.NDArray[Any]:
+    """``labels`` (booleans, or integer group codes) shuffled inside each stratum: every stratum
+    keeps its count of each label. Strata are visited in sorted order of their label, so one seed
+    gives one result whatever the row order of the strata's first appearance."""
+    flags = np.asarray(labels)
     if flags.size != len(strata):
         raise ValueError("one stratum per label")
     out = flags.copy()

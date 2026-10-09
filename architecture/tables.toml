@@ -351,7 +351,7 @@ note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), 
 name = "results/winners_study"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the ED6 winners study's rows per run (ADR 0053 amendment 2026-10-09): block effects, pooled tells, the probit proposals and the exclusions; framed and written by services/evaluation/discovery/persist.py, run_id in the key"
+note = "the ED6 winners study's rows per run (ADR 0053 amendment 2026-10-09): block effects, pooled tells, the probit proposals and the exclusions (version 2, W4: g_WL, g_L, variance_like; the run record says table_version); framed and written by services/evaluation/discovery/persist.py, run_id in the key"
 
 [[table]]
 name = "results/*"

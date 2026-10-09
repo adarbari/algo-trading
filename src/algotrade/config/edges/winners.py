@@ -1,7 +1,8 @@
 """``WinnersStudySettings``: the ED6 winners study's parameters (ADR 0053 amendment 2026-10-09)
 from ``config/site/studies/winners.toml``: the outcome window the outcomes backfill computes
-for it, the grid, the winner and control definitions, the discovery thresholds and the gate. Site
-only, fail closed: an unknown key, a wrong type or an out-of-range value names the file."""
+for it, the grid, the winner, loser and control definitions, the discovery thresholds and the
+gate. Site only, fail closed: an unknown key, a wrong type or an out-of-range value names the
+file."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -35,6 +36,10 @@ class WinnersStudySettings:
     top_fraction: float
     controls_per_winner: int
     liquidity_quantiles: int
+    volatility_field: str
+    volatility_quantiles: int
+    max_control_shortfall: float
+    bottom_fraction: float
     listing_age_edges_years: tuple[int, ...]
     seed: int
     min_coverage: float
@@ -46,6 +51,7 @@ class WinnersStudySettings:
     permutations: int
     min_clusters: int
     min_abs_hedges_g: float
+    min_abs_wl_hedges_g: float
     null_percentile: int
 
 
@@ -61,15 +67,25 @@ def parse_winners(doc: Mapping[str, Any] | None, where: str = WHERE) -> WinnersS
     if not doc:
         raise ConfigurationError(f"{where}: missing")
     t = Table(doc, where)
-    t.only(("outcome", "grid", "eligible", "winner", "controls", "discovery", "gate"))
+    t.only(("outcome", "grid", "eligible", "winner", "loser", "controls", "discovery", "gate"))
     out = t.table("outcome", ("horizon_sessions", "benchmark"))
     grid = t.table(
         "grid", ("step_sessions", "min_history_sessions", "frozen_from", "max_missing_fraction")
     )
     el = t.table("eligible", ("min_price", "min_adv_usd_20d"))
     win = t.table("winner", ("top_fraction",))
+    lose = t.table("loser", ("bottom_fraction",))
     ctl = t.table(
-        "controls", ("per_winner", "liquidity_quantiles", "listing_age_edges_years", "seed")
+        "controls",
+        (
+            "per_winner",
+            "liquidity_quantiles",
+            "volatility_field",
+            "volatility_quantiles",
+            "max_control_shortfall",
+            "listing_age_edges_years",
+            "seed",
+        ),
     )
     dis = t.table(
         "discovery",
@@ -83,7 +99,9 @@ def parse_winners(doc: Mapping[str, Any] | None, where: str = WHERE) -> WinnersS
             "permutations",
         ),
     )
-    gate = t.table("gate", ("min_clusters", "min_abs_hedges_g", "null_percentile"))
+    gate = t.table(
+        "gate", ("min_clusters", "min_abs_hedges_g", "min_abs_wl_hedges_g", "null_percentile")
+    )
     ages = ctl.raw("listing_age_edges_years")
     if (
         not isinstance(ages, list)
@@ -108,18 +126,23 @@ def parse_winners(doc: Mapping[str, Any] | None, where: str = WHERE) -> WinnersS
         min_adv_usd_20d=el.number("min_adv_usd_20d", 1_000_000.0, 0),
         top_fraction=_open_fraction(win, "top_fraction", 0.02),
         controls_per_winner=ctl.integer("per_winner", 5, 1),
-        liquidity_quantiles=ctl.integer("liquidity_quantiles", 5, 2),
+        liquidity_quantiles=ctl.integer("liquidity_quantiles", 3, 2),
+        volatility_field=ctl.text("volatility_field", "rollup.vol_stats@v1.hv60"),
+        volatility_quantiles=ctl.integer("volatility_quantiles", 5, 2),
+        max_control_shortfall=ctl.fraction("max_control_shortfall", 0.25),
+        bottom_fraction=_open_fraction(lose, "bottom_fraction", 0.02),
         listing_age_edges_years=tuple(ages),
         seed=ctl.integer("seed", 0, 0),
         min_coverage=dis.fraction("min_coverage", 0.8),
         max_coverage_gap=dis.fraction("max_coverage_gap", 0.1),
-        cluster_rank_corr=dis.fraction("cluster_rank_corr", 0.7),
+        cluster_rank_corr=dis.fraction("cluster_rank_corr", 0.5),
         stable_blocks=dis.integer("stable_blocks", 5, 1),
         block_sessions=dis.integer("block_sessions", 504, 1),
         split_date=_date(dis, "split_date"),
         permutations=dis.integer("permutations", 200, 1),
         min_clusters=gate.integer("min_clusters", 5, 1),
         min_abs_hedges_g=gate.number("min_abs_hedges_g", 0.3, 0),
+        min_abs_wl_hedges_g=gate.number("min_abs_wl_hedges_g", 0.3, 0),
         null_percentile=pct,
     )
 

@@ -1,20 +1,21 @@
-"""The discovery frame of one grid session: the winners and their controls with every usable
-catalogue feature read at S (ED6 winners study, definition 3).
+"""The discovery frame of one grid session: the winners, their controls and the losers with every
+usable catalogue feature read at S (ED6 winners study, definition 3).
 
 Point in time: a feature is read from the rollup partition of S itself (``entity_field_view``:
-exactly that session, never a later or earlier one), for the winners and controls only; an UNKNOWN
-value is NaN, dropped by the statistics and counted, never imputed. A feature is left out of
-a session, with the reason recorded, when
+exactly that session, never a later or earlier one), for the winners, controls and losers only;
+an UNKNOWN value is NaN, dropped by the statistics and counted, never imputed. A feature is
+left out of a session, with the reason recorded, when
 - it is an ``edge_score_*`` (a learned scorer fitted on windows that overlap the label), or reads
   one;
-- it is, or is derived from, a matching variable (``adv_usd_20d``: the controls are matched on it);
+- it is, or is derived from, a matching variable (``adv_usd_20d`` and the volatility field: the
+  controls are matched on them, reason "matched on");
 - one of the tables it reads has no partition on or before S (``first_partition``: the first
   session the table was stored; the universe, company, shares, chains and IV tables start long
   after the history and would put today's knowledge on an old S).
 Only numeric instrument features are tested.
 """
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from datetime import date
 
@@ -33,9 +34,16 @@ from algotrade.services.evaluation.discovery.labels import Labels, read_labels
 from algotrade.services.features import entity_field_view
 
 EDGE_SCORE_PREFIX = "edge_score_"
-MATCHING = frozenset({"price_stats.adv_usd_20d"})  # ``<group>.<column>`` of the matching variable
+LIQUIDITY = "price_stats.adv_usd_20d"  # ``<group>.<column>`` of the liquidity matching variable
 EDGE_SCORE = "learned edge score"
-MATCHING_VARIABLE = "matching variable"
+MATCHING_VARIABLE = "matched on"
+
+
+def matching_columns(settings: WinnersStudySettings) -> frozenset[str]:
+    """The ``<group>.<column>`` of every variable the controls are matched on: the dollar volume
+    and the volatility field (``rollup.<group>@v<N>.<column>``)."""
+    _, group_key, column = settings.volatility_field.split(".", 2)
+    return frozenset({LIQUIDITY, f"{group_key.partition('@')[0]}.{column}"})
 
 
 @dataclass(frozen=True)
@@ -59,8 +67,10 @@ class Candidates:
 
 @dataclass(frozen=True)
 class SessionFrame:
-    """One grid session ready for the statistics. ``frame``: ``instrument_id``, ``winner``
-    (bool), ``cell`` and one column per read field (NaN: UNKNOWN); ``excluded``: (field, reason)."""
+    """One grid session ready for the statistics. ``frame``: ``instrument_id``, ``winner`` and
+    ``loser`` (bool; a control is neither), ``cell`` and one column per read field (NaN: UNKNOWN);
+    ``excluded``: (field, reason); ``unknown_volatility``: names at the floors with no volatility,
+    not eligible."""
 
     grid: GridSession
     labels: Labels
@@ -68,6 +78,7 @@ class SessionFrame:
     seed: tuple[int, int]
     frame: pd.DataFrame
     excluded: tuple[tuple[str, str], ...]
+    unknown_volatility: int = 0
 
 
 def feature_reads(features: FeatureSet, feature: Feature) -> Reads:
@@ -111,7 +122,10 @@ def feature_reads(features: FeatureSet, feature: Feature) -> Reads:
 
 
 def usable_fields(
-    features: FeatureSet, session: date, first_partition: Mapping[str, date | None]
+    features: FeatureSet,
+    session: date,
+    first_partition: Mapping[str, date | None],
+    matching: frozenset[str] = frozenset({LIQUIDITY}),
 ) -> Candidates:
     """The numeric instrument features to read at ``session`` and those left out with the reason.
     ``first_partition``: table -> first session stored (None: never stored)."""
@@ -121,7 +135,7 @@ def usable_fields(
         if f.entity != "instrument" or f.dtype not in NUMERIC_TYPES:
             continue
         reads = feature_reads(features, f)
-        why = _why_not(f, reads, session, first_partition)
+        why = _why_not(f, reads, session, first_partition, matching)
         if why:
             excluded.append((f.field, why))
         else:
@@ -130,13 +144,17 @@ def usable_fields(
 
 
 def _why_not(
-    f: Feature, reads: Reads, session: date, first_partition: Mapping[str, date | None]
+    f: Feature,
+    reads: Reads,
+    session: date,
+    first_partition: Mapping[str, date | None],
+    matching: frozenset[str],
 ) -> str:
     if f.name.startswith(EDGE_SCORE_PREFIX) or any(
         n.startswith(EDGE_SCORE_PREFIX) for n in reads.names
     ):
         return EDGE_SCORE
-    if reads.columns & MATCHING:
+    if reads.columns & matching:
         return MATCHING_VARIABLE
     for table in sorted(reads.tables):
         first = first_partition.get(table)
@@ -162,10 +180,12 @@ def assemble(
     winners: set[str],
     controls: set[str],
     cells: pd.Series,
+    losers: Collection[str] = (),
 ) -> pd.DataFrame:
-    """The frame of ``winners`` and ``controls`` from ``values`` (``instrument_id`` and any of
-    ``fields``; a field absent from it is wholly UNKNOWN), sorted by id."""
-    ids = sorted(winners | controls)
+    """The frame of ``winners``, ``controls`` and ``losers`` from ``values`` (``instrument_id`` and
+    any of ``fields``; a field absent from it is wholly UNKNOWN), sorted by id."""
+    lost = set(losers)
+    ids = sorted(winners | controls | lost)
     base = values.drop_duplicates("instrument_id").set_index("instrument_id").reindex(ids)
     numeric = {
         f: pd.to_numeric(base[f], errors="coerce").to_numpy(dtype=float)
@@ -177,6 +197,7 @@ def assemble(
         {
             "instrument_id": ids,
             "winner": [i in winners for i in ids],
+            "loser": [i in lost for i in ids],
             "cell": [str(cells.get(i, "")) for i in ids],
         }
     )
@@ -208,11 +229,17 @@ def session_frame(
     stored, or too many names lack an outcome)."""
     day = grid.session
     eligible = read_eligible(reader, day, settings, features)
-    labels = read_labels(reader, day, list(eligible["instrument_id"]), settings)
-    cells = assign_cells(eligible, settings)
-    drawn = draw_controls(cells, labels.winners, day, settings, labels.measured_ids)
-    candidates = usable_fields(features, day, first_partition)
-    ids = sorted(labels.winners | set(drawn.ids))
+    labels = read_labels(reader, day, list(eligible.names["instrument_id"]), settings)
+    cells = assign_cells(eligible.names, settings)
+    pool = labels.measured_ids - labels.losers
+    drawn = draw_controls(cells, labels.winners, day, settings, pool)
+    candidates = usable_fields(features, day, first_partition, matching_columns(settings))
+    ids = sorted(labels.winners | labels.losers | set(drawn.ids))
     view = read_values(reader, day, candidates.fields, ids, features)
-    frame = assemble(view, candidates.fields, set(labels.winners), set(drawn.ids), cells)
-    return SessionFrame(grid, labels, drawn.wanted, drawn.seed, frame, candidates.excluded)
+    frame = assemble(
+        view, candidates.fields, set(labels.winners), set(drawn.ids), cells, set(labels.losers)
+    )
+    return SessionFrame(
+        grid, labels, drawn.wanted, drawn.seed, frame, candidates.excluded,
+        eligible.unknown_volatility,
+    )  # fmt: skip

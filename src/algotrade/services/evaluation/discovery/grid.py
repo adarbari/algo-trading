@@ -8,8 +8,11 @@ a block's last windows overlap the next block's).
 
 The eligible at S are the stocks of ``universe_asof(S)`` (survivors and the delisted alike; its
 membership identity read, never a feature) with a bar at S, a close of at least ``min_price`` and a
-20-session dollar volume of at least ``min_adv_usd_20d``, both read from the rollup partition of
-S only. A grid session whose rollup partition is missing is ``MissingDataError`` (ADR 0008).
+20-session dollar volume of at least ``min_adv_usd_20d``, and a stored 60-session volatility
+(``controls.volatility_field``, the controls' third matching variable), all read from the rollup
+partition of S only (never a later one). A name whose volatility is UNKNOWN is not eligible: it
+has no cell to be matched in, and the count is reported (``Eligible.unknown_volatility``). A grid
+session whose rollup partition is missing is ``MissingDataError`` (ADR 0008).
 """
 
 from dataclasses import dataclass
@@ -32,6 +35,15 @@ PRICE_GROUP = "price_stats"
 STOCK = "STOCK"
 DAYS_PER_YEAR = 365.25
 HINT = "run `algotrade-ingest run rollups --from ... --to ...` for the session"
+
+
+@dataclass(frozen=True)
+class Eligible:
+    """``names``: the eligible at one session (``instrument_id``, ``adv``, ``hv``, ``age_years``,
+    sorted by id); ``unknown_volatility``: names at both floors left out for want of volatility."""
+
+    names: pd.DataFrame
+    unknown_volatility: int
 
 
 @dataclass(frozen=True)
@@ -75,40 +87,56 @@ def price_fields(features: FeatureSet) -> tuple[str, str]:
     return found["close"], found["adv_usd_20d"]
 
 
+def volatility_field(features: FeatureSet, settings: WinnersStudySettings) -> str:
+    """The selection field of the controls' volatility, which must be in the catalogue."""
+    field = settings.volatility_field
+    if not any(f.field == field for f in features.features.values()):
+        raise MissingDataError("vol_stats", f"{field} is not in the catalogue", "")
+    return field
+
+
 def pick_eligible(
     listings: pd.DataFrame, prices: pd.DataFrame, session: date, settings: WinnersStudySettings
-) -> pd.DataFrame:
+) -> Eligible:
     """The eligible at ``session``: ``listings`` (``instrument_id``, ``asset_type``,
     ``start_date``) the stocks among them, joined to ``prices`` (``instrument_id``, ``close``,
-    ``adv``; NaN is UNKNOWN: no bar), with a close and dollar volume at the floors. Columns
-    ``instrument_id``, ``adv``, ``age_years`` (from the listing's start date); sorted by id."""
+    ``adv``, ``hv``; NaN is UNKNOWN: no bar), with a close and dollar volume at the floors and a
+    known volatility (a name at the floors without one is counted, not kept). Columns
+    ``instrument_id``, ``adv``, ``hv``, ``age_years`` (from the listing's start date); by id."""
     stocks = listings[listings["asset_type"].astype(str).str.upper() == STOCK]
     stocks = stocks.drop_duplicates("instrument_id")
     joined = stocks.merge(prices, on="instrument_id", how="inner")
     close = pd.to_numeric(joined["close"], errors="coerce")
     adv = pd.to_numeric(joined["adv"], errors="coerce")
-    kept = joined[(close >= settings.min_price) & (adv >= settings.min_adv_usd_20d)]
+    floors = (close >= settings.min_price) & (adv >= settings.min_adv_usd_20d)
+    at_floors = joined[floors]
+    known = pd.to_numeric(at_floors["hv"], errors="coerce").notna()
+    kept = at_floors[known]
     age = (pd.Timestamp(session) - pd.to_datetime(kept["start_date"])).dt.days / DAYS_PER_YEAR
     out = pd.DataFrame(
         {
             "instrument_id": kept["instrument_id"].astype(str).to_numpy(),
             "adv": pd.to_numeric(kept["adv"]).to_numpy(dtype=float),
+            "hv": pd.to_numeric(kept["hv"]).to_numpy(dtype=float),
             "age_years": age.to_numpy(dtype=float),
         }
     )
-    return out.sort_values("instrument_id", kind="stable").reset_index(drop=True)
+    names = out.sort_values("instrument_id", kind="stable").reset_index(drop=True)
+    return Eligible(names, int((~known).sum()))
 
 
 def read_eligible(
     reader: StoreReader, session: date, settings: WinnersStudySettings, features: FeatureSet
-) -> pd.DataFrame:
+) -> Eligible:
     """``pick_eligible`` over the stored universe and the rollup partition of ``session``;
     ``MissingDataError`` when the session has no ``price_stats`` partition."""
     listed = universe_asof(reader, session).instruments
     close, adv = price_fields(features)
+    hv = volatility_field(features, settings)
     ids = sorted(listed["instrument_id"].astype(str).unique())
-    frame, missing = entity_field_view(reader, session, [close, adv], ids, features=features)
+    frame, missing = entity_field_view(reader, session, [close, adv, hv], ids, features=features)
     if missing:
         raise MissingDataError(missing[0], f"no partition for the grid session {session}", HINT)
-    prices = frame.rename(columns={close: "close", adv: "adv"})[["instrument_id", "close", "adv"]]
+    named = frame.rename(columns={close: "close", adv: "adv", hv: "hv"})
+    prices = named[["instrument_id", "close", "adv", "hv"]]
     return pick_eligible(listed, prices, session, settings)

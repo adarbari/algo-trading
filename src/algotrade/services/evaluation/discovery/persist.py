@@ -17,6 +17,7 @@ from algotrade.storage.tables.schemas import WINNERS_STUDY
 
 RESULT = "winners_study"
 SOURCE = "winners-study"
+TABLE_VERSION = 2  # W4: g_WL, g_L, variance_like; runs of version 1 matched on two variables
 JOB = "winners-study"  # the run record's job; the drafts writer finds a run by it
 NOTE = (
     "blocks are not independent: the outcome windows of neighbouring blocks overlap, so the "
@@ -43,7 +44,16 @@ def winners_frame(result: DiscoveryResult, run_id: str, now: datetime) -> pd.Dat
     """The ``results/winners_study`` rows of ``result``, stamped."""
     common = {"passed": result.passed, "blocks": result.blocks}
     rows = [
-        _row("block", b.feature, block=b.block, mean_g=b.mean_g, sessions=b.sessions, **common)
+        _row(
+            "block",
+            b.feature,
+            block=b.block,
+            mean_g=b.mean_g,
+            g_WL=b.mean_g_wl,
+            g_L=b.mean_g_l,
+            sessions=b.sessions,
+            **common,
+        )
         for b in result.block_effects
     ]
     rows += [
@@ -58,6 +68,9 @@ def winners_frame(result: DiscoveryResult, run_id: str, now: datetime) -> pd.Dat
             stable=t.stable,
             qualifies=t.qualifies,
             cluster=-1 if t.cluster is None else t.cluster,
+            g_WL=t.mean_g_wl,
+            g_L=t.mean_g_l,
+            variance_like=t.variance_like,
             sessions=t.blocks,
             **common,
         )
@@ -96,9 +109,13 @@ def run_stats(result: DiscoveryResult) -> dict[str, Any]:
     s = result.settings
     return {
         "passed": result.passed,
+        "table_version": TABLE_VERSION,
         "blocks": result.blocks,
         "note": NOTE,
         "grid_sessions": len(result.sessions),
+        "losers": sum(x.losers for x in result.sessions),
+        "unknown_volatility": sum(x.unknown_volatility for x in result.sessions),
+        "variance_like": sorted(t.feature for t in result.tells if t.variance_like and t.stable),
         "observed_clusters": result.observed_clusters,
         "null_counts": list(result.null_counts),
         "null_threshold": result.null_threshold,
@@ -108,7 +125,13 @@ def run_stats(result: DiscoveryResult) -> dict[str, Any]:
         "frozen_from": s.frozen_from.isoformat(),
         "clusters": [list(c) for c in result.clusters],
         "tells": [
-            {"feature": t.feature, "mean_g": t.mean_g, "sign": t.sign, "cluster": t.cluster}
+            {
+                "feature": t.feature,
+                "mean_g": t.mean_g,
+                "mean_g_wl": t.mean_g_wl,
+                "sign": t.sign,
+                "cluster": t.cluster,
+            }
             for t in result.tells
             if t.qualifies
         ],

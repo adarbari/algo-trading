@@ -1,11 +1,13 @@
 """``tells`` and ``proposer``: the effect of a feature at a session (UNKNOWN dropped, missingness
 that differs between the groups refused), the clusters the gate counts and the probit's ranking."""
 
+from collections import Counter
 from datetime import date
 
 import numpy as np
 import pytest
 
+from algotrade.quant import discovery_statistics as ds
 from algotrade.quant.edge_statistics import standardised_effect
 from algotrade.services.evaluation.discovery.proposer import propose
 from algotrade.services.evaluation.discovery.results import PROPOSED_BY
@@ -53,7 +55,7 @@ def test_unknown_not_imputed() -> None:
     rng = np.random.default_rng(1)
     values = signal(rng)
     values[[0, 20, 21]] = np.nan  # 1 of 10 winners, 2 of 30 controls: coverage 0.9 / 0.93
-    got = effect_at("f", DAY, values, MASK, settings())
+    got = effect_at("f", DAY, values, MASK, ~MASK, settings())
     finite = np.isfinite(values)
     expected = standardised_effect(values[MASK & finite], values[~MASK & finite])
     assert got.counted and got.g == pytest.approx(expected)
@@ -68,15 +70,15 @@ def test_differential_missingness_refused() -> None:
     coverage differs by 10 points or more between the groups."""
     values = signal(np.random.default_rng(2))
     values[WINNERS + 25 :] = np.nan  # controls 83% covered, winners 100%
-    got = effect_at("f", DAY, values, MASK, settings())
+    got = effect_at("f", DAY, values, MASK, ~MASK, settings())
     assert not got.counted and got.reason == DIFFERENTIAL and got.g is None
     assert (got.coverage_winners, got.coverage_controls) == (1.0, 25 / 30)
     close = signal(np.random.default_rng(2))
     close[WINNERS + 28 :] = np.nan  # 93% covered against 100%: a 7-point gap passes
-    assert effect_at("f", DAY, close, MASK, settings()).counted
+    assert effect_at("f", DAY, close, MASK, ~MASK, settings()).counted
     gap = signal(np.random.default_rng(2))
     gap[WINNERS + 26 :] = np.nan  # 87% against 100%: 13 points
-    assert effect_at("f", DAY, gap, MASK, settings()).reason == DIFFERENTIAL
+    assert effect_at("f", DAY, gap, MASK, ~MASK, settings()).reason == DIFFERENTIAL
 
 
 def test_coverage_below_the_minimum_in_either_group_is_refused() -> None:
@@ -85,7 +87,7 @@ def test_coverage_below_the_minimum_in_either_group_is_refused() -> None:
     values = signal(np.random.default_rng(3))
     values[[2, 3, 4, 5]] = np.nan  # winners 60%
     values[WINNERS + 10 : WINNERS + 22] = np.nan  # controls 60%
-    got = effect_at("f", DAY, values, MASK, settings())
+    got = effect_at("f", DAY, values, MASK, ~MASK, settings())
     assert not got.counted and got.reason == LOW_COVERAGE
 
 
@@ -169,3 +171,114 @@ def test_the_proposer_ranks_the_separating_feature_first_and_gives_no_verdict() 
     assert got[0].rank == 1 and got[0].gain > got[1].gain and got[0].coefficient > 0
     assert all(p.proposed_by == PROPOSED_BY == "model" for p in got)
     assert not hasattr(got[0], "verdict")
+
+
+def with_losers(
+    values: np.ndarray, winner_shift: float, loser_shift: float, rng: np.random.Generator
+) -> np.ndarray:
+    """A column of winners, controls then losers: the winners and the losers sit at the shifts
+    above the controls (which are standard normal)."""
+    base = rng.normal(size=WINNERS + CONTROLS + 10)
+    base[:WINNERS] += winner_shift
+    base[WINNERS + CONTROLS :] += loser_shift
+    return base
+
+
+def test_variance_feature_rejected() -> None:
+    """The defect of the first real run: a volatility-like feature is high in the winners and in
+    the losers alike (both are the names that moved most), so it beat the controls in every block
+    and passed the gate. It must be ``variance_like``, must not qualify and must not count as a
+    cluster. Catches: a gate on winners against controls alone."""
+    s = settings(permutations=5)
+
+    def columns(rng: np.random.Generator) -> dict[str, np.ndarray]:
+        return {
+            "vol": with_losers(np.empty(0), 1.5, 1.5, rng),
+            "direction": with_losers(np.empty(0), 1.5, -1.5, rng),
+        }
+
+    got = find_tells(frames(columns), s)
+    by = {t.feature: t for t in got.tells}
+    assert by["vol"].stable and abs(by["vol"].mean_g) > s.min_abs_hedges_g  # beats controls
+    assert by["vol"].variance_like and not by["vol"].qualifies
+    assert by["vol"].mean_g_l > 0.5 * by["vol"].mean_g
+    assert got.clusters == (("direction",),)
+
+
+def test_directional_feature_kept() -> None:
+    """A feature that is high in the winners and low in the losers separates them (g_WL of the same
+    sign as g_W, large and stable), is not variance-like, and qualifies; one that is high in the
+    winners and about equal to the controls in the losers also qualifies, its g_L being near zero.
+    Catches: the winner-loser test rejecting a real tell."""
+    s = settings(permutations=5)
+
+    def columns(rng: np.random.Generator) -> dict[str, np.ndarray]:
+        return {
+            "both_ways": with_losers(np.empty(0), 1.5, -1.5, rng),
+            "winners_only": with_losers(np.empty(0), 1.5, 0.0, rng),
+        }
+
+    got = find_tells(frames(columns), s)
+    by = {t.feature: t for t in got.tells}
+    for name in ("both_ways", "winners_only"):
+        assert by[name].qualifies and not by[name].variance_like, name
+        assert by[name].mean_g_wl > s.min_abs_wl_hedges_g
+    assert by["both_ways"].mean_g_l < 0 < by["both_ways"].mean_g
+
+
+def test_controls_mask_excludes_losers() -> None:
+    """Winners are compared with the controls only: a loser row is not a control, so a column that
+    is wild in the losers leaves g_W unchanged, and the winner-over-control effect equals the
+    one computed over the control rows alone. Catches: controls taken as ``~winner`` (losers
+    folded into the controls)."""
+    rng = np.random.default_rng(11)
+    plain = with_losers(np.empty(0), 1.0, 0.0, rng)
+    wild = plain.copy()
+    wild[WINNERS + CONTROLS :] += 50.0
+    n = WINNERS + CONTROLS + 10
+    win = np.arange(n) < WINNERS
+    lose = np.arange(n) >= WINNERS + CONTROLS
+    ctl = ~win & ~lose
+    one = effect_at("f", DAY, plain, win, ctl, settings())
+    two = effect_at("f", DAY, wild, win, ctl, settings())
+    assert one.g == two.g and one.controls == CONTROLS
+    assert effect_at("f", DAY, wild, win, ~win, settings()).g != one.g  # the defect it prevents
+
+
+def test_null_permutes_three_labels_deterministic() -> None:
+    """The permutation null shuffles winner, control and loser together inside a (session, cell):
+    every cell keeps its count of each, one seed is one shuffle and another seed another, and the
+    null counts reproduce. Catches: a null that shuffles only the winner flag (leaving the
+    losers fixed, so a feature separating winners from losers is never tested against chance)."""
+    codes = np.array([1] * 3 + [2] * 3 + [0] * 12)
+    cells = ["a", "b"] * 9
+    one = ds.permute_within(codes, cells, np.random.default_rng(4))
+    again = ds.permute_within(codes, cells, np.random.default_rng(4))
+    assert one.tolist() == again.tolist()
+    for cell in ("a", "b"):
+        before = Counter(codes[[i for i, c in enumerate(cells) if c == cell]].tolist())
+        after = Counter(one[[i for i, c in enumerate(cells) if c == cell]].tolist())
+        assert before == after
+    assert any(
+        ds.permute_within(codes, cells, np.random.default_rng(k)).tolist() != one.tolist()
+        for k in range(10)
+    )
+    s = settings(permutations=6)
+    first = find_tells(frames(independent), s)
+    assert first.null_counts == find_tells(frames(independent), s).null_counts
+
+
+def test_proposer_sees_no_losers() -> None:
+    """The correlation matrix and the probit proposer are fed the winners and controls only: wild
+    values in the losers leave the proposals and the clusters unchanged. Catches: losers entering
+    the probit as non-winners (they would teach it to separate extremes from the middle)."""
+    s = settings(permutations=3)
+
+    def plain(rng: np.random.Generator) -> dict[str, np.ndarray]:
+        return {"x": with_losers(np.empty(0), 1.5, 0.0, rng), "y": rng.normal(size=50)}
+
+    base = frames(plain)
+    wild = frames(plain)
+    for f in wild:
+        f.frame.loc[f.frame["loser"], ["x", "y"]] += 40.0
+    assert find_tells(base, s).proposals == find_tells(wild, s).proposals
