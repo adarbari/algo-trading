@@ -6,7 +6,7 @@ from typing import Self
 
 import strawberry
 
-from algotrade.services.read.guide import indicator
+from algotrade.services.read.guide import regime as indicator
 from algotrade_api.graphql.types.guide.prose import GuideProse
 from algotrade_api.graphql.types.market.indicator import IndicatorLink, TextPart
 

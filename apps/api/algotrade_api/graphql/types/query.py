@@ -20,11 +20,11 @@ from algotrade.services.read.evaluation import runs as edge_runs
 from algotrade.services.read.evaluation import split as split_reads
 from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
-from algotrade.services.read.guide import episode as episode_page
+from algotrade.services.read.guide import entries as entries_page
 from algotrade.services.read.guide import field as field_page
 from algotrade.services.read.guide import index as guide_contents
-from algotrade.services.read.guide import indicator as indicator_page
 from algotrade.services.read.guide import playbook as playbook_page
+from algotrade.services.read.guide import regime as regime_page
 from algotrade.services.read.guide import search as guide_search
 from algotrade.services.read.guide import situation as situation_page
 from algotrade.services.read.guide import written as written_page
@@ -52,7 +52,7 @@ from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeRun
 from algotrade_api.graphql.types.evaluation.split import EvaluationSplit
 from algotrade_api.graphql.types.events.calendar import EventCalendar
-from algotrade_api.graphql.types.guide.entries import GuideEntries, GuideRef
+from algotrade_api.graphql.types.guide.entries import GuideEntries
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
 from algotrade_api.graphql.types.guide.field import GuideField
 from algotrade_api.graphql.types.guide.index import GuideIndex
@@ -314,7 +314,7 @@ class Query:
     )
     def guide_indicator(self, info: Ctx, key: str) -> GuideIndicatorDetail | None:
         ctx = info.context.stores()
-        found = indicator_page.load_guide_indicator(ctx, key) if ctx is not None else None
+        found = regime_page.load_guide_indicator(ctx, key) if ctx is not None else None
         return GuideIndicatorDetail.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -324,7 +324,7 @@ class Query:
     )
     def guide_episode(self, info: Ctx, slug: str) -> GuideEpisodeDetail | None:
         ctx = info.context.stores()
-        found = episode_page.load_guide_episode(ctx, slug) if ctx is not None else None
+        found = regime_page.load_guide_episode(ctx, slug) if ctx is not None else None
         return GuideEpisodeDetail.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -351,9 +351,10 @@ class Query:
         "page's help buttons cost one request; a ref with no entry is left out",
         extensions=[MaxItems("refs", MAX_REFS)],
     )
-    def guide_entries(self, info: Ctx, refs: list[GuideRef]) -> GuideEntries | None:
+    def guide_entries(self, info: Ctx, refs: list[entries_page.GuideRef]) -> GuideEntries | None:
         ctx = info.context.stores()
-        return GuideEntries.load(ctx, refs) if ctx is not None else None
+        found = entries_page.load_guide_entries(ctx, refs) if ctx is not None else None
+        return GuideEntries.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Search every Guide entry for `q` (ADR 0051): at most `limit` results per "

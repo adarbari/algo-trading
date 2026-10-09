@@ -431,6 +431,30 @@ function guideField(name: string): Json {
   };
 }
 
+interface GuideRef {
+  kind: 'INDICATOR' | 'EPISODE' | 'TERM' | 'START';
+  id: string;
+}
+
+/** `GuideEntries`: the batch holds what the single-entry answers above hold, each ref once. */
+function guideEntries(refs: GuideRef[]): Json {
+  const found = (read: (id: string) => Json, key: string, kind: GuideRef['kind']) =>
+    refs
+      .filter((r) => r.kind === kind)
+      .map((r) => (read(r.id)['data'] as Json)[key])
+      .filter((entry) => entry != null);
+  return {
+    data: {
+      guideEntries: {
+        indicators: found(guideIndicator, 'guideIndicator', 'INDICATOR'),
+        episodes: found(guideEpisode, 'guideEpisode', 'EPISODE'),
+        terms: found(guideTerm, 'guideTerm', 'TERM'),
+        startPages: found(guideStartPage, 'guideStartPage', 'START'),
+      },
+    },
+  };
+}
+
 /**
  * A GraphQL operation's recorded answer (`{ data }`): the catalogue (`FeatureCatalogue`), a
  * feature's distribution (`FeatureDistribution`) and AAPL's detail pane.
@@ -440,11 +464,8 @@ function graphqlAnswer(operation: Operation): Json | null {
   if (name === 'FeatureCatalogue' || name === 'FeatureCatalogueDetail') return catalogue();
   if (name === 'GuideIndex') return guideIndex();
   if (name === 'GuidePlaybook') return guidePlaybook(String(operation.variables?.['id']));
-  if (name === 'GuideIndicator') return guideIndicator(String(operation.variables?.['key']));
-  if (name === 'GuideEpisode') return guideEpisode(String(operation.variables?.['slug']));
   if (name === 'GuideSituation') return guideSituation(String(operation.variables?.['slug']));
-  if (name === 'GuideStartPage') return guideStartPage(String(operation.variables?.['id']));
-  if (name === 'GuideTerm') return guideTerm(String(operation.variables?.['id']));
+  if (name === 'GuideEntries') return guideEntries(operation.variables?.['refs'] as GuideRef[]);
   if (name === 'GuideSearch') {
     return guideSearch(String(operation.variables?.['q']), Number(operation.variables?.['limit']));
   }

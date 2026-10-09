@@ -52,6 +52,24 @@ export async function mockAdminApi(page: Page, overrides: AdminFixtures = {}): P
   await page.route('**/api/graphql', async (route: Route) => {
     const operation = (route.request().postDataJSON() ?? {}) as Operation;
     const field = /\{\s*(\w+)/.exec(operation.query ?? '')?.[1] ?? '';
+    if (/query\s+StatusStrip\b/.test(operation.query ?? '') && operation.variables?.['admin']) {
+      // The status strip's one read: an admin adds the newest nightly run and the grid.
+      const failing = answers['nightlyRuns'] === FAIL || answers['completeness'] === FAIL;
+      await route.fulfill({
+        json: failing
+          ? {
+              data: null,
+              errors: [{ message: 'store unavailable', extensions: { code: 'INTERNAL' } }],
+            }
+          : {
+              data: {
+                nightlyRuns: answers['nightlyRuns'] ?? [],
+                completeness: answers['completeness'] ?? null,
+              },
+            },
+      });
+      return;
+    }
     if (!FIELDS.has(field)) {
       await route.fallback();
       return;
@@ -65,6 +83,24 @@ export async function mockAdminApi(page: Page, overrides: AdminFixtures = {}): P
               errors: [{ message: 'store unavailable', extensions: { code: 'INTERNAL' } }],
             }
           : { data: { [field]: answer ?? null } },
+    });
+  });
+}
+
+/**
+ * The Guide's batched read answers no entry (`Query.guideEntries`): for an Admin spec that does
+ * not mock Explore, whose help buttons would otherwise reach the network. Register it before
+ * `mockAdminApi`; `mockApi` has the real answers instead.
+ */
+export async function mockNoGuideEntries(page: Page): Promise<void> {
+  await page.route('**/api/graphql', async (route: Route) => {
+    const operation = (route.request().postDataJSON() ?? {}) as Operation;
+    if (!/query\s+GuideEntries\b/.test(operation.query ?? '')) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      json: { data: { guideEntries: { indicators: [], episodes: [], terms: [], startPages: [] } } },
     });
   });
 }

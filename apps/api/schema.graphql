@@ -586,7 +586,7 @@ type GuideEntries {
   startPages: [GuideStartPage!]!
 }
 
-"""The kinds of Guide entry `guideEntries` reads in a batch"""
+"""The kinds of Guide entry `guideEntries` reads"""
 enum GuideEntryKind {
   INDICATOR
   EPISODE
