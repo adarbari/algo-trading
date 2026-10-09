@@ -331,8 +331,8 @@ id = "regime"
 term = "Regime"
 short = "The market's weather for the session: Clear, Clouds building, Storm or Severe storm."
 body = """
-The regime comes from two scores from 0 to 100: macro risk, the slow warning signs in the
-economy, and market stress, the fast ones in prices. Clear (CALM) is neither high, Clouds
+The regime comes from two scores from 0 to 100: macro risk, the warning signs in the
+economy (the financial conditions index is one, though it moves fast), and market stress, the fast ones in prices. Clear (CALM) is neither high, Clouds
 building (CAUTION) macro risk only, Storm (STRESS) market stress only, Severe storm (CRISIS)
 both. It is UNKNOWN when either score cannot be computed, never Clear for lack of data. To
 avoid flickering, the label is the most severe one of the last five sessions, so a regime is

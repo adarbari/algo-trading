@@ -29,18 +29,25 @@ vi.mock('@/widgets/regime-sizing', async () => {
   const { Text } = await import('@algotrade/ui');
   return { RegimeSizing: () => <Text>sizing widget</Text> };
 });
+vi.mock('@/widgets/regime-timing', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { RegimeTiming: () => <Text>timing widget</Text> };
+});
 
 describe('RegimePage', () => {
-  it('composes the header, legend, cycles, warning signs, sizing, episodes under one heading', async () => {
+  it('composes Now, Why and History under one heading and a section nav', async () => {
     const { container } = render(<RegimePage />);
     expect(screen.getByRole('heading', { level: 1, name: 'Regime' })).toBeVisible();
+    const nav = screen.getByRole('navigation', { name: 'Regime sections' });
+    expect(nav.querySelectorAll('a')).toHaveLength(3);
     const order = [
       'header widget',
+      'sizing widget',
+      'indicators widget',
       'legend widget',
       'cycles widget',
-      'indicators widget',
-      'sizing widget',
       'episodes widget',
+      'timing widget',
     ];
     const nodes = order.map((text) => screen.getByText(text));
     nodes.forEach((node) => {
@@ -52,6 +59,11 @@ describe('RegimePage', () => {
         previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
+    expect(screen.getByRole('region', { name: 'Now' })).toContainElement(nodes[0] as HTMLElement);
+    expect(screen.getByRole('region', { name: 'Why' })).toContainElement(nodes[2] as HTMLElement);
+    expect(screen.getByRole('region', { name: 'History' })).toContainElement(
+      nodes[6] as HTMLElement,
+    );
     await expectNoA11yViolations(container);
   });
 });

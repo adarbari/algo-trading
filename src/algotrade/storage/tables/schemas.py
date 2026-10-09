@@ -235,6 +235,22 @@ LISTING_HISTORY = _fixed(
     "end_date date",
     key=("source", "ticker", "start_date"),
 )
+# L1: who was in an index when (ADR 0013's S&P 500 rule over history; edges ED6b-3): one row per
+# (index, ticker, membership interval) from the fja05680/sp500 history, a full copy per pull
+# session (snapshot). Keyed by ticker, not by id: the history predates our ids, and
+# ``data.listings.universe_asof`` joins it to the listing alive on S. ``end_date`` is null while
+# the ticker is still a member. knowledge_ts is the pull time (2026 for a 2010 interval): an
+# identity read like the listing history, never a point-in-time fact.
+INDEX_MEMBERSHIP = _fixed(
+    "instruments/index_membership",
+    "reference",
+    ("index_name", "ticker", "start_date", "ts"),
+    "ts timestamp_utc!",
+    *_strings("index_name", "ticker"),
+    "start_date date!",
+    "end_date date",
+    key=("source", "index_name", "ticker", "start_date"),
+)
 # L1: company details from SEC EDGAR, per instrument (one full snapshot per date).
 INSTRUMENT_COMPANY = _fixed(
     "instruments/company",
@@ -641,6 +657,7 @@ KNOWN: dict[str, TableSpec] = {
         SYMBOL_HISTORY,
         ID_MAP,
         LISTING_HISTORY,
+        INDEX_MEMBERSHIP,
         INSTRUMENT_COMPANY,
         INSTRUMENT_SHARES,
         INSTRUMENT_DESCRIPTION,

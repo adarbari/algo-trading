@@ -50,6 +50,19 @@ export type RiskDirection =
   | 'HIGHER_IS_RISK'
   | 'LOWER_IS_RISK';
 
+/** A fast (market) or slow (macro) indicator, or the screener gate (GATE) */
+export type SignalKind =
+  | 'FAST'
+  | 'GATE'
+  | 'SLOW';
+
+/** How a signal did: LED (ON up to the trough), LATE (first ON only after it), NEVER_FIRED (every stored verdict false) or UNKNOWN (no verdict stored up to the trough) */
+export type SignalState =
+  | 'LATE'
+  | 'LED'
+  | 'NEVER_FIRED'
+  | 'UNKNOWN';
+
 /** Why a gap is there, in public words */
 export type UnavailableKind =
   | 'ILLIQUID'
@@ -326,6 +339,11 @@ export type RegimeEpisodesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type RegimeEpisodesQuery = { regime: { episodes: Array<{ key: string, name: string, kind: string, peak: string, trough: string, recovered: string | null, spxDrawdown: number, nasdaqDrawdown: number, recession: boolean, nberStart: string | null, nberEnd: string | null, cause: string, notes: string, knownFrom: string }>, recessions: Array<{ start: string, end: string | null, announcedStart: string | null, announcedEnd: string | null }> } | null };
+
+export type RegimeSignalsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type RegimeSignalsQuery = { regime: { episodes: Array<{ key: string, signals: { gate: { indicator: string, kind: SignalKind, state: SignalState, flaggedDay: number | null, clearedDay: number | null, flaggedDayFromTrough: number | null, firstKnownDay: number | null, neverFired: boolean, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, indicators: Array<{ indicator: string, kind: SignalKind, state: SignalState, flaggedDay: number | null, clearedDay: number | null, flaggedDayFromTrough: number | null, firstKnownDay: number | null, neverFired: boolean, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }> } | null }> } | null };
 
 export type MarketHistoryQueryVariables = Exact<{
   names: Array<string> | string;
@@ -2051,6 +2069,67 @@ export const RegimeEpisodesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RegimeEpisodesQuery, RegimeEpisodesQueryVariables>;
+export const RegimeSignalsDocument = new TypedDocumentString(`
+    query RegimeSignals {
+  regime {
+    episodes {
+      key
+      signals {
+        gate {
+          indicator
+          kind
+          state
+          flaggedDay
+          clearedDay
+          flaggedDayFromTrough
+          firstKnownDay
+          neverFired
+          unknownReason {
+            code
+            kind
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
+          }
+        }
+        indicators {
+          indicator
+          kind
+          state
+          flaggedDay
+          clearedDay
+          flaggedDayFromTrough
+          firstKnownDay
+          neverFired
+          unknownReason {
+            code
+            kind
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<RegimeSignalsQuery, RegimeSignalsQueryVariables>;
 export const MarketHistoryDocument = new TypedDocumentString(`
     query MarketHistory($names: [String!]!, $start: Date!, $end: Date!, $points: Int!) {
   market {

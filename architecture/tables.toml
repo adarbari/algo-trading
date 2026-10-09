@@ -39,7 +39,11 @@ target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_impo
 
 [[table]]
 name = "instruments/listing_history"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/listing_history.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/listings/listing_history.py"
+
+[[table]]
+name = "instruments/index_membership"
+owner = "apps/ingestion/algotrade_ingestion/tasks/listings/index_membership.py"
 
 [[table]]
 name = "instruments/company"

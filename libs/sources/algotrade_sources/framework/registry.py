@@ -73,6 +73,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sp500_history.membership import Sp500Membership
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.tiingo.listings import TiingoSupportedTickers
@@ -303,6 +304,7 @@ SOURCES: dict[str, SourceSpec] = {
             _token,
             tries=4,
         ),
+        SourceSpec("sp500_history", "sp500_history", "sp500_history", Sp500Membership, 1.0),
         SourceSpec("published", "published", "published", PublishedSeries, 1.0),
     )
 }

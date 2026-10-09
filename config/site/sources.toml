@@ -139,6 +139,10 @@ monthly_symbol_budget = 450      # distinct tickers `bars-history` fetches in a 
                                  # failed run asked for, a ticker fetched outside this task and a month-boundary
                                  # skew. 0: fetch none. The monthly launchd agent runs `bars-history --fill 450`.
 
+[sp500_history]                  # S&P 500 membership intervals since 1996 (fja05680/sp500, MIT licence, GitHub):
+enabled = true                   # the `index-membership` task (in no workflow until the owner runs it), one 28 KB file
+min_interval_s = 1.0             # a static file on GitHub; one request, stay polite
+
 [published]                      # published series files (Stooq, Fed EBP, OFR FSI, Shiller): one request per file
 enabled = true
 min_interval_s = 1.0             # a few static files a day; no published limit, stay polite
