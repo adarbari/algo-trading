@@ -14,10 +14,12 @@ Both snapshots used are named (``Universe.snapshot``, ``Universe.membership_snap
 
 ``end_date`` is the vendor's last trading day, which exists only for names that have since
 delisted: used as a feature, label or sort key it leaks the future. It is read **here, in
-``SymbolResolver.from_listings`` (both identity reads: is this listing alive on S) and by
+``SymbolResolver.from_listings`` (both identity reads: is this listing alive on S), by
 ``read_listings`` for the winners-sample runner** (which picks its strata by year of delisting,
-by design: a data-quality sample, never a feature), nowhere else, and ``universe_asof`` does
-not return it. The adapter stores a live name's end as null (open).
+by design: a data-quality sample, never a feature) **and by ``delisted_by`` for the outcomes
+task** (a name counts as delisted at T only when ``end_date <= T``, so no later delisting is
+known), nowhere else (``tests/architecture/data/test_listing_end_date_readers.py`` scans for
+it), and ``universe_asof`` does not return it. The adapter stores a live name's end as null (open).
 """
 
 from collections.abc import Collection
@@ -80,3 +82,17 @@ def read_listings(reader: StoreReader) -> tuple[pd.DataFrame, date]:
     and that snapshot's date. For the winners-sample runner only (see the module docstring)."""
     frame, snap = read_snapshot(reader, TABLE, None, REFERENCE_HINT)
     return frame, snap.snapshot_date
+
+
+def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
+    """Instrument id -> last trading day, for the listings with a trusted id whose ``end_date``
+    is on or before ``session`` (``MissingDataError`` with no snapshot). A listing that ends
+    after ``session``, or is open, is absent: at ``session`` its delisting was not known. For
+    the outcomes task (a window ending at ``session`` marks a name with no bar at its end
+    DELISTED)."""
+    frame, _ = read_snapshot(reader, TABLE, None, REFERENCE_HINT)
+    end = pd.to_datetime(frame["end_date"])
+    has_id = frame["instrument_id"].notna() & (frame["instrument_id"].astype(str) != "")
+    gone = frame[has_id & end.notna() & (end <= pd.Timestamp(session))]
+    last = pd.to_datetime(gone["end_date"]).dt.date
+    return dict(zip(gone["instrument_id"].astype(str), last, strict=True))

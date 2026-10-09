@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.listings.universe import COLUMNS, listed_asof, universe_asof
+from algotrade.data.listings.universe import COLUMNS, delisted_by, listed_asof, universe_asof
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -94,3 +94,20 @@ def test_universe_asof_reads_the_latest_snapshot_and_says_which() -> None:
 def test_universe_asof_without_a_snapshot_is_missing_data() -> None:
     with pytest.raises(MissingDataError):
         universe_asof(StoreReader(MemoryBackend()), S)
+
+
+def test_delisted_by_counts_only_an_end_date_on_or_before_the_session() -> None:
+    backend = MemoryBackend()
+    day = date(2026, 10, 5)
+    frame = _listings().assign(source="tiingo", run_id="r", perma_ticker="", session_date=day)
+    frame["ts"] = pd.Timestamp(day, tz="UTC")
+    frame["knowledge_ts"] = pd.Timestamp(day, tz="UTC")
+    StoreWriter(backend).write_table("instruments/listing_history", day, "r", frame)
+    reader = StoreReader(backend)
+    assert delisted_by(reader, date(2012, 5, 31)) == {
+        "EQ:TIINGO:OLD": date(2010, 12, 31),
+        "EQ:TIINGO:F": date(2012, 5, 31),
+    }
+    assert "EQ:TIINGO:C" not in delisted_by(reader, date(2013, 1, 1))  # ends 2013-01-02: unknown
+    got = delisted_by(reader, date(2013, 1, 2))
+    assert got["EQ:TIINGO:C"] == date(2013, 1, 2) and "EQ:TIINGO:A" not in got  # open, no id: out
