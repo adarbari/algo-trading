@@ -162,3 +162,24 @@ def build_world(
 @pytest.fixture
 def world() -> World:
     return build_world()
+
+
+def with_listing_history(w: World, snapshot: date) -> World:
+    """Store the listing history (every name, listed since 2000, none ended) and an S&P 500
+    membership snapshot at ``snapshot``: what a session before the first reference snapshot
+    reads its names from (ADR 0053 amendment 2026-10-09)."""
+    ts = datetime(2026, 9, 1, tzinfo=UTC)
+    listings = [
+        {"instrument_id": i, "ticker": f"N{k:02d}", "exchange": "NASDAQ", "asset_type": "Stock",
+         "perma_ticker": "", "start_date": date(2000, 1, 3), "end_date": None, "ts": ts}
+        for k, i in enumerate(IDS)
+    ]  # fmt: skip
+    members = [{"index_name": "SP500", "ticker": "ZZZ", "start_date": date(2000, 1, 3),
+                "end_date": None, "ts": ts}]  # fmt: skip
+    w.writer.write_table(
+        "instruments/listing_history", snapshot, "l", stamped(listings, snapshot, "l")
+    )
+    w.writer.write_table(
+        "instruments/index_membership", snapshot, "m", stamped(members, snapshot, "m")
+    )
+    return w

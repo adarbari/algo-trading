@@ -40,6 +40,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     edge,
     outcome_row,
     screen,
+    with_listing_history,
 )  # fmt: skip
 
 USER = UserContext("site")
@@ -818,23 +819,7 @@ def test_the_eligible_sets_read_for_the_events_are_not_kept_once_the_schedules_a
 
 
 def test_an_evaluation_before_the_first_snapshot_reads_the_listing_history_and_says_so() -> None:
-    w = build_world(snapshot=DAYS[3])  # the first reference snapshot is after D = DAYS[0]
-    listings = stamped(
-        [
-            {"instrument_id": i, "ticker": f"N{k:02d}", "exchange": "NASDAQ", "asset_type": "Stock",
-             "perma_ticker": "", "start_date": date(2000, 1, 3), "end_date": None,
-             "ts": datetime(2026, 9, 1, tzinfo=UTC)}
-            for k, i in enumerate(IDS)
-        ],
-        DAYS[3], "l",
-    )  # fmt: skip
-    members = stamped(
-        [{"index_name": "SP500", "ticker": "ZZZ", "start_date": date(2000, 1, 3),
-          "end_date": None, "ts": datetime(2026, 9, 1, tzinfo=UTC)}],
-        DAYS[3], "m",
-    )  # fmt: skip
-    w.writer.write_table("instruments/listing_history", DAYS[3], "l", listings)
-    w.writer.write_table("instruments/index_membership", DAYS[3], "m", members)
+    w = with_listing_history(build_world(snapshot=DAYS[3]), DAYS[3])  # first snapshot after D
     ev = run(w)
     assert ev.historical is not None and 0 < ev.historical.sessions < len(DAYS)  # before DAYS[3]
     assert ev.historical.eligible == {"today_flag": N * ev.historical.sessions, "proxy": 0}

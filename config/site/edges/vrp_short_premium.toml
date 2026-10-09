@@ -10,7 +10,7 @@ premium for jump and variance risk they cannot diversify (Carr and Wu 2009; Baks
 persistence = """A risk premium, not a mispricing: the seller is paid for losses that cluster in
 crashes, when capital is scarce, so being known does not remove it."""
 schedule = "every_session"
-universe = "liquid_optionable"
+universe = "liquid_optionable_floored"
 top_k = 20
 # vrp_iv_hv reads feature.vrp_iv30 (IBKR-only before 2026-10-02) and HV30, ~500 sessions of history. short_premium_liquidity
 # (option_liquidity@v1) and vrp_scanner v4 (put_wing@v1, option_tier) need option chains, stored
@@ -75,6 +75,8 @@ all = [
   { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
   { any = [
     { field = "instrument.security_type", op = "eq", value = "ETF" },
     { all = [

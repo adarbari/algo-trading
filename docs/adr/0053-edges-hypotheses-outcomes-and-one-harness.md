@@ -353,7 +353,8 @@ on it (`data.listings.universe_asof`: survivors and the delisted alike, `status`
 alive in today's snapshot keeps today's `optionable` flag and `security_type`; a name absent from
 it (delisted) counts as a common stock (Tiingo `Stock`; an ETF stays an ETF) and its `optionable`
 is replaced by the liquidity proxy: the universe's own close and `adv_usd_20d` floors (for
-`liquid_common_stocks`, above $5 and $50M), so a universe that reads `optionable` without both is
+`liquid_common_stocks`, above $5 and $50M; the vrp edge's `liquid_optionable_floored` carries the
+same values, the orchestrator's choice the owner can change), so a universe that reads `optionable` without both is
 a `ConfigurationError`, never a number of our own. After 2026-10-02, the real snapshot. This
 applies to the frozen period before 2026-10-02 as well, and to the training frame, which calls the
 same `eligible`.
@@ -362,7 +363,7 @@ same `eligible`.
 ones, so every number over these sessions is read with it. The run says so: its record
 (`stats["historical_identity"]`) and its report (`HISTORICAL IDENTITY`) carry the rule, the number
 of such sessions and the names by path (today's flag, liquidity proxy), eligible and screened.
-These sessions no longer count as `pre_snapshot` (that caveat stays for a store with no listing
-history, where the earliest snapshot still stands in). The read is opt-in (`historical=True`
+These sessions no longer count as `pre_snapshot` (a store with no listing history or S&P 500 membership raises `MissingDataError`: never today's
+names unsaid). The read is opt-in (`historical=True`
 through `fields_view` / `select` / `screen_session`): reads, backtests and the API are unchanged.
 `end_date` stays behind `universe_asof` (a name is in only while `start <= S <= end`).

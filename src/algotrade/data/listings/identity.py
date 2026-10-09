@@ -14,14 +14,13 @@ their identity fields come by one of two paths, the owner's rule (disclosed, nev
   ``services/evaluation/cross_section/historical.py`` checks the universe has them).
 
 ``status`` is ACTIVE for every name (it was listed on the session). Without a stored listing
-history the earliest snapshot stands in as before and the session stays ``pre_snapshot``."""
+history the read raises ``MissingDataError`` (no silent fallback to today's names)."""
 
 from dataclasses import dataclass
 from datetime import date
 
 import pandas as pd
 
-from algotrade.core.model.errors import MissingDataError
 from algotrade.data.listings.universe import ETF, universe_asof
 from algotrade.storage.tables.readers import StoreReader
 
@@ -51,13 +50,11 @@ class HistoricalIdentity:
 
 def historical_reference(
     reader: StoreReader, session: date, today: pd.DataFrame
-) -> HistoricalIdentity | None:
+) -> HistoricalIdentity:
     """The reference rows for ``session`` from ``universe_asof`` and ``today`` (the earliest
-    reference snapshot's rows); ``None`` when no listing history is stored."""
-    try:
-        listed = universe_asof(reader, session).instruments
-    except MissingDataError:
-        return None
+    reference snapshot's rows); ``MissingDataError`` when no listing history (or S&P 500
+    membership) is stored: the harness never falls back to today's names without saying so."""
+    listed = universe_asof(reader, session).instruments
     ids = listed["instrument_id"].astype(str)
     known = today.assign(instrument_id=today["instrument_id"].astype(str))
     known = known[known["instrument_id"].isin(set(ids))].assign(status="ACTIVE")

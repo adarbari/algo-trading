@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section import picks
 from algotrade.services.evaluation.cross_section.picks import (
@@ -27,6 +27,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     World,
     build_world,
     screen,
+    with_listing_history,
 )  # fmt: skip
 
 USER = UserContext("site")
@@ -57,9 +58,12 @@ def test_a_rejected_name_is_ranked_last_and_never_a_pick() -> None:
 def test_the_eligible_names_are_the_edges_universe_and_pre_snapshot_is_flagged() -> None:
     w = build_world(snapshot=DAYS[3])
     universe = parse_selection(ACTIVE, "active")
+    with pytest.raises(MissingDataError, match="listing_history"):  # never today's names unsaid
+        eligible(w.reader, universe, DAYS[0])
+    with_listing_history(w, DAYS[3])
     assert eligible(w.reader, universe, DAYS[0]).ids == frozenset(IDS)
     run = screen_variant(w.reader, resolve_config(w.configs, "momo", USER), DAYS[0])
-    assert run.pre_snapshot  # the snapshot is after the session: survivorship
+    assert not run.pre_snapshot  # the names come from the listing history, said in the caveat
     later = screen_variant(w.reader, resolve_config(w.configs, "momo", USER), DAYS[4])
     assert not later.pre_snapshot
 

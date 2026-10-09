@@ -114,7 +114,7 @@ def read_events_for(
     unknown: dict[str, dict[date, Mapping[str, int]]] = {k: {} for k in eligible_of}
     last: dict[str, dict[str, date]] = {k: {} for k in eligible_of}  # name -> latest counted D
     for day in decisions:
-        view, _ = fields_view(reader, (spec.count, spec.date), day)
+        view, _ = fields_view(reader, (spec.count, spec.date), day, historical=True)
         reads = {i: _read(view.get(i, spec.count), view.get(i, spec.date)) for i in view}
         if not any(count == target for count, _ in reads.values()):
             continue

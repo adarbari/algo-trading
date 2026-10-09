@@ -48,6 +48,8 @@ from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.core.time.calendar import sessions_between
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
+from algotrade.data.listings.membership import TABLE as MEMBERSHIP_TABLE
+from algotrade.data.listings.universe import TABLE as LISTING_TABLE
 from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes, stored_sessions
 from algotrade.data.reference import UNIVERSE_TABLE
 from algotrade.engines.screening.runner import RunCoverage
@@ -108,7 +110,13 @@ MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
 # Not an input table a screener lacks for a session but the run's own wiring (market features
 # not loaded, no universe or reference snapshot): always an error, never a lost session.
-WIRING_DATASETS = (MARKET_FEATURES, UNIVERSE_TABLE, REFERENCE_TABLE)
+WIRING_DATASETS = (
+    MARKET_FEATURES,
+    UNIVERSE_TABLE,
+    REFERENCE_TABLE,
+    LISTING_TABLE,
+    MEMBERSHIP_TABLE,
+)
 CHUNK_SESSIONS = 20  # decision sessions screened and measured before the frames are dropped
 OUTCOME_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS)  # kept per entry session
 

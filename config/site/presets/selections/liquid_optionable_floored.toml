@@ -1,0 +1,15 @@
+# liquid_optionable with the liquidity floors of liquid_common_stocks (close above $5, 20-session
+# dollar volume of at least $50M): the universe of the vrp_short_premium edge (ADR 0053). Before the
+# first reference snapshot a delisted name has no optionable flag and these floors decide in its
+# place (amendment 2026-10-09), so an edge universe that reads optionable must carry them. The
+# values are the orchestrator's choice (same as liquid_common_stocks); the owner can change them.
+name = "liquid_optionable_floored"
+
+[where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+]
