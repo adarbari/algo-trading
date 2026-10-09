@@ -10,6 +10,7 @@ const pick = (decision: string): IdeaPick => ({
   flags: [],
   columns: {},
   criterionValues: {},
+  criteria: [],
   decision,
   score: 1,
   reasons: '',
@@ -32,6 +33,7 @@ const sessions = (n: number | null) => ({
 const idea = (symbol: string, decision: string, days: number | null): Idea => ({
   instrumentId: `id-${symbol}`,
   symbol,
+  name: null,
   rank: 1,
   picks: [pick(decision)],
   best: pick(decision),

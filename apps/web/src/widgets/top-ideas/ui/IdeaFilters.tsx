@@ -2,9 +2,10 @@
  * The bar above the ideas table: the preset views and the filter chips, both design-system
  * components fed from the page's search params (so a view of the table is a link).
  */
-import { FilterChips, Stack, ViewChips } from '@algotrade/ui';
+import { FilterChips, SegmentedControl, Stack, ViewChips } from '@algotrade/ui';
 
 import {
+  IDEA_COLUMN_SETS,
   IDEA_FILTER_KEYS,
   IDEA_VIEWS,
   type Idea,
@@ -31,6 +32,15 @@ export function IdeaFilters({ ideas, search, onSearchChange }: IdeaFiltersProps)
         value={search.view ?? 'top'}
         onValueChange={(view) => {
           onSearchChange({ view });
+        }}
+      />
+      <SegmentedControl
+        aria-label="Columns"
+        size="sm"
+        options={IDEA_COLUMN_SETS.map((c) => ({ value: c.id, label: c.label }))}
+        value={search.columns ?? 'stocks'}
+        onValueChange={(columns) => {
+          onSearchChange({ columns });
         }}
       />
       <FilterChips

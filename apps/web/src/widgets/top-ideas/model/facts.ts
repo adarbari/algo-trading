@@ -4,11 +4,11 @@
  * "Presentation is not derivation"). The Earnings cell shows the next report date, else a muted
  * "Last <d MMM>" from the last report date, else the UNKNOWN label with the server's reason.
  */
-import { formatValue } from '@algotrade/ui';
+import { formatValue, type FormattedValue } from '@algotrade/ui';
 
 import { unknownText, unknownWord } from '@/entities/availability';
 import { factOf, IDEA_FACTS, type Idea } from '@/entities/idea';
-import { isUnknown } from '@/entities/feature';
+import { isUnknown, valueFormat } from '@/entities/feature';
 
 /** The label of a value the server does not have for the session. */
 export const UNKNOWN_LABEL = 'Unknown';
@@ -68,4 +68,10 @@ export function dteReason(idea: Idea): string | undefined {
 /** The VRP gate's IV30 (a fraction); null: not known. */
 export function iv30(idea: Idea): number | null {
   return number(factOf(idea, IDEA_FACTS.iv30)?.value);
+}
+
+/** A served value as its own format reads it (`info.format`); null: not known. */
+export function served(idea: Idea, name: string): FormattedValue | null {
+  const fact = factOf(idea, name);
+  return fact?.value == null ? null : formatValue(fact.value, valueFormat(fact.info));
 }

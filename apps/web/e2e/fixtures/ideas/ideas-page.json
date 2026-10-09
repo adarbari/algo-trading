@@ -178,8 +178,42 @@
                   "dtype": "float",
                   "nullMeaning": ""
                 }
+              },
+              {
+                "name": "rollup.price_stats@v2.close",
+                "value": 226.8,
+                "unknown": null,
+                "info": {
+                  "format": "CURRENCY",
+                  "unit": "usd_per_share",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.trend_stats@v2.ret_1d",
+                "value": 0.0123,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.relative_strength@v1.sector_etf",
+                "value": "XLK",
+                "unknown": null,
+                "info": {
+                  "format": "TEXT",
+                  "unit": null,
+                  "dtype": "str",
+                  "nullMeaning": ""
+                }
               }
-            ]
+            ],
+            "name": "Apple Inc."
           },
           "picks": [
             {
@@ -188,7 +222,23 @@
               "score": 84.0,
               "reasons": "",
               "flags": [],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "PASS",
+                  "value": 45000000.0
+                }
+              ],
               "columns": [
                 {
                   "name": "hv30",
@@ -222,7 +272,23 @@
               "score": 91.0,
               "reasons": "",
               "flags": [],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "PASS",
+                  "value": 45000000.0
+                }
+              ],
               "columns": []
             }
           ],
@@ -300,8 +366,42 @@
                   "dtype": "float",
                   "nullMeaning": ""
                 }
+              },
+              {
+                "name": "rollup.price_stats@v2.close",
+                "value": 421.3,
+                "unknown": null,
+                "info": {
+                  "format": "CURRENCY",
+                  "unit": "usd_per_share",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.trend_stats@v2.ret_1d",
+                "value": -0.0042,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.relative_strength@v1.sector_etf",
+                "value": "XLK",
+                "unknown": null,
+                "info": {
+                  "format": "TEXT",
+                  "unit": null,
+                  "dtype": "str",
+                  "nullMeaning": ""
+                }
               }
-            ]
+            ],
+            "name": "Microsoft Corp."
           },
           "picks": [
             {
@@ -310,7 +410,23 @@
               "score": 79.0,
               "reasons": "",
               "flags": [],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "PASS",
+                  "value": 45000000.0
+                }
+              ],
               "columns": [
                 {
                   "name": "hv30",
@@ -406,8 +522,42 @@
                   "dtype": "float",
                   "nullMeaning": ""
                 }
+              },
+              {
+                "name": "rollup.price_stats@v2.close",
+                "value": 118.4,
+                "unknown": null,
+                "info": {
+                  "format": "CURRENCY",
+                  "unit": "usd_per_share",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.trend_stats@v2.ret_1d",
+                "value": 0.0311,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.relative_strength@v1.sector_etf",
+                "value": "XLK",
+                "unknown": null,
+                "info": {
+                  "format": "TEXT",
+                  "unit": null,
+                  "dtype": "str",
+                  "nullMeaning": ""
+                }
               }
-            ]
+            ],
+            "name": "NVIDIA Corp."
           },
           "picks": [
             {
@@ -416,7 +566,23 @@
               "score": 77.0,
               "reasons": "",
               "flags": [],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "PASS",
+                  "value": 45000000.0
+                }
+              ],
               "columns": []
             },
             {
@@ -425,7 +591,23 @@
               "score": 70.0,
               "reasons": "",
               "flags": [],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "PASS",
+                  "value": 45000000.0
+                }
+              ],
               "columns": []
             }
           ],
@@ -506,8 +688,42 @@
                   "dtype": "float",
                   "nullMeaning": ""
                 }
+              },
+              {
+                "name": "rollup.price_stats@v2.close",
+                "value": 68.2,
+                "unknown": null,
+                "info": {
+                  "format": "CURRENCY",
+                  "unit": "usd_per_share",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.trend_stats@v2.ret_1d",
+                "value": -0.0008,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.relative_strength@v1.sector_etf",
+                "value": "XLP",
+                "unknown": null,
+                "info": {
+                  "format": "TEXT",
+                  "unit": null,
+                  "dtype": "str",
+                  "nullMeaning": ""
+                }
               }
-            ]
+            ],
+            "name": "Coca-Cola Co."
           },
           "picks": [
             {
@@ -516,7 +732,23 @@
               "score": 66.0,
               "reasons": "ADV below target",
               "flags": ["leveraged_inverse"],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "FAIL",
+                  "value": 45000000.0
+                }
+              ],
               "columns": []
             }
           ],
@@ -597,8 +829,42 @@
                   "dtype": "float",
                   "nullMeaning": ""
                 }
+              },
+              {
+                "name": "rollup.price_stats@v2.close",
+                "value": 248.9,
+                "unknown": null,
+                "info": {
+                  "format": "CURRENCY",
+                  "unit": "usd_per_share",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.trend_stats@v2.ret_1d",
+                "value": -0.0287,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.relative_strength@v1.sector_etf",
+                "value": "XLY",
+                "unknown": null,
+                "info": {
+                  "format": "TEXT",
+                  "unit": null,
+                  "dtype": "str",
+                  "nullMeaning": ""
+                }
               }
-            ]
+            ],
+            "name": "Tesla Inc."
           },
           "picks": [
             {
@@ -607,7 +873,23 @@
               "score": 63.0,
               "reasons": "Earnings in 6 sessions",
               "flags": ["large_move"],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "PASS",
+                  "value": 45000000.0
+                }
+              ],
               "columns": []
             }
           ],
@@ -700,8 +982,31 @@
                   "dtype": "float",
                   "nullMeaning": ""
                 }
+              },
+              {
+                "name": "rollup.price_stats@v2.close",
+                "value": 566.1,
+                "unknown": null,
+                "info": {
+                  "format": "CURRENCY",
+                  "unit": "usd_per_share",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.trend_stats@v2.ret_1d",
+                "value": 0.0051,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
               }
-            ]
+            ],
+            "name": "SPDR S&P 500 ETF Trust"
           },
           "picks": [
             {
@@ -710,7 +1015,23 @@
               "score": 88.0,
               "reasons": "",
               "flags": [],
-              "criteria": [],
+              "criteria": [
+                {
+                  "id": "trend_up",
+                  "outcome": "PASS",
+                  "value": 1
+                },
+                {
+                  "id": "iv_rank",
+                  "outcome": "NEAR",
+                  "value": 0.41
+                },
+                {
+                  "id": "adv",
+                  "outcome": "PASS",
+                  "value": 45000000.0
+                }
+              ],
               "columns": []
             }
           ],

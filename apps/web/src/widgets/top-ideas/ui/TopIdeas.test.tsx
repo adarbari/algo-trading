@@ -36,7 +36,7 @@ const pick = (configId: string, decision: string, score: number) => ({
   score,
   reasons: '',
   flags: [] as string[],
-  criteria: [] as { id: string; value: unknown }[],
+  criteria: [] as { id: string; outcome: string; value: unknown }[],
   columns: [] as { name: string; value: unknown }[],
 });
 const fact = (name: string, value: unknown, format: 'DATE' | 'NUMBER' | 'PERCENT' | 'FLAG') => ({
@@ -68,6 +68,9 @@ const facts = (
   fact(IDEA_FACTS.expiryDte, dte, 'NUMBER'),
   fact(IDEA_FACTS.earningsBeforeExpiry, first, 'FLAG'),
   fact(IDEA_FACTS.iv30, iv, 'PERCENT'),
+  fact(IDEA_FACTS.close, 200.5, 'NUMBER'),
+  fact(IDEA_FACTS.ret1d, -0.0123, 'PERCENT'),
+  fact(IDEA_FACTS.sectorEtf, 'XLK', 'NUMBER'),
 ];
 const item = (
   rank: number,
@@ -79,7 +82,7 @@ const item = (
   instrumentId: `id-${symbol}`,
   regime: null,
   sizeMultiplier: null,
-  instrument: { symbol, features },
+  instrument: { symbol, name: `${symbol} Inc`, features },
   picks,
 });
 const screener = (id: string, name: string) => ({
@@ -105,6 +108,13 @@ const response: IdeasResponse = {
         [
           {
             ...pick('vrp', 'QUALIFIED', 84),
+            reasons: 'IV rank high, spread tight',
+            criteria: [
+              { id: 'trend_up', outcome: 'PASS', value: 1 },
+              { id: 'iv_rank', outcome: 'NEAR', value: 0.4 },
+              { id: 'spread', outcome: 'FAIL', value: 0.9 },
+              { id: 'gap', outcome: 'MISSING', value: null },
+            ],
             columns: [
               { name: 'hv30', value: 0.21 },
               { name: 'iv_hv_ratio', value: 1.49 },
@@ -181,6 +191,46 @@ beforeEach(() => {
 });
 
 describe('TopIdeas', () => {
+  it('shows each ticker with its name and sector, why it is here, price and move', () => {
+    const { grid } = setup();
+    const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
+    expect(within(aapl).getByText('AAPL Inc · XLK')).toBeInTheDocument();
+    expect(within(aapl).getByText('IV rank high, spread tight')).toHaveAttribute(
+      'title',
+      'IV rank high, spread tight',
+    );
+    expect(within(aapl).getByText('+1 more')).toBeInTheDocument();
+    expect(within(aapl).getByText('200.50')).toBeInTheDocument();
+    expect(within(aapl).getByText('−1.2%')).toBeInTheDocument();
+    const ko = within(grid()).getByRole('row', { name: /KO/ });
+    expect(within(ko).queryByText(/more/)).not.toBeInTheDocument();
+  });
+
+  it('draws one labelled square per criterion of the best pick', () => {
+    const { grid } = setup();
+    const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
+    expect(within(aapl).getByRole('img', { name: /^Criteria:/ })).toHaveAccessibleName(
+      'Criteria: Trend up: Passed, Iv rank: Near miss, Spread: Missed, Gap: No value',
+    );
+  });
+
+  it('keeps the column set in the search params and shows the options set', async () => {
+    const user = userEvent.setup();
+    const { grid } = setup();
+    const headers = () =>
+      within(grid())
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent)
+        .join(' | ');
+    expect(headers()).toMatch(/Why it's here/);
+    expect(headers()).not.toMatch(/IV30/);
+    await user.click(screen.getByRole('radio', { name: 'Options columns' }));
+    expect(headers()).toMatch(/IV30.*HV30/);
+    expect(headers()).not.toMatch(/Why it's here|Criteria|Price/);
+    await user.click(screen.getByRole('radio', { name: 'Stocks columns' }));
+    expect(headers()).toMatch(/Why it's here/);
+  });
+
   it("opens a screener's results from its name in a row", async () => {
     const { grid, onOpenScreener } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
@@ -190,7 +240,6 @@ describe('TopIdeas', () => {
 
   it('shows the next earnings, else a muted last date, else Unknown', () => {
     const { grid } = setup();
-    expect(within(grid()).getByRole('row', { name: /AAPL/ })).toHaveTextContent('Thu 29 Oct');
     expect(within(grid()).getByRole('row', { name: /MRVL/ })).toHaveTextContent('Last 27 Aug');
     const spy = within(grid()).getByRole('row', { name: /SPY/ });
     expect(within(spy).getAllByText('Unknown')[0]).toHaveAttribute(
@@ -199,11 +248,9 @@ describe('TopIdeas', () => {
     );
   });
 
-  it('shows each ticker with its screeners, decision, score, earnings and expiry flag', async () => {
-    const { container, grid } = setup();
+  it('shows each ticker with its decision, score and expiry flag', async () => {
+    const { container, grid } = setup({ columns: 'options' });
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
-    expect(within(aapl).getByText('VRP scanner')).toBeInTheDocument();
-    expect(within(aapl).getByText('Liquidity')).toBeInTheDocument();
     expect(within(aapl).getByText('Qualified')).toBeInTheDocument();
     expect(within(aapl).getByText('Earnings first')).toBeInTheDocument();
     expect(within(aapl).getByText('36')).toBeInTheDocument();
@@ -214,7 +261,7 @@ describe('TopIdeas', () => {
   });
 
   it('shows the display values some screener stored, only as columns that have any', () => {
-    const { grid } = setup();
+    const { grid } = setup({ columns: 'options' });
     const headers = within(grid())
       .getAllByRole('columnheader')
       .map((h) => h.textContent)
@@ -255,6 +302,7 @@ describe('TopIdeas', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
     expect(within(aapl).getByText('Earnings before expiry')).toBeInTheDocument();
+    expect(within(aapl).queryByText('Thu 29 Oct')).not.toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
     expect(within(ko).getByText('Leveraged / inverse')).toBeInTheDocument();
   });
@@ -361,7 +409,7 @@ describe('TopIdeas', () => {
 describe('TopIdeas field headers', () => {
   it('puts the Guide help button in the catalogue field headers, not in the rest', async () => {
     vi.mocked(gql).mockResolvedValue({ guideField: null });
-    const { grid } = setup();
+    const { grid } = setup({ columns: 'options' });
     const help = (name: RegExp) =>
       within(within(grid()).getAllByRole('columnheader', { name })[0] as HTMLElement).queryByRole(
         'button',
@@ -369,8 +417,7 @@ describe('TopIdeas field headers', () => {
           name: /^What is .*\?$/,
         },
       );
-    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(3);
-    expect(help(/Earnings/)).toBeVisible();
+    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(2);
     expect(help(/Expiry DTE/)).toBeVisible();
     expect(help(/IV30/)).toBeVisible();
     expect(help(/Score/)).toBeNull();

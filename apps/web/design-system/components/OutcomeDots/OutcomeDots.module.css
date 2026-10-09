@@ -1,0 +1,27 @@
+/* OutcomeDots: a wrapped row of small squares in the tone of each outcome. */
+.root {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5);
+  align-items: center;
+  min-width: 0;
+}
+
+.dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
+}
+
+.dot[data-tone='positive'] {
+  background: var(--color-positive);
+}
+
+.dot[data-tone='warning'] {
+  background: var(--color-warning);
+}
+
+.dot[data-tone='negative'] {
+  background: var(--color-negative);
+}

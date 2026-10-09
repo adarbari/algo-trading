@@ -34,6 +34,8 @@ export interface IdeaPick {
   columns: Record<string, unknown>;
   /** What each criterion was judged on (criterion id -> value). */
   criterionValues: Record<string, unknown>;
+  /** Each criterion's served outcome (`PASS`, `NEAR`, `FAIL`, `MISSING`), in the screener's order. */
+  criteria: { id: string; outcome: string }[];
   /** The screener's flags that hold for the ticker (ids, e.g. `leveraged_inverse`). */
   flags: string[];
 }
@@ -48,6 +50,8 @@ export interface Idea {
   instrumentId: string;
   /** Null when the session's reference snapshot does not have the instrument. */
   symbol: string | null;
+  /** The company or fund name (null when the reference snapshot does not have the instrument). */
+  name: string | null;
   rank: number;
   /** Every screener that picked the ticker, highest priority first (the server's order). */
   picks: IdeaPick[];
@@ -176,6 +180,7 @@ function toPick(pick: ServedPick, names: ReadonlyMap<string, string>): IdeaPick 
     reasons: pick.reasons,
     columns: byName(pick.columns, (c) => c.name),
     criterionValues: byName(pick.criteria, (c) => c.id),
+    criteria: pick.criteria.map((c) => ({ id: c.id, outcome: c.outcome })),
     flags: pick.flags,
   };
 }
@@ -190,6 +195,7 @@ function toIdea(item: ServedItem, names: ReadonlyMap<string, string>): Idea | nu
   const idea: Idea = {
     instrumentId: item.instrumentId,
     symbol: item.instrument?.symbol ?? null,
+    name: item.instrument?.name ?? null,
     rank: item.rank,
     picks,
     best,
