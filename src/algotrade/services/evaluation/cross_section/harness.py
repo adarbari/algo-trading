@@ -48,7 +48,7 @@ from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.core.time.calendar import sessions_between
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes
+from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes, stored_sessions
 from algotrade.data.reference import UNIVERSE_TABLE
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
@@ -447,6 +447,13 @@ def _mean_on(result: VariantResult, day: date) -> float:
         if s.session == day and s.pick_mean is not None:
             return s.pick_mean
     return float("nan")
+
+
+def stored_outcome_sessions(reader: StoreReader) -> list[date]:
+    """The start sessions with stored outcomes, ascending: the range an evaluation covers by
+    default (empty: none stored). The one place outside the harness that asks, so the outcomes
+    stay quarantined (ADR 0053)."""
+    return stored_sessions(reader)
 
 
 def evaluate_edge(

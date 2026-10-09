@@ -20,6 +20,11 @@ OUTCOME_FIELDS = (
 _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "window_end")
 
 
+def stored_sessions(reader: StoreReader) -> list[date]:
+    """The start sessions with a stored outcome partition, ascending (empty: none stored)."""
+    return list(reader.dates(FORWARD_RETURNS))
+
+
 def read_outcomes(
     reader: StoreReader,
     horizon: int,

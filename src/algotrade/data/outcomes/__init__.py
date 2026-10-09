@@ -3,6 +3,6 @@ session, the one table read across sessions. Importable only from ``algotrade.se
 (import-linter contract and ``tests/architecture/data/test_outcomes_quarantine.py``): no screener,
 strategy, feature or page read can see the future because nothing it may import serves it."""
 
-from algotrade.data.outcomes.reading import OUTCOME_FIELDS, read_outcomes
+from algotrade.data.outcomes.reading import OUTCOME_FIELDS, read_outcomes, stored_sessions
 
-__all__ = ["OUTCOME_FIELDS", "read_outcomes"]
+__all__ = ["OUTCOME_FIELDS", "read_outcomes", "stored_sessions"]

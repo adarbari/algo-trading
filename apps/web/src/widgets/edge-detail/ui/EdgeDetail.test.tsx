@@ -11,6 +11,10 @@ vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEdges: hooks.useEdges,
 }));
+vi.mock('@/features/edge-evaluation', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { RunEvaluation: ({ edgeId }: { edgeId: string }) => <Text>{`run ${edgeId}`}</Text> };
+});
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
   return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
@@ -24,6 +28,7 @@ describe('EdgeDetail', () => {
   it('shows the frozen figures per variant through the odds line, never an exploratory row', async () => {
     const { container } = render(<EdgeDetail id="momentum_12_1" />);
     expect(screen.getByRole('heading', { name: 'Momentum 12-1' })).toBeInTheDocument();
+    expect(screen.getByText('run momentum_12_1')).toBeInTheDocument();
     expect(screen.getByText('momentum_12_1 (screener)')).toBeInTheDocument();
     expect(screen.getByText('equal_weight (baseline)')).toBeInTheDocument();
     expect(screen.getByText('58.0%')).toBeInTheDocument();

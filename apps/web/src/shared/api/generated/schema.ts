@@ -22,6 +22,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/edges/{edge_id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate */
+        post: operations["evaluate_edges__edge_id__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/edges/{edge_id}/evaluate/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Evaluate Status
+         * @description 403 for another user's job unless the caller is an admin (the job's owner is its user).
+         */
+        get: operations["evaluate_status_edges__edge_id__evaluate__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/evaluation/split": {
         parameters: {
             query?: never;
@@ -460,6 +497,23 @@ export interface components {
             id: string;
             /** Reason */
             reason: string;
+        };
+        /** EvaluationRequest */
+        EvaluationRequest: {
+            /** Edge Id */
+            edge_id: string;
+            /** Error */
+            error: string | null;
+            /** Exploratory */
+            exploratory: boolean | null;
+            /** Job Id */
+            job_id: string;
+            /** Run Id */
+            run_id: string | null;
+            /** State */
+            state: string;
+            /** User */
+            user: string;
         };
         /** EvaluationSplitBody */
         EvaluationSplitBody: {
@@ -1237,6 +1291,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveOptionChain"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_edges__edge_id__evaluate_post: {
+        parameters: {
+            query?: {
+                /** @description run it for the site, not for you (admins only) */
+                as_site?: boolean;
+            };
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path: {
+                edge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRequest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_status_edges__edge_id__evaluate__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                edge_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRequest"];
                 };
             };
             /** @description Validation Error */

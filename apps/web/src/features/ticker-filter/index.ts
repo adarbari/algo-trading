@@ -1,9 +1,2 @@
-/** Feature: filter the ticker table (search, security type, sector, liquidity, flags). */
-export {
-  liquidityLabel,
-  toTableFilters,
-  TYPE_CHIPS,
-  typeLabel,
-  type TickerFilters,
-} from './model/filters';
-export { TickerFilterBar, type TickerFilterBarProps } from './ui/TickerFilterBar';
+/** Feature: the security-type words (`COMMON_STOCK` -> Stock) the ticker views share. */
+export { typeLabel } from './model/filters';

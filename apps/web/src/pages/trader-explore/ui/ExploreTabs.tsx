@@ -1,13 +1,13 @@
 /**
- * Explore's tab row (Overview, Compare, Chart, Options, Features, Events, Screener hits; field help
- * is the Guide, opened from each field's help button). Choosing the default tab for the compare
- * set removes `tab` from the URL.
+ * Explore's tab row for the ticker in focus (Overview, Compare when two or more tickers are
+ * open, Chart, Options, Features, Events, Screener hits, and Why it is an idea when Ideas opened
+ * the ticker; field help is the Guide, opened from each field's help button).
  */
 import { Tabs, type TabItem } from '@algotrade/ui';
 import type { ReactNode } from 'react';
 
 import type { ExploreTab } from '@/entities/explore';
-import { defaultTab, type SearchPatch } from '../model/state';
+import type { SearchPatch } from '../model/state';
 
 const TABS: readonly (TabItem & { id: ExploreTab })[] = [
   { id: 'overview', label: 'Overview' },
@@ -17,24 +17,29 @@ const TABS: readonly (TabItem & { id: ExploreTab })[] = [
   { id: 'features', label: 'Features' },
   { id: 'events', label: 'Events' },
   { id: 'hits', label: 'Screener hits' },
+  { id: 'why', label: 'Why it is an idea' },
 ];
 
 export interface ExploreTabsProps {
   tab: ExploreTab;
-  /** How many tickers are in the compare set (the default tab depends on it). */
-  selectedCount: number;
+  /** How many tickers are open: Compare needs two. */
+  openCount: number;
+  /** The screener that surfaced the ticker: the Why tab needs one. */
+  via: string | null;
   onSearchChange: (patch: SearchPatch) => void;
   children: ReactNode;
 }
 
-export function ExploreTabs({ tab, selectedCount, onSearchChange, children }: ExploreTabsProps) {
+export function ExploreTabs({ tab, openCount, via, onSearchChange, children }: ExploreTabsProps) {
   return (
     <Tabs
       label="View"
-      items={TABS}
+      items={TABS.filter(
+        (t) => (t.id !== 'compare' || openCount > 1) && (t.id !== 'why' || via !== null),
+      )}
       value={tab}
       onChange={(id) => {
-        onSearchChange({ tab: id === defaultTab(selectedCount) ? undefined : (id as ExploreTab) });
+        onSearchChange({ tab: id as ExploreTab });
       }}
     >
       {children}

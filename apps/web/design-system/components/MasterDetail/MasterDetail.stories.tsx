@@ -108,3 +108,31 @@ export const Narrow: Story = {
     />
   ),
 };
+
+/** Phone width with previous / next in the header and the item's actions pinned to the bottom. */
+export const NarrowSheet: Story = {
+  decorators: [narrow],
+  render: (args) => (
+    <Example
+      {...args}
+      initial="MSFT"
+      step={{
+        onPrevious: () => undefined,
+        onNext: () => undefined,
+        hasPrevious: true,
+        hasNext: true,
+      }}
+      detailFooter={
+        <>
+          <Button size="sm">Open in Explore</Button>
+          <Button size="sm" variant="secondary">
+            Compare
+          </Button>
+          <Button size="sm" variant="ghost">
+            Dismiss
+          </Button>
+        </>
+      }
+    />
+  ),
+};

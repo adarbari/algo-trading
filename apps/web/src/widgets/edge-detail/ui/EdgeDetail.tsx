@@ -25,6 +25,7 @@ import {
   type Edge,
   type FrozenRow,
 } from '@/entities/edge';
+import { RunEvaluation } from '@/features/edge-evaluation';
 import { GuideHelp } from '@/features/guide-help';
 
 const term = (id: string) => <GuideHelp entry={{ kind: 'term', id }} />;
@@ -168,6 +169,7 @@ export function EdgeDetail({ id }: EdgeDetailProps) {
     <Panel title={edge.name} description={edge.thesis}>
       <Stack gap={4}>
         <KeyValue label={`${edge.name} facts`} layout="stacked" items={facts(edge)} />
+        <RunEvaluation edgeId={edge.id} />
         <Frozen edge={edge} />
         <Runs edge={edge} />
       </Stack>

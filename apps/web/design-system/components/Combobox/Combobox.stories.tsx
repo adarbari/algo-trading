@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useRef, useState } from 'react';
 import { userEvent, within } from 'storybook/test';
 
+import { narrow } from '../../testing';
 import { Field } from '../Field';
 import { Combobox, type ComboboxOption } from './Combobox';
 
@@ -150,3 +151,46 @@ function AsyncPicker() {
 
 /** Async options: the caller fetches on input and passes results and `loading`. */
 export const Async: Story = { render: () => <AsyncPicker /> };
+
+const PEOPLE: ComboboxOption[] = [
+  { value: 'NVDA', label: 'NVDA', description: 'NVIDIA Corp', badge: 'Nasdaq' },
+  { value: 'NVO', label: 'NVO', description: 'Novo Nordisk', badge: 'NYSE' },
+  { value: 'NVS', label: 'NVS', description: 'Novartis AG', badge: 'NYSE' },
+];
+
+const searchArgs = {
+  search: true,
+  focusKey: '/',
+  options: PEOPLE,
+  placeholder: 'Search to add',
+  'aria-label': 'Search to add',
+  mono: true,
+} as const;
+
+const typeNv: Story['play'] = async ({ canvasElement }) => {
+  await userEvent.type(within(canvasElement).getByRole('combobox'), 'nv');
+};
+
+/** A search box that adds: idle with the key that focuses it ("/"). */
+export const SearchIdle: Story = { args: searchArgs };
+
+/** Typing lists matches; arrows move, Enter adds and the box clears, Escape closes. */
+export const SearchOpen: Story = { args: searchArgs, play: typeNv };
+
+export const SearchLoading: Story = {
+  args: { ...searchArgs, options: [], loading: true, filter: 'none' },
+  play: typeNv,
+};
+
+export const SearchEmpty: Story = {
+  args: { ...searchArgs, options: [], filter: 'none' },
+  play: typeNv,
+};
+
+export const SearchError: Story = {
+  args: { ...searchArgs, options: [], filter: 'none', error: 'The search failed' },
+  play: typeNv,
+};
+
+/** A phone-width container: the list stays inside it. */
+export const SearchNarrow: Story = { ...SearchOpen, decorators: [narrow] };

@@ -66,19 +66,23 @@ for (const route of ROUTES) {
   });
 }
 
-test('Explore: a tapped ticker opens its detail in a sheet, closing it shows the table', async ({
+test('Explore: the search adds a ticker as a tab and the tab strip stays on the screen', async ({
   page,
 }) => {
-  await page.goto('/explore');
-  const tickers = page.getByRole('grid', { name: 'Tickers' });
-  // The table is virtualised and sorted by symbol: the first row is A (Agilent).
-  await tickers.getByRole('gridcell', { name: /^A Agilent/ }).tap();
-  const sheet = page.getByRole('dialog', { name: 'A', exact: true });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole('tab').first()).toBeVisible();
-  await sheet.getByRole('button', { name: /close/i }).first().tap();
-  await expect(sheet).toHaveCount(0);
-  await expect(tickers).toBeVisible();
+  await page.goto('/explore?sel=AAPL,MSFT');
+  const box = page.getByRole('combobox', { name: 'Search tickers' });
+  await box.fill('nvda');
+  await page.getByRole('option').first().tap();
+  const tabs = page.getByRole('tablist', { name: 'Open tickers' });
+  await expect(tabs.getByRole('tab')).toHaveText(['AAPL', 'MSFT', 'NVDA']);
+  await expect(tabs.getByRole('tab', { name: 'NVDA' })).toHaveAttribute('aria-selected', 'true');
+  const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+  await tabs.getByRole('tab', { name: 'MSFT' }).tap();
+  await expect(page).toHaveURL(/focus=MSFT/);
 });
 
 test('Ideas: the views and filter chips fit the screen and a tapped view narrows the table', async ({
@@ -98,8 +102,7 @@ test('Ideas: the views and filter chips fit the screen and a tapped view narrows
 
 test('Explore chart: the zoom buttons are there', async ({ page }) => {
   await page.goto('/explore?focus=AAPL&tab=chart');
-  const sheet = page.getByRole('dialog', { name: 'AAPL' });
-  await expect(sheet.getByRole('button', { name: 'Zoom in' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Zoom in' })).toBeVisible();
 });
 
 test('Admin ingestion: a tapped completeness cell opens its drill-down in a sheet', async ({
@@ -136,6 +139,29 @@ test('Screener results: the pick sheet shows no keyboard hints on a phone', asyn
   await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' })).toBeHidden();
 });
 
+test('Screener results: the pick opens as a full-height sheet; next, previous and back work', async ({
+  page,
+}) => {
+  await page.goto('/screeners/vrp_scanner');
+  const picks = page.getByRole('grid').first();
+  await picks.getByRole('row', { name: /AAPL/ }).tap();
+  const sheet = page.getByRole('dialog', { name: 'AAPL' });
+  await expect(sheet).toBeVisible();
+  const viewport = page.viewportSize();
+  const box = await sheet.boundingBox();
+  expect(box?.height).toBeGreaterThanOrEqual((viewport?.height ?? 0) - 1);
+  await expect(sheet.getByRole('button', { name: 'Previous' })).toBeDisabled();
+  await sheet.getByRole('button', { name: 'Next' }).tap();
+  await expect(page.getByRole('dialog', { name: 'AAPL' })).toHaveCount(0);
+  const next = page.getByRole('dialog');
+  await expect(next).toBeVisible();
+  await next.getByRole('button', { name: 'Previous' }).tap();
+  await expect(page.getByRole('dialog', { name: 'AAPL' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Back to list' }).tap();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(picks.getByRole('row', { name: /AAPL/ })).toBeVisible();
+});
+
 test('Regime: a tapped card help button opens the indicator drawer as a sheet', async ({
   page,
 }) => {
@@ -165,37 +191,6 @@ test('Screeners: a tapped row opens in place and its hits button opens the resul
   await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
 });
 
-test('Explore: a narrow table shows its essential columns and the picker for the rest', async ({
-  page,
-}) => {
-  await page.goto('/explore');
-  const tickers = page.getByRole('grid', { name: 'Tickers' });
-  await expect(tickers).toBeVisible();
-  // The select-all checkbox, the ticker and the first two catalogue columns; the rest wait.
-  await expect(tickers.getByRole('columnheader')).toHaveCount(4);
-  await expect(page.getByRole('button', { name: /Columns \d+ of \d+/ })).toBeVisible();
-});
-
-test('Explore: ticked tickers open the compare detail from the Compare button', async ({
-  page,
-}) => {
-  await page.goto('/explore?sel=AAPL,MSFT');
-  await page.getByRole('button', { name: 'Compare 2' }).tap();
-  await expect(page.getByRole('dialog', { name: 'AAPL' })).toBeVisible();
-});
-
-test('Explore: the filter bar is one "Filters" button that opens a sheet with the quick chips', async ({
-  page,
-}) => {
-  await page.goto('/explore');
-  const bar = page.getByRole('group', { name: 'Filters' });
-  await expect(bar.getByRole('searchbox', { name: 'Filter tickers' })).toBeVisible();
-  await expect(bar.getByRole('button', { name: 'Optionable' })).toHaveCount(0);
-  await bar.getByRole('button', { name: /^Filters/ }).tap();
-  const sheet = page.getByRole('dialog', { name: 'Filters' });
-  await expect(sheet.getByRole('button', { name: 'Optionable' })).toBeVisible();
-});
-
 test('Screener results: the pick actions are icon buttons named by their label', async ({
   page,
 }) => {
@@ -206,24 +201,6 @@ test('Screener results: the pick actions are icon buttons named by their label',
   await expect(open).toBeVisible();
   await expect(open).toHaveText('');
   await expect(open).toHaveAccessibleDescription('Open in Explore');
-});
-
-test('Explore: a column added on the phone is kept in the URL (ncols)', async ({ page }) => {
-  await page.goto('/explore');
-  await page.getByRole('button', { name: /Columns \d+ of \d+/ }).tap();
-  const panel = page.getByRole('group', { name: 'Show columns' });
-  const unchecked = panel.getByRole('checkbox', { checked: false }).first();
-  await unchecked.check();
-  await expect(page).toHaveURL(/ncols=/);
-});
-
-test('Explore: the catalogue and narrow-table Columns buttons share one row', async ({ page }) => {
-  await page.goto('/explore');
-  const buttons = page.getByRole('button', { name: /^Columns/ });
-  await expect(buttons).toHaveCount(2);
-  const [a, b] = await Promise.all([buttons.nth(0).boundingBox(), buttons.nth(1).boundingBox()]);
-  expect(a?.y).toBeDefined();
-  expect(a?.y).toBe(b?.y);
 });
 
 test('the top bar keeps every button on screen with a long viewer name', async ({ page }) => {
@@ -265,6 +242,7 @@ test('Edges: a tapped edge opens its detail as a sheet', async ({ page }) => {
   const sheet = page.getByRole('dialog', { name: 'momentum_12_1' });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText('58.0%').first()).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Run evaluation' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );
