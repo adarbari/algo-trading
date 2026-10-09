@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql, TestQueryProvider } from '@/shared/api';
-import { expectNoA11yViolations } from '@/shared/lib/testing';
+import { expectNoA11yViolations, servedEntries } from '@/shared/lib/testing';
 
 import { GuideHelpProvider } from '../model/navigation';
 import { GuideHelp } from './GuideHelp';
@@ -54,7 +54,7 @@ function setup(navigate = vi.fn()) {
 
 beforeEach(() => {
   GQL.mockReset();
-  GQL.mockResolvedValue(SERVED);
+  GQL.mockResolvedValue(servedEntries(SERVED));
 });
 
 describe('GuideHelp for a regime indicator', () => {
@@ -70,7 +70,9 @@ describe('GuideHelp for a regime indicator', () => {
     expect(within(drawer).getByText('6 to 24 months.')).toBeVisible();
     expect(within(drawer).getByText('Few false alarms.')).toBeVisible();
     await expectNoA11yViolations(container);
-    expect(GQL.mock.calls[0]?.[1]).toEqual({ key: 'curve_10y3m' });
+    expect(GQL.mock.calls[0]?.[1]).toEqual({
+      refs: [{ kind: 'INDICATOR', id: 'curve_10y3m' }],
+    });
   });
 
   it('opens the full page through the app navigation', async () => {
@@ -81,7 +83,7 @@ describe('GuideHelp for a regime indicator', () => {
   });
 
   it('says so when the Guide has no entry', async () => {
-    GQL.mockResolvedValue({ guideIndicator: null });
+    GQL.mockResolvedValue(servedEntries({ guideIndicator: null }));
     setup();
     await userEvent.click(await screen.findByRole('button', { name: /^What is / }));
     expect(await screen.findByText(/no entry for this warning sign yet/)).toBeVisible();

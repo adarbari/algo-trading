@@ -24,6 +24,19 @@ export type FeatureFormat =
   | 'PERCENT'
   | 'TEXT';
 
+/** The kinds of Guide entry `guideEntries` reads in a batch */
+export type GuideEntryKind =
+  | 'EPISODE'
+  | 'INDICATOR'
+  | 'START'
+  | 'TERM';
+
+/** One entry a page asks for: its `kind` and its `id` (an indicator's key, an episode's slug, a term's or Start here page's id) */
+export type GuideRef = {
+  id: string;
+  kind: GuideEntryKind;
+};
+
 /** An indicator's own verdict: ON, OFF or UNKNOWN */
 export type IndicatorStatus =
   | 'OFF'
@@ -174,24 +187,17 @@ export type FeatureTableQueryVariables = Exact<{
 
 export type FeatureTableQuery = { table: { universeSnapshot: string | null, preSnapshot: boolean, sort: string | null, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> }, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, instruments: Array<{ instrumentId: string, symbol: string, name: string }>, kindTexts: Array<{ kind: UnavailableKind, text: string }> } | null };
 
+export type GuideEntriesQueryVariables = Exact<{
+  refs: Array<GuideRef> | GuideRef;
+}>;
+
+
+export type GuideEntriesQuery = { guideEntries: { indicators: Array<{ key: string, plainName: string, technicalName: string, pace: string, feature: string, summary: { segments: Array<{ text: string, field: string | null }> }, whyItMatters: { segments: Array<{ text: string, field: string | null }> }, whatOnMeans: { segments: Array<{ text: string, field: string | null }> }, leadTime: { segments: Array<{ text: string, field: string | null }> }, trackRecord: { segments: Array<{ text: string, field: string | null }> }, before: Array<{ label: string, episode: string | null, line: { segments: Array<{ text: string, field: string | null }> } }>, how: Array<{ text: string, url: string | null }>, sources: Array<{ title: string, url: string }> }>, episodes: Array<{ episode: { key: string, name: string, kind: string, peak: string, trough: string, recovered: string | null, spxDrawdown: number, nasdaqDrawdown: number, recession: boolean, nberStart: string | null, nberEnd: string | null, knownFrom: string }, cause: { segments: Array<{ text: string, field: string | null }> }, notes: { segments: Array<{ text: string, field: string | null }> }, indicators: Array<{ key: string, plainName: string, label: string, line: { segments: Array<{ text: string, field: string | null }> } }> }>, terms: Array<{ entry: { id: string, term: string, short: string }, body: { segments: Array<{ text: string, field: string | null }> }, seeAlso: Array<{ id: string, term: string, short: string }> }>, startPages: Array<{ entry: { id: string, order: number, title: string, summary: string }, sections: Array<{ title: string, body: { segments: Array<{ text: string, field: string | null }> } }>, links: Array<{ kind: string, id: string, title: string }> }> } | null };
+
 export type GuideIndexQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, playbooks: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }>, indicators: Array<{ key: string, plainName: string, pace: string }>, episodes: Array<{ key: string, name: string }>, startPages: Array<{ id: string, order: number, title: string, summary: string }>, terms: Array<{ id: string, term: string, short: string }> } | null };
-
-export type GuideTermQueryVariables = Exact<{
-  id: string;
-}>;
-
-
-export type GuideTermQuery = { guideTerm: { entry: { id: string, term: string, short: string }, body: { segments: Array<{ text: string, field: string | null }> }, seeAlso: Array<{ id: string, term: string, short: string }> } | null };
-
-export type GuideStartPageQueryVariables = Exact<{
-  id: string;
-}>;
-
-
-export type GuideStartPageQuery = { guideStartPage: { entry: { id: string, order: number, title: string, summary: string }, sections: Array<{ title: string, body: { segments: Array<{ text: string, field: string | null }> } }>, links: Array<{ kind: string, id: string, title: string }> } | null };
 
 export type GuideFieldQueryVariables = Exact<{
   name: string;
@@ -213,20 +219,6 @@ export type GuideSituationQueryVariables = Exact<{
 
 
 export type GuideSituationQuery = { guideSituation: { slug: string, name: string, affects: Array<string>, signs: { segments: Array<{ text: string, field: string | null }> }, do: { segments: Array<{ text: string, field: string | null }> }, playbooks: Array<{ id: string, name: string, fields: Array<string> }> } | null };
-
-export type GuideIndicatorQueryVariables = Exact<{
-  key: string;
-}>;
-
-
-export type GuideIndicatorQuery = { guideIndicator: { key: string, plainName: string, technicalName: string, pace: string, feature: string, summary: { segments: Array<{ text: string, field: string | null }> }, whyItMatters: { segments: Array<{ text: string, field: string | null }> }, whatOnMeans: { segments: Array<{ text: string, field: string | null }> }, leadTime: { segments: Array<{ text: string, field: string | null }> }, trackRecord: { segments: Array<{ text: string, field: string | null }> }, before: Array<{ label: string, episode: string | null, line: { segments: Array<{ text: string, field: string | null }> } }>, how: Array<{ text: string, url: string | null }>, sources: Array<{ title: string, url: string }> } | null };
-
-export type GuideEpisodeQueryVariables = Exact<{
-  slug: string;
-}>;
-
-
-export type GuideEpisodeQuery = { guideEpisode: { episode: { key: string, name: string, kind: string, peak: string, trough: string, recovered: string | null, spxDrawdown: number, nasdaqDrawdown: number, recession: boolean, nberStart: string | null, nberEnd: string | null, knownFrom: string }, cause: { segments: Array<{ text: string, field: string | null }> }, notes: { segments: Array<{ text: string, field: string | null }> }, indicators: Array<{ key: string, plainName: string, label: string, line: { segments: Array<{ text: string, field: string | null }> } }> } | null };
 
 export type HarnessRunsQueryVariables = Exact<{
   limit: number;
@@ -441,10 +433,12 @@ export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, notRun: { kindText: string } | null, pickHistory: Array<{ session: string, picked: number | null }>, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }> } | null }> };
 
-export type StatusScreensQueryVariables = Exact<{ [key: string]: never; }>;
+export type StatusStripQueryVariables = Exact<{
+  admin: boolean;
+}>;
 
 
-export type StatusScreensQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }> };
+export type StatusStripQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, problems: Array<string>, steps: Array<{ name: string, status: string, durationS: number | null, reason: string | null, error: string | null }> }>, completeness?: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1033,6 +1027,146 @@ export const FeatureTableDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<FeatureTableQuery, FeatureTableQueryVariables>;
+export const GuideEntriesDocument = new TypedDocumentString(`
+    query GuideEntries($refs: [GuideRef!]!) {
+  guideEntries(refs: $refs) {
+    indicators {
+      key
+      plainName
+      technicalName
+      pace
+      summary {
+        segments {
+          text
+          field
+        }
+      }
+      whyItMatters {
+        segments {
+          text
+          field
+        }
+      }
+      whatOnMeans {
+        segments {
+          text
+          field
+        }
+      }
+      leadTime {
+        segments {
+          text
+          field
+        }
+      }
+      trackRecord {
+        segments {
+          text
+          field
+        }
+      }
+      before {
+        label
+        episode
+        line {
+          segments {
+            text
+            field
+          }
+        }
+      }
+      how {
+        text
+        url
+      }
+      feature
+      sources {
+        title
+        url
+      }
+    }
+    episodes {
+      episode {
+        key
+        name
+        kind
+        peak
+        trough
+        recovered
+        spxDrawdown
+        nasdaqDrawdown
+        recession
+        nberStart
+        nberEnd
+        knownFrom
+      }
+      cause {
+        segments {
+          text
+          field
+        }
+      }
+      notes {
+        segments {
+          text
+          field
+        }
+      }
+      indicators {
+        key
+        plainName
+        label
+        line {
+          segments {
+            text
+            field
+          }
+        }
+      }
+    }
+    terms {
+      entry {
+        id
+        term
+        short
+      }
+      body {
+        segments {
+          text
+          field
+        }
+      }
+      seeAlso {
+        id
+        term
+        short
+      }
+    }
+    startPages {
+      entry {
+        id
+        order
+        title
+        summary
+      }
+      sections {
+        title
+        body {
+          segments {
+            text
+            field
+          }
+        }
+      }
+      links {
+        kind
+        id
+        title
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideEntriesQuery, GuideEntriesQueryVariables>;
 export const GuideIndexDocument = new TypedDocumentString(`
     query GuideIndex {
   guideIndex {
@@ -1090,54 +1224,6 @@ export const GuideIndexDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideIndexQuery, GuideIndexQueryVariables>;
-export const GuideTermDocument = new TypedDocumentString(`
-    query GuideTerm($id: String!) {
-  guideTerm(id: $id) {
-    entry {
-      id
-      term
-      short
-    }
-    body {
-      segments {
-        text
-        field
-      }
-    }
-    seeAlso {
-      id
-      term
-      short
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideTermQuery, GuideTermQueryVariables>;
-export const GuideStartPageDocument = new TypedDocumentString(`
-    query GuideStartPage($id: String!) {
-  guideStartPage(id: $id) {
-    entry {
-      id
-      order
-      title
-      summary
-    }
-    sections {
-      title
-      body {
-        segments {
-          text
-          field
-        }
-      }
-    }
-    links {
-      kind
-      id
-      title
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideStartPageQuery, GuideStartPageQueryVariables>;
 export const GuideFieldDocument = new TypedDocumentString(`
     query GuideField($name: FeatureName!) {
   guideField(name: $name) {
@@ -1260,108 +1346,6 @@ export const GuideSituationDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideSituationQuery, GuideSituationQueryVariables>;
-export const GuideIndicatorDocument = new TypedDocumentString(`
-    query GuideIndicator($key: String!) {
-  guideIndicator(key: $key) {
-    key
-    plainName
-    technicalName
-    pace
-    summary {
-      segments {
-        text
-        field
-      }
-    }
-    whyItMatters {
-      segments {
-        text
-        field
-      }
-    }
-    whatOnMeans {
-      segments {
-        text
-        field
-      }
-    }
-    leadTime {
-      segments {
-        text
-        field
-      }
-    }
-    trackRecord {
-      segments {
-        text
-        field
-      }
-    }
-    before {
-      label
-      episode
-      line {
-        segments {
-          text
-          field
-        }
-      }
-    }
-    how {
-      text
-      url
-    }
-    feature
-    sources {
-      title
-      url
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideIndicatorQuery, GuideIndicatorQueryVariables>;
-export const GuideEpisodeDocument = new TypedDocumentString(`
-    query GuideEpisode($slug: String!) {
-  guideEpisode(slug: $slug) {
-    episode {
-      key
-      name
-      kind
-      peak
-      trough
-      recovered
-      spxDrawdown
-      nasdaqDrawdown
-      recession
-      nberStart
-      nberEnd
-      knownFrom
-    }
-    cause {
-      segments {
-        text
-        field
-      }
-    }
-    notes {
-      segments {
-        text
-        field
-      }
-    }
-    indicators {
-      key
-      plainName
-      label
-      line {
-        segments {
-          text
-          field
-        }
-      }
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideEpisodeQuery, GuideEpisodeQueryVariables>;
 export const HarnessRunsDocument = new TypedDocumentString(`
     query HarnessRuns($limit: Int!) {
   harnessRuns(limit: $limit) {
@@ -2534,8 +2518,8 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenerRunsQuery, ScreenerRunsQueryVariables>;
-export const StatusScreensDocument = new TypedDocumentString(`
-    query StatusScreens {
+export const StatusStripDocument = new TypedDocumentString(`
+    query StatusStrip($admin: Boolean!) {
   session {
     date
   }
@@ -2547,8 +2531,38 @@ export const StatusScreensDocument = new TypedDocumentString(`
       kindText
     }
   }
+  nightlyRuns(limit: 1) @include(if: $admin) {
+    runId
+    session
+    status
+    startedAt
+    finishedAt
+    durationS
+    problems
+    steps {
+      name
+      status
+      durationS
+      reason
+      error
+    }
+  }
+  completeness(sessions: 1) @include(if: $admin) {
+    sessions
+    datasets
+    lastClosed
+    cells {
+      dataset
+      session
+      status
+      present
+      expected
+      basis
+      runIds
+    }
+  }
 }
-    `) as unknown as TypedDocumentString<StatusScreensQuery, StatusScreensQueryVariables>;
+    `) as unknown as TypedDocumentString<StatusStripQuery, StatusStripQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {

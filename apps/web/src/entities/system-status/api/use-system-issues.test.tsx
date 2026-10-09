@@ -34,6 +34,9 @@ const NIGHTLY = {
     },
   ],
 };
+/** What the API answers: the admin-only fields are skipped (`@include`) unless `admin`. */
+const answer = (variables: unknown) =>
+  Promise.resolve((variables as { admin: boolean }).admin ? { ...SCREENS, ...NIGHTLY } : SCREENS);
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -47,7 +50,7 @@ afterEach(() => {
 
 describe('useSystemIssues', () => {
   it('reads only the screeners for a trader (the nightly run is admin-only)', async () => {
-    GQL.mockResolvedValue(SCREENS);
+    GQL.mockImplementation((_doc, variables) => answer(variables));
     const { result } = renderHook(() => useSystemIssues(false), { wrapper });
     await waitFor(() => {
       expect(result.current).toHaveLength(1);
@@ -57,29 +60,30 @@ describe('useSystemIssues', () => {
   });
 
   it('adds the failed nightly run for an admin, ahead of the warnings', async () => {
-    GQL.mockImplementation((doc) =>
-      Promise.resolve(String(doc).includes('NightlyRuns') ? NIGHTLY : SCREENS),
-    );
+    GQL.mockImplementation((_doc, variables) => answer(variables));
     const { result } = renderHook(() => useSystemIssues(true), { wrapper });
     await waitFor(() => {
       expect(result.current).toHaveLength(2);
     });
+    expect(GQL).toHaveBeenCalledOnce();
     expect(result.current.map((i) => i.severity)).toEqual(['failing', 'warning']);
   });
 
-  it('asks only for what the strip shows: no picks, a one-session grid', async () => {
-    // The ranked ideas and a ten-session grid cost the API 6 s of reads on every page.
-    GQL.mockImplementation((doc) =>
-      Promise.resolve(String(doc).includes('NightlyRuns') ? NIGHTLY : SCREENS),
-    );
+  it('asks only for what the strip shows, in one operation: no picks, a one-session grid', async () => {
+    // The ranked ideas and a ten-session grid cost the API 6 s of reads on every page; four
+    // requests (screens, nightly, grid, viewer) were three more round trips than needed.
+    GQL.mockImplementation((_doc, variables) => answer(variables));
     renderHook(() => useSystemIssues(true), { wrapper });
     await waitFor(() => {
-      expect(GQL).toHaveBeenCalledTimes(3);
+      expect(GQL).toHaveBeenCalledOnce();
     });
-    const calls = GQL.mock.calls.map(([doc, variables]) => ({ doc: String(doc), variables }));
-    expect(calls.some((c) => c.doc.includes('ideas'))).toBe(false);
-    const grid = calls.find((c) => c.doc.includes('query IngestionCompleteness'));
-    expect(grid?.variables).toEqual({ sessions: 1 });
+    const [document, variables] = GQL.mock.calls[0] ?? [];
+    const text = String(document);
+    expect(text).toContain('query StatusStrip');
+    expect(text).not.toContain('ideas');
+    expect(text).toContain('nightlyRuns(limit: 1) @include(if: $admin)');
+    expect(text).toContain('completeness(sessions: 1) @include(if: $admin)');
+    expect(variables).toEqual({ admin: true });
   });
 
   it('adds no issue while a read fails', async () => {

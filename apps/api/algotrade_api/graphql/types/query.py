@@ -52,6 +52,7 @@ from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeRun
 from algotrade_api.graphql.types.evaluation.split import EvaluationSplit
 from algotrade_api.graphql.types.events.calendar import EventCalendar
+from algotrade_api.graphql.types.guide.entries import GuideEntries, GuideRef
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
 from algotrade_api.graphql.types.guide.field import GuideField
 from algotrade_api.graphql.types.guide.index import GuideIndex
@@ -94,6 +95,7 @@ MAX_SESSIONS = 60  # completeness(sessions)
 MAX_CALLS = 200  # llmUsage(recent)
 MAX_SEARCH = 50  # guideSearch(limit): hits per kind
 MAX_QUERY = 200  # guideSearch(q): characters
+MAX_REFS = 100  # guideEntries(refs)
 
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
@@ -342,6 +344,16 @@ class Query:
         ctx = info.context.stores()
         found = written_page.load_guide_start_page(ctx, id) if ctx is not None else None
         return GuideStartPage.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Many Guide entries in one read (ADR 0051): the regime indicators, "
+        "episodes, glossary terms and Start here pages named by `refs` (at most 100), so a "
+        "page's help buttons cost one request; a ref with no entry is left out",
+        extensions=[MaxItems("refs", MAX_REFS)],
+    )
+    def guide_entries(self, info: Ctx, refs: list[GuideRef]) -> GuideEntries | None:
+        ctx = info.context.stores()
+        return GuideEntries.load(ctx, refs) if ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Search every Guide entry for `q` (ADR 0051): at most `limit` results per "
