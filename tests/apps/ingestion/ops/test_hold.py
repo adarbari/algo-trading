@@ -51,3 +51,35 @@ def test_the_cli_passes_the_exit_code_through_and_is_not_an_ingest_run(
         assert cli.main(["deploy-hold", "--", "sh", "-c", "exit 0"]) == BUSY
     finally:
         held.release()
+
+
+def test_deploy_only_runs_while_the_ingest_lock_is_held(tmp_path: Path) -> None:
+    ingest = LocalBackend(tmp_path).lock(INGEST_LOCK)
+    assert ingest.acquire(wait=False)
+    try:
+        assert hold(LocalBackend(tmp_path), lambda: 4, ingest=False) == 4
+    finally:
+        ingest.release()
+
+
+def test_deploy_only_is_still_busy_while_the_deploy_lock_is_held(tmp_path: Path) -> None:
+    other = LocalBackend(tmp_path).lock(DEPLOY_LOCK)
+    assert other.acquire(wait=False)
+    try:
+        busy = hold(LocalBackend(tmp_path), lambda: pytest.fail("must not run"), ingest=False)
+        assert busy == BUSY
+    finally:
+        other.release()
+
+
+def test_the_cli_deploy_only_flag_skips_the_ingest_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    monkeypatch.setenv("ALGOTRADE_DATA_URL", f"file://{tmp_path}/data")
+    held = LocalBackend(tmp_path / "data").lock(INGEST_LOCK)
+    assert held.acquire(wait=False)
+    try:
+        assert cli.main(["deploy-hold", "--deploy-only", "--", "sh", "-c", "exit 3"]) == 3
+    finally:
+        held.release()

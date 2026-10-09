@@ -89,7 +89,7 @@ main() {
   if ! git merge-base --is-ancestor main origin/main; then
     block "main has commits that are not on origin/main (unpushed or diverged)"; return 1
   fi
-  local target last acts
+  local target last acts locks
   target=$(git rev-parse origin/main)
   if [ "$mode" = auto ]; then
     if [ ! -f "$state/last_sha" ] && [ "$dry" = 0 ]; then
@@ -104,20 +104,31 @@ main() {
     if [ "$target" = "$last" ]; then return 0; fi
     acts=$("$api" deploy-plan --since "$last" --to "$target") \
       || { block "deploy-plan failed"; return 1; }
+    # the ingest lock only when a running ingest loads what changed (ADR 0057, 2026-10-09)
+    locks=$("$api" deploy-plan --locks --since "$last" --to "$target") \
+      || { block "deploy-plan failed"; return 1; }
   else
     acts="sync web restart"
+    locks=ingest
   fi
+  local deploy_only=""
+  if [ -z "$locks" ]; then deploy_only=1; fi
 
   if [ "$dry" = 1 ]; then
+    if [ -n "$deploy_only" ]; then echo "locks (dry-run): deploy"; else echo "locks (dry-run): deploy, ingest"; fi
     apply_phase "$mode" "$target" $acts
     return $?
   fi
   local rc=0
-  "$ingest" deploy-hold -- bash "$script" --apply "$mode" "$target" $acts || rc=$?
+  "$ingest" deploy-hold ${deploy_only:+--deploy-only} -- bash "$script" --apply "$mode" "$target" $acts || rc=$?
   case "$rc" in
     0) ;;
     75)
-      say "skipped: ingest/deploy running (${target:0:9} waits)"
+      if [ -n "$deploy_only" ]; then
+        say "skipped: deploy running (${target:0:9} waits)"
+      else
+        say "skipped: ingest/deploy running (${target:0:9} waits)"
+      fi
       if [ "$mode" != auto ]; then return 1; fi
       ;;
     *)

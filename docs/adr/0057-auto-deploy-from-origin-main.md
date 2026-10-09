@@ -32,6 +32,16 @@ without a bad deploy silently taking the site down.
    its `ingest` run lock (`Backend.lock`, `exclusive_run`, no waiting). Either taken: log
    "skipped" and try again in five minutes. A nightly that finds the deploy lock held is rerun by
    its watchdog; a manual ingest exits busy as for any second run.
+   *Amendment 2026-10-09 (owner):* the ingest lock is taken only when the change touches
+   something a running ingest loads, because a multi-hour backfill otherwise blocked even
+   web-only deploys. The ingest runs from the same checkout and venv, so a merge that rewrites
+   `src/`, `libs/`, `apps/ingestion`, `config/` or a `uv sync` mid-run gives a mixed-version run
+   with mixed-version code inside one run, and a late import or a `uv sync` can crash it. Web, API (apps
+   never import each other; the API only reads stores), docs, tests, `.claude`, `.github` and root `*.md` are on a deny-by-default allowlist
+   (`holds_ingest`, `algotrade-api deploy-plan --locks`); a dependency change, an unknown path
+   or a new folder holds the ingest lock, and an empty diff holds nothing. The others run under
+   the `deploy` lock alone (`algotrade-ingest deploy-hold --deploy-only`). The manual deploy
+   keeps both.
 5. **Atomic web.** The build goes to `var/deploy/web.next` (`make web-build WEB_DIST=...`,
    stamped as always), the previous `assets/` are copied in (hashed names: open tabs keep
    loading them), then `var/web` is renamed to `web.prev` and `web.next` to `var/web` (a

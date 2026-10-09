@@ -13,7 +13,11 @@ SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "ops" / "deploy.sh"
 API_STUB = """#!/bin/sh
 echo "api $*" >> "$STUB_LOG"
 case "$1" in
-  deploy-plan) echo "${STUB_PLAN:-restart}" ;;
+  deploy-plan)
+    case " $* " in
+      *" --locks "*) echo "${STUB_LOCKS-ingest}" ;;
+      *) echo "${STUB_PLAN:-restart}" ;;
+    esac ;;
   deploy-verify) exit "${STUB_VERIFY_RC:-0}" ;;
   schedule)
     while [ $# -gt 0 ]; do
@@ -24,7 +28,7 @@ esac
 """
 INGEST_STUB = """#!/bin/sh
 echo "ingest $*" >> "$STUB_LOG"
-shift; [ "$1" = -- ] && shift
+shift; [ "$1" = --deploy-only ] && shift; [ "$1" = -- ] && shift
 if [ -n "$STUB_BUSY" ]; then exit 75; fi
 exec "$@"
 """
@@ -367,6 +371,47 @@ def test_busy_skips_without_touching_anything(site: Site) -> None:
     assert site.state("last_sha").read_text().strip() == before
     assert not site.state("blocked").exists() and site.notices() == []
     assert _git(site.repo, "rev-parse", "HEAD") == before
+
+
+def test_a_web_only_plan_holds_the_deploy_lock_alone(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    out = site.run("--auto", STUB_PLAN="web", STUB_LOCKS="")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert any(c.startswith("ingest deploy-hold --deploy-only -- bash ") for c in site.called())
+
+
+def test_a_plan_that_touches_the_ingest_keeps_both_locks(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "src/algotrade/x.py")
+    assert site.run("--auto", STUB_PLAN="restart").returncode == 0
+    holds = [c for c in site.called() if c.startswith("ingest deploy-hold")]
+    assert holds and all("--deploy-only" not in c for c in holds)
+
+
+def test_a_deploy_only_skip_names_the_deploy_alone(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    assert site.run("--auto", STUB_PLAN="web", STUB_LOCKS="", STUB_BUSY="1").returncode == 0
+    assert "skipped: deploy running" in site.log()
+    assert "ingest/deploy" not in site.log()
+
+
+def test_a_failed_locks_plan_blocks_and_runs_no_hold(site: Site) -> None:
+    site._stub(
+        "algotrade-api",
+        API_STUB.replace('*" --locks "*) echo', '*" --locks "*) exit 1; echo'),
+    )
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    out = site.run("--auto", STUB_PLAN="web")
+    assert out.returncode == 1 and "deploy-plan failed" in site.state("blocked").read_text()
+    assert not any(c.startswith("ingest") for c in site.called())
+
+
+def test_the_dry_run_says_which_locks_it_would_take(site: Site) -> None:
+    out = site.run("--dry-run")
+    assert "locks (dry-run): deploy, ingest" in out.stdout
 
 
 def test_a_failed_verify_blocks_notifies_and_keeps_last_sha(site: Site) -> None:

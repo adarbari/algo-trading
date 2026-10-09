@@ -12,6 +12,7 @@ from algotrade_api.ops.deploy import (
     PLIST_WRITERS,
     Action,
     actions,
+    holds_ingest,
     verify,
 )
 from tests.conftest import REPO_ROOT
@@ -157,6 +158,51 @@ def test_deploy_plan_prints_the_actions_between_two_commits(
     cli.main(["deploy-plan", "--since", second, "--to", third])
     assert capsys.readouterr().out.split() == ["restart"]
     cli.main(["deploy-plan", "--since", third, "--to", third])
+    assert capsys.readouterr().out.strip() == ""
+
+
+@pytest.mark.parametrize(
+    ("paths", "expected"),
+    [
+        (["apps/web/src/a.ts", "docs/x.md", "tests/unit/a.py", ".github/w.yml"], False),
+        (["apps/api/algotrade_api/a.py", "apps/api/schema.graphql"], False),
+        ([".claude/skills/x/SKILL.md"], False),
+        (["datasets/golden/a.parquet"], True),  # `golden load` reads it at runtime
+        (["architecture/tables.toml"], True),  # read at import by services/read/session.py
+        (["README.md", "CLAUDE.md"], False),
+        (["src/algotrade/a.py"], True),
+        (["apps/web/src/a.ts", "src/algotrade/a.py"], True),
+        (["src/algotrade/notes.md"], True),
+        (["apps/ingestion/algotrade_ingestion/a.py"], True),
+        (["config/site/a.toml"], True),
+        (["newfolder/a.py"], True),
+        (["Makefile"], True),
+        (["uv.lock"], True),
+        (["apps/api/pyproject.toml"], True),  # uv sync rewrites the venv an ingest runs from
+        (["apps/web/package.json", "requirements.txt"], True),
+        ([], False),
+    ],
+)
+def test_holds_ingest_only_for_what_a_running_ingest_loads(
+    paths: list[str], expected: bool
+) -> None:
+    assert holds_ingest(paths) is expected
+
+
+def test_deploy_plan_locks_prints_ingest_only_when_it_is_held(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    first = _commit(tmp_path, "README.md")
+    web = _commit(tmp_path, "apps/web/src/a.ts")
+    src = _commit(tmp_path, "src/algotrade/a.py")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    cli.main(["deploy-plan", "--locks", "--since", first, "--to", web])
+    assert capsys.readouterr().out.strip() == ""
+    cli.main(["deploy-plan", "--locks", "--since", first, "--to", src])
+    assert capsys.readouterr().out.strip() == "ingest"
+    cli.main(["deploy-plan", "--locks", "--since", src, "--to", src])
     assert capsys.readouterr().out.strip() == ""
 
 

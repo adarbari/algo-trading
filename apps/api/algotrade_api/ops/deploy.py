@@ -5,8 +5,9 @@ matches the commit just deployed.
 what bash should not decide: ``actions`` maps the changed paths to what must run, ``verify``
 polls the running API's ``/health`` until it serves the deployed commit with no mismatch
 (``ops/build.py``). The locks it runs under are the ingestion app's
-(``algotrade-ingest deploy-hold``). Nothing here installs or restarts an agent: the script
-does, and the launchd plists are written by ``ops/schedule.py``.
+(``algotrade-ingest deploy-hold``); ``holds_ingest`` says whether a change needs the ingest
+run lock too (only when it touches something a running ingest loads). Nothing here installs
+or restarts an agent: the script does, and the launchd plists are written by ``ops/schedule.py``.
 """
 
 import json
@@ -60,6 +61,35 @@ def actions(paths: Iterable[str]) -> list[Action]:
     for path in paths:
         needed |= _needs(path)
     return [a for a in Action if a in needed]
+
+
+# Paths a running ingest never loads (it imports src/, libs/, apps/ingestion and reads config/;
+# apps never import each other and the API only reads stores). Deny by default: a path matching
+# none of these, or a new folder, makes the deploy wait for the ingest (owner decision 2026-10-09).
+_INGEST_FREE = (
+    "apps/web/*",
+    "apps/api/*",
+    "docs/*",
+    "tests/*",
+    ".claude/*",
+    ".github/*",
+)
+
+
+def _ingest_free(path: str) -> bool:
+    if Action.SYNC in _needs(path):  # uv sync rewrites the venv the ingest runs from
+        return False
+    if "/" not in path:  # root files: only top-level markdown
+        return path.endswith(".md")
+    return any(fnmatchcase(path, p) for p in _INGEST_FREE)
+
+
+def holds_ingest(paths: Iterable[str]) -> bool:
+    """Whether a deploy of the changed ``paths`` must also take the ingest run lock: ``True``
+    unless every path is one a running ingest never loads (web, API, docs, tests, harness,
+    root ``*.md``); a dependency change, an unknown path or a new folder holds it. An empty
+    diff holds nothing."""
+    return not all(_ingest_free(p) for p in paths)
 
 
 CHECKS = ("api", "full", "web")
