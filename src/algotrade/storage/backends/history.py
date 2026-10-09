@@ -34,6 +34,7 @@ to exactly what it holds); anything else reads partitions.
 import json
 import logging
 import secrets
+import shutil
 import threading
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager
@@ -198,6 +199,19 @@ class HistoryCopy:
         data = data.filter(keep_rows)
         order = pc.sort_indices(data, sort_keys=[(DAY, "ascending"), (POS, "ascending")])
         return data.take(order).drop_columns([DAY, POS])
+
+    def size(self, table: str) -> int:
+        """Bytes the table's copy takes on disk (files and manifest)."""
+        folder = self._folder(table)
+        files = folder.iterdir() if folder.exists() else ()
+        return sum(p.stat().st_size for p in files if p.is_file())
+
+    def free_bytes(self) -> int:
+        """Bytes free on the volume the store is on."""
+        probe = self.root
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        return shutil.disk_usage(probe).free
 
     # ------------------------------------------------------------------------ building
 

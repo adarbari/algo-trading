@@ -617,7 +617,7 @@ purpose = "ingestion tasks by domain (no modules of its own)"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/derived"
-purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups)"
+purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060)"
 kind = "task-domain"
 
 [[dir]]
@@ -685,6 +685,10 @@ reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 reason = "the option-chain coverage (`select_underlyings`: every active optionable instrument) is the coverage IBKR contract resolution enriches (ADR 0028), and `prioritise` is the one fetch order (priority symbols, S&P 500, liquidity) the descriptions task follows too (ADR 0034)"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/history_copy.py"
+reason = "its acceptance check (`check_history_copy`, WARN per skipped table) is declared by the nightly workflow on the `history-copy` step, like the quality checks (ADR 0060)"
 
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py"

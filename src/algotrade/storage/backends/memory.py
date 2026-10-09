@@ -186,6 +186,12 @@ class MemoryTables:
         """No history copy in memory (ADR 0060): reads are already one lookup per partition."""
         return []
 
+    def history_size(self, table: str) -> int:
+        return 0
+
+    def free_bytes(self) -> int:
+        return 1 << 62  # memory: no volume to fill
+
     def size(self, table: str) -> int:
         with self._index_lock:
             frames = [f for (key, _, _), f in self._frames.items() if key[0] == table]
