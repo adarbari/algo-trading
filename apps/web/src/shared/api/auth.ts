@@ -34,6 +34,9 @@ type Auth = InstanceType<typeof AuthClient>;
 
 let client: Auth | null | undefined;
 let signingOut = false;
+// The session ended while no listener was registered (a tab that has loaded but whose page has
+// not mounted yet): the next listener hears it on registration, so no sign-out is ever missed.
+let endedUnheard = false;
 
 /** The project's base URL: https, or http only for a local Supabase (the e2e mock, `supabase start`). */
 function baseUrl(raw: string): URL {
@@ -114,6 +117,7 @@ export async function signInWithPassword(email: string, password: string): Promi
   }
   const { error } = await auth.signInWithPassword({ email, password });
   if (error) throw new AuthFailure(error.message, error.code);
+  endedUnheard = false;
 }
 
 /** Ends the browser session. Local scope: this session only; the stored session goes even when the revoke call fails. */
@@ -131,6 +135,10 @@ const unauthorizedListeners = new Set<() => void>();
 /** Calls `listener` whenever the API answers 401 (or the session ends); returns the unsubscribe. */
 export function onUnauthorized(listener: () => void): () => void {
   unauthorizedListeners.add(listener);
+  if (endedUnheard) {
+    endedUnheard = false;
+    listener();
+  }
   return () => {
     unauthorizedListeners.delete(listener);
   };
@@ -143,6 +151,7 @@ export async function handleUnauthorized(): Promise<void> {
 }
 
 function notifyUnauthorized(): void {
+  if (unauthorizedListeners.size === 0) endedUnheard = true;
   unauthorizedListeners.forEach((listener) => {
     listener();
   });
