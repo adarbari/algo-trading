@@ -17,17 +17,22 @@ import {
   StatusBadge,
   Text,
 } from '@algotrade/ui';
+import { lazy, Suspense } from 'react';
 
 import { statusLabel, useEdges, verdictLabel, verdictTone } from '@/entities/edge';
 import { RunEvaluation } from '@/features/edge-evaluation';
 import { GuideHelp } from '@/features/guide-help';
 
 import { EdgeDefinition } from './EdgeDefinition';
-import { EdgeDeciles } from './EdgeDeciles';
 import { EdgeDetails } from './EdgeDetails';
 import { EdgeFigures } from './EdgeFigures';
-import { EdgeRobustness } from './EdgeRobustness';
 import { EdgeYears } from './EdgeYears';
+
+/** The decile bars and the robustness histogram load on demand: their own chunk, so the page's first paint stays small. */
+const EdgeDeciles = lazy(() => import('./EdgeDeciles').then((m) => ({ default: m.EdgeDeciles })));
+const EdgeRobustness = lazy(() =>
+  import('./EdgeRobustness').then((m) => ({ default: m.EdgeRobustness })),
+);
 
 export interface EdgeDetailProps {
   /** The chosen edge's id (from the URL). */
@@ -91,8 +96,12 @@ export function EdgeDetail({ id, onBack }: EdgeDetailProps) {
       </Stack>
       <EdgeFigures verdict={v} />
       <Grid columns={2} gap={4} collapse="lg" align="start">
-        <EdgeDeciles deciles={v.deciles} />
-        <EdgeRobustness robustness={v.robustness} />
+        <Suspense fallback={<Panel title="Top vs bottom decile" state="loading" />}>
+          <EdgeDeciles deciles={v.deciles} />
+        </Suspense>
+        <Suspense fallback={<Panel title="Robustness" state="loading" />}>
+          <EdgeRobustness robustness={v.robustness} />
+        </Suspense>
       </Grid>
       <EdgeYears years={v.years} />
       <EdgeDefinition edge={edge} />

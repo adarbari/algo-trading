@@ -54,9 +54,9 @@ describe('EdgeDetail', () => {
     expect(screen.getAllByText('help official_result').length).toBeGreaterThan(0);
   });
 
-  it('draws the in-sample decile bars and places the lift among the random-pick backtests', () => {
+  it('draws the in-sample decile bars and places the lift among the random-pick backtests', async () => {
     render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
-    const bars = screen.getByRole('list', { name: 'Mean outcome by decile' });
+    const bars = await screen.findByRole('list', { name: 'Mean outcome by decile' });
     const rows = within(bars).getAllByRole('listitem');
     expect(rows).toHaveLength(10);
     expect(rows[0]).toHaveTextContent('Decile 1+9.0%');
@@ -68,9 +68,9 @@ describe('EdgeDetail', () => {
     expect(screen.getByText('help robustness')).toBeInTheDocument();
   });
 
-  it('says what is missing instead of drawing zeros when a run stored no deciles or draws', () => {
+  it('says what is missing instead of drawing zeros when a run stored no deciles or draws', async () => {
     render(<EdgeDetail id="sp500_index_changes" onBack={vi.fn()} />);
-    expect(screen.getByText('Not stored for this result.')).toBeInTheDocument();
+    expect(await screen.findByText('Not stored for this result.')).toBeInTheDocument();
     expect(screen.getByText('No random-pick backtests for this result.')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Mean outcome by decile' })).not.toBeInTheDocument();
   });
