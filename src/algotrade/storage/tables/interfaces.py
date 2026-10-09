@@ -91,6 +91,14 @@ class TableStore(Protocol):
         ``instrument_id`` and the point-in-time columns."""
         ...
 
+    def build_history(self, table: str, years: Sequence[int]) -> list[int]:
+        """Make the table's derived history copy (ADR 0060) hold exactly ``years`` and be
+        current, rebuilding only the years whose partitions changed; -> the years built. The
+        local backend writes one Parquet file per year that ``read_range`` then serves (same
+        rows and order as the partitions); the memory backend keeps no copy and returns ``[]``.
+        Not part of a run: ingestion calls it after its commits."""
+        ...
+
     def dates(self, table: str, own_run: str | None = None) -> list[date]: ...
 
     def names(self, own_run: str | None = None) -> list[str]:
