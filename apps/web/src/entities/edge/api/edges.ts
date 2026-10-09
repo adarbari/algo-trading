@@ -1,5 +1,7 @@
 /**
- * The edges pages' one read (ADR 0037 / 0053, ED8): `Query.edges`, each edge document with its
+ * The edges pages' one read (ADR 0037 / 0053, ED8): `Query.edges` (and the user's own files that
+ * did not load, `Query.edgeProblems`), each edge document with the user's state about it and, for
+ * their own copy, its comparison with the edge it extends; the
  * verdict (judged by the read model on the official result, the canonical run: the sentence, the
  * figures, the criteria and the year rows), how it is defined, its sources, and every run the
  * user sees so exploratory ones can be listed and labelled. The cache holds the response.
@@ -10,10 +12,47 @@ import { gql, graphql, queryKeys } from '@/shared/api';
 
 const EdgesPage = graphql(`
   query EdgesPage {
+    edgeProblems {
+      edgeId
+      reason
+    }
     edges {
       id
       name
       status
+      state
+      since
+      stateReason
+      labels
+      oosRevealed
+      oosHidden
+      mine
+      extends
+      replaces
+      compare {
+        oosHidden
+        reason
+        rows {
+          kind
+          label
+          basis
+          oosHidden
+          inSample {
+            winRate
+            baseRate
+            liftPts
+            decileSpread
+            trades
+          }
+          outOfSample {
+            winRate
+            baseRate
+            liftPts
+            decileSpread
+            trades
+          }
+        }
+      }
       thesis
       mechanism
       persistence
@@ -87,6 +126,11 @@ const EdgesPage = graphql(`
 /** Every edge the user sees (empty: none declared). */
 export function useEdges() {
   return useQuery({ ...edgesQuery(), select: (data) => data.edges });
+}
+
+/** The user's own edge files that did not load, each with its reason (empty: all load). */
+export function useEdgeProblems() {
+  return useQuery({ ...edgesQuery(), select: (data) => data.edgeProblems });
 }
 
 const edgesQuery = () =>

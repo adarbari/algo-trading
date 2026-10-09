@@ -4,12 +4,22 @@
  * defined, why it should last with its sources, and the details (tests, backtests, figures, the
  * user's own split). Each term carries its Guide button; every word and number is the server's.
  */
-import { Button, EmptyState, Heading, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
+import { Button, Chip, EmptyState, Heading, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
 
-import { statusLabel, useEdges, verdictLabel, verdictTone } from '@/entities/edge';
+import {
+  labelText,
+  stateLabel,
+  stateTone,
+  statusLabel,
+  useEdges,
+  verdictLabel,
+  verdictTone,
+} from '@/entities/edge';
+import { EdgeActions } from '@/features/edge-follow';
 import { RunEvaluation } from '@/features/edge-evaluation';
 import { GuideHelp } from '@/features/guide-help';
 
+import { EdgeCompare } from './EdgeCompare';
 import { EdgeDefinition } from './EdgeDefinition';
 import { EdgeDetails } from './EdgeDetails';
 import { EdgeFigures } from './EdgeFigures';
@@ -20,9 +30,11 @@ export interface EdgeDetailProps {
   id: string;
   /** Back to the edges list. */
   onBack: () => void;
+  /** Open another edge's page (a clone was made). */
+  onOpen: (id: string) => void;
 }
 
-export function EdgeDetail({ id, onBack }: EdgeDetailProps) {
+export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
   const edges = useEdges();
   const edge = edges.data?.find((e) => e.id === id);
   if (edges.isPending) return <Panel title="Edge" state="loading" loadingLabel="Loading edge…" />;
@@ -53,12 +65,33 @@ export function EdgeDetail({ id, onBack }: EdgeDetailProps) {
               <StatusBadge tone={verdictTone(v.verdict)}>{verdictLabel(v.verdict)}</StatusBadge>
               <GuideHelp entry={{ kind: 'term', id: 'verdict' }} />
               <Text size="sm" tone="secondary">
+                {edge.mine ? `Your edge · extends ${edge.extends ?? 'nothing'}` : 'Site edge'}
+              </Text>
+              <GuideHelp entry={{ kind: 'term', id: 'edge_copy' }} />
+              <Text size="sm" tone="secondary">
                 {statusLabel(edge.status)}
               </Text>
               <GuideHelp entry={{ kind: 'term', id: 'edge_status' }} />
+              <StatusBadge tone={stateTone(edge.state)}>{stateLabel(edge.state)}</StatusBadge>
+              <GuideHelp entry={{ kind: 'term', id: 'edge_state' }} />
+            </Stack>
+            {edge.labels.length > 0 && (
+              <Stack direction="row" gap={1} align="center" wrap>
+                {edge.labels.map((label) => (
+                  <Chip key={label} label={labelText(label)} />
+                ))}
+                <GuideHelp entry={{ kind: 'term', id: 'edge_labels' }} />
+              </Stack>
+            )}
+          </Stack>
+          <Stack gap={2} align="end">
+            <RunEvaluation edgeId={edge.id} />
+            <Stack direction="row" gap={1} align="center">
+              <EdgeActions edge={edge} onCloned={onOpen} />
+              <GuideHelp entry={{ kind: 'term', id: 'follow_edge' }} />
+              {edge.oosHidden && <GuideHelp entry={{ kind: 'term', id: 'show_out_of_sample' }} />}
             </Stack>
           </Stack>
-          <RunEvaluation edgeId={edge.id} />
         </Stack>
         <Text size="base">{v.headline}</Text>
         {edge.rejectionReason && (
@@ -68,6 +101,7 @@ export function EdgeDetail({ id, onBack }: EdgeDetailProps) {
         )}
       </Stack>
       <EdgeFigures verdict={v} />
+      {edge.compare && <EdgeCompare compare={edge.compare} />}
       <EdgeYears years={v.years} />
       <EdgeDefinition edge={edge} />
       <EdgeDetails edge={edge} />

@@ -1,11 +1,19 @@
 /**
  * The edges list's columns: the edge (its screens beneath), its verdict (with its Guide button),
- * the out-of-sample result (the server's sentence), the trades behind it and the status. The
+ * the out-of-sample result (the server's sentence), the trades behind it and where the user stands
+ * (their own state, else the site's status). The
  * rows are edge documents, not instruments; every figure and sentence is served.
  */
 import { StatusBadge, Stack, Text, type DataTableColumn } from '@algotrade/ui';
 
-import { statusLabel, statusTone, verdictLabel, verdictTone, type Edge } from '@/entities/edge';
+import {
+  stateOrStatus,
+  stateTone,
+  statusTone,
+  verdictLabel,
+  verdictTone,
+  type Edge,
+} from '@/entities/edge';
 import { GuideHelp } from '@/features/guide-help';
 
 const screensOf = (e: Edge): string =>
@@ -28,7 +36,7 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
             {row.name}
           </Text>
           <Text size="xs" tone="muted">
-            {screensOf(row)}
+            {`${row.mine ? 'mine' : 'site edge'} · ${screensOf(row)}`}
           </Text>
         </Stack>
       ),
@@ -64,11 +72,15 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
     {
       id: 'status',
       header: 'Status',
-      headerAction: <GuideHelp entry={{ kind: 'term', id: 'edge_status' }} />,
-      value: (e) => e.status,
+      headerAction: <GuideHelp entry={{ kind: 'term', id: 'edge_state' }} />,
+      value: stateOrStatus,
       tone: 'secondary',
       cell: ({ row }) => (
-        <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>
+        <StatusBadge
+          tone={row.state === 'researching' ? statusTone(row.status) : stateTone(row.state)}
+        >
+          {stateOrStatus(row)}
+        </StatusBadge>
       ),
     },
   ];

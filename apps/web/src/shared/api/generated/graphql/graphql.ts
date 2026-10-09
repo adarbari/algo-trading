@@ -118,7 +118,7 @@ export type OptionQuotesQuery = { instrument: { instrumentId: string, chain: { q
 export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }> }, canonicalRun: { runId: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
+export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, since: string | null, stateReason: string, labels: Array<string>, oosRevealed: boolean, oosHidden: boolean, mine: boolean, extends: string | null, replaces: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, compare: { oosHidden: boolean, reason: string, rows: Array<{ kind: string, label: string, basis: string, oosHidden: boolean, inSample: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null, outOfSample: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null }> } | null, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }> }, canonicalRun: { runId: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -458,6 +458,13 @@ export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ViewerQuery = { viewer: { id: string, name: string, role: string, workspaces: Array<string> } };
 
+export type PublishedEdgeQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type PublishedEdgeQuery = { publishedEdgeDocument: string | null };
+
 export type GuideHelpFieldQueryVariables = Exact<{
   name: string;
 }>;
@@ -570,10 +577,47 @@ export const OptionQuotesDocument = new TypedDocumentString(`
     `) as unknown as TypedDocumentString<OptionQuotesQuery, OptionQuotesQueryVariables>;
 export const EdgesPageDocument = new TypedDocumentString(`
     query EdgesPage {
+  edgeProblems {
+    edgeId
+    reason
+  }
   edges {
     id
     name
     status
+    state
+    since
+    stateReason
+    labels
+    oosRevealed
+    oosHidden
+    mine
+    extends
+    replaces
+    compare {
+      oosHidden
+      reason
+      rows {
+        kind
+        label
+        basis
+        oosHidden
+        inSample {
+          winRate
+          baseRate
+          liftPts
+          decileSpread
+          trades
+        }
+        outOfSample {
+          winRate
+          baseRate
+          liftPts
+          decileSpread
+          trades
+        }
+      }
+    }
     thesis
     mechanism
     persistence
@@ -2634,6 +2678,11 @@ export const ViewerDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ViewerQuery, ViewerQueryVariables>;
+export const PublishedEdgeDocument = new TypedDocumentString(`
+    query PublishedEdge($id: String!) {
+  publishedEdgeDocument(id: $id)
+}
+    `) as unknown as TypedDocumentString<PublishedEdgeQuery, PublishedEdgeQueryVariables>;
 export const GuideHelpFieldDocument = new TypedDocumentString(`
     query GuideHelpField($name: FeatureName!) {
   guideField(name: $name) {

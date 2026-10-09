@@ -431,7 +431,7 @@ what cost) and the screens that implement it. The app runs each screen on every 
 using only what was known then, and compares what its picks did next with every other eligible
 name. An edge earns trust only from those numbers, never from the idea alone.
 """
-see_also = ["verdict", "edge_status", "base_rate", "out_of_sample"]
+see_also = ["verdict", "edge_status", "edge_state", "edge_copy", "base_rate", "out_of_sample"]
 
 [[term]]
 id = "edge_status"
@@ -445,6 +445,83 @@ kept so it is not filed again. Blocked: worth testing but missing the data it ne
 official result over the out-of-sample period can move an edge to evidenced.
 """
 see_also = ["verdict", "edge", "out_of_sample", "exploratory"]
+
+[[term]]
+id = "edge_state"
+term = "Your state about an edge"
+short = "What you have decided about an edge: researching, following, rejected, retired or trial."
+body = """
+Researching is where every edge starts. Follow an edge when you intend to act on it; you can
+retire it later, or go back to researching. Reject one you have checked and dropped, with the
+reason kept so it is not filed again. Trial is a new version of an edge you follow, tested beside
+the old one before it replaces it. The state is yours: it does not change the site's edge or what
+other users see. The site's own status (candidate, evidenced, live) is separate.
+"""
+see_also = ["follow_edge", "edge_status", "edge_copy"]
+
+[[term]]
+id = "edge_copy"
+term = "Site edge and your edge"
+short = "A site edge is the shared document; your edge is your own copy of one, or one you wrote."
+body = """
+A site edge is reviewed and shared: its official result is the one everybody sees. Clone one
+to make your own copy: it extends the site edge, so you change only what you want (the screens,
+the picks, the holding periods, the universe) and the original stays as it is. Your copy has its
+own backtests. Its out-of-sample result stays hidden until you show it or follow it, so the fair
+test is not used up while you tune. An admin can publish a copy site-wide.
+"""
+see_also = ["edge", "show_out_of_sample", "compare_versions"]
+
+[[term]]
+id = "follow_edge"
+term = "Following an edge"
+short = "Following says you intend to act on the edge; the app warns when the evidence is thin."
+body = """
+You can follow any edge, but the app warns when its verdict is Not working or Not enough data,
+and the warning stays on the edge as a permanent label (Followed against the verdict). Following
+a copy shows its out-of-sample result. Retire an edge you follow when it stops working or you
+stop acting on it. Following is a record of your decision, not an order: the app never trades.
+"""
+see_also = ["edge_state", "verdict", "show_out_of_sample", "edge_labels"]
+
+[[term]]
+id = "edge_labels"
+term = "Edge labels"
+short = "Permanent warnings the app puts on an edge when a choice weakens its evidence."
+body = """
+Followed against the verdict: you followed it while its verdict was Not working. Out-of-sample
+seen while tuning: you looked at a copy's out-of-sample result and kept changing it, so that
+result is no longer a fair test. Replaced without a forward test: a new version replaced the old
+one before enough new sessions had passed. Split moved after viewing: the out-of-sample start
+was moved after the result was seen. Labels are never removed.
+"""
+see_also = ["follow_edge", "out_of_sample", "show_out_of_sample"]
+
+[[term]]
+id = "show_out_of_sample"
+term = "Show out-of-sample"
+short = "Reveals a copy's out-of-sample result; once seen it cannot be hidden again."
+body = """
+The out-of-sample period is the fair test: data the edge was not tuned on. While you are still
+changing a copy the app keeps that result hidden and judges the copy on the in-sample period
+only. Showing it reveals the figures and the verdict on them. Do it when you are done tuning:
+if you keep changing the copy afterwards, the label Out-of-sample seen while tuning is kept on
+it.
+"""
+see_also = ["out_of_sample", "edge_labels", "edge_copy"]
+
+[[term]]
+id = "compare_versions"
+term = "Compare versions"
+short = "Your copy beside the edge it extends and the baselines, on the same measures."
+body = """
+Each row is one version tested on one screen and holding period: your copy's latest backtest,
+the edge it extends (its official result) and the baselines. Read the in-sample columns to see
+whether a change helped on the period you tuned on. The out-of-sample columns appear once you
+show that result. A copy that beats its original in-sample but not out-of-sample was probably
+fitted to the past.
+"""
+see_also = ["edge_copy", "show_out_of_sample", "win_rate"]
 
 [[term]]
 id = "verdict"

@@ -35,6 +35,16 @@ const verdict = (over: Record<string, unknown>) => ({
 
 const edge = (over: Record<string, unknown>) => ({
   status: 'candidate',
+  state: 'researching',
+  since: null,
+  stateReason: '',
+  labels: [],
+  oosRevealed: false,
+  oosHidden: false,
+  mine: false,
+  extends: null,
+  replaces: null,
+  compare: null,
   thesis: 'Winners keep winning for months.',
   mechanism: 'Slow reaction to news.',
   persistence: 'Limits to arbitrage.',
@@ -56,7 +66,16 @@ const edge = (over: Record<string, unknown>) => ({
   ...over,
 });
 
+const figures = (winRate: number, baseRate: number, trades: number) => ({
+  winRate,
+  baseRate,
+  liftPts: Math.round((winRate - baseRate) * 100),
+  decileSpread: 0.05,
+  trades,
+});
+
 export const EDGES_FIXTURE = {
+  edgeProblems: [{ edgeId: 'broken', reason: "broken.toml extends: no edge 'ghost'" }],
   edges: [
     edge({
       id: 'momentum_12_1',
@@ -137,6 +156,36 @@ export const EDGES_FIXTURE = {
           lostInputs: [],
         },
       ],
+    }),
+    edge({
+      id: 'my_momentum',
+      name: 'My momentum',
+      mine: true,
+      extends: 'momentum_12_1',
+      oosHidden: true,
+      screeners: ['momentum_12_1'],
+      compare: {
+        oosHidden: true,
+        reason: '',
+        rows: [
+          {
+            kind: 'this',
+            label: 'My momentum',
+            basis: 'momentum_12_1, 20 trading days',
+            oosHidden: true,
+            inSample: figures(0.6, 0.5, 40),
+            outOfSample: null,
+          },
+          {
+            kind: 'extended',
+            label: 'Momentum 12-1',
+            basis: 'momentum_12_1, 20 trading days',
+            oosHidden: false,
+            inSample: figures(0.58, 0.5, 70),
+            outOfSample: figures(0.57, 0.52, 6),
+          },
+        ],
+      },
     }),
     edge({
       id: 'earnings_drift',

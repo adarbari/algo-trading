@@ -49,7 +49,7 @@ from algotrade_api.graphql.limits import MAX_DAYS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
-from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeRun
+from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeProblem, EdgeRun
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.guide.entries import GuideEntries
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
@@ -391,6 +391,15 @@ class Query:
         ctx = info.context.stores()
         found = edge_reads.load_edges(ctx) if ctx is not None else ()
         return [Edge.of(e, ctx) for e in found] if ctx is not None else []
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The user's own edge files `edges` leaves out (or reads only in part), by id, "
+        "with the reason; empty: every file of theirs loads"
+    )
+    def edge_problems(self, info: Ctx) -> list[EdgeProblem]:
+        ctx = info.context.stores()
+        found = edge_reads.load_edge_problems(ctx) if ctx is not None else ()
+        return [EdgeProblem.of(p) for p in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The edge `id`; null: the user has no such edge"

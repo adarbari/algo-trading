@@ -4,15 +4,25 @@
  * sees) and each screener's track records (`Screener.trackRecords`) for the Screeners
  * list's chip and the Ideas odds line. Never reads an exploratory run as a track record.
  */
-export { prefetchEdges, refreshEdges, useEdges } from './api/edges';
+export { prefetchEdges, refreshEdges, useEdgeProblems, useEdges } from './api/edges';
 export { useTrackRecords } from './api/track-records';
 export {
+  EDGE_VIEWS,
+  inView,
+  labelText,
+  stateLabel,
+  stateOrStatus,
+  stateTone,
   statusLabel,
   statusTone,
   verdictLabel,
   verdictTone,
   VERDICT_ORDER,
+  type CompareRow,
   type Edge,
+  type EdgeCompare,
+  type EdgeProblem,
+  type EdgeView,
   type EdgesResponse,
   type EdgeVerdict,
   type VerdictCriterion,

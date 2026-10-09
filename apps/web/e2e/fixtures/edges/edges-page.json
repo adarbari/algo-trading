@@ -106,7 +106,17 @@
             "trialsCounted": 4,
             "lostInputs": []
           }
-        ]
+        ],
+        "state": "researching",
+        "since": null,
+        "stateReason": "",
+        "labels": [],
+        "oosRevealed": false,
+        "oosHidden": false,
+        "mine": false,
+        "extends": null,
+        "replaces": null,
+        "compare": null
       },
       {
         "id": "sp500_index_changes",
@@ -147,8 +157,19 @@
           "years": []
         },
         "canonicalRun": null,
-        "runs": []
+        "runs": [],
+        "state": "researching",
+        "since": null,
+        "stateReason": "",
+        "labels": [],
+        "oosRevealed": false,
+        "oosHidden": false,
+        "mine": false,
+        "extends": null,
+        "replaces": null,
+        "compare": null
       }
-    ]
+    ],
+    "edgeProblems": []
   }
 }

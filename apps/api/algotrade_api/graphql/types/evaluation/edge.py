@@ -136,6 +136,19 @@ class EdgeRun:
 
 
 @strawberry.type(
+    description="One of the user's own edge files that does not load (or loads only in part), "
+    "with the reason: the edge is left out of `edges` rather than vanishing without a word"
+)
+class EdgeProblem:
+    edge_id: str
+    reason: str
+
+    @classmethod
+    def of(cls, d: edges.EdgeProblem) -> Self:
+        return cls(edge_id=d.edge_id, reason=d.reason)
+
+
+@strawberry.type(
     description="The run an evidenced or live edge cites and the split it was measured at"
 )
 class EdgeEvidence:
