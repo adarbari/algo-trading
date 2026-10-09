@@ -53,6 +53,7 @@ export {
 } from './DataTable';
 export { Dialog, type DialogProps } from './Dialog';
 export { Disclosure, type DisclosureProps } from './Disclosure';
+export { ExpandableRow, type ExpandableRowProps } from './ExpandableRow';
 export {
   Distribution,
   type DistributionBin,
@@ -106,6 +107,12 @@ export {
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
 export { FilterBar, type FilterBarProps } from './FilterBar';
+export {
+  FilterChips,
+  type FilterChipsProps,
+  type FilterDefinition,
+  type FilterValues,
+} from './FilterChips';
 export { KeyHints, type KeyHint, type KeyHintsProps } from './KeyHints';
 export { NavList, type NavListItem, type NavListProps } from './NavList';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
@@ -164,9 +171,17 @@ export { Sparkline, type SparklineProps, type SparklineTone } from './Sparkline'
 export { StackedBar, type StackedBarProps, type StackedBarSegment } from './StackedBar';
 export { StatStrip, type StatItem, type StatStripProps } from './StatStrip';
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge';
+export {
+  StatusStrip,
+  type StatusIssue,
+  type StatusIssueSeverity,
+  type StatusStripProps,
+  type StatusStripWords,
+} from './StatusStrip';
 export { TabStrip, type TabStripItem, type TabStripProps } from './TabStrip';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { TickerTag, type TickerTagProps } from './TickerTag';
+export { ViewChips, type ViewChipsProps, type ViewOption } from './ViewChips';
 export {
   Toast,
   ToastProvider,

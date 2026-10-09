@@ -58,7 +58,7 @@ from algotrade.config.site.regime.episodes import Episode
 from algotrade.config.site.settings import load_rollup
 from algotrade.config.user import UserContext
 from algotrade.core.model.instruments import index_id, market_id
-from algotrade.core.time.calendar import next_session, sessions_ending, sessions_to
+from algotrade.core.time.calendar import next_session, session_offset, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.macro.series import known_window, latest_vintages, stored_vintages
 from algotrade.features.framework.declaration import FeatureGroup
@@ -251,11 +251,6 @@ def signal_verdicts(
     return frame.rename_axis("session_date").sort_index().reset_index()
 
 
-def offset(start: date, end: date) -> int:
-    """Exchange sessions from ``start`` to ``end`` (negative when ``end`` is before it)."""
-    return sessions_to(start, end) if end >= start else -sessions_to(end, start)
-
-
 # ----------------------------------------------------------------------------- (a) dating
 
 
@@ -294,7 +289,7 @@ def match(index: str, method: str, bears: Sequence[Bear], e: Episode) -> Match:
     best = max(bears, key=lambda b: _overlap(b, e), default=None)
     if best is None or _overlap(best, e) < 0:
         return Match(index, method, e, None, None, None, reference, False)
-    peak_off, trough_off = offset(e.peak, best.peak), offset(e.trough, best.trough)
+    peak_off, trough_off = session_offset(e.peak, best.peak), session_offset(e.trough, best.trough)
     deep = abs(best.depth - reference) <= DEPTH_TOLERANCE
     dated = abs(peak_off) <= DATE_TOLERANCE and abs(trough_off) <= DATE_TOLERANCE
     return Match(index, method, e, best, peak_off, trough_off, reference,
@@ -381,8 +376,8 @@ def leads(history: History, episodes: Sequence[Episode], revised: Collection[str
         path = _path(rows, sessions_ending(e.peak, PATH_BEFORE + 1)[0], e.trough)
         lagged = _lagged(history.vintages, m or e.peak, revised)
         unknown = (_unknown(rows, c, start, e.trough) for c in ("macro_risk", "market_stress"))
-        out.append(Lead(e, None if m is None else offset(e.peak, m),
-                        None if k is None else offset(e.peak, k), path, lagged,
+        out.append(Lead(e, None if m is None else session_offset(e.peak, m),
+                        None if k is None else session_offset(e.peak, k), path, lagged,
                         *unknown))  # fmt: skip
     return out
 
@@ -521,7 +516,7 @@ def _episode_lead(col: pd.Series, days: list[date], e: Episode) -> tuple[int | N
     if all(np.isnan(x) for _, x in seen):
         return None
     on = [d for d, x in seen if x == 1.0]
-    first = None if not on else offset(e.peak, on[0])
+    first = None if not on else session_offset(e.peak, on[0])
     return first, sum(d <= e.peak for d in on)
 
 

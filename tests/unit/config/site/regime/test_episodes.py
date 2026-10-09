@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.site.regime.episodes import Episodes, load_episodes
+from algotrade.config.site.regime.episodes import Episodes, Timeline, load_episodes
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from tests.conftest import REPO_ROOT
@@ -132,3 +132,25 @@ def test_bad_recessions_fail_naming_the_recession(
 ) -> None:
     with pytest.raises(ConfigurationError, match=message):
         Episodes.from_document({"recession": recessions})
+
+
+def test_the_shipped_timeline_window_and_gate_labels() -> None:
+    timeline = load_episodes(FileConfigStore(REPO_ROOT / "config")).timeline
+    assert (timeline.lookback_sessions, timeline.clear_horizon_sessions) == (260, 260)
+    assert timeline.gate_labels == ("STRESS", "CRISIS") and timeline.min_coverage == 0.8
+    assert Episodes.from_document({}).timeline == Timeline()  # no table: the defaults
+
+
+@pytest.mark.parametrize(
+    ("table", "message"),
+    [
+        ({"lookback_sessions": 0}, "lookback_sessions: expected an integer >= 1"),
+        ({"gate_labels": ["SUNNY"]}, "gate_labels: expected one or more of"),
+        ({"gate_labels": []}, "gate_labels: expected one or more of"),
+        ({"min_coverage": 1.5}, "min_coverage: expected a fraction"),
+        ({"horizon": 5}, "unknown keys"),
+    ],
+)
+def test_a_bad_timeline_fails(table: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        Episodes.from_document({"timeline": table})

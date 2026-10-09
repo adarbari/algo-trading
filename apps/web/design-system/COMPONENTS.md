@@ -184,13 +184,14 @@ Source: `design-system/components/ActionGroup`
 
 ### AppShell
 
-AppShell: the frame of every screen: a skip link, the TopBar, and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
+AppShell: the frame of every screen: a skip link, the TopBar, an optional status strip under it (a StatusStrip) and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
 
 Source: `design-system/components/AppShell`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `topBar` | `ReactNode` | yes | The bar across the top (TopBar). |
+| `strip` | `ReactNode` | no | A slim strip under the bar, on every page (a StatusStrip); absent: nothing. |
 | `layout` | `'page' \| 'full'` | no | `page` (centred, max page width, padded; default) or `full` (edge to edge). |
 | `skipLabel` | `string` | no | Text of the skip link that jumps past the top bar to the content. |
 | `children` | `ReactNode` | yes | The page. |
@@ -564,6 +565,22 @@ Source: `design-system/components/EventTimeline`
 | `onRetry` | `() => void` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when no event falls in the window. |
 
+### ExpandableRow
+
+ExpandableRow: one row of a list that opens its detail in place (a screener with its criteria, hits and actions). The summary is a button with `aria-expanded` controlling the detail region; it shows a title, an optional badge, a figure that stays on a phone (`essential`) and further cells (`secondary`) that drop out in a narrow container. Controlled by the caller, so a list keeps one row open at a time. For a labelled count with hidden detail use Disclosure.
+
+Source: `design-system/components/ExpandableRow`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The row's name. |
+| `badge` | `ReactNode` | no | A small pill beside the title (Mine / Preset). |
+| `essential` | `ReactNode` | no | The figure a phone keeps (hits today). |
+| `secondary` | `ReactNode` | no | Cells shown beside the essential one only when the container is wide enough. |
+| `open` | `boolean` | yes | Whether the detail is shown. |
+| `onOpenChange` | `(open: boolean) => void` | yes |  |
+| `children` | `ReactNode` | yes | The detail; rendered only while open, so it can load lazily. |
+
 ### ExpiryLadder
 
 ExpiryLadder: the listed option expiries from near to far, one row each: the expiry date, its days to expiry, and the events the expiry spans (an event on or before the expiry date, after the close included) as EventChips with their days, or a "Clear" badge when it spans none. The first clear row is marked ("First clear", an accent rule) so the first expiry that holds no event is easy to find. The rows, the flags and the mark come from the caller (the API decides what a row spans); the ladder draws them. A real table (caption = `label`), so it reads row by row with a screen reader and wraps at phone width. Loading, empty and error states.
@@ -627,6 +644,19 @@ Source: `design-system/components/FilterBar`
 | `narrow` | `'sheet' \| 'scroll'` | no | The narrow form: `sheet` (default) or `scroll`. |
 | `label` | `string` | no | Accessible name of the bar (default "Filters"). |
 | `defaultOpen` | `boolean` | no | The narrow filters sheet starts open (a story's open state). |
+
+### FilterChips
+
+FilterChips: the filters of a table as chips. A filter in force is a removable chip ("Screener: VRP scanner", an × named "Remove Screener: VRP scanner"); one not in force is a dashed "+ Name" button that opens its values; "Clear filters" appears only while one is in force. The row wraps, so it fits a phone. The caller owns the values (usually search params) and what each filter means; this only shows and edits them.
+
+Source: `design-system/components/FilterChips`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `filters` | `readonly FilterDefinition[]` | yes |  |
+| `values` | `FilterValues` | yes |  |
+| `onChange` | `(id: string, value: string \| undefined) => void` | yes | Set a filter's value, or remove it (`undefined`). |
+| `onClear` | `() => void` | yes | Remove every filter in force. |
 
 ### HeatGrid
 
@@ -1221,6 +1251,21 @@ Source: `design-system/components/StatusBadge`
 | `title` | `string` | no | Full explanation on hover ("Earnings in 6 sessions"). |
 | `children` | `ReactNode` | yes | The state, in words. |
 
+### StatusStrip
+
+StatusStrip: one slim line under the top bar of every page that says what is wrong with the system, instead of a stack of banners. Severity pills ("1 failing", "2 warnings"), the most serious message and "and N more"; the whole line is one button that expands the full list, each issue with its title, detail, its own actions and a snooze. Issues arrive most serious first. With no issue it renders nothing, or the slim `allClear` line when the caller gives one. Presentational: the caller decides what an issue is and where a snooze is remembered (`onSnooze`); the words are props with English defaults. Container query: under 480 px an issue's actions drop under its text.
+
+Source: `design-system/components/StatusStrip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `issues` | `readonly StatusIssue[]` | yes | The open issues, most serious first. |
+| `onSnooze` | `(id: string) => void` | no | Hides one issue (a per-viewer snooze); without it the list has no snooze button. |
+| `allClear` | `ReactNode` | no | The slim all-clear line ("All systems normal"); omitted, a clear system shows nothing. |
+| `defaultExpanded` | `boolean` | no | Start expanded (default false). |
+| `label` | `string` | no | Accessible name of the strip. |
+| `words` | `Partial<StatusStripWords>` | no | Words: the pills, "and N more" and the snooze button. |
+
 ### TabStrip
 
 TabStrip: a row of open items (documents, instruments, views) as pill tabs the user can close, with the selected item's content in its panel. Controlled: the caller owns `value` and the list. Arrow keys, Home and End move focus and select; Delete or Backspace closes the focused tab (and focuses its neighbour; announced through aria-keyshortcuts); every tab also has a close button for pointer and touch, hidden from the accessibility tree because a tab list may hold only tabs. The row scrolls sideways when the tabs do not fit, the selected one scrolled into view. For switching between fixed views of one subject use Tabs.
@@ -1334,6 +1379,18 @@ Source: `design-system/components/TrackRecordChip`
 | `status` | `TrackRecordStatus` | yes | `evidenced`, `candidate` or `not-run`. |
 | `sessions` | `number` | no | Independent sessions behind a `candidate` (written as "Candidate · 42 sessions"). |
 | `exploratory` | `boolean` | no | The record comes from an exploratory run: nothing is rendered. |
+
+### ViewChips
+
+ViewChips: a row of saved views of a table or list (presets such as "Top today", a user's own views), exactly one in use. Each view is a toggle chip (pressed when in use) and the row wraps, so it never overflows a phone. Pass the views and the one in use; the caller owns what a view means. For two to four short mutually exclusive options in a toolbar use SegmentedControl.
+
+Source: `design-system/components/ViewChips`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `views` | `readonly ViewOption<V>[]` | yes | The views, in display order. |
+| `value` | `V` | yes | The view in use. |
+| `onValueChange` | `(value: V) => void` | yes |  |
 
 ### WorkspaceSwitch
 

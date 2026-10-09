@@ -15,7 +15,7 @@ import pytest
 from algotrade.config.site.regime.episodes import Episode
 from algotrade.config.user import UserContext
 from algotrade.core.model.instruments import index_id, macro_id
-from algotrade.core.time.calendar import sessions_between, sessions_ending
+from algotrade.core.time.calendar import session_offset, sessions_between, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.features.rollups.market import macro, regime
@@ -199,14 +199,14 @@ def test_the_probit_is_fitted_on_month_end_rows(reader: StoreReader) -> None:
     assert result.hit_rate > 0.7 and 0 < result.base_rate < 0.5
     text = render(read_history(reader), EPISODES, ())
     assert f'fitted = 1, fitted_through = "{result.through}"' in text and "do not paste" not in text
-    assert result.through in macro_rows() and sc.offset(result.through, B_TROUGH) >= sc.HORIZON
+    assert result.through in macro_rows() and session_offset(result.through, B_TROUGH) >= sc.HORIZON
 
 
 def test_without_data_every_section_says_so() -> None:
     _, empty = store()
     text = render(read_history(empty), EPISODES, ())
     assert text.count(sc.NO_DATA) == 6 and sc.BACKFILL in text
-    assert sc.offset(date(2004, 6, 1), date(2004, 5, 28)) == -1
+    assert session_offset(date(2004, 6, 1), date(2004, 5, 28)) == -1
     assert sessions_ending(date(2004, 6, 1), 2)[0] == date(2004, 5, 28)
 
 

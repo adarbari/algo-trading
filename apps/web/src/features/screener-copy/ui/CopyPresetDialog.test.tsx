@@ -9,13 +9,22 @@ import { CopyPresetDialog } from './CopyPresetDialog';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, api: { POST: vi.fn() } };
+  return { ...actual, api: { POST: vi.fn(), PUT: vi.fn() } };
 });
+const source = vi.hoisted(() => ({ draft: null as Record<string, unknown> | null }));
+vi.mock('@/entities/screen', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useScreener: () => ({ data: { draft: source.draft }, isError: false }),
+  useScreenerVersions: () => ({ data: [], isError: false }),
+}));
 
 const POST = vi.mocked(api.POST);
+const PUT = vi.mocked(api.PUT);
 
 beforeEach(() => {
   POST.mockReset();
+  PUT.mockReset();
+  source.draft = null;
 });
 
 function setup() {
@@ -63,5 +72,29 @@ describe('CopyPresetDialog', () => {
     await userEvent.clear(screen.getByRole('textbox', { name: 'Name of your copy' }));
     await userEvent.type(screen.getByRole('textbox', { name: 'Name of your copy' }), 'No Good');
     expect(screen.getByRole('button', { name: 'Copy' })).toBeDisabled();
+  });
+
+  it('duplicates one of your screeners: its document is saved as a draft under the new name', async () => {
+    source.draft = { id: 'my-vrp', kind: 'screener', extends: 'vrp_scanner@2' };
+    PUT.mockResolvedValue({
+      data: { screener_id: 'my-vrp-copy', document: {} },
+      response: new Response(null, { status: 200 }),
+    });
+    const onCopied = vi.fn();
+    render(
+      <TestQueryProvider>
+        <CopyPresetDialog preset="my-vrp" own open onOpenChange={vi.fn()} onCopied={onCopied} />
+      </TestQueryProvider>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Name of your copy' })).toHaveValue('my-vrp-copy');
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+    await waitFor(() => {
+      expect(onCopied).toHaveBeenCalledWith('my-vrp-copy');
+    });
+    expect(PUT).toHaveBeenCalledWith('/screeners/{screener_id}/draft', {
+      params: { path: { screener_id: 'my-vrp-copy' } },
+      body: { document: { id: 'my-vrp-copy', kind: 'screener', extends: 'vrp_scanner@2' } },
+    });
+    expect(POST).not.toHaveBeenCalled();
   });
 });

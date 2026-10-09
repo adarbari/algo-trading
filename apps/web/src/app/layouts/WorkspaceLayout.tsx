@@ -6,7 +6,8 @@
  * design system knows no routes). The account menu (the viewer's name) holds the workspace
  * switch, listing only the workspaces the viewer may enter (hidden when there is one), and,
  * when they signed in through Supabase, a sign-out action; the regime chip (ADR 0047) sits
- * before the name, on both workspaces, and opens the Regime page. The Guide's search dialog
+ * before the name, on both workspaces, and opens the Regime page. The status strip (open system
+ * issues, ADR 0052's one tree) sits under the bar on every page once the viewer is known. The Guide's search dialog
  * (Ctrl+K / ⌘K) is mounted here once, for every page of both workspaces and the Guide. A viewer that turns null (the
  * API refused the token) goes back to the login page.
  */
@@ -28,6 +29,7 @@ import { useEffect } from 'react';
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
 import { GuideSearchProvider } from '@/features/guide-search';
+import { SystemStatusStrip } from '@/widgets/status-strip';
 
 import {
   canEnter,
@@ -75,6 +77,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
         }}
       >
         <AppShell
+          strip={viewer ? <SystemStatusStrip admin={canEnter(viewer, 'admin')} /> : null}
           topBar={
             <TopBar
               brand={<Mono weight="medium">algotrade</Mono>}
