@@ -3,8 +3,10 @@ explicit; a statistic that is undefined is None (one session has no sd), never a
 
 from datetime import date
 
+import numpy as np
 import pytest
 
+from algotrade.quant.edge_statistics import moments
 from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     Slice,
@@ -20,7 +22,7 @@ def stat(
 ) -> SessionStat:
     return SessionStat(
         session=day, regime=str(kw.pop("regime", "BULL")), pick_values=picks, pick_hits=hits,
-        rest_values=rest, base_hits=int(kw.pop("base_hits", hits)), **kw,
+        rest=moments(rest), base_hits=int(kw.pop("base_hits", hits)), **kw,
     )  # type: ignore[arg-type]  # fmt: skip
 
 
@@ -115,3 +117,16 @@ def test_a_model_screener_slice_is_in_sample_when_it_keeps_a_session_before_froz
     assert flags(model=True, frozen_from=first) == [False, False, False]  # nothing before it
     assert flags(model=True) == [True, True, True]  # no frozen period: all fitted-on unknown
     assert flags(model=False, frozen_from=second) == [False, False, False]  # a rule screener
+
+
+def test_pooled_running_moments_equal_the_raw_pooled_values() -> None:
+    """bh_mean and effect_size from per-session moments match the formulas over every value."""
+    rows = [A, B]
+    (m,) = slice_measures(rows, [ALL])
+    picks = np.array([v for r in rows for v in r.pick_values])
+    rest = np.array([0.0, 0.02, -0.02, 0.0, -0.02, 0.01, 0.03])
+    assert m.bh_mean == pytest.approx(np.concatenate([picks, rest]).mean(), rel=1e-12)
+    nx, ny = picks.size, rest.size
+    pooled = ((nx - 1) * picks.var(ddof=1) + (ny - 1) * rest.var(ddof=1)) / (nx + ny - 2)
+    g = (picks.mean() - rest.mean()) / np.sqrt(pooled) * (1 - 3 / (4 * (nx + ny) - 9))
+    assert m.effect_size == pytest.approx(g, rel=1e-9)
