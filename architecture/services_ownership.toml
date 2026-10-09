@@ -110,18 +110,18 @@ section = "docs/adr/0058-llm-usage-log-prices-and-budget.md#budget"
 detect = [{ string = "usage/llm_calls" }, { call = "UsageWriter" }, { call = "UsageLedger" }]
 
 [[responsibility]]
-id = "on-request-screen-runs"
-description = "The API's on-request screen runs (ADR 0033): resolve the screener for the user, pick the latest session with data, answer ready when this config version has already run for it, else submit the `screen` job (the nightly's job) to a local runner that does not wait for ingestion (results publish atomically); writes only result tables and run records (ResultWriter), never market or feature data"
-owner = ["src/algotrade/services/ondemand/*"]
-section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"
-detect = [{ call = "OnDemandScreens" }]
-
-[[responsibility]]
 id = "on-request-edge-evaluations"
 description = "The API's on-request edge evaluations (ADR 0059): the CLI's `edge-eval` job for the caller, or an admin's site run, on its own single-worker runner (one queued or running evaluation per user; a stale RUNNING record is recovered first); writes only results/edge_eval rows and run records under the run's own run id, never market or feature data"
 owner = ["src/algotrade/services/ondemand/*"]
 section = "docs/adr/0059-edge-evaluations-on-request.md#decision"
 detect = [{ call = "OnDemandEdges" }]
+
+[[responsibility]]
+id = "on-request-screen-runs"
+description = "The API's on-request screen runs (ADR 0033): resolve the screener for the user, pick the latest session with data, answer ready when this config version has already run for it, else submit the `screen` job (the nightly's job) to a local runner that does not wait for ingestion (results publish atomically); writes only result tables and run records (ResultWriter), never market or feature data"
+owner = ["src/algotrade/services/ondemand/*"]
+section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"
+detect = [{ call = "OnDemandScreens" }]
 
 [[responsibility]]
 id = "regime-explaining"
