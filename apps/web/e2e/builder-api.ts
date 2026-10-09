@@ -84,6 +84,7 @@ export async function mockBuilderApi(
       .sort();
   const ran = new Set<string>(); // the screeners whose requested run has finished
   let polls = 0;
+  let lastRun = ''; // the screener whose run was last requested (the job poll names only the job)
   const detailOf = (id: string): Json | null => details[id] ?? null;
   // Your screens: one finalised with a working copy, one draft only; copies and new drafts join.
   const own = new Set(['my-vrp']);
@@ -228,24 +229,29 @@ export async function mockBuilderApi(
         201,
       );
     }
-    const run = /^\/screens\/([^/]+)\/run(?:\/([^/]+))?$/.exec(path);
-    if (run) {
-      const id = decodeURIComponent(run[1] ?? '');
-      const view = (state: string) => ({
-        state,
-        config_id: id,
-        session: '2026-10-02',
-        job_id: 'job-screen-1',
-        run_id: state === 'complete' ? 'run-1' : null,
-        error: null,
+    const view = (state: string) => ({
+      job_id: 'job-screen-1',
+      kind: 'screen',
+      state,
+      user: 'ann',
+      session: '2026-10-02',
+      run_id: state === 'complete' ? 'run-1' : null,
+      exploratory: null,
+      error: null,
+    });
+    const run = /^\/screens\/([^/]+)\/run$/.exec(path);
+    if (run && method === 'POST') {
+      lastRun = decodeURIComponent(run[1] ?? '');
+      mock.runs.push(lastRun);
+      polls = 0;
+      return route.fulfill({
+        status: 202,
+        json: { ...view('running'), config_id: lastRun, state: 'running' },
       });
-      if (method === 'POST') {
-        mock.runs.push(id);
-        polls = 0;
-        return route.fulfill({ status: 202, json: view('running') });
-      }
+    }
+    if (/^\/jobs\/[^/]+$/.test(path) && method === 'GET') {
       polls += 1; // the first poll still sees it running
-      if (polls > 1) ran.add(id);
+      if (polls > 1) ran.add(lastRun);
       return json(view(polls > 1 ? 'complete' : 'running'));
     }
     const viewOf = /^\/preferences\/views\/screener:([^/]+)\/view$/.exec(decodeURIComponent(path));
