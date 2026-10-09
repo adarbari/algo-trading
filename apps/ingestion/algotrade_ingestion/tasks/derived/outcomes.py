@@ -124,7 +124,7 @@ def _one(
     listed: dict[str, date],
     nightly: bool,
 ) -> RunRecord:
-    left = {i: d for i, d in listed.items() if d <= end} | gone  # known by ``end`` only
+    left = {i: d for i, d in (listed | gone).items() if d <= end}  # known by ``end`` only
     with IngestRun(ctx, TASK, end) as run:
         for h in horizons:
             if nightly and h > NIGHTLY_MAX_HORIZON:
@@ -134,7 +134,7 @@ def _one(
             if window.start < first:
                 run.record_item(f"h{h}", "BEFORE_HISTORY")
                 continue
-            names, pre_snapshot = _universe_ids(run.reader, window.start)
+            names, pre_snapshot = _universe_ids(run.reader, window.start, not nightly)
             resolver = run.resolver(window.start)
             frames, reasons, eligible = [], {}, 0
             prices = panel.window(window.start, end)
@@ -161,16 +161,21 @@ def _one(
     return run.record
 
 
-def _universe_ids(reader: StoreReader, start: date) -> tuple[set[str], bool]:
+def _universe_ids(
+    reader: StoreReader, start: date, backfill: bool = False
+) -> tuple[set[str], bool]:
     """The names to measure from ``start`` and whether they are today's (survivorship): the
     universe snapshot's, or before the first snapshot the listing history's alive on ``start``
-    (the snapshot's names when no listing history is stored)."""
+    (with no listing history stored: the snapshot's names, flagged, in the nightly; a backfill
+    raises ``MissingDataError``, its rows would be survivors only)."""
     universe = load_universe(reader, start)
     if not universe.pre_snapshot:
         return set(universe.instruments), False
     try:
         return set(universe_asof(reader, start).instruments["instrument_id"].astype(str)), False
     except MissingDataError:
+        if backfill:
+            raise
         return set(universe.instruments), True
 
 

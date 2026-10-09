@@ -16,10 +16,12 @@ Both snapshots used are named (``Universe.snapshot``, ``Universe.membership_snap
 delisted: used as a feature, label or sort key it leaks the future. It is read **here, in
 ``SymbolResolver.from_listings`` (both identity reads: is this listing alive on S), by
 ``read_listings`` for the winners-sample runner** (which picks its strata by year of delisting,
-by design: a data-quality sample, never a feature) **and by ``delisted_by`` for the outcomes
+by design: a data-quality sample, never a feature) **by ``delisted_by`` for the outcomes
 task** (a name counts as delisted at T only when ``end_date <= T``, so no later delisting is
-known), nowhere else (``tests/architecture/data/test_listing_end_date_readers.py`` scans for
-it), and ``universe_asof`` does not return it. The adapter stores a live name's end as null (open).
+known) and by ``listings_over`` for the bars-history task (clipping a vendor's bars to the
+listing's own dates), nowhere else
+(``tests/architecture/data/test_listing_end_date_readers.py`` scans for it), and
+``universe_asof`` does not return it. The adapter stores a live name's end as null (open).
 """
 
 from collections.abc import Collection

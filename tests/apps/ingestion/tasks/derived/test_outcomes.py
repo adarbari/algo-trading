@@ -113,7 +113,7 @@ def test_a_delisting_the_reference_notices_later_turns_a_reason_into_a_row() -> 
     start = sessions_ending(days[-3], 7)[0]
     assert "EQ:D" not in set(_partition(reader, start, days[-3])["instrument_id"])
     # the weekly build notices on days[-1]; that night rechecks the window ending days[-3]
-    write_rows(writer, "instruments/reference", days[-1], _reference(days[-1]))
+    write_rows(writer, "instruments/reference", days[-1], _reference(days[-4]))
     compute_outcomes(task_ctx(writer), days[-1])
     d = _partition(reader, start, days[-3])
     assert d.loc[d["instrument_id"] == "EQ:D", "outcome_status"].tolist() == ["DELISTED"]
@@ -161,3 +161,10 @@ def test_acceptance_fails_without_a_run() -> None:
     _, reader, _ = _store()
     [check] = check_outcomes(reader, END, task_ctx(StoreWriter(reader._backend)).settings)
     assert check.status == "FAIL"
+
+
+def test_a_reference_delisting_after_the_window_end_is_not_known_then() -> None:
+    writer, _reader, days = _store()
+    write_rows(writer, "instruments/reference", days[0], _reference(days[-1]))  # after T
+    record = compute_outcomes(task_ctx(writer), days[-3])
+    assert record.stats["h6"]["examples"] == {"EQ:D": NO_END_BAR}

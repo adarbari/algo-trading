@@ -1,7 +1,7 @@
 """A listing's ``end_date`` is the vendor's last trading day, known only for names that have since
 delisted: read for a session S it leaks the future unless it is compared ``<= S``. Only the modules
-below read it (the listing reads, the identity resolver, the listing writers and the winners
-sample); anything else, e.g. a feature or the outcomes task, goes through
+below read it (the listing reads, the identity resolver, the listing writers, the winners
+sample and the bars-history clip); anything else, e.g. a feature or the outcomes task, goes through
 ``data.listings.delisted_by(reader, T)``."""
 
 import re
@@ -15,6 +15,7 @@ ALLOWED = (
     "src/algotrade/storage/tables/schemas.py",  # declares the columns
     "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",  # listing -> id
     "apps/ingestion/algotrade_ingestion/tasks/listings/",  # the winners sample and its coverage
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # listings_over: clip
     "libs/sources/",  # the vendor adapters that write the column
 )
 READ = re.compile(r"(?<![A-Za-z0-9_])end_date(?![A-Za-z0-9_])")

@@ -8,7 +8,9 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import sessions_ending
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.derived import outcomes
@@ -90,3 +92,16 @@ def test_a_horizon_above_the_nightly_cap_is_computed_only_in_a_backfill(
     assert nightly.items["h504"] == "BACKFILL_ONLY" and nightly.items["h6"].startswith("OK")
     backfill = compute_outcomes(task_ctx(writer), END, days[-3], END)
     assert backfill.items["h504"] == "BEFORE_HISTORY"
+
+
+def test_a_backfill_without_a_listing_history_is_refused_but_the_nightly_is_flagged() -> None:
+    writer, _, days = _store()
+    nothing = StoreWriter(MemoryBackend())  # same bars and snapshot, no listing history
+    for table in ("bars/1d", "universe", "instruments/reference"):
+        for day in StoreReader(writer._backend).dates(table):
+            frame = StoreReader(writer._backend).table(table, day)
+            assert frame is not None
+            nothing.write_table(table, day, f"copy-{day}", frame)
+    with pytest.raises(MissingDataError):
+        compute_outcomes(task_ctx(nothing), END, days[-3], END)
+    assert compute_outcomes(task_ctx(nothing), END).stats["h6"]["pre_snapshot"] is True
