@@ -1,10 +1,23 @@
 /**
- * One edge's page: its name, verdict (with the server's reason) and status, the Run backtest
- * button, the headline sentence, the out-of-sample figures, year by year, how the edge is
- * defined, why it should last with its sources, and the details (tests, backtests, figures, the
- * user's own split). Each term carries its Guide button; every word and number is the server's.
+ * One edge's page: its name, verdict (with the server's reason), whose edge it is, its status and
+ * the date of the official result, the Run backtest button, the headline sentence, the
+ * out-of-sample figures, the decile bars beside the robustness against random picks, year by
+ * year, how the edge is defined, why it should last with its sources, and the details (tests,
+ * backtests, figures, the user's own split). Each term carries its Guide button; every word and
+ * number is the server's.
  */
-import { Button, EmptyState, Heading, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
+import {
+  Button,
+  EmptyState,
+  formatValue,
+  Grid,
+  Heading,
+  Panel,
+  Stack,
+  StatusBadge,
+  Text,
+} from '@algotrade/ui';
+import { lazy, Suspense } from 'react';
 
 import { statusLabel, useEdges, verdictLabel, verdictTone } from '@/entities/edge';
 import { RunEvaluation } from '@/features/edge-evaluation';
@@ -14,6 +27,12 @@ import { EdgeDefinition } from './EdgeDefinition';
 import { EdgeDetails } from './EdgeDetails';
 import { EdgeFigures } from './EdgeFigures';
 import { EdgeYears } from './EdgeYears';
+
+/** The decile bars and the robustness histogram load on demand: their own chunk, so the page's first paint stays small. */
+const EdgeDeciles = lazy(() => import('./EdgeDeciles').then((m) => ({ default: m.EdgeDeciles })));
+const EdgeRobustness = lazy(() =>
+  import('./EdgeRobustness').then((m) => ({ default: m.EdgeRobustness })),
+);
 
 export interface EdgeDetailProps {
   /** The chosen edge's id (from the URL). */
@@ -53,9 +72,17 @@ export function EdgeDetail({ id, onBack }: EdgeDetailProps) {
               <StatusBadge tone={verdictTone(v.verdict)}>{verdictLabel(v.verdict)}</StatusBadge>
               <GuideHelp entry={{ kind: 'term', id: 'verdict' }} />
               <Text size="sm" tone="secondary">
-                {statusLabel(edge.status)}
+                {`${edge.mine ? 'Your edge' : 'Site edge'} · ${statusLabel(edge.status)}`}
               </Text>
               <GuideHelp entry={{ kind: 'term', id: 'edge_status' }} />
+              {edge.canonicalRun && (
+                <>
+                  <Text size="sm" tone="secondary">
+                    {`Last backtest ${formatValue(edge.canonicalRun.knowledgeTs, { kind: 'date', style: 'day' }).text} (official result)`}
+                  </Text>
+                  <GuideHelp entry={{ kind: 'term', id: 'official_result' }} />
+                </>
+              )}
             </Stack>
           </Stack>
           <RunEvaluation edgeId={edge.id} />
@@ -68,6 +95,14 @@ export function EdgeDetail({ id, onBack }: EdgeDetailProps) {
         )}
       </Stack>
       <EdgeFigures verdict={v} />
+      <Grid columns={2} gap={4} collapse="lg" align="start">
+        <Suspense fallback={<Panel title="Top vs bottom decile" state="loading" />}>
+          <EdgeDeciles deciles={v.deciles} />
+        </Suspense>
+        <Suspense fallback={<Panel title="Robustness" state="loading" />}>
+          <EdgeRobustness robustness={v.robustness} />
+        </Suspense>
+      </Grid>
       <EdgeYears years={v.years} />
       <EdgeDefinition edge={edge} />
       <EdgeDetails edge={edge} />

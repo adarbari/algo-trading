@@ -24,6 +24,8 @@ from algotrade.storage.tables.schemas import result_table
 
 EDGE_EVAL = "edge_eval"
 MAIN = "main"
+RANDOM = "random"  # the role of a random-pick draw (ED8), never a screener or a baseline
+DECILES = 10
 IN_SAMPLE = "in_sample"  # the slice before the split
 
 
@@ -86,6 +88,8 @@ class EdgeRow:
     exploratory: bool = False
     decile_sessions: int | None = None
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
+    decile_means: tuple[float | None, ...] = ()  # each tenth's mean outcome, best-ranked first;
+    # empty when the slice had none or the run is older than the columns (never zeros)
 
 
 def lift_points(hit_rate: float | None, base_rate: float | None) -> float | None:
@@ -183,6 +187,11 @@ def _float(value: Any) -> float | None:
     return float(stored) if stored is not None else None
 
 
+def _deciles(row: Mapping[str, Any]) -> tuple[float | None, ...]:
+    found = tuple(_float(row.get(f"decile_mean_{i:02d}")) for i in range(1, DECILES + 1))
+    return found if any(x is not None for x in found) else ()
+
+
 def _row(row: Mapping[str, Any]) -> EdgeRow:
     return EdgeRow(
         edge_variant=str(to_scalar(row.get("edge_variant")) or MAIN),  # a null is NaN in a frame
@@ -209,16 +218,28 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         exploratory=to_scalar(row.get("exploratory")) is True,
         decile_sessions=_int(row.get("decile_sessions")),
         in_sample=to_scalar(row.get("in_sample")) is True,
+        decile_means=_deciles(row),
     )
 
 
-def rows_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
-    """The rows the run ``record`` wrote, as it left them; none when its partition holds none
-    of its own."""
+def _stored(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
     frame = run_partition(ctx, result_table(EDGE_EVAL), record)
     if frame is None:
         return ()
     return tuple(_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records"))
+
+
+def rows_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
+    """The screener and baseline rows the run ``record`` wrote, as it left them; none when its
+    partition holds none of its own. The random-pick draws are not among them (the one filter
+    every verdict, record and promotion consumer reads through): ``draws_of_record``."""
+    return tuple(r for r in _stored(ctx, record) if r.role != RANDOM)
+
+
+def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
+    """The random-pick draws the run ``record`` wrote (slice kind ``draw``, out-of-sample only),
+    each a ``lift`` and ``hit_rate`` of one draw of names chosen with no information."""
+    return tuple(r for r in _stored(ctx, record) if r.role == RANDOM)
 
 
 def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
@@ -229,3 +250,12 @@ def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
     record = ctx.reader.run(run.run_id)
     found = rows_of_record(ctx, record) if record is not None else ()
     return tuple(r for r in found if r.slice_kind == IN_SAMPLE) if run.oos_hidden else found
+
+
+def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
+    """The random-pick draws ``run`` wrote; none for a run from before they were drawn, and
+    none while its out-of-sample result is hidden (a draw is measured out of sample)."""
+    record = ctx.reader.run(run.run_id)
+    if record is None or run.oos_hidden:
+        return ()
+    return draws_of_record(ctx, record)

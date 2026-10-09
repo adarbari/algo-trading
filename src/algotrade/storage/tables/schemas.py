@@ -603,6 +603,12 @@ RULE_SCREEN_VALUES = _fixed(
 # Rows written before the column stay under the null key (never rewritten) beside a new run's
 # dated one; a reader picks a run by ``run_id`` (ED5c), never by key. ``in_sample`` is true on
 # a model screener's slice whose sessions its score was fitted on (ED7b): never evidence.
+# ``decile_mean_01`` .. ``decile_mean_10`` (ED8): the mean outcome of each tenth of the ranked
+# eligible names, best-ranked first, averaged over the slice's sessions that had deciles; null
+# when it had none and in rows written before the columns (never zero). Rows with ``role`` =
+# ``random`` (``variant`` = ``random``, ``slice_kind`` = ``draw``, ``slice_value`` the draw's
+# number) are the random-pick backtest's draws over the out-of-sample slice: no screener, never a
+# candidate for a verdict, read only through ``services/read/evaluation/runs.py``.
 EDGE_EVAL = _fixed(
     "results/edge_eval",
     "results",
@@ -629,6 +635,7 @@ EDGE_EVAL = _fixed(
         "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
         "decile_spread", "decile_t", "effect_size", "sharpe", "deflated_sharpe", "pbo",
         "reference_rate", "touch_rate",
+        *(f"decile_mean_{i:02d}" for i in range(1, 11)),
     ),
     runs="merge",
     key=(

@@ -18,3 +18,6 @@ max_pbo = 0.5            # probability of overfitting above this: Not working
 works_max_pbo = 0.2
 
 oos_lift_share = 0.5     # OOS lift must keep this share of the whole-history lift
+
+random_beat_share = 0.95 # Works: the out-of-sample lift beats at least this share of the 1,000
+                         # random-pick backtests the harness draws (random_picks.DEFAULT_DRAWS)

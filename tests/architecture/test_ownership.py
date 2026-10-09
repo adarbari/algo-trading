@@ -288,7 +288,7 @@ _CROSS_SECTION = Path(__file__).parents[2] / "src/algotrade/services/evaluation/
 def test_only_report_containment_calls_stored_events() -> None:
     callers = {
         p.name
-        for p in _CROSS_SECTION.glob("*.py")
+        for p in _CROSS_SECTION.rglob("*.py")
         if re.search(r"\bstored_events\b", p.read_text())
     }
     assert callers == {"report_containment.py"}

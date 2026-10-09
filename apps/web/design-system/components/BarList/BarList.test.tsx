@@ -26,6 +26,30 @@ describe('BarList', () => {
     expect(fills[2]?.style.getPropertyValue('--share')).toBe('0%');
   });
 
+  it('draws signed values either side of a zero axis, scaled to the largest magnitude', () => {
+    const signed = [
+      { id: 'a', label: 'Top', value: 0.09 },
+      { id: 'b', label: 'Bottom', value: -0.045 },
+      { id: 'c', label: 'Flat', value: 0 },
+    ];
+    const { container } = render(
+      <BarList label="By decile" items={signed} diverging format={{ kind: 'delta', digits: 1 }} />,
+    );
+    const fills = container.querySelectorAll<HTMLElement>('[data-sign]');
+    expect(fills[0]).toHaveAttribute('data-sign', 'positive');
+    expect(fills[0]).toHaveAttribute('data-tone', 'positive');
+    expect(fills[0]?.style.getPropertyValue('--share')).toBe('50%');
+    expect(fills[1]).toHaveAttribute('data-sign', 'negative');
+    expect(fills[1]).toHaveAttribute('data-tone', 'negative');
+    expect(fills[1]?.style.getPropertyValue('--share')).toBe('25%');
+    expect(fills[2]?.style.getPropertyValue('--share')).toBe('0%');
+    expect(screen.getByRole('list', { name: 'By decile' })).toHaveAttribute(
+      'data-diverging',
+      'true',
+    );
+    expect(screen.getByText('−4.5%')).toBeInTheDocument();
+  });
+
   it('uses display text when given', () => {
     render(
       <BarList

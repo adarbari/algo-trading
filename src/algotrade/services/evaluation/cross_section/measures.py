@@ -43,6 +43,7 @@ class SessionStat:
     base_hits: int = 0  # hits among all counted eligible names (the picks included)
     top_decile: float | None = None  # mean of the best-ranked tenth of the ranked eligible
     spread: float | None = None  # top tenth minus bottom tenth
+    deciles: tuple[float, ...] = ()  # the mean of each tenth, best-ranked first; () when unranked
     ranked: int = 0  # eligible names with a rank and a counted outcome
     unscored: int = 0  # eligible names with no score, in sessions whose deciles were ranked
     excluded_score_coverage: int = 0  # 1: too few names scored; picks counted, no deciles
@@ -80,6 +81,7 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         return SessionStat(session=first.session, regime=first.regime, excluded_coverage=1)
     tops = [leg.top_decile for leg in legs if leg.top_decile is not None]
     spreads = [leg.spread for leg in legs if leg.spread is not None]
+    ranked = [leg.deciles for leg in legs if leg.deciles]
     return SessionStat(
         session=first.session,
         regime=first.regime,
@@ -89,6 +91,7 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         base_hits=sum(leg.base_hits for leg in legs),
         top_decile=float(np.mean(tops)) if tops else None,
         spread=float(np.mean(spreads)) if spreads else None,
+        deciles=_mean_deciles(ranked),
         ranked=sum(leg.ranked for leg in legs),
         unscored=sum(leg.unscored for leg in legs),
         excluded_score_coverage=sum(leg.excluded_score_coverage for leg in legs),
@@ -150,15 +153,22 @@ class SliceMeasure:
     reference_rate: float | None = field(default=None)  # expires_otm: mean risk-neutral N(d2)
     touch_rate: float | None = field(default=None)  # expires_otm: picks whose strike was touched
     in_sample: bool = field(default=False)  # a model screener's fit saw sessions of this slice
+    decile_means: tuple[float, ...] = field(default=())  # mean of each tenth, over the sessions
+    # that had deciles (BUCKETS values), best-ranked first; () when the slice had none
 
 
-def decile_means(values_in_rank_order: Sequence[float]) -> tuple[float, float] | None:
-    """``(top tenth mean, top minus bottom tenth)`` of finite values best-ranked first; None
-    under ``BUCKETS`` values."""
-    spread = decile_spread(values_in_rank_order, BUCKETS)
-    if spread is None:
-        return None
-    return float(np.mean(np.array_split(np.asarray(values_in_rank_order), BUCKETS)[0])), spread
+def decile_means(values_in_rank_order: Sequence[float]) -> tuple[float, ...]:
+    """The mean of each tenth of finite values best-ranked first (``BUCKETS`` near-equal runs);
+    empty under ``BUCKETS`` values or with a value that is not finite."""
+    if decile_spread(values_in_rank_order, BUCKETS) is None:
+        return ()
+    parts = np.array_split(np.asarray(values_in_rank_order, dtype=np.float64), BUCKETS)
+    return tuple(float(p.mean()) for p in parts)
+
+
+def _mean_deciles(ranked: Sequence[tuple[float, ...]]) -> tuple[float, ...]:
+    """The tenth-by-tenth mean of the sessions' decile means; empty when none had any."""
+    return tuple(float(x) for x in np.mean(np.array(ranked), axis=0)) if ranked else ()
 
 
 def _mean(total: float, count: int) -> float | None:
@@ -199,6 +209,7 @@ def _measure(sl: Slice, kept: Sequence[SessionStat], in_sample: bool = False) ->
         bh_mean=_mean(float(pick_values.sum() + rest[0] * rest[1]), eligible),
         top_decile_mean=float(np.mean(tops)) if tops else None,
         decile_spread=spread_mean,
+        decile_means=_mean_deciles([r.deciles for r in rows if r.deciles]),
         decile_t=spread_t,
         decile_sessions=spread_n,
         effect_size=effect_vs_moments(pick_values, rest),

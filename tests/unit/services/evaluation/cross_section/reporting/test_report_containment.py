@@ -6,7 +6,7 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.services.evaluation.cross_section.report import render_edge_report
+from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
 from algotrade.services.evaluation.cross_section.results import (
     lost_sessions,
     report_containment,
