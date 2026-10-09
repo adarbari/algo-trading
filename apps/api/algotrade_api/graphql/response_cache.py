@@ -64,6 +64,7 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
 USER_OPERATIONS: frozenset[str] = frozenset(
     {
         "Regime",
+        "PublishedEdge",
         "FeatureTable",
         "FeatureDistribution",
         "FeatureCatalogue",

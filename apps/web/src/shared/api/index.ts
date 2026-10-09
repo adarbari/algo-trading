@@ -16,6 +16,7 @@ export { active } from './active-client';
 export { api, ApiError, errorDetail, unwrap } from './client';
 export { feature, SITE_FEATURES, type SiteFeature } from './generated/catalogue';
 export { graphql, useFragment, type FragmentType } from './generated/graphql';
+export { TypedDocumentString } from './generated/graphql/graphql';
 export type * as gqlTypes from './generated/graphql/graphql';
 export type { components, paths } from './generated/schema';
 export { gql, GraphQLRequestError } from './graphql';

@@ -5,6 +5,8 @@
  */
 import { Heading, Stack, Text } from '@algotrade/ui';
 
+import type { EdgeView } from '@/entities/edge';
+
 import { EdgeDetail } from '@/widgets/edge-detail';
 import { EdgeList } from '@/widgets/edge-list';
 
@@ -14,10 +16,19 @@ export interface EdgesPageProps {
   onSelect: (id: string) => void;
   /** Back to the list: the route clears the choice. */
   onClear: () => void;
+  /** The list's view (from the URL) and its change. */
+  view?: EdgeView;
+  onViewChange?: (view: EdgeView) => void;
 }
 
-export function EdgesPage({ selected = null, onSelect, onClear }: EdgesPageProps) {
-  if (selected !== null) return <EdgeDetail id={selected} onBack={onClear} />;
+export function EdgesPage({
+  selected = null,
+  onSelect,
+  onClear,
+  view,
+  onViewChange,
+}: EdgesPageProps) {
+  if (selected !== null) return <EdgeDetail id={selected} onBack={onClear} onOpen={onSelect} />;
   return (
     <Stack gap={3}>
       <Stack gap={1}>
@@ -26,7 +37,11 @@ export function EdgesPage({ selected = null, onSelect, onClear }: EdgesPageProps
           Strategy ideas, each backtested for an edge
         </Text>
       </Stack>
-      <EdgeList onSelect={onSelect} />
+      <EdgeList
+        onSelect={onSelect}
+        {...(view ? { view } : {})}
+        {...(onViewChange ? { onViewChange } : {})}
+      />
     </Stack>
   );
 }

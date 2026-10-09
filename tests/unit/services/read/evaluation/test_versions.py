@@ -13,7 +13,7 @@ from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.evaluation import runs, versions
-from algotrade.services.read.evaluation.edges import Edge, load_edge, load_edges
+from algotrade.services.read.evaluation.edges import Edge, load_edge, load_edge_problems, load_edges
 from algotrade.services.read.evaluation.verdict import NOT_ENOUGH, NOT_WORKING, WAITING
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -229,3 +229,11 @@ def test_the_oos_hidden_flag_follows_the_users_reveal(hidden: bool) -> None:
     follow = None if hidden else {"state": "researching", "oos_revealed": True}
     ctx = ctx_for(MemoryBackend(), with_copy(follow))
     assert mine(ctx).oos_hidden is hidden
+
+
+def test_a_copy_that_does_not_load_is_served_with_its_reason_not_silently_dropped() -> None:
+    ctx = ctx_for(MemoryBackend(), with_copy(extends="ghost"))
+    assert "mine" not in {e.id for e in load_edges(ctx)}
+    (problem,) = load_edge_problems(ctx)
+    assert problem.edge_id == "mine" and "extends: no edge 'ghost'" in problem.reason
+    assert load_edge_problems(ctx_for(MemoryBackend(), with_copy())) == ()

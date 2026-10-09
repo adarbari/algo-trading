@@ -206,3 +206,15 @@ def test_an_admin_publishes_any_users_copy(client: TestClient) -> None:
     assert read(client, document, id="mine") is None  # the admin's own view has no such edge
     text = read(client, document, id="mine", user="alice")
     assert 'id = "mine"' in text and "top_k = 4" in text
+
+
+def test_a_faulty_copy_file_is_served_as_a_problem_with_its_reason(
+    client: TestClient, root: Path
+) -> None:
+    query = "{ edgeProblems { edgeId reason } }"
+    assert read(client, query) == []
+    (root / "users" / "local" / "edges").mkdir(parents=True)
+    (root / "users" / "local" / "edges" / "broken.toml").write_text('extends = "ghost"\n')
+    (problem,) = read(client, query)
+    assert problem["edgeId"] == "broken" and "extends: no edge 'ghost'" in problem["reason"]
+    assert [e["id"] for e in read(client, LIST)] == ["drift"]

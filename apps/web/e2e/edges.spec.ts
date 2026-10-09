@@ -47,6 +47,29 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
   expect(errors).toEqual([]);
 });
 
+test('the list filters by view and an edge offers Clone and Follow in dialogs', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/edges');
+  const list = page.getByRole('grid', { name: 'Edges' });
+  await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toContainText('site edge');
+  await page.getByRole('button', { name: /^Mine · 0/ }).click();
+  await expect(page).toHaveURL(/view=mine/);
+  await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /^All · / }).click();
+  await list.getByRole('row', { name: /Momentum 12-1/ }).click();
+  await page.getByRole('button', { name: 'Follow', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: /Follow · Momentum 12-1/ })).toBeVisible();
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Clone', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Name of your copy' })).toHaveValue(
+    'my-momentum_12_1',
+  );
+  expect(errors).toEqual([]);
+});
+
 test('a user runs an evaluation of the chosen edge and sees it finish', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/edges?edge=momentum_12_1');
