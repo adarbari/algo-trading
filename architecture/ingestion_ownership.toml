@@ -179,3 +179,17 @@ description = "Add the point-in-time columns (session_date, knowledge_ts, source
 owner = ["apps/ingestion/algotrade_ingestion/tasks/framework/run.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "stamp" }]
+
+[[responsibility]]
+id = "vendor-listing-perma-ticker"
+description = "Which vendor listing a Tiingo permaTicker belongs to (edges ED6): TiingoListingMeta fetches the fundamentals meta rows (one per listing that ever used a ticker) and match_perma assigns a permaTicker to a listing only by a unique ticker + active / inactive match (one listing and one row; the one open listing and the one active row; the one delisted listing and the one inactive row), otherwise it gets none (ambiguous / no_meta); the id then follows from equity_id, never from a guess"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",
+    "libs/sources/algotrade_sources/vendors/tiingo/meta.py",
+]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/listings/listing_history.py",  # the task calls the matcher and fills perma_ticker
+    "libs/sources/algotrade_sources/framework/registry.py",  # registers the adapter
+]
+section = "docs/adr/0018-figi-instrument-ids.md#decision"
+detect = [{ call = "match_perma" }, { call = "parse_meta" }]

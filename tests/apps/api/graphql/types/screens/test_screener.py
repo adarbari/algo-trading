@@ -132,3 +132,20 @@ def test_track_record_is_not_run_without_a_canonical_edge_run(graph: Graph) -> N
     assert data["edges"] and data["edgeRuns"] == []  # the site's edge documents, no runs
     for entry in data["screener"]["trackRecords"]:
         assert entry["runId"] is None and entry["notRun"]["code"] == "NOT_RUN"
+
+
+PICK_HISTORY = """query History($id: String!, $sessions: Int) {
+  screener(id: $id) {
+    pickHistory(sessions: $sessions) { session picked paused notRun { code } }
+  }
+}"""
+
+
+def test_pick_history_is_one_entry_per_session_oldest_first(graph: Graph) -> None:
+    body = graph(PICK_HISTORY, {"id": "vrp_scanner", "sessions": 3})
+    assert "errors" not in body, body
+    first, second, third = body["data"]["screener"]["pickHistory"]
+    assert (first["session"], first["picked"], first["paused"]) == ("2022-11-21", None, None)
+    assert first["notRun"] == {"code": "NOT_RUN"}  # the run's absence is an entry, not a gap
+    assert (second["session"], second["picked"], second["paused"]) == ("2022-11-22", 2, 0)
+    assert (third["session"], third["picked"], third["paused"]) == ("2022-11-23", 2, 1)

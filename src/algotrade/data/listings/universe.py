@@ -16,10 +16,10 @@ Both snapshots used are named (``Universe.snapshot``, ``Universe.membership_snap
 delisted: used as a feature, label or sort key it leaks the future. It is read **here, in
 ``SymbolResolver.from_listings`` (both identity reads: is this listing alive on S), by
 ``read_listings`` for the winners-sample runner** (which picks its strata by year of delisting,
-by design: a data-quality sample, never a feature) **by ``delisted_by`` for the outcomes
-task** (a name counts as delisted at T only when ``end_date <= T``, so no later delisting is
-known) and by ``listings_over`` for the bars-history task (clipping a vendor's bars to the
-listing's own dates), nowhere else
+by design: a data-quality sample, never a feature), by ``delisted_by`` for the outcomes task
+(a name counts as delisted at T only when ``end_date <= T``, so no later delisting is known) and
+by ``listings_over`` for ``bars-history --from-listings`` (which fetches a listing's bars by its
+permaTicker and clips them to its own dates: identity, never a feature), nowhere else
 (``tests/architecture/data/test_listing_end_date_readers.py`` scans for it), and
 ``universe_asof`` does not return it. The adapter stores a live name's end as null (open).
 """
@@ -30,7 +30,8 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.data.listings.membership import index_members
+from algotrade.data.listings.membership import SP500, index_members
+from algotrade.data.listings.membership import TABLE as MEMBERSHIP
 from algotrade.data.reference import REFERENCE_HINT, read_snapshot
 from algotrade.storage.tables.readers import StoreReader
 
@@ -77,6 +78,55 @@ def universe_asof(reader: StoreReader, session: date) -> Universe:
     return Universe(
         session, snap.snapshot_date, found.instruments, found.without_id, members.snapshot
     )
+
+
+def listings_over(reader: StoreReader, since: date, until: date) -> tuple[pd.DataFrame, date]:
+    """The listings that are in the universe on ANY session of ``since..until`` (exactly: a
+    listing's dates clipped to the window, and for a stock that is neither on NASDAQ nor an ETF a
+    S&P 500 interval of its ticker overlapping them) and the listing snapshot used. Columns:
+    ``instrument_id``, ``ticker``, ``perma_ticker`` (``""`` when unknown), ``start_date``,
+    ``end_date`` (null while open) and ``reused`` (another listing of the snapshot has the same
+    ticker). For the bars backfill only (see the module docstring)."""
+    frame, snap = read_snapshot(reader, TABLE, None, REFERENCE_HINT)
+    members, _ = read_snapshot(reader, MEMBERSHIP, None, REFERENCE_HINT)
+    members = members[members["index_name"] == SP500]
+    tickers = frame["ticker"].astype(str)
+    out = frame.assign(
+        reused=tickers.map(tickers.value_counts()).gt(1),
+        perma_ticker=frame["perma_ticker"].fillna("").astype(str),
+        start_date=pd.to_datetime(frame["start_date"]),
+        end_date=pd.to_datetime(frame["end_date"]),
+    )
+    low, high = pd.Timestamp(since), pd.Timestamp(until)
+    lo = out["start_date"].where(out["start_date"] > low, low)
+    hi = out["end_date"].fillna(high).where(out["end_date"].fillna(high) < high, high)
+    has_id = out["instrument_id"].notna() & (out["instrument_id"].astype(str) != "")
+    alive = has_id & (lo <= hi)
+    easy = out["asset_type"].astype(str).str.upper().eq(ETF)
+    easy |= out["exchange"].astype(str).str.upper().eq(NASDAQ)
+    joined = (
+        out.assign(_lo=lo, _hi=hi)
+        .reset_index()
+        .merge(
+            members.assign(
+                _ms=pd.to_datetime(members["start_date"]),
+                _me=pd.to_datetime(members["end_date"]).fillna(pd.Timestamp.max),
+            )[["ticker", "_ms", "_me"]],
+            on="ticker",
+            how="inner",
+        )
+    )
+    overlapping = joined[(joined["_ms"] <= joined["_hi"]) & (joined["_me"] >= joined["_lo"])]
+    member = out.index.isin(overlapping["index"])
+    kept = out[alive & (easy | member)].drop_duplicates("instrument_id")
+    kept = kept.assign(
+        start_date=kept["start_date"].dt.date,
+        end_date=kept["end_date"].dt.date.where(kept["end_date"].notna(), None),
+    )
+    cols = ["instrument_id", "ticker", "perma_ticker", "start_date", "end_date", "reused"]
+    return kept[cols].sort_values(["ticker", "start_date"]).reset_index(
+        drop=True
+    ), snap.snapshot_date
 
 
 def read_listings(reader: StoreReader) -> tuple[pd.DataFrame, date]:
