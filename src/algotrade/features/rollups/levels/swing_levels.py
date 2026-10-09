@@ -17,8 +17,8 @@ and a pivot needs its 5 bars each side inside them, so a pivot can be dated d - 
                      swing_low_date its session
 
 So ``swing_high > close > swing_low`` whenever they are known. Distances (``dist_to_*``) are
-expression features (``config/site/features/swing.toml``). The pivot width and the window are
-part of the definition: changing one is a new version.
+expression features (``config/site/features/technical/swing.toml``). The pivot width and the
+window are part of the definition: changing one is a new version.
 """
 
 from datetime import date

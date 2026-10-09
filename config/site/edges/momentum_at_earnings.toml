@@ -55,24 +55,32 @@ one universe snapshot (rerun on per-session snapshots before evidenced)."""
 
 [[sources]]
 title = "Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance 51(5), 1996"
+url = "https://doi.org/10.1111/j.1540-6261.1996.tb05222.x"
 
 [[sources]]
 title = "Chordia, T. and Shivakumar, L., Earnings and Price Momentum, Journal of Financial Economics 80(3), 2006"
+url = "https://doi.org/10.1016/j.jfineco.2005.05.005"
 
 [[sources]]
 title = "Novy-Marx, R., Fundamentally, Momentum is Fundamental Momentum, NBER working paper 20984, 2015"
+url = "https://www.nber.org/papers/w20984"
 
 [[sources]]
 title = "Gerard, B. and Jehl, T., The Many Facets of Stock Momentum, Financial Analysts Journal, 2025"
+url = "https://doi.org/10.1080/0015198X.2025.2562790"
 
 [[sources]]
 title = "Sadka, R., Momentum and Post-Earnings-Announcement Drift Anomalies: The Role of Liquidity Risk, Journal of Financial Economics 80(2), 2006"
+url = "https://doi.org/10.1016/j.jfineco.2005.04.005"
 
 [[sources]]
 title = "Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies 29(1), 2016"
+url = "https://doi.org/10.1093/rfs/hhv063"
 
 [[sources]]
 title = "Chordia, T., Subrahmanyam, A. and Tong, Q., Have Capital Market Anomalies Attenuated in the Recent Era of High Liquidity and Trading Activity?, Journal of Accounting and Economics 58(1), 2014"
+url = "https://doi.org/10.1016/j.jacceco.2014.06.001"
 
 [[sources]]
 title = "Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993"
+url = "https://doi.org/10.1111/j.1540-6261.1993.tb04702.x"

@@ -5,7 +5,7 @@ precedent: coefficients in site config, applied by the expression engine's ``ncd
 ``ncdf(b0 + w1 * (x1 - m1) / s1 + ...)`` over the declared features with every coefficient a
 ``params`` entry, and a description that records the fit (``fitted_through``, rows, sessions,
 horizon). ``merge_scorers`` puts a rendered table into the text of
-``config/site/features/edge_scores.toml``, replacing that edge's table and keeping the others
+``config/site/features/scores/edge_scores.toml``, replacing that edge's table and keeping the others
 sorted by name. A site config change reviewed via PR: ``fit-edge-scorer`` writes the file, the
 owner commits it."""
 

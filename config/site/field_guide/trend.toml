@@ -5,7 +5,7 @@
 # channel distances, the pullback's depth and age, the day's close location, breakouts and
 # breakdowns. The keys and the rules each entry follows are in the header of momentum.toml.
 # Positions in the bands and channels, stretches and streaks (bands@v2, trend_stats@v2 and
-# config/site/features/bands.toml): where the close sits against its own recent range, how
+# config/site/features/technical/bands.toml): where the close sits against its own recent range, how
 # far it has run, and the longer momentum returns.
 
 [[field]]
@@ -308,7 +308,7 @@ note = "confirm with rollup.momentum@v1.rel_volume gte 1.3 on the cross; alone i
 
 # Slopes, short returns, acceleration, the EMA alignment and distances, the channel distances,
 # the pullback's depth and age, the day's close location, and the breakout and breakdown
-# rules (bands@v2, trend_stats@v2, config/site/features/bands.toml and swing.toml).
+# rules (bands@v2, trend_stats@v2, config/site/features/technical/bands.toml and swing.toml).
 
 [[field]]
 name = "rollup.bands@v2.ema20_slope_5d"

@@ -53,6 +53,7 @@ describe('RunEvaluation', () => {
       params: { path: { edge_id: 'drift' }, query: { as_site: false } },
     });
     expect(await screen.findByText('Done (exploratory)')).toBeInTheDocument();
+    expect(GET).toHaveBeenCalledWith('/jobs/{job_id}', { params: { path: { job_id: 'job-1' } } });
     expect(screen.queryByRole('button', { name: 'Run as site' })).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

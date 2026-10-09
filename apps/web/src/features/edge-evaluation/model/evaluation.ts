@@ -4,7 +4,11 @@
  */
 import type { components } from '@/shared/api';
 
-export type EvaluationRun = components['schemas']['EvaluationRequest'];
+/** The POST's answer (`EvaluationRequest`) or the job's status (`JobStatus`). */
+export type EvaluationRun = Pick<
+  components['schemas']['EvaluationRequest'] | components['schemas']['JobStatus'],
+  'state' | 'exploratory' | 'error'
+>;
 
 /** Still going: poll it. */
 export const isActive = (run: EvaluationRun | undefined): boolean =>

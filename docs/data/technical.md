@@ -151,7 +151,7 @@ folder per kind of thing; `architecture/layout.toml`):
 | `fundamentals@v3` | `corporate/` | v2 + `shares_outstanding_year_ago` | built |
 
 Formulas over stored columns are expression features (computed on read):
-`config/site/features/bands.toml` (bands, channels, z-scores, stretches),
+`config/site/features/technical/bands.toml` (bands, channels, z-scores, stretches),
 `swing.toml` (level distances, the pullback in ATRs, the 52-week position, the 50-session breakout and
 20-session breakdown, the short put's cushion above support), `price.toml` (`rs_spy_positive`,
 `rs_improving`, `sector_leader`),
@@ -250,7 +250,7 @@ the upper wick; (5) DOJI: body share <= `doji_body`; (6) NONE. An unknown averag
 matches an engulfing candle (the bar then reads on to the later tests; the label is not null
 for it). The inside-day breakout is not a candle but the expression `inside_day_breakout`
 (`ret_1d > 0` and `prev_bar_relation` INSIDE); `strong_close` is `close_range_pos >= 0.7` and
-`body_share >= 0.5` (both in `config/site/features/swing.toml`).
+`body_share >= 0.5` (both in `config/site/features/technical/swing.toml`).
 
 Worked example: open 100, high 101.2, low 95, close 101 after 20 sessions of body 1: body
 share 1 / 6.2 = 0.16, lower wick 5 (5 bodies, share 0.81), upper wick share 0.03: HAMMER;
@@ -445,5 +445,5 @@ NOT_ANNOUNCED (nothing stored yet); on S and every later session it is SCHEDULED
 sessions read the new date, and a recompute of S still reads the old one. A 2:1 split
 executing after the partition that holds the latest listing divides the amount by 2 (a later
 listing carries the vendor's own number and is used as stored). `ex_div_before_expiry`
-(`config/site/features/earnings.toml`) is null while no date is known: a date beyond the
+(`config/site/features/options/earnings.toml`) is null while no date is known: a date beyond the
 30-day window is not listed yet, so null is never "no dividend".

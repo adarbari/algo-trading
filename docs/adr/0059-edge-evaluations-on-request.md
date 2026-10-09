@@ -14,7 +14,8 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
 ## Decision
 1. **The same job, on request.** `POST /edges/{id}/evaluate` starts the CLI's `edge-eval` job
    (`services/ondemand/edges.py`, `OnDemandEdges`), never inline in a request (ADR 0010), and
-   answers 202 with the job; `GET /edges/{id}/evaluate/{job_id}` polls it. The decision sessions
+   answers 202 with the job; `GET /jobs/{job_id}` polls it (moved there 2026-10-08, ADR 0037
+   amended; it was `GET /edges/{id}/evaluate/{job_id}`). The decision sessions
    are the stored outcome sessions, outcomes known now, the split the user's `evaluation.toml`
    else the edge's `frozen_from` (a run under any other split is EXPLORATORY, as from the CLI).
 2. **Whose rows.** Any signed-in user may evaluate an edge for themselves: the job runs as that
@@ -31,9 +32,9 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
    does not wait for ingestion (the harness reads committed data and publishes atomically, ADR
    0022) and writes only `results/edge_eval` and run records through `ResultWriter`. Market,
    feature and outcome data stay ingestion's alone (ADR 0005, 0053).
-5. **REST allow-list.** The poll is one more `GET` kept REST by design (job polling, like
-   `/screens/{id}/run/{job_id}`): `max_get_routes` goes from 4 to 5, by hand, with this
-   amendment of ADR 0037.
+5. **REST allow-list.** The poll was one more `GET` kept REST by design (job polling):
+   `max_get_routes` went from 4 to 5 with an amendment of ADR 0037. Superseded 2026-10-08: both
+   polls are the one `GET /jobs/{job_id}`, count back to 4.
 
 ## Consequences
 - The Edges page's edge detail has a "Run evaluation" button; it shows the job's state and reads

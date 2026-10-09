@@ -75,7 +75,7 @@ purpose). The non-obvious cases:
 
 | Kind of code | Folder |
 |---|---|
-| A formula over existing features (ratio, spread, label from thresholds) | `config/site/features/<theme>.toml`, an expression feature: no code; `make features-doc` (`add-feature`) |
+| A formula over existing features (ratio, spread, label from thresholds) | `config/site/features/<kind>/<theme>.toml`, an expression feature: no code; `make features-doc` (`add-feature`) |
 | A feature (a documented column) in a feature group | `src/algotrade/features/rollups/<kind>/<group>.py` (`FEATURES` + pure compute); then `make features-doc` |
 | A feature derived from a personal-use source (IBKR) | its group in `features/rollups/` with `licence="personal"` on each `Feature`; expression features over it inherit the licence (ADR 0028) |
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |

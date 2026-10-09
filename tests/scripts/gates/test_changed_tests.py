@@ -93,5 +93,5 @@ def test_a_feature_change_runs_the_web_catalogue_export_test() -> None:
     present = {*changed_tests.CATALOGUE_TESTS, "tests/unit/features"}.__contains__
     found = changed_tests.covering_tests(["src/algotrade/features/registry.py"], present)
     assert set(changed_tests.CATALOGUE_TESTS) <= set(found)
-    found = changed_tests.covering_tests(["config/site/features/bands.toml"], present)
+    found = changed_tests.covering_tests(["config/site/features/technical/bands.toml"], present)
     assert set(changed_tests.CATALOGUE_TESTS) <= set(found)

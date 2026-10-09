@@ -84,6 +84,7 @@ export async function mockBuilderApi(
       .sort();
   const ran = new Set<string>(); // the screeners whose requested run has finished
   let polls = 0;
+  let lastRun = ''; // the screener whose run was last requested (the job poll names only the job)
   const detailOf = (id: string): Json | null => details[id] ?? null;
   // Your screens: one finalised with a working copy, one draft only; copies and new drafts join.
   const own = new Set(['my-vrp']);
@@ -130,14 +131,36 @@ export async function mockBuilderApi(
           { decision: 'QUALIFIED', count: 12 },
           { decision: 'REJECT', count: 400 },
         ],
+        changes: [
+          { change: 'new', count: 3 },
+          { change: 'dropped', count: 1 },
+        ],
       };
       const notRun = { kindText: 'not run for this session' };
       const criteria = [{ id: 'iv30', field: 'iv_rank', mode: 'hard' }];
+      const pickHistory = [
+        { session: '2026-10-06', picked: 10 },
+        { session: '2026-10-07', picked: 12 },
+      ];
       return {
         session: { date: '2026-10-07' },
         screeners: [
-          { id: 'vrp_scanner', criteria, notRun: null, latestRun: ran12 },
-          ...[...own, 'idea-draft'].map((id) => ({ id, criteria, notRun, latestRun: null })),
+          {
+            id: 'vrp_scanner',
+            name: 'vrp_scanner',
+            criteria,
+            pickHistory,
+            notRun: null,
+            latestRun: ran12,
+          },
+          ...[...own, 'idea-draft'].map((id) => ({
+            id,
+            name: id,
+            criteria,
+            pickHistory,
+            notRun,
+            latestRun: null,
+          })),
         ],
       };
     }
@@ -228,24 +251,29 @@ export async function mockBuilderApi(
         201,
       );
     }
-    const run = /^\/screens\/([^/]+)\/run(?:\/([^/]+))?$/.exec(path);
-    if (run) {
-      const id = decodeURIComponent(run[1] ?? '');
-      const view = (state: string) => ({
-        state,
-        config_id: id,
-        session: '2026-10-02',
-        job_id: 'job-screen-1',
-        run_id: state === 'complete' ? 'run-1' : null,
-        error: null,
+    const view = (state: string) => ({
+      job_id: 'job-screen-1',
+      kind: 'screen',
+      state,
+      user: 'ann',
+      session: '2026-10-02',
+      run_id: state === 'complete' ? 'run-1' : null,
+      exploratory: null,
+      error: null,
+    });
+    const run = /^\/screens\/([^/]+)\/run$/.exec(path);
+    if (run && method === 'POST') {
+      lastRun = decodeURIComponent(run[1] ?? '');
+      mock.runs.push(lastRun);
+      polls = 0;
+      return route.fulfill({
+        status: 202,
+        json: { ...view('running'), config_id: lastRun, state: 'running' },
       });
-      if (method === 'POST') {
-        mock.runs.push(id);
-        polls = 0;
-        return route.fulfill({ status: 202, json: view('running') });
-      }
+    }
+    if (/^\/jobs\/[^/]+$/.test(path) && method === 'GET') {
       polls += 1; // the first poll still sees it running
-      if (polls > 1) ran.add(id);
+      if (polls > 1) ran.add(lastRun);
       return json(view(polls > 1 ? 'complete' : 'running'));
     }
     const viewOf = /^\/preferences\/views\/screener:([^/]+)\/view$/.exec(decodeURIComponent(path));

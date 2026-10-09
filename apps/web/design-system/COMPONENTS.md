@@ -584,6 +584,18 @@ Source: `design-system/components/ExpandableRow`
 | `onOpenChange` | `(open: boolean) => void` | yes |  |
 | `children` | `ReactNode` | yes | The detail; rendered only while open, so it can load lazily. |
 
+### ExpandableTable
+
+ExpandableTable: a table whose rows open their detail in place (a screener's criteria, today's run and hits). Columns line up under a header row; each row's first cell holds the toggle (a button with `aria-expanded`, its stretched hit area covers the whole row) and the other cells are plain. In a narrow container (phone) only the columns marked `narrow` stay and the header follows. Controlled by the caller, so a list keeps one row open at a time; the detail is rendered only while open, so it can load lazily. For a flat list of rows use ExpandableRow; for sortable, virtualised data DataTable.
+
+Source: `design-system/components/ExpandableTable`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `columns` | `readonly ExpandableTableColumn[]` | yes |  |
+| `rows` | `readonly ExpandableTableRow[]` | yes |  |
+| `label` | `string` | yes | Accessible name of the table. |
+
 ### ExpiryLadder
 
 ExpiryLadder: the listed option expiries from near to far, one row each: the expiry date, its days to expiry, and the events the expiry spans (an event on or before the expiry date, after the close included) as EventChips with their days, or a "Clear" badge when it spans none. The first clear row is marked ("First clear", an accent rule) so the first expiry that holds no event is easy to find. The rows, the flags and the mark come from the caller (the API decides what a row spans); the ladder draws them. A real table (caption = `label`), so it reads row by row with a screen reader and wraps at phone width. Loading, empty and error states.

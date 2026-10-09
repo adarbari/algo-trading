@@ -7,13 +7,16 @@ Writes, for every golden dataset:
 - ``universe``: the same instruments as one snapshot at the first session (what the edge harness's
   universe selection reads); ``optionable`` and ``security_type`` are synthetic facts
 - ``bars/1d``: one partition per session date, ids resolved through that reference
+- ``instruments/shares``: the share counts of the datasets that declare them (the cross-section
+  stocks), as cover-page facts filed on the first session and again later, so a count is never
+  stale over the golden range and ``feature.market_cap`` is computed
 - ``catalog/golden_datasets``: which instruments make up which dataset
 
 Load into a dedicated fixture store (``make golden-store``), never the production store:
 synthetic symbols such as ``AAA`` collide with real tickers.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -50,6 +53,34 @@ def golden_universe(reference: pd.DataFrame, session: date) -> pd.DataFrame:
     """The ``universe`` snapshot of the golden instruments (all active, optionable stocks)."""
     columns = ["instrument_id", "symbol", "asset_class", "security_type", "optionable", "status"]
     return reference[columns].assign(universe_version=session.isoformat())
+
+
+# A count filed on the first session (as of the year before) and a later one (a count is STALE
+# 400 days after its period end): same number, so the market cap moves with the close only.
+SHARES_FILINGS = ((date(2019, 12, 31), 0), (date(2020, 9, 30), 288))  # (period end, filed + days)
+
+
+def golden_shares(source: FixtureSource, resolver: SymbolResolver, first: date) -> pd.DataFrame:
+    """``instruments/shares`` rows: each dataset's declared counts as cover-page (``dei``) facts."""
+    rows: list[dict[str, object]] = []
+    for ds in source.datasets().values():
+        for symbol, count in sorted(ds.shares.items()):
+            for period_end, days in SHARES_FILINGS:
+                rows.append(
+                    {
+                        "instrument_id": resolver.id_for(symbol),
+                        "symbol": symbol,
+                        "cik": f"{len(rows) // len(SHARES_FILINGS) + 1:010d}",
+                        "concept": "dei",
+                        "period_start": None,
+                        "period_end": period_end,
+                        "filed": first + timedelta(days=days),
+                        "shares": count,
+                        "unit": "shares",
+                        "fetched_on": first,
+                    }
+                )
+    return pd.DataFrame(rows)
 
 
 def _collect(source: FixtureSource, resolver: SymbolResolver) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -91,6 +122,9 @@ def load_golden(ctx: TaskContext, source: FixtureSource) -> RunRecord:
             run.write(BARS, frame, SOURCE, session=session)
         run.write("instruments/reference", reference, SOURCE)
         run.write("universe", golden_universe(reference, first), SOURCE)
+        shares = golden_shares(source, SymbolResolver.from_reference(reference), first)
+        if not shares.empty:
+            run.write("instruments/shares", shares, SOURCE)
         run.write(CATALOG, catalog, SOURCE)
         run.stats.update(
             datasets=int(catalog["dataset"].nunique()),

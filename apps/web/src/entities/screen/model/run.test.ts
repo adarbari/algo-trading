@@ -4,10 +4,7 @@ import { isActive, runMessage, type ScreenRun } from './run';
 
 const run = (state: string, error: string | null = null): ScreenRun => ({
   state,
-  config_id: 'vrp_scanner',
   session: '2026-10-02',
-  job_id: state === 'ready' ? null : 'job-1',
-  run_id: null,
   error,
 });
 

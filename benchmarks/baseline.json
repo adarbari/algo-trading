@@ -3,7 +3,7 @@
   "edges": {
     "momentum_12_1:momentum_12_1@h20/all=all": {
       "base_rate": 0.5456919060052219,
-      "bh_mean": 0.008990060438463525,
+      "bh_mean": 0.008990060438463524,
       "decile_sessions": 6.0,
       "decile_spread": 0.05686709971869885,
       "decile_t": 3.142140856476347,
@@ -21,7 +21,7 @@
     },
     "momentum_12_1:momentum_12_1@h20/regime=UNKNOWN": {
       "base_rate": 0.5456919060052219,
-      "bh_mean": 0.008990060438463525,
+      "bh_mean": 0.008990060438463524,
       "decile_sessions": 6.0,
       "decile_spread": 0.05686709971869885,
       "decile_t": 3.142140856476347,
@@ -56,6 +56,63 @@
       "picks": 250.0,
       "sessions": 5.0,
       "top_decile_mean": 0.03431121594023941
+    },
+    "momentum_12_1:size_small@h20/all=all": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 16.0,
+      "decile_spread": -0.0035108458408938175,
+      "decile_t": -0.42549696213679467,
+      "hit_rate": 0.53875,
+      "lift": 0.9872787081339713,
+      "mean_excess_picks": 0.007792232363845143,
+      "picks": 800.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.0038274642204863176
+    },
+    "momentum_12_1:size_small@h20/frozen=frozen": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:size_small@h20/regime=UNKNOWN": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 16.0,
+      "decile_spread": -0.0035108458408938175,
+      "decile_t": -0.42549696213679467,
+      "hit_rate": 0.53875,
+      "lift": 0.9872787081339713,
+      "mean_excess_picks": 0.007792232363845143,
+      "picks": 800.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.0038274642204863176
+    },
+    "momentum_12_1:size_small@h20/year=2020": {
+      "base_rate": 0.5404040404040404,
+      "bh_mean": 0.008701354993718444,
+      "decile_sessions": 11.0,
+      "decile_spread": 0.0059925368589293345,
+      "decile_t": 0.5974372164512575,
+      "hit_rate": 0.5472727272727272,
+      "lift": 1.0127102803738317,
+      "mean_excess_picks": 0.009567293703568703,
+      "picks": 550.0,
+      "sessions": 11.0,
+      "top_decile_mean": 0.00878814209147935
+    },
+    "momentum_12_1:size_small@h20/year=2021": {
+      "base_rate": 0.5574229691876751,
+      "bh_mean": 0.009630549828486228,
+      "decile_sessions": 5.0,
+      "decile_spread": -0.024418287780504755,
+      "decile_t": -2.3866423250763824,
+      "hit_rate": 0.52,
+      "lift": 0.9328643216080402,
+      "mean_excess_picks": 0.00388709741645331,
+      "picks": 250.0,
+      "sessions": 5.0,
+      "top_decile_mean": -0.007086027095698352
     }
   },
   "results": {

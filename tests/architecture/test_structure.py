@@ -177,7 +177,8 @@ def test_preset_version_check_catches_edits(tmp_path: Path) -> None:
 
 # Raw IBKR IV is personal-licence and missing for names IBKR has no history for; a screener
 # reads it through the catalogue's coalescing features (feature.iv_rank, iv_percentile,
-# iv_rank_source in config/site/features/volatility.toml), never the rollup (owner 2026-10-08).
+# iv_rank_source in config/site/features/options/volatility.toml), never the rollup (owner
+# 2026-10-08).
 # Only the latest version of each preset is checked: older versions are immutable (above).
 RAW_IBKR_IV = "rollup.ibkr_iv@v1."
 

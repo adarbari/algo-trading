@@ -141,6 +141,14 @@ describe('updated and shrunk', () => {
   });
 });
 
+describe('reasons', () => {
+  it('survive an update', () => {
+    const sizes = measure(manifest, gzipSize, LAZY);
+    const after = updated(sizes, { bundle: budgets, e2e: {}, reasons: { x: '2026-10-09 #1 why' } });
+    expect(after.reasons).toEqual({ x: '2026-10-09 #1 why' });
+  });
+});
+
 describe('table', () => {
   it('marks a size over its budget', () => {
     const sizes = measure(manifest, gzipSize, LAZY);

@@ -636,7 +636,7 @@ TASKS: dict[str, Task] = {
             "unadjusted daily bars from Tiingo since 2018 for the scope list and its funds' "
             "references (resumable backfill: 50 requests an hour on the free tier)",
             bars_history,
-            ("bars/1d",),
+            ("bars/1d", "events/split"),
             _bars_history,
             sources=("tiingo_prices",),
             settings="sources.toml [tiingo]; events/scope.toml",
@@ -925,7 +925,7 @@ TASKS: dict[str, Task] = {
             "golden-load",
             "load the golden CSVs into the store (a fixture store, never production)",
             golden,
-            ("bars/1d", "instruments/reference", "universe", golden.CATALOG),
+            ("bars/1d", "instruments/reference", "instruments/shares", "universe", golden.CATALOG),
             _golden_load,
             sources=("synthetic",),
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),

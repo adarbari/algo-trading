@@ -34,12 +34,15 @@ test('the list shows your screeners and the site presets in one list', async ({ 
       .getByRole('navigation', { name: 'Trader sections' })
       .getByRole('link', { name: 'Screeners' }),
   ).toHaveAttribute('aria-current', 'page');
-  const list = page.getByRole('list', { name: 'Screeners' });
-  await expect(list.getByRole('button', { name: /^my-vrp Mine/ })).toContainText('No run today');
+  const list = page.getByRole('table', { name: 'Screeners' });
+  const rowOf = (name: RegExp) =>
+    list.getByRole('row').filter({ has: page.getByRole('button', { name }) });
+  await expect(rowOf(/^my-vrp Mine/)).toContainText('No run today');
   // A draft that was never finalized is listed too.
   await expect(list.getByRole('button', { name: /^idea-draft Mine/ })).toContainText('Draft');
   const preset = list.getByRole('button', { name: /^vrp_scanner Preset/ });
-  await expect(preset).toContainText('12');
+  await expect(rowOf(/^vrp_scanner Preset/)).toContainText('12');
+  await expect(rowOf(/^vrp_scanner Preset/)).toContainText('+3');
   await expect(preset).toHaveAttribute('aria-expanded', 'false');
   await expect(list.getByRole('button', { name: /^short_premium_liquidity Preset/ })).toBeVisible();
   // The segments and the search narrow the list.
@@ -47,7 +50,7 @@ test('the list shows your screeners and the site presets in one list', async ({ 
   await expect(list.getByRole('button', { name: /Mine/ })).toHaveCount(0);
   await page.getByRole('radio', { name: 'All' }).click();
   await page.getByRole('searchbox', { name: 'Search screeners' }).fill('idea');
-  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await expect(list.getByRole('button')).toHaveCount(1);
   await expectAccessible(page);
   expect(errors).toEqual([]);
 });
@@ -56,13 +59,12 @@ test('a row opens in place, one at a time, with its criteria, hits and actions',
   page,
 }) => {
   await page.goto('/screeners');
-  const list = page.getByRole('list', { name: 'Screeners' });
+  const list = page.getByRole('table', { name: 'Screeners' });
   const preset = list.getByRole('button', { name: /^vrp_scanner Preset/ });
   await preset.click();
   await expect(preset).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByRole('list', { name: 'Criteria of vrp_scanner' })).toContainText(
-    'iv_rank',
-  );
+  await expect(page.getByRole('heading', { level: 3, name: 'Criteria' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 3, name: 'Top hits' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Duplicate to edit' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Playbook' })).toHaveAttribute(
     'href',

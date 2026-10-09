@@ -394,9 +394,9 @@ for = "has a dated gap below"
 op = "not_null"
 mode = "hard"
 
-# Bands and channels as levels (bands@v1 and config/site/features/bands.toml): the Bollinger
+# Bands and channels as levels (bands@v1 and config/site/features/technical/bands.toml): the Bollinger
 
-# Bands and channels as levels (bands@v2 and config/site/features/bands.toml): the Bollinger
+# Bands and channels as levels (bands@v2 and config/site/features/technical/bands.toml): the Bollinger
 # bands and the Keltner channel in dollars per share. Compared with the close, not
 # thresholded; the positions (feature.bb_pct_b, feature.kc_position) and the squeeze carry
 # the screening thresholds (momentum and trend, volatility).

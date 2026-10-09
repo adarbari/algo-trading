@@ -26,13 +26,14 @@ from datetime import UTC, datetime, timedelta
 
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.user import SITE_USER, UserContext
-from algotrade.core.model.errors import AlgoTradeError, ConfigurationError, PermissionDeniedError
+from algotrade.core.model.errors import ConfigurationError, PermissionDeniedError
 from algotrade.data import StoreReader
 from algotrade.services.authoring.scope import ConflictError
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.jobs.api import open_runner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
+from algotrade.services.jobs.runner import LocalJobRunner
 from algotrade.services.read.availability.cause import ADMIN_CAUSE, GENERIC
 from algotrade.services.read.session import NotFoundError
 from algotrade.storage.configs.store import ConfigStore
@@ -109,22 +110,6 @@ class OnDemandEdges:
             job_id = self._jobs.submit(KIND, params, owner, force=True)
         return self._view(self._jobs.status(job_id))
 
-    def status(
-        self, edge_id: str, job_id: str, viewer: UserContext, *, admin: bool = False
-    ) -> EvaluationRequest:
-        """The state of a requested evaluation (``NotFoundError`` for a job that is not an
-        evaluation of ``edge_id``; ``PermissionDeniedError`` for another user's unless ``admin``;
-        a site run is visible to everyone, like a site preset's)."""
-        try:
-            job = self._jobs.status(job_id)
-        except AlgoTradeError as exc:
-            raise NotFoundError(str(exc)) from exc
-        if job.kind != KIND or job.params.get("edge") != edge_id:
-            raise NotFoundError(f"{job_id} is not an evaluation of {edge_id}")
-        if not (admin or job.user in (viewer.user_id, SITE_USER)):
-            raise PermissionDeniedError(f"{job_id} is another user's evaluation")
-        return self._view(job)
-
     @staticmethod
     def _view(job: JobRecord) -> EvaluationRequest:
         stored = job.status in STORED
@@ -137,6 +122,11 @@ class OnDemandEdges:
             job.result.get("exploratory") if stored else None,
             job.error,
         )
+
+    @property
+    def jobs(self) -> LocalJobRunner:
+        """The runner whose records ``read_job`` (``status.py``) serves."""
+        return self._jobs
 
     def close(self) -> None:
         self._jobs.shutdown()

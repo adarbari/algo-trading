@@ -16,7 +16,7 @@ same window, same thresholds (``rollups.toml ["ibkr_iv@v1"]``, defaults equal to
 ``["iv_history@v2"]``), gaps counted out, never filled. Every feature here is derived from
 IBKR market data: ``licence = "personal"``. The site's ``iv_rank`` / ``iv_percentile``
 expression features prefer these and fall back to ours, saying which they used
-(``config/site/features/volatility.toml``).
+(``config/site/features/options/volatility.toml``).
 
 The group is ``optional`` (ADR 0055): IB Gateway may be down for a session, so a screen that
 reads it (only through an expression feature coalescing with a required table) goes without

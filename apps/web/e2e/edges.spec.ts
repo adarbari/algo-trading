@@ -70,9 +70,10 @@ test('a user runs an evaluation of the chosen edge and sees it finish', async ({
   expect(errors).toEqual([]);
 });
 
-test('Screeners shows the track-record chip', async ({ page }) => {
+test('Screeners shows the track record of a screener in an edge', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/screeners');
-  await expect(page.getByText('Candidate · 120 sessions').first()).toBeVisible();
+  await expect(page.getByText(/vs \d+% base/).first()).toBeVisible();
+  await expect(page.getByText(/^Edge: /).first()).toBeVisible();
   expect(errors).toEqual([]);
 });

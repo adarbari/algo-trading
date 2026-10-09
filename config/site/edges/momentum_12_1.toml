@@ -58,9 +58,20 @@ screen on the same sessions)."""
 
 [[sources]]
 title = "Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993"
+url = "https://doi.org/10.1111/j.1540-6261.1993.tb04702.x"
 
 [[sources]]
 title = "Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016"
+url = "https://doi.org/10.1016/j.jfineco.2015.12.002"
 
 [[sources]]
 title = "Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998"
+url = "https://doi.org/10.1016/S0304-405X(98)00027-0"
+
+[[sources]]
+title = "Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing"
+
+[[sources]]
+title = "Quantpedia, Momentum Factor Effect in Stocks (strategy page)"
+url = "https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/"

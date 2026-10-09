@@ -19,7 +19,7 @@ counted out of ``history_days``, not filled. ``window`` and ``min_provisional`` 
 
 v2 (ADR 0023 step 3) stores the floats as 32-bit and drops ``iv_hv_spread`` / ``iv_hv_ratio``
 (and with them the ``price_stats`` input): they are expression features
-(``config/site/features/volatility.toml``), computed on read.
+(``config/site/features/options/volatility.toml``), computed on read.
 """
 
 from dataclasses import dataclass

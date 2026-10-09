@@ -18,9 +18,10 @@ session.
                           (positive) or below the lower (negative); 0 inside
 
 The bands themselves, %B, the Keltner channel (EMA +- 2 ATR), the squeeze, the price z-score,
-the EMA distances and alignment are expression features (``config/site/features/bands.toml``)
-over these columns, ``price_stats@v2`` and ``momentum@v1``. The windows and the multiplier are
-part of the definition: changing one is a new version.
+the EMA distances and alignment are expression features
+(``config/site/features/technical/bands.toml``) over these columns, ``price_stats@v2`` and
+``momentum@v1``. The windows and the multiplier are part of the
+definition: changing one is a new version.
 """
 
 from datetime import date
