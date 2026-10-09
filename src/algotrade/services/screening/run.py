@@ -97,16 +97,17 @@ def screen_rules(
     features: FeatureSet,
     gate: RegimeGate | None = None,
     excluded: Mapping[str, str] | None = None,
-) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...]]:
+) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...], tuple[str, ...]]:
     """A rule screen over the selected instruments: the spec's fields read for the session
     (missing values stay missing: a HARD criterion rejects the row), evaluated once, through
     the regime ``gate`` and the ``excluded`` names (ADR 0054), then audited. Also returns the
-    tables that had no rows for the session."""
+    tables that had no rows for the session and the fields the spec reads."""
     screener = RuleScreener(config.screen_spec)
     ids = list(selected.instruments)
     view, source = fields_view(reader, screener.spec.fields(), session_date, ids, features=features)
     result = exclude_rule_result(gate_rule_result(screener.evaluate(view), gate), excluded or {})
-    return rule_run(result, ids, config.screening), result, source.missing
+    run = rule_run(result, ids, config.screening)
+    return run, result, tuple(source.missing), screener.spec.fields()
 
 
 def rule_run(result: RuleScreenResult, ids: list[str], screening: ScreeningSettings) -> ScreenRun:
@@ -115,32 +116,22 @@ def rule_run(result: RuleScreenResult, ids: list[str], screening: ScreeningSetti
     return audit_rows(RULES, rows, ids, screening.min_coverage)
 
 
-def split_missing(
-    missing_tables: Sequence[str], optional_tables: frozenset[str]
-) -> tuple[list[str], list[str]]:
-    """``missing_tables`` -> (the required ones, the optional ones: ADR 0055)."""
-    optional = [t for t in missing_tables if t in optional_tables]
-    return [t for t in missing_tables if t not in optional_tables], optional
-
-
 def settle_coverage(
     run: ScreenRun,
     selected: SelectionResult,
     universe: Universe,
     session_date: date,
     screening: ScreeningSettings,
-    missing_tables: Sequence[str] = (),
-    optional_tables: frozenset[str] = frozenset(),
+    blocking: Sequence[str] = (),
 ) -> ScreenRun:
     """The run's final coverage: ``EMPTY_SELECTION`` when the selection matched nothing,
-    ``PARTIAL`` when a required table the screen reads had no rows for the session (every row
-    would read as missing data, which a HARD criterion rejects: ADR 0030, never a clean run),
-    and ``UNIVERSE_INCOMPLETE`` when a complete run read a universe older than allowed. A
-    missing table of ``optional_tables`` (ADR 0055) leaves the coverage as it is."""
+    ``PARTIAL`` when a table is ``blocking`` (``FeatureSet.coverage``, ADR 0055: a field the
+    screen reads has no value from stored data, so every row would read as missing data, which a
+    HARD criterion rejects: ADR 0030, never a clean run), and ``UNIVERSE_INCOMPLETE`` when a
+    complete run read a universe older than allowed. A tolerated table leaves it as it is."""
     if selected.empty:
         return _with_coverage(run, RunCoverage.EMPTY_SELECTION)
-    required, _ = split_missing(missing_tables, optional_tables)
-    if required and run.coverage is RunCoverage.COMPLETE:
+    if blocking and run.coverage is RunCoverage.COMPLETE:
         run = _with_coverage(run, RunCoverage.PARTIAL)
     if run.coverage is RunCoverage.COMPLETE and universe.is_stale(
         session_date, screening.max_universe_age_days
@@ -193,8 +184,8 @@ class ScreenSession:
     selected: SelectionResult
     universe: Universe
     gate: RegimeGate | None
-    missing_tables: tuple[str, ...]
-    optional_tables: frozenset[str]
+    blocking: tuple[str, ...]  # missing tables that leave a field uncovered (PARTIAL)
+    tolerated: tuple[str, ...]  # missing tables only covered fields read (ADR 0055)
 
 
 def screen_session(
@@ -219,11 +210,12 @@ def screen_session(
     selected = select(reader, config.selection, session_date, features=features)
     rules: RuleScreenResult | None = None
     missing_tables: tuple[str, ...] = ()
+    fields: tuple[str, ...] = ()
     market = session_market(reader, market_names(config), session_date)
     gate = regime_gate(config, market)
     excluded = _tolerated_stale(reader, session_date, now, sources)
     if config.config.impl in RULE_IMPLS:
-        run, rules, missing_tables = screen_rules(
+        run, rules, missing_tables, fields = screen_rules(
             reader, config, session_date, selected, features, gate, excluded
         )
     else:
@@ -233,11 +225,9 @@ def screen_session(
         )
         ids = list(selected.instruments)
         run = run_screen(screener, view, ids, screening.min_coverage, gate, excluded)
-    optional = features.optional_tables()
-    run = settle_coverage(
-        run, selected, universe, session_date, screening, missing_tables, optional
-    )
-    return ScreenSession(run, rules, selected, universe, gate, missing_tables, optional)
+    blocking, tolerated = features.coverage(fields, missing_tables)
+    run = settle_coverage(run, selected, universe, session_date, screening, blocking)
+    return ScreenSession(run, rules, selected, universe, gate, tuple(blocking), tuple(tolerated))
 
 
 def run_screener(
@@ -253,8 +243,7 @@ def run_screener(
     now = now or datetime.now(UTC)
     screened = screen_session(reader, config, session_date, now, sources=sources)
     run, rules, selected = screened.run, screened.rules, screened.selected
-    universe, gate, missing_tables = screened.universe, screened.gate, screened.missing_tables
-    optional = screened.optional_tables
+    universe, gate = screened.universe, screened.gate
     user = config.user.user_id
     record = start_run(run_job_name(config.config.id, user), session_date, now)
     run_id = record.run_id
@@ -283,9 +272,9 @@ def run_screener(
         }
     if rules is not None:  # the run summary (ADR 0029): passed, decisions, narrow misses
         audit["summary"] = rules.summary.as_dict()
-        # ADR 0055: an optional source's table goes in the audit only (a nightly warning)
-        required, skipped = split_missing(missing_tables, optional)
-        audit["missing_tables"], audit["missing_optional_tables"] = required, skipped
+        # ADR 0055: a tolerated table (the screen ran without it) is audited apart, a WARN
+        audit["missing_tables"] = list(screened.blocking)
+        audit["missing_optional_tables"] = list(screened.tolerated)
     version = rules.spec.version if rules else None
     stamp = Stamp(session_date, run_id, now, user, config.config.id, config.hash, version)
     if gate is not None:
