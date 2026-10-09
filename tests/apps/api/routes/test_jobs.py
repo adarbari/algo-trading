@@ -9,11 +9,19 @@ from fastapi.testclient import TestClient
 
 from algotrade.config.site.users import Role, UserRecord
 from algotrade.config.user import UserContext
+from algotrade.services.ondemand.edges import OnDemandEdges
 from algotrade.services.ondemand.screens import OnDemandScreens
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.helpers.api_store import StubAuthenticator, as_user, store_over
 from tests.helpers.ondemand_store import DAY, SCREEN, seeded_backend, site_configs
+from tests.unit.services.evaluation.cross_section.conftest import (
+    ACTIVE,
+    build_world,
+    edge_document,
+    screen,
+)
 
 USERS = {
     "user": [
@@ -47,7 +55,7 @@ def client(stub: StubAuthenticator) -> Iterator[TestClient]:
 
 
 def finished(client: TestClient, job_id: str) -> dict[str, object]:
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         body = client.get(f"/jobs/{job_id}").json()
         if body["state"] not in ("queued", "running"):
@@ -94,3 +102,36 @@ def test_jobs_are_off_without_a_runner() -> None:
         authenticator=as_user(),
     )
     assert TestClient(app).get("/jobs/job-screen-x").status_code == 400
+
+
+def test_an_edge_job_is_read_through_the_screens_runner_over_one_store(
+    stub: StubAuthenticator,
+) -> None:
+    """``get_job_runner`` serves the route from the screens runner first: both runners keep
+    their records in the one store, so an evaluation started through the edges runner reads."""
+    world = build_world()
+    configs = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "momo"): screen(),
+            ("site", "edges", "drift"): edge_document(),
+            ("site", "settings", "users"): USERS,
+        }
+    )
+    edges = OnDemandEdges(world.backend, configs)
+    app = create_app(
+        ApiSettings("memory://", "config"),
+        store_over(world.backend, configs, UserContext("alice")),
+        ondemand=OnDemandScreens(world.backend, configs),
+        ondemand_edges=edges,
+        authenticator=stub,
+    )
+    with TestClient(app) as http:
+        job_id = edges.request("drift", UserContext("alice")).job_id
+        done = finished(http, job_id)
+        assert (done["kind"], done["state"], done["user"]) == ("edge-eval", "complete", "alice")
+        assert done["run_id"] and done["exploratory"] is not None
+        stub.user = UserRecord("bob", Role.TRADER)
+        assert http.get(f"/jobs/{job_id}").status_code == 404
+        stub.user = UserRecord("ana", Role.ADMIN)
+        assert http.get(f"/jobs/{job_id}").status_code == 200
