@@ -16,7 +16,7 @@
       "src/pages/trader-explore/index.ts": 61100,
       "src/pages/trader-explore/ui/OtherTabs.tsx": 93400,
       "src/pages/trader-ideas/index.ts": 40900,
-      "src/pages/trader-regime/index.ts": 57100,
+      "src/pages/trader-regime/index.ts": 57700,
       "src/pages/trader-screeners/index.ts": 16500
     }
   },
@@ -64,6 +64,7 @@
     "bundle.routes.src/pages/guide/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
     "bundle.routes.src/pages/screener-results/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
     "bundle.routes.src/pages/trader-edges/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; plus the Edges Lab pages",
+    "bundle.routes.src/pages/trader-regime/index.ts": "2026-10-09 #425 ED8 step 1: the same shared DataTable groupBy / OddsLine code lands in this chunk (+20 B gzip)",
     "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks"
   }
 }
