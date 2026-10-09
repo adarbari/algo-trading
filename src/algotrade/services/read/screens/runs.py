@@ -60,7 +60,7 @@ class ScreenerRun:
     run record's stats (coverage, the selection's audit; empty: no record); ``coverage``: the
     record's coverage (COMPLETE, PARTIAL; None: not recorded) and ``missing_tables``: the
     tables that had no rows when it ran (its own, not the session's as read now);
-    ``missing_optional_tables``: the optional sources' tables it ran without (ADR 0055: a
+    ``missing_optional_tables``: the tables it ran without (no field needed them: ADR 0055; a
     COMPLETE run, warned not failed)."""
 
     run_id: str

@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: test-shard coverage-combine check-gates check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
+.PHONY: web-perf test-shard coverage-combine check-gates check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -208,7 +208,15 @@ web-e2e: web-typecheck     ## production build (once, by Playwright's web server
 
 web-check: web-ds web-lint web-typecheck web-unit web-storybook web-e2e  ## every web gate (in parallel under `make check`; serial: npm run check)
 
-web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke: Vite dev + the real API, empty and golden stores, every route
+# Performance budgets (docs/ci.md "Web performance"): the production build, the bundle budgets
+# from its manifest, then the request / script / DOM budgets on the phone (LCP and blocking time
+# are only reported). Needs the Playwright Chromium (`make web-install`). CI: the web-perf job.
+web-perf: $(WEB)/node_modules/.package-lock.json  ## web performance budgets: bundle sizes, then requests / scripts / DOM on a phone
+	cd $(WEB) && VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key npx vite build
+	cd $(WEB) && $(NPM) run perf:bundle
+	cd $(WEB) && $(NPM) run perf:e2e
+
+web-real: $(WEB)/node_modules/.package-lock.json golden-store ## real-app smoke: Vite dev + the real API, empty and golden stores, every route
 	cd $(WEB) && ALGOTRADE_PY=$(abspath $(PY)) npx playwright test -c playwright.real.config.ts
 
 web-visual:      ## screenshots + axe over every story, in the CI Linux image (needs Docker)

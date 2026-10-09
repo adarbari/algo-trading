@@ -14,7 +14,8 @@ its code on that machine.
 | CI: web e2e (production build, Playwright, in the Playwright image) | web changes |
 | CI: web Storybook build (uploaded as the `storybook-static` artifact) | web changes |
 | CI: web screenshots + axe, four shards over the artifact, in the Playwright image | web changes |
-| CI: web (the gate: passes when the four web jobs passed or were skipped) | every run |
+| CI: web performance budgets (bundle sizes from the Vite manifest; requests, script bytes and DOM nodes per route on a phone; LCP and blocking time reported only) | web changes |
+| CI: web (the gate: passes when the five web jobs passed or were skipped) | every run |
 | CI: real app smoke (Vite dev server + the real API, empty and golden stores) | Python or web changes |
 | Auto-merge sweeps | after every CI run and every 30 minutes |
 | Nightly evaluation | daily |
@@ -141,6 +142,34 @@ PNGs to the PR branch as `github-actions[bot]` and removes the label. It never r
 fork. A push with `GITHUB_TOKEN` starts no CI run, so push any follow-up commit (or
 `gh workflow run ci.yml --ref <branch>`) afterwards, so CI and auto-merge see the new head.
 Review the PNG diff in the PR before that follow-up.
+
+## Web performance
+
+The site must stay fast on a phone, so CI fails a PR that makes it heavier. `make web-perf`
+(CI: the `web-perf` job, one of the five behind the protected `Web (...)` gate, so it is required
+without a settings change) builds the production bundle and runs two gates; every budget is in
+`apps/web/perf-budgets.json`:
+
+- **Bundle** (`apps/web/scripts/check-bundle-budgets.ts`, `npm run perf:bundle`): from
+  `dist/.vite/manifest.json`, the gzip size of the entry chunk (JS + CSS, 45 kB), of the entry plus
+  everything it imports statically (every first visit), and of what each lazy page adds beyond that;
+  and the chart engine must not be in the entry's static imports. A size table is printed and added
+  to the job summary.
+- **Phone** (`apps/web/e2e/perf.spec.ts`, `npm run perf:e2e`, config `playwright.perf.config.ts`):
+  per main route (Ideas, Screeners, Explore with a ticker, Regime, Screener results, Admin
+  ingestion), with the API mocked as in the e2e suite, the gzip bytes of scripts transferred, the
+  requests made and the DOM nodes once settled stay under their budgets.
+
+All gated numbers are counts or sizes, never durations. LCP and total blocking time (CPU throttled
+4x) are measured in the same run but **only reported** in the job summary: on shared GitHub
+runners they move 20-50 % between identical runs, so a gate on them would fail PRs at random and
+teach people to ignore it. Read them as a trend, not a verdict.
+
+Budgets only shrink. Budgets sit at the size when they were set + 10 %. After an improvement run
+`npm run perf:bundle -- update` and `PERF_UPDATE=1 npm run perf:e2e` to lower them (they never
+raise one); a new page needs its first budget the same way. Raising a budget is a hand edit of the
+JSON that a reviewer sees, with the reason in the PR. A heavy new dependency belongs behind a
+dynamic import (as the chart engine is), not in the entry.
 
 ## Flaky specs
 

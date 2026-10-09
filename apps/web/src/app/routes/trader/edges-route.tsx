@@ -4,9 +4,10 @@
  */
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
-import { EdgesPage } from '@/pages/trader-edges';
-
 import { traderRoute } from './layout-route';
+import { lazyPage } from '../lazy-page';
+
+const EdgesPage = lazyPage(() => import('@/pages/trader-edges'), 'EdgesPage');
 
 interface EdgesSearch {
   edge?: string;

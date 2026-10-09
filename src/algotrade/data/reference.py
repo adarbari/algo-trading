@@ -303,7 +303,7 @@ def instrument_view(
             company_pre = company is not None and company.pre_snapshot
         else:
             frame = reader.table(table, session, as_of)
-        if frame is None:
+        if frame is None or frame.empty:  # an empty partition holds no value either
             missing.append(table)
             continue
         out = join_fields(out, frame, columns)

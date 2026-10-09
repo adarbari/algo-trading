@@ -13,7 +13,7 @@ from algotrade.services.configs import nightly_screeners, resolve_config
 from algotrade.services.jobs import JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.screening import run as run_module
-from algotrade.services.screening.run import run_screener
+from algotrade.services.screening.run import run_screener, screen_session
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus
@@ -237,6 +237,71 @@ def test_a_required_table_missing_beside_an_optional_one_is_still_partial() -> N
     config = resolve_config(store, "big_liquid", UserContext(SITE_USER))
     outcome = run_screener(reader, writer, config, DAY, now=T0)
     assert outcome.run.coverage is RunCoverage.PARTIAL
-    assert IBKR in outcome.audit["missing_optional_tables"]
-    assert IBKR not in outcome.audit["missing_tables"]
+    # vrp_iv30 has no leg present either: IBKR's table is blocking too (ADR 0055 amendment)
+    assert outcome.audit["missing_optional_tables"] == []
+    assert IBKR in outcome.audit["missing_tables"]
     assert "rollups/instrument/option_liquidity@v1" in outcome.audit["missing_tables"]
+
+
+CBOE = "rollups/instrument/iv30@v1"
+
+
+def _vrp_session(ibkr: bool, cboe: bool):  # type: ignore[no-untyped-def]
+    reader, writer = seeded()
+    if ibkr:
+        rows = [
+            {"instrument_id": i, "iv30_ibkr": v} for i, v in (("EQ:AAA", 0.3), ("EQ:BBB", 0.05))
+        ]
+        writer.write_table(IBKR, DAY, "f2", stamped(rows, DAY, "f2"))
+    if cboe:
+        rows = [{"instrument_id": "EQ:AAA", "iv30_cboe": 0.3}]
+        writer.write_table(CBOE, DAY, "f3", stamped(rows, DAY, "f3"))
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
+    )
+    return reader, resolve_config(store, "vrp_like", UserContext(SITE_USER))
+
+
+def test_ibkr_rows_without_iv30_cboe_is_complete_with_picks_and_the_table_tolerated() -> None:
+    """ADR 0055 amendment: the history sessions before iv30@v1 existed (the screen graded
+    PARTIAL and the edge harness dropped it)."""
+    reader, config = _vrp_session(ibkr=True, cboe=False)
+    screened = screen_session(reader, config, DAY, now=T0)
+    assert screened.run.coverage is RunCoverage.COMPLETE
+    assert screened.blocking == () and screened.tolerated == (CBOE,)
+    assert screened.rules is not None and screened.rules.summary.passed == 1
+
+
+def test_run_screener_audits_the_ran_without_table() -> None:
+    reader, writer = seeded()
+    rows = [{"instrument_id": "EQ:AAA", "iv30_ibkr": 0.3}]
+    writer.write_table(IBKR, DAY, "f2", stamped(rows, DAY, "f2"))
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
+    )
+    config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
+    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    assert outcome.run.coverage is RunCoverage.COMPLETE
+    assert outcome.audit["missing_optional_tables"] == [CBOE]
+    assert outcome.audit["missing_tables"] == []
+
+
+def test_both_iv30_sources_missing_is_partial() -> None:
+    reader, config = _vrp_session(ibkr=False, cboe=False)
+    screened = screen_session(reader, config, DAY, now=T0)
+    assert screened.run.coverage is RunCoverage.PARTIAL
+    assert set(screened.blocking) == {IBKR, CBOE}
+
+
+def test_an_empty_ibkr_partition_with_no_cboe_is_partial_not_a_zero_pick_complete() -> None:
+    """Review of #398: an empty partition holds no value, so it is missing, not present."""
+    reader, writer = seeded()
+    empty = stamped([{"instrument_id": "EQ:AAA", "iv30_ibkr": 0.3}], DAY, "f2").iloc[0:0]
+    writer.write_table(IBKR, DAY, "f2", empty)
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
+    )
+    config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
+    screened = screen_session(reader, config, DAY, now=T0)
+    assert screened.run.coverage is RunCoverage.PARTIAL
+    assert set(screened.blocking) == {IBKR, CBOE}
