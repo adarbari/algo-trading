@@ -55,3 +55,29 @@ one could pick a different session (ADR 0036).
 - One endpoint returning 200 on errors is harder to debug: operation names and
   `extensions.code` carry the signal.
 - New skills: `add-domain-object`, `add-graphql-field`; `add-api-endpoint` covers REST writes only.
+
+## Amendment 2026-10-09: the response cache keys on the runs generation
+
+`POST /graphql` keeps the serialized answer of an error-free query
+(`apps/api/algotrade_api/graphql/response_cache.py`). Its key is the published state
+(`visible_seq`, read before the answer is computed, ADR 0022), the `WriteEpoch` (the config and
+result writes this API served), the document, its variables and the caller's role (ADR 0056).
+That covered only operations over published tables and configs; every read of run records
+(ideas, status strip, screener runs, track records, edges, ingestion, nightly runs, quality)
+ran on each request and, under load, queued for the read threads until the API answered 503.
+
+1. **A runs generation.** `RunStore.generation()` changes on every `save` of a run record (a
+   job's too: `services/jobs` saves through the same store) and on nothing else. Local: the
+   `(inode, mtime_ns)` of `runs/`, which an atomic rename into it moves (measured on APFS:
+   2000 of 2000 saves), `(0, 0)` while it does not exist; memory: a save counter. It is exposed
+   as `StoreReader.runs_generation()` and contract-tested (`tests/contract/storage/`).
+2. **Four groups, every web operation in exactly one** (a test over the generated `gql.ts`
+   fails a new operation until it is classified): shared (role-keyed), user-keyed static,
+   run-dependent, never cached. A run-dependent key also holds the runs generation, read
+   before the answer like `visible_seq`; an operation whose loader reads the clock
+   (`load_completeness`'s last closed session) holds that session too. Role and user id stay in
+   the key. An answer with `errors` is never kept.
+3. **Exact, not timed.** A save moves the generation, so the next read recomputes; a record
+   saved while an answer is computed leaves that answer under a key nobody asks for again. A
+   publish and a save are two moves, so a read between them is keyed on one and recomputed on
+   the other. The 300 s age bound still covers a config edited outside the process.

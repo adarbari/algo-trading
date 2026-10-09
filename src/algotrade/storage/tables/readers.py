@@ -62,6 +62,11 @@ class StoreReader:
         """The latest committed publish sequence: changes exactly when a commit publishes."""
         return self._backend.tables.visible_seq()
 
+    def runs_generation(self) -> tuple[int, int]:
+        """Changes exactly when a run record (a job's too) is saved: the key of a cache over the
+        run records, read before them like ``visible_seq`` (ADR 0022)."""
+        return self._backend.runs.generation()
+
     def table_names(self) -> list[str]:
         return self._backend.tables.names(self.own_run)
 

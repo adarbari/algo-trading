@@ -9,6 +9,7 @@ import asyncio
 import gzip
 import json
 from collections.abc import Callable, Hashable
+from datetime import UTC, date, datetime
 from typing import Any, cast
 
 import strawberry
@@ -20,11 +21,14 @@ from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionResult
 
 from algotrade.config.site.users import Role
+from algotrade.core.time.calendar import last_closed_session
 from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, context_getter
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
 from algotrade_api.graphql.offload import Admission, OffLoop, only_inline
 from algotrade_api.graphql.response_cache import (
+    CLOSED_SESSION_OPERATIONS,
+    RUN_OPERATIONS,
     ResponseCache,
     WriteEpoch,
     cacheable,
@@ -61,10 +65,13 @@ class _Router(GraphQLRouter[RequestContext, None]):
         epoch: WriteEpoch,
         cache: ResponseCache,
         admission: Admission,
+        runs: Callable[[], tuple[int, int]],
+        closed: Callable[[], date],
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._seq, self._epoch, self._cache, self._admission = seq, epoch, cache, admission
+        self._runs, self._closed = runs, closed
 
     async def process_result(
         self, request: Request, result: ExecutionResult
@@ -82,7 +89,17 @@ class _Router(GraphQLRouter[RequestContext, None]):
         if parsed is not None and viewer is not None and cacheable(parsed[0]):
             document, variables = parsed
             name = operation_name(document)
-            key = response_key(self._seq(), self._epoch.value, viewer, document, variables, name)
+            # every state the answer depends on is read before it is computed (ADR 0022)
+            key = response_key(
+                self._seq(),
+                self._epoch.value,
+                viewer,
+                document,
+                variables,
+                name,
+                self._runs() if name in RUN_OPERATIONS else (0, 0),
+                self._closed() if name in CLOSED_SESSION_OPERATIONS else None,
+            )
             body = self._cache.get(key)
             if body is not None:
                 return await _served(body, request)
@@ -146,11 +163,15 @@ def graphql_router(
     epoch: WriteEpoch | None = None,
     cache: ResponseCache | None = None,
     admission: Admission | None = None,
+    runs: Callable[[], tuple[int, int]] = lambda: (0, 0),
+    closed: Callable[[], date] = lambda: last_closed_session(datetime.now(UTC)),
 ) -> GraphQLRouter[RequestContext, None]:
     """``POST /graphql`` over the read contexts ``opener`` opens (one per requested session,
     per request) and the session-free one ``stores`` opens (configs, run records); the
     GraphiQL IDE at ``GET /graphql`` only when ``debug``. ``seq`` is the published state
-    (``StoreReader.visible_seq``) the response cache keys on; ``epoch`` the writes served."""
+    (``StoreReader.visible_seq``) the response cache keys on; ``epoch`` the writes served,
+    ``runs`` the runs generation (``StoreReader.runs_generation``) and ``closed`` the last
+    closed session, which the keys of the run-dependent operations hold."""
     router = _Router(
         schema,
         path=PATH,
@@ -162,6 +183,8 @@ def graphql_router(
         epoch=epoch if epoch is not None else WriteEpoch(),
         cache=cache if cache is not None else ResponseCache(),
         admission=admission if admission is not None else Admission(),
+        runs=runs,
+        closed=closed,
     )
     # No subscriptions: drop Strawberry's WebSocket route, which the caller guard (an HTTP
     # dependency, ADR 0040) cannot see; /graphql is served over HTTP POST only.

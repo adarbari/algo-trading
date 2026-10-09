@@ -65,7 +65,15 @@ def _decisions(record: RunRecord) -> Mapping[str, int] | None:
 
 def _records(ctx: ReadContext, jobs: frozenset[str], first: date, last: date) -> list[RunRecord]:
     """The screen records of ``jobs`` for ``first..last``, one pass, once per publish."""
-    key = ("pick_history", first, last, tuple(sorted(jobs)), ctx.reader.visible_seq())
+    # a record saved by a job or an on-request run moves the runs generation, not the seq
+    key = (
+        "pick_history",
+        first,
+        last,
+        tuple(sorted(jobs)),
+        ctx.reader.visible_seq(),
+        ctx.reader.runs_generation(),
+    )
     found: list[RunRecord] | None = ctx.cache.get(key)  # key read first (ADR 0022)
     if found is None:
         found = ctx.reader.runs_of(jobs, first, last)
