@@ -16,8 +16,13 @@ export {
   type EdgesResponse,
   type FrozenRow,
 } from './model/edges';
-export { chipOf, oddsEntry, toTrackRecords, type TrackEntry } from './model/track-records';
-export { ScreenerOdds, type ScreenerOddsProps } from './ui/ScreenerOdds';
-export { ScreenerTrackChip } from './ui/ScreenerTrackChip';
+export {
+  oddsEntry,
+  recordFigures,
+  toTrackRecords,
+  type RecordFigures,
+  type TrackEntry,
+} from './model/track-records';
+export { ScreenerEdgeName, ScreenerRecord, type ScreenerRecordProps } from './ui/ScreenerRecord';
 export { StoredOdds, type StoredOddsProps } from './ui/StoredOdds';
 export { EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from './model/fixtures';

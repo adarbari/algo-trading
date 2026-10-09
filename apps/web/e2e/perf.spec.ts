@@ -13,7 +13,13 @@ import { gzipSync } from 'node:zlib';
 
 import { expect, test, type Locator, type Page, type Response } from '@playwright/test';
 
-import { loadBudgets, saveBudgets, shrunk, type RouteBudget } from '../scripts/perf-budgets';
+import {
+  loadBudgets,
+  nearBudgetNotes,
+  saveBudgets,
+  shrunk,
+  type RouteBudget,
+} from '../scripts/perf-budgets';
 import { settled } from './a11y';
 import { mockViewer } from './auth-api';
 import { mockApi } from './mock-api';
@@ -167,6 +173,13 @@ test.afterAll(() => {
   console.log(
     `\n${text}\n(value / budget; LCP and TBT are noise on shared runners and never fail)`,
   );
+  const measuredByPath: Record<string, number> = {};
+  for (const [url, m] of results) {
+    measuredByPath[`e2e.${url}.first_load_js_gzip_bytes`] = m.first_load_js_gzip_bytes;
+    measuredByPath[`e2e.${url}.requests`] = m.requests;
+    measuredByPath[`e2e.${url}.dom_nodes`] = m.dom_nodes;
+  }
+  for (const note of nearBudgetNotes(measuredByPath, budgets)) console.log(note);
   const summary = process.env['GITHUB_STEP_SUMMARY'];
   if (summary !== undefined) appendFileSync(summary, `${text}\n\n`);
 

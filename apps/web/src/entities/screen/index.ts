@@ -69,6 +69,8 @@ export {
 } from './model/decisions';
 export { CriteriaScorecard, type CriteriaScorecardProps } from './ui/CriteriaScorecard';
 export { scorecardRows, type ScorecardEntry, type ScorecardRow } from './model/scorecard';
+export { useCriterionLines } from './api/criteria-lines';
+export { criterionLines, type CriterionLine } from './model/criteria-lines';
 export { ScoreBreakdown } from './ui/ScoreBreakdown';
 export { scoreBreakdown, type ScoreLine } from './model/score';
 export {
