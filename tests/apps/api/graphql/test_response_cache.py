@@ -1,9 +1,10 @@
 """The response cache of ``POST /graphql`` and the admission in front of the read pool: a hit
-serves the stored bytes without opening a context, a role or user never reads another's entry
-(ADR 0056: an admin's answer carries causes), a publish or a write makes the earlier entries
-unreachable, ``If-None-Match`` gets a 304 before the operation runs, an errored answer is not
-kept, the bytes are bounded; a request past ``MAX_WAITING`` gets 503 + ``Retry-After`` while
-``/health`` and the inline ``viewer`` are never refused."""
+serves the stored bytes without opening a context, only the allow-listed operations are kept
+(one that reads run records is never cached), a role or user never reads another's entry
+(ADR 0056: an admin's answer carries causes), a publish or a write route makes the earlier
+entries unreachable (a probe or preview POST does not), an errored answer is not kept, the
+bytes are bounded; a request past ``MAX_WAITING`` gets 503 + ``Retry-After`` while ``/health``
+and the inline ``viewer`` are never refused."""
 
 from collections.abc import Callable
 from typing import Any
@@ -15,13 +16,21 @@ from algotrade.config.site.users import Role, UserRecord
 from algotrade_api import main
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.graphql.offload import MAX_WAITING, READ_THREADS, Admission
-from algotrade_api.graphql.response_cache import ResponseCache, WriteEpoch, response_key
+from algotrade_api.graphql.response_cache import (
+    SHARED_OPERATIONS,
+    USER_OPERATIONS,
+    ResponseCache,
+    WriteEpoch,
+    response_key,
+)
 from algotrade_api.graphql.schema import graphql_router
 from algotrade_api.main import create_app
 from tests.helpers.api_store import as_user
 
-SESSION = "{ session { date } }"
-VIEWER = "{ viewer { id role } }"
+SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
+VIEWER = "query Day { viewer { id role } }"
+SHARED = "query MarketHistory { viewer { id role } }"  # a SHARED_OPERATIONS name
+RUNS = "query RunRecord { session { date } }"  # reads run records: never cached
 
 
 class Harness:
@@ -64,8 +73,8 @@ def harness(
     return Harness(api_golden[0], monkeypatch)
 
 
-def _post(client: TestClient, query: str, **headers: str) -> Any:
-    return client.post("/graphql", json={"query": query}, headers=headers)
+def _post(client: TestClient, query: str) -> Any:
+    return client.post("/graphql", json={"query": query})
 
 
 def test_a_repeat_is_served_from_the_cache_without_opening_a_context(harness: Harness) -> None:
@@ -75,19 +84,18 @@ def test_a_repeat_is_served_from_the_cache_without_opening_a_context(harness: Ha
     again = _post(client, SESSION)
     assert first.status_code == again.status_code == 200
     assert opened > 0 and harness.opened == opened  # the second never reached the loaders
-    assert again.content == first.content and again.headers["etag"] == first.headers["etag"]
-    assert again.headers["cache-control"] == "private, no-cache"
+    assert again.content == first.content
 
 
-def test_if_none_match_answers_304_before_executing(harness: Harness) -> None:
+def test_an_operation_that_reads_run_records_is_never_cached(harness: Harness) -> None:
+    # run records and jobs change without a publish (an on-request run, a failed job)
     client = harness.client()
-    first = _post(client, SESSION)
+    _post(client, RUNS)
     opened = harness.opened
-    again = _post(client, SESSION, **{"If-None-Match": first.headers["etag"]})
-    assert again.status_code == 304 and again.content == b""
-    assert harness.opened == opened
-    other = _post(client, SESSION, **{"If-None-Match": '"nope"'})
-    assert other.status_code == 200
+    _post(client, RUNS)
+    assert harness.opened > opened and harness.cache.held == 0
+    _post(client, "{ session { date } }")  # an anonymous operation: not cached either
+    assert harness.cache.held == 0
 
 
 def test_a_role_and_a_user_never_read_another_entry(harness: Harness) -> None:
@@ -98,34 +106,57 @@ def test_a_role_and_a_user_never_read_another_entry(harness: Harness) -> None:
     assert trader.json()["data"]["viewer"]["role"] == "trader"
     assert trader.json()["data"]["viewer"]["id"] == "bob"
     assert other.json()["data"]["viewer"]["id"] == "alice"
-    assert len({admin.headers["etag"], trader.headers["etag"], other.headers["etag"]}) == 3
-    # and the trader's ETag does not open the admin's entry
-    stale = _post(harness.client("ana"), VIEWER, **{"If-None-Match": trader.headers["etag"]})
-    assert stale.status_code == 200
+
+
+def test_a_shared_operation_is_keyed_on_the_role_alone(harness: Harness) -> None:
+    admin = _post(harness.client("ana", Role.ADMIN), SHARED)
+    bob = _post(harness.client("bob", Role.TRADER), SHARED)
+    alice = _post(harness.client("alice", Role.TRADER), SHARED)
+    assert admin.json()["data"]["viewer"]["role"] == "admin"  # never a trader's entry
+    assert bob.json()["data"]["viewer"]["role"] == "trader"
+    assert alice.content == bob.content  # one entry for the role (bob's)
 
 
 def test_a_publish_makes_the_earlier_entries_unreachable(harness: Harness) -> None:
     client = harness.client()
-    first = _post(client, SESSION)
+    _post(client, SESSION)
     harness.seq += 1
     opened = harness.opened
-    after = _post(client, SESSION, **{"If-None-Match": first.headers["etag"]})
-    assert after.status_code == 200 and harness.opened > opened
-    assert after.headers["etag"] != first.headers["etag"]
+    _post(client, SESSION)
+    assert harness.opened > opened
 
 
-def test_a_write_the_api_served_makes_the_earlier_entries_unreachable(harness: Harness) -> None:
+def test_a_write_route_makes_the_earlier_entries_unreachable(harness: Harness) -> None:
     client = harness.client()
-    first = _post(client, SESSION)
-    client.delete("/configs/nothing-here")  # any write the API serves moves the epoch
-    assert _post(client, SESSION).headers["etag"] != first.headers["etag"]
+    _post(client, SESSION)
+    client.delete("/screeners/none/draft")  # a route of routes/authoring
+    opened = harness.opened
+    _post(client, SESSION)
+    assert harness.opened > opened
+
+
+def test_a_probe_or_a_preview_post_leaves_the_cache_alone(harness: Harness) -> None:
+    client = harness.client()
+    _post(client, SESSION)
+    opened = harness.opened
+    client.post("/features/check", json={})  # a preview POST: writes nothing
+    client.post("/regime/explain", json={})  # the explain probe the Regime view sends
+    _post(client, SESSION)
+    assert harness.opened == opened
 
 
 def test_an_errored_answer_is_not_kept(harness: Harness) -> None:
     client = harness.client()
-    bad = _post(client, "{ nonsense }")
-    assert "errors" in bad.json() and "etag" not in bad.headers
+    bad = _post(client, "query Day { nonsense }")
+    assert "errors" in bad.json()
     assert harness.cache.held == 0
+
+
+def test_the_allow_list_names_no_operation_that_reads_run_records() -> None:
+    names = SHARED_OPERATIONS | USER_OPERATIONS
+    banned = {"NightlyRuns", "RunRecord", "RunItems", "HarnessRuns", "HarnessRun"}
+    banned |= {"StatusScreens", "ScreenerRuns", "ScreenerResults", "IdeasPage", "EdgesPage"}
+    assert not names & banned and not SHARED_OPERATIONS & USER_OPERATIONS
 
 
 def test_the_key_holds_the_variables_and_the_document() -> None:
@@ -162,11 +193,10 @@ def test_past_the_queue_the_api_answers_503_with_retry_after(harness: Harness) -
     client = harness.client()
     harness.admission.admit()
     harness.admission.admit()  # the pool and its queue are full
-    refused = _post(client, SESSION)
+    refused = _post(client, RUNS)
     assert refused.status_code == 503 and int(refused.headers["retry-after"]) > 0
-    assert harness.cache.held == 0
     harness.admission.release()
-    assert _post(client, SESSION).status_code == 200  # a place is free again
+    assert _post(client, RUNS).status_code == 200  # a place is free again
 
 
 def test_health_and_viewer_are_never_refused(harness: Harness) -> None:
@@ -174,7 +204,7 @@ def test_health_and_viewer_are_never_refused(harness: Harness) -> None:
     harness.admission.admit()
     harness.admission.admit()
     assert client.get("/health").status_code == 200
-    viewer = _post(client, "{ me: viewer { id } }")  # not cached yet: runs, never refused
+    viewer = _post(client, "{ me: viewer { id } }")  # inline: never refused
     assert viewer.status_code == 200 and viewer.json()["data"]["me"]["id"] == "ana"
 
 

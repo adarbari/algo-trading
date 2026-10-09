@@ -22,7 +22,13 @@ from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, 
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
 from algotrade_api.graphql.offload import Admission, OffLoop, only_inline
-from algotrade_api.graphql.response_cache import ResponseCache, WriteEpoch, response_key
+from algotrade_api.graphql.response_cache import (
+    ResponseCache,
+    WriteEpoch,
+    cacheable,
+    operation_name,
+    response_key,
+)
 from algotrade_api.graphql.scalars import SCALARS
 from algotrade_api.graphql.types.query import Query
 
@@ -42,7 +48,7 @@ def sdl() -> str:
 
 class _Router(GraphQLRouter[RequestContext, None]):
     """Strawberry's FastAPI router with an ``extensions.code`` on every error, a response cache
-    with ``ETag`` / 304 (``response_cache.py``) and the admission control in front of the read
+    (``response_cache.py``) and the admission control in front of the read
     pool (``offload.Admission``: a request past the queue raises ``OverloadedError``)."""
 
     def __init__(
@@ -61,6 +67,7 @@ class _Router(GraphQLRouter[RequestContext, None]):
         self, request: Request, result: ExecutionResult
     ) -> GraphQLHTTPResponse:
         viewer = getattr(request.state, "viewer", None)
+        request.state.failed = bool(result.errors)  # a failed or partial answer is never kept
         return response_of(result, viewer is not None and viewer.role is Role.ADMIN)
 
     async def run(self, request: Any, *args: Any, **kwargs: Any) -> Any:
@@ -69,15 +76,13 @@ class _Router(GraphQLRouter[RequestContext, None]):
         parsed = await _operation(request)
         viewer = getattr(request.state, "viewer", None)
         key = None
-        if parsed is not None and viewer is not None:
-            document, variables, name = parsed
+        if parsed is not None and viewer is not None and cacheable(parsed[0]):
+            document, variables = parsed
+            name = operation_name(document)
             key = response_key(self._seq(), self._epoch.value, viewer, document, variables, name)
-            etag = f'"{key}"'
             body = self._cache.get(key)
             if body is not None:
-                if _matches(request.headers.get("if-none-match"), etag):
-                    return Response(status_code=304, headers=_validators(etag))
-                return Response(body, media_type="application/json", headers=_validators(etag))
+                return Response(body, media_type="application/json")
         inline = parsed is not None and only_inline(cast(Hashable, self.schema), parsed[0])
         if not inline:
             self._admission.admit()
@@ -86,15 +91,15 @@ class _Router(GraphQLRouter[RequestContext, None]):
         finally:
             if not inline:
                 self._admission.release()
-        if key is not None and _cacheable(response):
+        failed = getattr(request.state, "failed", True)
+        if key is not None and response.status_code == 200 and not failed:
             self._cache.put(key, bytes(response.body))
-            response.headers.update(_validators(f'"{key}"'))
         return response
 
 
-async def _operation(request: Request) -> tuple[str, Any, str | None] | None:
-    """The document, variables and operation name of a single-operation JSON POST; ``None``
-    for anything else (a batch, a multipart upload, a body that is not JSON)."""
+async def _operation(request: Request) -> tuple[str, Any] | None:
+    """The document and variables of a single-operation JSON POST; ``None`` for anything else
+    (a batch, a multipart upload, a body that is not JSON)."""
     if "application/json" not in request.headers.get("content-type", ""):
         return None
     try:
@@ -103,33 +108,7 @@ async def _operation(request: Request) -> tuple[str, Any, str | None] | None:
         return None
     if not isinstance(data, dict) or not isinstance(data.get("query"), str):
         return None
-    name = data.get("operationName")
-    return data["query"], data.get("variables"), name if isinstance(name, str) else None
-
-
-def _validators(etag: str) -> dict[str, str]:
-    """``private, no-cache``: the browser keeps the body but asks again (a conditional request)
-    before using it."""
-    return {"ETag": etag, "Cache-Control": "private, no-cache"}
-
-
-def _matches(header: str | None, etag: str) -> bool:
-    """Whether an ``If-None-Match`` header names ``etag`` (or ``*``)."""
-    if header is None:
-        return False
-    tags = {t.strip().removeprefix("W/") for t in header.split(",")}
-    return etag in tags or "*" in tags
-
-
-def _cacheable(response: Response) -> bool:
-    """A 200 JSON answer with no ``errors`` (a failed or partial read is never kept)."""
-    if response.status_code != 200 or "application/json" not in (response.media_type or ""):
-        return False
-    try:
-        body = json.loads(bytes(response.body))
-    except ValueError:
-        return False
-    return isinstance(body, dict) and not body.get("errors")
+    return data["query"], data.get("variables")
 
 
 def graphql_router(

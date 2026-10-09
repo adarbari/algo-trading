@@ -50,7 +50,7 @@ detect = [{ call = "load_edge_verdict" }, { call = "load_verdict" }]
 
 [[responsibility]]
 id = "graphql-schema"
-description = "The GraphQL read layer (ADR 0037): the Strawberry schema at POST /graphql, scalars (FeatureName, Date, JSON), error codes, limits, request context, dataloaders, the read pool's admission control (503 + Retry-After past the queue), the response cache with ETag / 304 (ADR 0056: keyed on role and user) and the thin types over services.read; the committed snapshot apps/api/schema.graphql (from read-model PR 4)"
+description = "The GraphQL read layer (ADR 0037): the Strawberry schema at POST /graphql, scalars (FeatureName, Date, JSON), error codes, limits, request context, dataloaders, the read pool's admission control (503 + Retry-After past the queue), the response cache (an allow-list of operations over published tables; ADR 0056: keyed on role, and user unless shared) and the thin types over services.read; the committed snapshot apps/api/schema.graphql (from read-model PR 4)"
 owner = ["apps/api/algotrade_api/graphql/*"]
 section = "docs/api/read-model.md#graphql-conventions"
 detect = [{ import = "strawberry" }]
