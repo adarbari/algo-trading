@@ -27,6 +27,8 @@
     "visual": "playwright test -c playwright.visual.config.ts",
     "visual:docker": "scripts/in-playwright-docker.sh npm run visual",
     "visual:update": "scripts/in-playwright-docker.sh npm run visual -- --update-snapshots",
+    "perf:bundle": "tsx scripts/check-bundle-budgets.ts",
+    "perf:e2e": "playwright test -c playwright.perf.config.ts",
     "tokens": "tsx scripts/generate-tokens.ts",
     "components:md": "tsx scripts/generate-components-md.ts",
     "api:generate": "tsx scripts/generate-api.ts && graphql-codegen --config codegen.ts",
