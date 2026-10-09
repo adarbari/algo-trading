@@ -347,6 +347,70 @@
         "title": "DroppedCriterion",
         "type": "object"
       },
+      "EvaluationRequest": {
+        "properties": {
+          "edge_id": {
+            "title": "Edge Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "exploratory": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exploratory"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "user": {
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "edge_id",
+          "user",
+          "job_id",
+          "run_id",
+          "exploratory",
+          "error"
+        ],
+        "title": "EvaluationRequest",
+        "type": "object"
+      },
       "EvaluationSplitBody": {
         "properties": {
           "split_from": {
@@ -2025,7 +2089,7 @@
     }
   },
   "info": {
-    "description": "Read-only API over the algotrade stores (ADR 0024); it writes only user configs and user features, through services.authoring (ADR 0029), and the live option quotes it served, to live/* tables (ADR 0028); a screener run on request writes its results as the nightly does (ADR 0033).",
+    "description": "Read-only API over the algotrade stores (ADR 0024); it writes only user configs and user features, through services.authoring (ADR 0029), and the live option quotes it served, to live/* tables (ADR 0028); a screener run or an edge evaluation on request writes its results as the nightly and the CLI do (ADR 0033, 0059).",
     "title": "algotrade API",
     "version": "0.1.0"
   },
@@ -2102,6 +2166,130 @@
         "summary": "Live Chain",
         "tags": [
           "chains"
+        ]
+      }
+    },
+    "/edges/{edge_id}/evaluate": {
+      "post": {
+        "operationId": "evaluate_edges__edge_id__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "run it for the site, not for you (admins only)",
+            "in": "query",
+            "name": "as_site",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "run it for the site, not for you (admins only)",
+              "title": "As Site",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRequest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate",
+        "tags": [
+          "edges"
+        ]
+      }
+    },
+    "/edges/{edge_id}/evaluate/{job_id}": {
+      "get": {
+        "description": "403 for another user's job unless the caller is an admin (the job's owner is its user).",
+        "operationId": "evaluate_status_edges__edge_id__evaluate__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRequest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Status",
+        "tags": [
+          "edges"
         ]
       }
     },

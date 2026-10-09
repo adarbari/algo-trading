@@ -558,6 +558,10 @@ path = "apps/api/algotrade_api/routes/drafting"
 purpose = "the drafting route (ADR 0041): a sentence to a draft rule screen through the app's text model; a POST body, never a write; calls the one services.drafting use case"
 
 [[dir]]
+path = "apps/api/algotrade_api/routes/edges"
+purpose = "the edges area's routes that stay REST (ADR 0059): run an edge evaluation on request and poll its job; its reads are GraphQL (Query.edges)"
+
+[[dir]]
 path = "apps/api/algotrade_api/routes/preview"
 purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.preview dry run"
 

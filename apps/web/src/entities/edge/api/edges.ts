@@ -4,7 +4,7 @@
  * and its stored rows, plus every run the user sees (without rows) so exploratory ones can be
  * listed and labelled. The cache holds the response; `select` shapes it.
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -90,4 +90,9 @@ export function useEdges() {
     queryFn: () => gql(EdgesPage, {}),
     select: toEdges,
   });
+}
+
+/** Read the edges (and their runs) again, after an evaluation finished. */
+export function refreshEdges(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: queryKeys.gqlAll('EdgesPage') });
 }

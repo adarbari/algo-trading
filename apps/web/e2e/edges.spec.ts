@@ -57,6 +57,15 @@ test('a user sets and clears their train / test split', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('a user runs an evaluation of the chosen edge and sees it finish', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/edges?edge=momentum_12_1');
+  await page.getByRole('button', { name: 'Run evaluation' }).click();
+  await expect(page.getByText('Done (exploratory)')).toBeVisible();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('Screeners shows the track-record chip and Ideas the odds line', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/screeners');

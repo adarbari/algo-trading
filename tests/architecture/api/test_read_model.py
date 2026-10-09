@@ -39,6 +39,8 @@ PARTITION_READERS = {
     READ_MODEL / "context.py": "the session plumbing: reads exactly the session's partition",
     SERVICES / "ondemand" / "screens.py": "a write: an on-request run targets the latest "
     "session (ADR 0033), outside read strictness (ADR 0036 decision 5)",
+    SERVICES / "ondemand" / "edges.py": "a write: an on-request evaluation spans the stored "
+    "outcome sessions, as the CLI's does (ADR 0059): a run input, never a page read",
     SERVICES / "features.py": "run inputs: expression features over a date range the run "
     "names (screens, backtests); check_user_features (the validate-features CLI only) samples "
     "the latest date an input has: never a page read",

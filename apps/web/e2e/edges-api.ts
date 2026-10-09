@@ -45,6 +45,25 @@ export async function mockEdgesApi(page: Page): Promise<void> {
     splitFrom = body.split_from;
     await route.fulfill({ json: { split_from: splitFrom } });
   });
+  let polls = 0;
+  const evaluation = (state: string) => ({
+    state,
+    edge_id: 'momentum_12_1',
+    user: 'ann',
+    job_id: 'job-edge-eval-1',
+    run_id: state === 'complete' ? 'run-9' : null,
+    exploratory: state === 'complete' ? true : null,
+    error: null,
+  });
+  await page.route('**/api/edges/*/evaluate**', async (route: Route) => {
+    if (route.request().method() === 'POST') {
+      polls = 0;
+      await route.fulfill({ status: 202, json: evaluation('running') });
+      return;
+    }
+    polls += 1; // the first poll still sees it running
+    await route.fulfill({ json: evaluation(polls > 1 ? 'complete' : 'running') });
+  });
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as { query?: string } | null;
     const query = body?.query ?? '';

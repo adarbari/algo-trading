@@ -438,7 +438,7 @@ query IdeasPage($date: Date, $limit: Int!, $names: [FeatureName!]!) {
 
 | Stays REST | Why |
 |---|---|
-| Writes: `routes/authoring/*`, `POST /screens/{id}/run` | a different contract (ADRs 0029, 0033); mutations would be a second write surface |
+| Writes: `routes/authoring/*`, `POST /screens/{id}/run`, `POST /edges/{id}/evaluate` | a different contract (ADRs 0029, 0033, 0059); mutations would be a second write surface |
 | `GET /screens/{id}/run/{job_id}` | job polling, kept with its POST |
 | `GET /health` | liveness probe for scripts and `make doctor` |
 | `GET /chains/{id}/live` | latency-bound, records to `live/*`, bypasses the session model on purpose (ADR 0028) |
