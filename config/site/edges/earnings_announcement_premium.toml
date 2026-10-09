@@ -72,9 +72,16 @@ baselines on the same sessions, and the same names outside their windows."""
 
 [[sources]]
 title = "Frazzini, A. and Lamont, O., The Earnings Announcement Premium and Trading Volume, NBER working paper, 2007"
+url = "https://www.nber.org/papers/w13090"
 
 [[sources]]
 title = "Savor, P. and Wilson, M., Earnings Announcements and Systematic Risk, Journal of Finance, 2016"
+url = "https://doi.org/10.1111/jofi.12361"
 
 [[sources]]
 title = "Barber, B., De George, E., Lehavy, R. and Trueman, B., The Earnings Announcement Premium Around the Globe, Journal of Financial Economics, 2013"
+url = "https://doi.org/10.1016/j.jfineco.2012.10.006"
+
+[[sources]]
+title = "Quantpedia, Earnings Announcement Premium (strategy page)"
+url = "https://quantpedia.com/strategies/earnings-announcement-premium/"
