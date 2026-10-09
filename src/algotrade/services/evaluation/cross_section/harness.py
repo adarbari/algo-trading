@@ -618,7 +618,7 @@ def evaluate_edge(
             pooled = [
                 pool_random([legs[leg.decision] for leg in block if leg.decision in legs])
                 for block in plan.blocks
-                if any(leg.decision in legs for leg in block)
+                if _drawn(block, legs, closed)
             ]
             if pooled:
                 randoms.append(
@@ -849,6 +849,13 @@ def _measure_random(
     )
     if found is not None:
         out.randoms.setdefault((p.key, variant.id), {})[leg.decision] = found
+
+
+def _drawn(block: Sequence[_Leg], legs: Mapping[date, RandomStat], closed: set[date]) -> bool:
+    """Whether a block has draws: every leg whose window closed has them, as ``pool_stats`` drops
+    a block with a day the screener could not measure, so must the draws matched to it."""
+    mine = [leg for leg in block if leg.entry in closed]
+    return bool(mine) and all(leg.decision in legs for leg in mine)
 
 
 def _trial_hash(scope: _Scope, variant: Variant) -> str:

@@ -921,3 +921,14 @@ def test_the_run_hash_follows_the_random_draws() -> None:
         DAYS[0], DAYS[-1], AS_OF, random_draws=50,
     ).run_hash  # fmt: skip
     assert a != b
+
+
+def test_a_block_with_a_day_the_screener_could_not_measure_has_no_draws_either() -> None:
+    w = build_world(no_features=[DAYS[2]])  # the second day of the DAYS[1] block: no screen
+    for day, names in {DAYS[1]: [10, 11], DAYS[2]: [12], DAYS[5]: [0, 1]}.items():
+        w.write_reactions(day, {IDS[i]: 0 for i in names})
+    ev = run(w, event_edge(2, frozen_from="2026-09-01"))
+    (found,) = ev.random_picks
+    # Same sessions as the screener: the unmeasured block is in neither.
+    frozen = next(m for m in ev.results[0].measures if m.slice_kind == "frozen")
+    assert found.draws[0].sessions == frozen.sessions == 1
