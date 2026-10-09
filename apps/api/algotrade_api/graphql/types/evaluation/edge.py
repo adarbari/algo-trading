@@ -144,7 +144,8 @@ class EdgeEvidence:
 
 @strawberry.type(
     description="An edge document (ADR 0053): status, thesis, the screeners and baselines that "
-    "implement it, its `frozenFrom` (null: no frozen period) and the run it cites"
+    "implement it, its `frozenFrom` (null: no frozen period) and the run it cites; `mine`: the "
+    "user has a document of this id of their own, not only the site's"
 )
 class Edge:
     id: str
@@ -163,6 +164,7 @@ class Edge:
     rejection_reason: str
     sources: list[EdgeSource]
     definition: EdgeDefinition
+    mine: bool
     edge: strawberry.Private[edges.Edge]
     ctx: strawberry.Private[Stores]
     cache: strawberry.Private[dict[str, Any]]
@@ -186,6 +188,7 @@ class Edge:
             rejection_reason=d.rejection_reason,
             sources=[EdgeSource.of(x) for x in d.sources],
             definition=EdgeDefinition.of(d.definition),
+            mine=d.mine,
             edge=d,
             ctx=ctx,
             cache={},

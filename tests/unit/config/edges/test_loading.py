@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.edges.document import CLOSED
-from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.loading import load_edges, own_edge_ids
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import field_catalog
@@ -32,6 +32,13 @@ def store(**docs: dict[str, Any]) -> MemoryConfigStore:
 
 def test_no_files_no_edges() -> None:
     assert load_edges(MemoryConfigStore({})) == ()
+
+
+def test_a_user_owns_the_edge_documents_in_their_own_folder_and_the_site_none() -> None:
+    configs = store(site__drift=document(), alice__drift={"top_k": 3}, alice__mine=document())
+    assert own_edge_ids(configs, "alice") == {"drift", "mine"}
+    assert own_edge_ids(configs, "bob") == frozenset()
+    assert own_edge_ids(configs) == frozenset()  # the site's documents are the site's
 
 
 def test_screeners_name_rule_screens_and_python_screeners() -> None:

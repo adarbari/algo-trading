@@ -22,6 +22,8 @@ KEYS = (
     "max_pbo",
     "works_max_pbo",
     "oos_lift_share",
+    "random_draws",
+    "random_beat_share",
 )
 
 
@@ -29,7 +31,9 @@ KEYS = (
 class VerdictSettings:
     """Trades are independent sessions; ``t`` is the top-vs-bottom decile t statistic, ``dsr`` the
     deflated Sharpe ratio, ``pbo`` the probability of backtest overfitting. ``oos_lift_share``:
-    the out-of-sample lift must keep this share of the whole-history lift."""
+    the out-of-sample lift must keep this share of the whole-history lift. ``random_draws``: random
+    picks of ``top_k`` names drawn per out-of-sample session and holding period (the random-pick
+    backtest, ED8); Works needs the out-of-sample lift to beat ``random_beat_share`` of them."""
 
     min_oos_trades: int = 40  # owner decision 2026-10-09
     works_trades: int = 100
@@ -43,6 +47,8 @@ class VerdictSettings:
     max_pbo: float = 0.5
     works_max_pbo: float = 0.2
     oos_lift_share: float = 0.5
+    random_draws: int = 1000
+    random_beat_share: float = 0.95
 
     @classmethod
     def from_document(
@@ -64,4 +70,6 @@ class VerdictSettings:
             max_pbo=t.fraction("max_pbo", d.max_pbo),
             works_max_pbo=t.fraction("works_max_pbo", d.works_max_pbo),
             oos_lift_share=t.number("oos_lift_share", d.oos_lift_share, 0),
+            random_draws=t.integer("random_draws", d.random_draws, 1),
+            random_beat_share=t.fraction("random_beat_share", d.random_beat_share),
         )

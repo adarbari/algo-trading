@@ -20,7 +20,7 @@ from algotrade.services.evaluation.cross_section.historical import (
     require_liquidity_rule,
 )
 from algotrade.services.evaluation.cross_section.picks import eligible, screen_variant
-from algotrade.services.evaluation.cross_section.report import render_edge_report
+from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
 from algotrade.services.evaluation.cross_section.results import historical_identity
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore

@@ -55,6 +55,14 @@ def result(
     return rows
 
 
+def draws(beaten: int, of: int = 100, horizon: int = 20) -> list[EdgeRow]:
+    """``of`` random-pick draws, ``beaten`` of them below the screener's own lift (1.2)."""
+    return [
+        row("random", "random", "draw", horizon_sessions=horizon, lift=1.0 if i < beaten else 1.5)
+        for i in range(of)
+    ]
+
+
 def verdict(rows: list[EdgeRow] | None, **kw: object) -> EdgeVerdict:
     return judge("e", rows, SPLIT, T, **kw)  # type: ignore[arg-type]
 
@@ -96,21 +104,33 @@ def test_works_needs_every_criterion_and_the_random_pick_win() -> None:
         whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
     )
     capped = verdict(strong)
-    assert capped.verdict == PROMISING and "random-pick" in capped.rationale
-    assert verdict(strong, random_beaten=True).verdict == WORKS
-    assert verdict(strong, random_beaten=False).verdict == PROMISING
+    assert capped.verdict == PROMISING and "random picks is not measured" in capped.rationale
+    assert verdict(strong, draws=draws(100)).verdict == WORKS
+    assert verdict(strong, draws=draws(0)).verdict == PROMISING
+
+
+def test_works_needs_the_lift_above_the_beat_share_of_the_draws() -> None:
+    strong = result(
+        oos={"decile_t": 3.0, "decile_spread": 0.9},
+        whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
+    )
+    assert verdict(strong, draws=draws(95)).verdict == WORKS  # exactly 95 of 100
+    below = verdict(strong, draws=draws(94))
+    assert below.verdict == PROMISING and "beats 94% of 100 random picks" in below.rationale
+    # Draws of another holding period say nothing about this one.
+    assert verdict(strong, draws=draws(100, horizon=5)).verdict == PROMISING
 
 
 def test_works_boundaries() -> None:
     strong = {"decile_t": 3.0, "decile_spread": 0.9}
     whole = {"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2}
-    assert verdict(result(oos=strong, whole=whole), random_beaten=True).verdict == WORKS
+    assert verdict(result(oos=strong, whole=whole), draws=draws(100)).verdict == WORKS
     short = {**whole, "sessions": 99}
-    assert verdict(result(oos=strong, whole=short), random_beaten=True).verdict == PROMISING
+    assert verdict(result(oos=strong, whole=short), draws=draws(100)).verdict == PROMISING
     thin = {**strong, "decile_t": 2.99}
-    assert verdict(result(oos=thin, whole=whole), random_beaten=True).verdict == PROMISING
+    assert verdict(result(oos=thin, whole=whole), draws=draws(100)).verdict == PROMISING
     few_oos = {**strong, "sessions": 39}  # below the Promising minimum too (both are 40)
-    assert verdict(result(oos=few_oos, whole=whole), random_beaten=True).verdict == NOT_ENOUGH
+    assert verdict(result(oos=few_oos, whole=whole), draws=draws(100)).verdict == NOT_ENOUGH
 
 
 def test_win_rate_not_above_base_is_not_working() -> None:
@@ -245,3 +265,18 @@ def test_no_declared_baselines_do_not_block_promising_and_say_so() -> None:
     assert (decoy.status, decoy.value) == ("pass", "no decoys declared")
     # a declared baseline with no stored row stays not measured
     assert verdict(result(baselines=())).verdict == NOT_ENOUGH
+
+
+def test_the_page_figures_are_the_in_sample_deciles_the_trials_and_the_robustness() -> None:
+    deciles = tuple(0.09 - i / 50 for i in range(10))
+    rows = [
+        row(kind="in_sample", decile_means=deciles) if r.slice_kind == "in_sample" else r
+        for r in result()
+    ]
+    v = verdict(rows, draws=draws(60))
+    assert v.deciles == deciles  # the in-sample row's, never the out-of-sample one
+    assert v.trials == 3
+    assert v.robustness is not None and v.robustness.beats == 0.6 and v.robustness.draws == 100
+    assert v.robustness.summary == "Beats 60% of 100 random backtests after 3 variants tried."
+    bare = verdict(result())
+    assert bare.deciles == () and bare.robustness is None  # not stored: not zeros, no chart

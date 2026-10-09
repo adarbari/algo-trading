@@ -9,8 +9,9 @@ First match wins: Waiting on data (no official result, or no candidate rows); No
 Not working (a hard failure: out-of-sample win rate not above the base rate, t, overfitting
 probability, deflated Sharpe, or worse than the median baseline; then any criterion of
 Promising missed); Promising;
-Works (more trades, stricter thresholds, and a win over the best random-pick backtest, which
-does not exist yet: it is "not measured" and caps the verdict at Promising). The statistics are
+Works (more trades, stricter thresholds, and an out-of-sample lift above at least
+``random_beat_share`` of the random-pick backtest's draws, ``quant.edge_statistics.percentile_of``;
+a run with no draws is "not measured" and caps the verdict at Promising). The statistics are
 the stored rows' (``quant/edge_statistics.py``), never recomputed; the thresholds are site data
 (``config/site/verdict.toml``); the sentences are the server's, the browser words nothing."""
 
@@ -25,6 +26,7 @@ from algotrade.config.site.settings import load_verdict
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge
+from algotrade.services.read.evaluation.robustness import Robustness, beat_share, load_robustness
 from algotrade.services.read.evaluation.runs import EdgeRow
 
 WORKS: Final = "works"
@@ -90,6 +92,9 @@ class EdgeVerdict:
     deflated_sharpe: float | None = None
     pbo: float | None = None
     years: tuple[YearRow, ...] = ()
+    trials: int | None = None  # the variants tried on the edge (the whole result's count)
+    deciles: tuple[float | None, ...] = ()  # in-sample mean outcome per tenth, best-ranked first
+    robustness: Robustness | None = None  # the lift among the random-pick backtests
 
 
 def _pct(x: float | None) -> str:
@@ -172,8 +177,17 @@ def _words(x: VerdictCriterion) -> str:
     return f"{x.label} is {x.value}; it needs {x.threshold}"
 
 
+def _random(c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow]) -> tuple[str, bool | None]:
+    """What the out-of-sample lift beats of the random-pick draws at the candidate's holding
+    period, in words, and whether that reaches ``random_beat_share`` (None: not measured)."""
+    share, n = beat_share(c.oos.lift, draws, c.horizon)
+    if share is None:
+        return "not measured yet", None
+    return f"beats {_pct(share)} of {n} random picks", share >= t.random_beat_share
+
+
 def _criteria(
-    c: _Candidate, t: VerdictSettings, random_beaten: bool | None, decoys: bool
+    c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
     oos, whole = c.oos, c.whole
     trades = whole.sessions
@@ -201,6 +215,7 @@ def _criteria(
         else trades >= t.works_trades and oos.sessions >= t.works_oos_trades
     )
     versus = f"{_pct(oos.hit_rate)} against {_pct(oos.base_rate)}"
+    random_value, random_beaten = _random(c, t, draws)
     best = (
         "no decoys declared"
         if not decoys
@@ -236,8 +251,8 @@ def _criteria(
               _num(oos.decile_spread, 3),
               "no decoys declared" if not decoys else "beats every baseline",
               beats_spread, WORKS),
-        _crit("random", "Beats the best random-pick backtest", "not measured yet",
-              "beats it", random_beaten, WORKS),
+        _crit("random", "Beats random picks", random_value,
+              f"beats at least {_pct(t.random_beat_share)} of them", random_beaten, WORKS),
     )  # fmt: skip
 
 
@@ -276,9 +291,9 @@ def _level(c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings) 
 
 
 def _judge_one(
-    c: _Candidate, t: VerdictSettings, random_beaten: bool | None, decoys: bool
+    c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> EdgeVerdict:
-    crit = _criteria(c, t, random_beaten, decoys)
+    crit = _criteria(c, t, draws, decoys)
     level, reason = _level(c, crit, t)
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
@@ -311,6 +326,9 @@ def _judge_one(
         if whole.deflated_sharpe is not None
         else oos.deflated_sharpe,
         pbo=whole.pbo if whole.pbo is not None else oos.pbo,
+        trials=whole.trials,
+        deciles=c.insample.decile_means if c.insample else (),
+        robustness=load_robustness(oos.lift, draws, c.horizon, whole.trials),
     )
 
 
@@ -342,7 +360,7 @@ def _rank(lift_pts: float | None) -> float:
 def _judge_candidate(
     c: _Candidate,
     t: VerdictSettings,
-    random_beaten: bool | None,
+    draws: Sequence[EdgeRow],
     decoys: bool,
     lost_inputs: Sequence[str],
 ) -> EdgeVerdict:
@@ -352,7 +370,7 @@ def _judge_candidate(
     if lost:
         reason = f"The result lost inputs for {c.variant}: {'; '.join(lost)}"
         return replace(_waiting("", reason), basis=f"{c.variant}, {c.horizon} trading days")
-    return _judge_one(c, t, random_beaten, decoys)
+    return _judge_one(c, t, draws, decoys)
 
 
 def judge(
@@ -361,19 +379,19 @@ def judge(
     split: date | None,
     t: VerdictSettings,
     lost_inputs: Sequence[str] = (),
-    random_beaten: bool | None = None,
+    draws: Sequence[EdgeRow] = (),
     decoys: bool = True,
 ) -> EdgeVerdict:
     """The verdict of ``edge_id`` from its official result's ``rows`` (None: it has no official
-    result); ``split``: the out-of-sample start; ``random_beaten``: whether it beat the best
-    random-pick backtest (None: not measured, which caps the verdict at Promising)."""
+    result); ``split``: the out-of-sample start; ``draws``: the run's random-pick draws (none:
+    not measured, which caps the verdict at Promising)."""
     if rows is None:
         return _waiting(edge_id, "No official result yet")
     found = _candidates(rows)
     if not found:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs else ""
         return _waiting(edge_id, f"The official result has no out-of-sample figures{lost}")
-    judged = [(c, _judge_candidate(c, t, random_beaten, decoys, lost_inputs)) for c in found]
+    judged = [(c, _judge_candidate(c, t, draws, decoys, lost_inputs)) for c in found]
     best_c, best = max(judged, key=lambda p: (ORDER.index(p[1].verdict), _rank(p[1].lift_pts)))
     return replace(best, edge_id=edge_id, years=_years(best_c, split))
 
@@ -392,5 +410,6 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
         edge.frozen_from,
         settings,
         found.run.lost_inputs,
+        draws=runs.load_run_draws(ctx, found.run),
         decoys=bool(edge.baselines),
     )

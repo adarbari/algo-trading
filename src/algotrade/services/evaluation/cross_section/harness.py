@@ -39,6 +39,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN, Edge, job_name
 from algotrade.config.edges.evaluation import load_evaluation
+from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -78,7 +79,14 @@ from algotrade.services.evaluation.cross_section.picks import (
     SelectionReads,
     screen_variant,
 )
-from algotrade.services.evaluation.cross_section.report_containment import (
+from algotrade.services.evaluation.cross_section.random_picks import (
+    RandomStat,
+    generator,
+    pool_random,
+    random_measures,
+    random_stat,
+)
+from algotrade.services.evaluation.cross_section.reporting.report_containment import (
     ReportContainment,
     containment,
     reports_after,
@@ -144,6 +152,16 @@ class VariantResult:
 
 
 @dataclass(frozen=True)
+class RandomPicks:
+    """The random-pick backtest of one edge variant at one horizon: one measure per draw over
+    the out-of-sample slice (``random_picks.py``)."""
+
+    edge_variant: str
+    horizon: int
+    draws: tuple[SliceMeasure, ...]
+
+
+@dataclass(frozen=True)
 class EdgeEvaluation:
     edge_id: str
     run_hash: str
@@ -163,6 +181,7 @@ class EdgeEvaluation:
     # Sessions before the first reference snapshot, read from the listing history (ADR 0053
     # amendment 2026-10-09): the rule and the names by path; None when none was read.
     historical: HistoricalCaveat | None = None
+    random_picks: tuple[RandomPicks, ...] = ()  # out-of-sample only: none without a split
 
 
 def run_hash(
@@ -311,6 +330,49 @@ class _Scope:
     overrides: tuple[str, ...] = ()  # the variant's base / picks overrides, in its trial key
 
 
+@dataclass(frozen=True)
+class _Names:
+    """The names of one edge variant at one decision session: ``ids`` the base (the rate and
+    the deciles are over them), ``pickable`` those a pick may be."""
+
+    ids: frozenset[str]
+    pickable: frozenset[str]
+
+
+def _names(scope: _Scope, eligible: frozenset[str], event_names: frozenset[str] | None) -> _Names:
+    """The base and the pickable names: an event schedule narrows them to the event's names
+    (``base = "event"``; ``picks = "universe"`` keeps every eligible name pickable)."""
+    edge = scope.edge
+    pickable = (
+        eligible if event_names is None or edge.picks == "universe" else event_names & eligible
+    )
+    ids = (
+        (eligible if event_names is None else event_names & eligible)
+        if edge.base == "event"
+        else eligible
+    )
+    return _Names(ids, pickable)
+
+
+def _outcomes(
+    scope: _Scope,
+    session: _Session,
+    day: date,
+    rows: pd.DataFrame,
+    eligible: frozenset[str],
+    ids: frozenset[str],
+) -> pd.DataFrame:
+    """The stored outcomes of ``ids`` scored by the edge's outcome (``apply_outcome``), indexed
+    by instrument; ``excluded`` is non-empty for a name that does not count."""
+    inside = rows[rows["instrument_id"].isin(ids)]
+    implied = (
+        session.implied(scope.key, scope.iv_field, eligible, day)
+        if needs_implied_vol(scope.edge)
+        else None
+    )
+    return apply_outcome(scope.edge, inside, implied).set_index("instrument_id")
+
+
 def _stat(
     scope: _Scope,
     session: _Session,
@@ -329,23 +391,11 @@ def _stat(
         run is None or run.coverage not in MEASURED_COVERAGE
     ):  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
-    pickable = (
-        eligible if event_names is None or edge.picks == "universe" else event_names & eligible
-    )
-    ids = (
-        (eligible if event_names is None else event_names & eligible)
-        if edge.base == "event"
-        else eligible
-    )
+    names = _names(scope, eligible, event_names)
+    pickable, ids = names.pickable, names.ids
     scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
-    inside = rows[rows["instrument_id"].isin(ids)]
-    implied = (
-        session.implied(scope.key, scope.iv_field, eligible, day)
-        if needs_implied_vol(edge)
-        else None
-    )
-    res = apply_outcome(edge, inside, implied).set_index("instrument_id")
+    res = _outcomes(scope, session, day, rows, eligible, ids)
     counted = res[res["excluded"] == ""]
     in_universe = [i for i in run.qualified if i in eligible]
     chosen = [i for i in in_universe if i in pickable]
@@ -358,7 +408,7 @@ def _stat(
         if thin
         else sorted((i for i in scored if i in counted.index), key=lambda i: (-scored[i], i))
     )
-    deciles = decile_means(counted.loc[ranked, "oriented"].to_list()) if ranked else None
+    deciles = decile_means(counted.loc[ranked, "oriented"].to_list()) if ranked else ()
     return SessionStat(
         session=day,
         regime=session.label(day),
@@ -367,7 +417,8 @@ def _stat(
         rest=moments(counted.loc[~counted.index.isin(pick_set), "oriented"].to_numpy(dtype=float)),
         base_hits=int(counted["hit"].sum()),
         top_decile=deciles[0] if deciles else None,
-        spread=deciles[1] if deciles else None,
+        spread=deciles[0] - deciles[-1] if deciles else None,
+        deciles=deciles,
         ranked=len(ranked),
         unscored=0 if thin else len(ids) - len(scored),
         excluded_score_coverage=int(thin),
@@ -524,8 +575,12 @@ def evaluate_edge(
         for scope in scopes
         for horizon in scope.edge.outcome.horizon_sessions
     ]
-    stats = _measure(reader, session, plans, variants, schedules, as_of)
+    hashed = run_hash(edge, variants, start, end, as_of, iv_field, split)
+    draws = load_verdict(configs).random_draws
+    spec = None if split is None else _RandomSpec(split, draws, hashed)
+    stats = _measure(reader, session, plans, variants, schedules, as_of, spec)
     results: list[VariantResult] = []
+    randoms: list[RandomPicks] = []
     reports = None  # the real report dates, read once and only for an earnings_expected edge
     starts: dict[int, int] = {}
     unclosed: dict[int, int] = {}
@@ -552,6 +607,14 @@ def evaluate_edge(
                 horizon,
                 reports,
             )
+        legs = stats.randoms.get(plan.key, {})
+        pooled = [
+            pool_random([legs[leg.decision] for leg in block if leg.decision in legs])
+            for block in plan.blocks
+            if any(leg.decision in legs for leg in block)
+        ]
+        if pooled:
+            randoms.append(RandomPicks(scope.key, horizon, random_measures(pooled)))
         for variant in variants:
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
@@ -593,7 +656,7 @@ def evaluate_edge(
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(
         edge_id=edge.id,
-        run_hash=run_hash(edge, variants, start, end, as_of, iv_field, split),
+        run_hash=hashed,
         user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,
@@ -608,6 +671,7 @@ def evaluate_edge(
         split_from=split,
         exploratory=exploratory,
         historical=session.caveat(),
+        random_picks=tuple(randoms),
     )
 
 
@@ -634,6 +698,17 @@ class _Measured:
     lost: dict[tuple[tuple[str, int], str], dict[date, str]]
     closed: dict[int, set[date]]
     stored: dict[tuple[int, date], frozenset[str]]  # (horizon, S) -> names with an outcome row
+    randoms: dict[tuple[str, int], dict[date, RandomStat]]  # per plan: the draws of each leg
+
+
+@dataclass(frozen=True)
+class _RandomSpec:
+    """What the random-pick backtest needs: the first out-of-sample session, the draws per
+    session and the run hash that seeds them."""
+
+    split: date
+    draws: int
+    run_hash: str
 
 
 def _measure(
@@ -643,11 +718,12 @@ def _measure(
     variants: Sequence[Variant],
     schedules: Mapping[str, EventSchedule],
     as_of: datetime,
+    spec: _RandomSpec | None = None,
 ) -> _Measured:
     """One statistic per (plan, variant, leg), over chunks of ``CHUNK_SESSIONS`` decision
     sessions: each chunk reads the outcomes of its entry sessions, screens its sessions and
     keeps only the statistics, so peak memory does not grow with the range."""
-    out = _Measured({}, {}, {}, {})
+    out = _Measured({}, {}, {}, {}, {})
     days = sorted({leg.decision for p in plans for b in p.blocks for leg in b})
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set() for p in plans})
@@ -661,6 +737,9 @@ def _measure(
         for p in plans:
             for variant in variants:
                 _measure_plan(p, variant, session, schedules.get(p.scope.key), chunk, closed, out)
+            if spec is not None and p.scope.edge.top_k is not None:
+                events = schedules.get(p.scope.key)
+                _measure_random(p, session, events, chunk, closed, out, spec)
         session.release()
     for horizon, missing in failed.items():
         if not out.closed[horizon]:  # nothing stored for any session of the range
@@ -723,6 +802,43 @@ def _measure_plan(
             mine[leg.decision] = _stat(p.scope, session, variant, leg, rows, names)
             if (variant.id, leg.decision) in session.lost:
                 lost[leg.decision] = session.lost[variant.id, leg.decision]
+
+
+def _measure_random(
+    p: _Plan,
+    session: _Session,
+    events: EventSchedule | None,
+    chunk: set[date],
+    closed: Mapping[int, Mapping[date, pd.DataFrame]],
+    out: _Measured,
+    spec: _RandomSpec,
+) -> None:
+    """The random-pick draws of each of ``p``'s legs in the chunk whose window closed, for the
+    blocks that start in the out-of-sample slice (``random_picks.py``)."""
+    mine = out.randoms.setdefault(p.key, {})
+    top_k = p.scope.edge.top_k
+    for block in p.blocks:
+        if block[0].decision < spec.split or top_k is None:
+            continue
+        for leg in block:
+            if leg.decision not in chunk or leg.entry not in closed[p.horizon]:
+                continue
+            eligible = session.eligible(p.scope.key, p.scope.universe, leg.decision)
+            event_names = None if events is None else events.names[leg.decision]
+            names = _names(p.scope, eligible, event_names)
+            res = _outcomes(
+                p.scope, session, leg.decision, closed[p.horizon][leg.entry], eligible, names.ids
+            )
+            found = random_stat(
+                leg.decision,
+                res[res["excluded"] == ""],
+                names.pickable,
+                top_k,
+                spec.draws,
+                generator(spec.run_hash, p.scope.key, p.horizon, leg.decision),
+            )
+            if found is not None:
+                mine[leg.decision] = found
 
 
 def _trial_hash(scope: _Scope, variant: Variant) -> str:

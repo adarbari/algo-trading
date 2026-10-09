@@ -43,7 +43,8 @@ class EdgeDefinition:
 @dataclass(frozen=True)
 class Edge:
     """An edge document. ``frozen_from``: the first session of its frozen period (None: it has
-    none, so no run is canonical); ``variants``: the ids of its ``[[variants]]``, ``main``
+    none, so no run is canonical); ``mine``: the user has a document of this id of their own
+    (not just the site's); ``variants``: the ids of its ``[[variants]]``, ``main``
     first; ``schedule``: ``every_session``, ``month_end`` or ``on_event:<class>``."""
 
     id: str
@@ -62,6 +63,7 @@ class Edge:
     rejection_reason: str
     sources: tuple[EdgeSource, ...]
     definition: EdgeDefinition
+    mine: bool = False
 
 
 def _picks(e: document.Edge) -> str:
@@ -110,7 +112,7 @@ def _test(e: document.Edge) -> str:
     return f"Out-of-sample from {e.frozen_from.isoformat()}"
 
 
-def _edge(e: document.Edge) -> Edge:
+def _edge(e: document.Edge, mine: bool) -> Edge:
     return Edge(
         id=e.id,
         name=e.name,
@@ -128,12 +130,14 @@ def _edge(e: document.Edge) -> Edge:
         rejection_reason=e.rejection_reason,
         sources=tuple(EdgeSource(x.title, x.url) for x in e.sources),
         definition=EdgeDefinition(_picks(e), _trade(e.outcome), _compare(e), _test(e)),
+        mine=mine,
     )
 
 
 def load_edges(ctx: Stores) -> tuple[Edge, ...]:
     """Every edge ``ctx.user`` sees, by id; none without documents."""
-    return tuple(_edge(e) for e in loading.load_edges(ctx.configs, ctx.user.user_id))
+    own = loading.own_edge_ids(ctx.configs, ctx.user.user_id)
+    return tuple(_edge(e, e.id in own) for e in loading.load_edges(ctx.configs, ctx.user.user_id))
 
 
 def load_edge(ctx: Stores, edge_id: str) -> Edge | None:

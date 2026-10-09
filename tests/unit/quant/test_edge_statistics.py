@@ -49,6 +49,35 @@ def test_spread_summary() -> None:
     assert es.spread_summary([1.0, float("nan"), 3.0])[3] == 2
 
 
+def test_percentile_of_counts_ties_half_and_is_none_without_a_value_or_sample() -> None:
+    assert es.percentile_of(2.5, [1.0, 2.0, 3.0, 4.0]) == 0.5
+    assert es.percentile_of(2.0, [1.0, 2.0, 3.0, 4.0]) == pytest.approx(0.375)  # 1 below, 1 tie
+    assert es.percentile_of(9.0, [1.0, float("nan"), 3.0]) == 1.0  # a NaN is not a draw
+    assert es.percentile_of(0.0, [1.0, 2.0]) == 0.0
+    assert es.percentile_of(None, [1.0]) is None and es.percentile_of(1.0, []) is None
+
+
+def test_random_pick_sums_are_without_replacement_uniform_and_reproducible() -> None:
+    values, hits = np.arange(20, dtype=float), (np.arange(20) % 2).astype(float)
+    a = es.random_pick_sums(values, hits, 5, 400, np.random.default_rng(7))
+    b = es.random_pick_sums(values, hits, 5, 400, np.random.default_rng(7))
+    assert a is not None and b is not None
+    np.testing.assert_array_equal(a[0], b[0])
+    np.testing.assert_array_equal(a[1], b[1])
+    assert a[0].min() >= 0 + 1 + 2 + 3 + 4 and a[0].max() <= 15 + 16 + 17 + 18 + 19  # 5 distinct
+    assert a[0].mean() == pytest.approx(5 * 9.5, abs=1.0)  # uniform: the mean pick is the mean
+    assert a[1].mean() == pytest.approx(2.5, abs=0.3)
+
+
+def test_random_pick_sums_with_k_at_or_above_the_names_take_every_name() -> None:
+    sums = es.random_pick_sums([1.0, 2.0, 3.0], [1, 0, 1], 5, 3, np.random.default_rng(0))
+    assert sums is not None
+    np.testing.assert_array_equal(sums[0], [6.0, 6.0, 6.0])
+    np.testing.assert_array_equal(sums[1], [2.0, 2.0, 2.0])
+    assert es.random_pick_sums([], [], 5, 3, np.random.default_rng(0)) is None
+    assert es.random_pick_sums([1.0], [1], 1, 0, np.random.default_rng(0)) is None
+
+
 def test_sharpe() -> None:
     assert es.sharpe([1.0, 2.0, 3.0]) == pytest.approx(2.0)
     assert es.sharpe([1.0]) is None

@@ -43,6 +43,12 @@ class Documents(Protocol):
     def names(self, scope: str, kind: str) -> list[str]: ...
 
 
+def own_edge_ids(configs: Documents, user: str = SITE_USER) -> frozenset[str]:
+    """The ids of the edge documents ``user`` has of their own (a draft or a layer over a site
+    edge): none for the ``site`` user, whose documents are the site's."""
+    return frozenset() if user == SITE_USER else frozenset(configs.names(user, KIND))
+
+
 def load_edges(
     configs: Documents, user: str = SITE_USER, catalog: FieldCatalog | None = None
 ) -> tuple[Edge, ...]:

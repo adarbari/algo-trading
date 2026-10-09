@@ -22,6 +22,7 @@ from algotrade.features.site import site_features
 from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.harness import edge_universe, evaluate_edge
+from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     historical_identity,
@@ -150,7 +151,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "event_unknown": dict(evaluation.event_unknown),
         "lost_sessions": lost_sessions(evaluation),
         "report_containment": report_containment(evaluation),
-        "rows": records(rows),
+        "rows": records(rows[rows["role"] != RANDOM]),  # the draws are stored, not reported
     }
 
 

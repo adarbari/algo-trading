@@ -32,6 +32,7 @@
 }
 
 .track {
+  position: relative;
   display: block;
   height: var(--space-1-5);
   border-radius: var(--radius-sm);
@@ -44,6 +45,28 @@
   height: 100%;
   border-radius: var(--radius-sm);
   background: var(--tone-fill);
+}
+
+/* Diverging: the fill grows from the middle, an axis marks zero. */
+.list[data-diverging] .fill {
+  position: absolute;
+  inset-block: 0;
+}
+
+.list[data-diverging] .fill[data-sign='positive'] {
+  inset-inline-start: 50%;
+}
+
+.list[data-diverging] .fill[data-sign='negative'] {
+  inset-inline-end: 50%;
+}
+
+.list[data-diverging] .track::after {
+  position: absolute;
+  inset-block: calc(var(--space-0-5) * -1);
+  inset-inline-start: 50%;
+  border-inline-start: var(--border-width-thin) solid var(--color-text-2);
+  content: '';
 }
 
 .value {
