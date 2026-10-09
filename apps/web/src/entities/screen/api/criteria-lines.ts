@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { byName, useFeatureCatalogue } from '@/entities/feature';
 
 import { criterionLines, type CriterionLine } from '../model/criteria-lines';
-import { criteriaOf } from '../model/spec';
+import { criteriaOf, resolvedRules } from '../model/spec';
 import { useScreener } from './hooks';
 
 export function useCriterionLines(screenerId: string): {
@@ -18,7 +18,7 @@ export function useCriterionLines(screenerId: string): {
   const detail = useScreener(screenerId);
   const features = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
   const lines = useMemo(
-    () => criterionLines(criteriaOf(detail.data?.resolved, { id: screenerId }), features),
+    () => criterionLines(criteriaOf(resolvedRules(detail.data?.resolved), { id: screenerId }), features),
     [detail.data, screenerId, features],
   );
   return { lines, isPending: detail.isPending };
