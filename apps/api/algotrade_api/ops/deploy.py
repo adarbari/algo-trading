@@ -69,16 +69,18 @@ _PAUSE = threading.Event()  # never set: ``wait(s)`` is a plain pause (not a rat
 def _problems(url: str, expect_sha: str, fetch: Fetch, check: str) -> list[str] | None:
     """What keeps the site from being the deployed commit; ``None``: nothing answers yet.
     ``api``: only the running API's commit (the web is still the old build); ``full``: also no
-    mismatch from ``ops/build.py``; ``web``: also the served web stamped with the commit."""
+    mismatch from ``ops/build.py``; ``web``: only the served web stamped with the commit (a
+    web-only deploy leaves the API, and so its mismatches, at the previous commit; after a
+    restart the ``api`` / ``full`` check already verified it)."""
     found = running_mismatches(url, fetch)
     if found is None:
         return None
-    out = [] if check == "api" else list(found)
+    out = list(found) if check == "full" else []
     try:
         build = json.loads(fetch(f"{url}/health"))["build"]
     except (OSError, ValueError, LookupError, TypeError):
         return None
-    for name in ("api", "web") if check == "web" else ("api",):
+    for name in ("web",) if check == "web" else ("api",):
         stamp = build.get(name)
         sha = str(stamp.get("git_sha", "")) if isinstance(stamp, dict) else ""
         if not sha or not (sha.startswith(expect_sha) or expect_sha.startswith(sha)):
