@@ -423,6 +423,11 @@ export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, criteria: Array<{ id: string, field: string, mode: string }>, notRun: { kindText: string } | null, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }> } | null }> };
 
+export type StatusScreensQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type StatusScreensQuery = { ideas: { session: string, screeners: Array<{ screener: { id: string, name: string }, notRun: { code: UnknownCode, kindText: string } | null }> } | null };
+
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -2428,6 +2433,23 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenerRunsQuery, ScreenerRunsQueryVariables>;
+export const StatusScreensDocument = new TypedDocumentString(`
+    query StatusScreens {
+  ideas(limit: 1) {
+    session
+    screeners {
+      screener {
+        id
+        name
+      }
+      notRun {
+        code
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<StatusScreensQuery, StatusScreensQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {
