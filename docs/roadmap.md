@@ -1,7 +1,6 @@
 # Roadmap
 
 ## Now / Next
-
 The pickup list a fresh session reads first. A PR that opens or closes an item updates it.
 
 **Running** (check `make status`; verified 2026-10-05 05:40): nothing long-running. IBKR IV history backfill finished 2026-10-05 05:30 (all 4,200 names: 4,197 OK, 3 genuine NO_DATA; `ibkr_iv@v1` rollups over 502 sessions, rank FULL for 4,789 of 5,415 names on 2026-10-02).
