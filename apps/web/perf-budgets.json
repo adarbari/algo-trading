@@ -53,7 +53,7 @@
     }
   },
   "reasons": {
-    "e2e./ideas.dom_nodes": "2026-10-09 #NNN Ideas: Why it's here stays on phones (owner-requested)",
+    "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
     "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
     "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
     "e2e./screeners/vrp_scanner.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
