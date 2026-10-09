@@ -1,27 +1,25 @@
 /**
  * The detail of Explore, the page's hero: the tabs of the ticker in focus (Overview, Compare,
  * Chart, Options, Features, Events, Screener hits, Why it is an idea), only the selected tab's
- * widget mounted. Compare is the rebased chart over the open tickers with their features side by
- * side (the feature table for those tickers, sorted in the table). A ticker named inside a panel
- * (a holding, a peer, a row of the comparison) opens in a tab of its own.
+ * widget mounted. Overview and Chart are in the page; the other tabs load on demand
+ * (`OtherTabs`). A ticker named inside a panel (a holding, a peer, a row of the comparison)
+ * opens in a tab of its own.
  */
-import { Stack } from '@algotrade/ui';
+import { Skeleton } from '@algotrade/ui';
+import { Suspense } from 'react';
 
-import { ComparePanel } from '@/widgets/compare-panel';
-import { EventStudyPanel } from '@/widgets/event-study-panel';
-import { EventsPanel } from '@/widgets/events-panel';
-import { FeatureTable } from '@/widgets/feature-table';
-import { FeaturesPanel } from '@/widgets/features-panel';
+import { lazyPage } from '@/shared/lib/lazy';
 import { HoldingsPanel } from '@/widgets/holdings-panel';
-import { OptionsPanel } from '@/widgets/options-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
-import { ScreenerHitsPanel, WhyIdeaPanel } from '@/widgets/screener-hits-panel';
 
-import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch } from '@/entities/explore';
+import type { ExploreSearch } from '@/entities/explore';
 import { exploreState, openTicker, type SearchPatch } from '../model/state';
 
 import { ExploreTabs } from './ExploreTabs';
+
+// The other tabs' widgets are one chunk, fetched when one of those tabs opens.
+const OtherTabs = lazyPage(() => import('./OtherTabs'), 'OtherTabs');
 
 export interface DetailTabsProps {
   /** The ticker in focus: the tabs are its own. */
@@ -32,43 +30,10 @@ export interface DetailTabsProps {
   onOpenScreener: (screenerId: string) => void;
 }
 
-function Content({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsProps) {
+function Content(props: DetailTabsProps) {
+  const { symbol, search, onSearchChange } = props;
   const state = exploreState(search);
-  const open = (other: string) => {
-    onSearchChange(openTicker(state, other));
-  };
   switch (state.tab) {
-    case 'compare':
-      return (
-        <Stack gap={4}>
-          <ComparePanel
-            symbols={state.open}
-            range={state.range}
-            onRangeChange={(range) => {
-              onSearchChange({ range });
-            }}
-          />
-          <FeatureTable
-            label="Side by side"
-            keys={state.open}
-            columns={state.dimensions}
-            onColumnsChange={(dims) => {
-              onSearchChange({ dims: joinList(dims, DEFAULT_DIMENSIONS) });
-            }}
-            pickerLabel="Dimension"
-            pickerIcon="plus"
-            sortMode="client"
-            emptyMessage="None of these tickers is in the reference snapshot."
-            onRowActivate={open}
-          />
-        </Stack>
-      );
-    case 'hits':
-      return <ScreenerHitsPanel symbol={symbol} onOpenScreener={onOpenScreener} via={state.via} />;
-    case 'why':
-      return state.via ? (
-        <WhyIdeaPanel symbol={symbol} screenerId={state.via} onOpenScreener={onOpenScreener} />
-      ) : null;
     case 'chart':
       return (
         <PriceChartPanel
@@ -79,51 +44,25 @@ function Content({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsP
           }}
         />
       );
-    case 'options':
-      return (
-        <OptionsPanel
-          symbol={symbol}
-          expiry={search.expiry ?? null}
-          onExpiryChange={(expiry) => {
-            onSearchChange({ expiry });
-          }}
-          view={search.view ?? 'simple'}
-          onViewChange={(view) => {
-            onSearchChange({ view: view === 'simple' ? undefined : view });
-          }}
-          right={search.right ?? 'P'}
-          onRightChange={(right) => {
-            onSearchChange({ right: right === 'P' ? undefined : right });
-          }}
-          allStrikes={search.strikes === 'all'}
-          onAllStrikesChange={(all) => {
-            onSearchChange({ strikes: all ? 'all' : undefined });
-          }}
-        />
-      );
-    case 'features':
-      return (
-        <FeaturesPanel
-          symbol={symbol}
-          feature={search.feature ?? null}
-          onFeatureChange={(feature) => {
-            onSearchChange({ feature });
-          }}
-        />
-      );
-    case 'events':
-      return (
-        <Stack gap={4}>
-          <EventStudyPanel symbol={symbol} onSelectSymbol={open} />
-          <EventsPanel symbol={symbol} />
-        </Stack>
-      );
-    default:
+    case 'overview':
       return (
         <OverviewPanel
           symbol={symbol}
-          fund={<HoldingsPanel symbol={symbol} onSelectSymbol={open} />}
+          fund={
+            <HoldingsPanel
+              symbol={symbol}
+              onSelectSymbol={(other) => {
+                onSearchChange(openTicker(state, other));
+              }}
+            />
+          }
         />
+      );
+    default:
+      return (
+        <Suspense fallback={<Skeleton variant="rect" height="lg" label="Loading the tab" />}>
+          <OtherTabs {...props} />
+        </Suspense>
       );
   }
 }
