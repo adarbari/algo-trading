@@ -215,7 +215,9 @@ NIGHTLY: tuple[Step, ...] = (
     Step("verify", latest_only=True, critical=False, accept=(check_verification,)),
     # The derived history copies (ADR 0060), last: every step that publishes the copied tables
     # (bars, the rollups, the market rollups) has committed and the screens' jobs are done, so
-    # no commit lands while a build waits for the commit lock. Latest session only (a catch-up
+    # ingestion commits no more. The API can still commit (screener runs, ADR 0033; edge
+    # evaluations, ADR 0059): the build refuses half-applied commits, and its fallback may hold
+    # the commit lock up to ~48 s. Latest session only (a catch-up
     # night would rebuild the same year per session). Optional: a missed night leaves the old
     # copy, which reads detect as stale and replace by the partitions.
     Step(
