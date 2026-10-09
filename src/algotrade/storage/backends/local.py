@@ -410,12 +410,15 @@ class LocalRuns:
         # run ids are ``{job}-{session}-{time}`` (new_run_id): only a job's own files are
         # opened, and of those only the sessions asked for (a record of another job, an edge
         # evaluation's runs are large, is never read)
-        records = [
-            RunRecord.from_json(path.read_text())
+        # a job whose name is a prefix of another's matches the other's files too: each file
+        # is read once, and a record counts only for the job it names
+        paths = {
+            path
             for job in jobs
             for path in self.root.glob(f"{glob.escape(safe(job))}-*.json")
             if (day := run_session(path.stem)) is not None and first <= day <= last
-        ]
+        }
+        records = [RunRecord.from_json(path.read_text()) for path in sorted(paths)]
         hits = [r for r in records if r.job in jobs]
         return sorted(hits, key=lambda r: r.started_at)
 
