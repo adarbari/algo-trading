@@ -1,15 +1,20 @@
 {
   "bundle": {
-    "entry_gzip_bytes": 45000,
-    "entry_closure_gzip_bytes": 327100,
-    "lazy_only": ["design-system/components/Chart/engine.ts"],
+    "entry_gzip_bytes": 33200,
+    "entry_closure_gzip_bytes": 257600,
+    "lazy_only": [
+      "design-system/components/Chart/engine.ts"
+    ],
     "routes": {
+      "src/pages/admin-harness-runs/index.ts": 34200,
       "src/pages/admin-ingestion/index.ts": 13200,
+      "src/pages/admin-llm-usage/index.ts": 53300,
       "src/pages/guide/index.ts": 20500,
       "src/pages/login/index.ts": 2000,
       "src/pages/screener-builder/index.ts": 33300,
       "src/pages/screener-results/index.ts": 31500,
       "src/pages/trader-calendar/index.ts": 8200,
+      "src/pages/trader-edges/index.ts": 39300,
       "src/pages/trader-explore/index.ts": 51600,
       "src/pages/trader-ideas/index.ts": 8300,
       "src/pages/trader-regime/index.ts": 15900,
@@ -18,29 +23,29 @@
   },
   "e2e": {
     "/ideas": {
-      "first_load_js_gzip_bytes": 314200,
-      "requests": 63,
-      "dom_nodes": 310
+      "first_load_js_gzip_bytes": 284600,
+      "requests": 53,
+      "dom_nodes": 300
     },
     "/screeners": {
-      "first_load_js_gzip_bytes": 312800,
-      "requests": 64,
-      "dom_nodes": 200
+      "first_load_js_gzip_bytes": 258900,
+      "requests": 59,
+      "dom_nodes": 194
     },
     "/regime": {
-      "first_load_js_gzip_bytes": 384200,
+      "first_load_js_gzip_bytes": 361200,
       "requests": 95,
       "dom_nodes": 1742
     },
     "/screeners/vrp_scanner": {
-      "first_load_js_gzip_bytes": 335200,
+      "first_load_js_gzip_bytes": 307900,
       "requests": 77,
       "dom_nodes": 322
     },
     "/admin/ingestion": {
-      "first_load_js_gzip_bytes": 318100,
-      "requests": 70,
-      "dom_nodes": 700
+      "first_load_js_gzip_bytes": 288000,
+      "requests": 68,
+      "dom_nodes": 698
     },
     "/explore?focus=AAPL&tab=chart": {
       "first_load_js_gzip_bytes": 416200,
