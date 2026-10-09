@@ -1,5 +1,5 @@
 """The ``outcomes`` task (ADR 0053 decision 3): write every forward-outcome window a session
-closes to ``outcomes/instrument/forward_returns@v1``, the grain only the edge harness reads.
+closes to ``outcomes/instrument/forward_returns@v2``, the grain only the edge harness reads.
 
 For a window-end session T and each horizon h, S is the h-th exchange session before T; the
 rows are the names in the universe at S with a bar at S, measured from S's close to T's
@@ -11,8 +11,11 @@ change. Before the first
 universe snapshot the names are the listing history's alive on S (``data.listings.universe_asof``,
 survivors and the delisted alike), not today's snapshot; a name with no bar at T is DELISTED when
 the reference snapshot, or the listing history (``delisted_by``: a last trading day on or
-before T), says it left. A window whose S is before the first
-stored bars session is not computed; one whose T has not closed is refused (``knowledge_ts``,
+before T), says it left. A name with a bar in S..T that the
+``bar-quality`` task flagged (``events/bar_flag``, dropped at read time) gets an UNMEASURED row
+with the reason ``BAD_BAR`` and no returns (ADR 0061; a flagged S counts as eligible), and the
+harness counts it unmeasured, never a miss. A window whose S is before the first stored bars
+session is not computed; one whose T has not closed is refused (``knowledge_ts``,
 the write time, is never before the window's close).
 
 Each night also recomputes the ``RECHECK`` window ends before it, reading delistings from the
@@ -29,7 +32,10 @@ nightly rows on the same store. Bars restated after T are read as stored now; th
 backfill chunk are read once (``CHUNK`` window ends at a time).
 
 The acceptance check (``check_outcomes``) holds the run to its own count: every eligible name has
-a row or a reason, and the rows are stored.
+a row or a reason, and the rows are stored; and no COMPLETE row of a window of at most
+``BOUNDED_HORIZON`` sessions returns more than ``[quality] max_bounded_return`` across a bar the
+detector would flag but no flag covers (the row would not be UNMEASURED); a rise that clears the
+bound with no suspect bar (a real squeeze) is a WARN naming the names.
 """
 
 from collections.abc import Sequence
@@ -46,13 +52,14 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import close_time, next_session, sessions_between, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.listings.universe import delisted_by, universe_asof
-from algotrade.data.prices import SessionBars, bars, session_bars
+from algotrade.data.prices import SessionBars, bars_with_flags, session_bars
 from algotrade.data.reference import instruments, load_universe
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade_ingestion.tasks.derived.outcome_paths import Window, window_rows
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.maintenance.bar_quality import suspect_instruments
 from algotrade_ingestion.tasks.maintenance.quality import Check
 
 TASK = "outcomes"
@@ -66,6 +73,7 @@ CHUNK = 40  # window ends whose bars are read at once in a backfill
 # stamps a delisting when it notices, after the last bar, so a name that was a reason the night
 # its window closed becomes a DELISTED row (its new run wins on the merge key).
 RECHECK = 10
+BOUNDED_HORIZON = 60  # sessions: up to here a return above ``max_bounded_return`` is a bad bar
 NIGHTLY_MAX_HORIZON = 252  # longer horizons are backfill-only: the nightly panel stays this deep
 SHOWN = 5  # reasons listed per window in the run stats
 SITE = FileConfigStore(config_dir())
@@ -151,7 +159,7 @@ def _one(
             prices = panel.window(window.start, end)
             for ticker in benchmarks:
                 bench = resolver.id_for(ticker) if resolver.knows(ticker) else None
-                rows, why = window_rows(prices, window, names, bench, left)
+                rows, why = window_rows(prices, window, names, bench, left, panel.flagged)
                 frames.append(rows.assign(benchmark=ticker))
                 reasons, eligible = why, len(rows) + len(why)
             out = pd.concat(frames, ignore_index=True)
@@ -220,30 +228,58 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
     runs = [r for r in reader.runs(TASK, session) if r.status == RunStatus.COMPLETE]
     if not runs:
         return [Check("outcomes", "FAIL", f"no complete outcomes run for {session}")]
-    problems = []
+    problems: list[str] = []
+    warnings: list[str] = []
     for key, value in sorted(runs[-1].stats.items()):
         if not (key.startswith("h") and isinstance(value, dict)):
             continue
         start = date.fromisoformat(value["start"])
         unaccounted = len(_eligible(reader, start)) - value["rows"] - value["reasons"]
         stored = reader.table(TABLE, start)
-        mine = set() if stored is None else set(
-            stored.loc[
+        horizon = int(key[1:])
+        ours = (
+            None
+            if stored is None
+            else stored[
                 (pd.to_datetime(stored["window_end"]).dt.date == session)
-                & (stored["horizon_sessions"] == int(key[1:])),
-                "instrument_id",
-            ].astype(str)
-        )  # fmt: skip
+                & (stored["horizon_sessions"] == horizon)
+            ]
+        )
+        mine = set() if ours is None else set(ours["instrument_id"].astype(str))
         if unaccounted or len(mine) != value["rows"]:
             problems.append(f"{key}: {unaccounted} names without a row or a reason, "
                             f"{len(mine)} of {value['rows']} rows stored")  # fmt: skip
+        if ours is not None and horizon <= BOUNDED_HORIZON:
+            huge = ours[
+                (ours["outcome_status"] == "COMPLETE") & (ours["fwd_return"] > s.max_bounded_return)
+            ]
+            if len(huge):
+                ids = sorted(set(huge["instrument_id"].astype(str)))
+                bad = suspect_instruments(reader, ids, start, session, s)
+                if bad:
+                    problems.append(
+                        f"{key}: {len(bad)} COMPLETE rows over {s.max_bounded_return:+.0%} in "
+                        f"{horizon} sessions across a bar the detector would flag "
+                        f"({', '.join(bad[:SHOWN])}): run bar-quality"
+                    )
+                real = [i for i in ids if i not in bad]
+                if real:  # a genuine squeeze looks the same: named, never a failure
+                    warnings.append(
+                        f"{key}: {len(real)} rows over {s.max_bounded_return:+.0%} in {horizon} "
+                        f"sessions with no suspect bar ({', '.join(real[:SHOWN])})"
+                    )
     if problems:
         return [Check("outcomes", "FAIL", "; ".join(problems))]
-    return [Check("outcomes", "PASS", f"every eligible name has a row or a reason for {session}")]
+    detail = f"every eligible name has a row or a reason for {session}"
+    if warnings:
+        return [Check("outcomes", "WARN", f"{detail}; {'; '.join(warnings)}")]
+    return [Check("outcomes", "PASS", detail)]
 
 
 def _eligible(reader: StoreReader, start: date) -> set[str]:
-    """The names in the universe at ``start`` with a bar at ``start``."""
+    """The names in the universe at ``start`` with a bar at ``start`` (a flagged bar included:
+    that name has an UNMEASURED row)."""
     universe = _universe_ids(reader, start)[0]
-    day = bars(reader, "1d", start, start, columns=("close",))
-    return universe & set(day.loc[day["close"].notna(), "instrument_id"].astype(str))
+    day, dropped = bars_with_flags(reader, "1d", start, start, columns=("close",))
+    have = set(day.loc[day["close"].notna(), "instrument_id"].astype(str))
+    return universe & (have | set(dropped["instrument_id"].astype(str)))

@@ -52,6 +52,8 @@ class SessionStat:
     excluded_coverage: int = (
         0  # 1: the screen's coverage was not COMPLETE; the session is not measured
     )
+    excluded_unmeasured: int = 0  # picks whose outcome is UNMEASURED (a flagged bar, ADR 0061)
+    unmeasured_base: int = 0  # eligible names with an UNMEASURED outcome (the picks included)
     delisted: int = 0
     pre_snapshot: bool = False
     outside_universe: int = 0  # qualified names the edge's universe does not contain
@@ -95,6 +97,8 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         excluded_score_coverage=sum(leg.excluded_score_coverage for leg in legs),
         excluded_unclosed=sum(leg.excluded_unclosed for leg in legs),
         excluded_missing=sum(leg.excluded_missing for leg in legs),
+        excluded_unmeasured=sum(leg.excluded_unmeasured for leg in legs),
+        unmeasured_base=sum(leg.unmeasured_base for leg in legs),
         delisted=sum(leg.delisted for leg in legs),
         pre_snapshot=any(leg.pre_snapshot for leg in legs),
         outside_universe=sum(leg.outside_universe for leg in legs),
@@ -141,6 +145,8 @@ class SliceMeasure:
     excluded_coverage: int  # sessions left out: the screen read incomplete data
     delisted: int
     pre_snapshot_sessions: int
+    excluded_unmeasured: int = 0  # picks left out: their window held a flagged bar
+    unmeasured_base: int = 0  # eligible names left out of the base for the same reason
     deflated_sharpe: float | None = field(default=None)
     trials: int | None = field(default=None)
     pbo: float | None = field(default=None)
@@ -212,6 +218,8 @@ def _measure(sl: Slice, kept: Sequence[SessionStat], in_sample: bool = False) ->
         excluded_score_coverage=sum(r.excluded_score_coverage for r in rows),
         excluded_unclosed=sum(r.excluded_unclosed for r in rows),
         excluded_missing=sum(r.excluded_missing for r in rows),
+        excluded_unmeasured=sum(r.excluded_unmeasured for r in rows),
+        unmeasured_base=sum(r.unmeasured_base for r in rows),
         excluded_coverage=sum(r.excluded_coverage for r in kept),
         delisted=sum(r.delisted for r in rows),
         pre_snapshot_sessions=sum(1 for r in rows if r.pre_snapshot),

@@ -229,6 +229,42 @@ def test_a_session_whose_screen_read_incomplete_data_is_not_measured_but_counted
     assert m.picks == 15  # nothing from the incomplete session reaches the pooled numbers
 
 
+def test_a_pick_with_an_unmeasured_outcome_is_not_a_miss_but_counted_unmeasured() -> None:
+    """ADR 0061: a window over a flagged bar has an UNMEASURED row; a session whose pick has one
+    is counted like a screen that could not be measured, and its numbers reach no total."""
+    unmeasured = {
+        "outcome_status": "UNMEASURED", "outcome_reason": "BAD_BAR", "fwd_return": None,
+        "fwd_excess_return": None, "fwd_max_return": None, "fwd_max_drawdown": None,
+    }  # fmt: skip
+
+    def rows(day: date) -> list[dict[str, Any]]:
+        return [outcome_row(iid, i, day, **unmeasured) for i, iid in enumerate(IDS)]
+
+    (r,) = run(build_world(rows_of=rows)).results
+    m = r.measures[0]
+    assert (m.sessions, m.excluded_coverage, m.picks) == (0, 4, 0)  # four sessions, none measured
+
+
+def test_unmeasured_picks_are_counted_per_pick_and_the_session_stays_measured() -> None:
+    """ADR 0061: an UNMEASURED pick leaves picks, hits, the base and the deciles like any
+    excluded name and is counted apart from ``excluded_missing``; the session stays measured
+    while at most half its picks are unmeasured."""
+    bad = {
+        "outcome_status": "UNMEASURED", "outcome_reason": "BAD_BAR", "fwd_return": None,
+        "fwd_excess_return": None, "fwd_max_return": None, "fwd_max_drawdown": None,
+    }  # fmt: skip
+
+    def rows(day: date) -> list[dict[str, Any]]:
+        return [outcome_row(iid, i, day, **(bad if i == 19 else {})) for i, iid in enumerate(IDS)]
+
+    base = run(build_world()).results[0].measures[0]
+    m = run(build_world(rows_of=rows)).results[0].measures[0]
+    assert m.excluded_coverage == 0 and m.sessions == base.sessions
+    assert m.unmeasured_base == base.sessions  # one name a session, in the base
+    assert m.eligible == base.eligible - m.unmeasured_base  # never a zero-return member
+    assert m.excluded_missing == base.excluded_missing  # not double-counted as missing
+
+
 def test_trials_are_counted_per_user_and_the_regime_label_is_the_sites() -> None:
     w = build_world()
     write_edge_eval(w.results, run(w), AS_OF)
