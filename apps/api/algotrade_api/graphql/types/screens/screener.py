@@ -158,15 +158,23 @@ class ScreenerRun:
         return ScreenResultPage.of(found, self.ctx)
 
 
-@strawberry.type(description="A criterion of a screen, in funnel order: the field it judges")
+@strawberry.type(
+    description="A criterion of a screen, in funnel order: the field it judges, its `mode` and "
+    "its rule as the config states it: the operator `op` and the threshold `value` in the "
+    "field's stored unit (a number, a string or boolean, a list for `in` / `between`; null: "
+    "the operator takes none)"
+)
 class ScreenCriterion:
     id: str
     field: str
     mode: str
+    op: str
+    value: JSON | None
 
     @classmethod
     def of(cls, d: screeners.ScreenCriterion) -> Self:
-        return cls(id=d.id, field=d.field, mode=d.mode)
+        value = list(d.value) if isinstance(d.value, tuple) else d.value
+        return cls(id=d.id, field=d.field, mode=d.mode, op=d.op, value=JSON(value))
 
 
 @strawberry.type(description="A display column of a screen: its name and catalogue field")

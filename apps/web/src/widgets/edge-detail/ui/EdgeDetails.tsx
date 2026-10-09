@@ -18,7 +18,6 @@ import {
 } from '@algotrade/ui';
 
 import { verdictLabel, type Edge, type VerdictCriterion } from '@/entities/edge';
-import { EvaluationSplitForm } from '@/features/evaluation-split';
 import { GuideHelp } from '@/features/guide-help';
 
 import { criterionColumns } from '../model/columns';
@@ -109,7 +108,6 @@ export function EdgeDetails({ edge }: EdgeDetailsProps) {
           <Backtests edge={edge} />
         </Stack>
         <KeyValue label="Figures behind the verdict" items={figures(edge)} />
-        <EvaluationSplitForm renderTermHelp={term} />
       </Stack>
     </Disclosure>
   );

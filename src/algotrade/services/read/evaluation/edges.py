@@ -43,9 +43,13 @@ class EdgeDefinition:
 @dataclass(frozen=True)
 class Edge:
     """An edge document. ``frozen_from``: the first session of its frozen period (None: it has
-    none, so no run is canonical); ``mine``: the user has a document of this id of their own
-    (not just the site's); ``variants``: the ids of its ``[[variants]]``, ``main``
-    first; ``schedule``: ``every_session``, ``month_end`` or ``on_event:<class>``."""
+    none, so no run is canonical); ``variants``: the ids of its ``[[variants]]``, ``main``
+    first; ``schedule``: ``every_session``, ``month_end`` or ``on_event:<class>``. The user's
+    own state about it (``[follow]``, ADR 0053 amendment 2026-10-09): ``state`` (researching,
+    following, rejected, retired, trial), ``since``, ``state_reason``, the permanent ``labels``
+    the server decided, ``oos_revealed``; ``mine``: the document is the user's (a copy or a new
+    edge, not a site edge), ``extends`` the edge it is a copy of, ``replaces`` the edge a trial
+    would replace. ``oos_hidden``: a copy whose out-of-sample result is withheld until shown."""
 
     id: str
     name: str
@@ -63,7 +67,15 @@ class Edge:
     rejection_reason: str
     sources: tuple[EdgeSource, ...]
     definition: EdgeDefinition
+    state: str = "researching"
+    since: date | None = None
+    state_reason: str = ""
+    labels: tuple[str, ...] = ()
+    oos_revealed: bool = False
     mine: bool = False
+    extends: str | None = None
+    replaces: str | None = None
+    oos_hidden: bool = False
 
 
 def _picks(e: document.Edge) -> str:
@@ -130,14 +142,23 @@ def _edge(e: document.Edge, mine: bool) -> Edge:
         rejection_reason=e.rejection_reason,
         sources=tuple(EdgeSource(x.title, x.url) for x in e.sources),
         definition=EdgeDefinition(_picks(e), _trade(e.outcome), _compare(e), _test(e)),
+        state=e.follow.state,
+        since=e.follow.since,
+        state_reason=e.follow.reason,
+        labels=e.follow.labels,
+        oos_revealed=e.follow.oos_revealed,
         mine=mine,
+        extends=e.extends,
+        replaces=e.follow.replaces,
+        oos_hidden=mine and not e.follow.oos_revealed,
     )
 
 
 def load_edges(ctx: Stores) -> tuple[Edge, ...]:
     """Every edge ``ctx.user`` sees, by id; none without documents."""
-    own = loading.own_edge_ids(ctx.configs, ctx.user.user_id)
-    return tuple(_edge(e, e.id in own) for e in loading.load_edges(ctx.configs, ctx.user.user_id))
+    site = set(ctx.configs.names(loading.SITE, loading.KIND))
+    found = loading.load_edges(ctx.configs, ctx.user.user_id)
+    return tuple(_edge(e, mine=e.id not in site) for e in found)
 
 
 def load_edge(ctx: Stores, edge_id: str) -> Edge | None:

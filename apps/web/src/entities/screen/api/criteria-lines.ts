@@ -1,29 +1,25 @@
 /**
- * One screener's criteria as lines (label, rule in the field's format, mode): its resolved
- * working copy through the catalogue, the same rule source the scorecard reads.
+ * One screener's criteria as lines (label, rule in the field's format, mode): the typed criteria
+ * of its `Screener` (the Screeners list's run summary) through the catalogue, the same rule
+ * source the scorecard reads. No query of its own.
  */
 import { useMemo } from 'react';
 
 import { byName, useFeatureCatalogue } from '@/entities/feature';
 
-import { criterionLines, type CriterionLine } from '../model/criteria-lines';
-import { criteriaOf, resolvedRules } from '../model/spec';
-import { useScreener } from './hooks';
+import {
+  criterionLines,
+  toCriteria,
+  type CriterionLine,
+  type ServedCriterion,
+} from '../model/criteria-lines';
 
-export function useCriterionLines(screenerId: string): {
+export function useCriterionLines(criteria: readonly ServedCriterion[] | undefined): {
   lines: CriterionLine[];
   isPending: boolean;
 } {
   const catalogue = useFeatureCatalogue();
-  const detail = useScreener(screenerId);
   const features = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
-  const lines = useMemo(
-    () =>
-      criterionLines(
-        criteriaOf(resolvedRules(detail.data?.resolved), { id: screenerId }),
-        features,
-      ),
-    [detail.data, screenerId, features],
-  );
-  return { lines, isPending: detail.isPending };
+  const lines = useMemo(() => criterionLines(toCriteria(criteria), features), [criteria, features]);
+  return { lines, isPending: catalogue.isPending };
 }

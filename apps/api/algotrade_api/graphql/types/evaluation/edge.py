@@ -11,8 +11,9 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
-from algotrade.services.read.evaluation import edges, runs, verdict
+from algotrade.services.read.evaluation import edges, runs, versions
 from algotrade_api.graphql.offload import off_loop
+from algotrade_api.graphql.types.evaluation.compare import EdgeCompare
 from algotrade_api.graphql.types.evaluation.verdict import EdgeDefinition, EdgeSource, EdgeVerdict
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
@@ -82,7 +83,9 @@ class EdgeRow:
     "record), `knowledgeTs` when it committed, `asOf` the data version it read, "
     "`afterSession` it committed "
     "after the request's session (false without one), `lostInputs` what the run could not read "
-    "(a screener's missing table and the sessions lost)"
+    "(a screener's missing table and the sessions lost); `oosHidden`: the run is a copy's whose "
+    "out-of-sample result is withheld until the user shows it, so `rows` serves the in-sample "
+    "rows only"
 )
 class EdgeRun:
     run_id: str
@@ -98,6 +101,7 @@ class EdgeRun:
     trials_counted: int | None
     after_session: bool
     lost_inputs: list[str]
+    oos_hidden: bool
     run: strawberry.Private[runs.EdgeRun]
     ctx: strawberry.Private[Stores]
 
@@ -117,6 +121,7 @@ class EdgeRun:
             trials_counted=d.trials_counted,
             after_session=d.after_session,
             lost_inputs=list(d.lost_inputs),
+            oos_hidden=d.oos_hidden,
             run=d,
             ctx=ctx,
         )
@@ -144,8 +149,11 @@ class EdgeEvidence:
 
 @strawberry.type(
     description="An edge document (ADR 0053): status, thesis, the screeners and baselines that "
-    "implement it, its `frozenFrom` (null: no frozen period) and the run it cites; `mine`: the "
-    "user has a document of this id of their own, not only the site's"
+    "implement it, its `frozenFrom` (null: no frozen period) and the run it cites; the user's "
+    "own `state` about it (researching, following, rejected, retired, trial) with its `since`, "
+    "`stateReason`, the permanent `labels` the server decided and `oosRevealed`; `mine`: the "
+    "document is the user's own (a copy or a new edge), `extends` the edge it is a copy of, "
+    "`replaces` the edge a trial would replace, `oosHidden` its out-of-sample result is withheld"
 )
 class Edge:
     id: str
@@ -164,7 +172,15 @@ class Edge:
     rejection_reason: str
     sources: list[EdgeSource]
     definition: EdgeDefinition
+    state: str
+    since: dt.date | None
+    state_reason: str
+    labels: list[str]
+    oos_revealed: bool
+    oos_hidden: bool
     mine: bool
+    extends: str | None
+    replaces: str | None
     edge: strawberry.Private[edges.Edge]
     ctx: strawberry.Private[Stores]
     cache: strawberry.Private[dict[str, Any]]
@@ -188,7 +204,15 @@ class Edge:
             rejection_reason=d.rejection_reason,
             sources=[EdgeSource.of(x) for x in d.sources],
             definition=EdgeDefinition.of(d.definition),
+            state=d.state,
+            since=d.since,
+            state_reason=d.state_reason,
+            labels=list(d.labels),
+            oos_revealed=d.oos_revealed,
+            oos_hidden=d.oos_hidden,
             mine=d.mine,
+            extends=d.extends,
+            replaces=d.replaces,
             edge=d,
             ctx=ctx,
             cache={},
@@ -227,10 +251,19 @@ class Edge:
         return [EdgeRun.of(r, self.ctx) for r in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The verdict on the official result (the canonical run): Works, Promising, "
-        "Not working, Not enough data or Waiting on data, with the reason, the figures it rests "
-        "on and its criteria (ED8)"
+        description="The verdict on the official result (a site edge: the canonical run; the "
+        "user's own edge: their latest run, judged on in-sample figures while `oosHidden`): "
+        "Works, Promising, Not working, Not enough data or Waiting on data, with the reason, "
+        "the figures it rests on and its criteria (ED8)"
     )
     async def verdict(self, info: Info) -> EdgeVerdict:
-        found = await off_loop(verdict.load_edge_verdict, self.ctx, self.edge)
+        found = await off_loop(versions.load_verdict, self.ctx, self.edge)
         return EdgeVerdict.of(found)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The user's own edge against the edge it extends and its baselines, "
+        "in-sample only while `oosHidden`; null for a site edge"
+    )
+    async def compare(self, info: Info) -> EdgeCompare | None:
+        found = await off_loop(versions.load_compare, self.ctx, self.edge)
+        return EdgeCompare.of(found) if found is not None else None

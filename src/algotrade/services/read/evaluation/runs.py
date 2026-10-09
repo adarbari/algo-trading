@@ -26,6 +26,7 @@ EDGE_EVAL = "edge_eval"
 MAIN = "main"
 RANDOM = "random"  # the role of a random-pick draw (ED8), never a screener or a baseline
 DECILES = 10
+IN_SAMPLE = "in_sample"  # the slice before the split
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,9 @@ class EdgeRun:
     committed; ``as_of``: the data version it read (ISO); ``after_session``: it committed
     after the request's session (a session-bound read only; always False without one): its
     numbers were not knowable on that session; ``lost_inputs``: what the run could not read, as
-    "<variant>: <table> (<n> sessions)" (a screener missing a table on those decision sessions)."""
+    "<variant>: <table> (<n> sessions)" (a screener missing a table on those decision sessions);
+    ``oos_hidden``: the run is a copy's whose out-of-sample result is withheld until the user shows
+    it (ADR 0053 amendment 2026-10-09): its rows are served in-sample only (``load_run_rows``)."""
 
     run_id: str
     edge_id: str
@@ -52,6 +55,7 @@ class EdgeRun:
     trials_counted: int | None
     after_session: bool = False
     lost_inputs: tuple[str, ...] = ()
+    oos_hidden: bool = False
 
 
 @dataclass(frozen=True)
@@ -127,6 +131,7 @@ def _run(ctx: Stores, record: RunRecord, edge: Edge, owner: str) -> EdgeRun:
         trials_counted=stats.get("trials_counted"),
         after_session=session is not None and committed.date() > session,
         lost_inputs=_lost(stats),
+        oos_hidden=edge.oos_hidden and owner != SITE_USER,
     )
 
 
@@ -238,12 +243,19 @@ def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
 
 
 def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
-    """The rows ``run`` wrote, as it left them; none when its partition holds none of its own."""
+    """The rows ``run`` wrote, as it left them; none when its partition holds none of its own.
+    A run whose out-of-sample result is hidden serves its ``in_sample`` rows only: the whole
+    history, the years and the regimes all contain out-of-sample sessions, so they are withheld
+    here, in the one reader, not in the browser."""
     record = ctx.reader.run(run.run_id)
-    return rows_of_record(ctx, record) if record is not None else ()
+    found = rows_of_record(ctx, record) if record is not None else ()
+    return tuple(r for r in found if r.slice_kind == IN_SAMPLE) if run.oos_hidden else found
 
 
 def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
-    """The random-pick draws ``run`` wrote; none for a run from before they were drawn."""
+    """The random-pick draws ``run`` wrote; none for a run from before they were drawn, and
+    none while its out-of-sample result is hidden (a draw is measured out of sample)."""
     record = ctx.reader.run(run.run_id)
-    return draws_of_record(ctx, record) if record is not None else ()
+    if record is None or run.oos_hidden:
+        return ()
+    return draws_of_record(ctx, record)

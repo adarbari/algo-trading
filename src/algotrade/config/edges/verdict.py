@@ -23,6 +23,7 @@ KEYS = (
     "works_max_pbo",
     "oos_lift_share",
     "random_beat_share",
+    "forward_sessions",
 )
 
 
@@ -47,6 +48,7 @@ class VerdictSettings:
     works_max_pbo: float = 0.2
     oos_lift_share: float = 0.5
     random_beat_share: float = 0.95
+    forward_sessions: int = 20  # a new version's forward test, in sessions (ED8; owner 2026-10-09)
 
     @classmethod
     def from_document(
@@ -69,4 +71,5 @@ class VerdictSettings:
             works_max_pbo=t.fraction("works_max_pbo", d.works_max_pbo),
             oos_lift_share=t.number("oos_lift_share", d.oos_lift_share, 0),
             random_beat_share=t.fraction("random_beat_share", d.random_beat_share),
+            forward_sessions=t.integer("forward_sessions", d.forward_sessions, 1),
         )

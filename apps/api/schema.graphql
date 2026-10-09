@@ -134,6 +134,31 @@ type CheckCounts {
 }
 
 """
+One period's figures of a screen at a horizon (null: not stored): win rate, base rate, lift in points, decile spread and the independent sessions (`trades`)
+"""
+type CompareFigures {
+  winRate: Float
+  baseRate: Float
+  liftPts: Float
+  decileSpread: Float
+  trades: Int
+}
+
+"""
+One line of the comparison: `kind` is this (the edge's latest run of yours), extended (the edge it is a copy of, its official result) or baseline; `basis` the screen and holding period; `outOfSample` is null while it is hidden (`oosHidden`) or not stored
+"""
+type CompareRow {
+  kind: String!
+  label: String!
+  edgeId: String
+  runId: String
+  basis: String!
+  inSample: CompareFigures
+  outOfSample: CompareFigures
+  oosHidden: Boolean!
+}
+
+"""
 Ingestion completeness: every dataset x the window's `sessions` (oldest first, ending at the session read); `lastClosed` the exchange's last closed session (later than the last of `sessions`: the store is stale)
 """
 type Completeness {
@@ -181,7 +206,7 @@ type DecisionCount {
 }
 
 """
-An edge document (ADR 0053): status, thesis, the screeners and baselines that implement it, its `frozenFrom` (null: no frozen period) and the run it cites; `mine`: the user has a document of this id of their own, not only the site's
+An edge document (ADR 0053): status, thesis, the screeners and baselines that implement it, its `frozenFrom` (null: no frozen period) and the run it cites; the user's own `state` about it (researching, following, rejected, retired, trial) with its `since`, `stateReason`, the permanent `labels` the server decided and `oosRevealed`; `mine`: the document is the user's own (a copy or a new edge), `extends` the edge it is a copy of, `replaces` the edge a trial would replace, `oosHidden` its out-of-sample result is withheld
 """
 type Edge {
   id: String!
@@ -200,7 +225,15 @@ type Edge {
   rejectionReason: String!
   sources: [EdgeSource!]!
   definition: EdgeDefinition!
+  state: String!
+  since: Date
+  stateReason: String!
+  labels: [String!]!
+  oosRevealed: Boolean!
+  oosHidden: Boolean!
   mine: Boolean!
+  extends: String
+  replaces: String
 
   """
   The latest committed site run whose split is `frozenFrom`; null: none (see `canonicalNotRun`). An exploratory or older split is never shown here
@@ -216,9 +249,25 @@ type Edge {
   runs: [EdgeRun!]!
 
   """
-  The verdict on the official result (the canonical run): Works, Promising, Not working, Not enough data or Waiting on data, with the reason, the figures it rests on and its criteria (ED8)
+  The verdict on the official result (a site edge: the canonical run; the user's own edge: their latest run, judged on in-sample figures while `oosHidden`): Works, Promising, Not working, Not enough data or Waiting on data, with the reason, the figures it rests on and its criteria (ED8)
   """
   verdict: EdgeVerdict!
+
+  """
+  The user's own edge against the edge it extends and its baselines, in-sample only while `oosHidden`; null for a site edge
+  """
+  compare: EdgeCompare
+}
+
+"""
+A user's edge against the edge it extends and its baselines. `oosHidden`: its out-of-sample figures are withheld until the user shows them (Follow, or the reveal); `reason` says why `rows` is empty
+"""
+type EdgeCompare {
+  edgeId: String!
+  extends: String
+  oosHidden: Boolean!
+  reason: String!
+  rows: [CompareRow!]!
 }
 
 """
@@ -268,7 +317,7 @@ type EdgeRow {
 }
 
 """
-A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one), `lostInputs` what the run could not read (a screener's missing table and the sessions lost)
+A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one), `lostInputs` what the run could not read (a screener's missing table and the sessions lost); `oosHidden`: the run is a copy's whose out-of-sample result is withheld until the user shows it, so `rows` serves the in-sample rows only
 """
 type EdgeRun {
   runId: String!
@@ -284,6 +333,7 @@ type EdgeRun {
   trialsCounted: Int
   afterSession: Boolean!
   lostInputs: [String!]!
+  oosHidden: Boolean!
 
   """
   The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none
@@ -362,15 +412,6 @@ type EquityPoint {
   ts: String!
   equity: Float
   grossExposure: Float
-}
-
-"""
-The user's own `splitFrom` (null: none set, so each edge's frozen period is the split), the `frozenPeriods` of the edges they see and the `latestSession` a split may name. A run under a personal split is exploratory
-"""
-type EvaluationSplit {
-  splitFrom: Date
-  frozenPeriods: [FrozenPeriod!]!
-  latestSession: Date!
 }
 
 """
@@ -549,12 +590,6 @@ type Fill {
   price: Float
   commission: Float
   multiplier: Float
-}
-
-"""One edge's frozen period: the first session of its test slice"""
-type FrozenPeriod {
-  edgeId: String!
-  frozenFrom: Date!
 }
 
 """
@@ -1632,9 +1667,9 @@ type Query {
   edge(id: String!): Edge
 
   """
-  The user's train / test split (their evaluation.toml), the frozen periods of the edges they see and the latest session a split may name; null: nothing stored
+  The edge `id` as one whole TOML document (extends resolved, the user's state left out): what an admin lands in config/site/edges/ by pull request to publish it site-wide (the site's config changes only by PR); null: no such edge. `user`: whose copy (an admin may publish any user's; default: their own)
   """
-  evaluationSplit: EvaluationSplit
+  publishedEdgeDocument(id: String!, user: String = null): String
 
   """
   Every committed evaluation run of the edge `edgeId` the user sees (theirs, then the site's), newest first; empty: no such edge or no run. Read by run, as the run left it (never by session)
@@ -1917,15 +1952,19 @@ type ScreenColumn {
   field: String!
 }
 
-"""A criterion of a screen, in funnel order: the field it judges"""
+"""
+A criterion of a screen, in funnel order: the field it judges, its `mode` and its rule as the config states it: the operator `op` and the threshold `value` in the field's stored unit (a number, a string or boolean, a list for `in` / `between`; null: the operator takes none)
+"""
 type ScreenCriterion {
   id: String!
   field: String!
   mode: String!
+  op: String!
+  value: JSON
 }
 
 """
-A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, the latest version resolved (`hash`, `layers`, `resolved`, `error`) and `working`, the rule keys the Builder edits
+A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, why the latest version does not resolve (`error`) and `working`, the rule keys the Builder edits
 """
 type ScreenDetail {
   screenerId: String!
@@ -1935,9 +1974,6 @@ type ScreenDetail {
   versions: [Int!]!
   latest: Int
   preset: PresetPin
-  hash: String
-  layers: [String!]!
-  resolved: JSON
   error: String
   working: JSON
 }

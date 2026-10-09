@@ -241,8 +241,8 @@ corrected it on point-in-time grounds.
    at S is excluded as `no_entry_bar`.
 8. **Train and test split in the UI** (ED5). The site `frozen_from` stays the only evidence
    gate: an edge's status changes only from a run whose split equals it. A user may set
-   `split_from` in `config/users/<id>/evaluation.toml`, or per run (ADR 0015 layering:
-   site < user < run). The run records it with its config hash. Every number from a split that
+   `split_from` per run, or, in a copy of an edge, its own `frozen_from` (the user-wide
+   `evaluation.toml` was deleted by the amendment of 2026-10-09; ADR 0015 layering: site < user < run). The run records it with its config hash. Every number from a split that
    is not the site's is labelled EXPLORATORY in the read model and the UI. The track-record chip
    never reads one, and a fitness test forbids a status change from one.
 9. **Option history.** No free source has usable history. The Cboe chains captured daily since
@@ -372,3 +372,66 @@ These sessions no longer count as `pre_snapshot` (a store with no listing histor
 names unsaid). The read is opt-in (`historical=True`
 through `fields_view` / `select` / `screen_session`): reads, backtests and the API are unchanged.
 `end_date` stays behind `universe_asof` (a name is in only while `start <= S <= end`).
+
+## Amendment 2026-10-09: user edges extend, never shadow; per-user state; publish by download (ED8)
+
+Decided on the owner's behalf by the architect, 2026-10-09 (owner away; decisions D1 to D5 of
+the ED8 plan, accepted as recommended). It finishes the Edges Lab and Desk (prototype screens 1
+to 14) on the existing documents, with one new grain still to come.
+
+1. **A user's edge extends; it never shadows (D1).** The same-id merge of a user document over a
+   site edge (ADR 0015 layering of the first decision) is removed: nothing could show "my copy"
+   beside the site edge, nor several copies. A user document
+   `config/users/<u>/edges/<id>.toml` is now one of three things. With `extends = "<edge id>"` it
+   is a COPY under its own id: the extended document (a site edge, or the user's own, so v2
+   extends v1) is deep-merged under it (tables deeply, lists replaced; the screener-copy pattern
+   of `services/authoring/presets.py`). Without it, and with an id that is no site edge's, it is a
+   new edge. The file of a site edge's own id holds nothing but `[follow]`. What the site decides
+   (`status`, `rejection_reason`, `evidence`, `implementation`) is never inherited nor set: a
+   copy is a `candidate`. `frozen_from` is a copy's own to set; the run is exploratory when it
+   differs from the `frozen_from` of the site edge the chain started from
+   (`Edge.site_frozen_from`), or when the user moved the split after seeing the result (below).
+   No user edge file shadows a site id today (verified), so nothing migrates.
+2. **The user-wide split is deleted (D2).** `config/users/<id>/evaluation.toml`, `PUT
+   /evaluation/split`, `Query.evaluationSplit`, `EvaluationSettings` and the web form go: the
+   split is per edge, the copy's own `frozen_from` (the builder's step 6, PR-C). The first
+   decision's "the split is the site's, a user's is exploratory" stands, now per copy.
+3. **State is the user's, in their own document (`[follow]`).** `state` (researching, following,
+   rejected, retired, trial), `since`, `reason`, `replaces` (a new version's trial: the edge it
+   would replace), permanent `labels` and `oos_revealed`. The table is never inherited and never
+   published. Following a site edge without copying it is a `[follow]`-only file. One file per
+   (user, edge), no table: state is a user choice (ADR 0029), low volume, and `config/users/`
+   being git-ignored (the Mac only) is accepted, as for screens. The server decides the
+   transitions (`researching -> following | rejected | trial`, `following -> retired |
+   researching`, `trial -> following | rejected | researching`, anything closed `-> researching`)
+   and the labels, which are warnings, never blocks: `followed_against_verdict` (following while
+   the verdict is Not working), `oos_viewed_during_tuning` (the out-of-sample result shown while
+   not following), `replaced_without_forward_test` (a trial replaced its edge before
+   `forward_sessions` (site setting, default 20) sessions), `split_moved_after_viewing` (the
+   copy's `frozen_from` moved after the result was shown; the run is then exploratory for good).
+4. **The fair test is withheld server side.** A copy's out-of-sample result stays hidden until the
+   user shows it (Follow does it too; `oos_revealed`). Until then the one run reader
+   (`services/read/evaluation/runs.py::load_run_rows`) serves its in-sample rows only (the whole
+   history, the years and the regimes all contain out-of-sample sessions), its verdict is judged
+   on in-sample figures with the reason saying so (so it is at best Not enough data or Not
+   working, never Promising or Works), and the comparison with the edge it extends and its
+   baselines (`Edge.compare`) carries in-sample figures and `oosHidden`. The browser filters
+   nothing. The Admin harness-run reads, admin only, still show every run.
+5. **Publishing site-wide is a read (D3).** The site's config changes only by PR (ADRs 0005 and
+   0015): there is no API write to it. An admin reads the edge's whole layered document as TOML
+   (`Query.publishedEdgeDocument`, admin only; `extends` resolved, `[follow]` left out) and lands
+   it as `config/site/edges/<id>.toml` by pull request. Not a REST GET: the REST allow-list only
+   shrinks (ADR 0037).
+6. **Writes.** Only through `services/authoring/edges.py` into `config/users/<id>/edges/` (ADR
+   0029): copy (optionally as a trial version), save (validated as the harness reads it, fail
+   closed, nothing written on an error; a site edge's id is refused), delete (archived, an id not
+   reused), state (`PUT /edges/{id}/state`). The writer gains one generic
+   `save_user_document` / `archive_user_document` for the kinds in `USER_DOCUMENT_KINDS`; its
+   TOML serialiser moves to `storage/configs/toml_text.py` so the read model can render the
+   published document.
+7. **Still to come under this decision (not in this PR).** Paper trades and nightly signals: one
+   new job-written grain `results/edge_paper` (ADR 0005's list gets it then; D4: the first cut of
+   Ideas shows ahead or behind only after settlement); random-pick backtests and decile means on
+   `results/edge_eval` (D5: 1,000 draws, out-of-sample slice only, Works needs at least 95%
+   beaten); the web follow and builder UI. Each lands with its own tests and, where it touches
+   point-in-time reads or jobs, an `architect` review.

@@ -5,7 +5,6 @@
  * list's chip and the Ideas odds line. Never reads an exploratory run as a track record.
  */
 export { prefetchEdges, refreshEdges, useEdges } from './api/edges';
-export { refreshEvaluationSplit, useEvaluationSplit } from './api/split';
 export { useTrackRecords } from './api/track-records';
 export {
   statusLabel,

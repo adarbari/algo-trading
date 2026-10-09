@@ -20,6 +20,8 @@ const ScreenerRuns = graphql(`
         id
         field
         mode
+        op
+        value
       }
       notRun {
         kindText

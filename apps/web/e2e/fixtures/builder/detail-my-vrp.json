@@ -19,17 +19,6 @@
     "current": 2,
     "rebaseAvailable": true
   },
-  "hash": "h-my-vrp",
-  "layers": ["site/vrp_scanner@1", "abhinav/my-vrp"],
-  "resolved": {
-    "id": "my-vrp",
-    "kind": "screener",
-    "impl": "rules",
-    "selection": {
-      "name": "liquid_optionable",
-      "where": {}
-    }
-  },
   "error": null,
   "working": {
     "version": 1,

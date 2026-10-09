@@ -16,10 +16,6 @@ vi.mock('@/features/edge-evaluation', async () => {
   const { Text } = await import('@algotrade/ui');
   return { RunEvaluation: ({ edgeId }: { edgeId: string }) => <Text>{`run ${edgeId}`}</Text> };
 });
-vi.mock('@/features/evaluation-split', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return { EvaluationSplitForm: () => <Text>split form</Text> };
-});
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
   return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
@@ -103,14 +99,13 @@ describe('EdgeDetail', () => {
     expect(within(years()).getByText('No years to show')).toBeInTheDocument();
   });
 
-  it('keeps the tests, backtests and the split form in the details', async () => {
+  it('keeps the tests and backtests in the details', async () => {
     render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
     await userEvent.click(screen.getByText('Details'));
     expect(screen.getByText('Official result')).toBeInTheDocument();
     expect(screen.getByText('EXPLORATORY')).toBeInTheDocument();
     expect(screen.getByText('momentum_12_1: rollup (4 sessions)')).toBeInTheDocument();
     expect(screen.getByText('Not measured yet')).toBeInTheDocument();
-    expect(screen.getByText('split form')).toBeInTheDocument();
   });
 
   it('says what a waiting edge waits on and offers the way back', async () => {

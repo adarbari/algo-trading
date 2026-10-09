@@ -230,8 +230,7 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     """The edge harness (ADR 0053) through the jobs runner: every open edge that has screeners
     or baselines (or the one ``--edge``) over ``--from``..``--to`` (default: the stored outcome
     sessions), outcomes known as of ``--as-of`` (default now), the test slice from
-    ``--split-from`` (else
-    the user's ``evaluation.toml``, else each edge's ``frozen_from``; another split is
+    ``--split-from`` (else each edge's ``frozen_from``; another split than the site edge's is
     exploratory). Rows land in ``results/edge_eval``;
     a report with the survivorship line is printed (and written to ``--report``).
     With ``--baseline`` the measures are compared with the ``edges`` section of that file (exit 1
