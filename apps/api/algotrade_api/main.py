@@ -47,6 +47,7 @@ from algotrade.services.read.context import (
     ReadContext,
     ResultCache,
     StoreContext,
+    limit_threads,
     open_context,
     open_stores,
 )
@@ -68,6 +69,14 @@ from algotrade_api.text_model import open_text_model
 from algotrade_api.web import web_router
 
 TITLE = "algotrade API"
+# Each of the 6 read threads (``READ_THREADS``) otherwise decodes Parquet with up to one Arrow
+# CPU thread per core plus an IO pool, every thread holding arena memory: 100 concurrent users
+# peaked at 2.5 GB RSS. Two CPU and four IO threads, shared by all readers, bound it.
+ARROW_CPU_THREADS = 2
+ARROW_IO_THREADS = 4
+limit_threads(
+    ARROW_CPU_THREADS, ARROW_IO_THREADS
+)  # at import: the process that serves imports this
 
 
 def _not_found(request: Request, exc: Exception) -> JSONResponse:

@@ -2,10 +2,12 @@
 shared result cache, and ``partition``, which reads a session-grain table for exactly the
 session and never an older partition (ADR 0036 decision 6)."""
 
+import sys
 import threading
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pytest
@@ -228,8 +230,8 @@ def test_result_cache_holds_32_entries_by_default() -> None:
 def test_result_cache_is_bounded_by_the_bytes_of_its_frames() -> None:
     frame = pd.DataFrame({"x": range(1000)})  # 8 000 bytes and its index
     held = weigh(frame)
-    assert held >= 8000 and weigh((frame, {"k": frame})) >= 2 * held and weigh("text") == 4
-    cache = ResultCache(size=32, max_bytes=2 * held + 1)
+    assert held >= 8000 and weigh((frame, {"k": frame})) >= 2 * held and weigh("text") == 49 + 4
+    cache = ResultCache(size=32, max_bytes=2 * held + 64)  # slack: a small int weighs 24
     for key in "abc":
         cache.put(key, frame)
     # the oldest went to keep the frames under the bound; the newest always stays
@@ -308,3 +310,42 @@ def test_get_or_compute_lets_a_waiter_compute_after_a_failure() -> None:
         cache.get_or_compute("k", lambda: (_ for _ in ()).throw(OSError("mid-publish")))
     assert cache.get_or_compute("k", lambda: "ok") == "ok"
     assert cache.get_or_compute("k", lambda: "never") == "ok"
+
+
+def test_eviction_releases_arrow_pool_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[int] = []
+    monkeypatch.setattr("algotrade.services.read.context.release_unused", lambda: calls.append(1))
+    cache = ResultCache(size=2)
+    cache.put("a", 1)
+    cache.put("b", 2)
+    assert calls == []  # nothing evicted yet
+    cache.put("c", 3)
+    assert calls == [1]
+    cache.put("c", 4)  # replacing a key evicts nothing
+    assert calls == [1]
+
+
+def test_weigh_tracks_deep_memory_of_representative_values() -> None:
+    n = 5000
+    ids = [f"EQ:BBG{i:09d}" for i in range(n)]
+    rng = np.random.default_rng(0)
+    market = pd.DataFrame(
+        {
+            "instrument_id": pd.Series(ids, dtype=object),
+            "sector": pd.Categorical(rng.choice(["a", "b", "c"], n)),
+            "close": rng.random(n),
+        }
+    )
+    screen = pd.DataFrame(
+        {"instrument_id": pd.Series(ids, dtype=object), "score": np.arange(n, dtype=float)}
+    )
+    for frame in (market, screen):
+        deep = int(frame.memory_usage(index=True, deep=True).sum())
+        assert deep / 1.5 <= weigh(frame) <= deep * 1.5
+
+    records = [{"id": i, "name": "x" * 20, "v": float(k)} for k, i in enumerate(ids)]
+    measured = sys.getsizeof(records) + sum(
+        sys.getsizeof(r) + sum(sys.getsizeof(v) for v in r.values())  # keys are shared
+        for r in records
+    )
+    assert measured / 1.5 <= weigh(records) <= measured * 1.5
