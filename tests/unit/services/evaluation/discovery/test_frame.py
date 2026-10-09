@@ -40,7 +40,7 @@ def everywhere(fs: FeatureSet, first: date | None = LONG_AGO) -> dict[str, date 
     return {i.table: first for g in fs.code.values() for i in g.inputs}
 
 
-def test_a_learned_edge_score_and_what_reads_one_are_excluded() -> None:
+def test_edge_score_excluded() -> None:
     """A fit scorer's score was trained on windows overlapping the label; a tell made of it (or of
     a formula over it) would be the fit, not a finding. Catches: ``edge_score_*`` entering the
     discovery."""
@@ -67,7 +67,7 @@ def test_the_matching_variable_and_features_derived_from_it_are_excluded() -> No
     assert ("feature.adv_twice", MATCHING_VARIABLE) in got.excluded
 
 
-def test_a_feature_over_a_table_first_stored_after_the_session_is_excluded() -> None:
+def test_late_input_feature_excluded() -> None:
     """A table that starts in 2026 (company, shares, chains, IV) describes today on a 2012
     session; its features are left out for that session, with the table and its first date.
     Catches: today's knowledge entering an old grid session."""
@@ -101,7 +101,7 @@ TOY = FeatureGroup(
 )
 
 
-def test_a_value_at_s_plus_1_is_ignored() -> None:
+def test_value_at_s_plus_1_ignored() -> None:
     """The rollup of the next session holds different numbers; the frame reads S's partition
     only, and a name with no row at S is UNKNOWN even when the next session has one. Catches: a
     read that falls through to a later (or earlier) partition."""
