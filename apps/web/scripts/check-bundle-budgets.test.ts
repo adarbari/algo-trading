@@ -8,7 +8,7 @@ import {
   violations,
   type Manifest,
 } from './check-bundle-budgets';
-import { shrunk, type Budgets } from './perf-budgets';
+import { shrunk, withHeadroom, type Budgets } from './perf-budgets';
 
 // index.html (entry) -> react; page "a" -> react + shared + its css; the chart engine is lazy.
 const manifest: Manifest = {
@@ -104,13 +104,27 @@ describe('violations', () => {
 });
 
 describe('updated and shrunk', () => {
-  it('sets a first budget at the measured size + 10 % (rounded up to 100 B)', () => {
-    expect(shrunk(undefined, 12_000)).toBe(13_200);
+  it('adds 1 % headroom, rounded up to 100 B for sizes', () => {
+    expect(withHeadroom(12_000)).toBe(12_200); // 12 120 rounds up
+    expect(withHeadroom(239_682)).toBe(242_100); // 242 078.82 rounds up
+    expect(withHeadroom(12_000)).toBeGreaterThan(12_000);
+  });
+
+  it('rounds counts up to the next integer, at least +1', () => {
+    expect(withHeadroom(10, 1)).toBe(11); // 10.1 rounds up
+    expect(withHeadroom(1_200, 1)).toBe(1_212);
+    expect(withHeadroom(0, 1)).toBe(1);
+  });
+
+  it('sets a first budget at the headroom value', () => {
+    expect(shrunk(undefined, 12_000)).toBe(12_200);
   });
 
   it('never raises a budget, only shrinks it', () => {
-    expect(shrunk(20_000, 12_000)).toBe(13_200);
+    expect(shrunk(20_000, 12_000)).toBe(12_200);
+    expect(shrunk(12_100, 12_000)).toBe(12_100);
     expect(shrunk(10_000, 12_000)).toBe(10_000);
+    expect(shrunk(50, 50, 1)).toBe(50);
   });
 
   it('drops pages that no longer exist and adds new ones', () => {
@@ -123,7 +137,7 @@ describe('updated and shrunk', () => {
       'src/pages/a/index.ts',
       'src/pages/b/index.ts',
     ]);
-    expect(after.bundle.entry_gzip_bytes).toBe(40); // 35 + 10 % is 100 after rounding: kept
+    expect(after.bundle.entry_gzip_bytes).toBe(40); // 35 + 1 % is 100 after rounding: kept
   });
 });
 
