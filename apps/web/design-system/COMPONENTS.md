@@ -484,7 +484,7 @@ Source: `design-system/components/DocLayout`
 
 ### Drawer
 
-Drawer: a side sheet over the page for detail that keeps the screen behind it in context (a ticker's detail from a table row, a run's log, filters on a phone). Modal like Dialog: focus moves in, stays inside, and returns to the opener; Escape, the close button and a backdrop click close it; page scroll is locked. Full height on the `end` (default) or `start` side; `sm` / `md` / `lg` widths, never wider than the screen.
+Drawer: a side sheet over the page for detail that keeps the screen behind it in context (a ticker's detail from a table row, a run's log, filters on a phone). Modal like Dialog: focus moves in, stays inside, and returns to the opener; Escape, the close button and a backdrop click close it; page scroll is locked. Full height on the `end` (default) or `start` side; `sm` / `md` / `lg` widths, or `full` (the whole screen: a phone's detail sheet), never wider than the screen. `headerStart` / `headerActions` add controls to the header (back, previous / next).
 
 Source: `design-system/components/Drawer`
 
@@ -498,7 +498,9 @@ Source: `design-system/components/Drawer`
 | `description` | `ReactNode` | no | One line under the title; also the accessible description. |
 | `footer` | `ReactNode` | no | Actions pinned to the bottom of the sheet. |
 | `side` | `'start' \| 'end'` | no | The side it slides in from: `end` (default) or `start`. |
-| `size` | `'sm' \| 'md' \| 'lg'` | no | Width: `sm` (a sidebar), `md` (default), `lg`. |
+| `size` | `'sm' \| 'md' \| 'lg' \| 'full'` | no | Width: `sm` (a sidebar), `md` (default), `lg`, or `full` (the whole screen). |
+| `headerStart` | `ReactNode` | no | Before the title in the header (a back button). |
+| `headerActions` | `ReactNode` | no | Before the close button in the header (previous / next). |
 | `dismissible` | `boolean` | no | Escape and backdrop clicks close it (default true). |
 | `initialFocus` | `RefObject<HTMLElement \| null>` | no | The element focused on open; default the first focusable element. |
 | `children` | `ReactNode` | no |  |
@@ -891,17 +893,19 @@ Source: `design-system/components/LoginForm`
 
 ### MasterDetail
 
-MasterDetail: a list beside its detail (the ticker table and the focused ticker's tabs, a screener's picks and the pick under review). Wide, the two sit side by side in a Grid; when the component's own width is under the `collapse` breakpoint (a phone) the master takes the width, an optional summary (a compare bar, a "Detail for" picker) sits above it, and the detail opens in a side sheet (Drawer) each time `detailKey` names a new item. Dismissing the sheet calls `onDetailClose`; the caller clears its key there, so choosing the same item again reopens it.
+MasterDetail: a list beside its detail (the ticker table and the focused ticker's tabs, a screener's picks and the pick under review). Wide, the two sit side by side in a Grid; when the component's own width is under the `collapse` breakpoint (a phone) the master takes the width, an optional summary (a compare bar, a "Detail for" picker) sits above it, and the detail opens in a full-height sheet (Drawer, `full`) each time `detailKey` names a new item. The sheet's header has a back button, the title and, with `step`, previous / next; `detailFooter` pins the item's actions to its bottom. The list stays mounted behind it, so back returns to it at the same scroll position, and focus returns to the row. Dismissing the sheet (back, close, Escape) calls `onDetailClose`; the caller clears its key there, so choosing the same item again reopens it.
 
 Source: `design-system/components/MasterDetail`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `master` | `ReactNode` | yes | The list (a table of rows to choose from). |
-| `detail` | `ReactNode` | yes | The chosen item's detail. Wide: always beside the master; narrow: in the sheet. |
+| `detail` | `ReactNode \| ((inSheet: boolean) => ReactNode)` | yes | The chosen item's detail. Wide: always beside the master; narrow: in the sheet. A function gets whether it is drawn in the sheet (so its own actions can move to `detailFooter`). |
 | `detailKey` | `string \| null` | yes | The item the detail shows (null: none chosen). Narrow: a new non-null key opens the sheet. |
 | `detailTitle` | `ReactNode` | yes | The sheet's heading and accessible name on narrow (the item's name, "AAPL"). |
 | `detailDescription` | `ReactNode` | no | One line under the sheet's heading on narrow. |
+| `step` | `MasterDetailStep` | no | Narrow only: previous / next buttons in the sheet's header. |
+| `detailFooter` | `ReactNode` | no | Narrow only: actions pinned to the bottom of the sheet (Open in Explore, Compare, Dismiss). |
 | `onDetailClose` | `() => void` | yes | Narrow only: the sheet was dismissed (Escape, close button, backdrop). |
 | `summary` | `ReactNode` | no | Above the master on narrow, at the top of the detail column on wide (a compare bar). |
 | `columns` | `2 \| 'main-aside'` | no | Wide layout: two equal columns (default) or `main-aside` (3 : 2). |
@@ -932,6 +936,20 @@ Source: `design-system/components/NavTabs`
 | `activeHref` | `string` | no | The `href` of the current section. |
 | `'aria-label'` | `string` | yes | The navigation landmark's name ("Trader sections"). |
 | `renderLink` | `(link: NavLinkRenderProps) => ReactNode` | no | Renders one link (e.g. the router's Link); a plain anchor by default. |
+
+### NoticeLine
+
+NoticeLine: a condition worth knowing about in one line (a tinted pill with a count or a few words, then the first reason, truncated) that expands on a click or tap to its full content. Keeps a page's data starting near the top where a Banner would push it down. The button carries `aria-expanded` and `aria-controls`; colour only reinforces the pill's words.
+
+Source: `design-system/components/NoticeLine`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tone` | `Exclude<StatusTone, 'accent'>` | no | The pill's tone (default `warning`). |
+| `label` | `ReactNode` | yes | The pill's words ("6 unavailable"). |
+| `summary` | `ReactNode` | no | The first reason, one line, truncated. |
+| `defaultOpen` | `boolean` | no | Open on first render (default closed). |
+| `children` | `ReactNode` | no | The full content shown when expanded. |
 
 ### NumberInput
 

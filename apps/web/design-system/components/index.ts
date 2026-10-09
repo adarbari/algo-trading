@@ -127,8 +127,9 @@ export {
 } from './LinkedText';
 export { LinkedProse, type LinkedProsePart, type LinkedProseProps } from './LinkedProse';
 export { ActionGroup, type ActionGroupProps, type ActionItem } from './ActionGroup';
-export { MasterDetail, type MasterDetailProps } from './MasterDetail';
+export { MasterDetail, type MasterDetailProps, type MasterDetailStep } from './MasterDetail';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
+export { NoticeLine, type NoticeLineProps } from './NoticeLine';
 export { NumberInput, type NumberInputProps } from './NumberInput';
 export {
   OddsLine,

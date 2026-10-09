@@ -136,6 +136,29 @@ test('Screener results: the pick sheet shows no keyboard hints on a phone', asyn
   await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' })).toBeHidden();
 });
 
+test('Screener results: the pick opens as a full-height sheet; next, previous and back work', async ({
+  page,
+}) => {
+  await page.goto('/screeners/vrp_scanner');
+  const picks = page.getByRole('grid').first();
+  await picks.getByRole('row', { name: /AAPL/ }).tap();
+  const sheet = page.getByRole('dialog', { name: 'AAPL' });
+  await expect(sheet).toBeVisible();
+  const viewport = page.viewportSize();
+  const box = await sheet.boundingBox();
+  expect(box?.height).toBeGreaterThanOrEqual((viewport?.height ?? 0) - 1);
+  await expect(sheet.getByRole('button', { name: 'Previous' })).toBeDisabled();
+  await sheet.getByRole('button', { name: 'Next' }).tap();
+  await expect(page.getByRole('dialog', { name: 'AAPL' })).toHaveCount(0);
+  const next = page.getByRole('dialog');
+  await expect(next).toBeVisible();
+  await next.getByRole('button', { name: 'Previous' }).tap();
+  await expect(page.getByRole('dialog', { name: 'AAPL' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Back to list' }).tap();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(picks.getByRole('row', { name: /AAPL/ })).toBeVisible();
+});
+
 test('Regime: a tapped card help button opens the indicator drawer as a sheet', async ({
   page,
 }) => {

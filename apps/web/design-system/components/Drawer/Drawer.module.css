@@ -10,3 +10,7 @@
 .widthLg {
   max-width: calc(var(--size-sidebar) * 2);
 }
+
+.widthFull {
+  max-width: none;
+}

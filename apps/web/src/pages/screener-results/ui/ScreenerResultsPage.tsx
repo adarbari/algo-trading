@@ -80,15 +80,17 @@ export function ScreenerResultsPage({
           hide(row.instrumentId);
         }}
         dismissed={dismissed}
+        compared={compared}
         onShowDismissed={() => {
           setDismissed(new Set());
         }}
-        renderDetail={({ row, criteria }) => (
+        renderDetail={({ row, criteria, inSheet }) => (
           <Stack gap={3}>
             <PickDetail
               row={row}
               criteria={criteria}
               compared={compared.includes(row.symbol)}
+              showActions={!inSheet}
               onOpen={onOpenTicker}
               onToggleCompare={() => {
                 toggle(row.symbol);

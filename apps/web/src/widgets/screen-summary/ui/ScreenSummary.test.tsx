@@ -88,7 +88,7 @@ describe('ScreenSummary', () => {
     expect(screen.getByText('Running the preview…')).toBeInTheDocument();
   });
 
-  it('tells what the preview lacks, by kind, when coverage is incomplete', () => {
+  it('tells what the preview lacks, by kind, when coverage is incomplete', async () => {
     state.preview = {
       ...ready,
       data: {
@@ -108,6 +108,8 @@ describe('ScreenSummary', () => {
       },
     };
     render(<ScreenSummary />);
+    for (const line of screen.getAllByRole('button', { name: /unavailable/ }))
+      await userEvent.click(line);
     expect(screen.getByText('Not available: system error')).toBeInTheDocument();
   });
 });
