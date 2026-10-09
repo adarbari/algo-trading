@@ -94,8 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
     ee.add_argument(
         "--split-from",
         type=date.fromisoformat,
-        help="first session of the test slice (default: the user's evaluation.toml, else each "
-        "edge's frozen_from); another split than frozen_from is exploratory",
+        help="first session of the test slice (default: each "
+        "edge's frozen_from); another split than the site edge's is exploratory",
     )
     ee.add_argument(
         "--extra-baseline",

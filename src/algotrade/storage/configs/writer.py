@@ -15,14 +15,12 @@ The memory writer has the same semantics for tests; a DB backend can replace bot
 protocol later.
 """
 
-import json
-import math
 import os
 import re
 import tempfile
 import tomllib
 from collections.abc import Mapping
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -38,8 +36,9 @@ from algotrade.storage.configs.files import (
     version_file,
 )
 from algotrade.storage.configs.store import ConfigStore, split_version
+from algotrade.storage.configs.toml_text import toml_text
 
-MAX_DOCUMENT_BYTES = 64 * 1024  # a config is a few KiB; refuse anything far larger
+USER_DOCUMENT_KINDS = ("edges",)  # one TOML document per id, replaced whole, archived on delete
 
 
 class VersionExistsError(ConfigurationError):
@@ -76,92 +75,20 @@ class ConfigWriter(ConfigStore, Protocol):
         """Replace ``users/<user>/preferences.toml``."""
         ...
 
-    def save_evaluation(self, user: str, document: Mapping[str, Any]) -> None:
-        """Replace ``users/<user>/evaluation.toml`` (the train / test split, ED5f)."""
+    def save_user_document(
+        self, user: str, kind: str, name: str, document: Mapping[str, Any]
+    ) -> None:
+        """Replace ``users/<user>/<kind>/<name>.toml`` for a kind in ``USER_DOCUMENT_KINDS``."""
         ...
 
+    def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:
+        """Move that document to ``users/<user>/archive/<kind>/<name>-<stamp>.toml`` (never
+        erased); ``True`` when there was one."""
+        ...
 
-# ----------------------------------------------------------------------------- TOML text
-_BARE_KEY = re.compile(r"[A-Za-z0-9_-]+")
-
-
-def _key(key: Any) -> str:
-    if not isinstance(key, str):
-        raise ConfigurationError(f"config keys are strings, not {key!r}")
-    return key if _BARE_KEY.fullmatch(key) else json.dumps(key)
-
-
-def _float(value: float) -> str:
-    if math.isnan(value):
-        return "nan"
-    if math.isinf(value):
-        return "inf" if value > 0 else "-inf"
-    return repr(value)
-
-
-def _scalar(value: Any) -> str | None:
-    """TOML text of a scalar; ``None`` when ``value`` is not one."""
-    text: str | None = None
-    if isinstance(value, bool):
-        text = "true" if value else "false"
-    elif isinstance(value, int):
-        text = str(value)
-    elif isinstance(value, float):
-        text = _float(value)
-    elif isinstance(value, str):
-        text = json.dumps(value)  # a JSON string is a valid TOML basic string
-    elif isinstance(value, (datetime, date)):
-        text = value.isoformat()
-    return text
-
-
-def _value(value: Any, path: str) -> str:
-    scalar = _scalar(value)
-    if scalar is not None:
-        return scalar
-    if isinstance(value, (list, tuple)):
-        return "[" + ", ".join(_value(v, f"{path}[]") for v in value) + "]"
-    if isinstance(value, Mapping):
-        items = (f"{_key(k)} = {_value(v, f'{path}.{k}')}" for k, v in value.items())
-        return "{ " + ", ".join(items) + " }" if value else "{}"
-    raise ConfigurationError(f"{path}: {type(value).__name__} is not a config value")
-
-
-def _table(document: Mapping[str, Any], prefix: str, out: list[str]) -> None:
-    scalars = [(k, v) for k, v in document.items() if not isinstance(v, Mapping)]
-    tables = [(k, v) for k, v in document.items() if isinstance(v, Mapping)]
-    if prefix and (scalars or not tables):
-        out.append(f"[{prefix}]")
-    for key, value in scalars:
-        if value is None:
-            raise ConfigurationError(f"{prefix or 'document'}.{key}: TOML has no null")
-        out.append(f"{_key(key)} = {_value(value, f'{prefix}.{key}')}")
-    if scalars:
-        out.append("")
-    for key, value in tables:
-        _table(value, f"{prefix}.{_key(key)}" if prefix else _key(key), out)
-
-
-def toml_text(document: Mapping[str, Any]) -> str:
-    """``document`` as TOML; fails closed unless it reads back identical (and is small)."""
-    out: list[str] = []
-    _table(document, "", out)
-    text = "\n".join(out).rstrip("\n") + "\n"
-    if len(text.encode()) > MAX_DOCUMENT_BYTES:
-        raise ConfigurationError(f"config document larger than {MAX_DOCUMENT_BYTES} bytes")
-    if _normalised(tomllib.loads(text)) != _normalised(document):
-        raise ConfigurationError("config document does not round-trip through TOML")
-    return text
-
-
-def _normalised(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {k: _normalised(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_normalised(v) for v in value]
-    if isinstance(value, float) and math.isnan(value):
-        return "nan"
-    return value
+    def was_archived(self, user: str, kind: str, name: str) -> bool:
+        """``user`` once archived a document ``name`` of ``kind``: its id is not reused."""
+        ...
 
 
 def _user(user: str) -> str:
@@ -170,16 +97,30 @@ def _user(user: str) -> str:
     return validate_id("user", user)
 
 
-def archive_name(name: str, at: datetime) -> str:
+def archive_name(name: str, at: datetime, id_kind: str = "screener") -> str:
     """``<id>-<YYYYmmddTHHMMSSffffffZ>``: an archived screen's folder (``at`` is UTC-aware)."""
     if at.tzinfo is None or at.utcoffset() is None:
         raise ConfigurationError("an archive time must be timezone-aware (UTC)")
-    return f"{validate_id('screener', name)}-{at.astimezone(UTC):%Y%m%dT%H%M%S%fZ}"
+    return f"{validate_id(id_kind, name)}-{at.astimezone(UTC):%Y%m%dT%H%M%S%fZ}"
 
 
-def _archived_as(name: str) -> re.Pattern[str]:
-    """Matches the archive names of the screen ``name`` (and no other id that starts with it)."""
-    return re.compile(rf"{re.escape(validate_id('screener', name))}-\d{{8}}T\d{{12}}Z")
+def _archived_as(name: str, id_kind: str = "screener") -> re.Pattern[str]:
+    """Matches the archive names of ``name`` (and no other id that starts with it)."""
+    return re.compile(rf"{re.escape(validate_id(id_kind, name))}-\d{{8}}T\d{{12}}Z")
+
+
+def _document_kind(kind: str) -> str:
+    if kind not in USER_DOCUMENT_KINDS:
+        raise ConfigurationError(f"{kind!r} is not a kind a user document is written for")
+    return kind
+
+
+def _document_id_kind(kind: str) -> str:
+    return _document_kind(kind).removesuffix("s")  # "edges" -> the id kind "edge"
+
+
+def _document_id(kind: str, name: str) -> str:
+    return validate_id(_document_id_kind(kind), name)
 
 
 # ----------------------------------------------------------------------------- files
@@ -255,9 +196,31 @@ class FileConfigWriter(FileConfigStore):
         path = self.root / "users" / _user(user) / "preferences.toml"
         self._write(user, path, toml_text(document))
 
-    def save_evaluation(self, user: str, document: Mapping[str, Any]) -> None:
-        path = self.root / "users" / _user(user) / "evaluation.toml"
-        self._write(user, path, toml_text(document))
+    def _document_path(self, user: str, kind: str, name: str) -> Path:
+        folder = self.root / "users" / _user(user) / _document_kind(kind)
+        return folder / f"{_document_id(kind, name)}.toml"
+
+    def save_user_document(
+        self, user: str, kind: str, name: str, document: Mapping[str, Any]
+    ) -> None:
+        self._write(user, self._document_path(user, kind, name), toml_text(document))
+
+    def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:
+        current = self._inside_user(user, self._document_path(user, kind, name))
+        if not current.is_file():
+            return False
+        stamped = f"{archive_name(name, at, _document_id_kind(kind))}.toml"
+        target = self._inside_user(
+            user, self.root / "users" / _user(user) / "archive" / kind / stamped
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        current.rename(target)  # atomic on one filesystem; fails if the target exists
+        return True
+
+    def was_archived(self, user: str, kind: str, name: str) -> bool:
+        base = self.root / "users" / _user(user) / "archive" / _document_kind(kind)
+        pattern = _archived_as(name, _document_id_kind(kind))
+        return base.is_dir() and any(pattern.fullmatch(p.stem) for p in base.iterdir())
 
 
 # ----------------------------------------------------------------------------- memory
@@ -278,6 +241,8 @@ class MemoryConfigWriter(MemoryConfigStore):
         self._versions: dict[tuple[str, str], dict[int, dict[str, Any]]] = {}
         # (user, archive name) -> (draft, versions) of a deleted screen
         self.archived: dict[tuple[str, str], tuple[dict[str, Any] | None, dict[int, Any]]] = {}
+        # (user, kind, archive name) -> a document archived by archive_user_document
+        self.archived_documents: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     def _screen(self, user: str, name: str) -> tuple[str, str]:
         return _user(user), validate_id("screener", name)
@@ -345,5 +310,23 @@ class MemoryConfigWriter(MemoryConfigStore):
     def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "preferences", "preferences")] = _copy(document)
 
-    def save_evaluation(self, user: str, document: Mapping[str, Any]) -> None:
-        self._docs[(_user(user), "evaluation", "evaluation")] = _copy(document)
+    def save_user_document(
+        self, user: str, kind: str, name: str, document: Mapping[str, Any]
+    ) -> None:
+        self._docs[(_user(user), _document_kind(kind), _document_id(kind, name))] = _copy(document)
+
+    def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:
+        key = (_user(user), _document_kind(kind), _document_id(kind, name))
+        found = self._docs.pop(key, None)
+        if found is None:
+            return False
+        stamped = archive_name(name, at, _document_id_kind(kind))
+        self.archived_documents[(key[0], key[1], stamped)] = dict(found)
+        return True
+
+    def was_archived(self, user: str, kind: str, name: str) -> bool:
+        pattern = _archived_as(name, _document_id_kind(kind))
+        return any(
+            u == _user(user) and k == _document_kind(kind) and pattern.fullmatch(n)
+            for u, k, n in self.archived_documents
+        )

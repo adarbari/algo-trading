@@ -304,15 +304,17 @@ types (`enabled = "yes"`), out-of-range values (`workers = 0`, a fraction above 
 negative interval) and invalid leverage-marker regexes. Every key must also drive code
 (`tests/architecture/test_ownership.py`). Credentials never go in these files.
 
-## Evaluation split (edge harness)
+## User edges (edge harness)
 
-`config/users/<id>/evaluation.toml` (git-ignored, optional) holds `split_from` (a date), typed as
-`EvaluationSettings` by `src/algotrade/config/edges/evaluation.py`: the first session of the test slice
-of the edge harness (ADR 0053, ED5a). Layering (ADR 0015): the site default is none (each edge's
-`frozen_from` is the site's split) < the user's file < the run (`algotrade-backtest evaluate-edges
---split-from D`). A split other than the edge's `frozen_from` makes the run exploratory: its rows
-carry it in their key (`results/edge_eval.split_from`) and `exploratory`, and it never moves an
-edge's status or the track-record chip.
+`config/users/<id>/edges/<id>.toml` (git-ignored, optional) is one of three things (ADR 0053
+amendment 2026-10-09, typed by `src/algotrade/config/edges/loading.py`): a COPY (`extends = "<edge
+id>"`, a site edge or the user's own, deep-merged under the copy's own keys; it is a `candidate`
+and may set its own `frozen_from`, which is its split), a new edge, or, under a site edge's own id,
+only a `[follow]` table (the user's state about it: `config/edges/follow.py`). A user's edge never
+shadows a site edge. A run whose split is not the site edge's `frozen_from` is exploratory: its
+rows carry it in their key (`results/edge_eval.split_from`) and `exploratory`, and it never moves
+an edge's status or the track-record chip. `algotrade-backtest evaluate-edges --split-from D` sets
+a split for one run. Written only through `services/authoring/edges.py`.
 
 ## Expression features
 

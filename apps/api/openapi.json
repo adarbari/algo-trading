@@ -199,6 +199,26 @@
         "title": "CopyBody",
         "type": "object"
       },
+      "CopyEdgeBody": {
+        "properties": {
+          "as_version": {
+            "default": false,
+            "description": "a new version: the copy is a trial that would replace the edge",
+            "title": "As Version",
+            "type": "boolean"
+          },
+          "new_id": {
+            "description": "the id of the copy (1-64 of a-z, 0-9, _ and -)",
+            "title": "New Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_id"
+        ],
+        "title": "CopyEdgeBody",
+        "type": "object"
+      },
       "CriterionValue": {
         "properties": {
           "criterion_id": {
@@ -347,6 +367,86 @@
         "title": "DroppedCriterion",
         "type": "object"
       },
+      "EdgeDocument": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          },
+          "edge_id": {
+            "title": "Edge Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "edge_id",
+          "document"
+        ],
+        "title": "EdgeDocument",
+        "type": "object"
+      },
+      "EdgeState": {
+        "properties": {
+          "edge_id": {
+            "title": "Edge Id",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "oos_revealed": {
+            "title": "Oos Revealed",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "replaces": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "edge_id",
+          "state",
+          "since",
+          "reason",
+          "replaces",
+          "labels",
+          "oos_revealed"
+        ],
+        "title": "EdgeState",
+        "type": "object"
+      },
       "EvaluationRequest": {
         "properties": {
           "edge_id": {
@@ -409,50 +509,6 @@
           "error"
         ],
         "title": "EvaluationRequest",
-        "type": "object"
-      },
-      "EvaluationSplitBody": {
-        "properties": {
-          "split_from": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "the first session of the test slice (a stored session); null: clear it",
-            "title": "Split From"
-          }
-        },
-        "required": [
-          "split_from"
-        ],
-        "title": "EvaluationSplitBody",
-        "type": "object"
-      },
-      "EvaluationSplitSaved": {
-        "properties": {
-          "split_from": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "the split now saved (null: none)",
-            "title": "Split From"
-          }
-        },
-        "required": [
-          "split_from"
-        ],
-        "title": "EvaluationSplitSaved",
         "type": "object"
       },
       "ExplainBody": {
@@ -1625,6 +1681,21 @@
         "title": "SampleValue",
         "type": "object"
       },
+      "SaveEdgeBody": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "description": "the edge's TOML keys as JSON: `extends` and the settings it changes (a `[follow]` table in it is ignored: the state has its own call)",
+            "title": "Document",
+            "type": "object"
+          }
+        },
+        "required": [
+          "document"
+        ],
+        "title": "SaveEdgeBody",
+        "type": "object"
+      },
       "SavedFeature": {
         "properties": {
           "dtype": {
@@ -1812,6 +1883,36 @@
           "changes"
         ],
         "title": "ScreenPreview",
+        "type": "object"
+      },
+      "StateBody": {
+        "properties": {
+          "reason": {
+            "default": "",
+            "description": "why: a rejection needs one, a retirement may",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reveal_oos": {
+            "default": false,
+            "description": "show the copy's out-of-sample result (it is hidden until then)",
+            "title": "Reveal Oos",
+            "type": "boolean"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "researching | following | rejected | retired | trial; none keeps it",
+            "title": "State"
+          }
+        },
+        "title": "StateBody",
         "type": "object"
       },
       "TableView": {
@@ -2254,6 +2355,200 @@
         ]
       }
     },
+    "/edges/{edge_id}": {
+      "delete": {
+        "description": "Archive the user's own edge (its state about a site edge: reset); 404 when they have\nnone, 409 while another of their edges extends it.",
+        "operationId": "delete_edges__edge_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "edges"
+        ]
+      },
+      "put": {
+        "description": "Replace (or create) the user's own edge; validated as the harness reads it, nothing is\nwritten on an error (400). A site edge's id is 409: copy it.",
+        "operationId": "save_edges__edge_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveEdgeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeDocument"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save",
+        "tags": [
+          "edges"
+        ]
+      }
+    },
+    "/edges/{edge_id}/copy": {
+      "post": {
+        "description": "A new edge of the user's that extends ``edge_id``; 404 when they see no such edge, 409\nwhen the new id is taken or was deleted.",
+        "operationId": "copy_edges__edge_id__copy_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyEdgeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeDocument"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Copy",
+        "tags": [
+          "edges"
+        ]
+      }
+    },
     "/edges/{edge_id}/evaluate": {
       "post": {
         "operationId": "evaluate_edges__edge_id__evaluate_post",
@@ -2326,10 +2621,20 @@
         ]
       }
     },
-    "/evaluation/split": {
+    "/edges/{edge_id}/state": {
       "put": {
-        "operationId": "save_split_evaluation_split_put",
+        "description": "Move the user's state about an edge (follow, reject, retire, replace) and/or show its\nout-of-sample result. The server decides the permanent labels (a warning, never a block).",
+        "operationId": "set_state_edges__edge_id__state_put",
         "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "header",
@@ -2353,7 +2658,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EvaluationSplitBody"
+                "$ref": "#/components/schemas/StateBody"
               }
             }
           },
@@ -2364,7 +2669,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationSplitSaved"
+                  "$ref": "#/components/schemas/EdgeState"
                 }
               }
             },
@@ -2381,7 +2686,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Save Split",
+        "summary": "Set State",
         "tags": [
           "edges"
         ]

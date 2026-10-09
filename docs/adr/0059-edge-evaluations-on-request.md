@@ -16,8 +16,8 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
    (`services/ondemand/edges.py`, `OnDemandEdges`), never inline in a request (ADR 0010), and
    answers 202 with the job; `GET /jobs/{job_id}` polls it (moved there 2026-10-08, ADR 0037
    amended; it was `GET /edges/{id}/evaluate/{job_id}`). The decision sessions
-   are the stored outcome sessions, outcomes known now, the split the user's `evaluation.toml`
-   else the edge's `frozen_from` (a run under any other split is EXPLORATORY, as from the CLI).
+   are the stored outcome sessions, outcomes known now, the split the edge's own `frozen_from`
+   (a copy's, ADR 0053 amendment 2026-10-09) (a run under any other split is EXPLORATORY, as from the CLI).
 2. **Whose rows.** Any signed-in user may evaluate an edge for themselves: the job runs as that
    user and its rows are keyed by their `user_id`. An admin may run it as the site (`?as_site=true`:
    the site's canonical run); anyone else asking for it gets 403. A job is read by its owner or

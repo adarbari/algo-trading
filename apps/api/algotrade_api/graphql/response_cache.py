@@ -112,7 +112,6 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "HarnessRun",
         "RunRecord",
         "RunItems",
-        "EvaluationSplit",
         "FigiReview",
         "LeverageReview",
         "IngestionCell",

@@ -47,21 +47,6 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
   expect(errors).toEqual([]);
 });
 
-test('a user sets and clears their out-of-sample split', async ({ page }) => {
-  const errors = collectErrors(page);
-  await page.goto('/edges?edge=momentum_12_1');
-  await page.getByText('Details').click();
-  await expect(page.getByText('2026-06-01').first()).toBeVisible();
-  await page.getByLabel('Out-of-sample starts').fill('2026-04-01');
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText(/labelled EXPLORATORY and come from evaluate-edges/)).toBeVisible();
-  await expect(page.getByText('2026-04-01').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Clear' }).click();
-  await expect(page.getByText(/Cleared/)).toBeVisible();
-  await expectAccessible(page);
-  expect(errors).toEqual([]);
-});
-
 test('a user runs an evaluation of the chosen edge and sees it finish', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/edges?edge=momentum_12_1');

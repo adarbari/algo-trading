@@ -87,6 +87,16 @@ class RequestContext(BaseContext):
         """``stores`` for an async resolver, off the event loop."""
         return await off_loop(self.stores)
 
+    def stores_for(self, user_id: str | None) -> Stores | None:
+        """``stores`` for another user (an admin acting for them, ADR 0040): the caller's own
+        context when it is theirs. Only behind ``AdminOnly``; never cached across users."""
+        if user_id is None or user_id == self.viewer.user_id:
+            return self.stores()
+        if self._open_stores is None:
+            ctx = self._open(UserContext(user_id), None)
+            return ctx
+        return self._open_stores(UserContext(user_id))
+
     def stores(self) -> Stores | None:
         """The session-free context for configs, run records and the catalogue: it needs no
         stored market data (a fresh store still lists its configs). Without a stores opener,
