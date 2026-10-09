@@ -135,7 +135,7 @@ purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035),
 
 [[dir]]
 path = "src/algotrade/data/listings"
-purpose = "reads of instruments/listing_history (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing snapshot, which it names"
+purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
 
 [[dir]]
 path = "src/algotrade/data/macro"
@@ -622,6 +622,11 @@ path = "apps/ingestion/algotrade_ingestion/tasks/framework"
 purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the task registry and refresh scheduling (slot days for incremental tasks)"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/listings"
+purpose = "listing tasks (edges ED6): the vendor listing history, the S&P 500 membership history and the winners-study sample with its coverage report"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/macro"
 purpose = "macro-series tasks: the macro task (FRED / ALFRED and published economic series and index levels into macro/series, with vintages) and the rows it adds to what is stored"
 kind = "task-domain"
@@ -643,7 +648,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/reference"
-purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids, the vendor listing history"
+purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids"
 kind = "task-domain"
 
 [[dir]]

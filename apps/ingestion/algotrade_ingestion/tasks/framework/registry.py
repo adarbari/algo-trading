@@ -24,6 +24,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
 from algotrade_ingestion.tasks.framework.run import TaskContext
+from algotrade_ingestion.tasks.listings import index_membership, listing_history, winners_sample
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
 from algotrade_ingestion.tasks.macro import series as macro_series
 from algotrade_ingestion.tasks.maintenance import (
@@ -47,7 +48,6 @@ from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,
     ibkr_contracts,
-    listing_history,
     shares,
     universe_build,
     universe_import,
@@ -155,6 +155,23 @@ def _company_details(ctx: TaskContext, p: Params) -> RunRecord:
 def _listing_history(ctx: TaskContext, p: Params) -> RunRecord:
     return listing_history.ingest_listing_history(
         ctx, ctx.sources["tiingo_listings"], session_of(p)
+    )
+
+
+def _index_membership(ctx: TaskContext, p: Params) -> RunRecord:
+    return index_membership.ingest_index_membership(
+        ctx, ctx.sources["sp500_history"], session_of(p)
+    )
+
+
+def _winners_sample(ctx: TaskContext, p: Params) -> RunRecord:
+    return winners_sample.ingest_winners_sample(
+        ctx,
+        ctx.sources["tiingo_prices"],
+        session_of(p),
+        Path(p["report"]) if p.get("report") else None,
+        p.get("seed") or winners_sample.DEFAULT_SEED,
+        p.get("limit"),
     )
 
 
@@ -501,14 +518,41 @@ TASKS: dict[str, Task] = {
         Task(
             "listing-history",
             "every US stock / ETF Tiingo ever listed, with its dates "
-            "(instruments/listing_history); in no workflow until a real recording replaces the "
-            "synthetic test payload",
+            "(instruments/listing_history); in no workflow until the owner has read a real pull",
             listing_history,
             ("instruments/listing_history",),
             _listing_history,
             sources=("tiingo_listings",),
             settings="sources.toml [tiingo]",
             params=(SESSION,),
+        ),
+        Task(
+            "index-membership",
+            "S&P 500 membership intervals since 1996 from fja05680/sp500 "
+            "(instruments/index_membership); in no workflow until the owner has read a real pull",
+            index_membership,
+            ("instruments/index_membership",),
+            _index_membership,
+            sources=("sp500_history",),
+            settings="sources.toml [sp500_history]",
+            params=(SESSION,),
+        ),
+        Task(
+            "winners-sample",
+            "Tiingo daily bars from 2010 for a seeded 200-name sample (100 delisted by year, 50 "
+            "live, 50 hand-listed winners) and its coverage report (var/logs); writes no table "
+            "(resumable; 72 s a name on the free tier)",
+            winners_sample,
+            (),
+            _winners_sample,
+            sources=("tiingo_prices",),
+            settings="sources.toml [tiingo]",
+            params=(
+                SESSION,
+                Param("report", ("--report",), str, "coverage report path (default var/logs)"),
+                Param("seed", ("--seed",), int, "sampling seed (default fixed: same names)"),
+                Param("limit", ("--limit",), int, "fetch at most N names this run"),
+            ),
         ),
         Task(
             "shares",

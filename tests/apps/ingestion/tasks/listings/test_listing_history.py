@@ -1,4 +1,4 @@
-"""The listing-history task on the SYNTHETIC supported-tickers file: one snapshot per session,
+"""The listing-history task on the RECORDED supported-tickers slice: one snapshot per session,
 ids only from symbol_history or a permaTicker, never ``EQ:<symbol>`` (ADR 0018 amendment)."""
 
 from datetime import UTC, date, datetime
@@ -9,13 +9,16 @@ from algotrade.data.listings.universe import universe_asof
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.reference.instrument_ids import assign_listing_ids
-from algotrade_ingestion.tasks.reference.listing_history import (
+from algotrade_ingestion.tasks.listings.index_membership import ingest_index_membership
+from algotrade_ingestion.tasks.listings.listing_history import (
     ingest_listing_history,
 )
+from algotrade_ingestion.tasks.reference.instrument_ids import assign_listing_ids
 from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.vendors.sp500_history.membership import Sp500Membership
 from algotrade_sources.vendors.tiingo.listings import TiingoSupportedTickers
 from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.payloads import published as sp500
 from tests.helpers.payloads import tiingo as payloads
 from tests.helpers.stored_frames import stamped
 
@@ -35,10 +38,10 @@ def source(payload: bytes | None = None) -> TiingoSupportedTickers:
 def test_task_writes_a_snapshot_and_ids_come_only_from_symbol_history() -> None:
     writer = StoreWriter(MemoryBackend())
     history = [
-        {"instrument_id": "EQ:BBG000AAA", "ts": pd.Timestamp(DAY, tz="UTC"), "figi": "BBG000AAA",
-         "symbol": "AAA", "valid_from": date(1999, 1, 4), "valid_to": None},
-        {"instrument_id": "EQ:BBG000RCY", "ts": pd.Timestamp(DAY, tz="UTC"), "figi": "BBG000RCY",
-         "symbol": "RCY", "valid_from": date(2011, 1, 3), "valid_to": None},
+        {"instrument_id": "EQ:BBG000AAPL", "ts": pd.Timestamp(DAY, tz="UTC"),
+         "figi": "BBG000AAPL", "symbol": "AAPL", "valid_from": date(1999, 1, 4), "valid_to": None},
+        {"instrument_id": "EQ:BBG000AAC", "ts": pd.Timestamp(DAY, tz="UTC"),
+         "figi": "BBG000AAC", "symbol": "AAC", "valid_from": date(2026, 8, 1), "valid_to": None},
     ]  # fmt: skip
     writer.write_table(
         "instruments/symbol_history", DAY, "h", stamped(history, DAY, "h"), pending=False
@@ -46,19 +49,27 @@ def test_task_writes_a_snapshot_and_ids_come_only_from_symbol_history() -> None:
     ctx = task_ctx(writer, clock=CLOCK)
     record = ingest_listing_history(ctx, source(payloads.supported_tickers_zip()), DAY)
     assert record.status is RunStatus.COMPLETE
-    assert (record.stats["listings"], record.stats["with_id"]) == (6, 2)
+    assert (record.stats["listings"], record.stats["with_id"]) == (217, 2)
+    assert record.stats["dropped_odd_ticker"] == 6 and record.stats["dropped_not_usd"] == 8
     stored = ctx.reader.table("instruments/listing_history", DAY)
-    assert stored is not None and len(stored) == 6
+    assert stored is not None and len(stored) == 217
     keys = zip(stored["ticker"], stored["start_date"], strict=True)
     ids = dict(zip(keys, stored["instrument_id"], strict=True))
-    assert ids[("AAA", date(2000, 1, 3))] == "EQ:BBG000AAA"
+    assert ids[("AAPL", date(1980, 12, 12))] == "EQ:BBG000AAPL"
     # The recycled ticker: only the listing overlapping the FIGI's row gets its id.
-    assert ids[("RCY", date(2011, 3, 1))] == "EQ:BBG000RCY"
-    assert pd.isna(ids[("RCY", date(2005, 1, 3))])
-    assert not any(str(i).startswith("EQ:RCY") for i in stored["instrument_id"].dropna())
-    members = {"EQ:BBG000AAA", "EQ:BBG000RCY"}
-    got = universe_asof(ctx.reader, date(2012, 6, 1), members)
-    assert got.snapshot == DAY and set(got.instruments["ticker"]) == {"AAA", "RCY"}
+    assert ids[("AAC", date(2026, 8, 27))] == "EQ:BBG000AAC"
+    assert pd.isna(ids[("AAC", date(2014, 10, 2))]) and pd.isna(ids[("AAC", date(2021, 3, 25))])
+    assert not any(
+        str(i).startswith(("EQ:AAC", "EQ:TWTR")) for i in stored["instrument_id"].dropna()
+    )
+    members = ingest_index_membership(
+        ctx, Sp500Membership(http_for(lambda url: sp500.membership_csv())), DAY, (5, 40)
+    )
+    assert members.status is RunStatus.COMPLETE
+    got = universe_asof(ctx.reader, date(2018, 6, 1))
+    assert got.snapshot == DAY and got.membership_snapshot == DAY
+    assert list(got.instruments["ticker"]) == ["AAPL"]  # the only listing with an id alive then
+    assert got.without_id > 50  # the rest wait for a trusted id (the meta pull)
 
 
 def test_a_perma_ticker_gives_the_namespaced_id_when_symbol_history_has_none() -> None:
