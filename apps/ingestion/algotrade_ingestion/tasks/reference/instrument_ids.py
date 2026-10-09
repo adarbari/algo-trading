@@ -18,6 +18,8 @@
 - A vendor listing with no snapshot row (``assign_listing_ids``, ``instruments/listing_history``,
   ADR 0018 amendment 2026-10-08): the overlapping ``symbol_history`` row's id, else
   ``EQ:TIINGO:<permaTicker>``, else none; never ``EQ:<symbol>``.
+- A listing's ``permaTicker`` (``match_perma``): from Tiingo's meta rows of its ticker by a UNIQUE
+  match only, never a guess (see there).
 
 Review state lives on the reference row: ``vendor_figi`` (the vendor's FIGI when the build
 did not use it as the listing's own: a different FIGI than the one held, or one several
@@ -360,3 +362,52 @@ def assign_listing_ids(listings: pd.DataFrame, history: pd.DataFrame | None) -> 
             found = equity_id(str(ticker), perma_ticker=str(perma))
         ids.append(found)
     return listings.assign(instrument_id=pd.Series(ids, index=listings.index, dtype=object))
+
+
+NO_META = "no_meta"
+AMBIGUOUS = "ambiguous"
+
+
+def match_perma(
+    listings: pd.DataFrame, meta: pd.DataFrame, need: pd.Series | None = None
+) -> tuple[pd.Series, dict[str, int]]:
+    """The ``permaTicker`` of the listings in ``need`` (default: all), from Tiingo's meta rows
+    (``ticker``, ``perma_ticker``, ``is_active``; one per listing that ever used the ticker)
+    -> (a string per listing of ``listings``, ``""`` when none, stats).
+
+    A listing is matched only when the match is unique, ticker by ticker over ALL ``listings`` of
+    the ticker (those in ``need`` and those that already have an id), never by a guess:
+    one listing and one meta row; else the one open listing (null ``end_date``) takes the one
+    active row, and the one delisted listing takes the one inactive row. Anything else (two or
+    more delisted listings or inactive rows on either side, extra rows) leaves the delisted
+    listings without a ``permaTicker`` (``ambiguous``), a ticker with no meta row too
+    (``no_meta``). Stats: ``perma_matched``, ``perma_no_meta``, ``perma_ambiguous``."""
+    wanted = pd.Series(True, index=listings.index) if need is None else need.astype(bool)
+    found = pd.Series("", index=listings.index, dtype=object)
+    stats = {"perma_matched": 0, f"perma_{NO_META}": 0, f"perma_{AMBIGUOUS}": 0}
+    by_ticker = {str(t): g for t, g in meta.groupby("ticker")}
+    for ticker, group in listings.groupby(listings["ticker"].astype(str).str.upper()):
+        rows = by_ticker.get(str(ticker))
+        mine = group[wanted.loc[group.index]]
+        if mine.empty:
+            continue
+        if rows is None or rows.empty:
+            stats[f"perma_{NO_META}"] += len(mine)
+            continue
+        open_ = group["end_date"].isna()
+        active = rows["is_active"].astype(bool)
+        if len(group) == 1 and len(rows) == 1:
+            pairs = [(group.index[0], rows["perma_ticker"].iloc[0])]
+        else:
+            pairs = []
+            for listed, row_mask in ((group[open_], active), (group[~open_], ~active)):
+                chosen = rows[row_mask]
+                if len(listed) == 1 and len(chosen) == 1:
+                    pairs.append((listed.index[0], chosen["perma_ticker"].iloc[0]))
+        for index, perma in pairs:
+            if wanted.loc[index]:
+                found.loc[index] = str(perma)
+        matched = sum(1 for i, _ in pairs if wanted.loc[i])
+        stats["perma_matched"] += matched
+        stats[f"perma_{AMBIGUOUS}"] += len(mine) - matched
+    return found, stats

@@ -132,6 +132,13 @@ is stored open. Ids come from `instruments/symbol_history` overlap or, once a me
 `perma_ticker`, `EQ:TIINGO:<permaTicker>` (never `EQ:<symbol>`). Gate: if `permaTicker` needs a
 paid fundamentals plan, edges ED6b returns to ADR 0018.
 
+The meta pull: `GET /tiingo/fundamentals/meta?tickers=a,b,...` (batches of 100) answers one row per
+listing that ever used each ticker (`permaTicker`, lowercase `ticker`, `name`, `isActive`; the sector
+fields are gated on the free tier). `listing-history` asks it only for tickers whose listings have no
+`symbol_history` id; `match_perma` fills `perma_ticker` by a unique match only. A listing's own bars
+are `/tiingo/daily/<permaTicker>/prices`; `bars-history --from-listings` fetches by it and never
+fetches a reused ticker that has none.
+
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 
 `sp500_ticker_start_end.csv` of https://github.com/fja05680/sp500 (MIT licence, free, no key):

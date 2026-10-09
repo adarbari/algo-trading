@@ -380,3 +380,76 @@ def test_a_run_spanning_a_month_end_counts_in_both_months() -> None:
     assert in_feb.stats["fetched"] == 1  # 3 + 1 of the 5 spent
     in_mar = fill_run(writer, vendor, 5, datetime(2020, 3, 5, tzinfo=UTC), budget=5)
     assert in_mar.stats["month_used"] == in_mar.stats["fetched"] + 1  # only the open run spills
+
+
+def write_listings(writer: StoreWriter, rows_: list[tuple[str, str, str, str, str | None]]) -> None:
+    """A listing snapshot of (id, ticker, perma, start, end) NASDAQ stocks, and an empty S&P 500
+    history (NASDAQ names are in the universe by exchange)."""
+    day, now = date(2020, 1, 2), pd.Timestamp("2020-01-02", tz="UTC")
+    frame = pd.DataFrame(
+        rows_, columns=["instrument_id", "ticker", "perma_ticker", "start_date", "end_date"]
+    )
+    for column in ("start_date", "end_date"):
+        days = pd.to_datetime(frame[column]).dt.date
+        frame[column] = days.where(frame[column].notna(), None)
+    meta = {
+        "exchange": "NASDAQ", "asset_type": "Stock", "price_currency": "USD", "ts": now,
+        "session_date": day, "knowledge_ts": now, "source": "tiingo", "run_id": "l",
+    }  # fmt: skip
+    writer.write_table("instruments/listing_history", day, "l", frame.assign(**meta))
+    members = pd.DataFrame(
+        {
+            "index_name": ["SP500"], "ticker": ["ZZZ"], "start_date": [date(1999, 1, 4)],
+            "end_date": [None], "ts": [now], "session_date": [day], "knowledge_ts": [now],
+            "source": ["x"], "run_id": ["m"],
+        }
+    )  # fmt: skip
+    writer.write_table("instruments/index_membership", day, "m", members)
+
+
+def test_recycled_without_perma_never_fetched_by_ticker(writer: StoreWriter) -> None:
+    """The winners-sample's bars:0 (ACCL, CEG, MEMS, OPEN, PRM): a ticker Tiingo serves for
+    another company must not be asked by ticker; the listing with a permaTicker is."""
+    write_listings(writer, [
+        ("EQ:TIINGO:US0001", "RCY", "US0001", "2019-06-03", "2020-01-03"),  # the old company
+        ("EQ:BBG000NEW", "RCY", "", "2020-01-06", None),  # the new one: no permaTicker yet
+        ("EQ:AAA", "AAA", "", "2000-01-03", None),  # a ticker never reused
+    ])  # fmt: skip
+    vendor = Vendor({"US0001": payloads.prices(rows(10)), "AAA": payloads.prices(rows(20)),
+                     "RCY": payloads.prices(rows(99))})  # fmt: skip
+    record = run(writer, vendor, (), from_listings=True)
+    assert sorted(vendor.asked) == ["AAA", "US0001"]  # never "RCY"
+    assert record.items["perma:EQ:BBG000NEW"].startswith("NO_PERMA")
+    assert record.stats["no_perma"] == 1 and record.stats["fetched"] == 2
+    assert "hist:EQ:BBG000NEW" not in record.items
+    ids = {d: list(stored(writer, d)["instrument_id"]) for d in DAYS[:2]}
+    assert ids == {d: ["EQ:AAA", "EQ:TIINGO:US0001"] for d in DAYS[:2]}
+    assert list(stored(writer, DAYS[2])["instrument_id"]) == ["EQ:AAA"]  # US0001 ended 01-03
+
+
+def test_rows_are_clipped_to_the_listing_dates_and_the_request_asks_only_for_them(
+    writer: StoreWriter,
+) -> None:
+    write_listings(writer, [("EQ:TIINGO:US0001", "RCY", "US0001", "2019-06-03", "2020-01-03"),
+                            ("EQ:BBG000NEW", "RCY", "US0002", "2020-01-06", None)])  # fmt: skip
+    urls: list[str] = []
+
+    def answer(url: str) -> bytes:
+        urls.append(url)
+        return payloads.prices(rows(10))  # always all three days, whatever was asked
+
+    source = TiingoDailyPrices(http_for(answer, RetryPolicy(tries=1)))
+    ctx = task_ctx(writer, clock=advancing_clock)
+    record = ingest_bars_history(ctx, source, (), SINCE, UNTIL, from_listings=True)
+    assert [u.split("startDate=")[1] for u in urls] == [
+        "2020-01-01&endDate=2020-01-03&format=json",  # US0001: ends 2020-01-03
+        "2020-01-06&endDate=2020-01-07&format=json",  # US0002: starts 2020-01-06
+    ]
+    assert record.stats["clipped_rows"] == 3  # 1 day past the old end, 2 before the new start
+    assert list(stored(writer, DAYS[0])["instrument_id"]) == ["EQ:TIINGO:US0001"]
+    assert list(stored(writer, DAYS[2])["instrument_id"]) == ["EQ:BBG000NEW"]
+
+
+def test_from_listings_and_fill_are_exclusive(writer: StoreWriter) -> None:
+    with pytest.raises(ValueError, match="use one"):
+        run(writer, Vendor({}), (), from_listings=True, fill=3)

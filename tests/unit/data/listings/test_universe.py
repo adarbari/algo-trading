@@ -94,3 +94,44 @@ def test_universe_asof_reads_the_latest_snapshot_and_says_which() -> None:
 def test_universe_asof_without_a_snapshot_is_missing_data() -> None:
     with pytest.raises(MissingDataError):
         universe_asof(StoreReader(MemoryBackend()), S)
+
+
+def test_listings_over_a_window_marks_reused_tickers_and_keeps_the_listing_dates() -> None:
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    frame = _listings().assign(perma_ticker=["P" + str(i) for i in range(9)])
+    frame.loc[6, "perma_ticker"] = ""
+    stamped = frame.assign(
+        ts=pd.Timestamp("2026-10-05", tz="UTC"),
+        session_date=date(2026, 10, 5),
+        knowledge_ts=pd.Timestamp("2026-10-05", tz="UTC"),
+        source="tiingo",
+        run_id="r",
+        price_currency="USD",
+    )
+    stamped["start_date"] = pd.to_datetime(stamped["start_date"]).dt.date
+    stamped["end_date"] = pd.to_datetime(stamped["end_date"]).dt.date.where(
+        stamped["end_date"].notna(), None
+    )
+    writer.write_table("instruments/listing_history", date(2026, 10, 5), "r", stamped)
+    members = pd.DataFrame(
+        {"index_name": ["SP500"], "ticker": ["AAA"], "start_date": [date(2000, 1, 3)],
+         "end_date": [None], "ts": [pd.Timestamp("2026-10-05", tz="UTC")]},
+    )  # fmt: skip
+    known = pd.Timestamp("2026-10-05", tz="UTC")
+    members = members.assign(session_date=date(2026, 10, 5), knowledge_ts=known)
+    members = members.assign(source="x", run_id="m")
+    writer.write_table("instruments/index_membership", date(2026, 10, 5), "m", members)
+    out, snapshot = listings_over(StoreReader(backend), date(2010, 1, 4), date(2012, 6, 1))
+    assert snapshot == date(2026, 10, 5)
+    by_id = out.set_index("instrument_id")
+    assert set(by_id.index) == {
+        "EQ:TIINGO:A", "EQ:TIINGO:C", "EQ:TIINGO:D",
+        "EQ:TIINGO:OLD", "EQ:TIINGO:NEW", "EQ:TIINGO:F",
+    }  # fmt: skip
+    assert by_id.loc["EQ:TIINGO:OLD", "reused"] and by_id.loc["EQ:TIINGO:NEW", "reused"]
+    assert not by_id.loc["EQ:TIINGO:A", "reused"]
+    assert by_id.loc["EQ:TIINGO:OLD", "end_date"] == date(2010, 12, 31)
+    assert by_id.loc["EQ:TIINGO:A", "end_date"] is None

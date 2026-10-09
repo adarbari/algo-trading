@@ -16,8 +16,10 @@ Both snapshots used are named (``Universe.snapshot``, ``Universe.membership_snap
 delisted: used as a feature, label or sort key it leaks the future. It is read **here, in
 ``SymbolResolver.from_listings`` (both identity reads: is this listing alive on S) and by
 ``read_listings`` for the winners-sample runner** (which picks its strata by year of delisting,
-by design: a data-quality sample, never a feature), nowhere else, and ``universe_asof`` does
-not return it. The adapter stores a live name's end as null (open).
+by design: a data-quality sample, never a feature) and ``listings_over`` for ``bars-history
+--from-listings`` (which fetches a listing's bars by its permaTicker and clips them to its own
+dates: identity, never a feature), nowhere else, and ``universe_asof`` does not return it. The
+adapter stores a live name's end as null (open).
 """
 
 from collections.abc import Collection
@@ -73,6 +75,38 @@ def universe_asof(reader: StoreReader, session: date) -> Universe:
     return Universe(
         session, snap.snapshot_date, found.instruments, found.without_id, members.snapshot
     )
+
+
+def listings_over(reader: StoreReader, since: date, until: date) -> tuple[pd.DataFrame, date]:
+    """The listings that are in the universe on any sampled session of ``since..until`` (the two
+    ends and the first day of each month between: a listing alive for less than a month between
+    samples can be missed) and the listing snapshot used. Columns: ``instrument_id``, ``ticker``,
+    ``perma_ticker`` (``""`` when unknown), ``start_date``, ``end_date`` (null while open) and
+    ``reused`` (another listing of the snapshot has the same ticker). For the bars backfill only
+    (see the module docstring)."""
+    frame, snap = read_snapshot(reader, TABLE, None, REFERENCE_HINT)
+    days = {since, until}
+    month = date(since.year, since.month, 1)
+    while month <= until:
+        if month >= since:
+            days.add(month)
+        month = date(month.year + (month.month == 12), month.month % 12 + 1, 1)
+    ids: set[str] = set()
+    for day in sorted(days):
+        found = listed_asof(frame, day, index_members(reader, day).tickers)
+        ids |= set(found.instruments["instrument_id"])
+    tickers = frame["ticker"].astype(str)
+    out = frame.assign(reused=tickers.map(tickers.value_counts()).gt(1))
+    out = out[out["instrument_id"].isin(ids)].drop_duplicates("instrument_id")
+    out = out.assign(
+        perma_ticker=out["perma_ticker"].fillna("").astype(str),
+        start_date=pd.to_datetime(out["start_date"]).dt.date,
+        end_date=pd.to_datetime(out["end_date"]).dt.date.where(out["end_date"].notna(), None),
+    )
+    cols = ["instrument_id", "ticker", "perma_ticker", "start_date", "end_date", "reused"]
+    return out[cols].sort_values(["ticker", "start_date"]).reset_index(
+        drop=True
+    ), snap.snapshot_date
 
 
 def read_listings(reader: StoreReader) -> tuple[pd.DataFrame, date]:
