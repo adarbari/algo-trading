@@ -58,6 +58,17 @@ def equity_id(symbol: str, figi: str | None = None, perma_ticker: str | None = N
     return instrument_id(AssetClass.EQUITY, symbol)
 
 
+def is_perma_id(instrument: str) -> bool:
+    """True for ``EQ:TIINGO:<permaTicker>``: a listing outside ``symbol_history`` (equity_id)."""
+    parts = instrument.split(":")
+    return (
+        len(parts) == 3
+        and parts[0] == AssetClass.EQUITY.value
+        and parts[1] == PERMA_NAMESPACE
+        and bool(parts[2])
+    )
+
+
 def market_id(market: str) -> str:
     """The id of a whole market's row in a market-entity feature group: ``market_id("US")``
     is ``MKT:US`` (ADR 0047). The one place the ``MKT:`` prefix is built."""
