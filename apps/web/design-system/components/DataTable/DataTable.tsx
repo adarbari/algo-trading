@@ -12,7 +12,9 @@
  * scrolling on narrow widths, with the checkbox column and the first column pinned at the start
  * (the row's key stays in view; `pinFirst`). Under the `sm` breakpoint (its own width: a phone,
  * not a desktop's aside column) only the `essential` columns show by default (else the first
- * three) and the column picker appears so the user adds the rest back. Built on TanStack Table + Virtual, which stay internal.
+ * three) and the column picker appears so the user adds the rest back. `groupBy` puts the rows
+ * under group headings in a declared order (the sort still orders the rows inside each group).
+ * Built on TanStack Table + Virtual, which stay internal.
  */
 import {
   useTable,
@@ -53,6 +55,17 @@ export interface DataTableSort {
   columnId: string;
   direction: 'asc' | 'desc';
 }
+
+/** Rows under group headings: `getGroup` names a row's group, `order` lists the groups top to bottom. */
+export interface DataTableGroupBy<TRow> {
+  getGroup: (row: TRow) => string;
+  /** Groups in display order; a group not listed follows them, in order of first appearance. */
+  order?: readonly string[];
+  /** The heading text of a group (default the group's name). */
+  label?: (group: string, count: number) => ReactNode;
+}
+
+type Item = { kind: 'group'; group: string; count: number } | { kind: 'row'; row: number };
 
 export interface DataTableProps<TRow> {
   /** Column definitions, in display order. */
@@ -133,6 +146,8 @@ export interface DataTableProps<TRow> {
    * sideways (default true): pass false when the first column is not the row's key.
    */
   pinFirst?: boolean;
+  /** Show the rows under group headings (see `DataTableGroupBy`); none: one flat list. */
+  groupBy?: DataTableGroupBy<TRow>;
 }
 
 const EMPTY_IDS: readonly string[] = [];
@@ -177,6 +192,7 @@ export function DataTable<TRow extends RowData>({
   toolbar,
   toolbarEnd,
   pinFirst = true,
+  groupBy,
 }: DataTableProps<TRow>) {
   const id = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -268,17 +284,45 @@ export function DataTable<TRow extends RowData>({
   });
 
   const visibleColumns = columns.filter((column) => columnVisibility[column.id] !== false);
-  const tableRows = table.getRowModel().rows;
+  const sortedRows = table.getRowModel().rows;
   const ready = status === 'ready';
+  // Grouped: a stable partition of the sorted rows by group order, with a heading item before
+  // each group; the virtual list counts headings and rows, the keyboard moves over rows only.
+  const { tableRows, items, rowItem } = useMemo(() => {
+    if (!groupBy) {
+      const flat: Item[] = sortedRows.map((_, row) => ({ kind: 'row', row }));
+      return { tableRows: sortedRows, items: flat, rowItem: sortedRows.map((_, i) => i) };
+    }
+    const names = sortedRows.map((r) => groupBy.getGroup(r.original));
+    const order = [...new Set([...(groupBy.order ?? []), ...names])];
+    const ranked = order.flatMap((group) => sortedRows.filter((_, i) => names[i] === group));
+    const list: Item[] = [];
+    const itemOf: number[] = [];
+    order.forEach((group) => {
+      const count = names.filter((n) => n === group).length;
+      if (count === 0) return;
+      list.push({ kind: 'group', group, count });
+      for (let n = 0; n < count; n += 1) {
+        itemOf.push(list.length);
+        list.push({ kind: 'row', row: itemOf.length - 1 });
+      }
+    });
+    return { tableRows: ranked, items: list, rowItem: itemOf };
+  }, [groupBy, sortedRows]);
   const bodyRows = ready ? tableRows.length : 0;
+  const itemCount = ready ? items.length : 0;
 
   // TanStack Virtual returns fresh functions each render; the compiler skips memoizing here.
   // eslint-disable-next-line react-hooks/incompatible-library -- the virtualizer re-renders by design
   const virtualizer = useVirtualizer({
-    count: bodyRows,
+    count: itemCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
-    getItemKey: (index) => tableRows[index]?.id ?? index,
+    getItemKey: (index) => {
+      const item = items[index];
+      if (item?.kind === 'group') return `group:${item.group}`;
+      return item ? (tableRows[item.row]?.id ?? index) : index;
+    },
     overscan: 8,
     scrollMargin: baseHeight,
     scrollPaddingStart: baseHeight,
@@ -302,7 +346,7 @@ export function DataTable<TRow extends RowData>({
     if (!row) return;
     setActiveId(row.id);
     onActiveRowChange?.(row.original);
-    virtualizer.scrollToIndex(next, { align: 'auto' });
+    virtualizer.scrollToIndex(rowItem[next] ?? next, { align: 'auto' });
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -371,7 +415,8 @@ export function DataTable<TRow extends RowData>({
   const someSelected = table.getIsSomeRowsSelected();
   const rowIdFor = (rowId: string) => `${id}-row-${encodeURIComponent(rowId)}`;
   const activeVisible =
-    activeIndex >= 0 && virtualizer.getVirtualItems().some((item) => item.index === activeIndex);
+    activeIndex >= 0 &&
+    virtualizer.getVirtualItems().some((item) => item.index === rowItem[activeIndex]);
   const colCount = visibleColumns.length + (selectable ? 1 : 0);
   const firstColumnId = visibleColumns[0]?.id;
   /** `data-pinned` of the checkbox cell, of a column's cells, or of a placeholder cell by index. */
@@ -428,7 +473,7 @@ export function DataTable<TRow extends RowData>({
         className={styles.scroller}
         role="grid"
         aria-label={label}
-        aria-rowcount={ready ? bodyRows + 1 : -1}
+        aria-rowcount={ready ? itemCount + 1 : -1}
         aria-colcount={colCount}
         aria-multiselectable={selectable || undefined}
         aria-busy={status === 'loading' || undefined}
@@ -560,7 +605,28 @@ export function DataTable<TRow extends RowData>({
             {ready && bodyRows === 0 && stateRow(emptyMessage)}
             {ready &&
               virtualizer.getVirtualItems().map((item) => {
-                const row = tableRows[item.index];
+                const entry = items[item.index];
+                if (!entry) return null;
+                const offset = {
+                  transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`,
+                };
+                if (entry.kind === 'group') {
+                  return (
+                    <div
+                      key={`group:${entry.group}`}
+                      className={styles.groupRow}
+                      role="row"
+                      aria-rowindex={item.index + 2}
+                      data-virtual
+                      style={offset}
+                    >
+                      <div className={styles.groupCell} role="rowheader" aria-colspan={colCount}>
+                        {groupBy?.label ? groupBy.label(entry.group, entry.count) : entry.group}
+                      </div>
+                    </div>
+                  );
+                }
+                const row = tableRows[entry.row];
                 if (!row) return null;
                 const selected = row.getIsSelected();
                 return (
@@ -571,12 +637,10 @@ export function DataTable<TRow extends RowData>({
                     role="row"
                     aria-rowindex={item.index + 2}
                     aria-selected={selectable ? selected : undefined}
-                    data-active={item.index === activeIndex || undefined}
+                    data-active={entry.row === activeIndex || undefined}
                     data-clickable={clickable(row.original) || undefined}
                     data-virtual
-                    style={{
-                      transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`,
-                    }}
+                    style={offset}
                     data-row-id={row.id}
                   >
                     {selectable && (

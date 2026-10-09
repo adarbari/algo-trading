@@ -379,7 +379,7 @@ Source: `design-system/components/Combobox`
 
 ### DataTable
 
-DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view; `pinFirst`). Under the `sm` breakpoint (its own width: a phone, not a desktop's aside column) only the `essential` columns show by default (else the first three) and the column picker appears so the user adds the rest back. Built on TanStack Table + Virtual, which stay internal.
+DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view; `pinFirst`). Under the `sm` breakpoint (its own width: a phone, not a desktop's aside column) only the `essential` columns show by default (else the first three) and the column picker appears so the user adds the rest back. `groupBy` puts the rows under group headings in a declared order (the sort still orders the rows inside each group). Built on TanStack Table + Virtual, which stay internal.
 
 Source: `design-system/components/DataTable`
 
@@ -417,6 +417,7 @@ Source: `design-system/components/DataTable`
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
 | `toolbarEnd` | `ReactNode` | no | Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the two sit in one row, so a narrow table does not spend a row on each. |
 | `pinFirst` | `boolean` | no | Pin the checkbox column and the first column at the start while the table scrolls sideways (default true): pass false when the first column is not the row's key. |
+| `groupBy` | `DataTableGroupBy<TRow>` | no | Show the rows under group headings (see `DataTableGroupBy`); none: one flat list. |
 
 ### Dialog
 
@@ -981,7 +982,7 @@ Source: `design-system/components/NumberInput`
 
 ### OddsLine
 
-OddsLine: an edge's evidence for a pick in one line: hit rate against the base rate, the lift, the independent sessions behind them, optionally the picks and the run it came from. The hit rate, base rate and sessions are required together, so a bare hit rate cannot be shown. An exploratory run (read outside the frozen period) carries a visible EXPLORATORY badge. States: loading (placeholder), empty (no run yet) and error (the evidence failed to load). Explanations are not written here: the `info` slot takes an InfoButton given a Guide entry. It wraps in a narrow container.
+OddsLine: an edge's evidence for a pick in one line: win rate against the base rate, the lift (in points: win rate minus base rate, served), the trades (independent sessions) behind them, optionally the picks and the run it came from. The win rate, base rate and trades are required together, so a bare win rate cannot be shown. An exploratory run (read outside the official out-of-sample period) carries a visible EXPLORATORY badge. States: loading (placeholder), empty (no run yet) and error (the evidence failed to load). Explanations are not written here: the `info` slot takes an InfoButton given a Guide entry. It wraps in a narrow container.
 
 Source: `design-system/components/OddsLine`
 
@@ -1429,14 +1430,14 @@ Source: `design-system/components/TopBar`
 
 ### TrackRecordChip
 
-TrackRecordChip: a screener's track record in one small badge: `evidenced` (an edge passed the frozen period), `candidate` with the independent sessions so far, or `not-run`. A figure from an exploratory run never feeds it: `exploratory` renders nothing at all. The state is always in words; colour only reinforces it. Not interactive.
+TrackRecordChip: a screener's track record in one small badge: `evidenced` (an edge passed the out-of-sample period), `candidate` with the trades (independent sessions) so far, or `not-run`. A figure from an exploratory run never feeds it: `exploratory` renders nothing at all. The state is always in words; colour only reinforces it. Not interactive.
 
 Source: `design-system/components/TrackRecordChip`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `status` | `TrackRecordStatus` | yes | `evidenced`, `candidate` or `not-run`. |
-| `sessions` | `number` | no | Independent sessions behind a `candidate` (written as "Candidate · 42 sessions"). |
+| `sessions` | `number` | no | Trades (independent sessions) behind a `candidate` (written as "Candidate · 42 trades"). |
 | `exploratory` | `boolean` | no | The record comes from an exploratory run: nothing is rendered. |
 
 ### ViewChips

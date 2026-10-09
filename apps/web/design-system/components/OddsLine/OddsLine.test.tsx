@@ -8,7 +8,7 @@ import { OddsLine } from './OddsLine';
 const READY = { hitRate: 0.62, baseRate: 0.51, sessions: 118 };
 
 describe('OddsLine', () => {
-  it('writes the hit rate against the base rate, with the sessions', () => {
+  it('writes the win rate against the base rate, with the trades', () => {
     const { container } = render(<OddsLine {...READY} />);
     expect(container.textContent).toContain('62.0%');
     expect(container.textContent).toContain('vs 51.0% base');
@@ -20,13 +20,13 @@ describe('OddsLine', () => {
     const { container } = render(
       <OddsLine
         {...READY}
-        lift={1.22}
+        liftPts={11}
         picks={340}
         runLabel="run 7"
         info={<InfoButton label="Help" />}
       />,
     );
-    expect(container.textContent).toContain('1.22×');
+    expect(container.textContent).toContain('+11 pts');
     expect(container.textContent).toContain('340');
     expect(container.textContent).toContain('run 7');
     expect(screen.getByRole('button', { name: 'Help' })).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe('OddsLine', () => {
   });
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<OddsLine {...READY} lift={1.22} picks={3} exploratory />);
+    const { container } = render(<OddsLine {...READY} liftPts={11} picks={3} exploratory />);
     await expectNoA11yViolations(container);
   });
 });

@@ -34,7 +34,8 @@ class EdgeRun:
     ``exploratory``: its split is not the edge's ``frozen_from``; ``knowledge_ts``: when it
     committed; ``as_of``: the data version it read (ISO); ``after_session``: it committed
     after the request's session (a session-bound read only; always False without one): its
-    numbers were not knowable on that session."""
+    numbers were not knowable on that session; ``lost_inputs``: what the run could not read, as
+    "<variant>: <table> (<n> sessions)" (a screener missing a table on those decision sessions)."""
 
     run_id: str
     edge_id: str
@@ -48,6 +49,7 @@ class EdgeRun:
     as_of: str | None
     trials_counted: int | None
     after_session: bool = False
+    lost_inputs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,15 @@ def _run(ctx: Stores, record: RunRecord, edge: Edge, owner: str) -> EdgeRun:
         as_of=stats.get("as_of"),
         trials_counted=stats.get("trials_counted"),
         after_session=session is not None and committed.date() > session,
+        lost_inputs=_lost(stats),
+    )
+
+
+def _lost(stats: Mapping[str, Any]) -> tuple[str, ...]:
+    lost = [t for t in stats.get("lost_sessions") or [] if isinstance(t, dict)]
+    return tuple(
+        f"{t.get('variant', '?')}: {t.get('table', '?')} ({t.get('sessions', '?')} sessions)"
+        for t in lost
     )
 
 

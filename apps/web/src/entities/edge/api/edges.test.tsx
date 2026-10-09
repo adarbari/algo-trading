@@ -26,14 +26,14 @@ beforeEach(() => {
 });
 
 describe('useEdges', () => {
-  it('asks the EdgesPage operation and shapes the frozen rows', async () => {
+  it('asks the EdgesPage operation and serves the edges with their verdicts', async () => {
     GQL.mockResolvedValue(EDGES_FIXTURE);
     const { result } = renderHook(() => useEdges(), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgesPage');
-    expect(result.current.data?.[0]?.frozenRows).toHaveLength(2);
+    expect(result.current.data?.[0]?.verdict.verdict).toBe('promising');
   });
 });
 

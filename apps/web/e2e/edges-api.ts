@@ -2,8 +2,8 @@
  * Playwright route mock for the edges: the `EdgesPage` and `ScreenerTrackRecords` GraphQL
  * operations (POST /api/graphql). The golden store holds no edge runs, so the answers are
  * synthetic with the real API's shapes (`Query.edges`, `Screener.trackRecords`): one candidate
- * edge with a frozen canonical run and an exploratory run beside it, one rejected edge with no
- * run; `EvaluationSplit` and its PUT keep one split in the page; the VRP screeners (Ideas and Screeners ids) are candidates with their record, every other
+ * edge with an official result and an exploratory run beside it, one rejected edge with no
+ * result; `EvaluationSplit` and its PUT keep one split in the page; the VRP screeners (Ideas and Screeners ids) are candidates with their record, every other
  * screener has none. Any other operation falls through to the other areas' mocks.
  */
 import { readFileSync } from 'node:fs';

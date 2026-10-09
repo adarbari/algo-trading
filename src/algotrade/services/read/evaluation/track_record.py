@@ -30,6 +30,7 @@ class TrackHorizon:
     lift: float | None
     sessions: int | None
     picks: int | None
+    lift_pts: float | None = None  # win rate minus base rate, in points
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,11 @@ def _horizon(row: runs.EdgeRow) -> TrackHorizon:
         lift=row.lift,
         sessions=row.sessions,
         picks=row.picks,
+        lift_pts=(
+            None
+            if row.hit_rate is None or row.base_rate is None
+            else (row.hit_rate - row.base_rate) * 100
+        ),
     )
 
 

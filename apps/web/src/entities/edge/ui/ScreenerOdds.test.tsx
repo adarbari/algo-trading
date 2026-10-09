@@ -20,12 +20,13 @@ beforeEach(() => {
 });
 
 describe('ScreenerOdds', () => {
-  it('shows the first run that ran: hit rate against base rate, lift, sessions and the run', () => {
+  it('shows the first run that ran: win rate against base rate, lift, trades and the run', () => {
     answer('momentum_12_1');
     render(<ScreenerOdds screenerId="momentum_12_1" />);
     expect(screen.getByText('58.0%')).toBeInTheDocument();
     expect(screen.getByText('vs 51.0% base')).toBeInTheDocument();
     expect(screen.getByText('120')).toBeInTheDocument();
+    expect(screen.getByText('+7 pts')).toBeInTheDocument();
     expect(screen.getByText(/momentum_12_1 from 2024-01-01/)).toBeInTheDocument();
     expect(screen.queryByText('EXPLORATORY')).not.toBeInTheDocument();
   });
@@ -53,7 +54,7 @@ describe('ScreenerTrackChip', () => {
   it('shows the first edge as a candidate with its sessions and the others as a count', () => {
     answer('momentum_12_1');
     render(<ScreenerTrackChip screenerId="momentum_12_1" />);
-    expect(screen.getByText('Candidate · 120 sessions')).toBeInTheDocument();
+    expect(screen.getByText('Candidate · 120 trades')).toBeInTheDocument();
     expect(screen.getByText('+1')).toBeInTheDocument();
   });
 

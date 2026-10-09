@@ -1,6 +1,6 @@
 /**
- * An `OddsLine` for figures as the server stored them: hit rate, base rate and sessions are
- * needed together (a bare hit rate is never shown), so a partial row reads as "not stored".
+ * An `OddsLine` for figures as the server stored them: win rate, base rate and trades are
+ * needed together (a bare win rate is never shown), so a partial row reads as "not stored".
  * Only frozen-period figures reach it: the caller never passes an exploratory run's.
  */
 import { OddsLine } from '@algotrade/ui';
@@ -10,7 +10,7 @@ export interface StoredOddsProps {
   hitRate: number | null;
   baseRate: number | null;
   sessions: number | null;
-  lift?: number | null;
+  liftPts?: number | null;
   picks?: number | null;
   /** The run the figures come from. */
   runLabel?: string | null;
@@ -22,7 +22,7 @@ export function StoredOdds({
   hitRate,
   baseRate,
   sessions,
-  lift,
+  liftPts,
   picks,
   runLabel,
   info,
@@ -35,7 +35,7 @@ export function StoredOdds({
       hitRate={hitRate}
       baseRate={baseRate}
       sessions={sessions}
-      {...(lift == null ? {} : { lift })}
+      {...(liftPts == null ? {} : { liftPts })}
       {...(picks == null ? {} : { picks })}
       {...(runLabel ? { runLabel } : {})}
       {...(info ? { info } : {})}

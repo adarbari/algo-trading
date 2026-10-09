@@ -48,7 +48,7 @@ describe('RunEvaluation', () => {
     POST.mockReturnValue(ok(view('running')));
     GET.mockReturnValue(ok(view('complete')));
     const { container } = setup('trader');
-    await userEvent.click(screen.getByRole('button', { name: 'Run evaluation' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
     expect(POST).toHaveBeenCalledWith('/edges/{edge_id}/evaluate', {
       params: { path: { edge_id: 'drift' }, query: { as_site: false } },
     });
@@ -65,7 +65,7 @@ describe('RunEvaluation', () => {
       }),
     );
     setup('trader');
-    await userEvent.click(screen.getByRole('button', { name: 'Run evaluation' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
     expect(await screen.findByText(/already running for ann/)).toBeInTheDocument();
   });
 

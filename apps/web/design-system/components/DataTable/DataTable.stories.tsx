@@ -358,3 +358,45 @@ export const Narrow: Story = {
 export const Comfortable: Story = {
   globals: { density: 'comfortable' },
 };
+
+/** Rows under group headings in a declared order; the sort still orders the rows in each group. */
+export const Grouped: Story = {
+  render: () => (
+    <DataTable
+      columns={screenColumns}
+      rows={screenRows}
+      getRowId={(r) => r.symbol}
+      label="Preview results"
+      defaultSort={{ columnId: 'score', direction: 'desc' }}
+      groupBy={{
+        getGroup: (r) => r.decision,
+        order: ['QUALIFIED', 'WATCH', 'EVENT_RISK'],
+        label: (group, count) => `${group.replace('_', ' ')} · ${String(count)}`,
+      }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const grid = within(canvasElement).getByRole('grid');
+    await expect(within(grid).getAllByRole('rowheader')[0]).toHaveTextContent(/QUALIFIED/);
+  },
+};
+
+/** Grouped on a phone: the headings span the narrow table. */
+export const GroupedNarrow: Story = {
+  ...Grouped,
+  decorators: [narrow],
+};
+
+/** Grouped with nothing to group: the empty message, no headings. */
+export const GroupedEmpty: Story = {
+  render: () => (
+    <DataTable
+      columns={screenColumns}
+      rows={[]}
+      getRowId={(r) => r.symbol}
+      label="Preview results"
+      groupBy={{ getGroup: (r) => r.decision, order: ['QUALIFIED'] }}
+      emptyMessage="No rows to group"
+    />
+  ),
+};

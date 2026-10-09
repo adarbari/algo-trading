@@ -24,7 +24,7 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     },
     {
       id: 'horizon',
-      header: 'Horizon',
+      header: 'Holding period',
       value: (r) => r.horizonSessions,
       format: COUNT,
       align: 'end',
@@ -44,7 +44,7 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     },
     {
       id: 'sessions',
-      header: 'Sessions',
+      header: 'Trades',
       value: (r) => r.sessions ?? null,
       format: COUNT,
       align: 'end',
@@ -53,16 +53,16 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     { id: 'hits', header: 'Hits', value: (r) => r.hits ?? null, format: COUNT, align: 'end' },
     {
       id: 'trials',
-      header: 'Trials',
-      headerAction: term('trial_log'),
+      header: 'Variants tried',
+      headerAction: term('variants_tried'),
       value: (r) => r.trials ?? null,
       format: COUNT,
       align: 'end',
     },
     {
       id: 'hitRate',
-      header: 'Hit rate',
-      headerAction: term('hit_rate'),
+      header: 'Win rate',
+      headerAction: term('win_rate'),
       value: (r) => r.hitRate ?? null,
       format: RATE,
       align: 'end',
@@ -85,8 +85,8 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     },
     {
       id: 'decile',
-      header: 'Decile spread',
-      headerAction: term('decile_spread'),
+      header: 'Top vs bottom decile',
+      headerAction: term('top_vs_bottom_decile'),
       value: (r) => r.decileSpread ?? null,
       format: { kind: 'percent', digits: 2 },
       align: 'end',
@@ -100,7 +100,7 @@ export function lostColumns(): DataTableColumn<HarnessLostInput>[] {
     { id: 'variant', header: 'Variant', value: (l) => l.variant, hideable: false, grow: true },
     {
       id: 'horizon',
-      header: 'Horizon',
+      header: 'Holding period',
       value: (l) => l.horizon,
       format: COUNT,
       align: 'end',

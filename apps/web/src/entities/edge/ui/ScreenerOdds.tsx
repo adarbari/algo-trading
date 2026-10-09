@@ -40,7 +40,7 @@ export function ScreenerOdds({ screenerId, info }: ScreenerOddsProps) {
       hitRate={horizon.hitRate ?? null}
       baseRate={horizon.baseRate ?? null}
       sessions={horizon.sessions ?? null}
-      lift={horizon.lift}
+      liftPts={horizon.liftPts}
       picks={horizon.picks}
       runLabel={entry.runLabel}
       info={info}

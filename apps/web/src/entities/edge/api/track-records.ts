@@ -43,7 +43,7 @@ const ScreenerTrackRecords = graphql(`
           horizonSessions
           hitRate
           baseRate
-          lift
+          liftPts
           sessions
           picks
         }

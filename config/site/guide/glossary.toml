@@ -431,7 +431,7 @@ what cost) and the screens that implement it. The app runs each screen on every 
 using only what was known then, and compares what its picks did next with every other eligible
 name. An edge earns trust only from those numbers, never from the idea alone.
 """
-see_also = ["edge_status", "base_rate", "frozen_period"]
+see_also = ["verdict", "edge_status", "base_rate", "out_of_sample"]
 
 [[term]]
 id = "edge_status"
@@ -439,117 +439,158 @@ term = "Edge status"
 short = "Where an edge stands: candidate, evidenced, live, retired, rejected or blocked."
 body = """
 Candidate: written and being tested; no claim yet. Evidenced: its picks beat the base rate and
-the baselines in the frozen period, on enough independent sessions. Live: evidenced and used to
-rank ideas. Retired: it stopped working by its own retirement rule. Rejected: checked and
-dropped, with the reason kept so it is not filed again. Blocked: worth testing but missing the
-data it needs. Only a run over the frozen period can move an edge to evidenced.
+the baselines out of sample, on enough trades. Live: evidenced and used to rank ideas. Retired:
+it stopped working by its own retirement rule. Rejected: checked and dropped, with the reason
+kept so it is not filed again. Blocked: worth testing but missing the data it needs. Only an
+official result over the out-of-sample period can move an edge to evidenced.
 """
-see_also = ["edge", "frozen_period", "exploratory"]
+see_also = ["verdict", "edge", "out_of_sample", "exploratory"]
 
 [[term]]
-id = "hit_rate"
-term = "Hit rate"
+id = "verdict"
+term = "Verdict"
+short = "What the official result says about an edge: Works, Promising, Not working, Not enough data or Waiting on data."
+body = """
+The verdict is judged by one fixed rule on the edge's official result, using its best screen and
+holding period (the page says which). Waiting on data: there is no official result, or it could
+not read what it needed. Not enough data: fewer than 40 trades, or a figure the rule needs was
+not measured. Not working: the out-of-sample win rate is not above the base rate, or the top
+vs bottom decile, the deflated Sharpe ratio or the overfitting chance is poor, or it does not
+beat the plain baselines. Promising: it passes all of those with 40 or more trades. Works: more
+trades, stricter thresholds and a win over the best of many random-pick backtests, which are not
+measured yet, so no edge can read Works for now. The reason line names the first test it fails;
+the details list every test with its value and its threshold.
+"""
+see_also = ["win_rate", "trades", "out_of_sample", "official_result"]
+
+[[term]]
+id = "official_result"
+term = "Official result"
+short = "The one backtest an edge is judged on: the site's latest run at its out-of-sample start."
+body = """
+Each edge document fixes the date its out-of-sample period starts. The official result is the
+latest committed site backtest run at that date. A backtest you run with another date is
+EXPLORATORY and never becomes the official result, so the verdict cannot be moved by choosing a
+date after seeing the numbers.
+"""
+see_also = ["out_of_sample", "exploratory", "variants_tried"]
+
+[[term]]
+id = "win_rate"
+term = "Win rate"
 short = "The share of an edge's picks whose outcome came true."
 body = """
 For each past session the app takes the screen's top picks and checks the edge's outcome for
 each one, for example "beat the S&P 500 over the next 20 trading days after costs" or "the
-short put expired worthless". The hit rate is hits divided by picks. A window that has not
-closed yet is left out, never counted as a miss. On its own a hit rate says little: compare it
+short put expired worthless". The win rate is wins divided by picks. A window that has not
+closed yet is left out, never counted as a loss. On its own a win rate says little: compare it
 with the base rate.
 """
-see_also = ["base_rate", "lift", "independent_sessions"]
+see_also = ["base_rate", "lift", "trades"]
 
 [[term]]
 id = "base_rate"
 term = "Base rate"
 short = "How often the same outcome came true for every eligible name, picked or not."
 body = """
-The base rate is the hit rate of doing nothing clever: every name the edge could have picked on
+The base rate is the win rate of doing nothing clever: every name the edge could have picked on
 the same sessions, judged by the same outcome. If 55% of picks beat the market but 54% of all
-names did too, the screen added almost nothing. Every hit rate in the app is shown beside its
+names did too, the screen added almost nothing. Every win rate in the app is shown beside its
 base rate for that reason.
 """
-see_also = ["hit_rate", "lift"]
+see_also = ["win_rate", "lift"]
 
 [[term]]
 id = "lift"
 term = "Lift"
-short = "The hit rate divided by the base rate: above 1 means the picks did better than the field."
+short = "The win rate minus the base rate, in points: how much better the picks did than the field."
 body = """
-A lift of 1.0 means the picks did exactly as well as every eligible name; 1.2 means their
-outcome came true 20% more often. Lift on a handful of sessions is noise: read it with the
-number of independent sessions beside it, and prefer the frozen period's lift to the whole
-history's.
+A lift of +5 pts means the picks' outcome came true 5 percentage points more often than for
+every eligible name; 0 means they did no better. The details also show the ratio (win rate
+divided by base rate). Lift on a handful of trades is noise: read it with the number of trades
+beside it, and prefer the out-of-sample lift to the whole history's.
 """
-see_also = ["base_rate", "independent_sessions", "frozen_period"]
+see_also = ["base_rate", "trades", "out_of_sample"]
 
 [[term]]
-id = "independent_sessions"
-term = "Independent sessions"
+id = "trades"
+term = "Trades"
 short = "How many non-overlapping test dates a number rests on: the real sample size."
 body = """
 Picks made on the same day share that day's market, so they are not independent: fifty picks
-on one session are one test, not fifty. The app spaces test sessions at least one holding
+on one session are one trade, not fifty. The app spaces test sessions at least one holding
 period apart (and pools overlapping events into one block) so that no two windows overlap, and
 shows the count beside every number. Fewer than about 40 cannot tell a real edge from luck;
-the decile spread's t statistic says the same thing in another way.
+the top vs bottom decile's t statistic says the same thing in another way.
 """
-see_also = ["lift", "decile_spread"]
+see_also = ["lift", "top_vs_bottom_decile"]
 
 [[term]]
-id = "decile_spread"
-term = "Decile spread"
+id = "top_vs_bottom_decile"
+term = "Top vs bottom decile"
 short = "The return of the best-ranked tenth of names minus the worst-ranked tenth."
 body = """
 On each test session every eligible name is ranked by the edge's own score (for example its
 12-1 momentum) and cut into ten equal groups. The spread is the average outcome of the top
 group minus the bottom group. A positive spread says the ranking itself carries information,
 beyond the few names a screen picks. Sessions where too few names have a score are left out of
-the deciles and counted.
+the deciles and counted. Its t statistic says how far the spread is from luck: 2 or more is
+promising, 3 or more strong.
 """
-see_also = ["independent_sessions", "base_rate"]
+see_also = ["trades", "base_rate"]
 
 [[term]]
-id = "frozen_period"
-term = "Frozen period"
+id = "out_of_sample"
+term = "Out-of-sample (OOS)"
 short = "Recent history held back from tuning: an edge must also work there to be trusted."
 body = """
 While an edge is built and compared, many versions get tried, and some will fit the past by
-luck. The frozen period, from 2026-04-01 on, is kept apart: it is reported on its own, and an
-edge counts as evidenced only if it beats the base rate and the baselines there too. The date
-is fixed and moves only by a recorded decision, so the test cannot be quietly shifted.
+luck. The out-of-sample period, from the date in the edge's Test line on, is kept apart: it is
+reported on its own, and the verdict rests on it. The date is fixed and moves only by a
+recorded decision, so the test cannot be quietly shifted.
 """
-see_also = ["exploratory", "edge_status", "trial_log"]
+see_also = ["in_sample", "exploratory", "verdict", "variants_tried"]
+
+[[term]]
+id = "in_sample"
+term = "In-sample"
+short = "The older history an edge was built and tuned on: it flatters the edge."
+body = """
+Everything before the out-of-sample start. Many versions were tried on it, so even a good
+in-sample result says little by itself; it is shown beside the out-of-sample result to see
+whether the edge held up or faded.
+"""
+see_also = ["out_of_sample", "variants_tried"]
 
 [[term]]
 id = "exploratory"
 term = "Exploratory"
-short = "A result over a train / test split you chose, not the site's frozen period."
+short = "A backtest over an out-of-sample date you chose, not the site's."
 body = """
-You can evaluate an edge with your own split date to explore. Such numbers are labelled
-EXPLORATORY: they never feed the track record shown on screeners and never change an edge's
-status, because a split chosen after seeing results is no longer a fair test. The site's frozen
-period is the one that counts.
+You can run an edge's backtest with your own out-of-sample date to explore. Such numbers are
+labelled EXPLORATORY: they never feed the track record shown on screeners, the verdict or an
+edge's status, because a date chosen after seeing results is no longer a fair test. The site's
+out-of-sample date is the one that counts.
 """
-see_also = ["frozen_period", "edge_status"]
+see_also = ["out_of_sample", "official_result", "edge_status"]
 
 [[term]]
-id = "trial_log"
-term = "Trial log"
+id = "variants_tried"
+term = "Variants tried"
 short = "Every version of an edge that was ever tested, so luck from many tries is discounted."
 body = """
-Each variant, setting and holding period tried on an edge is logged. The more versions tried,
+Each variant, setting and holding period tried on an edge is counted. The more versions tried,
 the more likely the best one looks good by chance; the deflated Sharpe ratio uses the count to
 discount it, and the probability of backtest overfitting estimates how often the best version
-in one half of history fails in the other. A result shown without its trial count is not
-comparable.
+in one half of history fails in the other. A result shown without its count of variants tried
+is not comparable.
 """
-see_also = ["frozen_period", "independent_sessions"]
+see_also = ["out_of_sample", "trades"]
 
 [[term]]
 id = "harness_exclusions"
 term = "What a run left out"
-short = "The sessions and names an evaluation run could not measure, counted so none is quietly dropped."
+short = "The sessions and names a backtest run could not measure, counted so none is quietly dropped."
 body = """
 A run counts what it set aside instead of ignoring it. Unclosed: decision sessions whose
 holding window had not finished by the run's end. Coverage: sessions with no screen run, or a
@@ -558,7 +599,7 @@ had a score to rank; below the minimum the deciles are skipped. No entry bar: na
 price on the session they would have been bought. A figure shown as unknown was not recorded by
 the run, which is different from none.
 """
-see_also = ["trial_log", "exploratory", "independent_sessions"]
+see_also = ["variants_tried", "exploratory", "trades"]
 
 # ---------------------------------------------------------------- the text model's cost (ADR 0058)
 

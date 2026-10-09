@@ -46,12 +46,12 @@ describe('EvaluationSplitForm', () => {
     expect(screen.getByText('boom')).toBeInTheDocument();
   });
 
-  it('shows the site frozen period, no personal split, and the exploratory help', async () => {
+  it('shows the site out-of-sample start, no personal split, and the exploratory help', async () => {
     GQL.mockResolvedValue(read(null));
     const { baseElement } = setup();
     expect(await screen.findByText('momentum_12_1')).toBeInTheDocument();
     expect(screen.getByText('2026-06-01')).toBeInTheDocument();
-    expect(screen.getByText(/None: each frozen period/)).toBeInTheDocument();
+    expect(screen.getByText(/None: each edge's own start/)).toBeInTheDocument();
     expect(screen.getByText('help exploratory')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
@@ -62,7 +62,7 @@ describe('EvaluationSplitForm', () => {
     GQL.mockResolvedValue(read(null));
     PUT.mockResolvedValue({ data: { split_from: '2026-04-01' }, response: new Response() });
     setup();
-    await userEvent.type(await screen.findByLabelText('Test slice starts'), '2026-04-01');
+    await userEvent.type(await screen.findByLabelText('Out-of-sample starts'), '2026-04-01');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/evaluation/split', { body: { split_from: '2026-04-01' } });
@@ -73,7 +73,7 @@ describe('EvaluationSplitForm', () => {
   it('refuses a malformed or later-than-stored date before any request', async () => {
     GQL.mockResolvedValue(read(null));
     setup();
-    const input = await screen.findByLabelText('Test slice starts');
+    const input = await screen.findByLabelText('Out-of-sample starts');
     await userEvent.type(input, '04/01/2026');
     expect(screen.getByText('Use the form 2026-04-01.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
@@ -102,7 +102,7 @@ describe('EvaluationSplitForm', () => {
       response: new Response(null, { status: 400, statusText: 'Bad Request' }),
     });
     setup();
-    await userEvent.type(await screen.findByLabelText('Test slice starts'), '2026-01-01');
+    await userEvent.type(await screen.findByLabelText('Out-of-sample starts'), '2026-01-01');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText(/expected a stored session/)).toBeInTheDocument();
   });
