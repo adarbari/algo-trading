@@ -3,44 +3,29 @@
  * latest session (its run for exactly that session, never an older one), with the decision,
  * rank and score its run stored and why it is not simply qualified.
  */
-import { Button, KeyValue, Panel, Stack, Text, type KeyValueItem } from '@algotrade/ui';
+import { Button, ExpandableRow, Panel, Stack, Text } from '@algotrade/ui';
+import { useState } from 'react';
 
-import { DecisionBadge, decisionLabel, useScreenerHits } from '@/entities/screen';
+import {
+  CriteriaScorecard,
+  DecisionBadge,
+  decisionLabel,
+  useScreenerHits,
+} from '@/entities/screen';
 
 export interface ScreenerHitsPanelProps {
   symbol: string;
-  /** Opens the screener's results page; with it each screener's name is a button. */
+  /** Opens the screener's results page; with it each open screener offers a button to it. */
   onOpenScreener?: (screenerId: string) => void;
+  /** The screener the reader came from (Ideas' `via`): its row opens first. */
+  via?: string | null;
 }
 
-export function ScreenerHitsPanel({ symbol, onOpenScreener }: ScreenerHitsPanelProps) {
+export function ScreenerHitsPanel({ symbol, onOpenScreener, via = null }: ScreenerHitsPanelProps) {
   const query = useScreenerHits(symbol);
   const data = query.data;
-  const items = (data?.hits ?? []).map(({ screener, result }): KeyValueItem => ({
-    id: screener.id,
-    label: onOpenScreener ? (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          onOpenScreener(screener.id);
-        }}
-      >
-        {screener.name}
-      </Button>
-    ) : (
-      screener.name
-    ),
-    hint: [
-      `#${String(result.rank)}`,
-      result.score === null ? null : `score ${String(Math.round(result.score))}`,
-      result.change ? decisionLabel(result.change).toLowerCase() : null,
-      result.reasons || null,
-    ]
-      .filter(Boolean)
-      .join(' · '),
-    value: <DecisionBadge decision={result.decision} />,
-  }));
+  const hits = data?.hits ?? [];
+  const [openId, setOpenId] = useState<string | null>(via);
   return (
     <Panel
       title="Screener hits"
@@ -50,7 +35,7 @@ export function ScreenerHitsPanel({ symbol, onOpenScreener }: ScreenerHitsPanelP
           ? 'error'
           : query.isPending
             ? 'loading'
-            : items.length === 0
+            : hits.length === 0
               ? 'empty'
               : 'ready'
       }
@@ -66,7 +51,49 @@ export function ScreenerHitsPanel({ symbol, onOpenScreener }: ScreenerHitsPanelP
         <Text size="sm" tone="secondary">
           The screeners whose run for this session picked it.
         </Text>
-        <KeyValue label={`Screeners that picked ${symbol}`} items={items} alignValues="end" />
+        <Stack gap={1}>
+          {hits.map(({ screener, result }) => (
+            <ExpandableRow
+              key={screener.id}
+              title={screener.name}
+              badge={<DecisionBadge decision={result.decision} />}
+              secondary={
+                [
+                  result.score === null ? null : `score ${String(Math.round(result.score))}`,
+                  result.change ? decisionLabel(result.change).toLowerCase() : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || undefined
+              }
+              essential={`#${String(result.rank)}`}
+              open={openId === screener.id}
+              onOpenChange={(open) => {
+                setOpenId(open ? screener.id : null);
+              }}
+            >
+              <Stack gap={2}>
+                <CriteriaScorecard
+                  screenerId={screener.id}
+                  entries={result.criteria}
+                  label={`${screener.name} criteria for ${symbol}`}
+                />
+                {onOpenScreener ? (
+                  <Stack direction="row">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        onOpenScreener(screener.id);
+                      }}
+                    >
+                      {`Open ${screener.name}`}
+                    </Button>
+                  </Stack>
+                ) : null}
+              </Stack>
+            </ExpandableRow>
+          ))}
+        </Stack>
       </Stack>
     </Panel>
   );

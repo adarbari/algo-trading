@@ -59,7 +59,16 @@ export {
   type Tolerance,
 } from './model/spec';
 export { DecisionBadge } from './ui/DecisionBadge';
-export { decisionLabel, decisionTone, OUTCOME_FILL, type DecisionTone } from './model/decisions';
+export {
+  decisionLabel,
+  decisionTone,
+  OUTCOME_FILL,
+  outcomeLabel,
+  outcomeTone,
+  type DecisionTone,
+} from './model/decisions';
+export { CriteriaScorecard, type CriteriaScorecardProps } from './ui/CriteriaScorecard';
+export { scorecardRows, type ScorecardEntry, type ScorecardRow } from './model/scorecard';
 export { ScoreBreakdown } from './ui/ScoreBreakdown';
 export { scoreBreakdown, type ScoreLine } from './model/score';
 export {
@@ -71,4 +80,5 @@ export {
   type ScreenChange,
   type ScreenResultsQuery,
 } from './model/results';
+export { describeCriterion, describeRule } from './model/rule';
 export { isActive, runMessage, type ScreenRun } from './model/run';

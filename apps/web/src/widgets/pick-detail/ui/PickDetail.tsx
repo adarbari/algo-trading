@@ -1,38 +1,23 @@
 /**
  * One pick of a screener's results, beside the table: the ticker with its decision and score, why
- * it is not simply qualified (a pick the regime gate paused says so, with the rule that did), every criterion with the value it was judged on and whether it
- * passed, came near or missed, and the review actions (open in Explore, add to the compare set,
+ * it is not simply qualified (a pick the regime gate paused says so, with the rule that did),
+ * its criteria scorecard (value, rule, outcome), and the review actions (open in Explore, add to the compare set,
  * dismiss) with their keys. The chart and anything else about the ticker is composed beside it.
  */
-import {
-  ActionGroup,
-  formatValue,
-  KeyHints,
-  type KeyHint,
-  KeyValue,
-  Mono,
-  Panel,
-  Stack,
-  StatusBadge,
-  Text,
-  type KeyValueItem,
-  type StatusTone,
-} from '@algotrade/ui';
-import { useMemo } from 'react';
+import { ActionGroup, KeyHints, type KeyHint, Panel, Stack, Text } from '@algotrade/ui';
 
+import type { CriterionInfo, TableRow } from '@/entities/feature';
 import {
-  byName,
-  displayValue,
-  featureFormat,
-  featureLabel,
-  useFeatureCatalogue,
-  type CriterionInfo,
-  type TableRow,
-} from '@/entities/feature';
-import { DecisionBadge, decisionLabel, isShownCriterion } from '@/entities/screen';
+  CriteriaScorecard,
+  DecisionBadge,
+  decisionLabel,
+  type ScorecardEntry,
+} from '@/entities/screen';
 
 export interface PickDetailProps {
   row: TableRow;
+  /** The screener the pick is from (its rules are read from it). */
+  screenerId: string;
   /** The screen's criteria in order (labels, fields); the gates have no row here. */
   criteria: readonly CriterionInfo[];
   /** The ticker is in the compare set. */
@@ -44,19 +29,6 @@ export interface PickDetailProps {
   showActions?: boolean;
 }
 
-const TONE: Readonly<Record<string, StatusTone>> = {
-  PASS: 'positive',
-  NEAR: 'warning',
-  FAIL: 'negative',
-  MISSING: 'negative',
-};
-const WORDS: Readonly<Record<string, string>> = {
-  PASS: 'Passed',
-  NEAR: 'Near miss',
-  FAIL: 'Missed',
-  MISSING: 'No value',
-};
-
 /** The keyboard shortcuts of the picks table (its `rowKeys`), as hints; hidden under a coarse pointer. */
 const KEY_HINTS: readonly KeyHint[] = [
   { keys: ['j', 'k'], label: 'move' },
@@ -67,6 +39,7 @@ const KEY_HINTS: readonly KeyHint[] = [
 
 export function PickDetail({
   row,
+  screenerId,
   criteria,
   compared,
   onOpen,
@@ -74,25 +47,14 @@ export function PickDetail({
   onDismiss,
   showActions = true,
 }: PickDetailProps) {
-  const catalogue = useFeatureCatalogue();
-  const known = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
   const symbol = row.symbol;
-  const items = criteria.filter(isShownCriterion).map((c): KeyValueItem => {
-    const found = row.criteria?.[c.id];
-    const feature = known.get(c.field);
-    const outcome = found?.outcome ?? 'MISSING';
-    const shown = found ? formatValue(displayValue(found.value), featureFormat(feature)).text : '—';
-    return {
-      id: c.id,
-      label: feature ? featureLabel(feature.name) : c.id,
-      value: (
-        <Stack direction="row" gap={2} align="center" justify="end">
-          <Mono size="sm">{shown}</Mono>
-          <StatusBadge tone={TONE[outcome] ?? 'neutral'}>{WORDS[outcome] ?? outcome}</StatusBadge>
-        </Stack>
-      ),
-    };
-  });
+  const entries = criteria.map((c): ScorecardEntry => ({
+    id: c.id,
+    field: c.field,
+    outcome: row.criteria?.[c.id]?.outcome ?? 'MISSING',
+    value: row.criteria?.[c.id]?.value,
+    distance: row.criteria?.[c.id]?.distance ?? null,
+  }));
   return (
     <Panel
       title={symbol}
@@ -114,16 +76,18 @@ export function PickDetail({
             .join(' · ')}
         </Text>
         {row.decision === 'PAUSED' ? (
-          <Text size="sm" tone="secondary">
-            The regime gate held this pick back, so it is not an idea for this session. The rule
-            that paused it:
-          </Text>
+          <>
+            <Text size="sm" tone="secondary">
+              The regime gate held this pick back, so it is not an idea for this session. The rule
+              that paused it:
+            </Text>
+            {row.reasons ? <Text size="sm">{row.reasons}</Text> : null}
+          </>
         ) : null}
-        {row.reasons ? <Text size="sm">{row.reasons}</Text> : null}
         {row.flags && row.flags.length > 0 ? (
           <Text size="sm" tone="muted">{`Flags: ${row.flags.join(', ')}`}</Text>
         ) : null}
-        <KeyValue label="Criteria" items={items} alignValues="end" />
+        <CriteriaScorecard screenerId={screenerId} entries={entries} />
         {showActions ? (
           <ActionGroup
             label="Pick actions"

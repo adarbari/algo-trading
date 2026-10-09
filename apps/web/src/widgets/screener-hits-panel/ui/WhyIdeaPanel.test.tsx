@@ -1,3 +1,4 @@
+import { Text } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,11 +11,22 @@ const hooks = vi.hoisted(() => ({ useScreenerHits: vi.fn() }));
 vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreenerHits: hooks.useScreenerHits,
+  CriteriaScorecard: (props: { screenerId: string }) => (
+    <Text>{`scorecard of ${props.screenerId}`}</Text>
+  ),
 }));
 
 const hit = (id: string, name: string, decision: string, score: number | null) => ({
   screener: { id, name },
-  result: { rank: 2, decision, score, reasons: 'iv rank near', flags: ['thin'], change: 'new' },
+  result: {
+    rank: 2,
+    decision,
+    score,
+    reasons: 'iv rank near',
+    flags: ['thin'],
+    change: 'new',
+    criteria: [],
+  },
 });
 
 beforeEach(() => {
@@ -39,6 +51,7 @@ describe('WhyIdeaPanel', () => {
     expect(list).toHaveTextContent('iv rank near');
     expect(list).toHaveTextContent('thin');
     expect(list).not.toHaveTextContent('Mine');
+    expect(screen.getByText('scorecard of vrp')).toBeInTheDocument();
     screen.getByRole('button', { name: 'Open VRP scanner' }).click();
     expect(onOpenScreener).toHaveBeenCalledWith('vrp');
     await expectNoA11yViolations(container);

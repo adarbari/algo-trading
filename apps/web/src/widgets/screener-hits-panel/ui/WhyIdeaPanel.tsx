@@ -1,12 +1,16 @@
 /**
  * Explore's "Why it is an idea" for one ticker the Ideas page opened: the screener that
  * surfaced it, with the decision, rank, score, change and reasons its run for the latest session
- * stored (the same read as the Screener hits tab, so nothing more is fetched). The per-criterion
- * values are not part of that read: the screener's results hold them, one link away.
+ * stored, and its criteria scorecard (the same read as the Screener hits tab).
  */
-import { Button, KeyValue, Panel, Stack, Text, type KeyValueItem } from '@algotrade/ui';
+import { Button, KeyValue, Panel, Stack, type KeyValueItem } from '@algotrade/ui';
 
-import { DecisionBadge, decisionLabel, useScreenerHits } from '@/entities/screen';
+import {
+  CriteriaScorecard,
+  DecisionBadge,
+  decisionLabel,
+  useScreenerHits,
+} from '@/entities/screen';
 
 export interface WhyIdeaPanelProps {
   symbol: string;
@@ -73,9 +77,13 @@ export function WhyIdeaPanel({ symbol, screenerId, onOpenScreener }: WhyIdeaPane
     >
       <Stack gap={2}>
         <KeyValue label={`${name} on ${symbol}`} items={items} alignValues="end" />
-        <Text size="sm" tone="muted">
-          Criterion values are in the screener’s results.
-        </Text>
+        {hit ? (
+          <CriteriaScorecard
+            screenerId={screenerId}
+            entries={hit.result.criteria}
+            label={`${name} criteria for ${symbol}`}
+          />
+        ) : null}
       </Stack>
     </Panel>
   );

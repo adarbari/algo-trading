@@ -3,10 +3,8 @@
  * one-click preset the drawer's "Use this" runs: op, value, mode, tolerance and on_miss as the
  * guide gives them, the id and field kept). Pure.
  */
-import { guideTolerance, type GuideUse } from '@/entities/feature';
+import { guideTolerance, shapeOf, type GuideUse } from '@/entities/feature';
 import type { Criterion, CriterionMode, MissDecision } from '@/entities/screen';
-
-import { shapeOf } from './threshold';
 
 const MODES: readonly CriterionMode[] = ['hard', 'soft', 'score'];
 const MISSES: readonly MissDecision[] = ['WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK'];

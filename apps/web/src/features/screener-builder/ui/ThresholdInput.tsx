@@ -7,8 +7,6 @@
 import { Checkbox, Input, NumberInput, Select, Stack, Text } from '@algotrade/ui';
 import { useState } from 'react';
 
-import type { CatalogueFeature } from '@/entities/feature';
-
 import {
   fieldKind,
   parseList,
@@ -16,9 +14,10 @@ import {
   shapeOf,
   toStored,
   toTyped,
+  type CatalogueFeature,
   type FieldKind,
   type NumberScale,
-} from '../model/threshold';
+} from '@/entities/feature';
 
 export interface ThresholdInputProps {
   feature: CatalogueFeature | undefined;
