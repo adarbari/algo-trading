@@ -39,7 +39,7 @@ from tests.helpers.api_store import as_user
 SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
 VIEWER = "query Day { viewer { id role } }"
 SHARED = "query MarketHistory { viewer { id role } }"  # a SHARED_OPERATIONS name
-RUNS = "query RunRecord { session { date } }"  # in NEVER_CACHED
+RUNS = "query LlmUsage { session { date } }"  # in NEVER_CACHED
 RUN_OP = "query NightlyRuns { session { date } viewer { id role } }"  # a RUN_OPERATIONS name
 CLOSED_OP = "query IngestionCompleteness { session { date } }"  # also CLOSED_SESSION_OPERATIONS
 GQL_TS = Path(__file__).parents[4] / "apps/web/src/shared/api/generated/graphql/gql.ts"

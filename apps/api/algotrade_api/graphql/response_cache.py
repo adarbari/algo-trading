@@ -9,9 +9,9 @@ configs, the same for every caller of a role: market and regime history, prices,
 ``USER_OPERATIONS`` (published tables and configs that depend on the caller's catalogue or
 configs: user features, the Guide's field entries), ``RUN_OPERATIONS`` (they also read run
 records or jobs: nightly runs, ingestion, screener runs and results, ideas, edges, status) and
-``NEVER_CACHED`` (live, explain, previews, the caller's own state, and detail reads not yet
-audited). The key (``response_key``) is the published state (``StoreReader.visible_seq()``), the
-writes the API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
+``NEVER_CACHED`` (the text model's usage, which reads the clock, and the caller's identity). The
+key (``response_key``) is the published state (``StoreReader.visible_seq()``), the writes the
+API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
 the routes that write: a config save changes the caller's next read without a publish), a hash
 of the operation document, its variables and the caller's role. A ``RUN_OPERATIONS`` key also
 holds the runs generation (``StoreReader.runs_generation()``: it moves on every saved run
@@ -83,6 +83,8 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "GuideTerm",
         "GuideSearch",
         "GuideEntries",
+        "OptionChain",  # stored chains and features: no live source
+        "Verification",  # the stored verification/ibkr partition: no call to IBKR
     }
 )
 # Operations that also read run records or jobs: cached per user, keyed on the runs generation.
@@ -97,36 +99,29 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "IngestionCompleteness",
         "NightlyRuns",
         "QualityChecks",
+        "ScreenerResults",
+        "ScreenerPicks",
+        "InstrumentScreenerHits",
+        "MyScreens",
+        "ScreenDetail",
+        "ScreenVersions",
+        "HarnessRuns",
+        "HarnessRun",
+        "RunRecord",
+        "RunItems",
+        "EvaluationSplit",
+        "FigiReview",
+        "LeverageReview",
+        "IngestionCell",
     }
 )
 # The run operations whose loader reads the clock (``load_completeness``: the last session the
 # exchange closed): the closed session is in their key too.
 CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", "StatusStrip"})
-# Never kept: the text model's usage (clock), run detail and item reads, reviews and the
-# caller's own screens, which no hot page asks for. Moving one into a cached group needs its
-# dependencies checked first (what it reads, whether the clock is in it).
-NEVER_CACHED: frozenset[str] = frozenset(
-    {
-        "EvaluationSplit",
-        "FigiReview",
-        "HarnessRun",
-        "HarnessRuns",
-        "IngestionCell",
-        "InstrumentScreenerHits",
-        "LeverageReview",
-        "LlmUsage",
-        "MyScreens",
-        "OptionChain",
-        "RunItems",
-        "RunRecord",
-        "ScreenDetail",
-        "ScreenVersions",
-        "ScreenerPicks",
-        "ScreenerResults",
-        "Verification",
-        "Viewer",
-    }
-)
+# Never kept: the text model's usage (it reads the clock, unkeyed) and the caller's identity
+# (answered inline, no context opened). A new operation is never in this group by default: the
+# classification test fails until it is placed.
+NEVER_CACHED: frozenset[str] = frozenset({"LlmUsage", "Viewer"})
 # The route packages whose endpoints write (configs, screen results, evaluations); a preview,
 # a draft or an explain POST writes nothing the cache keys on.
 WRITE_PACKAGES = (
