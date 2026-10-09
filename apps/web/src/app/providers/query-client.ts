@@ -7,10 +7,27 @@ import { ApiError, GraphQLRequestError, onUnauthorized } from '@/shared/api';
 /** GraphQL error codes about the request itself: asking again gets the same answer. */
 const REQUEST_CODES = new Set(['BAD_REQUEST', 'NOT_FOUND', 'UNKNOWN_FEATURE']);
 
+/** A 503 is the API shedding load, not a failure: retried quietly this many times, each after
+ * the `Retry-After` it sent (or a growing backoff), before it shows as an error. */
+const BUSY_RETRIES = 5;
+const MAX_WAIT_MS = 15_000;
+
+/** The wait before retry number `failureCount`: the server's `Retry-After` for a 503, growing,
+ * plus a jitter so a page's reads do not all return in the same tick; the library's backoff
+ * otherwise. */
+export function retryDelay(failureCount: number, error: unknown): number {
+  if (error instanceof ApiError && error.status === 503) {
+    const asked = (error.retryAfterS ?? 1) * 1000 * (1 + failureCount / 2);
+    return Math.min(MAX_WAIT_MS, asked + Math.random() * 500);
+  }
+  return Math.min(1000 * 2 ** failureCount, 30_000);
+}
+
 /** Retry a failed read once, but only when it may be transient: a 4xx answer (nothing stored,
  * a bad request), or a GraphQL error about the request, will not change, so it settles as an
  * error at once instead of waiting. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.status === 503) return failureCount < BUSY_RETRIES;
   if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
   if (error instanceof GraphQLRequestError && error.codes.every((c) => REQUEST_CODES.has(c))) {
     return false;
@@ -23,7 +40,7 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 export function createQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { staleTime: 60_000, retry: shouldRetry, refetchOnWindowFocus: false },
+      queries: { staleTime: 60_000, retry: shouldRetry, retryDelay, refetchOnWindowFocus: false },
     },
   });
   onUnauthorized(() => {

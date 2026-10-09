@@ -8,7 +8,9 @@
  * carrying each error's `extensions.code` (NOT_FOUND, BAD_REQUEST, UNKNOWN_FEATURE, NO_DATA).
  * "Nothing stored yet" is never an error: it is a null field or an UNKNOWN value.
  * Every request carries the Supabase access token as a bearer (ADR 0040); a 401 ends the
- * session (`handleUnauthorized`) and rejects with an `ApiError`.
+ * session (`handleUnauthorized`) and rejects with an `ApiError`. A 503 is the API shedding load
+ * (it queues only a few dozen reads): the `ApiError` carries its `Retry-After`, and the query
+ * client retries it quietly (`app/providers/query-client.ts`).
  */
 import { apiBaseUrl } from '@/shared/config';
 
@@ -53,7 +55,10 @@ export async function gql<TResult, TVariables>(
     body: JSON.stringify({ query: document.toString(), variables }),
   });
   if (response.status === 401) await handleUnauthorized();
-  if (!response.ok) throw new ApiError(response.status, response.statusText);
+  if (!response.ok) {
+    const wait = Number(response.headers.get('retry-after'));
+    throw new ApiError(response.status, response.statusText, wait > 0 ? wait : undefined);
+  }
   const body = (await response.json()) as Body<TResult>;
   if (body.errors?.length) throw new GraphQLRequestError(body.errors);
   if (body.data == null) throw new GraphQLRequestError([{ message: 'no data in the response' }]);

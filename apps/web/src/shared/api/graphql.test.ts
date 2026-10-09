@@ -86,4 +86,17 @@ describe('gql', () => {
     await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 403 });
     expect(handleUnauthorized).not.toHaveBeenCalled();
   });
+
+  it('carries the Retry-After of a 503 (the API shedding load) on the ApiError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(new Response('{}', { status: 503, headers: { 'retry-after': '2' } })),
+      ),
+    );
+    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({
+      status: 503,
+      retryAfterS: 2,
+    });
+  });
 });
