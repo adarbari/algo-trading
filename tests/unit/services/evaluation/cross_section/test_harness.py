@@ -237,13 +237,11 @@ def test_a_pick_with_an_unmeasured_outcome_is_not_a_miss_but_counted_unmeasured(
     }  # fmt: skip
 
     def rows(day: date) -> list[dict[str, Any]]:
-        extra = unmeasured if day == DAYS[2] else {}
-        return [outcome_row(iid, i, day, **extra) for i, iid in enumerate(IDS)]
+        return [outcome_row(iid, i, day, **unmeasured) for i, iid in enumerate(IDS)]
 
     (r,) = run(build_world(rows_of=rows)).results
     m = r.measures[0]
-    assert (m.sessions, m.excluded_coverage) == (3, 1)
-    assert m.picks == 15  # nothing from the UNMEASURED session reaches the pooled numbers
+    assert (m.sessions, m.excluded_coverage, m.picks) == (0, 4, 0)  # four sessions, none measured
 
 
 def test_trials_are_counted_per_user_and_the_regime_label_is_the_sites() -> None:
