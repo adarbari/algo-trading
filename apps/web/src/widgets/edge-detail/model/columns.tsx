@@ -1,11 +1,12 @@
 /**
- * The columns of an edge page's tables: the year-by-year rows of the verdict's basis, the
- * tests of the verdict (value, threshold, pass / fail / not measured) and a copy's comparison. Rows are served records,
+ * The columns of an edge page's tables: the year-by-year rows of the verdict's basis, the tests
+ * of the verdict (value, threshold, pass / fail / not measured) and a copy's comparison. Rows are served records,
  * not instruments; every figure and word is the server's.
  */
 import { Stack, StatusBadge, Text, type DataTableColumn, type StatusTone } from '@algotrade/ui';
 
-import type { CompareRow, VerdictCriterion, VerdictYear } from '@/entities/edge';
+import type { VerdictCriterion, VerdictYear } from '@/entities/edge';
+import type { CompareRow } from '@/features/edge-compare';
 
 export const yearColumns: DataTableColumn<VerdictYear>[] = [
   { id: 'year', header: 'Period', value: (y) => y.year, align: 'start', hideable: false },

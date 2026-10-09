@@ -1,7 +1,6 @@
 /**
  * The edges pages' one read (ADR 0037 / 0053, ED8): `Query.edges` (and the user's own files that
- * did not load, `Query.edgeProblems`), each edge document with the user's state about it and, for
- * their own copy, its comparison with the edge it extends; the
+ * did not load, `Query.edgeProblems`), each edge document with the user's state about it; the
  * verdict (judged by the read model on the official result, the canonical run: the sentence, the
  * figures, the criteria, the year rows, the in-sample decile means and the lift among random-pick
  * backtests), whether it is the user's own, how it is defined, its sources, and every run the
@@ -26,33 +25,12 @@ const EdgesPage = graphql(`
       oosHidden
       mine
       extends
-      compare {
-        oosHidden
-        reason
-        rows {
-          label
-          basis
-          inSample {
-            winRate
-            baseRate
-            liftPts
-            trades
-          }
-          outOfSample {
-            winRate
-            baseRate
-            liftPts
-            trades
-          }
-        }
-      }
       thesis
       mechanism
       persistence
       horizons
       screeners
       baselines
-      mine
       rejectionReason
       sources {
         title

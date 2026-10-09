@@ -6,30 +6,37 @@
 import { DataTable, Panel, Stack, Text } from '@algotrade/ui';
 import { useMemo } from 'react';
 
-import type { CompareRow, EdgeCompare as Compare } from '@/entities/edge';
+import { useEdgeCompare, type CompareRow } from '@/features/edge-compare';
 import { GuideHelp } from '@/features/guide-help';
 
 import { compareColumns } from '../model/columns';
 
 export interface EdgeCompareProps {
-  compare: Compare;
+  /** The copy whose comparison is shown. */
+  edgeId: string;
 }
 
-export function EdgeCompare({ compare }: EdgeCompareProps) {
-  const columns = useMemo(() => compareColumns(!compare.oosHidden), [compare.oosHidden]);
+export function EdgeCompare({ edgeId }: EdgeCompareProps) {
+  const found = useEdgeCompare(edgeId);
+  const compare = found.data;
+  const columns = useMemo(() => compareColumns(compare ? !compare.oosHidden : false), [compare]);
   return (
     <Panel
       title="Compare versions"
       flush
+      state={found.isError ? 'error' : found.isPending ? 'loading' : 'ready'}
+      loadingLabel="Loading comparison…"
+      errorMessage="The comparison failed to load."
+      onRetry={() => void found.refetch()}
       actions={<GuideHelp entry={{ kind: 'term', id: 'compare_versions' }} />}
     >
       <Stack gap={2}>
-        {compare.reason && (
+        {compare?.reason && (
           <Text size="sm" tone="muted">
             {compare.reason}
           </Text>
         )}
-        {compare.rows.length > 0 && (
+        {compare && compare.rows.length > 0 && (
           <DataTable<CompareRow>
             label="Compare versions"
             columns={columns}

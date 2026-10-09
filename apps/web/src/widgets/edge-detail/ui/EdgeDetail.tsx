@@ -136,11 +136,11 @@ export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
           <EdgeRobustness robustness={v.robustness} />
         </Suspense>
       </Grid>
-      {edge.compare && (
+      {edge.mine && (
         <Suspense
           fallback={<Panel title="Compare versions" state="loading" loadingLabel="Loading…" />}
         >
-          <EdgeCompare compare={edge.compare} />
+          <EdgeCompare edgeId={edge.id} />
         </Suspense>
       )}
       <EdgeYears years={v.years} />

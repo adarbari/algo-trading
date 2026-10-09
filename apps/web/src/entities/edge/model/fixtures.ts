@@ -47,7 +47,6 @@ const edge = (over: Record<string, unknown>) => ({
   mine: false,
   extends: null,
   replaces: null,
-  compare: null,
   thesis: 'Winners keep winning for months.',
   mechanism: 'Slow reaction to news.',
   persistence: 'Limits to arbitrage.',
@@ -67,14 +66,6 @@ const edge = (over: Record<string, unknown>) => ({
   canonicalRun: null,
   runs: [],
   ...over,
-});
-
-const figures = (winRate: number, baseRate: number, trades: number) => ({
-  winRate,
-  baseRate,
-  liftPts: Math.round((winRate - baseRate) * 100),
-  decileSpread: 0.05,
-  trades,
 });
 
 export const EDGES_FIXTURE = {
@@ -181,28 +172,6 @@ export const EDGES_FIXTURE = {
       extends: 'momentum_12_1',
       oosHidden: true,
       screeners: ['momentum_12_1'],
-      compare: {
-        oosHidden: true,
-        reason: '',
-        rows: [
-          {
-            kind: 'this',
-            label: 'My momentum',
-            basis: 'momentum_12_1, 20 trading days',
-            oosHidden: true,
-            inSample: figures(0.6, 0.5, 40),
-            outOfSample: null,
-          },
-          {
-            kind: 'extended',
-            label: 'Momentum 12-1',
-            basis: 'momentum_12_1, 20 trading days',
-            oosHidden: false,
-            inSample: figures(0.58, 0.5, 70),
-            outOfSample: figures(0.57, 0.52, 6),
-          },
-        ],
-      },
     }),
     edge({
       id: 'earnings_drift',

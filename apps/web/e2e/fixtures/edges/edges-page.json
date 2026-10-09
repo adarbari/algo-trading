@@ -50,10 +50,26 @@
             "beats": 0.96,
             "summary": "Beats 96% of 1,000 random backtests after 3 variants tried.",
             "bins": [
-              { "start": 0.8, "end": 0.9, "count": 120 },
-              { "start": 0.9, "end": 1.0, "count": 480 },
-              { "start": 1.0, "end": 1.1, "count": 360 },
-              { "start": 1.1, "end": 1.2, "count": 40 }
+              {
+                "start": 0.8,
+                "end": 0.9,
+                "count": 120
+              },
+              {
+                "start": 0.9,
+                "end": 1.0,
+                "count": 480
+              },
+              {
+                "start": 1.0,
+                "end": 1.1,
+                "count": 360
+              },
+              {
+                "start": 1.1,
+                "end": 1.2,
+                "count": 40
+              }
             ]
           },
           "criteria": [
@@ -129,10 +145,8 @@
         "labels": [],
         "oosRevealed": false,
         "oosHidden": false,
-        "mine": false,
         "extends": null,
-        "replaces": null,
-        "compare": null
+        "replaces": null
       },
       {
         "id": "sp500_index_changes",
@@ -184,10 +198,8 @@
         "labels": [],
         "oosRevealed": false,
         "oosHidden": false,
-        "mine": false,
         "extends": null,
-        "replaces": null,
-        "compare": null
+        "replaces": null
       }
     ],
     "edgeProblems": []

@@ -12,8 +12,6 @@ export type Edge = EdgesResponse['edges'][number];
 export type EdgeVerdict = Edge['verdict'];
 export type VerdictCriterion = EdgeVerdict['criteria'][number];
 export type EdgeProblem = EdgesResponse['edgeProblems'][number];
-export type EdgeCompare = NonNullable<Edge['compare']>;
-export type CompareRow = EdgeCompare['rows'][number];
 export type VerdictYear = EdgeVerdict['years'][number];
 
 /** The verdicts, best first: the list's groups in this order. */

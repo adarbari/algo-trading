@@ -7,7 +7,7 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { EdgeDetail } from './EdgeDetail';
 
-const hooks = vi.hoisted(() => ({ useEdges: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useEdges: vi.fn(), useEdgeCompare: vi.fn() }));
 vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEdges: hooks.useEdges,
@@ -22,6 +22,7 @@ vi.mock('@/features/edge-follow', async () => {
     EdgeActions: ({ edge }: { edge: { id: string } }) => <Text>{`actions ${edge.id}`}</Text>,
   };
 });
+vi.mock('@/features/edge-compare', () => ({ useEdgeCompare: hooks.useEdgeCompare }));
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
   return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
@@ -31,6 +32,26 @@ stubElementSize();
 
 beforeEach(() => {
   hooks.useEdges.mockReturnValue(fakeQuery(EDGES_FIXTURE.edges));
+  hooks.useEdgeCompare.mockReturnValue(
+    fakeQuery({
+      oosHidden: true,
+      reason: '',
+      rows: [
+        {
+          label: 'My momentum',
+          basis: 'momentum_12_1, 20 trading days',
+          inSample: { winRate: 0.6, baseRate: 0.5, liftPts: 10, trades: 40 },
+          outOfSample: null,
+        },
+        {
+          label: 'Momentum 12-1',
+          basis: 'momentum_12_1, 20 trading days',
+          inSample: { winRate: 0.58, baseRate: 0.5, liftPts: 8, trades: 70 },
+          outOfSample: { winRate: 0.57, baseRate: 0.52, liftPts: 5, trades: 6 },
+        },
+      ],
+    }),
+  );
 });
 
 describe('EdgeDetail', () => {
@@ -45,6 +66,7 @@ describe('EdgeDetail', () => {
     expect(screen.getByText('actions momentum_12_1')).toBeInTheDocument();
     expect(screen.getByText(/^Site edge · /)).toBeInTheDocument();
     expect(screen.queryByRole('grid', { name: 'Compare versions' })).not.toBeInTheDocument();
+    expect(hooks.useEdgeCompare).not.toHaveBeenCalled(); // a site edge has no comparison
     const strip = screen.getByRole('region', { name: 'Out-of-sample result' });
     expect(within(strip).getByText('57%')).toBeInTheDocument();
     expect(within(strip).getByText('+5 pts')).toBeInTheDocument();
