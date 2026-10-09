@@ -23,7 +23,7 @@
   "e2e": {
     "/ideas": {
       "first_load_js_gzip_bytes": 232200,
-      "requests": 42,
+      "requests": 43,
       "dom_nodes": 293
     },
     "/screeners": {
@@ -43,7 +43,7 @@
     },
     "/admin/ingestion": {
       "first_load_js_gzip_bytes": 233500,
-      "requests": 55,
+      "requests": 56,
       "dom_nodes": 634
     },
     "/explore?focus=AAPL&tab=chart": {
@@ -56,6 +56,8 @@
     "bundle.routes.src/pages/admin-llm-usage/index.ts": "2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
     "e2e./explore?focus=AAPL&tab=chart.dom_nodes": "2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks",
     "e2e./explore?focus=AAPL&tab=chart.first_load_js_gzip_bytes": "2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
+    "e2e./ideas.requests": "2026-10-09 #456 ED8 E7: the version comparison is its own lazy read, so the shared edge hooks load as one more small chunk here",
+    "e2e./admin/ingestion.requests": "2026-10-09 #456 ED8 E7: the version comparison is its own lazy read, so the shared edge hooks load as one more small chunk here",
     "e2e./ideas.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
     "e2e./screeners.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +295 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
     "e2e./regime.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
