@@ -139,3 +139,28 @@ def test_pbo_ties_and_flat_columns() -> None:
     assert es.pbo_cscv(np.hstack([col, col, col]), splits=4) is not None
     flat = np.hstack([np.zeros((64, 1)), col])
     assert es.pbo_cscv(flat, splits=4) is not None
+
+
+def _old_effect(a: np.ndarray, b: np.ndarray) -> float | None:
+    """The pre-running-moments formula, over the raw values."""
+    nx, ny = a.size, b.size
+    pooled = ((nx - 1) * a.var(ddof=1) + (ny - 1) * b.var(ddof=1)) / (nx + ny - 2)
+    d = (a.mean() - b.mean()) / np.sqrt(pooled)
+    return float(d * (1.0 - 3.0 / (4.0 * (nx + ny) - 9.0)))
+
+
+def test_running_moments_equal_the_raw_formula_even_with_a_large_offset() -> None:
+    rng = np.random.default_rng(7)
+    for offset in (0.0, 1e6):  # a naive sum of squares loses the variance at 1e6
+        a = rng.normal(offset, 0.02, 40)
+        parts = [rng.normal(offset, 0.03, n) for n in (500, 1, 3000, 0, 250)]
+        whole = np.concatenate(parts)
+        n, mean, m2 = es.merge_moments([es.moments(p) for p in parts])
+        assert n == whole.size
+        assert math.isclose(mean, whole.mean(), rel_tol=1e-12)
+        assert math.isclose(m2, ((whole - whole.mean()) ** 2).sum(), rel_tol=1e-9)
+        got = es.effect_vs_moments(a, (n, mean, m2))
+        assert got is not None and math.isclose(
+            got, _old_effect(a, whole), rel_tol=1e-9 if offset == 0 else 1e-6
+        )
+        assert es.standardised_effect(a, whole) == pytest.approx(got, rel=1e-6)
