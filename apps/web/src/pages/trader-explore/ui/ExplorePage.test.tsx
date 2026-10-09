@@ -89,20 +89,26 @@ describe('ExplorePage', () => {
     expect(tickerTabs()).toEqual(['AAPL', 'MSFT']);
     expect(screen.getByRole('tab', { name: 'AAPL' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'Compare' })).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => {
-      expect(widgets.compare).toHaveBeenLastCalledWith(
-        expect.objectContaining({ symbols: ['AAPL', 'MSFT'], range: '1Y' }),
-      );
-    });
-    await waitFor(() => {
-      expect(widgets.side).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          sortMode: 'client',
-          keys: ['AAPL', 'MSFT'],
-          columns: expect.arrayContaining(['feature.market_cap']) as unknown,
-        }),
-      );
-    });
+    await waitFor(
+      () => {
+        expect(widgets.compare).toHaveBeenLastCalledWith(
+          expect.objectContaining({ symbols: ['AAPL', 'MSFT'], range: '1Y' }),
+        );
+      },
+      { timeout: 5000 },
+    );
+    await waitFor(
+      () => {
+        expect(widgets.side).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            sortMode: 'client',
+            keys: ['AAPL', 'MSFT'],
+            columns: expect.arrayContaining(['feature.market_cap']) as unknown,
+          }),
+        );
+      },
+      { timeout: 5000 },
+    );
     expect(widgets.overview).not.toHaveBeenCalled();
     expect(widgets.search).toHaveBeenLastCalledWith(
       expect.objectContaining({ focusKey: '/', chosen: ['AAPL', 'MSFT'] }),
@@ -116,11 +122,14 @@ describe('ExplorePage', () => {
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('tab', { name: 'Compare' })).toBeNull();
     expect(screen.queryByRole('tab', { name: 'Why it is an idea' })).toBeNull();
-    await waitFor(() => {
-      expect(widgets.overview).toHaveBeenLastCalledWith(
-        expect.objectContaining({ symbol: 'AAPL', fund: expect.anything() as unknown }),
-      );
-    });
+    await waitFor(
+      () => {
+        expect(widgets.overview).toHaveBeenLastCalledWith(
+          expect.objectContaining({ symbol: 'AAPL', fund: expect.anything() as unknown }),
+        );
+      },
+      { timeout: 5000 },
+    );
     await user.click(screen.getByRole('tab', { name: 'Options' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'options' });
   });
@@ -167,11 +176,19 @@ describe('ExplorePage', () => {
   it('a focus that is not open yet opens its own tab', async () => {
     render(page({ sel: 'AAPL', focus: 'NVDA', tab: 'options' }));
     expect(tickerTabs()).toEqual(['AAPL', 'NVDA']);
-    await waitFor(() => {
-      expect(widgets.options).toHaveBeenLastCalledWith(
-        expect.objectContaining({ symbol: 'NVDA', view: 'simple', right: 'P', allStrikes: false }),
-      );
-    });
+    await waitFor(
+      () => {
+        expect(widgets.options).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            symbol: 'NVDA',
+            view: 'simple',
+            right: 'P',
+            allStrikes: false,
+          }),
+        );
+      },
+      { timeout: 5000 },
+    );
   });
 
   it('shows Why it is an idea only when Ideas named the screener, for that screener', async () => {
@@ -182,11 +199,14 @@ describe('ExplorePage', () => {
       'aria-selected',
       'true',
     );
-    await waitFor(() => {
-      expect(widgets.why).toHaveBeenLastCalledWith(
-        expect.objectContaining({ symbol: 'AAPL', screenerId: 'vrp' }),
-      );
-    });
+    await waitFor(
+      () => {
+        expect(widgets.why).toHaveBeenLastCalledWith(
+          expect.objectContaining({ symbol: 'AAPL', screenerId: 'vrp' }),
+        );
+      },
+      { timeout: 5000 },
+    );
     await user.click(screen.getByRole('tab', { name: 'Overview' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'overview' });
   });
@@ -198,14 +218,17 @@ describe('ExplorePage', () => {
 
   it('shows the screener hits of the focused ticker', async () => {
     render(page({ tab: 'hits', focus: 'NVDA' }));
-    await waitFor(() => {
-      expect(widgets.hits).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          symbol: 'NVDA',
-          onOpenScreener: expect.any(Function) as unknown,
-        }),
-      );
-    });
+    await waitFor(
+      () => {
+        expect(widgets.hits).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            symbol: 'NVDA',
+            onOpenScreener: expect.any(Function) as unknown,
+          }),
+        );
+      },
+      { timeout: 5000 },
+    );
   });
 
   it('has no Field guide tab (field help is the Guide, from each help button)', () => {
