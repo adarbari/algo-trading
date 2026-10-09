@@ -6,7 +6,7 @@
  *    transferred, requests made, DOM nodes once settled. Over a budget fails the run.
  *  - REPORTED, never gated: LCP and total blocking time (long tasks after first paint). They move
  *    with the shared runner's load, so they go to the job summary only (docs/ci.md "Web performance").
- * `PERF_UPDATE=1` shrinks the budgets to the measured counts + 10 % (never raises one).
+ * `PERF_UPDATE=1` shrinks the budgets to the measured counts + 1 % (never raises one).
  */
 import { appendFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
