@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 from pandas.testing import assert_frame_equal
@@ -309,6 +310,21 @@ def test_a_column_added_mid_year_is_not_served_as_nulls_for_earlier_days(tmp_pat
         got = backend.tables.read_range(TABLE, *late, instruments=["EQ:A"])
     assert taken == [2026]
     _same(got, _reference(backend, TABLE, *late, instruments=["EQ:A"]))
+
+
+def test_an_empty_partition_with_an_extra_column_marks_its_day_ragged(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    real = backend.tables._partition
+    odd = _days(30)[-1]  # a 2026 day
+
+    def resolve(day: date, upto: int) -> Any:
+        data = real(TABLE, day, None, None, None, upto)
+        if day == odd:
+            return data.slice(0, 0).append_column("x", pa.nulls(0, pa.float64()))
+        return data
+
+    backend.tables.history.build(TABLE, [2026], backend.tables.dates(TABLE), resolve)
+    assert backend.tables.history.years(TABLE)[2026].ragged >= {odd.isoformat()}
 
 
 def test_a_build_removes_the_temp_file_a_crashed_build_left(tmp_path: Path) -> None:
