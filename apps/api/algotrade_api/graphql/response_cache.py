@@ -23,7 +23,9 @@ cached one does. The role is always in the key (ADR 0056: an admin's answer carr
 trader must never read). ``ResponseCache`` is an LRU bounded by bytes (``MAX_BYTES``, a
 constant) and by age (``TTL_S``: a write made outside this process, such as a CLI config edit,
 is seen within it). Only queries (the schema has no mutation), only answers without
-``errors``; the cache lives in one process, which is the only process the API runs as."""
+``errors``; the cache lives in one process, which is the only process the API runs as. The
+body kept is the gzip-compressed one (``schema._served`` sends it as is to a client that
+accepts gzip), so the byte bound counts compressed bytes."""
 
 import hashlib
 import json
@@ -205,7 +207,9 @@ def response_key(
 
 
 class ResponseCache:
-    """Serialized responses by key: LRU by bytes, entries older than ``ttl_s`` dropped."""
+    """Serialized responses by key (the router stores them gzip-compressed once, off the event
+    loop, so a hit is served without compressing; ``held`` counts the bytes stored): LRU by
+    bytes, entries older than ``ttl_s`` dropped."""
 
     def __init__(
         self,
