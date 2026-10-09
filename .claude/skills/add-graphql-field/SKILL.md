@@ -104,6 +104,13 @@ name for `feature()` needs `.venv/bin/python scripts/export_catalogue.py` (CI's 
 `unknown.code` where `value` is null; format with `info.format`; never derive a fact the
 server can send (`architecture/web_forbidden_derivations.toml`).
 
+**Classify the operation in the response cache** (`apps/api/algotrade_api/graphql/response_cache.py`):
+exactly one group, shared (role-keyed), user-keyed, run-dependent (reads run records) or
+never cached; `test_every_web_operation_is_in_exactly_one_group` fails an unclassified one. A
+loader's cache key reads `visible_seq` / `runs_generation` before computing and never holds a
+request window; a page with many small reads batches them; long history reads use the history
+copy (`docs/api/read-model.md` "Performance rules", ADR 0037 amendment).
+
 Verify: `make web-check` (or `cd apps/web && npm run check`).
 
 ## Step 7: finish
