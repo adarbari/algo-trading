@@ -826,6 +826,10 @@ purpose = "tests for the delivery-pipeline scripts in scripts/ (changed_tests, c
 path = "tests/scripts/ops"
 purpose = "tests for the operator scripts in scripts/ops/ (deploy)"
 
+[[test_dir]]
+path = "tests/scripts/perf"
+purpose = "tests for the manual API load test in scripts/perf/ (load.py: percentiles, page-mix parsing, report)"
+
 # --------------------------------------------------------------------------- config (config/)
 # Every config/site/*.toml is loaded by the one settings loader (config/site/settings.py;
 # tests/architecture/test_layout_buckets.py) and every key in it is read by code
