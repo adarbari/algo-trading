@@ -142,7 +142,26 @@ describe('startQueryPersistence', () => {
     stop();
   });
 
-  it('is busted by a new session: restored data of the old session is reset', async () => {
+  it('renders nothing of a record until the session date answers, and drops another session', async () => {
+    const store = fakeStore(record('s1'));
+    let answer: (date: string) => void = () => undefined;
+    const client = new QueryClient();
+    client.setQueryData(queryKeys.gql('Viewer', {}), { id: 'u1' });
+    const stop = startQueryPersistence(client, {
+      store,
+      fetchSession: () => new Promise((resolve) => (answer = resolve)),
+      now: () => Date.now(),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toBeUndefined(); // not yet
+    answer('s2');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toBeUndefined(); // never shown
+    expect(store.data.has(CACHE_KEY)).toBe(false);
+    stop();
+  });
+
+  it('is busted by a new session: the old record is dropped, the new one is saved', async () => {
     const store = fakeStore(record('s1'));
     const { client, stop } = start(store, 's2');
     await vi.advanceTimersByTimeAsync(0);

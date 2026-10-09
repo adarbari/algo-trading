@@ -198,11 +198,17 @@ export function startQueryPersistence(
 
   const restore = async () => {
     try {
-      const text = await store.get(CACHE_KEY);
+      // Nothing is shown before the API says which session it reads: the record is rendered only
+      // when its session is that one, so a page never shows the previous night's data.
+      const [text] = await Promise.all([store.get(CACHE_KEY), sessionKnown]);
       if (stopped) return;
       const record = parseRecord(text);
       if (!record || now() - record.savedAt > MAX_AGE_MS) {
         if (text !== undefined) void safe(() => store.del(CACHE_KEY));
+        return;
+      }
+      if (session === null || record.session !== session) {
+        void safe(() => store.del(CACHE_KEY));
         return;
       }
       if (user === null && client.getQueryData(queryKeys.gql('Viewer', {})) === null) return;
@@ -225,14 +231,14 @@ export function startQueryPersistence(
     }
   };
 
-  void restore();
-  void fetchSession()
+  // Without the session date nothing is restored or saved, nothing is trusted.
+  const sessionKnown = fetchSession()
     .then((date) => {
       session = date;
-      reconcile();
       schedule();
     })
-    .catch(() => undefined); // without the session date nothing is saved, nothing is trusted
+    .catch(() => undefined);
+  void restore();
   learnUser(client.getQueryData(queryKeys.gql('Viewer', {})) ?? undefined);
 
   return () => {
