@@ -57,7 +57,6 @@ const EdgeDesk = graphql(`
 const EdgePaper = graphql(`
   query EdgePaper($id: String!) {
     edgePaper(id: $id) {
-      edgeId
       record {
         state
         closed
@@ -95,7 +94,6 @@ const EdgePaper = graphql(`
         since
         sessions
         needed
-        canReplace
         headline
         this {
           closed

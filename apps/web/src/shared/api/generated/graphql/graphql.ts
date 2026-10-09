@@ -130,7 +130,7 @@ export type EdgePaperQueryVariables = Exact<{
 }>;
 
 
-export type EdgePaperQuery = { edgePaper: { edgeId: string, record: { state: string, closed: number, wins: number, open: number, skipped: number, winRate: number | null, backtestRate: number | null, basis: string, low: number | null, high: number | null, headline: string, bins: Array<{ start: number, end: number, chance: number }> }, trades: Array<{ instrumentId: string, rank: number, signalSession: string, buySession: string, sellSession: string, status: string, reason: string, excessReturn: number | null, instrument: { symbol: string } | null }>, forward: { replaces: string, replacesName: string, since: string, sessions: number, needed: number, canReplace: boolean, headline: string, this: { closed: number, wins: number, winRate: number | null }, replaced: { closed: number, wins: number, winRate: number | null } } | null } | null };
+export type EdgePaperQuery = { edgePaper: { record: { state: string, closed: number, wins: number, open: number, skipped: number, winRate: number | null, backtestRate: number | null, basis: string, low: number | null, high: number | null, headline: string, bins: Array<{ start: number, end: number, chance: number }> }, trades: Array<{ instrumentId: string, rank: number, signalSession: string, buySession: string, sellSession: string, status: string, reason: string, excessReturn: number | null, instrument: { symbol: string } | null }>, forward: { replaces: string, replacesName: string, since: string, sessions: number, needed: number, headline: string, this: { closed: number, wins: number, winRate: number | null }, replaced: { closed: number, wins: number, winRate: number | null } } | null } | null };
 
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -725,7 +725,6 @@ export const EdgeDeskDocument = new TypedDocumentString(`
 export const EdgePaperDocument = new TypedDocumentString(`
     query EdgePaper($id: String!) {
   edgePaper(id: $id) {
-    edgeId
     record {
       state
       closed
@@ -763,7 +762,6 @@ export const EdgePaperDocument = new TypedDocumentString(`
       since
       sessions
       needed
-      canReplace
       headline
       this {
         closed
