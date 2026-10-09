@@ -487,3 +487,18 @@ def test_description_settings_are_typed_and_zero_turns_the_nightly_requests_off(
         90,
         2,
     )
+
+
+def test_every_vendor_section_sets_each_of_its_keys_explicitly() -> None:
+    """A vendor key the site file does not set falls back to its code default silently: the
+    Power-plan edit (#405) folded ``monthly_symbol_budget`` and ``licence`` into a comment line,
+    and the 2010+ backfill ran on the free tier's 450 names."""
+    from algotrade.config.site.settings import VENDOR_EXTRAS  # noqa: PLC0415
+
+    doc = tomllib.loads((SITE / "sources.toml").read_text())
+    missing = {
+        section: [key for key in keys if key not in doc[section]]
+        for section, keys in VENDOR_EXTRAS.items()
+        if section in doc
+    }
+    assert {s: keys for s, keys in missing.items() if keys} == {}
