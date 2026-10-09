@@ -12,7 +12,8 @@ recycled ticker returns no bar outside its own listing's dates.
 The sample (``pick_sample``, seeded: the same snapshot and seed give the same names), stocks on
 NYSE / NASDAQ / AMEX / ARCA listed at least a year, one listing per ticker, so at most 200
 unique Tiingo symbols (``MAX_SYMBOLS``; the free tier allows 500 a month, shared with
-``bars-history``, whose own budget does not see these):
+``bars-history`` through ``framework.tiingo_budget``: the run refuses when the month's
+remaining ``[tiingo] monthly_symbol_budget`` is smaller than the names left to fetch):
 
 - **delisted**: ``per_year`` (10) names whose end date falls in each year 2011-2020;
 - **live**: ``live`` (50) names listed since 2010 or earlier and still trading;
@@ -55,6 +56,7 @@ from algotrade_ingestion.tasks.framework.run import (
     TaskContext,
     status_label,
 )
+from algotrade_ingestion.tasks.framework.tiingo_budget import month_symbols
 from algotrade_ingestion.tasks.listings.sample_coverage import (
     DELISTED,
     LIVE,
@@ -282,6 +284,16 @@ def ingest_winners_sample(
         earlier = _earlier(run, sample)
         todo = [p for p in picks if _item(p) not in run.items and _item(p) not in earlier]
         todo = todo[: len(todo) if limit is None else max(0, limit)]
+        budget = ctx.settings.tiingo_monthly_symbol_budget
+        used = len(month_symbols(run))
+        run.stats.update(month_budget=budget, month_used=used)
+        names = len({p.ticker for p in todo})
+        if names > max(0, budget - used):
+            run.failed(
+                f"{names} names to fetch but only {max(0, budget - used)} of the month's "
+                f"{budget} Tiingo symbols are left ({used} used by bars-history and samples)"
+            )
+            return run.record
         failed_in_a_row = 0
         for i, pick in enumerate(todo, 1):
             fetch = partial(_fetch_name, run, source, pick, sessions, session)
@@ -301,6 +313,7 @@ def ingest_winners_sample(
             **sample,
             symbols=len(symbols),
             fetched=len(todo),
+            month_remaining=max(0, budget - len(month_symbols(run))),
             pending=left,
             licence=ctx.settings.tiingo_licence,
             summary=summary,

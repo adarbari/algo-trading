@@ -56,3 +56,9 @@ def test_normalize_exposes_the_frame_as_parsed() -> None:
 def test_a_file_without_the_documented_header_is_an_error() -> None:
     with pytest.raises(ValueError, match="lacks columns"):
         parse_membership(b"symbol,from\nAAA,1999-01-04\n")
+
+
+def test_a_share_class_dot_becomes_the_hyphen_tiingo_uses() -> None:
+    raw = b"ticker,start_date,end_date\nBRK.B,2010-02-16,\nBF.B,1996-01-02,\n"
+    rows, _ = parse_membership(raw)
+    assert list(rows["ticker"]) == ["BF-B", "BRK-B"]

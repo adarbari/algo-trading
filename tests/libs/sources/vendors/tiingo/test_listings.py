@@ -86,3 +86,15 @@ def test_a_live_name_stays_in_the_universe_and_a_delisted_one_leaves_it() -> Non
     assert list(after.instruments["ticker"]) == ["AAPL"]
     during = listed_asof(ids, date(2018, 6, 1), {"TWTR"})  # TWTR is NYSE: a member
     assert list(during.instruments["ticker"]) == ["AAPL", "TWTR"]
+
+
+def test_the_open_end_is_the_latest_day_of_the_kept_rows_not_of_a_foreign_listing() -> None:
+    raw = (
+        b"ticker,exchange,assetType,priceCurrency,startDate,endDate\n"
+        b"AAA,NYSE,Stock,USD,2000-01-03,2026-10-08\n"
+        b"BBB,NYSE,Stock,USD,2000-01-03,2026-10-07\n"
+        b"600000,SHG,Stock,CNY,2000-01-03,2026-10-09\n"
+    )
+    listings, _ = parse_listings(raw)
+    by = listings.set_index("ticker")["end_date"]
+    assert by["AAA"] is None and by["BBB"] == date(2026, 10, 7)

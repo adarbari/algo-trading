@@ -76,7 +76,6 @@ def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
     currency = raw["priceCurrency"].str.strip().str.upper()
     start = pd.to_datetime(raw["startDate"].str.strip(), errors="coerce")
     end = pd.to_datetime(raw["endDate"].str.strip(), errors="coerce")
-    end = end.where(end != end.max())  # the file's latest day: still listed (open)
     reasons = {
         "not_usd": currency != "USD",
         "other_exchange": exchange.isna(),
@@ -90,6 +89,9 @@ def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
     for reason, mask in reasons.items():  # each row counted under its first reason
         dropped[reason] = int((mask & ~drop).sum())
         drop |= mask
+    # The latest endDate among the rows kept is the pull's last day: still listed (open). Not the
+    # file's: Chinese listings (CNY, SHE / SHG) can be a day ahead.
+    end = end.where(end != end[~drop].max())
     kept = pd.DataFrame(
         {
             "ticker": ticker,

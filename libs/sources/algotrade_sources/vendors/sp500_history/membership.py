@@ -9,6 +9,9 @@ this ticker was a member", which ``data.listings.universe_asof`` joins to the li
 the day. The project's daily-snapshot file (``sp500_components_updated.csv``, 5.5 MB) holds the
 same history day by day and is not read: this file is the one 28 KB request.
 
+The project writes a share class with a dot (``BRK.B``, ``BF.B``); Tiingo and the listing
+history write it with a hyphen (``BRK-B``), so the dot becomes a hyphen here.
+
 Reliable from about 2001 (the project says so); earlier rows are kept as published. Rows with
 no ticker or an unparseable ``start_date`` are dropped and counted in ``Normalized.notes``.
 """
@@ -35,7 +38,7 @@ def parse_membership(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
     missing = [c for c in HEADER if c not in raw.columns]
     if missing:
         raise ValueError(f"S&P 500 membership CSV lacks columns {missing}")
-    ticker = raw["ticker"].str.strip().str.upper()
+    ticker = raw["ticker"].str.strip().str.upper().str.replace(".", "-", regex=False)
     start = pd.to_datetime(raw["start_date"].str.strip(), errors="coerce")
     end = pd.to_datetime(raw["end_date"].str.strip(), errors="coerce")
     no_ticker, no_start = ticker == "", start.isna()
