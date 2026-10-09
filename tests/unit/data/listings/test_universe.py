@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.listings.universe import COLUMNS, listed_asof, universe_asof
+from algotrade.data.listings.universe import COLUMNS, delisted_by, listed_asof, universe_asof
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -94,3 +94,111 @@ def test_universe_asof_reads_the_latest_snapshot_and_says_which() -> None:
 def test_universe_asof_without_a_snapshot_is_missing_data() -> None:
     with pytest.raises(MissingDataError):
         universe_asof(StoreReader(MemoryBackend()), S)
+
+
+def test_delisted_by_counts_only_an_end_date_on_or_before_the_session() -> None:
+    backend = MemoryBackend()
+    day = date(2026, 10, 5)
+    frame = _listings().assign(source="tiingo", run_id="r", perma_ticker="", session_date=day)
+    frame["ts"] = pd.Timestamp(day, tz="UTC")
+    frame["knowledge_ts"] = pd.Timestamp(day, tz="UTC")
+    StoreWriter(backend).write_table("instruments/listing_history", day, "r", frame)
+    reader = StoreReader(backend)
+    assert delisted_by(reader, date(2012, 5, 31)) == {
+        "EQ:TIINGO:OLD": date(2010, 12, 31),
+        "EQ:TIINGO:F": date(2012, 5, 31),
+    }
+    assert "EQ:TIINGO:C" not in delisted_by(reader, date(2013, 1, 1))  # ends 2013-01-02: unknown
+    got = delisted_by(reader, date(2013, 1, 2))
+    assert got["EQ:TIINGO:C"] == date(2013, 1, 2) and "EQ:TIINGO:A" not in got  # open, no id: out
+
+
+def test_listings_over_a_window_marks_reused_tickers_and_keeps_the_listing_dates() -> None:
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    frame = _listings().assign(perma_ticker=["P" + str(i) for i in range(9)])
+    frame.loc[6, "perma_ticker"] = ""
+    stamped = frame.assign(
+        ts=pd.Timestamp("2026-10-05", tz="UTC"),
+        session_date=date(2026, 10, 5),
+        knowledge_ts=pd.Timestamp("2026-10-05", tz="UTC"),
+        source="tiingo",
+        run_id="r",
+        price_currency="USD",
+    )
+    stamped["start_date"] = pd.to_datetime(stamped["start_date"]).dt.date
+    stamped["end_date"] = pd.to_datetime(stamped["end_date"]).dt.date.where(
+        stamped["end_date"].notna(), None
+    )
+    writer.write_table("instruments/listing_history", date(2026, 10, 5), "r", stamped)
+    members = pd.DataFrame(
+        {"index_name": ["SP500"], "ticker": ["AAA"], "start_date": [date(2000, 1, 3)],
+         "end_date": [None], "ts": [pd.Timestamp("2026-10-05", tz="UTC")]},
+    )  # fmt: skip
+    known = pd.Timestamp("2026-10-05", tz="UTC")
+    members = members.assign(session_date=date(2026, 10, 5), knowledge_ts=known)
+    members = members.assign(source="x", run_id="m")
+    writer.write_table("instruments/index_membership", date(2026, 10, 5), "m", members)
+    out, snapshot = listings_over(StoreReader(backend), date(2010, 1, 4), date(2012, 6, 1))
+    assert snapshot == date(2026, 10, 5)
+    by_id = out.set_index("instrument_id")
+    assert set(by_id.index) == {
+        "EQ:TIINGO:A", "EQ:TIINGO:C", "EQ:TIINGO:D",
+        "EQ:TIINGO:OLD", "EQ:TIINGO:NEW", "EQ:TIINGO:F",
+    }  # fmt: skip
+    assert by_id.loc["EQ:TIINGO:OLD", "reused"] and by_id.loc["EQ:TIINGO:NEW", "reused"]
+    assert not by_id.loc["EQ:TIINGO:A", "reused"]
+    assert by_id.loc["EQ:TIINGO:OLD", "end_date"] == date(2010, 12, 31)
+    assert by_id.loc["EQ:TIINGO:A", "end_date"] is None
+
+
+def test_listings_over_catches_a_listing_and_a_membership_between_month_starts() -> None:
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    now, day = pd.Timestamp("2026-10-05", tz="UTC"), date(2026, 10, 5)
+    rows = [  # id, ticker, exchange, start, end
+        ("EQ:TIINGO:SHORT", "SHT", "NASDAQ", date(2012, 3, 8), date(2012, 3, 20)),  # inside a month
+        ("EQ:TIINGO:MID", "MID", "NYSE", date(2000, 1, 3), None),  # a member 03-08..03-20 only
+        ("EQ:TIINGO:OUT", "OUT", "NYSE", date(2000, 1, 3), None),  # never a member
+    ]
+    frame = pd.DataFrame(
+        rows, columns=["instrument_id", "ticker", "exchange", "start_date", "end_date"]
+    )
+    frame = frame.assign(asset_type="Stock", price_currency="USD", perma_ticker="", ts=now,
+                         session_date=day, knowledge_ts=now, source="tiingo",
+                         run_id="l")  # fmt: skip
+    frame["end_date"] = frame["end_date"].astype(object).where(frame["end_date"].notna(), None)
+    members = pd.DataFrame({"index_name": ["SP500"], "ticker": ["MID"],
+                            "start_date": [date(2012, 3, 8)], "end_date": [date(2012, 3, 20)],
+                            "ts": [now], "session_date": [day], "knowledge_ts": [now],
+                            "source": ["x"], "run_id": ["m"]})  # fmt: skip
+    writer = StoreWriter(MemoryBackend())
+    writer.write_table("instruments/listing_history", day, "l", frame)
+    writer.write_table("instruments/index_membership", day, "m", members)
+    out, _ = listings_over(StoreReader(writer._backend), date(2012, 1, 4), date(2012, 6, 1))
+    assert set(out["instrument_id"]) == {"EQ:TIINGO:SHORT", "EQ:TIINGO:MID"}
+
+
+def test_listings_over_excludes_a_recycled_ticker_whose_membership_ended_before_the_listing() -> (
+    None
+):
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    now, day = pd.Timestamp("2026-10-05", tz="UTC"), date(2026, 10, 5)
+    frame = pd.DataFrame(
+        [("EQ:TIINGO:X2", "X", "NYSE", "Stock", date(2015, 1, 5), None)],
+        columns=["instrument_id", "ticker", "exchange", "asset_type", "start_date", "end_date"],
+    ).assign(price_currency="USD", perma_ticker="", ts=now, session_date=day,
+             knowledge_ts=now, source="tiingo", run_id="l")  # fmt: skip
+    members = pd.DataFrame(
+        {"index_name": ["SP500"], "ticker": ["X"], "start_date": [date(2000, 1, 3)],
+         "end_date": [date(2005, 12, 30)], "ts": [now], "session_date": [day],
+         "knowledge_ts": [now], "source": ["x"], "run_id": ["m"]}
+    )  # fmt: skip
+    writer = StoreWriter(MemoryBackend())
+    writer.write_table("instruments/listing_history", day, "l", frame)
+    writer.write_table("instruments/index_membership", day, "m", members)
+    out, _ = listings_over(StoreReader(writer._backend), date(2010, 1, 4), date(2020, 12, 31))
+    assert out.empty  # the old company's membership is not the new listing's

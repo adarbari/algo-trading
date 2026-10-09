@@ -60,7 +60,7 @@ detect = [{ string = "events/filing" }, { string = "sec_8k" }]
 
 [[responsibility]]
 id = "forward-outcomes"
-description = "Compute and store forward outcomes (ADR 0053 decision 3): for each window a session closes (S = T - h exchange sessions, horizons and benchmarks from the open edge documents plus the 20-session SPY default), every name in the universe at S with a bar at S measured from S's close to T's on bars split-adjusted as of T (return, excess over the benchmark, max favourable and adverse excursion, realised volatility; DELISTED by the reference snapshot's delisting date, else a reason), one run per window end into outcomes/instrument/forward_returns@v1, and its acceptance check; read back only through algotrade.data.outcomes, importable only from services/evaluation"
+description = "Compute and store forward outcomes (ADR 0053 decision 3): for each window a session closes (S = T - h exchange sessions, horizons and benchmarks from the open edge documents plus the 20-session SPY default), every name in the universe at S with a bar at S measured from S's close to T's on bars split-adjusted as of T (return, excess over the benchmark, max favourable and adverse excursion, realised volatility; DELISTED by the reference snapshot's delisting date or the listing history's last trading day on or before T, else a reason; before the first universe snapshot the names are the listing history's alive on S; horizons above 252 sessions only in a backfill), one run per window end into outcomes/instrument/forward_returns@v1, and its acceptance check; read back only through algotrade.data.outcomes, importable only from services/evaluation"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py",
     "apps/ingestion/algotrade_ingestion/tasks/derived/outcome_paths.py",
@@ -179,3 +179,17 @@ description = "Add the point-in-time columns (session_date, knowledge_ts, source
 owner = ["apps/ingestion/algotrade_ingestion/tasks/framework/run.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "stamp" }]
+
+[[responsibility]]
+id = "vendor-listing-perma-ticker"
+description = "Which vendor listing a Tiingo permaTicker belongs to (edges ED6): TiingoListingMeta fetches the fundamentals meta rows (one per listing that ever used a ticker) and match_perma assigns a permaTicker to a listing only by a unique ticker + active / inactive match (one listing and one row; the one open listing and the one active row; the one delisted listing and the one inactive row), otherwise it gets none (ambiguous / no_meta); the id then follows from equity_id, never from a guess"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",
+    "libs/sources/algotrade_sources/vendors/tiingo/meta.py",
+]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/listings/listing_history.py",  # the task calls the matcher and fills perma_ticker
+    "libs/sources/algotrade_sources/framework/registry.py",  # registers the adapter
+]
+section = "docs/adr/0018-figi-instrument-ids.md#decision"
+detect = [{ call = "match_perma" }, { call = "parse_meta" }]

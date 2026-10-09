@@ -154,7 +154,7 @@ def _company_details(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _listing_history(ctx: TaskContext, p: Params) -> RunRecord:
     return listing_history.ingest_listing_history(
-        ctx, ctx.sources["tiingo_listings"], session_of(p)
+        ctx, ctx.sources["tiingo_listings"], session_of(p), ctx.sources.get("tiingo_meta")
     )
 
 
@@ -261,6 +261,7 @@ def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("limit"),
         bool(p.get("include_tiers")),
         p.get("fill"),
+        bool(p.get("from_listings")),
     )
 
 
@@ -522,7 +523,7 @@ TASKS: dict[str, Task] = {
             listing_history,
             ("instruments/listing_history",),
             _listing_history,
-            sources=("tiingo_listings",),
+            sources=("tiingo_listings", "tiingo_meta"),
             settings="sources.toml [tiingo]",
             params=(SESSION,),
         ),
@@ -652,6 +653,14 @@ TASKS: dict[str, Task] = {
                     int,
                     "also the N most useful names of the universe without history (optionable, "
                     "then IV30, then dollar volume), within [tiingo] monthly_symbol_budget",
+                ),
+                Param(
+                    "from_listings",
+                    ("--from-listings",),
+                    None,
+                    "the names are the listings of the universe over since..until (by "
+                    "permaTicker; a reused ticker without one is never fetched), not the scope "
+                    "list",
                 ),
                 Param(
                     "include_tiers",

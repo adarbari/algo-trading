@@ -7,7 +7,7 @@ A commit (ADR 0022) happens under that lock, so it is atomic and never left half
 """
 
 import threading
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, date, datetime
 
 import pandas as pd
@@ -288,6 +288,11 @@ class MemoryRuns:
     def find(self, job: str, session_date: date | None = None) -> list[RunRecord]:
         records = [RunRecord.from_json(t) for t in self._data.values()]
         hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]
+        return sorted(hits, key=lambda r: r.started_at)
+
+    def find_many(self, jobs: Collection[str], first: date, last: date) -> list[RunRecord]:
+        records = [RunRecord.from_json(t) for t in self._data.values()]
+        hits = [r for r in records if r.job in jobs and first <= r.session_date <= last]
         return sorted(hits, key=lambda r: r.started_at)
 
 
