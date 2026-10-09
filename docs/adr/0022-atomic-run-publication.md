@@ -1,6 +1,6 @@
 # ADR 0022: A run's table writes publish atomically
 
-**Status:** accepted (2026-10-03). Extends [0007](0007-point-in-time-data.md) (how runs
+**Status:** accepted (2026-10-03); the derived history copy is outside a run's publish and has its own staleness rule ([0060](0060-history-copy.md)). Extends [0007](0007-point-in-time-data.md) (how runs
 combine, what `as_of` sees) and [0010](0010-jobs-model.md) (runs and recovery). Code:
 `storage/backends/` (`local_index.py`, `memory.py`, `run_selection.py`),
 `tasks/framework/run.py` (`IngestRun`), `storage/tables/result_writer.py`.

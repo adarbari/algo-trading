@@ -109,10 +109,10 @@ def keep_columns(columns: Iterable[str]) -> set[str]:
     return {*columns, *COMMON, KNOWN_FROM, "instrument_id", "ts", "change"}
 
 
-def parquet_bytes(data: pa.Table) -> bytes:
+def parquet_bytes(data: pa.Table, row_group_size: int = ROW_GROUP_SIZE) -> bytes:
     sink = io.BytesIO()
     pq.write_table(
-        data, sink, compression="zstd", row_group_size=ROW_GROUP_SIZE, write_page_index=True
+        data, sink, compression="zstd", row_group_size=row_group_size, write_page_index=True
     )
     return sink.getvalue()
 
