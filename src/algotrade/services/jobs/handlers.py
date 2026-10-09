@@ -22,7 +22,7 @@ from algotrade.features.site import site_features
 from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.harness import edge_universe, evaluate_edge
-from algotrade.services.evaluation.cross_section.random_picks import RANDOM
+from algotrade.services.evaluation.cross_section.random_picks import DEFAULT_DRAWS, RANDOM
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     historical_identity,
@@ -114,7 +114,8 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     default our IV30), ``split_from`` (ISO date: the run's test split, over the user's and the
     edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory), ``extra_baselines``
     (screener ids scored as baselines besides the edge's own: the golden evaluation's, never a
-    real edge document's). The harness's rows land in ``results/edge_eval``."""
+    real edge document's), ``random_draws`` (random picks per out-of-sample session; default
+    1,000). The harness's rows land in ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -133,6 +134,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         as_of,
         **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
         split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
+        random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
     )
     record = write_edge_eval(ctx.resources["writer"], evaluation, now)
     rows = edge_eval_frame(evaluation, record.run_id, now)

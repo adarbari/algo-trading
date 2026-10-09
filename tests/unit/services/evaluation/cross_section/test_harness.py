@@ -842,7 +842,7 @@ def test_random_picks_need_an_out_of_sample_slice_and_are_drawn_only_there() -> 
     ev = run(build_world(), edge(frozen_from="2026-09-04"))
     (found,) = ev.random_picks
     assert (found.edge_variant, found.horizon) == ("main", 2)
-    assert len(found.draws) == 1000  # random_draws, the site default
+    assert len(found.draws) == 1000  # DEFAULT_DRAWS
     first = found.draws[0]
     assert (first.slice_kind, first.sessions, first.picks, first.eligible) == ("draw", 2, 10, 40)
     # Names earn (i - 9.5)%: the screener's top five always hit (lift 2.0); random fives do not.

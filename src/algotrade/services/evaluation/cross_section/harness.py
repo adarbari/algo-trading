@@ -39,7 +39,6 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN, Edge, job_name
 from algotrade.config.edges.evaluation import load_evaluation
-from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -80,6 +79,7 @@ from algotrade.services.evaluation.cross_section.picks import (
     screen_variant,
 )
 from algotrade.services.evaluation.cross_section.random_picks import (
+    DEFAULT_DRAWS,
     RandomStat,
     generator,
     pool_random,
@@ -546,11 +546,13 @@ def evaluate_edge(
     as_of: datetime,
     iv_field: str = IMPLIED_VOL_FIELD,
     split_from: date | None = None,
+    random_draws: int = DEFAULT_DRAWS,
 ) -> EdgeEvaluation:
     """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
     horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
     one implied-vol field of the run (an outcome that reads one; its source and licence are
-    recorded); ``split_from``: the run's own split over the user's and the edge's. Raises
+    recorded); ``split_from``: the run's own split over the user's and the edge's;
+    ``random_draws``: random picks drawn per out-of-sample session (``random_picks.py``). Raises
     ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon."""
     variants = _variants(configs, user, edge)
@@ -576,8 +578,7 @@ def evaluate_edge(
         for horizon in scope.edge.outcome.horizon_sessions
     ]
     hashed = run_hash(edge, variants, start, end, as_of, iv_field, split)
-    draws = load_verdict(configs).random_draws
-    spec = None if split is None else _RandomSpec(split, draws, hashed)
+    spec = None if split is None else _RandomSpec(split, random_draws, hashed)
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec)
     results: list[VariantResult] = []
     randoms: list[RandomPicks] = []
