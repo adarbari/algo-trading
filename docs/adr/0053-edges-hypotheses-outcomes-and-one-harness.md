@@ -376,6 +376,7 @@ through `fields_view` / `select` / `screen_session`): reads, backtests and the A
 ## Amendment (2026-10-09, ADR 0061): the grain is `forward_returns@v2`
 A window that needs a bar `bar-quality` flagged is `outcome_status = UNMEASURED` with
 `outcome_reason = BAD_BAR` and null returns (the three return columns are nullable); the harness
-counts it `excluded_coverage` ("unmeasured, not a miss"). The table name carries the new version,
+counts it per pick (`excluded_unmeasured`, `unmeasured_base`: "unmeasured, not a miss"), and a
+session is `excluded_coverage` only when more than half its picks are UNMEASURED. The table name carries the new version,
 every reader follows it (`data/outcomes`, `services/evaluation`, the winners labels), and the v1
 table is no longer read.

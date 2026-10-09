@@ -33,12 +33,13 @@ backfill chunk are read once (``CHUNK`` window ends at a time).
 
 The acceptance check (``check_outcomes``) holds the run to its own count: every eligible name has
 a row or a reason, and the rows are stored; and no COMPLETE row of a window of at most
-``BOUNDED_HORIZON`` sessions returns more than ``[quality] max_bounded_return`` (a bad bar that no
-flag explains: the row would not be UNMEASURED).
+``BOUNDED_HORIZON`` sessions returns more than ``[quality] max_bounded_return`` across a bar the
+detector would flag but no flag covers (the row would not be UNMEASURED); a rise that clears the
+bound with no suspect bar (a real squeeze) is a WARN naming the names.
 """
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -50,14 +51,16 @@ from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import close_time, next_session, sessions_between, sessions_ending
 from algotrade.data import StoreReader
+from algotrade.data.events import read_events
 from algotrade.data.listings.universe import delisted_by, universe_asof
-from algotrade.data.prices import SessionBars, bars_with_flags, session_bars
+from algotrade.data.prices import SessionBars, bars_with_flags, raw_bars, session_bars
 from algotrade.data.reference import instruments, load_universe
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade_ingestion.tasks.derived.outcome_paths import Window, window_rows
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.maintenance.bar_quality import bad_bars, compact
 from algotrade_ingestion.tasks.maintenance.quality import Check
 
 TASK = "outcomes"
@@ -226,7 +229,8 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
     runs = [r for r in reader.runs(TASK, session) if r.status == RunStatus.COMPLETE]
     if not runs:
         return [Check("outcomes", "FAIL", f"no complete outcomes run for {session}")]
-    problems = []
+    problems: list[str] = []
+    warnings: list[str] = []
     for key, value in sorted(runs[-1].stats.items()):
         if not (key.startswith("h") and isinstance(value, dict)):
             continue
@@ -251,14 +255,37 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
                 (ours["outcome_status"] == "COMPLETE") & (ours["fwd_return"] > s.max_bounded_return)
             ]
             if len(huge):
-                names = ", ".join(sorted(set(huge["instrument_id"].astype(str)))[:SHOWN])
-                problems.append(
-                    f"{key}: {len(huge)} COMPLETE rows returned over {s.max_bounded_return:+.0%}"
-                    f" in {horizon} sessions with no bar flag ({names}): run bar-quality"
-                )
+                ids = sorted(set(huge["instrument_id"].astype(str)))
+                bad = _unflagged_bad_bars(reader, ids, start, session, s)
+                if bad:
+                    problems.append(
+                        f"{key}: {len(bad)} COMPLETE rows over {s.max_bounded_return:+.0%} in "
+                        f"{horizon} sessions across a bar the detector would flag "
+                        f"({', '.join(bad[:SHOWN])}): run bar-quality"
+                    )
+                real = [i for i in ids if i not in bad]
+                if real:  # a genuine squeeze looks the same: named, never a failure
+                    warnings.append(
+                        f"{key}: {len(real)} rows over {s.max_bounded_return:+.0%} in {horizon} "
+                        f"sessions with no suspect bar ({', '.join(real[:SHOWN])})"
+                    )
     if problems:
         return [Check("outcomes", "FAIL", "; ".join(problems))]
-    return [Check("outcomes", "PASS", f"every eligible name has a row or a reason for {session}")]
+    detail = f"every eligible name has a row or a reason for {session}"
+    if warnings:
+        return [Check("outcomes", "WARN", f"{detail}; {'; '.join(warnings)}")]
+    return [Check("outcomes", "PASS", detail)]
+
+
+def _unflagged_bad_bars(
+    reader: StoreReader, ids: Sequence[str], start: date, end: date, s: SourcesSettings
+) -> list[str]:
+    """The ``ids`` whose stored bars over ``start..end`` hold a bar ``bar-quality``'s detector
+    flags (``bad_bars``, flagged or not yet): a return over it is a bad datum, not a squeeze."""
+    bars = compact(raw_bars(reader, "1d", start, end, list(ids), None, ("high", "low", "close")))
+    day = timedelta(days=30)  # slack for the split window
+    splits = read_events(reader, "events/split", start - day, end + day, list(ids)).frame
+    return sorted(set(bad_bars(bars, splits, s)["instrument_id"].astype(str)))
 
 
 def _eligible(reader: StoreReader, start: date) -> set[str]:

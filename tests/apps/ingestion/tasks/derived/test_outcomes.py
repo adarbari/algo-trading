@@ -241,3 +241,15 @@ def test_outcome_rows_bounded() -> None:
     _flag(writer, reader, "EQ:A", END)  # flagged: the row becomes UNMEASURED, nothing to explain
     compute_outcomes(task_ctx(writer), END)
     assert [c.status for c in check_outcomes(reader, END, settings)] == ["PASS"]
+
+
+def test_a_real_squeeze_warns_and_never_fails_the_acceptance() -> None:
+    """A +1,600% run in a few sessions with no jump beyond the detector's bound (a GME-style
+    squeeze) is a WARN naming the name: the row stays COMPLETE."""
+    squeeze = [100.0] * (N - 4) + [200.0, 400.0, 800.0, 1700.0]
+    writer, reader, _ = _store(squeeze)
+    compute_outcomes(task_ctx(writer), END)
+    [check] = check_outcomes(reader, END, task_ctx(writer).settings)
+    assert check.status == "WARN" and "EQ:A" in check.detail and "no suspect bar" in check.detail
+    part = _partition(reader, sessions_ending(END, 7)[0], END).set_index("instrument_id")
+    assert part.loc["EQ:A", "outcome_status"] == "COMPLETE"
