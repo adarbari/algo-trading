@@ -9,7 +9,7 @@ Read first: `docs/architecture.md`, ADRs 0001, 0002 and 0008, and `docs/trading-
 
 **Ownership check (ADR 0019):** a strategy only maps a `MarketView` to target weights.
 Data loading, adjustment, selection, sizing, costs and run records are owned elsewhere
-(`architecture/ownership.toml`); reuse them through `services/backtests/run.py`, never copy
+(`architecture/*_ownership.toml`); reuse them through `services/backtests/run.py`, never copy
 them. Shared signal maths belongs in one helper: `make dupes` must pass.
 
 0. **Where it goes:** `strategies/trading/`; shared maths in `quant/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).

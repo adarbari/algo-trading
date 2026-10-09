@@ -17,7 +17,7 @@ that matter. Long docs (`docs/architecture.md`, `docs/configuration.md`,
 
 When planning, return:
 
-1. The owner of each responsibility touched (`architecture/ownership.toml`), and any new
+1. The owner of each responsibility touched (`architecture/*_ownership.toml`), and any new
    responsibility, folder, table or ADR the change needs.
 2. Ordered steps small enough for an `implementer` to do without design choices, each with
    its files and the check that proves it.

@@ -1,0 +1,73 @@
+# Ownership registry (ADR 0019), quant: pure numerics (quant/).
+# Every responsibility has exactly ONE owner. The registry is every architecture/*_ownership.toml
+# but web_ownership.toml, one file per layer: an entry lives in the file whose `scope` holds its
+# first owner (the longest prefix wins), sorted by id. Fields and detect rules: the docstring of
+# scripts/check_ownership.py. Before writing code that does X, find X
+# (`grep <keyword> architecture/*ownership.toml`) and extend its owner; a new responsibility
+# needs an entry + owner in the same PR (.claude/skills/add-responsibility).
+
+scope = ["src/algotrade/quant/"]
+
+[[responsibility]]
+id = "implied-vol"
+description = "Invert option prices to implied volatility, with a failure code per element"
+owner = ["src/algotrade/quant/implied_vol.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#implied-volatility"
+detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|bisect|fsolve)$" }]
+
+[[responsibility]]
+id = "option-pricing"
+description = "European option prices and Greeks (Black-Scholes-Merton, continuous q and r), delta strikes and out-of-the-money probabilities (ADR 0053 expires_otm), and the normal CDF and its inverse they use"
+owner = ["src/algotrade/quant/black_scholes.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#model"
+detect = [{ import = "scipy.stats" }, { call = "erfc" }, { call = "erf" }]
+
+[[responsibility]]
+id = "quant-covariance"
+description = "Cross-asset stress from a rolling covariance of a returns panel: Kritzman-Li turbulence (Mahalanobis distance, eigen pseudo-inverse), the absorption ratio and its standardised shift (eigenvalues only)"
+owner = ["src/algotrade/quant/covariance.py"]
+section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
+detect = [{ call_regex = "(^|\\.)linalg\\.(eigh|eigvalsh|eig|eigvals|pinv|svd|inv)$" }, { call = "cov" }]
+
+[[responsibility]]
+id = "quant-edge-statistics"
+description = "The statistics that judge a screener's picks (ADR 0053): lift, Hedges' g, decile spread and its t, Sharpe, the deflated Sharpe ratio and the probability of backtest overfitting (CSCV)"
+owner = ["src/algotrade/quant/edge_statistics.py"]
+allowed = ["src/algotrade/services/evaluation/cross_section/measures.py"]  # the harness calls these statistics (ADR 0053)
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "decile_spread" }, { call = "standardised_effect" }]
+
+[[responsibility]]
+id = "quant-probit"
+description = "The probit model: maximum-likelihood fit by Newton-Raphson with step halving (coefficients, convergence, log-likelihood) and prediction Phi(X b); the bear-state probit's maths"
+owner = ["src/algotrade/quant/probit.py"]
+section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
+detect = [{ import = "statsmodels" }, { call_regex = "(^|\\.)(Probit|probit)$" }]
+
+[[responsibility]]
+id = "quant-turning-points"
+description = "Bull and bear market dating of a level series (Pagan-Sossounov after Bry-Boschan, the Lunde-Timmermann threshold filter) into phases over array indices, and the running drawdown"
+owner = ["src/algotrade/quant/turning_points.py"]
+section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
+detect = [{ call_regex = "(^|\\.)(find_peaks|argrelextrema|argrelmax|argrelmin)$" }]
+
+[[responsibility]]
+id = "rate-conventions"
+description = "Treasury par yield -> continuous rate, tenor labels -> days, yield-curve interpolation"
+owner = ["src/algotrade/quant/rates.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#rates"
+detect = [{ call = "log1p" }, { call = "interp" }]
+
+[[responsibility]]
+id = "realized-vol"
+description = "Realised volatility estimators over rolling windows (close-to-close, Parkinson, Garman-Klass, Yang-Zhang), annualised, over quant.rolling's windows"
+owner = ["src/algotrade/quant/realized_vol.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#realised-volatility"
+detect = [{ call = "_annualise" }]
+
+[[responsibility]]
+id = "rolling-statistics"
+description = "Rolling statistics over sessions x instruments arrays, point in time (row i describes the window ending at session i; NaN until full and on any gap, never a shorter window): rolling mean, sample variance, max and min, and the trailing run of a condition; the realised-vol estimators and the feature groups build on them"
+owner = ["src/algotrade/quant/rolling.py"]
+section = "docs/data/technical.md#shared-rules"
+detect = [{ call = "sliding_window_view" }]

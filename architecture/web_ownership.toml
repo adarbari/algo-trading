@@ -1,6 +1,7 @@
 # Web ownership registry (ADR 0019, ADR 0025): the web app's responsibilities, each with ONE
-# owner, split from ownership.toml by kind (that file holds the Python responsibilities and the
-# stored tables). Before writing web code that does X, find X here and extend its owner.
+# owner, split from the Python registry by kind (the Python responsibilities are in the other
+# architecture/*_ownership.toml files, one per layer; the stored tables in tables.toml).
+# Before writing web code that does X, find X here and extend its owner.
 #
 # ADR 0025. TypeScript has no AST detect rules here: each web responsibility names the lint
 # rule or check that keeps it inside its owner (`enforced_by`); tests/architecture/

@@ -17,7 +17,7 @@ operations through codegen (`apps/web/codegen.ts`). There is no REST read path t
 
 ## Step 1: which object owns it
 
-`grep -n "domain-read-model" -A3 architecture/ownership.toml` and the object table in
+`grep -n "domain-read-model" -A3 architecture/*_ownership.toml` and the object table in
 `docs/api/read-model.md` ("The domain objects"). Find the object the field belongs to
 (`Instrument`, `Screener`, `ScreenerRun`, `ScreenResult`, `Ideas`, ...). No object fits ->
 **stop, use `.claude/skills/add-domain-object`**.

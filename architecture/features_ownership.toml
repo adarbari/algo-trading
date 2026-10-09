@@ -1,0 +1,61 @@
+# Ownership registry (ADR 0019), features: the feature store's computation (features/).
+# Every responsibility has exactly ONE owner. The registry is every architecture/*_ownership.toml
+# but web_ownership.toml, one file per layer: an entry lives in the file whose `scope` holds its
+# first owner (the longest prefix wins), sorted by id. Fields and detect rules: the docstring of
+# scripts/check_ownership.py. Before writing code that does X, find X
+# (`grep <keyword> architecture/*ownership.toml`) and extend its owner; a new responsibility
+# needs an entry + owner in the same PR (.claude/skills/add-responsibility).
+
+scope = ["src/algotrade/features/"]
+
+[[responsibility]]
+id = "feature-applicability"
+description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable and security_type facts and the company snapshot's SIC): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADRs 0042, 0045); and the declared explanations of a null (null_status with illiquid_statuses / explained_statuses, the closed NullReason) behind ILLIQUID and EXPLAINED (ADR 0046)"
+owner = ["src/algotrade/features/framework/feature.py"]
+allowed = [
+    "src/algotrade/services/read/instruments/features.py",  # NOT_APPLICABLE / ILLIQUID / EXPLAINED on a read
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # which names a feature is expected for
+]
+section = "docs/adr/0042-not-applicable-and-illiquid-values.md#decision"
+detect = [{ call = "not_applicable" }]
+
+[[responsibility]]
+id = "feature-expressions"
+description = "The expression language for features: lexing, parsing, type checking and vectorised evaluation of a formula over feature columns (null semantics, Kleene logic); never Python eval"
+owner = ["src/algotrade/features/expressions/*"]
+section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
+detect = [
+    { call = "parse_formula" },
+    { call = "check_formula" },
+    { call = "evaluate_formula" },
+    { call = "eval" },
+    { call = "exec" },
+]
+
+[[responsibility]]
+id = "feature-metadata"
+description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group, each expression feature one built from its site definition; the registry and the FeatureSet index them and catalogue.py renders docs/data/features.md (ADR 0023); guide.py renders docs/data/field-guide.md from the site field guide (ADR 0041)"
+owner = [
+    "src/algotrade/features/framework/feature.py",
+    "src/algotrade/features/rollups/*",
+    "src/algotrade/features/expressions/definitions.py",
+    "src/algotrade/features/registry.py",
+    "src/algotrade/features/catalogue.py",
+    "src/algotrade/features/guide.py",  # renders docs/data/field-guide.md from the site field guide (ADR 0041)
+]
+section = "docs/adr/0023-feature-store.md#decision"
+detect = [{ call = "Feature" }, { string = "docs/data/features.md" }]
+
+[[responsibility]]
+id = "rollup-computation"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0055), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity. The earnings report window (the E-1 to E+1 excess return, pre-event ADV and volume ratio) is computed once, in earnings_reaction@v1 (corporate/); EV2's event_reaction@v1 must read that group, never recompute the window"
+owner = [
+    "src/algotrade/features/framework/*",
+    "src/algotrade/features/registry.py",
+    "src/algotrade/features/rollups/*",
+    "src/algotrade/features/expressions/feature_set.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py",  # the market entity's task
+]
+section = "docs/data/layers.md#rollups-as-built"
+detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "FeatureGroup" }]

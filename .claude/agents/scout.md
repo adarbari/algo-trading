@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Cheap read-only lookup. Use for finding where something lives (the owner in architecture/ownership.toml, the folder in architecture/layout.toml, a symbol, a test, a doc section), sweeping many files, or summarising one section of a long doc. Returns paths, line numbers and short excerpts, never whole files. Never edits.
+description: Cheap read-only lookup. Use for finding where something lives (the owner in architecture/*_ownership.toml, the folder in architecture/layout.toml, a symbol, a test, a doc section), sweeping many files, or summarising one section of a long doc. Returns paths, line numbers and short excerpts, never whole files. Never edits.
 model: haiku
 tools: Read, Grep, Glob, Bash
 ---
@@ -16,7 +16,7 @@ Rules:
 - Never open generated or bulk files: `uv.lock`, `apps/web/package-lock.json`,
   `apps/api/openapi.json`, `datasets/golden/**`, `tests/fixtures/**`, `**/__screenshots__/**`.
   Grep `docs/data/features.md` instead of reading it.
-- Ownership questions: grep `architecture/ownership.toml` for the responsibility and quote
+- Ownership questions: grep `architecture/*_ownership.toml` for the responsibility and quote
   the entry. Folder questions: grep `architecture/layout.toml` (web folders: `architecture/web_layout.toml`).
 
 Answer format (keep it under 30 lines):

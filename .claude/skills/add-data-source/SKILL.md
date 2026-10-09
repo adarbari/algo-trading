@@ -21,7 +21,7 @@ ingest loop (`tasks/framework/run.py`, `IngestRun`). **Never pace, sleep or buil
 yourself**: the source takes one `Http` client and calls `http.get(url)`. Keep every vendor detail (file
 names, request keys, response fields) inside `sources/vendors/<vendor>/`; never import
 `algotrade.storage` (contract R4). New `sources.toml` keys are typed in
-`src/algotrade/config/site/settings.py`. Look these up in `architecture/ownership.toml`; `make ownership`
+`src/algotrade/config/site/settings.py`. Look these up in `architecture/*_ownership.toml`; `make ownership`
 must pass with `architecture/known_violations.toml` still empty.
 
 0. **Where it goes:** `libs/sources/algotrade_sources/vendors/<vendor>/` (new folder, covered by the `vendors/*` entry) (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).

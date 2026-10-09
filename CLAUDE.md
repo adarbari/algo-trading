@@ -256,7 +256,7 @@ Token habits (every session):
   its limit).
 - **Grep, then read the lines you need.** Long docs (`docs/architecture.md`,
   `docs/configuration.md`, `docs/data/layers.md`) are read by section; owners by grepping
-  `architecture/ownership.toml`; the feature catalogue `docs/data/features.md` by grep.
+  `architecture/*_ownership.toml`; the feature catalogue `docs/data/features.md` by grep.
 - **Never open generated or bulk files**: `uv.lock`, `apps/web/package-lock.json`,
   `apps/api/openapi.json`, `datasets/golden/**`, `tests/fixtures/**`, `__screenshots__/`.
 - **Verify narrow first**: `make changed` (the mirrored tests of every file changed vs

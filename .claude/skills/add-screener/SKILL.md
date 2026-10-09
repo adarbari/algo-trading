@@ -22,7 +22,7 @@ Read first: ADR 0029 (rule screens), ADRs 0007 and 0008, and `docs/data/storage.
 auditing coverage, writing results and run records belong to `services/screening/run.py`;
 running it belongs to the job runner (`services/jobs`, kind `screen`; nightly submits
 `screen` jobs). Shared filters live in one helper, not copies: `make dupes` must pass.
-Owners are listed in `architecture/ownership.toml`.
+Owners are listed in `architecture/*_ownership.toml`.
 
 0. **Where it goes:** `strategies/screeners/` (rule screens: `strategies/screeners/rules/`); running it is `services/screening/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Location:** `src/algotrade/strategies/screeners/<name>.py`. Implement the screener

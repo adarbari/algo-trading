@@ -440,7 +440,7 @@ ignore_imports = ["algotrade.services.text_model.usage -> algotrade.storage.tabl
 allow_indirect_imports = true  # the API reaches it only through services.text_model
 
 # ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
-# (no `pending_contract` remains in architecture/ownership.toml; a fitness test keeps it so).
+# (no `pending_contract` remains in architecture/*_ownership.toml; a fitness test keeps it so).
 
 [[tool.importlinter.contracts]]
 name = "R4: vendor sources never import storage or data (standard frames carry their own schema)"

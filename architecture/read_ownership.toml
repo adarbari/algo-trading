@@ -1,0 +1,101 @@
+# Ownership registry (ADR 0019), read: the read model and the graph that serves it (ADRs 0036-0038).
+# Every responsibility has exactly ONE owner. The registry is every architecture/*_ownership.toml
+# but web_ownership.toml, one file per layer: an entry lives in the file whose `scope` holds its
+# first owner (the longest prefix wins), sorted by id. Fields and detect rules: the docstring of
+# scripts/check_ownership.py. Before writing code that does X, find X
+# (`grep <keyword> architecture/*ownership.toml`) and extend its owner; a new responsibility
+# needs an entry + owner in the same PR (.claude/skills/add-responsibility).
+# Built over read-model PRs 2-10b (docs/api/read-model.md "Migration plan"); services/explore,
+# the legacy page reads, was deleted in PR 10b. A new rule is added with the code it guards
+# (never parked in known_violations.toml).
+
+scope = ["src/algotrade/services/read/", "apps/api/algotrade_api/graphql/"]
+
+[[responsibility]]
+id = "availability-causes"
+description = "Why a fact is not available, and who may know (ADR 0056, services/read/availability/): the public UnavailableKind and Unavailable (a kind, the catalogue features it hides, the Guide glossary term of the kind) and the admin-only Cause chain (source -> step -> table -> features); explain(ctx, leaf) expands a leaf from stored facts only (feature -> group table -> inputs; table -> the nightly step that wrote it, from the run record's recorded step tables). Every read-model construction site builds the leaf it knows; a trader is served the kind and the feature names, never a table, vendor, step or error text (GraphQL AdminCause, REST redact)"
+owner = ["src/algotrade/services/read/availability/*"]
+allowed = [
+    "src/algotrade/services/read/*",  # every construction site of an Unknown builds its leaf with table_cause / feature_cause / run_cause
+    "apps/api/algotrade_api/*",  # the serving layer calls explain behind AdminCause and redact
+]
+section = "docs/adr/0056-role-scoped-causes.md#decision"
+detect = [{ call = "explain" }, { call = "unavailable_tables" }]
+
+[[responsibility]]
+id = "domain-read-model"
+description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards, label bands, reference episodes and NBER recessions, and per episode the signal timing: when each indicator and the screener gate flagged and cleared from each session's own stored verdict over a ranged window ending at the session, services/read/regime/) and the market entity (services/read/market/: its values by catalogue name and the bucketed history of its stored fields), read from the market-entity feature groups by catalogue name. The edge evaluation reads (ADR 0053, services/read/evaluation/): Edge (the documents with their status), EdgeRun / EdgeRow (committed runs of results/edge_eval read BY RUN, never by session: the run's own partition, runId, range, split, knowledgeTs and asOf disclosed; the canonical run is the latest site run at the edge's frozen_from) and a screener's TrackRecord (the canonical run's frozen slice only, never an exploratory run). The text-model usage read (ADR 0058, services/read/ops/usage.py: LlmUsage over usage/llm_calls by a date range ending at the exchange date, the one read besides outcomes that is not one session; session-free). The Admin harness runs read (ADR 0053, services/read/ops/harness_runs.py: HarnessRun, every edge evaluation run record of any status with its trial-log figures, session-free, and one run's own rows through the evaluation read). The event reads (ADR 0050, services/read/events/): InstrumentEvents (the events ahead: own and a fund's reference earnings by catalogue name, the macro releases known by the session, the market-structure days from the exchange calendar; the 8-K filings; the expiry ladder over the session's chain with its spans and clear state; the fund reference by catalogue name) and the cross-name EventCalendar (its scope list through services.events). A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
+owner = ["src/algotrade/services/read/*"]
+allowed = [
+    "src/algotrade/data/*",  # the generic table reads (R1)
+    "src/algotrade/features/*",  # feature groups name their own tables
+    "src/algotrade/core/model/fields.py",  # ROLLUP_TABLE_PREFIX: catalogue names -> tables, in one place
+    "src/algotrade/storage/tables/schemas.py",  # declares the rollups/instrument/* and rollups/market/* table families
+    "src/algotrade/strategies/screeners/*",  # a screener declares the feature table it reads through core.views (engine input, not a display read)
+    "apps/ingestion/*",  # producers and the verification checks name the tables they write or compare
+]
+section = "docs/api/read-model.md#the-domain-objects"
+detect = [{ string_prefix = "rollups/instrument/" }, { string_prefix = "rollups/market/" }, { call = "chain_expiries" }]
+
+[[responsibility]]
+id = "graphql-schema"
+description = "The GraphQL read layer (ADR 0037): the Strawberry schema at POST /graphql, scalars (FeatureName, Date, JSON), error codes, limits, request context, dataloaders and the thin types over services.read; the committed snapshot apps/api/schema.graphql (from read-model PR 4)"
+owner = ["apps/api/algotrade_api/graphql/*"]
+section = "docs/api/read-model.md#graphql-conventions"
+detect = [{ import = "strawberry" }]
+
+[[responsibility]]
+id = "guide-read"
+description = "The Guide's read objects: the index of every entry kind, the field page with what the server derives for it (related fields from the guide entry's text and the formula's inputs, the site playbooks that use the field with each rule as text, the situations that fool it), the playbook page (prose, criteria table with what each asks, related playbooks, the situations that fool its fields) and the situation page (by slug; the playbooks whose fields it fools), the regime indicator page (a card's explanation without a session value) and episode page (by key; the cards whose before-line means it, one rule: before_episode), the glossary term and Start here pages (written.py; links titled from the one list of Guide entries), the one Guide search (search.py: every entry kind, ranked exact name, name or title, intent or theme, prose; grouped by kind; computed per request, no stored index), and Guide prose split at the catalogue names it mentions (the browser parses no text, ADR 0038), ADR 0051; session-free, over the site configs and the caller's catalogue"
+owner = ["src/algotrade/services/read/guide/*"]
+section = "docs/ui/guide.md#5-the-rule-and-its-checks"
+detect = [{ call = "load_guide_sections" }, { call = "site_playbooks" }, { call = "rule_text" }, { call = "load_guide_playbooks" }, { call = "link_prose" }, { call = "guide_entries" }]
+
+[[responsibility]]
+id = "ideas-ranking"
+description = "The Ideas list (ADR 0029): one row per ticker over the user's rule screens' runs for exactly the session (ADR 0036: a screener with no run for it is NOT_RUN, no lookback), listing each screener that picked it, ranked by the user's screener priority (preferences.toml ideas.priority), then score, tie-break and instrument id; per-screener picked counts and best picks over the whole run; never recomputes a screen (read-model PR 5)"
+owner = ["src/algotrade/services/read/screens/ideas.py"]
+allowed = ["apps/api/algotrade_api/graphql/*"]  # Query.ideas serves it (one loader call per resolver)
+section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
+detect = [{ call = "load_ideas" }]
+
+[[responsibility]]
+id = "scalar-coercion"
+description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs. Callers of the one coercion are allowed; re-implementations are not: a private _float / _text / _num helper is one (read-model PR 8), except where it parses a vendor payload, formats text or does arithmetic rather than coerce a stored value for display (the allowed entries below say which)"
+owner = ["src/algotrade/services/read/values.py"]
+allowed = [
+    "src/algotrade/services/read/*",  # the loaders call the one coercion for every value they return (docs/api/read-model.md "Values and UNKNOWN")
+    "src/algotrade/services/views.py",  # re-exports to_scalar as to_value (runs) and coerces the FeatureView through it
+    "src/algotrade/services/preview/*",  # the Builder's dry runs show values through the one coercion, as the nightly run stores them
+    "src/algotrade/services/screening/exports.py",  # run exports serialise through the same coercion, so runs and reads agree
+    "src/algotrade/services/selection.py",  # the selection's field values, same coercion
+    "src/algotrade/services/screening/rule_results.py",  # the rule-screen writer types value_num through the one coercion (_num calls to_value)
+    "src/algotrade/services/screening/regime.py",  # the session's market values for the regime gate (ADR 0049), same coercion as the FeatureView
+    "src/algotrade/services/backtests/market.py",  # a backtest's market feature values (ADR 0049), same coercion as screen runs
+    "src/algotrade/storage/configs/writer.py",  # _float formats a TOML float literal (text out, not a stored value in)
+    "src/algotrade/features/rollups/options/option_liquidity.py",  # _num is the rollup's arithmetic rule (no open interest / volume counts as 0), not display coercion
+    "libs/sources/algotrade_sources/vendors/*",  # vendor payload parsers (_float / _text read a vendor's JSON, XML or CSV, never a stored value)
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/*",  # the nightly email renderer and its timing lines format run-record stats as text
+]
+section = "docs/api/read-model.md#values-and-unknown"
+detect = [{ call = "to_value" }, { call = "to_scalar" }, { call_regex = "^_(float|text|num)$" }]
+
+[[responsibility]]
+id = "session-resolution"
+description = "Which partition a read sees (ADR 0036): resolve one Session (requested, else the latest with bars) and read session-grain tables for exactly that date, UNKNOWN otherwise; snapshot tables through data.reference.snapshot with the snapshot date disclosed. services/read/session.py resolves (resolve_session, the table grains); services/read/context.py calls it once per request (open_context) and reads session partitions (partition); nothing else may (services/explore, which picked its own partition by six rules, the bug ADR 0036 fixes, was deleted in read-model PR 10b)"
+owner = [
+    "src/algotrade/services/read/session.py",
+    "src/algotrade/services/read/context.py",
+]
+allowed = [
+    "src/algotrade/data/reference.py",  # the snapshot-grain primitive (snapshot-selection, ADR 0007's one rule)
+    "src/algotrade/services/ondemand/screens.py",  # a write: an on-request run targets the latest session (ADR 0033), outside read strictness (ADR 0036 decision 5)
+]
+section = "docs/api/read-model.md#session-resolution"
+detect = [
+    { call = "partition_for" },
+    { call = "latest_session" },
+    { call = "latest_date" },
+    { call = "rollup_row" },
+    { call = "resolve_session" },
+]
