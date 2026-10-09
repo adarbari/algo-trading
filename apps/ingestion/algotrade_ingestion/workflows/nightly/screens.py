@@ -32,12 +32,12 @@ def _summary(config_id: str, job: JobRecord) -> dict[str, Any]:
 
 
 def _optional_warnings(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """One WARN check per screener that went without an optional source's table."""
+    """One WARN check per screener that went without a table no field needed."""
     return [
         {
             "name": "optional_sources",
             "status": "WARN",
-            "detail": f"{s['config']} ran without {', '.join(missing)} (optional)",
+            "detail": f"{s['config']} ran without {', '.join(missing)}",
         }
         for s in summaries
         if (missing := s.get("missing_optional_tables"))

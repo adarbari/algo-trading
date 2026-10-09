@@ -63,8 +63,7 @@ A field the screen reads is *covered* for a session when it can have a value fro
 A stored field is covered when its table has rows, or when its group is optional. A materialised
 expression is covered when its own table has rows. A virtual expression is covered when all its
 operands are covered, with two exceptions. `coalesce(...)` is covered when at least one leg that
-reads a table has all of that leg's tables present. In that test, optional groups do not count
-as present and literal legs never count. `exists(g)` is always covered. A screen with any
+reads a table has all of that leg's tables present. In that test a table is present only when it has rows for the session; a group being optional never makes a leg present, and literal legs never count. `exists(g)` is always covered. A screen with any
 uncovered field is PARTIAL. Missing tables read only by covered fields are *tolerated*: the run
 reports them in `missing_optional_tables` (which now means "ran without") and the nightly shows
 them as a WARN. A missing table no field explains stays blocking. Implemented by

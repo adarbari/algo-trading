@@ -43,7 +43,7 @@ from algotrade.features.expressions.evaluator import (
 )
 from algotrade.features.expressions.frame import join
 from algotrade.features.expressions.functions import Type
-from algotrade.features.expressions.nodes import Call, Node, Ref
+from algotrade.features.expressions.nodes import Call, Node, Ref, children
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, Superseded
 from algotrade.features.framework.feature import Feature, StatusRule
@@ -193,7 +193,7 @@ class FeatureSet:
             return self._ref_coverage(node.name, gone)
         if isinstance(node, Call) and node.func == "exists":
             return set(), set()
-        parts = [self._node_coverage(c, gone) for c in _children(node)]
+        parts = [self._node_coverage(c, gone) for c in children(node)]
         read: set[str] = set().union(*(t for t, _ in parts))
         if isinstance(node, Call) and node.func == "coalesce":
             if any(t and not t & gone for t, _ in parts):
@@ -351,15 +351,6 @@ class FeatureSet:
             partial(_compute_materialised, self, e.name),
             entity=e.feature.entity,
         )
-
-
-def _children(node: Node) -> list[Node]:
-    """The direct operands of a node."""
-    if isinstance(node, Call):
-        return list(node.args)
-    if isinstance(node, Ref) or not hasattr(node, "pos"):
-        return []
-    return [c for c in (getattr(node, k, None) for k in ("operand", "left", "right")) if c]
 
 
 def _compute_materialised(

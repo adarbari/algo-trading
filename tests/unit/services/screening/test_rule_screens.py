@@ -291,3 +291,17 @@ def test_both_iv30_sources_missing_is_partial() -> None:
     screened = screen_session(reader, config, DAY, now=T0)
     assert screened.run.coverage is RunCoverage.PARTIAL
     assert set(screened.blocking) == {IBKR, CBOE}
+
+
+def test_an_empty_ibkr_partition_with_no_cboe_is_partial_not_a_zero_pick_complete() -> None:
+    """Review of #398: an empty partition holds no value, so it is missing, not present."""
+    reader, writer = seeded()
+    empty = stamped([{"instrument_id": "EQ:AAA", "iv30_ibkr": 0.3}], DAY, "f2").iloc[0:0]
+    writer.write_table(IBKR, DAY, "f2", empty)
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
+    )
+    config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
+    screened = screen_session(reader, config, DAY, now=T0)
+    assert screened.run.coverage is RunCoverage.PARTIAL
+    assert set(screened.blocking) == {IBKR, CBOE}
