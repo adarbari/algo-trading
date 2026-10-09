@@ -98,10 +98,10 @@ class LatestRun:
 def screen_rows(ctx: ReadContext) -> pd.DataFrame | Unknown:
     """Every rule screen's rows for the session (column-pruned), read once per publish."""
     key = ("rule_screen", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
-    found: pd.DataFrame | Unknown | None = ctx.cache.get(key)  # key read first (ADR 0022)
-    if found is None:
-        found = partition(ctx, RULE_SCREEN, ROW_COLUMNS)
-        ctx.cache.put(key, found)
+    # key read first (ADR 0022)
+    found: pd.DataFrame | Unknown = ctx.cache.get_or_compute(
+        key, lambda: partition(ctx, RULE_SCREEN, ROW_COLUMNS)
+    )
     return found
 
 

@@ -28,6 +28,8 @@ import glob
 import gzip
 import os
 import shutil
+import threading
+from collections import OrderedDict
 from collections.abc import Collection, Sequence
 from dataclasses import replace
 from datetime import date, datetime
@@ -387,12 +389,18 @@ class LocalStaging:
         return len(old)
 
 
+MAX_PARSED_BYTES = 64 * 1024 * 1024  # the run files ``LocalRuns`` keeps parsed, by file size
+
+
 class LocalRuns:
     def __init__(self, root: Path) -> None:
         self.root = root / "runs"
         # file name -> (its stat when parsed, the record): a record is parsed again only once
         # its file changed (``save`` replaces the file); never handed out, only copies of it
-        self._parsed: dict[str, tuple[tuple[int, int, int], RunRecord]] = {}
+        # (an LRU bounded by the files' sizes: ``MAX_PARSED_BYTES``)
+        self._parsed: OrderedDict[str, tuple[tuple[int, int, int], RunRecord]] = OrderedDict()
+        self._parsed_bytes = 0
+        self._parsed_lock = threading.Lock()
 
     def _record(self, name: str) -> RunRecord | None:
         """The record in file ``name``, parsed once per version of the file; a copy (its
@@ -402,14 +410,29 @@ class LocalRuns:
         try:
             st = path.stat()
             stamp = (st.st_ino, st.st_mtime_ns, st.st_size)
-            held = self._parsed.get(name)
+            with self._parsed_lock:
+                held = self._parsed.get(name)
+                if held is not None and held[0] == stamp:
+                    self._parsed.move_to_end(name)
             if held is None or held[0] != stamp:
                 held = (stamp, RunRecord.from_json(path.read_text()))
-                self._parsed[name] = held
+                self._remember(name, held, st.st_size)
         except FileNotFoundError:
             return None
         record = held[1]
         return replace(record, items=dict(record.items), stats=dict(record.stats))
+
+    def _remember(self, name: str, held: tuple[tuple[int, int, int], RunRecord], size: int) -> None:
+        """Keep ``held`` as the most recent entry; evict the least recent past the byte bound."""
+        with self._parsed_lock:
+            old = self._parsed.pop(name, None)
+            if old is not None:
+                self._parsed_bytes -= old[0][2]
+            self._parsed[name] = held
+            self._parsed_bytes += size
+            while self._parsed_bytes > MAX_PARSED_BYTES and len(self._parsed) > 1:
+                _, (evicted, _record) = self._parsed.popitem(last=False)
+                self._parsed_bytes -= evicted[2]
 
     def save(self, record: RunRecord) -> None:
         atomic_write(self.root / f"{safe(record.run_id)}.json", record.to_json().encode())

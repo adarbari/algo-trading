@@ -103,10 +103,10 @@ def market_frame(ctx: ReadContext, table: str, ids: Sequence[str]) -> pd.DataFra
     reads it ahead of the first request (``warm_market_frames``). The frame is only read,
     never changed, by its callers."""
     key = ("series-frame", table, tuple(ids), ctx.session.date, ctx.reader.visible_seq())
-    cached: tuple[pd.DataFrame | None] | None = ctx.cache.get(key)
-    if cached is None:
-        cached = (rollup_rows(ctx.reader, table, date.min, ctx.session.date, instruments=ids),)
-        ctx.cache.put(key, cached)
+    cached: tuple[pd.DataFrame | None] = ctx.cache.get_or_compute(
+        key,
+        lambda: (rollup_rows(ctx.reader, table, date.min, ctx.session.date, instruments=ids),),
+    )
     return cached[0]
 
 

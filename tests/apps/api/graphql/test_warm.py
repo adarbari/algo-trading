@@ -66,3 +66,25 @@ def test_a_failed_warm_is_logged_and_tried_again(
 
     asyncio.run(asyncio.wait_for(two_polls(), 5))
     assert len(calls) == 2 and "warming the read cache failed" in caplog.text
+
+
+def test_a_failing_step_does_not_stop_the_others(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    ran: list[str] = []
+
+    def boom(_ctx: Any) -> None:
+        raise ValueError("no data")
+
+    monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
+    monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append("completeness"))
+    monkeypatch.setattr(warm, "load_regime", boom)
+    monkeypatch.setattr(
+        warm,
+        "load_episodes",
+        lambda configs: type("E", (), {"episodes": [type("X", (), {"key": "a"})]}),
+    )
+    monkeypatch.setattr(warm, "load_episode_signals", lambda c, k: ran.append(f"episode {k}"))
+    ctx = type("C", (), {"configs": None})()
+    warm.warm(ctx)  # type: ignore[arg-type]
+    assert ran == ["frames", "completeness", "episode a"] and "regime failed" in caplog.text

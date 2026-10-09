@@ -6,11 +6,12 @@ request (20 s a table cold), and the status strip's one-session completeness gri
 session's regime that every page shows (3 to 5 s on the first page after a publish), and
 the signal timing of every reference episode (the regime page's History).
 The read runs in the read pool (``off_loop``) like any request's, taking one of its threads;
-a failure is logged and tried again at the next poll."""
+a failing step is logged and the others still run; the next publish tries again."""
 
 import asyncio
 import logging
 from collections.abc import Callable, Hashable
+from functools import partial
 
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.services.read.context import ReadContext
@@ -27,11 +28,23 @@ log = logging.getLogger(__name__)
 
 def warm(ctx: ReadContext) -> None:
     """Read what every page shares for ``ctx``'s session and published state."""
-    warm_market_frames(ctx)
-    load_completeness(ctx, 1)  # the status strip's grid (``useSystemIssues``)
-    load_regime(ctx)
-    for episode in load_episodes(ctx.configs).episodes:  # the regime page's History
-        load_episode_signals(ctx, episode.key)
+    steps: list[tuple[str, Callable[[], object]]] = [
+        ("market frames", lambda: warm_market_frames(ctx)),
+        ("completeness", lambda: load_completeness(ctx, 1)),  # the status strip's grid
+        ("regime", lambda: load_regime(ctx)),
+    ]
+    try:
+        for episode in load_episodes(ctx.configs).episodes:  # the regime page's History
+            steps.append(
+                (f"episode {episode.key}", partial(load_episode_signals, ctx, episode.key))
+            )
+    except Exception:
+        log.exception("warming the read cache: the episodes failed")
+    for name, step in steps:  # one failing step does not stop (or repeat) the others
+        try:
+            step()
+        except Exception:
+            log.exception("warming the read cache: %s failed", name)
 
 
 class CacheWarmer:

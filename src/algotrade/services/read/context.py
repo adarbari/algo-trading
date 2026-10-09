@@ -16,7 +16,7 @@ only: another date is a named argument of the loader, never derived."""
 
 import threading
 from collections import OrderedDict
-from collections.abc import Hashable, Sequence
+from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import cached_property
@@ -61,13 +61,16 @@ __all__ = [
 
 STRING_CELL_BYTES = 60  # what a Python string in an object column costs, about
 
+SLOT_BYTES = 8  # a pointer in a tuple, list or dict
 MAX_CACHE_BYTES = 400 * 1024 * 1024  # the frames a cache holds, together (the hosted API's RSS)
 
 
 def weigh(value: Any) -> int:
-    """About how many bytes ``value`` holds in frames (a DataFrame, or a tuple, list or dict of
-    them; anything else weighs nothing: the cache's count bound covers it). Cheap: no deep
-    walk of a frame's strings, an object column's cells are priced at ``STRING_CELL_BYTES``."""
+    """About how many bytes ``value`` holds: a DataFrame's buffers, a container's slots
+    (``SLOT_BYTES`` each) and what they hold, a string's characters; any other object weighs
+    nothing (the cache's count bound covers it). Cheap: no deep walk of a frame's strings, an
+    object column's cells are priced at ``STRING_CELL_BYTES``. Records (a dict per row) are
+    priced too: a page's value rows held as records weighed nothing before."""
     if isinstance(value, pd.DataFrame):
         # only a NumPy object column holds Python strings ``memory_usage`` cannot see; the
         # string dtype (pandas 3's default) and categoricals are counted from their buffers
@@ -75,10 +78,12 @@ def weigh(value: Any) -> int:
         return int(value.memory_usage(index=True, deep=False).sum()) + (
             STRING_CELL_BYTES * len(value) * objects
         )
+    if isinstance(value, str):
+        return len(value)
     if isinstance(value, tuple | list):
-        return sum(weigh(v) for v in value)
+        return SLOT_BYTES * len(value) + sum(weigh(v) for v in value)
     if isinstance(value, dict):
-        return sum(weigh(v) for v in value.values())
+        return 2 * SLOT_BYTES * len(value) + sum(weigh(v) for v in value.values())
     return 0
 
 
@@ -100,6 +105,30 @@ class ResultCache:
         self._weights: dict[Hashable, int] = {}
         self._held = 0
         self._lock = threading.Lock()
+        self._flights: dict[Hashable, threading.Lock] = {}
+
+    def get_or_compute(self, key: Hashable, compute: Callable[[], Any]) -> Any:
+        """The entry under ``key``, computed once by ``compute()`` (never ``None``) when it is
+        missing: concurrent callers missing the same key wait for the first one's result
+        instead of each computing it (a hundred cold requests for the regime page's history
+        would each read 14 000 partitions and hold their own frame). Another key never waits.
+        A failed compute raises to its caller; a waiter then computes in turn."""
+        found = self.get(key)
+        if found is not None:
+            return found
+        with self._lock:
+            flight = self._flights.setdefault(key, threading.Lock())
+        try:
+            with flight:
+                found = self.get(key)
+                if found is None:
+                    found = compute()
+                    self.put(key, found)
+                return found
+        finally:
+            with self._lock:
+                if self._flights.get(key) is flight:
+                    del self._flights[key]
 
     def get(self, key: Hashable) -> Any | None:
         with self._lock:
@@ -233,10 +262,7 @@ def _session(reader: StoreReader, requested: date | None, cache: ResultCache) ->
     """The session ``requested`` resolves to, kept in ``cache`` until the next publish."""
     # Read before resolving (ADR 0022); a run's own pending writes do not move visible_seq.
     key = ("session", requested, reader.own_run, reader.visible_seq())
-    session: Session | None = cache.get(key)
-    if session is None:
-        session = resolve_session(reader, requested)
-        cache.put(key, session)
+    session: Session = cache.get_or_compute(key, lambda: resolve_session(reader, requested))
     return session
 
 
@@ -317,10 +343,7 @@ def stored_dates(ctx: Stores, table: str) -> tuple[date, ...]:
     if ctx.reader.own_run is not None:  # its pending writes add dates without a publish
         return tuple(ctx.reader.dates(table))
     key = ("stored-dates", ctx.reader.visible_seq())  # read before listing (ADR 0022)
-    listed: dict[str, tuple[date, ...]] | None = ctx.cache.get(key)
-    if listed is None:
-        listed = {}
-        ctx.cache.put(key, listed)
+    listed: dict[str, tuple[date, ...]] = ctx.cache.get_or_compute(key, dict)
     if table not in listed:
         listed[table] = tuple(ctx.reader.dates(table))
     return listed[table]

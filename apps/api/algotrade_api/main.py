@@ -9,6 +9,7 @@ on the same origin (``web``, ADR 0044: mounted last, so every API route keeps pr
 the build identity it started with (``ops/build.py``) is taken here, once."""
 
 import asyncio
+import contextlib
 import json
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -104,6 +105,13 @@ def _rate_limited(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _stop(task: asyncio.Task[None]) -> None:
+    """Cancel ``task`` and wait for it, so its read-pool call is not left to outlive the app."""
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+
 def create_app(
     settings: ApiSettings,
     store: ReadStore | None = None,
@@ -130,7 +138,7 @@ def create_app(
         warming = asyncio.create_task(warmer.run()) if warmer is not None else None
         yield
         if warming is not None:
-            warming.cancel()
+            await _stop(warming)
         app.state.live.close()
         close = getattr(app.state.text_model, "close", None)
         if close is not None:

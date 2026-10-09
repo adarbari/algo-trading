@@ -15,7 +15,7 @@ of the window it names through the context's inventory reads (``stored_dates``,
 - ``snapshot`` (reference, universe): COMPLETE when a snapshot was built that session, CARRIED
   when an earlier one stands in, MISSING before the first."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
@@ -168,13 +168,14 @@ def load_completeness(
     # key, read before the partitions, ADR 0022): the status strip of every page asks for one
     # session, 430 partitions read (1.6 s a page)
     key = ("completeness", tuple(days), ctx.reader.visible_seq())
-    cells: tuple[Cell, ...] | None = ctx.cache.get(key)
-    if cells is None:
-        counts = _Counts(ctx)
-        cells = tuple(_cell(counts, d, day) for d in DATASETS for day in days)
-        ctx.cache.put(key, cells)
+    cells: tuple[Cell, ...] = ctx.cache.get_or_compute(key, lambda: _cells(ctx, days))
     closed = last_closed_session(now or datetime.now(UTC))
     return Completeness(tuple(days), tuple(d.name for d in DATASETS), cells, closed)
+
+
+def _cells(ctx: ReadContext, days: Sequence[date]) -> tuple[Cell, ...]:
+    counts = _Counts(ctx)
+    return tuple(_cell(counts, d, day) for d in DATASETS for day in days)
 
 
 @dataclass(frozen=True)

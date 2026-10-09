@@ -221,3 +221,16 @@ def test_find_opens_only_the_job_s_files_and_parses_a_file_once_per_version(
     time.sleep(0.01)
     runs.save(record.finish(T0 + timedelta(1)))
     assert runs.find("job")[0].status is RunStatus.COMPLETE and len(parsed) == 3
+
+
+def test_the_parsed_run_cache_evicts_past_its_byte_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``LocalRuns._parsed`` grew with the runs folder (50 MB, 6 400 files, nightly more)."""
+    runs = LocalBackend(tmp_path).runs
+    for n in range(6):
+        runs.save(start_run("job", D1, T0 + timedelta(n)))
+    size = max(p.stat().st_size for p in (tmp_path / "runs").glob("*.json"))
+    monkeypatch.setattr(local, "MAX_PARSED_BYTES", 2 * size)
+    assert len(runs.find("job")) == 6
+    assert 0 < len(runs._parsed) <= 2 and runs._parsed_bytes <= 2 * size

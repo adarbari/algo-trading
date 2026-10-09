@@ -201,10 +201,9 @@ def _values(
         None if ids is None else tuple(sorted(ids)),
         asked,
     )
-    cached: dict[ResultKey, list[Mapping[str, Any]]] | None = ctx.cache.get(key)
-    if cached is None:
-        cached = _read_values(ctx, runs, ids, wanted)
-        ctx.cache.put(key, cached)
+    cached: dict[ResultKey, list[Mapping[str, Any]]] = ctx.cache.get_or_compute(
+        key, lambda: _read_values(ctx, runs, ids, wanted)
+    )
     return cached
 
 
