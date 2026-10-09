@@ -42,7 +42,8 @@ correct without IBKR.
   and site criterion over it.
 - Only screen coverage changes. The selection audit and the Builder preview still list the
   optional table among the session's missing tables (neither grades a run), and a backtest
-  over a session without it still raises (ADR 0008: missing data is an error). The typed read
+  over a session without it raises only when the table is blocking by the amendment below
+  (ADR 0008: missing data is an error). The typed read
   model shows only the required `missing_tables`; the optional ones are in the run's audit.
 - A user's own screen with a HARD criterion directly on an optional field is not checked by the
   fitness test: on a session without the source it rejects every row and says why per row
@@ -67,4 +68,5 @@ reads a table has all of that leg's tables present. In that test a table is pres
 uncovered field is PARTIAL. Missing tables read only by covered fields are *tolerated*: the run
 reports them in `missing_optional_tables` (which now means "ran without") and the nightly shows
 them as a WARN. A missing table no field explains stays blocking. Implemented by
-`FeatureSet.coverage` and used by `services/screening/run.py` (`split_missing` is gone).
+`FeatureSet.coverage` and used by `services/screening/run.py` (`split_missing` is gone). The backtest's rebalance
+evaluation (`services/backtests/rebalance.py`) applies the same rule to the selection's fields.

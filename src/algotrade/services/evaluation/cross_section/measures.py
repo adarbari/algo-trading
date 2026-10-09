@@ -16,11 +16,13 @@ from datetime import date
 import numpy as np
 
 from algotrade.quant.edge_statistics import (
+    Moments,
     decile_spread,
+    effect_vs_moments,
     lift,
+    merge_moments,
     sharpe,
     spread_summary,
-    standardised_effect,
 )
 
 BUCKETS = 10
@@ -37,7 +39,7 @@ class SessionStat:
     regime: str  # the session's regime label, "UNKNOWN" when none is stored
     pick_values: tuple[float, ...] = ()  # oriented values of the counted picks
     pick_hits: int = 0
-    rest_values: tuple[float, ...] = ()  # oriented values of the eligible non-picks (counted)
+    rest: Moments = (0, 0.0, 0.0)  # (n, mean, m2) of the oriented eligible non-picks (counted)
     base_hits: int = 0  # hits among all counted eligible names (the picks included)
     top_decile: float | None = None  # mean of the best-ranked tenth of the ranked eligible
     spread: float | None = None  # top tenth minus bottom tenth
@@ -58,7 +60,7 @@ class SessionStat:
 
     @property
     def eligible(self) -> int:
-        return len(self.pick_values) + len(self.rest_values)
+        return len(self.pick_values) + self.rest[0]
 
     @property
     def pick_mean(self) -> float | None:
@@ -81,7 +83,7 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         regime=first.regime,
         pick_values=tuple(v for leg in legs for v in leg.pick_values),
         pick_hits=sum(leg.pick_hits for leg in legs),
-        rest_values=tuple(v for leg in legs for v in leg.rest_values),
+        rest=merge_moments([leg.rest for leg in legs]),
         base_hits=sum(leg.base_hits for leg in legs),
         top_decile=float(np.mean(tops)) if tops else None,
         spread=float(np.mean(spreads)) if spreads else None,
@@ -167,7 +169,7 @@ def _measure(sl: Slice, kept: Sequence[SessionStat], in_sample: bool = False) ->
     eligible = sum(r.eligible for r in rows)
     base_hits = sum(r.base_hits for r in rows)
     pick_values = _pooled([r.pick_values for r in rows])
-    rest_values = _pooled([r.rest_values for r in rows])
+    rest = merge_moments([r.rest for r in rows])
     n_ref = sum(len(r.pick_reference) for r in rows)  # picks with an expires_otm reference
     hit_rate, base_rate = _mean(hits, picks), _mean(base_hits, eligible)
     spreads = [r.spread for r in rows if r.spread is not None]
@@ -187,12 +189,12 @@ def _measure(sl: Slice, kept: Sequence[SessionStat], in_sample: bool = False) ->
         base_rate=base_rate,
         lift=lift(hit_rate, base_rate),
         mean_excess_picks=_mean(float(pick_values.sum()), picks),
-        bh_mean=_mean(float(pick_values.sum() + rest_values.sum()), eligible),
+        bh_mean=_mean(float(pick_values.sum() + rest[0] * rest[1]), eligible),
         top_decile_mean=float(np.mean(tops)) if tops else None,
         decile_spread=spread_mean,
         decile_t=spread_t,
         decile_sessions=spread_n,
-        effect_size=standardised_effect(pick_values, rest_values),
+        effect_size=effect_vs_moments(pick_values, rest),
         sharpe=sharpe(means),
         unscored=sum(r.unscored for r in rows),
         excluded_score_coverage=sum(r.excluded_score_coverage for r in rows),
