@@ -1,6 +1,6 @@
 """Storage protocols. Every backend implements all of them and passes tests/contract/storage."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date, datetime
 from typing import Protocol
 
@@ -166,6 +166,11 @@ class RunStore(Protocol):
     def load(self, run_id: str) -> RunRecord | None: ...
 
     def find(self, job: str, session_date: date | None = None) -> list[RunRecord]: ...
+
+    def find_many(self, jobs: Collection[str], first: date, last: date) -> list[RunRecord]:
+        """The records of any of ``jobs`` for the sessions ``first..last``, by start time: one
+        pass over the store, not one per job."""
+        ...
 
 
 class Backend(Protocol):

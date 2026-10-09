@@ -260,7 +260,8 @@ def _ideas(writer: StoreWriter) -> None:
     ]  # fmt: skip
     writer.write_result("rule_screen", PREVIOUS, before.run_id,
                         stamped(earlier, PREVIOUS, before.run_id))  # fmt: skip
-    writer.save_run(before.finish(NOW, stats={"coverage": "COMPLETE"}))
+    counts = {"summary": {"decisions": {"REJECT": 1, "QUALIFIED": 2}}}  # as the nightly records
+    writer.save_run(before.finish(NOW, stats={"coverage": "COMPLETE", **counts}))
     _write(writer, "rollups/instrument/earnings@v1", [
         {"instrument_id": "EQ:AAA", "next_earnings_date": date(2022, 12, 1),
          "earnings_time": "pre", "days_to_earnings": 6},
