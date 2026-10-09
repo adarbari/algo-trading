@@ -11,11 +11,18 @@ Corporate actions are applied here, at read time (ADR 0016), from ``events/split
 
 ``session_bars`` serves rollups: one load for a range of sessions, then each session's
 lookback window split-adjusted as of that session (never by a later split).
+
+**Flagged bars** (ADR 0061): a bar the ``bar-quality`` task flagged in ``events/bar_flag``
+(``FLAGGED``, latest version per bar, read with the same ``as_of`` as the bars) is dropped at
+read time, as a split is applied: the stored bar is never edited (ADR 0007). A dropped bar is
+a missing bar, never a zero return; ``bars_with_flags`` and ``SessionBars.flagged`` say which
+bars went, and ``load_price_data`` (a backtest) raises ``MissingDataError`` naming the flag
+when a requested instrument lost one.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -31,6 +38,62 @@ from algotrade.data.events import read_events
 from algotrade.data.reference import REFERENCE_HINT, Snapshot, instrument_terms, read_snapshot
 from algotrade.storage.tables.readers import StoreReader
 
+FLAGS_TABLE = "events/bar_flag"  # the bar-quality task's table (ADR 0061)
+FLAGGED = "FLAGGED"
+_NO_FLAGS = pd.DataFrame(columns=["instrument_id", "session_date", "ts", "reason", "detail"])
+
+
+def _split_flagged(
+    reader: StoreReader,
+    frame: pd.DataFrame,
+    start: date,
+    end: date,
+    instruments: Sequence[str] | None,
+    as_of: datetime | None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``frame`` without its FLAGGED bars, and those bars (``instrument_id``, ``session_date``,
+    ``ts``, ``reason``, ``detail``). A flag is read by the bar's close ``ts`` (a day either
+    side of the range: the close is on the session's date in UTC)."""
+    day = timedelta(days=1)
+    flags = read_events(reader, FLAGS_TABLE, start - day, end + day, instruments, as_of).frame
+    if flags.empty:
+        return frame, _NO_FLAGS
+    flags = flags[flags["status"] == FLAGGED]
+    candidate = frame["instrument_id"].astype(str).isin(set(flags["instrument_id"].astype(str)))
+    if flags.empty or not candidate.any():
+        return frame, _NO_FLAGS
+    keys = flags.assign(
+        instrument_id=flags["instrument_id"].astype(str), ts=pd.to_datetime(flags["ts"], utc=True)
+    )[["instrument_id", "ts", "reason", "detail"]]
+    sub = frame.loc[candidate, ["instrument_id", "session_date", "ts"]].assign(
+        instrument_id=lambda f: f["instrument_id"].astype(str),
+        ts=lambda f: pd.to_datetime(f["ts"], utc=True),
+    )
+    hit = sub.merge(keys, on=["instrument_id", "ts"], how="inner")
+    if hit.empty:
+        return frame, _NO_FLAGS
+    pairs = pd.MultiIndex.from_arrays(
+        [frame["instrument_id"].astype(str), pd.to_datetime(frame["ts"], utc=True)]
+    )
+    drop = pairs.isin(pd.MultiIndex.from_frame(hit[["instrument_id", "ts"]]))
+    return frame[~drop].reset_index(drop=True), hit.reset_index(drop=True)
+
+
+def bars_with_flags(
+    reader: StoreReader,
+    interval: str,
+    start: date,
+    end: date,
+    instruments: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+    columns: Sequence[str] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``bars`` plus the flagged bars it dropped (``_split_flagged``); 1d bars only."""
+    frame = raw_bars(reader, interval, start, end, instruments, as_of, columns)
+    if interval != "1d":
+        return frame, _NO_FLAGS
+    return _split_flagged(reader, frame, start, end, instruments, as_of)
+
 
 def bars(
     reader: StoreReader,
@@ -41,11 +104,25 @@ def bars(
     as_of: datetime | None = None,
     columns: Sequence[str] | None = None,
 ) -> pd.DataFrame:
-    """Bars for ``start <= session_date <= end``, sorted by (instrument_id, ts). ``columns``:
-    only these (and the key and point-in-time columns) are read: a long window of one price.
+    """Bars for ``start <= session_date <= end``, sorted by (instrument_id, ts), without the
+    flagged ones (module doc). ``columns``: only these (and the key and point-in-time columns)
+    are read: a long window of one price.
 
     Raises ``MissingDataError`` when nothing is stored; backtests never fetch (ADR 0008).
     """
+    return bars_with_flags(reader, interval, start, end, instruments, as_of, columns)[0]
+
+
+def raw_bars(
+    reader: StoreReader,
+    interval: str,
+    start: date,
+    end: date,
+    instruments: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+    columns: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """Every stored bar of the range, flagged or not (the bar-quality detector's input)."""
     table = f"bars/{interval}"
     frame = reader.table_range(table, start, end, as_of, instruments, columns)
     if frame is None:
@@ -134,11 +211,25 @@ def adjusted_bars(
 ) -> tuple[pd.DataFrame, dict[str, list[str]]]:
     """``bars`` adjusted for the splits (and dividends) whose event date is in
     ``start..end`` (``adjust_bars``) -> (frame, table -> run ids read)."""
+    frame, versions, _ = _adjusted(reader, interval, start, end, instruments, as_of, adjustment)
+    return frame, versions
+
+
+def _adjusted(
+    reader: StoreReader,
+    interval: str,
+    start: date,
+    end: date,
+    instruments: Sequence[str] | None,
+    as_of: datetime | None,
+    adjustment: str,
+) -> tuple[pd.DataFrame, dict[str, list[str]], pd.DataFrame]:
+    """``adjusted_bars`` and the flagged bars it dropped."""
     if adjustment not in ADJUSTMENTS:
         raise ConfigurationError(
             f"price adjustment must be one of {ADJUSTMENTS}, got {adjustment!r}"
         )
-    frame = bars(reader, interval, start, end, instruments, as_of)
+    frame, dropped = bars_with_flags(reader, interval, start, end, instruments, as_of)
     versions = {f"bars/{interval}": sorted(map(str, frame["run_id"].unique()))}
     if adjustment != "none":
         splits = read_events(reader, "events/split", start, end, instruments, as_of)
@@ -151,7 +242,7 @@ def adjusted_bars(
                 if e.runs
             }
         )
-    return frame, versions
+    return frame, versions, dropped
 
 
 @dataclass(frozen=True)
@@ -180,7 +271,17 @@ def load_price_data(
     they were stored (``data.events``). ``aligned=False`` keeps each instrument's own bars
     (for a changing selection, which puts them on one timeline with ``core.views.series.panel``).
     """
-    frame, versions = adjusted_bars(reader, interval, start, end, instruments, as_of, adjustment)
+    frame, versions, dropped = _adjusted(
+        reader, interval, start, end, instruments, as_of, adjustment
+    )
+    if not dropped.empty:  # a backtest never runs over a bar the quality check rejected
+        first = dropped.sort_values(["instrument_id", "ts"]).iloc[0]
+        raise MissingDataError(
+            f"bars/{interval}",
+            f"{len(dropped)} flagged bars in {start}..{end}; first {first['instrument_id']} "
+            f"{first['session_date']}: {first['reason']} ({first['detail']})",
+            f"see events/bar_flag; leave {first['instrument_id']} out or clear the flag (ADR 0061)",
+        )
     reference, snapshot = read_snapshot(
         reader, REFERENCE_TABLE, start, REFERENCE_HINT, as_of, instruments
     )
@@ -209,6 +310,7 @@ class SessionBars:
     splits: pd.DataFrame  # instrument_id, ex_date (date), ratio
     _days: np.ndarray  # frame session dates as datetime64[D], for slicing
     _rows: dict[str, np.ndarray]  # frame row positions of each instrument with a split
+    flagged: frozenset[tuple[str, date]] = frozenset()  # (instrument, session) of dropped bars
 
     @classmethod
     def empty(cls) -> "SessionBars":
@@ -248,7 +350,7 @@ def session_bars(
     ``columns``: only those of ``open high low close volume`` are read and kept.
 
     Raises ``MissingDataError`` when no bars are stored in the range."""
-    frame = bars(reader, "1d", start, end, instruments, as_of, columns)
+    frame, dropped = bars_with_flags(reader, "1d", start, end, instruments, as_of, columns)
     splits = read_events(reader, "events/split", start, end, instruments, as_of).frame
     no_dividends = pd.DataFrame(columns=["instrument_id", "ts", "cash_amount"])
     frame = adjust_bars(frame, splits, no_dividends, "splits")
@@ -268,6 +370,10 @@ def session_bars(
         table,
         days,
         _rows_of(frame["instrument_id"].astype(str), list(table["instrument_id"])),
+        frozenset(
+            (str(i), pd.Timestamp(d).date())
+            for i, d in zip(dropped["instrument_id"], dropped["session_date"], strict=True)
+        ),
     )
 
 
