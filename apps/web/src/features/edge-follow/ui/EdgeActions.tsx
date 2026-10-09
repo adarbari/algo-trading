@@ -5,15 +5,18 @@
  * decides what is allowed and which warnings are kept; the buttons only ask.
  */
 import { Button, saveTextFile, Stack, useToast } from '@algotrade/ui';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
 import type { Edge } from '@/entities/edge';
 import { useViewer } from '@/entities/viewer';
 
 import { publishedDocument } from '../api/hooks';
 import { canReveal, MOVE_LABELS, movesFrom, type Move } from '../model/moves';
-import { CloneEdgeDialog } from './CloneEdgeDialog';
-import { MoveEdgeDialog } from './MoveEdgeDialog';
+import { lazyPage } from '@/shared/lib/lazy';
+
+// The dialogs load when first opened: most visits to an edge never open one.
+const CloneEdgeDialog = lazyPage(() => import('./CloneEdgeDialog'), 'CloneEdgeDialog');
+const MoveEdgeDialog = lazyPage(() => import('./MoveEdgeDialog'), 'MoveEdgeDialog');
 
 export interface EdgeActionsProps {
   edge: Edge;
@@ -77,27 +80,29 @@ export function EdgeActions({ edge, onCloned }: EdgeActionsProps) {
           </Button>
         )}
       </Stack>
-      {cloning && (
-        <CloneEdgeDialog
-          edgeId={edge.id}
-          open
-          onOpenChange={setCloning}
-          onCloned={(id) => {
-            setCloning(false);
-            onCloned(id);
-          }}
-        />
-      )}
-      {move && (
-        <MoveEdgeDialog
-          edge={edge}
-          move={move}
-          open
-          onOpenChange={(open) => {
-            if (!open) setMove(null);
-          }}
-        />
-      )}
+      <Suspense fallback={null}>
+        {cloning && (
+          <CloneEdgeDialog
+            edgeId={edge.id}
+            open
+            onOpenChange={setCloning}
+            onCloned={(id) => {
+              setCloning(false);
+              onCloned(id);
+            }}
+          />
+        )}
+        {move && (
+          <MoveEdgeDialog
+            edge={edge}
+            move={move}
+            open
+            onOpenChange={(open) => {
+              if (!open) setMove(null);
+            }}
+          />
+        )}
+      </Suspense>
     </>
   );
 }

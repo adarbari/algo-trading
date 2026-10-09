@@ -34,7 +34,7 @@ export function EdgeCompare({ compare }: EdgeCompareProps) {
             label="Compare versions"
             columns={columns}
             rows={compare.rows}
-            getRowId={(r) => `${r.kind}:${r.label}:${r.basis}`}
+            getRowId={(r) => `${r.label}:${r.basis}`}
             emptyMessage="Nothing to compare yet"
             visibleRows={8}
           />

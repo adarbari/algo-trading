@@ -12,10 +12,10 @@
       "src/pages/screener-builder/index.ts": 69700,
       "src/pages/screener-results/index.ts": 69800,
       "src/pages/trader-calendar/index.ts": 12900,
-      "src/pages/trader-edges/index.ts": 37900,
+      "src/pages/trader-edges/index.ts": 40700,
       "src/pages/trader-explore/index.ts": 61100,
       "src/pages/trader-explore/ui/OtherTabs.tsx": 93400,
-      "src/pages/trader-ideas/index.ts": 40900,
+      "src/pages/trader-ideas/index.ts": 41100,
       "src/pages/trader-regime/index.ts": 57700,
       "src/pages/trader-screeners/index.ts": 17000
     }
@@ -71,10 +71,10 @@
     "bundle.routes.src/pages/admin-harness-runs/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
     "bundle.routes.src/pages/guide/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
     "bundle.routes.src/pages/screener-results/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; then 2026-10-09 #452 the criteria scorecard reads typed criteria through the screeners list query (useScreenerRuns) instead of the screen detail (+416 B)",
-    "bundle.routes.src/pages/trader-edges/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; plus the Edges Lab pages",
+    "bundle.routes.src/pages/trader-edges/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; plus the Edges Lab pages; then 2026-10-09 #456 ED8 E7: the list views, the user's state column and the follow actions (the dialogs and the comparison panel are lazy chunks, counted here); the route keeps the view names so the entity stays out of the entry chunk",
     "bundle.routes.src/pages/trader-regime/index.ts": "2026-10-09 #425 ED8 step 1: the same shared DataTable groupBy / OddsLine code lands in this chunk (+20 B gzip)",
     "e2e./regime.requests": "2026-10-09 #425 ED8 step 1: the shared DataTable / OddsLine code splits into one more chunk on this route (82 -> 83)",
-    "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
+    "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; then 2026-10-09 #456 shared entity chunk graph after the edge state fields (+78 B gzip)",
     "e2e./screeners.requests": "2026-10-09 #452 one more script chunk from the build split; the GraphQL operations are unchanged (8, checked)",
     "e2e./screeners/vrp_scanner.dom_nodes": "2026-10-09 #452 the criteria scorecard shows each rule again (it read none before #447)"
   }

@@ -65,7 +65,7 @@ describe('EdgeActions', () => {
     POST.mockResolvedValue(ok({ edge_id: 'mine', document: {} }));
     const { onCloned, baseElement } = setup('momentum_12_1');
     await userEvent.click(screen.getByRole('button', { name: 'Clone' }));
-    const name = screen.getByRole('textbox', { name: 'Name of your copy' });
+    const name = await screen.findByRole('textbox', { name: 'Name of your copy' });
     expect(name).toHaveValue('my-momentum_12_1');
     await expectNoA11yViolations(baseElement);
     await userEvent.clear(name);
@@ -83,7 +83,7 @@ describe('EdgeActions', () => {
   it('refuses an invalid copy name', async () => {
     setup('momentum_12_1');
     await userEvent.click(screen.getByRole('button', { name: 'Clone' }));
-    await userEvent.type(screen.getByRole('textbox', { name: 'Name of your copy' }), 'X');
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Name of your copy' }), 'X');
     expect(screen.getByText('Use 1-64 of a-z, 0-9, _ and -.')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Clone' }).at(-1)).toBeDisabled();
   });
@@ -92,7 +92,7 @@ describe('EdgeActions', () => {
     PUT.mockResolvedValue(ok({ edge_id: 'earnings_drift', state: 'following' }));
     setup('earnings_drift');
     await userEvent.click(screen.getByRole('button', { name: 'Follow' }));
-    expect(screen.getByText(/win rate above the base rate is 49%/)).toBeInTheDocument();
+    expect(await screen.findByText(/win rate above the base rate is 49%/)).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Follow' }).at(-1) as HTMLElement);
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
@@ -106,6 +106,7 @@ describe('EdgeActions', () => {
     PUT.mockResolvedValue(ok({ edge_id: 'momentum_12_1', state: 'rejected' }));
     setup('momentum_12_1');
     await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    await screen.findByRole('textbox', { name: 'Why' });
     const confirm = () => screen.getAllByRole('button', { name: 'Reject' }).at(-1) as HTMLElement;
     expect(confirm()).toBeDisabled();
     await userEvent.type(screen.getByRole('textbox', { name: 'Why' }), 'No edge.');

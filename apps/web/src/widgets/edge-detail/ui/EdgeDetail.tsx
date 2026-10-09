@@ -6,6 +6,8 @@
  */
 import { Button, Chip, EmptyState, Heading, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
 
+import { Suspense } from 'react';
+
 import {
   labelText,
   stateLabel,
@@ -19,11 +21,15 @@ import { EdgeActions } from '@/features/edge-follow';
 import { RunEvaluation } from '@/features/edge-evaluation';
 import { GuideHelp } from '@/features/guide-help';
 
-import { EdgeCompare } from './EdgeCompare';
+import { lazyPage } from '@/shared/lib/lazy';
+
 import { EdgeDefinition } from './EdgeDefinition';
 import { EdgeDetails } from './EdgeDetails';
 import { EdgeFigures } from './EdgeFigures';
 import { EdgeYears } from './EdgeYears';
+
+// A copy's comparison is for the user's own edges only: its chunk loads when there is one.
+const EdgeCompare = lazyPage(() => import('./EdgeCompare'), 'EdgeCompare');
 
 export interface EdgeDetailProps {
   /** The chosen edge's id (from the URL). */
@@ -101,7 +107,13 @@ export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
         )}
       </Stack>
       <EdgeFigures verdict={v} />
-      {edge.compare && <EdgeCompare compare={edge.compare} />}
+      {edge.compare && (
+        <Suspense
+          fallback={<Panel title="Compare versions" state="loading" loadingLabel="Loading…" />}
+        >
+          <EdgeCompare compare={edge.compare} />
+        </Suspense>
+      )}
       <EdgeYears years={v.years} />
       <EdgeDefinition edge={edge} />
       <EdgeDetails edge={edge} />

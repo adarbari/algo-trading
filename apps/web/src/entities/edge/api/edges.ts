@@ -21,34 +21,26 @@ const EdgesPage = graphql(`
       name
       status
       state
-      since
-      stateReason
       labels
-      oosRevealed
       oosHidden
       mine
       extends
-      replaces
       compare {
         oosHidden
         reason
         rows {
-          kind
           label
           basis
-          oosHidden
           inSample {
             winRate
             baseRate
             liftPts
-            decileSpread
             trades
           }
           outOfSample {
             winRate
             baseRate
             liftPts
-            decileSpread
             trades
           }
         }

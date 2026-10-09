@@ -100,7 +100,7 @@ describe('EdgeDetail', () => {
     expect(screen.getByText('Not measured yet')).toBeInTheDocument();
   });
 
-  it("shows a copy's origin, its labels and the comparison with the out-of-sample hidden", () => {
+  it("shows a copy's origin, its labels and the comparison with the out-of-sample hidden", async () => {
     hooks.useEdges.mockReturnValue(
       fakeQuery(
         EDGES_FIXTURE.edges.map((e) =>
@@ -111,7 +111,7 @@ describe('EdgeDetail', () => {
     render(<EdgeDetail id="my_momentum" onBack={vi.fn()} onOpen={vi.fn()} />);
     expect(screen.getByText('Your edge · extends momentum_12_1')).toBeInTheDocument();
     expect(screen.getByText('Followed against the verdict')).toBeInTheDocument();
-    const table = screen.getByRole('grid', { name: 'Compare versions' });
+    const table = await screen.findByRole('grid', { name: 'Compare versions' });
     expect(within(table).getByText('Momentum 12-1')).toBeInTheDocument();
     expect(within(table).getByText('In-sample win rate')).toBeInTheDocument();
     expect(within(table).queryByText('Out-of-sample win rate')).not.toBeInTheDocument();

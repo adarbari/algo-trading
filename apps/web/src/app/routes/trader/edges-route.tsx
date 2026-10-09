@@ -5,10 +5,14 @@
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
-import { EDGE_VIEWS, type EdgeView } from '@/entities/edge';
+import type { EdgeView } from '@/entities/edge';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const EdgesPage = lazyPage(() => import('@/pages/trader-edges'), 'EdgesPage');
+
+// The views a link may name (`all` is the bare list); a type import only keeps the entity out of
+// the entry chunk.
+const VIEWS: readonly EdgeView[] = ['mine', 'following', 'rejected'];
 
 interface EdgesSearch {
   edge?: string;
@@ -17,10 +21,10 @@ interface EdgesSearch {
 
 export function validateEdgesSearch(search: Record<string, unknown>): EdgesSearch {
   const { edge, view } = search;
-  const found = EDGE_VIEWS.find((v) => v.value === view && v.value !== 'all');
+  const found = VIEWS.find((v) => v === view);
   return {
     ...(typeof edge === 'string' && edge ? { edge } : {}),
-    ...(found ? { view: found.value } : {}),
+    ...(found ? { view: found } : {}),
   };
 }
 

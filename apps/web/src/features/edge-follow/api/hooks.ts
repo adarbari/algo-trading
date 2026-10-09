@@ -7,13 +7,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { refreshEdges } from '@/entities/edge';
-import { api, gql, graphql, unwrap } from '@/shared/api';
+import { api, gql, TypedDocumentString, unwrap } from '@/shared/api';
 
-const PublishedEdge = graphql(`
-  query PublishedEdge($id: String!) {
-    publishedEdgeDocument(id: $id)
-  }
-`);
+/** Written by hand, not through `graphql()`: the admin's one-off download stays out of the
+ * generated document map the entry chunk carries. */
+const PublishedEdge = new TypedDocumentString<
+  { publishedEdgeDocument?: string | null },
+  { id: string }
+>('query PublishedEdge($id: String!) { publishedEdgeDocument(id: $id) }');
 
 export function useCopyEdge(id: string) {
   const client = useQueryClient();

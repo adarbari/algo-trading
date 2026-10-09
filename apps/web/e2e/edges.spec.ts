@@ -56,7 +56,7 @@ test('the list filters by view and an edge offers Clone and Follow in dialogs', 
   await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toContainText('site edge');
   await page.getByRole('button', { name: /^Mine · 0/ }).click();
   await expect(page).toHaveURL(/view=mine/);
-  await expect(page.getByText('No edge is declared.')).toBeHidden();
+  await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toHaveCount(0);
   await page.getByRole('button', { name: /^All · / }).click();
   await list.getByRole('row', { name: /Momentum 12-1/ }).click();
   await page.getByRole('button', { name: 'Follow', exact: true }).click();
