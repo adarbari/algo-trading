@@ -138,6 +138,9 @@ coverage-combine: ## the 90% coverage gate over the shards' data files (.coverag
 perf:            ## strict timing budgets (the `perf` tests), serially; run on an idle machine
 	$(PY) -m pytest -p no:xdist -m perf
 
+load:            ## API load test by hand on an idle machine (an API on :8011 first); ARGS="--scenario warm --users 100 --seconds 30"
+	$(PY) scripts/perf/load.py $(ARGS)
+
 datasets-verify: ## committed golden CSVs match their checksums
 	$(BIN)algotrade-ingest golden verify
 
