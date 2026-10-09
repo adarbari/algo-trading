@@ -28,7 +28,7 @@ stubElementSize();
 const picks = (ids: string[]) =>
   fakeQuery({
     screener: {
-      latestRun: { results: { results: ids.map((instrumentId) => ({ instrumentId })) } },
+      latestRun: { pickIds: { instrumentIds: ids } },
     },
   });
 

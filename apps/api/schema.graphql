@@ -1330,6 +1330,14 @@ type PickCount {
 }
 
 """
+The tickers a run picked, in rank order, without the rows behind them: `instrumentIds` (at most `size`) and `total`, the picks in all (the picks and the ones the regime gate held back)
+"""
+type PickIds {
+  instrumentIds: [String!]!
+  total: Int!
+}
+
+"""
 The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
 """
 type PresetPin {
@@ -2019,6 +2027,11 @@ type ScreenerRun {
   How many tickers are `new` / `dropped` since the previous run, over the whole run; empty: no previous run
   """
   changes: [ChangeCount!]!
+
+  """
+  Who the run picked, read from the run's rows alone (cheap: no criterion values); `size` ids at most, in rank order
+  """
+  pickIds(size: Int! = 100): PickIds!
 
   """
   Its rows as a review table: `decisions` (none: all; any case), `change` (`new` / `dropped`) and `q` (the symbol or name contains it) filtered, sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows

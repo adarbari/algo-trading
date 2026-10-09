@@ -34,7 +34,7 @@ export interface CalendarSource {
 type Results = ScreenerPicksResponse['screener'];
 
 function idsOf(screener: Results | undefined): string[] {
-  return (screener?.latestRun?.results.results ?? []).map((r) => r.instrumentId);
+  return screener?.latestRun?.pickIds.instrumentIds ?? [];
 }
 
 export function useCalendarSource(): CalendarSource {

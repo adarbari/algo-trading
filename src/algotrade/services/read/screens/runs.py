@@ -239,3 +239,14 @@ def load_previous_run(ctx: ReadContext, run: ScreenerRun) -> ScreenerRun | None:
     if day is None:
         return None
     return latest_run(at_session(ctx, day), run.owner, run.config_id).run
+
+
+def load_pick_ids(ctx: ReadContext, run: ScreenerRun, limit: int) -> tuple[list[str], int]:
+    """The instrument ids of ``run``'s picks in rank order (at most ``limit``) and how many it
+    picked in all: the picks and the picks the regime gate held back (``PAUSED``), read from
+    the run's rows alone, never the criterion values behind them (the calendar needs who, not
+    why; the values were the cost of a results page)."""
+    rows = run_rows(ctx, run)
+    decisions = rows["decision"]
+    shown = rows[picked_mask(decisions) | (decisions.astype(str) == PAUSED)]
+    return [str(i) for i in shown["instrument_id"].iloc[: max(limit, 0)]], len(shown)

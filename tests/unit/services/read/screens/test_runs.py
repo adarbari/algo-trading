@@ -1,10 +1,13 @@
 from datetime import date, timedelta
+from typing import Any
 
 import pandas as pd
+import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
+from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.runs import (
     NOT_PICKED,
     DecisionCount,
@@ -144,3 +147,29 @@ def test_the_previous_run_is_the_screeners_run_in_the_previous_session(
 def test_picked_mask_is_is_picked_on_every_row() -> None:
     decisions = pd.Series([*sorted(NOT_PICKED), "PICK", "WATCH", None], dtype="string")
     assert picked_mask(decisions).tolist() == [is_picked(str(d)) for d in decisions]
+
+
+def test_pick_ids_read_the_run_rows_only_in_rank_order(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the calendar's ids came from load_results: the criterion value rows were the 3.4 s
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    read: list[str] = []
+    real = results.partition
+
+    def counting(c: ReadContext, table: str, *args: Any) -> Any:
+        read.append(table)
+        return real(c, table, *args)
+
+    monkeypatch.setattr(results, "partition", counting)
+    ids, total = runs.load_pick_ids(ctx, run, 100)
+    assert read == []  # no results/rule_screen_values read
+    rows = runs.run_rows(ctx, run)
+    mine = [
+        str(i)
+        for i, d in zip(rows["instrument_id"], rows["decision"], strict=True)
+        if runs.is_picked(str(d)) or d == runs.PAUSED
+    ]
+    assert ids == mine and total == len(mine) and total > 0
+    assert runs.load_pick_ids(ctx, run, 1) == (mine[:1], total)

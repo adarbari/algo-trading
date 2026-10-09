@@ -38,6 +38,16 @@ class DecisionCount:
 
 
 @strawberry.type(
+    description="The tickers a run picked, in rank order, without the rows behind them: "
+    "`instrumentIds` (at most `size`) and `total`, the picks in all (the picks and the ones the "
+    "regime gate held back)"
+)
+class PickIds:
+    instrument_ids: list[str]
+    total: int
+
+
+@strawberry.type(
     description="A screener's run for the session: whose, which version ran, its run record's "
     "status and `audit` (coverage, the selection's audit), and every decision with its count "
     "over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate "
@@ -107,6 +117,15 @@ class ScreenerRun:
     async def changes(self, info: Info) -> list[ChangeCount]:
         found = await off_loop(results.load_run_changes, self.ctx, self.run)
         return [ChangeCount.of(c) for c in found.counts]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Who the run picked, read from the run's rows alone (cheap: no criterion "
+        "values); `size` ids at most, in rank order",
+        extensions=[MaxItems("size", MAX_PAGE)],
+    )
+    async def pick_ids(self, info: Info, size: int = DEFAULT_SIZE) -> PickIds:
+        ids, total = await off_loop(runs.load_pick_ids, self.ctx, self.run, size)
+        return PickIds(instrument_ids=ids, total=total)
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Its rows as a review table: `decisions` (none: all; any case), `change` "

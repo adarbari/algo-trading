@@ -25,14 +25,15 @@ beforeEach(() => {
 
 describe('useScreenerPicks', () => {
   it('asks for the ids of the picks only: no criteria, columns or reasons per row', async () => {
-    GQL.mockResolvedValue({ screener: { latestRun: { results: { results: [] } } } });
+    GQL.mockResolvedValue({ screener: { latestRun: { pickIds: { instrumentIds: [] } } } });
     const { result } = renderHook(() => useScreenerPicks('momentum_12_1'), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
     const document = String(GQL.mock.calls[0]?.[0]);
     expect(document).toContain('instrumentId');
-    for (const heavy of ['criteria', 'reasons', 'columns', 'instrument {']) {
+    expect(document).toContain('pickIds');
+    for (const heavy of ['criteria', 'reasons', 'columns', 'results(']) {
       expect(document).not.toContain(heavy);
     }
     expect(GQL.mock.calls[0]?.[1]).toMatchObject({ id: 'momentum_12_1', size: PICKS_LIMIT });
