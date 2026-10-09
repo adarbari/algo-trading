@@ -90,10 +90,23 @@ def test_verify_retries_until_the_api_answers() -> None:
 def test_verify_fails_after_its_tries_naming_what_is_wrong() -> None:
     sha = "b" * 40
     fetch = lambda url: _health("a" * 40, "a" * 40, ("restart the API",))  # noqa: E731
-    out = verify("http://x", sha, fetch, "web", tries=3, sleep=lambda s: None)
+    out = verify("http://x", sha, fetch, "full", tries=3, sleep=lambda s: None)
     assert "restart the API" in out
     assert any("api is at commit aaaaaaaaa, expected bbbbbbbbb" in line for line in out)
-    assert any(line.startswith("the web is at") for line in out)
+    web = verify("http://x", sha, fetch, "web", tries=3, sleep=lambda s: None)
+    assert web == ["the web is at commit aaaaaaaaa, expected bbbbbbbbb"]
+
+
+def test_a_web_only_deploy_passes_the_web_check_with_the_api_at_the_older_commit() -> None:
+    """The 2026-10-09 false block: the API stays at f7b0a6c on a web-only deploy."""
+    old_api = lambda url: _health("f" * 40, "e" * 40, ("the API runs commit fffffffff",))  # noqa: E731
+    assert verify("http://x", "e" * 40, old_api, "web", tries=1, sleep=lambda s: None) == []
+
+
+def test_a_restart_deploy_with_a_stale_api_fails_the_api_check() -> None:
+    stale = lambda url: _health("f" * 40, "e" * 40)  # noqa: E731
+    out = verify("http://x", "e" * 40, stale, "api", tries=1, sleep=lambda s: None)
+    assert out == ["the api is at commit fffffffff, expected eeeeeeeee"]
 
 
 def test_verify_says_so_when_nothing_answers() -> None:
@@ -110,7 +123,7 @@ def test_the_checks_ask_for_more_of_the_site() -> None:
     none = lambda s: None  # noqa: E731
     assert verify("http://x", "new", old_web, "api", tries=1, sleep=none) == []
     assert verify("http://x", "new", old_web, "full", tries=1, sleep=none) == ["web differs"]
-    assert len(verify("http://x", "new", old_web, "web", tries=1, sleep=none)) == 2
+    assert len(verify("http://x", "new", old_web, "web", tries=1, sleep=none)) == 1
     with pytest.raises(ValueError, match="check"):
         verify("http://x", "new", old_web, "bogus")
 

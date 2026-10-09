@@ -113,6 +113,18 @@ describe('instrument events', () => {
       { time: '2026-10-29', kind: 'earnings' },
     ]);
   });
+
+  it('marks a report stored by two sources on one day once', () => {
+    const eightK: InstrumentEvent = {
+      table: 'events/earnings',
+      kind: 'earnings',
+      date: '2026-10-29',
+      ts: '2026-10-29T15:48:19+00:00',
+      values: { time: 'intraday', reported: true },
+    };
+    const marks = toChartEvents([...events, eightK]).filter((e) => e.kind === 'earnings');
+    expect(marks).toEqual([{ time: '2026-10-29', kind: 'earnings' }]);
+  });
 });
 
 describe('instrument detail', () => {
