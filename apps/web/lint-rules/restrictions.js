@@ -98,8 +98,6 @@ const HTTP_LIBRARIES = [
   'superagent',
   'node-fetch',
   'cross-fetch',
-  // The Supabase client (ADR 0040) talks to Supabase over fetch: only shared/api/auth.ts.
-  '@supabase/supabase-js',
   // GraphQL clients (ADR 0037): the one transport is gql() in src/shared/api/graphql.ts over
   // fetch and TanStack Query; Apollo / urql would add a second cache and are not used at all.
   'graphql-request',
@@ -107,6 +105,16 @@ const HTTP_LIBRARIES = [
   'urql',
   '@urql/core',
 ];
+/**
+ * ADR 0040 (amended): the web signs in through `@supabase/auth-js` only, in shared/api/auth.ts;
+ * the full `@supabase/supabase-js` (database, realtime, storage clients) is banned everywhere,
+ * `shared/api` included, so it never returns to the bundle.
+ */
+const SUPABASE_JS = {
+  name: '@supabase/supabase-js',
+  message:
+    '[ADR 0040] @supabase/supabase-js is banned: the web uses @supabase/auth-js (the auth client it wraps), only in src/shared/api/auth.ts. See docs/adr/0040-identity-and-roles.md.',
+};
 /**
  * WEB 2: a GraphQL document is written only with the generated `graphql()` tag (from
  * `@/shared/api`), so codegen sees it and types its result; no runtime GraphQL parser.
@@ -243,6 +251,7 @@ function restrictedImports(layer, helpDrawerAllowed = false) {
     {
       paths: [
         ...(httpAllowed ? [] : http(HTTP_LIBRARIES)),
+        SUPABASE_JS,
         ...GRAPHQL_DOCUMENTS,
         ...CSS_IN_JS.map((name) => ({
           name,
@@ -323,6 +332,7 @@ function designSystemImports({ chart }) {
     {
       paths: [
         ...http(HTTP_LIBRARIES),
+        SUPABASE_JS,
         ...CSS_IN_JS.map((name) => ({
           name,
           message: message(

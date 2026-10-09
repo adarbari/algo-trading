@@ -1,7 +1,7 @@
 {
   "bundle": {
     "entry_gzip_bytes": 45000,
-    "entry_closure_gzip_bytes": 327100,
+    "entry_closure_gzip_bytes": 269700,
     "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
       "src/pages/admin-ingestion/index.ts": 13200,
@@ -18,27 +18,27 @@
   },
   "e2e": {
     "/ideas": {
-      "first_load_js_gzip_bytes": 314200,
+      "first_load_js_gzip_bytes": 256500,
       "requests": 63,
       "dom_nodes": 310
     },
     "/screeners": {
-      "first_load_js_gzip_bytes": 312800,
+      "first_load_js_gzip_bytes": 255100,
       "requests": 64,
       "dom_nodes": 200
     },
     "/regime": {
-      "first_load_js_gzip_bytes": 384200,
+      "first_load_js_gzip_bytes": 326500,
       "requests": 95,
       "dom_nodes": 1742
     },
     "/screeners/vrp_scanner": {
-      "first_load_js_gzip_bytes": 335200,
-      "requests": 77,
-      "dom_nodes": 322
+      "first_load_js_gzip_bytes": 278000,
+      "requests": 76,
+      "dom_nodes": 321
     },
     "/admin/ingestion": {
-      "first_load_js_gzip_bytes": 318100,
+      "first_load_js_gzip_bytes": 260500,
       "requests": 70,
       "dom_nodes": 700
     },
