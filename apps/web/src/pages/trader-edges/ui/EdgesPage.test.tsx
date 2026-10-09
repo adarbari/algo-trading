@@ -3,29 +3,26 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { EdgesPage } from './EdgesPage';
 
-vi.mock('@/features/evaluation-split', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return { EvaluationSplitForm: () => <Text>split form</Text> };
-});
 vi.mock('@/widgets/edge-list', async () => {
   const { Text } = await import('@algotrade/ui');
-  return {
-    EdgeList: ({ selected }: { selected: string | null }) => (
-      <Text>{`list ${selected ?? 'none'}`}</Text>
-    ),
-  };
+  return { EdgeList: () => <Text>list</Text> };
 });
 vi.mock('@/widgets/edge-detail', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { EdgeDetail: ({ id }: { id: string | null }) => <Text>{`detail ${id ?? 'none'}`}</Text> };
+  return { EdgeDetail: ({ id }: { id: string }) => <Text>{`detail ${id}`}</Text> };
 });
 
 describe('EdgesPage', () => {
-  it('has its heading, the list and the chosen edge beside it', () => {
-    render(<EdgesPage selected="momentum_12_1" onSelect={vi.fn()} onClear={vi.fn()} />);
+  it('shows its heading and the list when no edge is chosen', () => {
+    render(<EdgesPage onSelect={vi.fn()} onClear={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Edges' })).toBeInTheDocument();
-    expect(screen.getByText('split form')).toBeInTheDocument();
-    expect(screen.getByText('list momentum_12_1')).toBeInTheDocument();
+    expect(screen.getByText('list')).toBeInTheDocument();
+    expect(screen.queryByText(/^detail/)).not.toBeInTheDocument();
+  });
+
+  it('shows the chosen edge in place of the list', () => {
+    render(<EdgesPage selected="momentum_12_1" onSelect={vi.fn()} onClear={vi.fn()} />);
     expect(screen.getByText('detail momentum_12_1')).toBeInTheDocument();
+    expect(screen.queryByText('list')).not.toBeInTheDocument();
   });
 });

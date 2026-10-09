@@ -1,14 +1,12 @@
 /**
- * The edges page's one read (ADR 0037 / 0053): `Query.edges`, each edge document with its
- * canonical run (the latest site run whose split is the frozen period, never an exploratory one)
- * and its stored rows, plus every run the user sees (without rows) so exploratory ones can be
- * listed and labelled. The cache holds the response; `select` shapes it.
+ * The edges pages' one read (ADR 0037 / 0053, ED8): `Query.edges`, each edge document with its
+ * verdict (judged by the read model on the official result, the canonical run: the sentence, the
+ * figures, the criteria and the year rows), how it is defined, its sources, and every run the
+ * user sees so exploratory ones can be listed and labelled. The cache holds the response.
  */
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
-
-import { toEdges } from '../model/edges';
 
 const EdgesPage = graphql(`
   query EdgesPage {
@@ -19,56 +17,57 @@ const EdgesPage = graphql(`
       thesis
       mechanism
       persistence
-      schedule
       horizons
       screeners
       baselines
-      variants
-      frozenFrom
       rejectionReason
-      evidence {
-        runId
-        splitFrom
+      sources {
+        title
+        url
+      }
+      definition {
+        picks
+        trade
+        compare
+        test
+      }
+      verdict {
+        verdict
+        rationale
+        headline
+        result
+        basis
+        trades
+        oosTrades
+        winRate
+        baseRate
+        liftPts
+        lift
+        decileSpread
+        decileT
+        sharpe
+        deflatedSharpe
+        pbo
+        criteria {
+          id
+          label
+          value
+          threshold
+          status
+          level
+        }
+        years {
+          year
+          period
+          winRate
+          baseRate
+          liftPts
+          decileSpread
+          trades
+        }
       }
       canonicalRun {
         runId
-        owner
-        rangeFrom
-        rangeTo
-        splitFrom
-        exploratory
-        knowledgeTs
-        afterSession
-        rows {
-          edgeVariant
-          variant
-          role
-          horizonSessions
-          sliceKind
-          sliceValue
-          sessions
-          picks
-          hitRate
-          baseRate
-          lift
-          exploratory
-        }
-      }
-      canonicalNotRun {
-        code
-        reason
-        kind
-        guideTerm
-        kindText
-        cause {
-          links {
-            level
-            subject
-            status
-            message
-            runId
-          }
-        }
       }
       runs {
         runId
@@ -78,6 +77,8 @@ const EdgesPage = graphql(`
         splitFrom
         exploratory
         knowledgeTs
+        trialsCounted
+        lostInputs
       }
     }
   }
@@ -88,7 +89,7 @@ export function useEdges() {
   return useQuery({
     queryKey: queryKeys.gql('EdgesPage', {}),
     queryFn: () => gql(EdgesPage, {}),
-    select: toEdges,
+    select: (data) => data.edges,
   });
 }
 

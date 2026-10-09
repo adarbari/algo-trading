@@ -1,5 +1,5 @@
 /**
- * Trader > Edges: the edges list beside the chosen edge's detail. The chosen edge lives in the
+ * Trader > Edges: the edges list, or the chosen edge's page. The chosen edge lives in the
  * URL (`/edges?edge=momentum_12_1`) so it can be shared and a phone's sheet can be dismissed.
  */
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';

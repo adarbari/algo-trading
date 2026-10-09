@@ -61,7 +61,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'split',
       header: 'Split from',
-      headerAction: term('frozen_period'),
+      headerAction: term('out_of_sample'),
       value: (r) => r.splitFrom ?? null,
       cell: ({ row }) => (
         <>
@@ -71,10 +71,10 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
       ),
     },
     { id: 'variants', header: 'Variants', value: (r) => r.variants.join(', '), mono: true },
-    { id: 'horizons', header: 'Horizons', value: (r) => r.horizons.join(', '), mono: true },
+    { id: 'horizons', header: 'Holding periods', value: (r) => r.horizons.join(', '), mono: true },
     {
       id: 'sessions',
-      header: 'Sessions',
+      header: 'Trades',
       value: (r) => r.sessions ?? null,
       format: COUNT,
       align: 'end',
@@ -113,8 +113,8 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     },
     {
       id: 'trials',
-      header: 'Trials',
-      headerAction: term('trial_log'),
+      header: 'Variants tried',
+      headerAction: term('variants_tried'),
       value: (r) => r.trials ?? null,
       format: COUNT,
       align: 'end',

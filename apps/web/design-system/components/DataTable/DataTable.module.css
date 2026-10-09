@@ -105,6 +105,30 @@
   cursor: default;
 }
 
+/* A group heading (`groupBy`): one full-width cell, as tall as a row, in the muted surface. */
+.groupRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  height: var(--dt-row-height);
+  background: var(--color-row);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.groupCell {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--density-panel-padding-x);
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
 /* Only a row a click acts on looks clickable (DataTable.tsx `clickable`). */
 .row[data-clickable] {
   cursor: pointer;

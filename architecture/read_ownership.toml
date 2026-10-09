@@ -38,6 +38,17 @@ section = "docs/api/read-model.md#the-domain-objects"
 detect = [{ string_prefix = "rollups/instrument/" }, { string_prefix = "rollups/market/" }, { call = "chain_expiries" }]
 
 [[responsibility]]
+id = "edge-verdict"
+description = "An edge's verdict (ED8, ADR 0053): Works, Promising, Not working, Not enough data or Waiting on data from its official result (the canonical run's stored rows: the best of its screens and holding periods, one deterministic rule, the one-line reason, the criteria with value, threshold and pass / fail / not measured, the year-by-year rows), its thresholds typed from config/site/verdict.toml; the statistics are the stored rows', never recomputed, and the browser derives nothing of it"
+owner = [
+    "src/algotrade/services/read/evaluation/verdict.py",
+    "src/algotrade/config/edges/verdict.py",
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+allowed = ["apps/api/algotrade_api/graphql/*"]  # Edge.verdict serves it
+detect = [{ call = "load_edge_verdict" }, { call = "load_verdict" }]
+
+[[responsibility]]
 id = "graphql-schema"
 description = "The GraphQL read layer (ADR 0037): the Strawberry schema at POST /graphql, scalars (FeatureName, Date, JSON), error codes, limits, request context, dataloaders and the thin types over services.read; the committed snapshot apps/api/schema.graphql (from read-model PR 4)"
 owner = ["apps/api/algotrade_api/graphql/*"]

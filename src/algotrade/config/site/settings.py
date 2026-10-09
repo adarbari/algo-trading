@@ -10,6 +10,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     macro.toml     -> MacroSettings     (config/site/macro.py: macro series, index levels; ADR 0048)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
+    verdict.toml   -> VerdictSettings   (config/edges/verdict.py: the edge verdict's thresholds)
     users.toml     -> UsersSettings     (config/site/users.py: the user registry, ADR 0040)
     users/<id>/identity.toml -> the user's sign-in email / subject on its UserRecord (git-ignored)
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
@@ -30,6 +31,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.coverage import DEFAULT_COVERAGE, CoverageRule, load_coverage
 from algotrade.config.site.features.definitions import (
     SCALARS,
@@ -803,6 +805,10 @@ def load_sources(configs: SiteDocuments) -> SourcesSettings:
 
 def load_nightly(configs: SiteDocuments) -> NightlySettings:
     return NightlySettings.from_document(site_document(configs.load, "nightly"))
+
+
+def load_verdict(configs: SiteDocuments) -> VerdictSettings:
+    return VerdictSettings.from_document(site_document(configs.load, "verdict"))
 
 
 def load_users(configs: SiteDocuments) -> UsersSettings:

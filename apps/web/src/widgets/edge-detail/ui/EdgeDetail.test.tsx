@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EDGES_FIXTURE, toEdges } from '@/entities/edge';
-import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
+import { EDGES_FIXTURE } from '@/entities/edge';
+import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { EdgeDetail } from './EdgeDetail';
 
@@ -15,58 +16,92 @@ vi.mock('@/features/edge-evaluation', async () => {
   const { Text } = await import('@algotrade/ui');
   return { RunEvaluation: ({ edgeId }: { edgeId: string }) => <Text>{`run ${edgeId}`}</Text> };
 });
+vi.mock('@/features/evaluation-split', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { EvaluationSplitForm: () => <Text>split form</Text> };
+});
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
   return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
 });
 
+stubElementSize();
+
 beforeEach(() => {
-  hooks.useEdges.mockReturnValue(fakeQuery(toEdges(EDGES_FIXTURE)));
+  hooks.useEdges.mockReturnValue(fakeQuery(EDGES_FIXTURE.edges));
 });
 
 describe('EdgeDetail', () => {
-  it('shows the frozen figures per variant through the odds line, never an exploratory row', async () => {
-    const { container } = render(<EdgeDetail id="momentum_12_1" />);
-    expect(screen.getByRole('heading', { name: 'Momentum 12-1' })).toBeInTheDocument();
+  it('shows the verdict, the server headline, the figures and the actions', async () => {
+    const { container } = render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeInTheDocument();
+    expect(screen.getAllByText('Promising').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Out-of-sample, momentum_12_1, 20 trading days/)).toBeInTheDocument();
     expect(screen.getByText('run momentum_12_1')).toBeInTheDocument();
-    expect(screen.getByText('momentum_12_1 (screener)')).toBeInTheDocument();
-    expect(screen.getByText('equal_weight (baseline)')).toBeInTheDocument();
-    expect(screen.getByText('58.0%')).toBeInTheDocument();
-    expect(screen.queryByText('99.0%')).not.toBeInTheDocument();
-    expect(screen.queryByText('90.0%')).not.toBeInTheDocument();
-    for (const id of ['hit_rate', 'base_rate', 'lift', 'independent_sessions', 'edge_status']) {
+    const strip = screen.getByRole('region', { name: 'Out-of-sample result' });
+    expect(within(strip).getByText('57%')).toBeInTheDocument();
+    expect(within(strip).getByText('+5 pts')).toBeInTheDocument();
+    for (const id of ['win_rate', 'base_rate', 'lift', 'trades', 'verdict', 'edge_status']) {
       expect(screen.getAllByText(`help ${id}`).length).toBeGreaterThan(0);
     }
     await expectNoA11yViolations(container);
   });
 
-  it('labels an exploratory run as such and lists the canonical one', () => {
-    render(<EdgeDetail id="momentum_12_1" />);
+  it('defines the edge in six parts, with screens linked and sources linked only with a url', () => {
+    render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
+    for (const label of ['1 · Idea', '2 · Screens', '3 · Picks', '4 · Trade', '6 · Test']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByRole('link', { name: 'momentum_12_1' })).toHaveAttribute(
+      'href',
+      '/screeners/momentum_12_1',
+    );
+    expect(screen.getByRole('link', { name: /Jegadeesh and Titman 1993/ })).toHaveAttribute(
+      'href',
+      'https://example.org/jt1993',
+    );
+    expect(screen.getByText('Daniel and Moskowitz 2016')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Daniel/ })).not.toBeInTheDocument();
+  });
+
+  it('switches the year table between in-sample, out-of-sample and both', async () => {
+    render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
+    const years = () => screen.getByRole('grid', { name: 'Year by year' });
+    expect(within(years()).getByText('2026')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'In-sample' }));
+    expect(within(years()).getByText('2025')).toBeInTheDocument();
+    expect(within(years()).queryByText('2026')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Out-of-sample' }));
+    expect(within(years()).getByText('No years to show')).toBeInTheDocument();
+  });
+
+  it('keeps the tests, backtests and the split form in the details', async () => {
+    render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
+    await userEvent.click(screen.getByText('Details'));
+    expect(screen.getByText('Official result')).toBeInTheDocument();
     expect(screen.getByText('EXPLORATORY')).toBeInTheDocument();
-    expect(screen.getByText('Canonical')).toBeInTheDocument();
-    expect(screen.getByText('help exploratory')).toBeInTheDocument();
+    expect(screen.getByText('momentum_12_1: rollup (4 sessions)')).toBeInTheDocument();
+    expect(screen.getByText('Not measured yet')).toBeInTheDocument();
+    expect(screen.getByText('split form')).toBeInTheDocument();
   });
 
-  it('says why an edge has no run, with the rejection reason', () => {
-    render(<EdgeDetail id="sp500_index_changes" />);
-    expect(screen.getByText('not run yet')).toBeInTheDocument();
+  it('says what a waiting edge waits on and offers the way back', async () => {
+    const onBack = vi.fn();
+    render(<EdgeDetail id="sp500_index_changes" onBack={onBack} />);
+    expect(screen.getAllByText('No official result yet').length).toBeGreaterThan(0);
     expect(screen.getByText('The effect vanished after 2005.')).toBeInTheDocument();
-    expect(screen.queryByText('EXPLORATORY')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '← Edges' }));
+    expect(onBack).toHaveBeenCalled();
   });
 
-  it('asks to choose an edge, and says when the chosen one does not exist', () => {
-    const { rerender } = render(<EdgeDetail id={null} />);
-    expect(screen.getByText('Choose an edge')).toBeInTheDocument();
-    rerender(<EdgeDetail id="nope" />);
+  it('says when the chosen edge does not exist, and shows loading and error', () => {
+    const { rerender } = render(<EdgeDetail id="nope" onBack={vi.fn()} />);
     expect(screen.getByText('No edge nope')).toBeInTheDocument();
-  });
-
-  it('shows loading and error states', () => {
     hooks.useEdges.mockReturnValue(fakeQuery(undefined));
-    const { rerender } = render(<EdgeDetail id="momentum_12_1" />);
+    rerender(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
     expect(screen.getByText('Loading edge…')).toBeInTheDocument();
     hooks.useEdges.mockReturnValue(fakeQuery(undefined, { isError: true }));
-    rerender(<EdgeDetail id="momentum_12_1" />);
+    rerender(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} />);
     expect(screen.getByText('The edge failed to load.')).toBeInTheDocument();
   });
 });

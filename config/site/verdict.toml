@@ -1,0 +1,20 @@
+# The thresholds behind an edge's verdict (Works / Promising / Not working / Not enough data /
+# Waiting on data), read by services/read/evaluation/verdict.py. A "trade" is an independent
+# session of the official result. Out-of-sample (OOS) is the slice from the edge's split date.
+
+min_oos_trades = 40      # fewer out-of-sample trades than this: Not enough data (owner, 2026-10-09)
+works_trades = 100       # Works needs this many trades ...
+works_oos_trades = 40    # ... of which this many out-of-sample
+
+not_working_t = 1.0      # top-vs-bottom decile t below this: Not working
+promising_t = 2.0        # Promising needs at least this t
+works_t = 3.0            # Works needs at least this t
+
+not_working_dsr = 0.5    # deflated Sharpe below this: Not working
+promising_dsr = 0.80
+works_dsr = 0.95
+
+max_pbo = 0.5            # probability of overfitting above this: Not working
+works_max_pbo = 0.2
+
+oos_lift_share = 0.5     # OOS lift must keep this share of the whole-history lift
