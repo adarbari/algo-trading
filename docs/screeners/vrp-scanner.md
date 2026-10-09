@@ -1,14 +1,14 @@
 # Daily Stock Identifier — IV / HV Volatility Premium Scanner
 
 > **Status in this repo:** a site rule-screen preset (not scheduled; run it from the Builder
-> preview or as a `screen` job), over the expression features in `config/site/features/vrp.toml`
+> preview or as a `screen` job), over the expression features in `config/site/features/options/vrp.toml`
 > (`vrp_iv30`, `vrp_iv30_source`, `vrp_iv_hv_spread`, `vrp_iv_hv_ratio`) and `price.toml`
 > (`dist_52w`, `pct_vs_sma_20/50/200`). The latest version is
 > `config/site/presets/screeners/vrp_scanner/v4.toml`; `v1.toml` to `v3.toml` stay as they were
 > (immutable; user copies pinned to `vrp_scanner@1`, `@2` or `@3` keep computing them).
 >
 > - **v4** (owner 2026-10-08) is v3 with the IV rank score criterion over `feature.iv_rank`
->   (IBKR's rank where it has one, else ours from Cboe chains; `config/site/features/volatility.toml`)
+>   (IBKR's rank where it has one, else ours from Cboe chains; `config/site/features/options/volatility.toml`)
 >   instead of IBKR's only, and an `iv_rank_source` column (`ibkr` / `ours`) in place of
 >   `iv_rank_ibkr`. The latest version of a site preset never reads `rollup.ibkr_iv@v1.*`
 >   directly (`tests/architecture/test_structure.py`).

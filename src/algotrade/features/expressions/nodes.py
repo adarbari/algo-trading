@@ -1,7 +1,7 @@
 """The syntax tree of a feature expression, and the error every stage raises.
 
 Every node records where it starts (``Pos``: 1-based line and column in the formula), so an
-error names the file, the feature and the position: ``config/site/features/price.toml
+error names the file, the feature and the position: ``config/site/features/technical/price.toml
 [near_52w] expr, line 1 col 14: unknown feature 'price_stats.clsoe'``.
 """
 

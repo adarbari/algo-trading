@@ -439,7 +439,7 @@ def test_verification_errors_name_the_key() -> None:
 
 
 def test_the_committed_feature_files_load() -> None:
-    names = sorted(p.stem for p in (SITE / "features").glob("*.toml"))
+    names = sorted(p.stem for p in (SITE / "features").glob("*/*.toml"))
     store = open_config_store(str(REPO_ROOT / "config"))
     assert store.names("site", "features") == names
     assert names == [

@@ -20,7 +20,7 @@ chain or an underlying quote. No spot, no pricing: sums over the stored contract
 
 A null ``open_interest`` or ``volume`` counts as 0. ``flow_status``: ``NO_CHAIN`` (no quotes
 for the underlying on the session) or ``OK``. The put / call ratios over these columns are
-expression features (``config/site/features/positioning.toml``).
+expression features (``config/site/features/options/positioning.toml``).
 """
 
 from dataclasses import dataclass

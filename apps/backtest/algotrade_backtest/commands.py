@@ -302,14 +302,15 @@ def _edge_baseline(
     return 0
 
 
-SCORES_FILE = "site/features/edge_scores.toml"
+SCORES_FILE = "site/features/scores/edge_scores.toml"
 
 
 def cmd_fit_edge_scorer(args: argparse.Namespace) -> int:
     """Fit the learned scorer of ``--edge`` (a probit on the document's ``[scorer] features``,
     windows closed before its frozen period less one horizon; ADR 0053, ED7) through the jobs
-    runner and write it as an expression feature into ``config/site/features/edge_scores.toml``
-    (or ``--out``). The file is a site config change: the owner commits it."""
+    runner and write it as an expression feature into
+    ``config/site/features/scores/edge_scores.toml`` (or ``--out``).
+    The file is a site config change: the owner commits it."""
     backend = open_backend(data_url(args.data_url))
     reader = StoreReader(backend)
     root = config_dir(args.config_dir)

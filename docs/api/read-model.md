@@ -148,7 +148,7 @@ series, `RANGE_GRAIN_FIELDS` in `test_read_model.py`, as `Bar.close` was on REST
 **A fact a page needs that is computed on read becomes a stored feature first**
 (`.claude/skills/add-feature`): `rollup.nearest_expiry@v1.{expiry_date,dte,sessions_to_expiry}`
 (new group `features/rollups/options/nearest_expiry.py`, kind `chain`) and the expression
-`feature.earnings_before_expiry` (`config/site/features/earnings.toml`) land in PR 3.
+`feature.earnings_before_expiry` (`config/site/features/options/earnings.toml`) land in PR 3.
 `earnings.days_to_earnings` already exists.
 
 ## The domain objects

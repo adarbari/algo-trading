@@ -275,7 +275,7 @@ change architecture and need `write-adr` plus an `architect` review.
   view; FS6 covers the mechanics.
 - `features/rollups/market/macro.py`: curve slope from `rates/treasury`, HY OAS change,
   claims vs 52-week low, Sahm gap, permits YoY, SLOOS, Fed 12-month change, CFNAI.
-- Everything else is **TOML expression features** in `config/site/features/regime.toml`:
+- Everything else is **TOML expression features** in `config/site/features/market/regime.toml`:
   the ratios, the thresholds, the two scores, the label and the multiplier. No Python, and
   `make features-doc` documents them.
 

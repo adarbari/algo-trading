@@ -2,7 +2,7 @@
 
 Sections (a) dating agreement, (b) leads per episode, (c) false alarms per decade, (d) the
 plan's acceptance as PASS / FAIL lines, (f) the bear-state probit fit with the params to paste
-into ``config/site/features/regime.toml`` (or "not converged: do not paste"), (g) each macro
+into ``config/site/features/market/regime.toml`` (or "not converged: do not paste"), (g) each macro
 signal's own leads, hit rate and false alarms. A section with
 nothing stored to read prints ``regime_scorecard.NO_DATA`` and the backfill command instead
 (e): the report never fails for want of data. Numbers are rounded the same way every run, rows
@@ -163,8 +163,8 @@ def probit_section(result: sc.ProbitResult | None) -> list[str]:
     return [
         *head,
         summary,
-        "  paste into config/site/features/regime.toml, bump both versions (a new fit is a new",
-        f"  definition) and note that sessions up to {result.through} are in-sample:",
+        "  paste into config/site/features/market/regime.toml, bump both versions (a new fit is a",
+        f"  new definition) and note that sessions up to {result.through} are in-sample:",
         f"  [bear_prob_6m] params = {{ b0 = {b[0]}, b_curve = {b[1]}, b_cpi = {b[2]}, "
         f"b_hy = {b[3]} }}",
         f'  [bear_prob_source] params = {{ fitted = 1, fitted_through = "{result.through}" }}',

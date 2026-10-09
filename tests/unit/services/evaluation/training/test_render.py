@@ -42,7 +42,7 @@ def test_expression_names() -> None:
 def test_the_expression_feature_scores_what_the_fit_predicts() -> None:
     fit = fitted()
     doc = tomllib.loads(render_scorer(fit))
-    site = {p.stem: tomllib.loads(p.read_text()) for p in SITE_FEATURES.glob("*.toml")}
+    site = {p.stem: tomllib.loads(p.read_text()) for p in SITE_FEATURES.glob("*/*.toml")}
     fs = FeatureSet.build(GROUPS, feature_definitions({**site, "edge_scores": doc}), SUPERSEDED)
     x = np.array([[0.5, 1e9], [-0.2, 2e8], [1.5, 5e9]])
     ids = ["A", "B", "C"]

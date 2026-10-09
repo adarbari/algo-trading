@@ -96,7 +96,8 @@ HISTORY_ATTEMPTS = 3  # requests per name before it is FETCH_ERROR (pending)
 BACKOFF_S = 30.0  # first back-off before a retry; doubles each time (30 s, 60 s)
 STOP_AFTER_FAILED = 5  # names IB did not answer in a row (gateway / IB trouble): stop
 # Backfill order inputs (stored rollups, through services.features): option tiers, the
-# liquidity class expression (config/site/features/liquidity.toml), 20-session dollar volume.
+# liquidity class expression (config/site/features/company/liquidity.toml), 20-session dollar
+# volume.
 PRICE_GROUP, OPTION_GROUP = "price_stats", "option_liquidity"
 LIQUID_TIERS, LIQUID_CLASSES = ("A", "B"), ("HIGH", "MEDIUM")
 LIQUIDITY_CLASS = "liquidity_class"

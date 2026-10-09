@@ -22,7 +22,7 @@ groups:
 | `anchored_vwap@v1` | `price/` | `avwap_earnings`, `avwap_anchor_date` |
 | `oi_walls@v1` | `options/` | `wall_status`, `call_wall`, `call_wall_oi`, `put_wall`, `put_wall_oi` |
 
-A formula over stored columns is an expression feature in `config/site/features/swing.toml`
+A formula over stored columns is an expression feature in `config/site/features/technical/swing.toml`
 (computed on read): `atr_pct`, `range_20d_pct`, `trend_state`, `dist_to_resistance`,
 `dist_to_support`, `dist_to_resistance_atr`, `dist_to_support_atr`, `breakout_20d`,
 `pullback_to_sma20`, `breakout_retest_held`, `breakout_failed`, `dist_to_gap_above`,

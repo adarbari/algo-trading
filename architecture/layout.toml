@@ -841,7 +841,23 @@ purpose = "L3 field guide, one <theme>.toml per theme plus situations.toml: how 
 
 [[config_dir]]
 path = "config/site/features"
-purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3); ; fit-edge-scorer (ADR 0053, ED7) writes edge_scores.toml here once a fit has 40 sessions"
+purpose = "L3 expression features, one <theme>.toml per theme in the subfolder of its kind (loaded by config/site/settings.py load_features through the config store, one level of subfolders; a theme name is unique across them; ADR 0023 step 3); the 12-file cap applies per subfolder; scores/ (ED7: edge_scores.toml, written by fit-edge-scorer, ADR 0053) is added with its first file"
+
+[[config_dir]]
+path = "config/site/features/technical"
+purpose = "expression features of the chart: bands.toml (bands, channels, z-scores, regression trend), price.toml (price statistics, relative strength), swing.toml (swing levels, candles, momentum), volume.toml (volume dry-ups, accumulation)"
+
+[[config_dir]]
+path = "config/site/features/options"
+purpose = "expression features of options and volatility: earnings.toml (events against expiries), positioning.toml (skew, flow, term structure), volatility.toml (IV against HV, IV rank), vrp.toml (the VRP scanner), wings.toml (the covered-call wing)"
+
+[[config_dir]]
+path = "config/site/features/company"
+purpose = "expression features of the company and its tradability: fundamentals.toml (ratios over fundamentals and dividends), liquidity.toml (the liquidity class)"
+
+[[config_dir]]
+path = "config/site/features/market"
+purpose = "expression features of the market entity: regime.toml (the context signals of the market regime, ADR 0047)"
 
 [[config_dir]]
 path = "config/site/edges"

@@ -4,7 +4,8 @@ site/defaults.toml                         L3 defaults (screening, backtest)
 site/<name>.toml                           L3 site settings (kind ``settings``)
 site/<name>.local.toml                     this machine's values over site/<name>.toml
                                            (git-ignored; merged key by key, tables merged)
-site/features/<theme>.toml                 L3 expression features (kind ``features``)
+site/features/<kind>/<theme>.toml          L3 expression features, one folder per kind of theme
+                                           (kind ``features``; the theme name is unique)
 site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``, ADR 0041)
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
@@ -55,6 +56,7 @@ SITE_FOLDERS = {
     "guide_playbooks": "guide/playbooks",
     "edges": "edges",
 }
+NESTED = (PLAYBOOKS, "features")  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
     "defaults", "settings", "field_guide", "regime", "events", "guide", "guide_playbooks",
 )  # fmt: skip
@@ -118,15 +120,16 @@ class FileConfigStore:
                 return self.root / SITE / f"{validate_id(kind, name)}.toml"
             if kind in SITE_FOLDERS:
                 path = self.root / SITE / SITE_FOLDERS[kind] / f"{validate_id(kind, name)}.toml"
-                return self._playbook_path(path) if kind == PLAYBOOKS else path
+                return self._nested_path(path) if kind in NESTED else path
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
         if kind in USER_FILES:  # one file per user: users/<id>/<kind>.toml
             return self.root / "users" / user / f"{kind}.toml"
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
 
-    def _playbook_path(self, flat: Path) -> Path:
-        """``site/guide/playbooks/<family>/<id>.toml``: the family folder that holds the file."""
+    def _nested_path(self, flat: Path) -> Path:
+        """``site/guide/playbooks/<family>/<id>.toml``, ``site/features/<kind>/<theme>.toml``:
+        the subfolder that holds the file."""
         return next(iter(sorted(flat.parent.glob(f"*/{flat.name}"))), flat)
 
     def screen_dir(self, scope: str, name: str) -> Path:
@@ -203,8 +206,8 @@ class FileConfigStore:
             return ["defaults"] if scope == SITE and self._path(SITE, kind, "x").exists() else []
         if kind == SCREENERS:
             return [n for n in self.screen_folders(scope) if self.screen_versions(scope, n)]
-        if kind == PLAYBOOKS:
-            base = self.root / SITE / SITE_FOLDERS[PLAYBOOKS]
+        if kind in NESTED and (scope == SITE or kind == PLAYBOOKS):  # a user's features: flat
+            base = self.root / SITE / SITE_FOLDERS[kind]
             return sorted(p.stem for p in base.glob("*/*.toml")) if scope == SITE else []
         directory = self._path(scope, kind, "x").parent
         return sorted(p.stem for p in directory.glob("*.toml")) if directory.exists() else []
