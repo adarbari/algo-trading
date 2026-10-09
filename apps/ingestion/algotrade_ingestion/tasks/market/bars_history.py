@@ -53,8 +53,11 @@ say how many are left.
   nightly ``bars`` task must fill from Massive (it skips stored dates), so Tiingo rows for it are
   counted (``no_partition_rows``) and not written.
 - **Split check**: the days Tiingo's ``splitFactor`` is not 1 are compared with ``events/split``
-  (``ratio`` = to / from) over the span of the fetched bars; each difference (a split on one
-  side only, or another ratio) is an item ``split:<id>`` (``SPLIT_MISMATCH: <n> ...``) and
+  (``ratio`` = to / from) over the span of the fetched bars. An ex-date with no stored split
+  becomes an ``events/split`` row (source ``tiingo``, ratio = factor as given), for ANY id
+  (Massive's history is shallow: AAPL 2014 and 2020 were missing); a stored row always wins and
+  is never shadowed, and the rows are published with the same run's bars (all or none). A date
+  both have with another ratio is an item ``split:<id>`` (``SPLIT_MISMATCH: <n> ...``) and
   counts in ``stats["split_mismatches"]``. Reported, never a failure and never a reason not
   to write: the bars are what the vendor sent.
 """
@@ -70,7 +73,6 @@ from typing import cast
 
 import pandas as pd
 
-from algotrade.core.model.instruments import is_perma_id
 from algotrade.data.events import read_events
 from algotrade.data.listings.universe import listings_over
 from algotrade.services.events.fill import FillCandidate, fill_order
@@ -182,7 +184,8 @@ def split_findings(
 ) -> list[str]:
     """Differences between the splits in Tiingo's ``actions`` (``ts``, ``split_factor``) and the
     stored ``events/split`` rows (``ts``, ``ratio``) of one instrument, over ``first..last`` (the
-    span of the fetched bars): one line per day with a split on one side only or two ratios."""
+    span of the fetched bars): one line per day where both sides have a split with two ratios (a
+    day only Tiingo has is written by ``tiingo_split_rows``, not a finding)."""
     ours = {
         pd.Timestamp(t).date(): float(f)
         for t, f in zip(tiingo["ts"], tiingo["split_factor"], strict=True)
@@ -197,11 +200,10 @@ def split_findings(
         }
     )
     found = []
-    for day in sorted(set(ours) | {d for d in theirs if first <= d <= last}):
-        a, b = ours.get(day), theirs.get(day)
-        if a is None or b is None or not math.isclose(a, b, rel_tol=RATIO_TOLERANCE):
-            ours_text, theirs_text = ("none" if v is None else f"{v:g}" for v in (a, b))
-            found.append(f"{day.isoformat()}: tiingo {ours_text} vs events/split {theirs_text}")
+    for day in sorted(set(ours) & {d for d in theirs if first <= d <= last}):
+        a, b = ours[day], theirs[day]
+        if not math.isclose(a, b, rel_tol=RATIO_TOLERANCE):
+            found.append(f"{day.isoformat()}: tiingo {a:g} vs events/split {b:g}")
     return found
 
 
@@ -210,16 +212,15 @@ def tiingo_split_rows(
 ) -> pd.DataFrame:
     """The ``events/split`` rows (``ts``, ``split_from``, ``split_to``, ``ratio``) to write for
     one instrument from Tiingo's ``actions`` (``ts``, ``split_factor``) over ``first..last``:
-    only for an ``EQ:TIINGO:`` id (module docstring), and not for a day ``stored`` (the stored
-    ``events/split`` rows of the instrument) already has."""
+    for any id, but only for a day ``stored`` (the stored ``events/split`` rows of the instrument)
+    does not have: Massive's history is shallow, and its rows win where they exist."""
     rows = []
-    if is_perma_id(instrument_id):
-        known = set() if stored.empty else {pd.Timestamp(t).date() for t in stored["ts"]}
-        for t, factor in zip(tiingo["ts"], tiingo["split_factor"], strict=True):
-            day = pd.Timestamp(t).date()
-            if factor != 1.0 and factor > 0 and first <= day <= last and day not in known:
-                rows.append({"ts": pd.Timestamp(day, tz="UTC"), "split_from": 1.0,
-                             "split_to": float(factor), "ratio": float(factor)})  # fmt: skip
+    known = set() if stored.empty else {pd.Timestamp(t).date() for t in stored["ts"]}
+    for t, factor in zip(tiingo["ts"], tiingo["split_factor"], strict=True):
+        day = pd.Timestamp(t).date()
+        if factor != 1.0 and factor > 0 and first <= day <= last and day not in known:
+            rows.append({"ts": pd.Timestamp(day, tz="UTC"), "split_from": 1.0,
+                         "split_to": float(factor), "ratio": float(factor)})  # fmt: skip
     cols = ["ts", "split_from", "split_to", "ratio"]
     return pd.DataFrame(rows, columns=cols).assign(instrument_id=instrument_id)
 
@@ -256,11 +257,9 @@ def _fetch_name(
     run.stage_sessions(BARS, f"hist_{name.instrument_id}", frame, source.name)
     mine = stored_splits[stored_splits["instrument_id"] == name.instrument_id]
     actions = normalized.parsed["actions"]
-    if is_perma_id(name.instrument_id):  # no other source's splits: write ours
-        splits = tiingo_split_rows(name.instrument_id, actions, mine, days.min(), days.max())
-        if not splits.empty:
-            run.stage(SPLITS, f"split_{name.instrument_id}", splits, source.name)
-        return f"OK: {_window(since, until)}"
+    splits = tiingo_split_rows(name.instrument_id, actions, mine, days.min(), days.max())
+    if not splits.empty:  # only the ex-dates Massive's history lacks
+        run.stage(SPLITS, f"split_{name.instrument_id}", splits, source.name)
     found = split_findings(actions, mine, days.min(), days.max())
     if found:
         shown = "; ".join(found[:3]) + ("; ..." if len(found) > 3 else "")

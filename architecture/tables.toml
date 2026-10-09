@@ -83,8 +83,8 @@ also_written_by = [
 name = "events/split"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
 also_written_by = [
-    # ADR 0053 ED6: Tiingo's splitFactor for EQ:TIINGO: ids only (listings outside symbol_history, which Massive's
-    # ticker-resolved splits never reach), published with the same run's bars; never for a FIGI id.
+    # ADR 0053 ED6: Tiingo's splitFactor for any id, only on ex-dates with no stored split row (Massive's history
+    # is shallow and its rows win; never shadowed), published with the same run's bars.
     "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",
 ]
 

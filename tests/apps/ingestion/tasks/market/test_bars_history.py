@@ -250,18 +250,20 @@ def test_split_check_reports_differences_and_still_writes(writer: StoreWriter) -
         {
             "AAA": payloads.prices(rows(10), split_days),  # events/split agrees
             "BBB": payloads.prices(rows(20), split_days),  # events/split has 2, not 4
-            "CCC": payloads.prices(rows(30)),  # events/split has a split Tiingo does not show
+            "CCC": payloads.prices(
+                rows(30)
+            ),  # events/split has a split Tiingo does not show: no finding
         }
     )
     write_split(writer, "EQ:AAA", date(2020, 1, 3), 4.0, date(2020, 1, 4))  # a run each
     write_split(writer, "EQ:BBB", date(2020, 1, 3), 2.0, date(2020, 1, 5))
     write_split(writer, "EQ:CCC", date(2020, 1, 6), 2.0, date(2020, 1, 7))
     record = run(writer, vendor, ("AAA", "BBB", "CCC"))
-    assert record.stats["split_mismatches"] == 2 and record.stats["rows"] == 9  # written anyway
+    assert record.stats["split_mismatches"] == 1 and record.stats["rows"] == 9  # written anyway
     assert "split:EQ:AAA" not in record.items
     assert "tiingo 4 vs events/split 2" in record.items["split:EQ:BBB"]
-    assert "tiingo none vs events/split 2" in record.items["split:EQ:CCC"]
-    assert len(record.stats["split_mismatch_examples"]) == 2
+    assert "split:EQ:CCC" not in record.items
+    assert len(record.stats["split_mismatch_examples"]) == 1
     assert record.status is RunStatus.COMPLETE  # a finding, not a failure
 
 
@@ -276,8 +278,10 @@ def test_split_findings_only_compare_the_span_of_the_fetched_bars() -> None:
         }
     )
     assert split_findings(tiingo, stored, date(2020, 1, 2), date(2020, 1, 6)) == []
-    assert split_findings(tiingo, stored, date(2019, 1, 1), date(2020, 1, 6)) == [
-        "2019-06-03: tiingo none vs events/split 3"
+    assert split_findings(tiingo, stored, date(2019, 1, 1), date(2020, 1, 6)) == []
+    far = stored.assign(ratio=[3.0, 4.0, 5.0])
+    assert split_findings(tiingo, far, date(2020, 1, 2), date(2020, 1, 6)) == [
+        "2020-01-03: tiingo 2 vs events/split 4"
     ]
 
 
@@ -494,28 +498,31 @@ def _splits(writer: StoreWriter) -> pd.DataFrame:
     return pd.concat([p for p in parts if p is not None], ignore_index=True)
 
 
-def test_tiingo_split_rows_only_for_tiingo_namespace_ids(writer: StoreWriter) -> None:
-    """A delisted name (EQ:TIINGO:) has no Massive split row, so Tiingo's splitFactor becomes
-    one (ex-date midnight UTC, ratio = factor = split_to, split_from 1, no known_from); a FIGI
-    id's split stays Massive's: Tiingo's is only compared."""
-    write_listings(writer, [
-        ("EQ:TIINGO:US0001", "OLD", "US0001", "2019-06-03", "2020-01-07"),
-        ("EQ:AAA", "AAA", "", "2000-01-03", None),
-    ])  # fmt: skip
-    split_days = {"2020-01-03": 2.0}
-    vendor = Vendor({"US0001": payloads.prices(rows(10), split_days),
-                     "AAA": payloads.prices(rows(20), split_days)})  # fmt: skip
+def test_tiingo_split_fills_only_dates_without_a_stored_split(writer: StoreWriter) -> None:
+    """AAPL's 2014 and 2020 splits were missing from Massive's shallow history (and reported as
+    "vs events/split none"): a FIGI id's Tiingo splitFactor becomes a row (ex-date midnight UTC,
+    ratio = factor = split_to, split_from 1) only on the date with no stored row; the date
+    Massive has stays Massive's and, agreeing, is no mismatch."""
+    write_listings(writer, [("EQ:AAA", "AAA", "", "2000-01-03", None)])
+    write_split(writer, "EQ:AAA", date(2020, 1, 3), 2.0, date(2020, 1, 4))
+    vendor = Vendor({"AAA": payloads.prices(rows(20), {"2020-01-03": 2.0, "2020-01-06": 3.0})})
     record = run(writer, vendor, (), from_listings=True)
-    out = _splits(writer)
-    assert (
-        list(out["instrument_id"]) == ["EQ:TIINGO:US0001"]
-        and record.stats["tiingo_split_rows"] == 1
-    )
-    [row] = out.to_dict("records")
-    assert row["ts"] == pd.Timestamp("2020-01-03", tz="UTC") and row["source"] == "tiingo"
-    assert (row["ratio"], row["split_to"], row["split_from"]) == (2.0, 2.0, 1.0)
-    assert "known_from" not in out.columns or pd.isna(row["known_from"])
-    assert "tiingo 2 vs events/split none" in record.items["split:EQ:AAA"]  # FIGI: report only
+    out = _splits(writer).sort_values("ts")
+    assert list(out["ts"].dt.date) == [date(2020, 1, 3), date(2020, 1, 6)]
+    assert list(out["source"]) == ["test", "tiingo"] and record.stats["tiingo_split_rows"] == 1
+    row = out.to_dict("records")[1]
+    assert (row["ratio"], row["split_to"], row["split_from"]) == (3.0, 3.0, 1.0)
+    assert "split:EQ:AAA" not in record.items and record.stats["split_mismatches"] == 0
+
+
+def test_split_mismatch_reports_only_true_disagreements(writer: StoreWriter) -> None:
+    """Both sides have the date with different ratios: reported, and Massive's row kept."""
+    write_listings(writer, [("EQ:AAA", "AAA", "", "2000-01-03", None)])
+    write_split(writer, "EQ:AAA", date(2020, 1, 3), 2.0, date(2020, 1, 4))
+    vendor = Vendor({"AAA": payloads.prices(rows(20), {"2020-01-03": 3.0})})
+    record = run(writer, vendor, (), from_listings=True)
+    assert "tiingo 3 vs events/split 2" in record.items["split:EQ:AAA"]
+    assert list(_splits(writer)["source"]) == ["test"]
 
 
 def test_tiingo_split_never_shadows_massive_row(writer: StoreWriter) -> None:
