@@ -63,8 +63,10 @@ export interface TableRow {
   decision?: string | undefined;
   score?: number | null | undefined;
   flags?: readonly string[] | undefined;
-  /** Criterion id -> its value and outcome (PASS / NEAR / FAIL / MISSING). */
-  criteria?: Readonly<Record<string, { value: unknown; outcome: string }>> | undefined;
+  /** Criterion id -> its value, outcome (PASS / NEAR / FAIL / MISSING) and distance from passing. */
+  criteria?:
+    | Readonly<Record<string, { value: unknown; outcome: string; distance?: number | null }>>
+    | undefined;
   /** New or dropped since the previous run (decided by the server). */
   change?: string | null | undefined;
   /** The previous run's decision (null: not in it). */

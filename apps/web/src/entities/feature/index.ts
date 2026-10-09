@@ -62,6 +62,22 @@ export {
   type DetailedFeature,
 } from './model/catalogue';
 export {
+  allowsTolerance,
+  coerceValue,
+  fieldKind,
+  opFor,
+  operatorSymbol,
+  operatorsFor,
+  parseList,
+  scaleOf,
+  shapeOf,
+  toStored,
+  toTyped,
+  type FieldKind,
+  type NumberScale,
+  type ToleranceUnit,
+} from './model/threshold';
+export {
   guideTolerance,
   guideValues,
   ruleText,

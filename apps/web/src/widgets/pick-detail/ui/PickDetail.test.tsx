@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { Stack, Text } from '@algotrade/ui';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -7,28 +8,19 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { PickDetail } from './PickDetail';
 
-vi.mock('@/entities/feature', async (importOriginal) => ({
+// The scorecard (entities/screen) reads the catalogue and the screen; its own test covers that.
+vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useFeatureCatalogue: () => ({
-    data: [
-      {
-        name: 'rollup.iv30@v1.iv30',
-        unit: 'decimal',
-        dtype: 'float64',
-        description: 'IV30',
-        kind: 'chain',
-        scope: 'site',
-      },
-      {
-        name: 'feature.iv_hv_ratio',
-        unit: 'ratio',
-        dtype: 'float64',
-        description: 'IV30 / HV30',
-        kind: 'expression',
-        scope: 'site',
-      },
-    ],
-  }),
+  CriteriaScorecard: (props: {
+    screenerId: string;
+    entries: readonly { id: string; outcome: string }[];
+  }) => (
+    <Stack aria-label={`Criteria of ${props.screenerId}`}>
+      {props.entries.map((e) => (
+        <Text key={e.id}>{`${e.id} ${e.outcome}`}</Text>
+      ))}
+    </Stack>
+  ),
 }));
 
 const CRITERIA: CriterionInfo[] = [
@@ -59,7 +51,14 @@ const ROW: TableRow = {
 function setup(overrides: Partial<Parameters<typeof PickDetail>[0]> = {}) {
   const handlers = { onOpen: vi.fn(), onToggleCompare: vi.fn(), onDismiss: vi.fn() };
   const view = render(
-    <PickDetail row={ROW} criteria={CRITERIA} compared={false} {...handlers} {...overrides} />,
+    <PickDetail
+      row={ROW}
+      screenerId="vrp"
+      criteria={CRITERIA}
+      compared={false}
+      {...handlers}
+      {...overrides}
+    />,
   );
   return { ...handlers, ...view };
 }
@@ -69,15 +68,12 @@ describe('PickDetail', () => {
     const { container } = setup();
     expect(screen.getByRole('heading', { name: 'SOXS' })).toBeInTheDocument();
     expect(screen.getByText('Score 90 · new since the previous run')).toBeInTheDocument();
-    expect(screen.getByText('ratio 1.08 below 1.25 (within tolerance)')).toBeInTheDocument();
     expect(screen.getByText('Flags: leveraged_inverse')).toBeInTheDocument();
-    const criteria = screen.getByLabelText('Criteria');
-    expect(within(criteria).queryByText(/optionable/i)).toBeNull();
-    expect(criteria).toHaveTextContent('IV30');
-    expect(criteria).toHaveTextContent('111.0%');
-    expect(criteria).toHaveTextContent('Passed');
-    expect(criteria).toHaveTextContent('1.08');
-    expect(criteria).toHaveTextContent('Near miss');
+    // The reasons text is the server's raw wording: only a paused pick shows it.
+    expect(screen.queryByText('ratio 1.08 below 1.25 (within tolerance)')).toBeNull();
+    const criteria = screen.getByLabelText('Criteria of vrp');
+    expect(criteria).toHaveTextContent('iv30 PASS');
+    expect(criteria).toHaveTextContent('ratio NEAR');
     await expectNoA11yViolations(container);
   });
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CatalogueFeature } from '@/entities/feature';
 
-import { describeCriterion } from './describe';
+import { describeCriterion, describeRule } from './rule';
 
 const feature = (dtype: string, unit: string | null = null): CatalogueFeature =>
   ({ dtype, unit, categories: [] }) as unknown as CatalogueFeature;
@@ -54,5 +54,14 @@ describe('describeCriterion', () => {
     expect(describeCriterion({ field: 'rollup.price_stats@v2.close', op: 'gte' }, undefined)).toBe(
       'Last close',
     );
+  });
+});
+
+describe('describeRule', () => {
+  it('is the rule without the field name, in the field unit', () => {
+    const iv30 = feature('float32', 'decimal');
+    expect(describeRule({ field: 'f', op: 'gte', value: 0.5 }, iv30)).toBe('≥ 50%');
+    expect(describeRule({ field: 'f', op: 'not_null' }, undefined)).toBe('has a value');
+    expect(describeRule({ field: 'f', op: 'gte' }, iv30)).toBe('');
   });
 });

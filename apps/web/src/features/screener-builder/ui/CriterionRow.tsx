@@ -17,11 +17,20 @@ import {
 } from '@algotrade/ui';
 import { useState, type ReactNode } from 'react';
 
-import { featureMarks, unitLabel, type CatalogueFeature, type GuideUse } from '@/entities/feature';
+import {
+  allowsTolerance,
+  coerceValue,
+  featureMarks,
+  fieldKind,
+  opFor,
+  operatorsFor,
+  unitLabel,
+  type CatalogueFeature,
+  type GuideUse,
+} from '@/entities/feature';
 import { MODES, type Criterion, type CriterionMode } from '@/entities/screen';
 
 import { applyGuideUse } from '../model/guide';
-import { allowsTolerance, coerceValue, fieldKind, opFor, operatorsFor } from '../model/threshold';
 
 import { FeaturePicker } from './FeaturePicker';
 import { ThresholdDistribution } from './ThresholdDistribution';

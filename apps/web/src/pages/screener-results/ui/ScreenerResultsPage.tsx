@@ -87,6 +87,7 @@ export function ScreenerResultsPage({
           <Stack gap={3}>
             <PickDetail
               row={row}
+              screenerId={id}
               criteria={criteria}
               compared={compared.includes(row.symbol)}
               onOpen={onOpenTicker}

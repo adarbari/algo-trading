@@ -396,7 +396,7 @@ export type InstrumentScreenerHitsQueryVariables = Exact<{
 }>;
 
 
-export type InstrumentScreenerHitsQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, screenerHits: Array<{ screener: { id: string, name: string }, result: { rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null } }> } | null };
+export type InstrumentScreenerHitsQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, screenerHits: Array<{ screener: { id: string, name: string }, result: { rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }> } }> } | null };
 
 export type ScreenerConfigsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2268,6 +2268,14 @@ export const InstrumentScreenerHitsDocument = new TypedDocumentString(`
         reasons
         flags
         change
+        criteria {
+          id
+          field
+          mode
+          outcome
+          value
+          distance
+        }
       }
     }
   }
