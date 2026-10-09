@@ -48,6 +48,7 @@ export {
   type DataTableCellContext,
   type DataTableColumn,
   type DataTableFill,
+  type DataTableGroupBy,
   type DataTableProps,
   type DataTableSort,
 } from './DataTable';

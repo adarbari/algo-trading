@@ -4,4 +4,9 @@ export {
   type DataTableColumn,
   type DataTableFill,
 } from './columns';
-export { DataTable, type DataTableProps, type DataTableSort } from './DataTable';
+export {
+  DataTable,
+  type DataTableGroupBy,
+  type DataTableProps,
+  type DataTableSort,
+} from './DataTable';

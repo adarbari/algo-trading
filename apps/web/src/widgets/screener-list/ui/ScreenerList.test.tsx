@@ -47,7 +47,7 @@ vi.mock('@/entities/edge', async () => {
             ...entries[0],
             hitRate: 0.6,
             baseRate: 0.5,
-            lift: 1.2,
+            liftPts: 12,
             sessions: 100,
             horizonSessions: 10,
           }

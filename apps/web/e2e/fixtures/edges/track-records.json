@@ -28,7 +28,8 @@
                 "baseRate": 0.51,
                 "lift": 1.14,
                 "sessions": 120,
-                "picks": 2400
+                "picks": 2400,
+                "liftPts": 7.0
               }
             ]
           },
@@ -46,7 +47,8 @@
                 "baseRate": 0.51,
                 "lift": 1.14,
                 "sessions": 80,
-                "picks": 2400
+                "picks": 2400,
+                "liftPts": 7.0
               }
             ]
           }

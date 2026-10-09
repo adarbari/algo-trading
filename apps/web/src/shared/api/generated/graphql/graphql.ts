@@ -105,7 +105,7 @@ export type OptionQuotesQuery = { instrument: { instrumentId: string, chain: { q
 export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, schedule: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, variants: Array<string>, frozenFrom: string | null, rejectionReason: string, evidence: { runId: string, splitFrom: string } | null, canonicalRun: { runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, afterSession: boolean, rows: Array<{ edgeVariant: string, variant: string, role: string, horizonSessions: number, sliceKind: string, sliceValue: string, sessions: number | null, picks: number | null, hitRate: number | null, baseRate: number | null, lift: number | null, exploratory: boolean }> } | null, canonicalNotRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string }> }> };
+export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }> }, canonicalRun: { runId: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
 export type EvaluationSplitQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -115,7 +115,7 @@ export type EvaluationSplitQuery = { evaluationSplit: { splitFrom: string | null
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: string }>, screeners: Array<{ id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, lift: number | null, sessions: number | null, picks: number | null }> }> }> };
+export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: string }>, screeners: Array<{ id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, liftPts: number | null, sessions: number | null, picks: number | null }> }> }> };
 
 export type EventCalendarQueryVariables = Exact<{
   instrumentIds: Array<string> | string;
@@ -575,56 +575,57 @@ export const EdgesPageDocument = new TypedDocumentString(`
     thesis
     mechanism
     persistence
-    schedule
     horizons
     screeners
     baselines
-    variants
-    frozenFrom
     rejectionReason
-    evidence {
-      runId
-      splitFrom
+    sources {
+      title
+      url
+    }
+    definition {
+      picks
+      trade
+      compare
+      test
+    }
+    verdict {
+      verdict
+      rationale
+      headline
+      result
+      basis
+      trades
+      oosTrades
+      winRate
+      baseRate
+      liftPts
+      lift
+      decileSpread
+      decileT
+      sharpe
+      deflatedSharpe
+      pbo
+      criteria {
+        id
+        label
+        value
+        threshold
+        status
+        level
+      }
+      years {
+        year
+        period
+        winRate
+        baseRate
+        liftPts
+        decileSpread
+        trades
+      }
     }
     canonicalRun {
       runId
-      owner
-      rangeFrom
-      rangeTo
-      splitFrom
-      exploratory
-      knowledgeTs
-      afterSession
-      rows {
-        edgeVariant
-        variant
-        role
-        horizonSessions
-        sliceKind
-        sliceValue
-        sessions
-        picks
-        hitRate
-        baseRate
-        lift
-        exploratory
-      }
-    }
-    canonicalNotRun {
-      code
-      reason
-      kind
-      guideTerm
-      kindText
-      cause {
-        links {
-          level
-          subject
-          status
-          message
-          runId
-        }
-      }
     }
     runs {
       runId
@@ -634,6 +635,8 @@ export const EdgesPageDocument = new TypedDocumentString(`
       splitFrom
       exploratory
       knowledgeTs
+      trialsCounted
+      lostInputs
     }
   }
 }
@@ -684,7 +687,7 @@ export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
         horizonSessions
         hitRate
         baseRate
-        lift
+        liftPts
         sessions
         picks
       }

@@ -1,7 +1,7 @@
 /**
- * Your train / test split: the site's frozen period per edge (read-only), the user's own split
- * (or none), a date input with Save and Clear. A saved split is the first session of the test
- * slice; results under it are labelled EXPLORATORY and come from `evaluate-edges`, which the
+ * Your out-of-sample split: the site's out-of-sample start per edge (read-only), the user's own
+ * split (or none), a date input with Save and Clear. A saved split is the first session of the
+ * out-of-sample period; results under it are labelled EXPLORATORY and come from `evaluate-edges`, which the
  * form says once after a save. The `exploratory` term carries the Guide button (`renderTermHelp`:
  * features never import each other). Checked here for form only; the API checks the range.
  */
@@ -15,13 +15,13 @@ import { useSaveSplit } from '../api/hooks';
 import { afterLatest, dateError } from '../model/date';
 
 export interface EvaluationSplitFormProps {
-  /** The Guide button for a glossary term (`exploratory`, `frozen_period`). */
+  /** The Guide button for a glossary term (`exploratory`, `out_of_sample`). */
   renderTermHelp?: (term: string) => ReactNode;
 }
 
 const SAVED =
-  'Saved: results under your split are labelled EXPLORATORY and come from evaluate-edges.';
-const CLEARED = 'Cleared. Each edge’s frozen period is the split again.';
+  'Saved: backtests under your split are labelled EXPLORATORY and come from evaluate-edges.';
+const CLEARED = 'Cleared. Each edge’s own out-of-sample start applies again.';
 
 export function EvaluationSplitForm({ renderTermHelp }: EvaluationSplitFormProps) {
   const split = useEvaluationSplit();
@@ -29,7 +29,7 @@ export function EvaluationSplitForm({ renderTermHelp }: EvaluationSplitFormProps
   const [text, setText] = useState('');
   const [said, setSaid] = useState<string | null>(null);
   const read = split.data ?? null;
-  if (split.isPending) return <Panel title="Train / test split" state="loading" />;
+  if (split.isPending) return <Panel title="Out-of-sample split" state="loading" />;
   if (split.isError)
     return (
       <Banner tone="negative" title="Could not load your split">
@@ -55,20 +55,20 @@ export function EvaluationSplitForm({ renderTermHelp }: EvaluationSplitFormProps
     value: <Mono>{p.frozenFrom}</Mono>,
   }));
   return (
-    <Panel title="Train / test split" actions={renderTermHelp?.('exploratory')}>
+    <Panel title="Out-of-sample split" actions={renderTermHelp?.('exploratory')}>
       <Stack gap={3}>
         <Stack gap={1}>
           <Stack direction="row" gap={1} align="center">
             <Text size="sm" tone="secondary">
-              Site frozen periods
+              Site out-of-sample starts
             </Text>
-            {renderTermHelp?.('frozen_period')}
+            {renderTermHelp?.('out_of_sample')}
           </Stack>
           {frozen.length > 0 ? (
             <KeyValue items={frozen} />
           ) : (
             <Text size="sm" tone="muted">
-              No edge has a frozen period.
+              No edge has an out-of-sample period.
             </Text>
           )}
         </Stack>
@@ -80,13 +80,13 @@ export function EvaluationSplitForm({ renderTermHelp }: EvaluationSplitFormProps
             <Mono>{read.splitFrom}</Mono>
           ) : (
             <Text size="sm" tone="muted">
-              None: each frozen period is the split
+              None: each edge's own start applies
             </Text>
           )}
         </Stack>
         <Field
-          label="Test slice starts"
-          hint={`The first session of the test slice, up to ${read.latestSession}.`}
+          label="Out-of-sample starts"
+          hint={`The first session of the out-of-sample period, up to ${read.latestSession}.`}
           error={error}
         >
           <Input

@@ -244,6 +244,35 @@ describe('DataTable', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Preview failed');
   });
 
+  it('groups rows under headings in the declared order, with an accessible grid', async () => {
+    const group = (r: TickerRow) => (r.symbol.charCodeAt(0) % 2 === 0 ? 'Even' : 'Odd');
+    const { container } = render(
+      <Table
+        groupBy={{
+          getGroup: group,
+          order: ['Odd', 'Even'],
+          label: (g, n) => `${g} (${String(n)})`,
+        }}
+      />,
+    );
+    const headings = screen.getAllByRole('rowheader');
+    const odd = rows.filter((r) => group(r) === 'Odd').length;
+    expect(headings[0]).toHaveTextContent(`Odd (${String(odd)})`);
+    expect(headings).toHaveLength(2);
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', String(rows.length + 2 + 1));
+    await expectNoA11yViolations(container);
+  });
+
+  it('moves the keyboard over rows, skipping the group headings', async () => {
+    const user = userEvent.setup();
+    render(<Table groupBy={{ getGroup: () => 'All' }} />);
+    screen.getByRole('grid').focus();
+    await user.keyboard('{ArrowDown}');
+    const active = screen.getByRole('grid').getAttribute('aria-activedescendant');
+    expect(active).not.toBeNull();
+    expect(document.getElementById(active ?? '')).toHaveAttribute('data-row-id');
+  });
+
   it('virtualises large row sets: renders a window, not every row', () => {
     render(<Table rows={makeUniverse(11_427)} visibleRows={12} />);
     expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '11428');

@@ -38,7 +38,7 @@ describe('HarnessRunDetail', () => {
     expect(within(screener).getByText('frozen 2024-01-01')).toBeInTheDocument();
     const baseline = within(table).getByRole('row', { name: /equal_weight \(baseline\)/ });
     expect(within(baseline).getByText('EXPLORATORY')).toBeInTheDocument();
-    expect(screen.getByText('help hit_rate')).toBeInTheDocument();
+    expect(screen.getByText('help win_rate')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

@@ -1,7 +1,7 @@
 """``Edge`` (an edge document with its status), ``EdgeRun`` (one committed evaluation run, read
 by run: its id, range, split, ``knowledgeTs`` and ``asOf`` disclosed) and ``EdgeRow`` (one
 stored row of it). ``Edge.canonicalRun`` is the latest site run at the edge's frozen period, else
-``canonicalNotRun`` says why (NOT_RUN, ADR 0036)."""
+``canonicalNotRun`` says why (NOT_RUN, ADR 0036); ``Edge.verdict`` judges it (ED8)."""
 
 import asyncio
 import datetime as dt
@@ -11,8 +11,9 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
-from algotrade.services.read.evaluation import edges, runs
+from algotrade.services.read.evaluation import edges, runs, verdict
 from algotrade_api.graphql.offload import off_loop
+from algotrade_api.graphql.types.evaluation.verdict import EdgeDefinition, EdgeSource, EdgeVerdict
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
 
@@ -80,7 +81,8 @@ class EdgeRow:
     "was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track "
     "record), `knowledgeTs` when it committed, `asOf` the data version it read, "
     "`afterSession` it committed "
-    "after the request's session (false without one)"
+    "after the request's session (false without one), `lostInputs` what the run could not read "
+    "(a screener's missing table and the sessions lost)"
 )
 class EdgeRun:
     run_id: str
@@ -95,6 +97,7 @@ class EdgeRun:
     as_of: str | None
     trials_counted: int | None
     after_session: bool
+    lost_inputs: list[str]
     run: strawberry.Private[runs.EdgeRun]
     ctx: strawberry.Private[Stores]
 
@@ -113,6 +116,7 @@ class EdgeRun:
             as_of=d.as_of,
             trials_counted=d.trials_counted,
             after_session=d.after_session,
+            lost_inputs=list(d.lost_inputs),
             run=d,
             ctx=ctx,
         )
@@ -157,6 +161,8 @@ class Edge:
     frozen_from: dt.date | None
     evidence: EdgeEvidence | None
     rejection_reason: str
+    sources: list[EdgeSource]
+    definition: EdgeDefinition
     edge: strawberry.Private[edges.Edge]
     ctx: strawberry.Private[Stores]
     cache: strawberry.Private[dict[str, Any]]
@@ -178,6 +184,8 @@ class Edge:
             frozen_from=d.frozen_from,
             evidence=EdgeEvidence.of(d.evidence) if d.evidence else None,
             rejection_reason=d.rejection_reason,
+            sources=[EdgeSource.of(x) for x in d.sources],
+            definition=EdgeDefinition.of(d.definition),
             edge=d,
             ctx=ctx,
             cache={},
@@ -214,3 +222,12 @@ class Edge:
     async def runs(self, info: Info) -> list[EdgeRun]:
         found = await off_loop(runs.load_edge_runs, self.ctx, self.edge)
         return [EdgeRun.of(r, self.ctx) for r in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The verdict on the official result (the canonical run): Works, Promising, "
+        "Not working, Not enough data or Waiting on data, with the reason, the figures it rests "
+        "on and its criteria (ED8)"
+    )
+    async def verdict(self, info: Info) -> EdgeVerdict:
+        found = await off_loop(verdict.load_edge_verdict, self.ctx, self.edge)
+        return EdgeVerdict.of(found)

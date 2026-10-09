@@ -8,92 +8,92 @@
         "thesis": "Winners keep winning for months.",
         "mechanism": "Slow reaction to news.",
         "persistence": "Limits to arbitrage.",
-        "schedule": "Monthly",
-        "horizons": [21],
+        "horizons": [20],
         "screeners": ["momentum_12_1"],
         "baselines": ["equal_weight"],
-        "variants": ["main"],
-        "frozenFrom": "2024-01-01",
         "rejectionReason": "",
-        "evidence": null,
-        "canonicalRun": {
-          "runId": "run-frozen",
-          "owner": "site",
-          "rangeFrom": "2012-01-03",
-          "rangeTo": "2026-10-02",
-          "splitFrom": "2024-01-01",
-          "exploratory": false,
-          "knowledgeTs": "2026-10-05T02:00:00+00:00",
-          "afterSession": false,
-          "rows": [
+        "sources": [
+          {
+            "title": "Jegadeesh and Titman 1993",
+            "url": "https://example.org/jt1993"
+          }
+        ],
+        "definition": {
+          "picks": "Every month end \u00b7 top 50 of the screen",
+          "trade": "Enter 1 session after the decision \u00b7 hold 20 trading days \u00b7 0.1% costs \u00b7 win = beats SPY",
+          "compare": "Universe: liquid_common_stocks \u00b7 against equal_weight",
+          "test": "Out-of-sample from 2026-04-01"
+        },
+        "verdict": {
+          "verdict": "promising",
+          "rationale": "Trades, and out-of-sample trades is 70 and 6; it needs at least 100 and 40",
+          "headline": "Out-of-sample, momentum_12_1, 20 trading days: win rate 58% against a base rate of 51% (+7 pts).",
+          "result": "Win rate 58% \u00b7 base rate 51%",
+          "basis": "momentum_12_1, 20 trading days",
+          "trades": 70,
+          "oosTrades": 6,
+          "winRate": 0.58,
+          "baseRate": 0.51,
+          "liftPts": 7,
+          "lift": 1.14,
+          "decileSpread": 0.067,
+          "decileT": 2.5,
+          "sharpe": 1.1,
+          "deflatedSharpe": 0.9,
+          "pbo": 0.3,
+          "criteria": [
             {
-              "edgeVariant": "main",
-              "variant": "momentum_12_1",
-              "role": "screener",
-              "horizonSessions": 21,
-              "sliceKind": "frozen",
-              "sliceValue": "2024-01-01",
-              "sessions": 120,
-              "picks": 2400,
-              "hitRate": 0.58,
-              "baseRate": 0.51,
-              "lift": 1.14,
-              "exploratory": false
+              "id": "trades",
+              "label": "Trades",
+              "value": "70",
+              "threshold": "at least 40",
+              "status": "pass",
+              "level": "promising"
             },
             {
-              "edgeVariant": "main",
-              "variant": "equal_weight",
-              "role": "baseline",
-              "horizonSessions": 21,
-              "sliceKind": "frozen",
-              "sliceValue": "2024-01-01",
-              "sessions": 120,
-              "picks": 2400,
-              "hitRate": 0.51,
-              "baseRate": 0.51,
-              "lift": 1,
-              "exploratory": false
+              "id": "random",
+              "label": "Beats the best random-pick backtest",
+              "value": "not measured yet",
+              "threshold": "beats it",
+              "status": "not_measured",
+              "level": "works"
+            }
+          ],
+          "years": [
+            {
+              "year": "2025",
+              "period": "in_sample",
+              "winRate": 0.6,
+              "baseRate": 0.5,
+              "liftPts": 10,
+              "decileSpread": 0.128,
+              "trades": 9
             },
             {
-              "edgeVariant": "main",
-              "variant": "momentum_12_1",
-              "role": "screener",
-              "horizonSessions": 21,
-              "sliceKind": "year",
-              "sliceValue": "2023",
-              "sessions": 120,
-              "picks": 2400,
-              "hitRate": 0.9,
+              "year": "2026",
+              "period": "both",
+              "winRate": 0.58,
               "baseRate": 0.51,
-              "lift": 1.14,
-              "exploratory": false
-            },
-            {
-              "edgeVariant": "main",
-              "variant": "momentum_12_1",
-              "role": "screener",
-              "horizonSessions": 21,
-              "sliceKind": "frozen",
-              "sliceValue": "2024-01-01",
-              "sessions": 120,
-              "picks": 2400,
-              "hitRate": 0.99,
-              "baseRate": 0.51,
-              "lift": 1.14,
-              "exploratory": true
+              "liftPts": 7,
+              "decileSpread": 0.067,
+              "trades": 6
             }
           ]
         },
-        "canonicalNotRun": null,
+        "canonicalRun": {
+          "runId": "run-frozen"
+        },
         "runs": [
           {
             "runId": "run-frozen",
             "owner": "site",
             "rangeFrom": "2012-01-03",
             "rangeTo": "2026-10-02",
-            "splitFrom": "2024-01-01",
+            "splitFrom": "2026-04-01",
             "exploratory": false,
-            "knowledgeTs": "2026-10-05T02:00:00+00:00"
+            "knowledgeTs": "2026-10-05T02:00:00+00:00",
+            "trialsCounted": 3,
+            "lostInputs": []
           },
           {
             "runId": "run-explore",
@@ -102,7 +102,9 @@
             "rangeTo": "2026-10-02",
             "splitFrom": "2022-06-01",
             "exploratory": true,
-            "knowledgeTs": "2026-10-06T02:00:00+00:00"
+            "knowledgeTs": "2026-10-06T02:00:00+00:00",
+            "trialsCounted": 4,
+            "lostInputs": []
           }
         ]
       },
@@ -113,23 +115,38 @@
         "thesis": "Added names pop.",
         "mechanism": "Index demand.",
         "persistence": "Arbitraged away.",
-        "schedule": "Event",
         "horizons": [5],
         "screeners": [],
         "baselines": [],
-        "variants": ["main"],
-        "frozenFrom": null,
         "rejectionReason": "The effect vanished after 2005.",
-        "evidence": null,
-        "canonicalRun": null,
-        "canonicalNotRun": {
-          "code": "NOT_RUN",
-          "reason": null,
-          "kind": "NOT_RUN",
-          "guideTerm": "not_run",
-          "kindText": "not run yet",
-          "cause": null
+        "sources": [],
+        "definition": {
+          "picks": "Every month end \u00b7 top 50 of the screen",
+          "trade": "Enter 1 session after the decision \u00b7 hold 20 trading days \u00b7 0.1% costs \u00b7 win = beats SPY",
+          "compare": "Universe: liquid_common_stocks \u00b7 against equal_weight",
+          "test": "Out-of-sample from 2026-04-01"
         },
+        "verdict": {
+          "verdict": "waiting_on_data",
+          "rationale": "No official result yet",
+          "headline": "No official result yet",
+          "result": "No official result yet",
+          "basis": null,
+          "trades": null,
+          "oosTrades": null,
+          "winRate": null,
+          "baseRate": null,
+          "liftPts": null,
+          "lift": null,
+          "decileSpread": null,
+          "decileT": null,
+          "sharpe": null,
+          "deflatedSharpe": null,
+          "pbo": null,
+          "criteria": [],
+          "years": []
+        },
+        "canonicalRun": null,
         "runs": []
       }
     ]

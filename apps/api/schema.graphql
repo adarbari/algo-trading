@@ -198,6 +198,8 @@ type Edge {
   frozenFrom: Date
   evidence: EdgeEvidence
   rejectionReason: String!
+  sources: [EdgeSource!]!
+  definition: EdgeDefinition!
 
   """
   The latest committed site run whose split is `frozenFrom`; null: none (see `canonicalNotRun`). An exploratory or older split is never shown here
@@ -211,6 +213,21 @@ type Edge {
   Every committed run of the edge the user sees (theirs, then the site's), newest first, exploratory ones flagged
   """
   runs: [EdgeRun!]!
+
+  """
+  The verdict on the official result (the canonical run): Works, Promising, Not working, Not enough data or Waiting on data, with the reason, the figures it rests on and its criteria (ED8)
+  """
+  verdict: EdgeVerdict!
+}
+
+"""
+How the edge is defined, as sentences: `picks` (when it fires, how many), `trade` (entry, holding periods, costs, what a win is), `compare` (universe and baselines) and `test` (where the out-of-sample period starts)
+"""
+type EdgeDefinition {
+  picks: String!
+  trade: String!
+  compare: String!
+  test: String!
 }
 
 """
@@ -250,7 +267,7 @@ type EdgeRow {
 }
 
 """
-A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one)
+A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one), `lostInputs` what the run could not read (a screener's missing table and the sessions lost)
 """
 type EdgeRun {
   runId: String!
@@ -265,11 +282,42 @@ type EdgeRun {
   asOf: String
   trialsCounted: Int
   afterSession: Boolean!
+  lostInputs: [String!]!
 
   """
   The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none
   """
   rows: [EdgeRow!]!
+}
+
+"""A source the edge rests on; `url` is empty when it has none"""
+type EdgeSource {
+  title: String!
+  url: String!
+}
+
+"""
+An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel
+"""
+type EdgeVerdict {
+  verdict: String!
+  rationale: String!
+  headline: String!
+  result: String!
+  basis: String
+  trades: Int
+  oosTrades: Int
+  winRate: Float
+  baseRate: Float
+  liftPts: Float
+  lift: Float
+  decileSpread: Float
+  decileT: Float
+  sharpe: Float
+  deflatedSharpe: Float
+  pbo: Float
+  criteria: [VerdictCriterion!]!
+  years: [VerdictYear!]!
 }
 
 """
@@ -2062,7 +2110,7 @@ type TextPart {
 }
 
 """
-The frozen slice at one horizon: hit rate against the base rate, the lift, the independent `sessions` behind them and the `picks` counted
+The frozen slice at one horizon: hit rate against the base rate, the lift, the independent `sessions` (trades) behind them and the `picks` counted; `liftPts`: win rate minus base rate, in points
 """
 type TrackHorizon {
   horizonSessions: Int!
@@ -2071,6 +2119,7 @@ type TrackHorizon {
   lift: Float
   sessions: Int
   picks: Int
+  liftPts: Float
 }
 
 """
@@ -2262,6 +2311,31 @@ type UsePass {
   intent: String!
   count: Int!
   bins: [Int!]!
+}
+
+"""
+One test of the verdict: the `value` measured, the `threshold` it must reach and its `status` (pass, fail, not_measured); `level`: the verdict it gates (promising, works)
+"""
+type VerdictCriterion {
+  id: String!
+  label: String!
+  value: String!
+  threshold: String!
+  status: String!
+  level: String!
+}
+
+"""
+One calendar year of the verdict's basis; `period`: in_sample, out_of_sample or both (the split falls inside the year); `liftPts`: win rate minus base rate, in points
+"""
+type VerdictYear {
+  year: String!
+  period: String!
+  winRate: Float
+  baseRate: Float
+  liftPts: Float
+  decileSpread: Float
+  trades: Int
 }
 
 """

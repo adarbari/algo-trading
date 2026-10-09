@@ -1,6 +1,6 @@
 /**
  * TrackRecordChip: a screener's track record in one small badge: `evidenced` (an edge passed the
- * frozen period), `candidate` with the independent sessions so far, or `not-run`. A figure from
+ * out-of-sample period), `candidate` with the trades (independent sessions) so far, or `not-run`. A figure from
  * an exploratory run never feeds it: `exploratory` renders nothing at all. The state is always
  * in words; colour only reinforces it. Not interactive.
  */
@@ -12,7 +12,7 @@ export type TrackRecordStatus = 'evidenced' | 'candidate' | 'not-run';
 export interface TrackRecordChipProps {
   /** `evidenced`, `candidate` or `not-run`. */
   status: TrackRecordStatus;
-  /** Independent sessions behind a `candidate` (written as "Candidate · 42 sessions"). */
+  /** Trades (independent sessions) behind a `candidate` (written as "Candidate · 42 trades"). */
   sessions?: number;
   /** The record comes from an exploratory run: nothing is rendered. */
   exploratory?: boolean;
@@ -28,7 +28,7 @@ function words(status: TrackRecordStatus, sessions: number | undefined): string 
   if (status === 'evidenced') return 'Evidenced';
   if (status === 'not-run') return 'Not run';
   if (sessions === undefined) return 'Candidate';
-  return `Candidate · ${sessions} ${sessions === 1 ? 'session' : 'sessions'}`;
+  return `Candidate · ${sessions} ${sessions === 1 ? 'trade' : 'trades'}`;
 }
 
 export function TrackRecordChip({ status, sessions, exploratory = false }: TrackRecordChipProps) {

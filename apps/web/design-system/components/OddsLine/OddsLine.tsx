@@ -1,8 +1,9 @@
 /**
- * OddsLine: an edge's evidence for a pick in one line: hit rate against the base rate, the lift,
- * the independent sessions behind them, optionally the picks and the run it came from. The hit
- * rate, base rate and sessions are required together, so a bare hit rate cannot be shown. An
- * exploratory run (read outside the frozen period) carries a visible EXPLORATORY badge. States:
+ * OddsLine: an edge's evidence for a pick in one line: win rate against the base rate, the lift
+ * (in points: win rate minus base rate, served), the trades (independent sessions) behind them,
+ * optionally the picks and the run it came from. The win rate, base rate and trades are required
+ * together, so a bare win rate cannot be shown. An
+ * exploratory run (read outside the official out-of-sample period) carries a visible EXPLORATORY badge. States:
  * loading (placeholder), empty (no run yet) and error (the evidence failed to load). Explanations
  * are not written here: the `info` slot takes an InfoButton given a Guide entry. It wraps in a
  * narrow container.
@@ -24,17 +25,17 @@ interface OddsLineBase {
 
 export interface OddsLineReady extends OddsLineBase {
   state?: 'ready';
-  /** Share of picks that hit, as a fraction (0.62). Required with the base rate and sessions. */
+  /** Share of trades that won, as a fraction (0.62). Required with the base rate and sessions. */
   hitRate: number;
-  /** The share that hit with no edge, as a fraction (0.51): the comparison for the hit rate. */
+  /** The share that hit with no edge, as a fraction (0.51): the comparison for the win rate. */
   baseRate: number;
-  /** Independent sessions the figures rest on. */
+  /** Trades (independent sessions) the figures rest on. */
   sessions: number;
-  /** Hit rate over base rate; written when given, never derived here. */
-  lift?: number;
-  /** How many picks the hit rate counts. */
+  /** Win rate minus base rate, in points; written when given, never derived here. */
+  liftPts?: number;
+  /** How many picks the win rate counts. */
   picks?: number;
-  /** The run was read outside the frozen period: shown as EXPLORATORY, never as evidence. */
+  /** The run was read outside the official out-of-sample period: shown as EXPLORATORY, never as evidence. */
   exploratory?: boolean;
 }
 
@@ -48,6 +49,8 @@ export interface OddsLineNotReady extends OddsLineBase {
 export type OddsLineProps = OddsLineReady | OddsLineNotReady;
 
 const percent = (value: number) => formatValue(value, { kind: 'percent', digits: 1 }).text;
+const points = (value: number) =>
+  formatValue(value, { kind: 'delta', unit: 'points', digits: 0 }).text;
 const count = (value: number) => formatValue(value, { kind: 'number' }).text;
 
 function Part({ label, children }: { label: string; children: ReactNode }) {
@@ -76,26 +79,26 @@ function NotReady({ state, message, info }: OddsLineNotReady) {
 
 export function OddsLine(props: OddsLineProps) {
   if (!('hitRate' in props)) return <NotReady {...props} />;
-  const { hitRate, baseRate, sessions, lift, picks, exploratory, runLabel, info } = props;
+  const { hitRate, baseRate, sessions, liftPts, picks, exploratory, runLabel, info } = props;
   return (
     <p className={styles.root} data-state="ready" data-exploratory={exploratory || undefined}>
       {exploratory && (
-        <StatusBadge tone="warning" title="Read outside the frozen period">
+        <StatusBadge tone="warning" title="Read outside the official out-of-sample period">
           EXPLORATORY
         </StatusBadge>
       )}
-      <Part label="Hit rate">
+      <Part label="Win rate">
         <Text size="sm" weight="semibold">
           {percent(hitRate)}
         </Text>
         <Text size="sm" tone="muted">{`vs ${percent(baseRate)} base`}</Text>
       </Part>
-      {lift !== undefined && (
+      {liftPts !== undefined && (
         <Part label="Lift">
-          <Text size="sm">{`${formatValue(lift, { kind: 'number', digits: 2 }).text}×`}</Text>
+          <Text size="sm">{points(liftPts)}</Text>
         </Part>
       )}
-      <Part label="Sessions">
+      <Part label="Trades">
         <Text size="sm">{count(sessions)}</Text>
       </Part>
       {picks !== undefined && (
