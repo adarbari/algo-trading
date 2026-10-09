@@ -14,6 +14,7 @@ schedule = "month_end"
 universe = "liquid_common_stocks"
 top_k = 50
 screeners = ["momentum_12_1"]
+baselines = ["size_small"]  # the size tilt of past winners (decoys); on the golden store too (make evaluate)
 status = "candidate"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1
