@@ -105,7 +105,7 @@ def test_fred_needs_its_key_and_sends_it_only_as_a_query_parameter(
     assert "api_key" not in source.url(request)  # type: ignore[attr-defined]
 
 
-def test_tiingo_needs_its_key_sends_it_as_a_token_header_and_paces_for_the_free_tier(
+def test_tiingo_needs_its_key_sends_it_as_a_token_header_and_paces_as_configured(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     missing = build_sources(settings(), lambda name: None, ["tiingo_prices"], tmp_path)
@@ -129,7 +129,8 @@ def test_tiingo_needs_its_key_sends_it_as_a_token_header_and_paces_for_the_free_
     built.sources["tiingo_prices"].fetch(FetchRequest("AAPL:2018-01-01:2018-02-01"))
     assert sent[0] is not None and sent[0]["Authorization"] == "Token s3cret"
     assert "s3cret" not in urls[0]  # a header, never in the URL
-    assert built.limiters["tiingo"].min_interval_s == 72.0  # 50 requests an hour
+    # the plan's pace comes from sources.toml (free tier 72 s, Power 0.4 s): never a constant here
+    assert built.limiters["tiingo"].min_interval_s == SITE_SOURCES["tiingo"]["min_interval_s"]
     assert settings().tiingo_licence == "personal"
 
 
