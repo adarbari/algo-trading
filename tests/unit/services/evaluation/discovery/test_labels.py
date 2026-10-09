@@ -80,3 +80,21 @@ def test_missing_grid_session_raises() -> None:
         read_labels(reader, S, ["EQ:000"], settings())
     with pytest.raises(MissingDataError, match="no eligible"):
         label_winners(rows([]), [], S, settings())
+
+
+def test_losers_bottom_fraction() -> None:
+    """The losers are the eligible names at or below the bottom-fraction quantile of the same
+    counted rows, the delisted included (the worst are often delisted), never a winner, and a name
+    with no counted row is neither. Catches: the loser cut taken over survivors only, or computed
+    over a different set than the winner threshold."""
+    complete = rows([i / 100 for i in range(97)])
+    delisted = rows([-0.95, -0.9, 3.0], "DELISTED", start=97)
+    pending = rows([-9.0], "PENDING", start=100)
+    out = pd.concat([complete, delisted, pending], ignore_index=True)
+    ids = out["instrument_id"].tolist()
+    s = settings(top_fraction=0.02, bottom_fraction=0.02, max_missing_fraction=0.02)
+    got = label_winners(out, ids, S, s)
+    counted = np.concatenate([complete["fwd_excess_return"], [-0.95, -0.9, 3.0]])
+    assert got.loser_threshold == pytest.approx(float(np.quantile(counted, 0.02)))
+    assert got.losers == {"EQ:097", "EQ:098"}  # the two delisted; EQ:100 is PENDING, not counted
+    assert not got.losers & got.winners and "EQ:099" in got.winners

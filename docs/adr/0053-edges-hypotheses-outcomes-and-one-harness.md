@@ -342,6 +342,11 @@ itself follows.
    eligible set is `universe_asof(S)` (survivors and the delisted alike) with a bar at S. Company
    snapshots start in 2026, so sector is never a control; Russell reconstitution stays blocked (no
    historical membership).
+6. **2026-10-09 (W4): controls are matched on a pre-S hv60 quintile as well; a tell must also
+   separate winners from losers (g_WL, sign-stable, above the threshold); the null shuffles
+   winner, control and loser within (session, cell); clusters at rank correlation 0.5.** The first
+   real run passed on volatility and range tells that mark the names which moved most, winners
+   and losers alike.
 
 ## Amendment 2026-10-09: historical eligibility before the first snapshot
 

@@ -41,12 +41,13 @@ def test_the_same_frames_give_the_same_result(seed: int, shift: float) -> None:
 @given(seed=st.integers(0, 2**31 - 1), day=st.integers(0, 4000))
 def test_the_controls_are_a_function_of_the_seed_and_the_session(seed: int, day: int) -> None:
     """Catches: a control draw that depends on process state."""
-    s = replace(study(), seed=seed)
+    s = replace(study(max_control_shortfall=1.0), seed=seed)
     rng = np.random.default_rng(1)
     eligible = pd.DataFrame(
         {
             "instrument_id": [f"EQ:{i:03d}" for i in range(120)],
             "adv": rng.uniform(1e6, 1e8, 120),
+            "hv": rng.uniform(0.1, 1.0, 120),
             "age_years": rng.uniform(0, 10, 120),
         }
     )

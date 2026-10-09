@@ -62,8 +62,9 @@ def test_eligible_are_stocks_over_the_price_and_dollar_volume_floors_with_a_bar(
             "instrument_id": ["S1", "S2", "S3", "S4", "E1"],  # S5 has no price row at all
             "close": [5.0, 4.99, 50.0, None, 50.0],
             "adv": [1_000_000.0, 9e6, 999_999.0, 9e6, 9e6],
+            "hv": [0.3, 0.3, 0.3, 0.3, 0.3],
         }
     )
-    got = pick_eligible(listings, prices, day, s)
+    got = pick_eligible(listings, prices, day, s).names
     assert got["instrument_id"].tolist() == ["S1"]  # S2 < $5, S3 < $1M, S4 no bar, E1 an ETF
     assert abs(got["age_years"].iloc[0] - 10.0) < 0.01

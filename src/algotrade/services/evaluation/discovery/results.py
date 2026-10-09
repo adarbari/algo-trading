@@ -14,7 +14,8 @@ class SessionSummary:
     """One grid session: ``eligible`` names, ``winners`` (excess return at or above ``threshold``
     among the eligible with a COMPLETE or DELISTED outcome), the controls ``wanted`` and
     ``drawn`` (fewer when a cell ran out of names), the share of eligible names with no outcome
-    row (``missing_fraction``) and the ``block`` of non-overlapping horizons it belongs to."""
+    row (``missing_fraction``), the ``losers`` (bottom of the same excess return), the names left
+    out for an UNKNOWN volatility and the ``block`` of non-overlapping horizons it belongs to."""
 
     session: date
     block: int
@@ -24,6 +25,8 @@ class SessionSummary:
     controls_drawn: int
     threshold: float
     missing_fraction: float
+    losers: int = 0
+    unknown_volatility: int = 0
 
 
 @dataclass(frozen=True)
@@ -55,20 +58,27 @@ class Effect:
 
 @dataclass(frozen=True)
 class BlockEffect:
-    """A feature's mean effect over the counted grid sessions of one block."""
+    """A feature's mean effect over the counted grid sessions of one block: winners over controls
+    (``mean_g``), winners over losers and losers over controls (NaN when none counted)."""
 
     feature: str
     block: int
     mean_g: float
     sessions: int
+    mean_g_wl: float = float("nan")
+    mean_g_l: float = float("nan")
 
 
 @dataclass(frozen=True)
 class Tell:
-    """A feature pooled over blocks: the mean of its block effects, the sign most blocks share,
-    how many blocks agree, whether both halves agree, ``stable`` and ``qualifies`` (stable and
-    |mean| above the gate); ``cluster`` the index into ``DiscoveryResult.clusters`` of a
-    qualifying tell."""
+    """A feature pooled over blocks: the mean of its block effects (``mean_g``: winners over
+    controls), the sign most blocks share, how many blocks agree, whether both halves agree,
+    ``stable`` and ``qualifies`` (stable and |mean| above the gate, and also separating winners
+    from losers: ``mean_g_wl`` of the same sign, sign-stable, above ``min_abs_wl_hedges_g``);
+    ``mean_g_l`` is losers over the winners' controls, and ``variance_like`` says the losers differ
+    from the controls the way the winners do (same sign, at least half the size: the feature
+    measures how much a name moves, not which way); ``cluster`` the index into
+    ``DiscoveryResult.clusters`` of a qualifying tell."""
 
     feature: str
     mean_g: float
@@ -79,6 +89,9 @@ class Tell:
     stable: bool
     qualifies: bool
     cluster: int | None
+    mean_g_wl: float = float("nan")
+    mean_g_l: float = float("nan")
+    variance_like: bool = False
 
 
 @dataclass(frozen=True)
