@@ -68,6 +68,17 @@ class Call:
 type Node = Literal | Ref | Unary | Binary | Call
 
 
+def children(node: Node) -> list[Node]:
+    """The direct operands of ``node``."""
+    if isinstance(node, Unary):
+        return [node.operand]
+    if isinstance(node, Binary):
+        return [node.left, node.right]
+    if isinstance(node, Call):
+        return list(node.args)
+    return []
+
+
 def walk(node: Node) -> list[Node]:
     """``node`` and every node below it, depth first."""
     out: list[Node] = [node]

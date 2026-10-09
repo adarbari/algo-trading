@@ -177,9 +177,8 @@ def _with_expressions(
 def _stored(
     reader: StoreReader, table: str, start: date, end: date, as_of: datetime | None
 ) -> bool:
-    """Does ``table`` have rows in ``start..end`` known at ``as_of`` (None: now)?"""
-    if as_of is None:
-        return any(start <= d <= end for d in reader.dates(table))
+    """Does ``table`` have rows in ``start..end`` known at ``as_of`` (None: now)? An empty
+    partition has none (ADR 0055 amendment: it holds no value, so it is missing)."""
     return feature_rows(reader, table, ["instrument_id"], start, end, as_of) is not None
 
 

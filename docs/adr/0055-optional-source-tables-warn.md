@@ -51,3 +51,20 @@ correct without IBKR.
   input for a session of the run (`check_rollup_inputs`, read from the run record's stats), so
   an empty optional partition such as `ibkr_iv@v1` is visible in the nightly report when it
   happens (2026-10-06: the rollups ran before `ibkr-iv` succeeded and nothing said so).
+
+## Amendment: coverage of coalescing expressions (2026-10-08)
+`vrp_iv_hv` reads `feature.vrp_iv30`, a coalesce of IBKR's `iv30` (optional group `ibkr_iv@v1`)
+and our Cboe-derived `iv30@v1` (required, stored only from 2026-10-02). On every earlier session
+the screen graded PARTIAL (`iv30@v1` has no rows) and the edge harness dropped it, although
+IBKR's leg was present and picks existed. Splitting missing tables by group alone cannot say
+that a required table is not needed when a fallback is present, so the rule is by field.
+
+A field the screen reads is *covered* for a session when it can have a value from stored data.
+A stored field is covered when its table has rows, or when its group is optional. A materialised
+expression is covered when its own table has rows. A virtual expression is covered when all its
+operands are covered, with two exceptions. `coalesce(...)` is covered when at least one leg that
+reads a table has all of that leg's tables present. In that test a table is present only when it has rows for the session; a group being optional never makes a leg present, and literal legs never count. `exists(g)` is always covered. A screen with any
+uncovered field is PARTIAL. Missing tables read only by covered fields are *tolerated*: the run
+reports them in `missing_optional_tables` (which now means "ran without") and the nightly shows
+them as a WARN. A missing table no field explains stays blocking. Implemented by
+`FeatureSet.coverage` and used by `services/screening/run.py` (`split_missing` is gone).

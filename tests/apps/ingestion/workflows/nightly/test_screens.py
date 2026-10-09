@@ -57,7 +57,7 @@ def test_an_optional_table_missed_by_a_complete_screen_is_a_warning(
     assert step.status is StepStatus.SUCCEEDED
     (warning,) = step.checks
     assert warning["status"] == "WARN" and warning["name"] == "optional_sources"
-    assert warning["detail"] == f"vrp_scanner ran without {IBKR} (optional)"
+    assert warning["detail"] == f"vrp_scanner ran without {IBKR}"
 
 
 def test_screens_without_optional_misses_carry_no_warning(
