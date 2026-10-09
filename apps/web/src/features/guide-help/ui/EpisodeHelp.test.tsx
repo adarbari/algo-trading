@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql, TestQueryProvider } from '@/shared/api';
-import { expectNoA11yViolations } from '@/shared/lib/testing';
+import { expectNoA11yViolations, servedEntries } from '@/shared/lib/testing';
 
 import { GuideHelpProvider } from '../model/navigation';
 import { GuideHelp } from './GuideHelp';
@@ -50,7 +50,7 @@ function setup(navigate = vi.fn()) {
 
 beforeEach(() => {
   GQL.mockReset();
-  GQL.mockResolvedValue(SERVED);
+  GQL.mockResolvedValue(servedEntries(SERVED));
 });
 
 describe('GuideHelp for a market fall', () => {
@@ -67,16 +67,18 @@ describe('GuideHelp for a market fall', () => {
     expect(facts.closest('div')).toHaveTextContent(/[-−]57%/);
     expect(within(drawer).getByText('Recovered').closest('div')).toHaveTextContent(/2013/);
     await expectNoA11yViolations(container);
-    expect(GQL.mock.calls[0]?.[1]).toEqual({ slug: 'gfc_2007' });
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ refs: [{ kind: 'EPISODE', id: 'gfc_2007' }] });
   });
 
   it('says a fall that has not recovered has not, and opens the full page', async () => {
-    GQL.mockResolvedValue({
-      guideEpisode: {
-        ...SERVED.guideEpisode,
-        episode: { ...SERVED.guideEpisode.episode, recovered: null },
-      },
-    });
+    GQL.mockResolvedValue(
+      servedEntries({
+        guideEpisode: {
+          ...SERVED.guideEpisode,
+          episode: { ...SERVED.guideEpisode.episode, recovered: null },
+        },
+      }),
+    );
     const { navigate } = setup();
     await userEvent.click(await screen.findByRole('button', { name: /^About / }));
     const drawer = await screen.findByRole('dialog');

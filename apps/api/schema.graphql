@@ -577,6 +577,24 @@ type GuideCriterionRow {
 }
 
 """
+The entries found for the refs asked, each list in the order of the refs; a ref with no entry is left out (the caller matches by key)
+"""
+type GuideEntries {
+  indicators: [GuideIndicatorDetail!]!
+  episodes: [GuideEpisodeDetail!]!
+  terms: [GuideTerm!]!
+  startPages: [GuideStartPage!]!
+}
+
+"""The kinds of Guide entry `guideEntries` reads"""
+enum GuideEntryKind {
+  INDICATOR
+  EPISODE
+  TERM
+  START
+}
+
+"""
 A reference market fall: its key (its page's slug, `Query.guideEpisode(slug)`) and name
 """
 type GuideEpisode {
@@ -762,6 +780,14 @@ A run of Guide prose: `field` is the catalogue name it is (then `text` is that n
 type GuideProseSegment {
   text: String!
   field: String
+}
+
+"""
+One entry a page asks for: its `kind` and its `id` (an indicator's key, an episode's slug, a term's or Start here page's id)
+"""
+input GuideRef {
+  kind: GuideEntryKind!
+  id: String!
 }
 
 """Another playbook worth reading next, and why"""
@@ -1572,6 +1598,11 @@ type Query {
   The Start here page `id` (ADR 0051): its entry, the sections linked and the Guide entries it links to; null: no such page
   """
   guideStartPage(id: String!): GuideStartPage
+
+  """
+  Many Guide entries in one read (ADR 0051): the regime indicators, episodes, glossary terms and Start here pages named by `refs` (at most 100), so a page's help buttons cost one request; a ref with no entry is left out
+  """
+  guideEntries(refs: [GuideRef!]!): GuideEntries
 
   """
   Search every Guide entry for `q` (ADR 0051): at most `limit` results per kind, grouped by kind, ranked exact name, then name or title, then intent or theme, then prose (case-insensitive); not session data

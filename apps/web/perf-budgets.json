@@ -5,7 +5,7 @@
     "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
       "src/pages/admin-harness-runs/index.ts": 31800,
-      "src/pages/admin-ingestion/index.ts": 46500,
+      "src/pages/admin-ingestion/index.ts": 47200,
       "src/pages/admin-llm-usage/index.ts": 48700,
       "src/pages/guide/index.ts": 56900,
       "src/pages/login/index.ts": 1800,
@@ -53,6 +53,7 @@
     }
   },
   "reasons": {
+    "bundle.routes.src/pages/admin-ingestion/index.ts": "2026-10-09 #438 Guide entries in one batched read: the batch document and loader (replacing four single-entry documents) move into this page chunk (+645 B gzip)",
     "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
     "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
     "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",

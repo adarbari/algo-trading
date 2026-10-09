@@ -6,7 +6,7 @@ from typing import Self
 
 import strawberry
 
-from algotrade.services.read.guide import episode as guide_episode
+from algotrade.services.read.guide import regime as guide_episode
 from algotrade_api.graphql.types.guide.prose import GuideProse
 from algotrade_api.graphql.types.market.regime import Episode
 

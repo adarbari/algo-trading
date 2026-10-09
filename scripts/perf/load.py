@@ -70,9 +70,7 @@ PAGES: dict[str, list[Op]] = {
     "ideas": [
         Op("IdeasPage", _static(limit=200, names=IDEA_NAMES)),
         Op("Viewer", _static()),
-        Op("StatusScreens", _static()),
-        Op("NightlyRuns", _static(limit=1)),
-        Op("IngestionCompleteness", _static(sessions=1)),
+        Op("StatusStrip", _static(admin=True)),
         Op("Regime", _static()),
     ],
     "regime": [

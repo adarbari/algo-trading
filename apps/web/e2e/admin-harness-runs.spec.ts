@@ -7,7 +7,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
-import { FAIL, mockAdminApi } from './admin-api';
+import { FAIL, mockAdminApi, mockNoGuideEntries } from './admin-api';
 import { mockViewer } from './auth-api';
 import { mockRegimeApi } from './regime-api';
 
@@ -91,6 +91,7 @@ function collectErrors(page: Page): string[] {
 async function open(page: Page, overrides = {}) {
   await mockRegimeApi(page); // the top-bar chip reads the regime
   await mockViewer(page);
+  await mockNoGuideEntries(page);
   await mockAdminApi(page, { harnessRuns: RUNS, 'harnessRun:run-b': ROWS, ...overrides });
 }
 
