@@ -352,7 +352,7 @@ Source: `design-system/components/Chip`
 
 ### Combobox
 
-Combobox: choose one value from a long or searchable list by typing (the feature picker). Each option shows a label (mono for feature names), an optional kind badge ("formula") and a secondary description, grouped under headings. Filters locally, or asynchronously: pass `filter="none"`, fetch on `onInputChange`, and set `options` and `loading`. Keyboard per the ARIA combobox pattern: ArrowDown / ArrowUp open and move, Enter selects, Escape closes, Tab leaves; the active option is announced through aria-activedescendant.
+Combobox: choose one value from a long or searchable list by typing (the feature picker). Each option shows a label (mono for feature names), an optional kind badge ("formula") and a secondary description, grouped under headings. Filters locally, or asynchronously: pass `filter="none"`, fetch on `onInputChange`, and set `options` and `loading`. Keyboard per the ARIA combobox pattern: ArrowDown / ArrowUp open and move, Enter selects, Escape closes, Tab leaves; the active option is announced through aria-activedescendant. `search` turns it into a search box that adds things: it holds no selection (the input is the query and clears after a choice), shows a search icon and, with `focusKey`, the key that jumps to it from anywhere outside a text field ("/"). Choosing again an item already chosen still calls `onValueChange`, so a caller can re-open it. Built to be the app's palette box.
 
 Source: `design-system/components/Combobox`
 
@@ -374,6 +374,8 @@ Source: `design-system/components/Combobox`
 | `invalid` | `boolean` | no |  |
 | `disabled` | `boolean` | no |  |
 | `name` | `string` | no |  |
+| `search` | `boolean` | no | A search box that adds: no selection is kept, the list shows only once something is typed, and the input clears after a choice. |
+| `focusKey` | `string` | no | With `search`: the key that focuses the box from anywhere outside a text field ("/"); shown as a hint at the end while the box is idle. |
 
 ### DataTable
 
@@ -1292,6 +1294,21 @@ Source: `design-system/components/StatusStrip`
 | `defaultExpanded` | `boolean` | no | Start expanded (default false). |
 | `label` | `string` | no | Accessible name of the strip. |
 | `words` | `Partial<StatusStripWords>` | no | Words: the pills, "and N more" and the snooze button. |
+
+### TabStrip
+
+TabStrip: a row of open items (documents, instruments, views) as pill tabs the user can close, with the selected item's content in its panel. Controlled: the caller owns `value` and the list. Arrow keys, Home and End move focus and select; Delete or Backspace closes the focused tab (and focuses its neighbour; announced through aria-keyshortcuts); every tab also has a close button for pointer and touch, hidden from the accessibility tree because a tab list may hold only tabs. The row scrolls sideways when the tabs do not fit, the selected one scrolled into view. For switching between fixed views of one subject use Tabs.
+
+Source: `design-system/components/TabStrip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly TabStripItem[]` | yes |  |
+| `value` | `string \| null` | yes | The selected tab id (none selected when it names no item). |
+| `onChange` | `(id: string) => void` | yes |  |
+| `onClose` | `(id: string) => void` | no | Called with the id of the tab to close; omit for tabs that cannot be closed. |
+| `label` | `string` | yes | Accessible name of the tab list, e.g. "Open items". |
+| `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
 
 ### Tabs
 
