@@ -8,7 +8,10 @@ neither a flag nor a clear, and a signal with no stored verdict is unknown, neve
 from datetime import date
 from typing import Any
 
+import pytest
+
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.regime import timeline
 from algotrade.services.read.regime.timeline import (
     GATE,
     EpisodeSignals,
@@ -201,3 +204,25 @@ def test_a_sparse_signal_with_an_on_run_is_still_led() -> None:
     led = timing(signals({SEP24: {"trend_on": True}}), "trend")
     assert (led.state, led.flagged_day, led.unknown_reason) == (SignalState.LED, 2, None)
     assert led.verdict_sessions == 1
+
+
+def test_an_episode_s_signals_are_computed_once_per_published_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # the regime page's History asks for every episode at once (1.2 s a page)
+    ctx: ReadContext = with_regime(
+        context(store_with(_write(ROWS))), docs={("site", "regime", "episodes"): DOC}
+    )
+    computed: list[str] = []
+    real = timeline._signals
+
+    def counting(c: ReadContext, key: str) -> Any:
+        computed.append(key)
+        return real(c, key)
+
+    monkeypatch.setattr(timeline, "_signals", counting)
+    first = load_episode_signals(ctx, "ep")
+    assert load_episode_signals(ctx, "ep") is first and computed == ["ep"]
+    seq = ctx.reader.visible_seq()
+    monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
+    assert load_episode_signals(ctx, "ep") == first and computed == ["ep", "ep"]

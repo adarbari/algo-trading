@@ -23,7 +23,10 @@ import pytest
 
 from algotrade.storage.backends import local
 from algotrade.storage.backends.local import LocalBackend, _read_file
+from algotrade.storage.runs import RunRecord, RunStatus, start_run
 from tests.helpers.stored_frames import T0, stamped
+
+D1 = date(2026, 10, 1)
 
 TABLE = "rollups/market/demo@v1"
 START = date(1971, 1, 1)
@@ -189,3 +192,32 @@ def test_listing_tables_of_50000_partitions_is_within_budget(tmp_path: Path) -> 
     elapsed = time.perf_counter() - start
     assert names == ["bars/1d", "macro/series", "rollups/market/regime@v2"]
     assert elapsed < 0.2, f"{elapsed:.3f} s for 50,000 partitions (budget 0.2 s)"
+
+
+def test_find_opens_only_the_job_s_files_and_parses_a_file_once_per_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every record of a store was parsed on every ``find`` (6 400 files, 0.9 s a call, 26
+    calls for the edges page): only the job's own ``new_run_id`` files (and files in another
+    id form) are opened, and a file is parsed again only once it changed."""
+    runs = LocalBackend(tmp_path).runs
+    for n, job in enumerate(["job", "other", "other", "other"]):
+        runs.save(start_run(job, D1, T0 + timedelta(n)))
+    runs.save(RunRecord("job-screen-0123456789abcdef", "job:screen", D1, T0))
+    parsed: list[str] = []
+    original = RunRecord.from_json
+
+    def spy(text: str) -> RunRecord:
+        record = original(text)
+        parsed.append(record.job)
+        return record
+
+    monkeypatch.setattr(local.RunRecord, "from_json", staticmethod(spy))
+    assert [r.job for r in runs.find("job")] == ["job"]
+    assert sorted(parsed) == ["job", "job:screen"]  # never another job's records
+    runs.find("job")
+    assert len(parsed) == 2  # unchanged files: nothing parsed again
+    record = runs.find("job")[0]
+    time.sleep(0.01)
+    runs.save(record.finish(T0 + timedelta(1)))
+    assert runs.find("job")[0].status is RunStatus.COMPLETE and len(parsed) == 3

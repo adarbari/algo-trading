@@ -164,8 +164,15 @@ def load_completeness(
     """Every dataset x the last ``sessions`` exchange sessions ending at ``ctx.session.date``,
     and the last session the exchange closed by ``now`` (default: the current time)."""
     days = sessions_ending(ctx.session.date, min(max(sessions, 1), MAX_SESSIONS))
-    counts = _Counts(ctx)
-    cells = tuple(_cell(counts, d, day) for d in DATASETS for day in days)
+    # the cells are what is stored, the same for every caller until the next publish (in the
+    # key, read before the partitions, ADR 0022): the status strip of every page asks for one
+    # session, 430 partitions read (1.6 s a page)
+    key = ("completeness", tuple(days), ctx.reader.visible_seq())
+    cells: tuple[Cell, ...] | None = ctx.cache.get(key)
+    if cells is None:
+        counts = _Counts(ctx)
+        cells = tuple(_cell(counts, d, day) for d in DATASETS for day in days)
+        ctx.cache.put(key, cells)
     closed = last_closed_session(now or datetime.now(UTC))
     return Completeness(tuple(days), tuple(d.name for d in DATASETS), cells, closed)
 

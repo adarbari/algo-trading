@@ -23,8 +23,8 @@ from algotrade.services.read.screens.results import ScreenResult, load_results
 from algotrade.services.read.screens.runs import (
     PAUSED,
     ScreenerRun,
-    is_picked,
     load_latest_runs,
+    picked_mask,
     run_rows,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
@@ -111,11 +111,13 @@ def _picks(
     out: dict[str, list[tuple[Any, str]]] = {}
     for run in runs:
         rows = run_rows(ctx, run)
-        for iid, decision, score, tie in zip(
-            rows["instrument_id"], rows["decision"], rows["score"], rows["tie_break"], strict=True
+        picked = rows[picked_mask(rows["decision"])]
+        for iid, score, tie in zip(
+            picked["instrument_id"].tolist(),
+            picked["score"].tolist(),
+            picked["tie_break"].tolist(),
+            strict=True,
         ):
-            if not is_picked(str(decision)):
-                continue
             key = (
                 place.get(run.config_id, len(place)),
                 -_or(score, -1.0),
@@ -130,7 +132,7 @@ def _picks(
 
 def _top(ctx: ReadContext, run: ScreenerRun) -> list[str]:
     rows = run_rows(ctx, run)
-    picked = rows[[is_picked(str(d)) for d in rows["decision"]]]
+    picked = rows[picked_mask(rows["decision"])]
     return [str(i) for i in picked["instrument_id"].head(TOP_PER_SCREENER)]
 
 

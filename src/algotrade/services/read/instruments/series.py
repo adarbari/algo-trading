@@ -8,9 +8,9 @@ features computed for them (``services.features.read_expressions``, the evaluati
 uses). A session with no value for a name has ``None`` there. ``instrument.*`` facts are
 snapshot facts with no history: asking for one is a request error, and so is a name outside the
 caller's catalogue (``UnknownFeatureError``). The rows of a stored table are shared through
-``ctx.cache`` (market entity only: keyed on the table, ids, the session and the published
-state and the window's start; the read is the window up to the session), so a chart that
-asks again for it reads the store once."""
+``ctx.cache`` (market entity only, ``market_frame``: keyed on the table, ids, the session and
+the published state; the read is the table's whole history up to the session and a window is
+a slice of it), so every chart of a published state reads the store once."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -85,23 +85,29 @@ def _frame(
         # Instrument reads come in batches (dataloaders) and would evict the session's and
         # the screens' entries; a run's pending writes do not move visible_seq.
         return rollup_rows(ctx.reader, table, start, end, instruments=ids)
-    # A market table's rows do not depend on the caller, so every request shares them. The
-    # read is the window up to the session (a day is a partition: a read from the first stored
-    # day, 14 000 of them since 1971, took 10 s for a one-year chart), and the published state
-    # is in the key (read before the rows, ADR 0022), so a publish makes it unreachable. A
-    # chart that asks again for the window reads the store once. The frame is only read, never
-    # changed, by its callers.
-    key = ("series-frame", table, tuple(ids), start, ctx.session.date, ctx.reader.visible_seq())
-    cached: tuple[pd.DataFrame | None] | None = ctx.cache.get(key)
-    if cached is None:
-        cached = (rollup_rows(ctx.reader, table, start, ctx.session.date, instruments=ids),)
-        ctx.cache.put(key, cached)
-    frame = cached[0]
+    frame = market_frame(ctx, table, ids)
     if frame is None:
         return None
     days = frame["session_date"]
     window = frame[(days >= start) & (days <= end)]
     return None if window.empty else window
+
+
+def market_frame(ctx: ReadContext, table: str, ids: Sequence[str]) -> pd.DataFrame | None:
+    """Every stored row of market table ``table`` for ``ids`` up to the session, shared by every
+    request. A market table's rows do not depend on the caller; the read is the table's whole
+    history (a day is a partition, 14 000 of them since 1971: 20 s cold), once per published
+    state (in the key, read before the rows, ADR 0022: a publish makes it unreachable), and
+    every window is a slice of it: keyed on the window's start, the regime page's sixteen
+    episodes and its scores chart each read thousands of partitions again (150 s). The API
+    reads it ahead of the first request (``warm_market_frames``). The frame is only read,
+    never changed, by its callers."""
+    key = ("series-frame", table, tuple(ids), ctx.session.date, ctx.reader.visible_seq())
+    cached: tuple[pd.DataFrame | None] | None = ctx.cache.get(key)
+    if cached is None:
+        cached = (rollup_rows(ctx.reader, table, date.min, ctx.session.date, instruments=ids),)
+        ctx.cache.put(key, cached)
+    return cached[0]
 
 
 def load_series(

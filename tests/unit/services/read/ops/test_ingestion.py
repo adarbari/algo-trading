@@ -99,3 +99,26 @@ def test_the_grid_lists_each_tables_stored_dates_once(
     grid = load_completeness(_ctx(api_golden), 5, NOW)
     assert len(grid.cells) == 5 * len(grid.datasets)
     assert len(listed) == len(set(listed))
+
+
+def test_the_grid_is_kept_until_the_next_publish(
+    api_golden: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the status strip of every page asks for a one-session grid: 430 partitions read a page
+    ctx = _ctx(api_golden)
+    read: list[str] = []
+    real = ingestion.partition_on
+
+    def counting(c: Any, table: str, day: date) -> Any:
+        read.append(table)
+        return real(c, table, day)
+
+    monkeypatch.setattr(ingestion, "partition_on", counting)
+    first = load_completeness(ctx, 2, NOW)
+    once = len(read)
+    assert once > 0
+    assert load_completeness(ctx, 2, NOW).cells == first.cells and len(read) == once
+    seq = ctx.reader.visible_seq()
+    monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
+    load_completeness(ctx, 2, NOW)
+    assert len(read) == 2 * once

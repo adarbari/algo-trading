@@ -1,14 +1,18 @@
 from datetime import date, timedelta
 
+import pandas as pd
+
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.services.read.screens.runs import (
+    NOT_PICKED,
     DecisionCount,
     is_picked,
     latest_run,
     load_latest_runs,
     load_previous_run,
+    picked_mask,
     run_rows,
 )
 from algotrade.services.read.values import UnknownCode
@@ -135,3 +139,8 @@ def test_the_previous_run_is_the_screeners_run_in_the_previous_session(
     assert beta is not None and load_previous_run(ctx, beta) is None  # beta did not run on D0
     gamma = latest_run(_on(reader, D0), "me", "gamma").run
     assert gamma is not None and load_previous_run(_on(reader, D0), gamma) is None  # no earlier
+
+
+def test_picked_mask_is_is_picked_on_every_row() -> None:
+    decisions = pd.Series([*sorted(NOT_PICKED), "PICK", "WATCH", None], dtype="string")
+    assert picked_mask(decisions).tolist() == [is_picked(str(d)) for d in decisions]
