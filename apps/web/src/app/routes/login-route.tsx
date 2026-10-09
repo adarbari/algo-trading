@@ -12,7 +12,7 @@ import { signOutSession } from '@/shared/api';
 import { DEFAULT_WORKSPACE } from '../workspaces';
 import type { LoginReason } from '../workspaces/guard';
 import { rootRoute } from './root';
-import { lazyPage } from './lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 const LoginPage = lazyPage(() => import('@/pages/login'), 'LoginPage');
 

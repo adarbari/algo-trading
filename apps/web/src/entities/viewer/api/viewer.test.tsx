@@ -5,20 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError, gql } from '@/shared/api';
 
-import { ensureViewer, useViewer } from './viewer';
-
-/** The listeners `onUnauthorized` registered: the test plays the API refusing a token. */
-const refusals = vi.hoisted(() => new Set<() => void>());
+import { ensureViewer, forgetUser, useViewer } from './viewer';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     gql: vi.fn(),
-    onUnauthorized: (listener: () => void) => {
-      refusals.add(listener);
-      return () => refusals.delete(listener);
-    },
   };
 });
 
@@ -57,18 +50,22 @@ describe('the viewer', () => {
     await expect(ensureViewer(client)).rejects.toMatchObject({ status: 403 });
   });
 
-  it('turns null when any later request is refused with a 401', async () => {
+  it('forgetUser empties the cache, cancels reads and leaves the viewer null', async () => {
     GQL.mockResolvedValue({ viewer: TRADER });
-    const { wrapper } = setup();
+    const { client, wrapper } = setup();
     const { result } = renderHook(() => useViewer(), { wrapper });
     await waitFor(() => {
       expect(result.current.data).toEqual(TRADER);
     });
+    client.setQueryData(['gql', 'Secret'], { private: 1 });
+    const draft = client.getMutationCache().build(client, { mutationFn: () => Promise.resolve(1) });
+    await draft.execute({ draft: 'a screener' });
+    expect(client.getMutationCache().getAll()).toHaveLength(1);
     act(() => {
-      refusals.forEach((refuse) => {
-        refuse();
-      });
+      forgetUser(client);
     });
+    expect(client.getQueryData(['gql', 'Secret'])).toBeUndefined();
+    expect(client.getMutationCache().getAll()).toHaveLength(0);
     await waitFor(() => {
       expect(result.current.data).toBeNull();
     });

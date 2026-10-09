@@ -5,10 +5,9 @@
  * error. With the API running `ALGOTRADE_AUTH=off` the viewer answers with no session at all,
  * and that counts as signed in: there is no separate dev mode in the web app.
  */
-import { queryOptions, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { hashKey, queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
-import { ApiError, gql, graphql, onUnauthorized, queryKeys, type gqlTypes } from '@/shared/api';
+import { ApiError, gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
 
 const ViewerQuery = graphql(`
   query Viewer {
@@ -47,13 +46,14 @@ export function ensureViewer(client: QueryClient): Promise<Viewer | null> {
  * Any 401 anywhere in the app (the API refused the token) turns it into `null`.
  */
 export function useViewer() {
-  const client = useQueryClient();
-  useEffect(
-    () =>
-      onUnauthorized(() => {
-        client.setQueryData(viewerKey, null);
-      }),
-    [client],
-  );
   return useQuery(viewerQuery());
+}
+
+/** The session ended (our sign-out, another tab's, a 401): nothing of the user stays in memory; the viewer is null. */
+export function forgetUser(client: QueryClient): void {
+  void client.cancelQueries();
+  // The viewer query stays (set to null) so a mounted top bar sees it and leaves.
+  client.removeQueries({ predicate: (query) => query.queryHash !== hashKey(viewerKey) });
+  client.getMutationCache().clear();
+  client.setQueryData(viewerKey, null);
 }

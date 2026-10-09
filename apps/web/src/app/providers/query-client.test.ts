@@ -1,8 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { ApiError, GraphQLRequestError } from '@/shared/api';
+import { ApiError, GraphQLRequestError, queryKeys } from '@/shared/api';
 
-import { shouldRetry } from './query-client';
+import { createQueryClient, shouldRetry } from './query-client';
+
+/** The listeners `onUnauthorized` registered: the test plays a sign-out arriving. */
+const signOuts = vi.hoisted(() => new Set<() => void>());
+
+vi.mock('@/shared/api', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    onUnauthorized: (listener: () => void) => {
+      signOuts.add(listener);
+      return () => signOuts.delete(listener);
+    },
+  };
+});
 
 describe('shouldRetry', () => {
   it('never retries a 4xx answer: it will not change, so the query settles at once', () => {
@@ -20,5 +34,18 @@ describe('shouldRetry', () => {
     expect(shouldRetry(0, new TypeError('Failed to fetch'))).toBe(true);
     expect(shouldRetry(0, new ApiError(503, 'down'))).toBe(true);
     expect(shouldRetry(1, new ApiError(503, 'down'))).toBe(false);
+  });
+});
+
+describe('createQueryClient', () => {
+  it('is signed out by a sign-out with no page mounted yet, and forgets the cached data', () => {
+    const client = createQueryClient(); // no component exists: the client alone listens
+    client.setQueryData(['gql', 'Positions'], { rows: 1 });
+    expect(signOuts.size).toBeGreaterThan(0);
+    signOuts.forEach((signOut) => {
+      signOut();
+    });
+    expect(client.getQueryData(['gql', 'Positions'])).toBeUndefined();
+    expect(client.getQueryData(queryKeys.gql('Viewer', {}))).toBeNull();
   });
 });

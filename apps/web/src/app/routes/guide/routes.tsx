@@ -16,7 +16,7 @@ import { parseFieldsSearch } from '@/entities/guide';
 import { GuideLayout } from '../../layouts';
 import { viewerGuard } from '../../workspaces';
 import { rootRoute } from '../root';
-import { lazyPage } from '../lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 // One chunk for the Guide's pages (they share widgets), loaded when the first Guide page opens.
 const GuideEpisodePage = lazyPage(() => import('@/pages/guide'), 'GuideEpisodePage');

@@ -140,6 +140,27 @@ describe('with Supabase configured', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it('only a SIGNED_OUT without a session signs this tab out; SIGNED_IN, TOKEN_REFRESHED and INITIAL_SESSION never do', async () => {
+    const callbacks: ((event: string, session: unknown) => void)[] = [];
+    auth.onAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
+      callbacks.push(cb);
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    });
+    const { accessToken, onUnauthorized } = await load(CONFIGURED);
+    await accessToken();
+    const listener = vi.fn();
+    onUnauthorized(listener);
+    const session = { user: { email: 'a@b.co' } };
+    callbacks[0]?.('SIGNED_OUT', session);
+    callbacks[0]?.('SIGNED_IN', session);
+    callbacks[0]?.('TOKEN_REFRESHED', session);
+    callbacks[0]?.('INITIAL_SESSION', session);
+    callbacks[0]?.('INITIAL_SESSION', null);
+    expect(listener).not.toHaveBeenCalled();
+    callbacks[0]?.('SIGNED_OUT', null);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('on a 401 signs out locally and tells the listeners', async () => {
     const { handleUnauthorized, onUnauthorized } = await load(CONFIGURED);
     const listener = vi.fn();
