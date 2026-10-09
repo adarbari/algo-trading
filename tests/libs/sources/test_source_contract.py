@@ -51,6 +51,7 @@ from algotrade_sources.vendors.sp500_history.membership import Sp500Membership
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.tiingo.listings import TiingoSupportedTickers
+from algotrade_sources.vendors.tiingo.meta import TiingoListingMeta
 from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
@@ -161,6 +162,11 @@ def tiingo_listings() -> Adapter:
     return source, FetchRequest("supported_tickers")
 
 
+def tiingo_meta() -> Adapter:
+    source = TiingoListingMeta(http_for(lambda url: tiingo_payloads.meta_payload()))
+    return source, FetchRequest("PRM,AAPL")
+
+
 def sp500_history() -> Adapter:
     source = Sp500Membership(http_for(lambda url: sp500_payloads.membership_csv()))
     return source, FetchRequest("membership")
@@ -268,6 +274,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "massive_bars": massive_bars,
     "tiingo_prices": tiingo_prices,
     "tiingo_listings": tiingo_listings,
+    "tiingo_meta": tiingo_meta,
     "sp500_history": sp500_history,
     "massive_actions": massive_actions,
     "nasdaq_earnings": nasdaq_earnings,

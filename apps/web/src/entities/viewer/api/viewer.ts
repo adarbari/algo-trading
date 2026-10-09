@@ -54,5 +54,6 @@ export function forgetUser(client: QueryClient): void {
   void client.cancelQueries();
   // The viewer query stays (set to null) so a mounted top bar sees it and leaves.
   client.removeQueries({ predicate: (query) => query.queryHash !== hashKey(viewerKey) });
+  client.getMutationCache().clear();
   client.setQueryData(viewerKey, null);
 }

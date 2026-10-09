@@ -127,11 +127,18 @@ def _coverage(stats: Mapping[str, Any]) -> tuple[str | None, tuple[str, ...], tu
     )
 
 
+def last_run_rows(rows: pd.DataFrame) -> tuple[pd.Series, pd.DataFrame]:
+    """THE run-selection rule: of ``rows`` (one owner's rows of one config in one session) the
+    run with the latest ``knowledge_ts`` (a later run supersedes an earlier one): its last
+    row and every row of that run. ``pick_history`` applies the same rule per session."""
+    last = rows.sort_values("knowledge_ts", kind="stable").iloc[-1]
+    return last, rows[rows["run_id"] == str(last["run_id"])]
+
+
 def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> ScreenerRun:
     """The run of ``rows`` (one owner's rows of one config) with the latest ``knowledge_ts``."""
-    last = rows.sort_values("knowledge_ts", kind="stable").iloc[-1]
+    last, mine = last_run_rows(rows)
     run_id = str(last["run_id"])
-    mine = rows[rows["run_id"] == run_id]
     counts = mine["decision"].astype(str).value_counts()
     record = ctx.reader.run(run_id)
     stats: Mapping[str, Any] = {} if record is None else dict(record.stats)

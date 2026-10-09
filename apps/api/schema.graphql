@@ -1272,6 +1272,16 @@ type PausedIdea {
 }
 
 """
+One session of a screener's pick history: how many tickers its latest run of the session picked and how many the regime gate held back (`paused`); both null when it has no run for the session, and `notRun` says why (NOT_RUN)
+"""
+type PickCount {
+  session: Date!
+  picked: Int
+  paused: Int
+  notRun: Unknown
+}
+
+"""
 The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
 """
 type PresetPin {
@@ -1882,7 +1892,7 @@ type ScreenVersion {
 }
 
 """
-A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `criteria` and `displayColumns` the current config's; `latestRun` its run for the session, else `notRun` says why (NOT_RUN)
+A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `criteria` and `displayColumns` the current config's; `latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its picked count per session over a window ending at the session
 """
 type Screener {
   id: String!
@@ -1904,6 +1914,11 @@ type Screener {
   Its record over the frozen period of each edge that lists it, by edge id, from that edge's canonical run (never an exploratory run); an edge without one has an entry whose `notRun` says why; empty: no edge lists it
   """
   trackRecords: [TrackRecord!]!
+
+  """
+  Its picked count for each of the last `sessions` (default 30, at most 90) exchange sessions ending at the session, oldest first, one entry per session: a session it did not run in has `picked` null and `notRun` says why (never an older run); a session with several runs counts the latest; each entry is what `latestRun` says at that session
+  """
+  pickHistory(sessions: Int! = 30): [PickCount!]!
 }
 
 """
