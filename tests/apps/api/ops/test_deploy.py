@@ -47,7 +47,7 @@ def test_what_a_change_needs(paths: list[str], expected: list[Action]) -> None:
 
 
 def test_the_deploy_cycle_is_owned_by_the_api_module_and_the_ingestion_hold() -> None:
-    owners = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
+    owners = tomllib.loads((REPO_ROOT / "architecture" / "api_ownership.toml").read_text())
     (cycle,) = [r for r in owners["responsibility"] if r["id"] == "deploy-cycle"]
     assert set(cycle["owner"]) == {
         "apps/api/algotrade_api/ops/deploy.py",
@@ -56,7 +56,7 @@ def test_the_deploy_cycle_is_owned_by_the_api_module_and_the_ingestion_hold() ->
 
 
 def test_the_plist_writers_are_the_launchd_agents_owners() -> None:
-    owners = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
+    owners = tomllib.loads((REPO_ROOT / "architecture" / "ingestion_ownership.toml").read_text())
     (agents,) = [r for r in owners["responsibility"] if r["id"] == "launchd-agents"]
     assert set(PLIST_WRITERS) == set(agents["owner"])
 

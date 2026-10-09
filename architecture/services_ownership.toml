@@ -1,0 +1,237 @@
+# Ownership registry (ADR 0019), services: the use cases and their engines (services/,
+# engines/, strategies/; the read model is read_ownership.toml).
+# Every responsibility has exactly ONE owner. The registry is every architecture/*_ownership.toml
+# but web_ownership.toml, one file per layer: an entry lives in the file whose `scope` holds its
+# first owner (the longest prefix wins), sorted by id. Fields and detect rules: the docstring of
+# scripts/check_ownership.py. Before writing code that does X, find X
+# (`grep <keyword> architecture/*ownership.toml`) and extend its owner; a new responsibility
+# needs an entry + owner in the same PR (.claude/skills/add-responsibility).
+
+scope = ["src/algotrade/services/", "src/algotrade/engines/", "src/algotrade/strategies/"]
+
+[[responsibility]]
+id = "config-authoring"
+description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; for a user the site registry declares (the API passes the registry as a predicate to `author`; no I/O of its own); the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol (which reads drafts and versions back: the read model, services/read/screens/documents.py)"
+owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
+section = "docs/adr/0029-rule-screener.md#versioned-configs"
+detect = [{ call = "add_version" }, { call = "save_features" }]
+
+[[responsibility]]
+id = "edge-evaluation"
+description = "Score an edge's screeners against stored outcomes (ADR 0053 decisions 5 to 7 and its amendment of 2026-10-08): per edge and per edge variant ([[variants]], each a trial), the decision sessions D of its schedule spaced a horizon apart (an event schedule: the event names read at D from a declared feature field, pooled into blocks of a horizon), the entry session S = D + offset (S > D) whose outcome partition is read, each screener's and baseline's picks and the eligible, base and implied-vol names at D (only what was known then; one fixed iv_field per run, its source and licence recorded), whether an outcome counts as a hit (the document's [outcome] against the stored fields; an unclosed or missing window, or no entry bar at S, excluded, never a miss), hit rate against the base rate, lift, decile spread, effect size, Sharpe, deflated Sharpe and PBO per slice (all, year, regime, frozen) with the independent sessions beside each, the trial log, and the rows of results/edge_eval; the one reader of outcomes (harness.py)"
+owner = ["src/algotrade/services/evaluation/cross_section/*"]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares results/edge_eval's one schema
+    "src/algotrade/services/jobs/handlers.py",  # the edge-eval job kind (ADR 0010) runs the harness
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pbo_cscv" }, { string = "results/edge_eval" }]
+
+[[responsibility]]
+id = "edge-scorer-fit"
+description = "Fit a learned scorer for an edge (ADR 0053 amendment, ED7): the training frame (the edge's eligible names at each decision session D with the features its document declares under [scorer] read at D only, and the edge's hit at the entry session S as the label, only windows closing before frozen_from less one horizon: purged and embargoed, never the frozen period), the probit of the hit on the standardised features (quant/probit.py is the model), and the coefficients written as the TOML expression feature edge_score_<edge> in config/site/features/edge_scores.toml with fitted_through; run by algotrade-backtest fit-edge-scorer through the edge-score-fit job; nightly scoring is the expression engine's ncdf over the file, with no label at score time"
+owner = ["src/algotrade/services/evaluation/training/*"]
+allowed = [
+    "src/algotrade/services/jobs/handlers.py",  # the edge-score-fit job kind (ADR 0010)
+    "apps/backtest/algotrade_backtest/commands.py",  # fit-edge-scorer writes the features file
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-08-ed7a-the-first-learned-scorer-a-probit-in-site-config"
+detect = [{ call = "fit_scorer" }, { call = "training_frame" }, { call = "render_scorer" }, { call = "merge_scorers" }]
+
+[[responsibility]]
+id = "event-scope"
+description = "Which names the event-sensitivity study covers (ADR 0050 decision 2) as of a session: the tier A / B short-put names (option_liquidity@v1.short_put_ok), the site list config/site/events/scope.toml and the stocks the scoped leveraged funds track (fund_reference@v1), each with its reason; list symbols become ids only through SymbolResolver of the session's reference snapshot and the unknown ones are returned, never dropped or built; tasks call scoped_instruments and never load the scope list themselves"
+owner = ["src/algotrade/services/events/*"]
+allowed = [
+    "src/algotrade/config/site/events/scope.py",  # the typed loader of the list's file (ADR 0050); the owner is its one caller
+    "src/algotrade/features/rollups/options/option_liquidity.py",  # declares short_put_ok
+    "src/algotrade/strategies/screeners/short_premium_liquidity.py",  # a screener's own read of the flag per row
+    "src/algotrade/services/screening/exports.py",  # the export's column of the flag
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "load_event_scope" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
+
+[[responsibility]]
+id = "history-fill-order"
+description = "The order a budgeted history backfill takes names as of a session (ADR 0050, services/events/fill.py): every ticker of the session's reference snapshot, optionable names first (an option_liquidity@v1 row), then iv_history@v2.iv30 descending, then price_stats@v2.adv_usd_20d descending, each read through rollup_as_of; tasks call fill_order and never rank the universe themselves"
+owner = ["src/algotrade/services/events/fill.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # the one caller: takes the first N names without history (--fill)
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "fill_order" }]
+
+[[responsibility]]
+id = "job-execution"
+description = "Execute long-running work: threads, locks, recovery, idempotency; apps run jobs through services.jobs.run_job, fan-out through services.jobs.as_completed"
+owner = ["src/algotrade/services/jobs/*"]
+allowed = [
+    "libs/sources/algotrade_sources/framework/session_thread.py",  # a gateway session's own thread (its socket + event loop), not work (ADR 0028)
+    "src/algotrade/storage/recording.py",  # the API's background batch writer (live quotes ADR 0028, usage ADR 0058): one thread draining a queue, not a job
+]
+section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
+detect = [
+    { call = "LocalJobRunner" },
+    { call = "ThreadPoolExecutor" },
+    { call = "ProcessPoolExecutor" },
+    { call = "threading.Thread" },
+]
+
+[[responsibility]]
+id = "live-option-quotes"
+description = "The API's live option quotes, read-only (ADR 0028): IBKR quotes for an underlying's expiry through the facade on the API's own client id and session thread, a 60 s cache, the stored delayed chain + a status as the fallback, and the API's one write: the answers recorded in the background to live/option_quotes (only through LiveWriter, atomic per run); read back through data.chains"
+owner = [
+    "src/algotrade/services/live/*",
+    "apps/api/algotrade_api/live.py",
+    "src/algotrade/storage/tables/live_writer.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/data/chains.py",  # the read of the recorded quotes (live_option_quotes)
+]
+section = "docs/adr/0028-ibkr-enrichment-source.md#live-option-quotes-in-the-api"
+detect = [{ string = "live/option_quotes" }, { call = "LiveWriter" }, { call = "SessionThread" }]
+
+[[responsibility]]
+id = "llm-usage"
+description = "What the text model spent (ADR 0058): every provider attempt of a call (failed and budget-skipped ones too) priced from llm.toml [[price]] (a paid remote model without one is a ConfigurationError; claude-cli's reported notional cost; free), counted against [budget] (daily / monthly USD: skip the paid providers or refuse) by an in-process ledger seeded from the store at startup, and recorded in the background to usage/llm_calls (only through UsageWriter, atomic per run); read back across a date range through data.usage"
+owner = [
+    "src/algotrade/services/text_model/usage.py",
+    "src/algotrade/services/text_model/ledger.py",
+    "src/algotrade/storage/tables/usage_writer.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/data/usage/*",  # the read of the recorded usage (spent_by_day, read_llm_calls)
+    "src/algotrade/config/site/llm.py",  # the [[price]] and [budget] settings and each provider's rate
+    "apps/api/algotrade_api/text_model.py",  # wires the ledger into the chain
+]
+section = "docs/adr/0058-llm-usage-log-prices-and-budget.md#budget"
+detect = [{ string = "usage/llm_calls" }, { call = "UsageWriter" }, { call = "UsageLedger" }]
+
+[[responsibility]]
+id = "on-request-screen-runs"
+description = "The API's on-request screen runs (ADR 0033): resolve the screener for the user, pick the latest session with data, answer ready when this config version has already run for it, else submit the `screen` job (the nightly's job) to a local runner that does not wait for ingestion (results publish atomically); writes only result tables and run records (ResultWriter), never market or feature data"
+owner = ["src/algotrade/services/ondemand/*"]
+section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"
+detect = [{ call = "OnDemandScreens" }]
+
+[[responsibility]]
+id = "regime-explaining"
+description = "The market regime explained in plain words on request (ADR 0041, amended 2026-10-06): the prompt of the regime's facts and the allowed links (no market data beyond them, no user data, no credentials), the answer cleaned (links outside the list dropped, markdown removed) and number-checked against the facts, the explanation cache keyed by session, signals, question and model (the API's one derived-cache write, ADR 0005 exception), and the per-user rate limit; nothing is asked of the model unasked"
+owner = [
+    "src/algotrade/services/explaining/*",
+    "src/algotrade/storage/backends/text_cache.py",
+]
+allowed = [
+    "apps/api/algotrade_api/routes/regime/*",  # the thin route calls the one use case
+    "src/algotrade/storage/factory.py",  # opens every backend from its URL
+]
+section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-06-the-text-model-seam"
+detect = [{ call = "explain_regime" }, { call = "LocalTextCache" }, { call = "MemoryTextCache" }]
+
+[[responsibility]]
+id = "regime-scorecard"
+description = "The regime episode scorecard: bear markets dated from stored index levels against the reference episodes, each score's lead on every episode peak, false alarms per decade, the plan's acceptance as PASS / FAIL, and the bear-state probit fitted on stored history; deterministic text (algotrade-backtest regime-scorecard, make evaluate)"
+owner = [
+    "src/algotrade/services/evaluation/regime_scorecard.py",
+    "src/algotrade/services/evaluation/regime_report.py",
+]
+section = "docs/market-regime-plan.md#4-the-regime-model-we-would-ship"
+detect = [{ call = "fit_probit" }, { call = "false_alarms" }]
+
+[[responsibility]]
+id = "rule-screen-evaluation"
+description = "Evaluate a rule screen (ADR 0029): each criterion's outcome, distance and penalty (HARD / SOFT tolerance band / SCORE), the row decision incl. SKIPPED, the distance score, rank and tie-break, tiers / flags / classify / columns, and the run summary (passed, skipped by reason, narrow misses)"
+owner = ["src/algotrade/strategies/screeners/rules/*"]
+section = "docs/screeners/rules.md#decision"
+detect = [{ call = "evaluate_screen" }, { call = "evaluate_criterion" }, { call = "summarise" }]
+
+[[responsibility]]
+id = "run-item-summary"
+description = "Summarise a run record's per-item statuses: status codes, which are fine, failed items grouped by a normalised reason (the nightly report and the API share it)"
+owner = ["src/algotrade/services/run_items.py"]
+section = "docs/api/read-model.md#the-domain-objects"
+detect = [{ string = "<date>" }, { string = "<url>" }]
+
+[[responsibility]]
+id = "run-overlays"
+description = "Run overlays and the regime gate (ADR 0049): the Overlay protocol and ScaleByLabel (engines/overlays), applied by the backtest engine after on_bar and before the risk limits; MarketFeatures on the bar timeline (session t's values at bar t, no lookahead) and the market features a run reads (services/backtests/market.py, services/screening/regime.py); the typed [regime] settings (config/strategy/regime.py); the screening engine's gate that PAUSES a screener's picks in the regimes it pauses in, and every pick of a gated screener (a non-empty pause_in) when the label is unknown (fail closed)"
+owner = [
+    "src/algotrade/engines/overlays/*",
+    "src/algotrade/engines/screening/gate.py",
+    "src/algotrade/core/views/market_features.py",
+    "src/algotrade/config/strategy/regime.py",
+    "src/algotrade/services/backtests/market.py",
+    "src/algotrade/services/screening/regime.py",
+]
+section = "docs/adr/0049-run-overlays-and-the-regime-gate.md#decision"
+detect = [{ string_prefix = "regime=" }, { call = "MarketFeatures" }, { call = "RegimeGate" }]
+
+[[responsibility]]
+id = "screen-drafting"
+description = "A rule screen drafted from a sentence (ADR 0041): the prompt over the caller's catalogue (name, type, unit, description, category values), the phrasebook and the field guide (config/site/field_guide/*.toml: how to read a field, the criterion per intent, caveats, situations; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; a draft the Builder loads, never a write, never a run"
+owner = ["src/algotrade/services/drafting/*"]
+allowed = [
+    "apps/api/algotrade_api/routes/drafting/*",  # the thin route calls the one use case
+]
+section = "docs/adr/0041-natural-language-screener-drafts.md#decision"
+detect = [{ call = "draft_screen" }]
+
+[[responsibility]]
+id = "screen-execution"
+description = "Run a configured screen (select, screen, audit, write results; coverage counts required tables only, an optional source's missing table is audited apart, ADR 0055); nightly submits `screen` jobs (workflows/nightly/screens.py) and warns on optional misses; the stale chains the chains gate tolerated (data.chains.tolerated_stale) are EXCLUDED from the run with a reason and out of its coverage (ADR 0054)"
+owner = [
+    "src/algotrade/services/screening/run.py",
+    "src/algotrade/services/screening/rule_results.py",  # a rule screen's result frames
+    "src/algotrade/services/jobs/handlers.py",
+    "src/algotrade/engines/screening/exclusions.py",  # EXCLUDED rows: names out of the run with a reason (ADR 0054)
+]
+section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
+detect = [{ call = "run_screener" }, { call = "tolerated_stale" }]
+
+[[responsibility]]
+id = "screen-preview"
+description = "The Builder's dry runs (ADR 0029), over the request's ReadContext: an unsaved rule-screen draft resolved for a user and evaluated by the nightly evaluate_screen on the context's session (summary, funnel, coverage, top rows; the field frame cached per session, fields, user features and visible_seq), and a formula type checked and sampled on that session; never writes; REST POSTs by design"
+owner = ["src/algotrade/services/preview/*"]
+section = "docs/adr/0029-rule-screener.md#preview--nightly"
+detect = [{ call = "field_frame" }]
+
+[[responsibility]]
+id = "selection-rebalancing"
+description = "Re-evaluate a backtest's selection over time (rebalance_selection): which sessions + the audit of each change (engines/selection/schedule.py), point-in-time evaluation through services.selection.select and one price load for the union (services/backtests/rebalance.py), the tradable set per bar and exits on removal (engines/backtest/universe.py, used by the engine loop)"
+owner = [
+    "src/algotrade/engines/selection/schedule.py",
+    "src/algotrade/services/backtests/rebalance.py",
+    "src/algotrade/engines/backtest/universe.py",
+    "src/algotrade/engines/backtest/engine.py",
+]
+allowed = ["src/algotrade/services/evaluation/cross_section/sessions.py"]  # the edge harness's every-session spacing is this function (ADR 0053)
+section = "docs/configuration.md#rebalancing-selections"
+detect = [
+    { call = "rebalance_sessions" },
+    { call = "DynamicUniverse" },
+]
+
+[[responsibility]]
+id = "text-model-seam"
+description = "The text model both on-demand text features are asked through (ADR 0041, amended 2026-10-06): the TextModel protocol and its Completion result, the OpenAI-compatible adapter (built by the source registry, the key only in a header) and the Claude Code adapter (claude -p under the owner's own login, locked down, owner-only), the FallbackTextModel chain over the llm.toml [[provider]] list (falls back only on ModelUnavailableError; skips a provider's only_users) and the API's wiring of it (off by default; 503 with the reason when off or down)"
+owner = [
+    "src/algotrade/services/text_model/__init__.py",
+    "src/algotrade/services/text_model/chain.py",
+    "src/algotrade/services/text_model/model.py",
+    "libs/sources/algotrade_sources/llm/*",
+    "apps/api/algotrade_api/text_model.py",
+]
+allowed = [
+    "libs/sources/algotrade_sources/framework/registry.py",  # builds the adapter, as every vendor client (source-construction)
+]
+section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-06-the-text-model-seam"
+detect = [{ call = "ChatCompletions" }, { call = "build_text_model" }, { call = "ClaudeCli" }, { call = "build_claude_cli" }, { string = "chat/completions" }]
+
+[[responsibility]]
+id = "virtual-feature-reads"
+description = "Read expression features on read (selections, FeatureView, series): load only the stored columns their formulas need (data.rollups.feature_rows, column-pruned) and evaluate them through the FeatureSet"
+owner = ["src/algotrade/services/features.py", "src/algotrade/data/rollups.py"]
+section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
+detect = [{ call = "feature_rows" }]

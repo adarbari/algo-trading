@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
 """Enforce single ownership of responsibilities (ADR 0019), with a shrink-only ratchet.
 
-``architecture/ownership.toml`` names, for each responsibility, the modules that own it and
-AST patterns that signal someone else doing the same work (a ``latest_date`` call, a
-``RunRecord`` built, ``os.environ`` read, ``urllib.request`` imported…). This script scans
-``src/``, ``libs/`` and ``apps/`` and reports every hit outside the owner's modules.
+The registry is every ``architecture/*_ownership.toml`` but ``web_ownership.toml`` (the web
+app's, enforced by lint): one file per layer, each declaring the owner path prefixes it holds
+(``scope``); an entry lives in the file whose scope holds its first owner (the longest prefix
+wins). It names, for each responsibility, the modules that own it and AST patterns that signal
+someone else doing the same work (a ``latest_date`` call, a ``RunRecord`` built,
+``os.environ`` read, ``urllib.request`` imported…). This script scans ``src/``, ``libs/`` and
+``apps/`` and reports every hit outside the owner's modules. An entry's fields:
+
+  owner         module globs that own it (fnmatch; ``*`` crosses directories)
+  target_owner  (optional) where it is moving; hits there are allowed too, so a PR can move
+                code without touching the registry first.
+  allowed       other modules that may legitimately match a detect rule (rare; say why)
+  section       the doc section (path#anchor) that states the rule
+  detect        AST patterns that signal "this module is doing that work":
+                  call = "name"          a call to name / x.name (arg = "lit": with that literal)
+                  call_regex = "re"      a call whose dotted callee matches the regex
+                  attr = "a.b"           an attribute expression ending in a.b (read or call)
+                  import = "mod"         importing mod or a submodule (except = [prefixes])
+                  string / string_prefix a string literal (docstrings ignored)
 
 ``architecture/known_violations.toml`` lists today's hits (file + responsibility + count).
 - a hit that is not listed (or a count above the listed one) fails: extend the owner instead;
@@ -27,7 +42,10 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-REGISTRY = Path("architecture/ownership.toml")
+ARCHITECTURE = Path("architecture")
+REGISTRY = ARCHITECTURE / "*_ownership.toml"  # one file per layer
+WEB_REGISTRY = "web_ownership.toml"  # the web app's: lint rules, not AST detect rules
+REGISTRY_KEYS = {"scope", "responsibility"}
 KNOWN = Path("architecture/known_violations.toml")
 SCAN_ROOTS = ("src", "libs", "apps")
 RULE_KINDS = ("call", "call_regex", "attr", "import", "string", "string_prefix")
@@ -64,10 +82,48 @@ class Hit:
     rule: Rule
 
 
+def registry_files(root: Path) -> list[Path]:
+    return sorted(p for p in (root / ARCHITECTURE).glob(REGISTRY.name) if p.name != WEB_REGISTRY)
+
+
+def read_registry(root: Path) -> list[dict]:
+    """Every entry of the per-layer files, after checking where each one lives: every file
+    declares its `scope`, no prefix is in two scopes, an entry sits in the file whose scope
+    holds its first owner (the longest prefix), and ids are unique across the files."""
+    files = {p.name: tomllib.loads(p.read_text()) for p in registry_files(root)}
+    if not files:
+        raise ValueError(f"no ownership registry: {REGISTRY}")
+    problems = [f"{name}: declare its `scope`" for name, d in files.items() if "scope" not in d]
+    problems += [
+        f"{name}: unknown top-level keys {sorted(set(d) - REGISTRY_KEYS)}"
+        for name, d in files.items()
+        if set(d) - REGISTRY_KEYS
+    ]
+    scopes: dict[str, str] = {}
+    for name, data in files.items():
+        for prefix in data.get("scope", []):
+            if prefix in scopes:
+                problems.append(f"scope {prefix!r} is in {scopes[prefix]} and {name}")
+            scopes[prefix] = name
+    entries = []
+    for name, data in files.items():
+        for entry in data.get("responsibility", []):
+            first = entry["owner"][0]
+            home = scopes.get(max((p for p in scopes if first.startswith(p)), key=len, default=""))
+            if home != name:
+                where = home or f"a new file whose scope holds {first}"
+                problems.append(f"{name}: {entry['id']} belongs in {where} (first owner {first})")
+            entries.append(entry)
+    ids = Counter(e["id"] for e in entries)
+    problems += [f"duplicate responsibility id {i!r}" for i, n in sorted(ids.items()) if n > 1]
+    if problems:
+        raise ValueError("ownership registry:\n  " + "\n  ".join(problems))
+    return entries
+
+
 def load_registry(root: Path) -> list[Responsibility]:
-    data = tomllib.loads((root / REGISTRY).read_text())
     out = []
-    for entry in data["responsibility"]:
+    for entry in read_registry(root):
         rules = []
         for spec in entry.get("detect", []):
             kinds = [k for k in RULE_KINDS if k in spec]
@@ -179,7 +235,7 @@ def write_known(root: Path, counts: Counter[tuple[str, str]]) -> None:
     lines = [
         "# Ratchet for scripts/check_ownership.py (ADR 0019): ownership violations, one entry per",
         "# file doing work another module owns. EMPTY since restructure PR 6, and a fitness test",
-        "# keeps it empty: extend the owner named in architecture/ownership.toml instead. A real",
+        "# keeps it empty: extend the owner named in architecture/*_ownership.toml instead. A real",
         "# exception needs an ADR and goes in that responsibility's `allowed` list, with why.",
         "",
     ]
@@ -253,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "NEW ownership violations: extend the owner instead of re-implementing it (ADR 0019)."
         )
-        print("A new responsibility needs an entry + owner in architecture/ownership.toml.\n")
+        print(f"A new responsibility needs an entry + owner in {REGISTRY}.\n")
         print("\n\n".join(new))
         return 1
     if args.update:

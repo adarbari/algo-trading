@@ -1,12 +1,12 @@
 ---
 name: add-responsibility
-description: Add a new responsibility (a kind of work some module must own) or move one to a new owner, keeping architecture/ownership.toml, the ratchets and ADRs in sync. Use before writing code that does something no owner covers yet, when moving work between modules, or when make ownership / make dupes fails.
+description: Add a new responsibility (a kind of work some module must own) or move one to a new owner, keeping architecture/*_ownership.toml, the ratchets and ADRs in sync. Use before writing code that does something no owner covers yet, when moving work between modules, or when make ownership / make dupes fails.
 ---
 
 # Add or move a responsibility
 
 Read first: ADR 0019 (`docs/adr/0019-ownership-and-boundaries.md`),
-`architecture/ownership.toml` and `architecture/layout.toml` (ADR 0020, directory layout).
+`architecture/*_ownership.toml` and `architecture/layout.toml` (ADR 0020, directory layout).
 
 **The ownership ratchet is at zero**: `make ownership` fails on any
 hit outside an owner, `architecture/known_violations.toml` must stay empty, and no
@@ -16,10 +16,13 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
 
 0. **Where it goes:** this skill is also the place for "nothing fits, I need a new folder":
    step 3 covers the new kind end to end.
-1. **Is it already owned?** Search `architecture/ownership.toml` (ids, descriptions, detect
+1. **Is it already owned?** Search `architecture/*_ownership.toml` (ids, descriptions, detect
    rules) and the table in `docs/architecture.md` section 14. If an owner exists, extend
    that module and stop here: never write a second implementation, even a small one.
-2. **New responsibility:** add a `[[responsibility]]` with `id` (kebab-case), one-line
+2. **New responsibility:** in the per-layer file whose `scope` holds its first owner (the
+   longest prefix wins: `services/read/` is `read_ownership.toml`, the rest of `services/` is
+   `services_ownership.toml`; `make ownership` names the file if you pick the wrong one),
+   sorted by `id`, add a `[[responsibility]]` with `id` (kebab-case), one-line
    `description`, `owner` (the one module, or a package glob), optional `target_owner` while
    a PR is moving it, `section` (an ADR heading anchor) and
    `detect` rules that would catch a re-implementation elsewhere: prefer specific call
@@ -46,11 +49,11 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    - an addendum to ADR 0020 (`docs/adr/0020-directory-layout.md`) when the top-level structure
      changes (a new top-level library package, app folder or test suite).
    Splitting a folder: move modules into kind subfolders, update imports and
-   `architecture/ownership.toml` paths, and move the tests to mirror (no re-export shims).
+   `architecture/*_ownership.toml` paths, and move the tests to mirror (no re-export shims).
    `tests/architecture/test_layout.py` and `test_layout_buckets.py` check all of it.
 4. **New stored table:** add a `[[table]]` to `architecture/tables.toml` with exactly one producing `owner`.
 5. **Moving a responsibility:** move the code and make the new module the `owner` in the
-   same PR (a `target_owner` may bridge a multi-PR move; remove it when done). Run
+   same PR (a new first owner in another layer moves the entry to that layer's file) (a `target_owner` may bridge a multi-PR move; remove it when done). Run
    `make dupes-update` if duplicates went away (it fails when counts go down without the
    update, on purpose). A boundary the move makes true goes straight into `pyproject.toml`
    as an import-linter contract (`make arch`), never as a pending entry.

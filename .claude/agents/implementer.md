@@ -11,7 +11,7 @@ Before writing:
 
 - Load the skill named in your brief (or the matching one from the CLAUDE.md "Workflows"
   table) and follow it step by step. Read the existing code you extend, not the whole area.
-- Confirm the owner in `architecture/ownership.toml` and the folder in
+- Confirm the owner in `architecture/*_ownership.toml` and the folder in
   `architecture/layout.toml` with a grep. Extend the owner; never re-implement it.
 
 Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`) when the

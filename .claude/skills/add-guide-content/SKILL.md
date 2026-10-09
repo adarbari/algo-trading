@@ -20,7 +20,7 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    config/site/regime/*.toml`, and the Guide sources below); extend an existing entry rather
    than adding a near-duplicate:
 
-   | Kind | Source (one owner each, `architecture/ownership.toml`) | Written by |
+   | Kind | Source (one owner each, `architecture/*_ownership.toml`) | Written by |
    |---|---|---|
    | field (a catalogue feature) | `config/site/field_guide/<theme>.toml` `[[field]]` | `add-feature` ships it with the feature |
    | situation (fools many fields at once) | `config/site/field_guide/situations.toml` `[[situation]]` | |

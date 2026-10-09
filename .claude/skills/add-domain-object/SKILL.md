@@ -90,7 +90,7 @@ if the grain has one. Run `.venv/bin/python -m pytest tests/unit/services/read -
 
 ## Step 6: registries and docs
 
-- `architecture/ownership.toml`: extend the `domain-read-model` description with the object
+- `architecture/*_ownership.toml`: extend the `domain-read-model` description with the object
   if it is a new kind; a new stored table it needs is `.claude/skills/add-dataset`, not here.
 - `docs/api/read-model.md` "The domain objects": add or complete the row.
 - `make ownership layout`.

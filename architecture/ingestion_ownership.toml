@@ -1,0 +1,181 @@
+# Ownership registry (ADR 0019), ingestion: the ingestion app.
+# Every responsibility has exactly ONE owner. The registry is every architecture/*_ownership.toml
+# but web_ownership.toml, one file per layer: an entry lives in the file whose `scope` holds its
+# first owner (the longest prefix wins), sorted by id. Fields and detect rules: the docstring of
+# scripts/check_ownership.py. Before writing code that does X, find X
+# (`grep <keyword> architecture/*ownership.toml`) and extend its owner; a new responsibility
+# needs an entry + owner in the same PR (.claude/skills/add-responsibility).
+
+scope = ["apps/ingestion/"]
+
+[[responsibility]]
+id = "coverage-acceptance"
+description = "Per key feature and tier, the share of the instruments it applies to (Feature.applies_to) that have a value for the session, graded against [quality.coverage.*] (minimum per tier, day-over-day drop, WARN or FAIL): the acceptance check of the rollups step and a quality check (ADR 0043)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py"]  # run_quality runs it with the other checks
+section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.md#later-prs-under-this-adr-not-in-this-change"
+detect = [{ call = "check_coverage" }]
+
+[[responsibility]]
+id = "etf-holdings"
+description = "What each ETF holds (ADR 0035): the etf-holdings task reads the issuers' daily files and SEC N-PORT through HoldingsSource adapters (first issuer that lists a fund wins), ranks and trims each fund's lines, links tickers to instruments through SymbolResolver and writes holdings/etf; consumers read it only through data.funds.holdings (latest rows per fund) and the read model's Holdings behind Instrument.holdings (services/read/instruments/holdings.py)"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py",
+    "src/algotrade/data/funds/holdings.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "src/algotrade/features/rollups/reference/fund_reference.py",  # names its input; read through data.feature_inputs (ADR 0050)
+]
+section = "docs/adr/0035-etf-holdings.md#decision"
+detect = [{ string = "holdings/etf" }]
+
+[[responsibility]]
+id = "feature-retirement"
+description = "Delete a superseded feature group's stored tables (all runs) after checking its replacement covers the same sessions; dry-run reports sizes. Backends implement TableStore.drop / size; only the retire-features command calls drop"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/retire_features.py",
+    "src/algotrade/storage/backends/*",
+    "src/algotrade/storage/tables/interfaces.py",
+    "src/algotrade/storage/tables/writers.py",
+]
+section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
+detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
+
+[[responsibility]]
+id = "filing-ingestion"
+description = "Store the SEC 8-K and 8-K/A filings of every operating company in the universe (the session's universe snapshot without ETFs / ETNs) in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; one whose stored filings already reach --since is skipped, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the acceptance's session in New York); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the same date). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/events/*"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
+    "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
+    "src/algotrade/services/read/events/filings.py",  # the filings read of InstrumentEvents (known_from <= session), a display read
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ string = "events/filing" }, { string = "sec_8k" }]
+
+[[responsibility]]
+id = "forward-outcomes"
+description = "Compute and store forward outcomes (ADR 0053 decision 3): for each window a session closes (S = T - h exchange sessions, horizons and benchmarks from the open edge documents plus the 20-session SPY default), every name in the universe at S with a bar at S measured from S's close to T's on bars split-adjusted as of T (return, excess over the benchmark, max favourable and adverse excursion, realised volatility; DELISTED by the reference snapshot's delisting date, else a reason), one run per window end into outcomes/instrument/forward_returns@v1, and its acceptance check; read back only through algotrade.data.outcomes, importable only from services/evaluation"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/outcome_paths.py",
+    "src/algotrade/data/outcomes/*",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the outcomes tables' one schema
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the reader of outcomes (ADR 0053)
+    "src/algotrade/services/evaluation/training/frame.py",  # the other: the labels of a fit (ED7)
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, { call = "read_outcomes" }]
+
+[[responsibility]]
+id = "ibkr-enrichment"
+description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the optionable universe (instruments/ibkr_contracts) and IB's implied / historical vol per underlying (volatility/ibkr_iv30: history backfill + nightly snapshot), each read through algotrade.data; features derived from them carry licence = personal"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py",
+    "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py",
+    "src/algotrade/data/volatility.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the tables
+    "src/algotrade/data/reference.py",  # the conid snapshot read (one snapshot rule)
+    "src/algotrade/features/rollups/options/ibkr_iv.py",  # names its input; read through data.feature_inputs
+]
+section = "docs/adr/0028-ibkr-enrichment-source.md#decision"
+detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }]
+
+[[responsibility]]
+id = "ingestion-report"
+description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, hints), run timing with the arrival record (each attempt stores when bars / chains data appeared; p50 / p90 over bracketed sessions, timing.py, ADR 0043) and notifications: the desktop alert and the daily summary email over SMTP"
+owner = [
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/records.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/report.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/render.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/timing.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/notify.py",
+]
+section = "docs/architecture.md#nightly-summary-email"
+detect = [
+    { import = "smtplib" },
+    { import = "email" },
+    { call = "build_report" },
+    { string = "osascript" },
+]
+
+[[responsibility]]
+id = "ingestion-step-dispatch"
+description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly): tasks are declared once in the registry; nightly is an ordered list of isolated task steps"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",
+    "apps/ingestion/algotrade_ingestion/workflows/*",
+]
+section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
+detect = [
+    { call_regex = "(^|\\.)(ingest_[a-z_]+|build_universe|import_universe|run_quality|compute_option_liquidity|load_golden|run_migrate_ids)$" },
+]
+
+[[responsibility]]
+id = "instrument-tiers"
+description = "Which underlyings are core (S&P 500, [cboe] priority_symbols, latest liquidity_class HIGH) and which are rest: the one tier rule, recorded in chains/status.tier at fetch time and graded by the chain acceptance check (ADR 0043)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/market/tiers.py"]
+section = "docs/adr/0019-ownership-and-boundaries.md#guardrails"
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py",  # the chain run loads the tiers it records and orders by
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # grades coverage per tier
+]
+detect = [{ call = "Tiers" }, { call = "load_tiers" }]
+
+[[responsibility]]
+id = "launchd-agents"
+description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py), the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044) and the auto-deploy poll (the same api module, ADR 0057)"
+owner = [
+    "apps/ingestion/algotrade_ingestion/ops/schedule.py",
+    "apps/api/algotrade_api/ops/schedule.py",
+]
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
+detect = [{ import = "plistlib" }]
+
+[[responsibility]]
+id = "live-verification"
+description = "Compare a session's stored values with an independent live source (IBKR): the sample, the checks and their tolerances (verification.toml), the verification/ibkr table; the quality check `verification` grades it and the nightly email reports it"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/verification/*"]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the session's rows
+    "src/algotrade/services/read/ops/quality.py",  # shows the session's rows read-only (Query.verification)
+]
+section = "docs/adr/0026-live-verification-ibkr.md#the-verify-task"
+detect = [{ string = "verification/ibkr" }, { call = "compare_bars" }, { call = "Grader" }]
+
+[[responsibility]]
+id = "macro-ingestion"
+description = "Store the registry's economic series and index levels in macro/series (ADR 0048): fetch each enabled series whole through the FRED / published sources, give every value its vintage (ALFRED's realtime_start, or the lagged rule: a changed lagged value is a new vintage dated the run's session) and write only the rows the table lacks; a series whose source is off or has no credential is skipped and counted, never an error. Also the macro release calendar (ADR 0050, calendar.py): one events/macro_release row per release date of the config/site/events/releases.toml registry (FRED release dates, ISM by the exchange calendar), its release moment in UTC, scheduled / released status and known_from, written only when new or newly released"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/macro/*"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the calendar (macro_calendar_future)
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
+
+[[responsibility]]
+id = "refresh-scheduling"
+description = "Which keys (CIKs, instrument ids) an incremental reference or profile task refetches on a session: new first, then each once per refresh_days on its own slot day (crc32 of the key), so refreshes spread over the window"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/framework/refresh.py"]
+section = "docs/data/vendors.md#refreshes-spread-over-the-window"
+detect = [{ call = "crc32" }, { call = "slot_day" }]
+
+[[responsibility]]
+id = "row-stamping"
+description = "Add the point-in-time columns (session_date, knowledge_ts, source, run_id) to stored rows"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/framework/run.py"]
+section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
+detect = [{ call = "stamp" }]

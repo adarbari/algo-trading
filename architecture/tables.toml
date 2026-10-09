@@ -1,5 +1,5 @@
 # Stored tables (ADR 0019): the registry of every table the system stores and its one producing
-# owner. Responsibilities (who owns which kind of work) are in architecture/ownership.toml.
+# owner. Responsibilities (who owns which kind of work) are in architecture/*_ownership.toml.
 # Read by tests/architecture/test_ownership.py, test_rollups.py, test_task_registry.py and
 # src/algotrade/services/read/session.py.
 
