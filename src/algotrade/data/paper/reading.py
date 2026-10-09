@@ -12,9 +12,16 @@ import pandas as pd
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import EDGE_PAPER
 
-LOOKBACK_DAYS = (
-    400  # the window a paper record is read over: a window of 252 sessions closes inside it
-)
+# The window a paper record is read over: a window of 252 sessions closes inside it.
+LOOKBACK_DAYS = 400
+
+
+def job_name(user_id: str) -> str:
+    """The run-record ``job`` of one user's nightly paper record (``edge-paper:<user>``): its stats
+    say, per followed edge, what the night did (signalled, no picks, not due, skipped and why)."""
+    return f"edge-paper:{user_id}"
+
+
 PAPER_COLUMNS = (
     "user_id", "edge_id", "signal_session", "instrument_id", "config_hash", "outcome_hash",
     "screener", "status", "reason", "buy_session", "sell_session", "horizon_sessions", "rank",

@@ -219,8 +219,9 @@ NIGHTLY: tuple[Step, ...] = (
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
     # The followed edges' paper picks for tonight and the open paper trades the stored outcomes
     # close (ADR 0053 amendment 2026-10-09): one job per user, after the screens (the picks read
-    # the same features) and the outcomes. Optional: a failure warns, never holds the session.
-    Step(EDGE_SIGNALS, needs=(SCREENS, "outcomes"), critical=False, latest_only=True),
+    # the same features); a trade whose outcome is not stored yet stays open. Optional: a
+    # failure warns, never holds the session.
+    Step(EDGE_SIGNALS, needs=(SCREENS,), critical=False, latest_only=True),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.
     Step("descriptions", latest_only=True, critical=False),
@@ -619,7 +620,7 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
         plan = Plan([session], until=max(until, session))
     export_dir = Path(params["export_dir"]) if params.get("export_dir") else None
     screens = screen_jobs(ctx.jobs, r["configs"], export_dir) if ctx.jobs else None
-    signals = signal_jobs(ctx.jobs, r["configs"]) if ctx.jobs else None
+    signals = signal_jobs(ctx.jobs, r["configs"], task_ctx.reader) if ctx.jobs else None
     workers = int(params["workers"]) if params.get("workers") else None
     resume = bool(params.get("resume", True))
     waive = dict(params.get("waive") or {})

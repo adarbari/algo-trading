@@ -2,7 +2,7 @@
 closed trades), open and skipped counted apart, the sentences the server's, and a trial's forward
 test beside the edge it replaces."""
 
-from datetime import date
+from datetime import date, timedelta
 from itertools import pairwise
 
 import pytest
@@ -82,7 +82,9 @@ def test_too_few_closed_trades_is_too_early_and_says_when_it_will_be_judged(
     record = paper(backend).record
     assert (record.state, record.closed, record.open, record.skipped) == (TOO_EARLY, 8, 1, 1)
     assert record.bins == () and record.low is None
-    assert record.headline.startswith("5 of 8 closed trades won; judged once 10 have closed.")
+    assert record.headline.startswith(
+        "5 of 8 closed trades won; judged once 10 signal sessions have closed."
+    )
     assert "1 open, 1 skipped" in record.headline
 
 
@@ -160,3 +162,45 @@ def test_a_trial_behind_the_edge_or_too_young_cannot_replace_it(backend: MemoryB
 def test_an_edge_that_is_not_a_trial_has_no_forward_test(backend: MemoryBackend) -> None:
     store(backend, closed_trades(12, 8))
     assert paper(backend).forward is None
+
+
+def test_the_picks_of_one_night_count_once_the_sessions_are_the_independent_units(
+    backend: MemoryBackend,
+) -> None:
+    # 36 closed trades but only 4 signal sessions: too few independent sessions to judge
+    few = [
+        trade(
+            f"EQ:{d}-{i}",
+            date(2026, 9, 2 + d),
+            "won" if i < 3 else "lost",
+            sell=date(2026, 10, 2),
+            rank=i + 1,
+        )
+        for d in range(4)
+        for i in range(5)
+    ]
+    store(backend, few)
+    record = paper(backend).record
+    assert (record.state, record.closed) == (TOO_EARLY, 20)
+    assert "10 signal sessions" in record.headline
+
+
+def test_the_band_is_taken_over_signal_sessions_not_trades() -> None:
+    backend = MemoryBackend()
+    write_run(backend, "site1", FROZEN, 0.6)
+    days = [
+        date(2026, 9, 1) + timedelta(days=n)
+        for n in range(0, 14)
+        if (date(2026, 9, 1) + timedelta(days=n)).weekday() < 5
+    ]
+    rows = [
+        trade(f"EQ:{d}-{i}", d, "won" if i < 3 else "lost", sell=date(2026, 10, 2), rank=i + 1)
+        for d in days
+        for i in range(5)
+    ]
+    store(backend, rows)
+    record = paper(backend).record
+    sessions = len(days)
+    assert record.closed == 5 * sessions and (record.low, record.high) == win_rate_band(
+        0.6, sessions
+    )

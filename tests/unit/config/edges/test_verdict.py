@@ -15,7 +15,7 @@ def test_defaults_are_the_owners_thresholds() -> None:
     assert (d.not_working_t, d.promising_t, d.works_t) == (1.0, 2.0, 3.0)
     assert (d.not_working_dsr, d.promising_dsr, d.works_dsr) == (0.5, 0.8, 0.95)
     assert (d.max_pbo, d.works_max_pbo, d.oos_lift_share) == (0.5, 0.2, 0.5)
-    assert (d.forward_sessions, d.live_min_trades, d.live_low, d.live_high) == (20, 10, 0.1, 0.9)
+    assert (d.forward_sessions, d.live_min_sessions, d.live_low, d.live_high) == (20, 10, 0.1, 0.9)
 
 
 def test_a_document_overrides_and_an_unknown_key_fails() -> None:

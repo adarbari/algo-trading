@@ -56,6 +56,27 @@ export const tradeLabel = (status: string): string => TRADE_LABELS[status] ?? st
 
 export const tradeTone = (status: string): StatusTone => TRADE_TONES[status] ?? 'neutral';
 
+const TONIGHT_LABELS: Record<string, string> = {
+  signalled: 'Signalled',
+  no_picks: 'No picks',
+  not_due: 'Not due',
+  skipped: 'Skipped',
+  not_run: 'Not run',
+};
+
+const TONIGHT_TONES: Record<string, StatusTone> = {
+  signalled: 'positive',
+  no_picks: 'neutral',
+  not_due: 'neutral',
+  skipped: 'warning',
+  not_run: 'warning',
+};
+
+/** What the nightly did for a followed edge on the session, as the signals table words it. */
+export const tonightLabel = (state: string): string => TONIGHT_LABELS[state] ?? state;
+
+export const tonightTone = (state: string): StatusTone => TONIGHT_TONES[state] ?? 'neutral';
+
 /** The picture's bars: the chance the live win rate falls in each range. */
 export function rangeBins(record: PaperRecord): DistributionBin[] {
   return record.bins.map((b) => ({ start: b.start, end: b.end, count: b.chance }));

@@ -7,10 +7,12 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.config.user import UserContext
 from algotrade.core.time.calendar import next_session
-from algotrade.data.paper import read_paper
-from algotrade.services.evaluation.forward.results import job_name, paper_users, run_night
+from algotrade.data.paper import job_name, read_paper
+from algotrade.services.evaluation.forward.results import MISSED, paper_users, run_night
 from algotrade.storage.tables.schemas import EDGE_PAPER
+from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
     IDS,
@@ -150,9 +152,28 @@ def test_the_night_publishes_one_run_and_a_failed_write_leaves_nothing(following
     assert book(following).empty  # pending rows were aborted, never visible
 
 
-def test_only_users_with_a_followed_edge_are_signalled_for() -> None:
-    d = desk()
-    assert paper_users(_with_users(d.configs, ["u1", "u2"])) == [USER]
+def test_only_users_with_a_followed_edge_or_open_trades_are_signalled_for(
+    following: Desk,
+) -> None:
+    store = _with_users(following.configs, ["u1", "u2", "u3"])
+    reader = following.world.reader
+    assert paper_users(reader, store, DAYS[0]) == [USER]
+    # u3 follows nothing any more but still has an open trade: it settles
+    following.world.writer.write_table(
+        "results/edge_paper",
+        DAYS[0],
+        "p3",
+        stamped([trade_row("u3")], DAYS[0], "p3", NOW, "edge-signals"),
+    )
+    assert paper_users(reader, store, DAYS[0]) == [USER, UserContext("u3")]
+
+
+def trade_row(user: str) -> dict:  # type: ignore[type-arg]
+    return {
+        "user_id": user, "edge_id": "gone", "signal_session": DAYS[0], "instrument_id": "EQ:A",
+        "status": "open", "buy_session": BUY, "sell_session": SELL, "horizon_sessions": 2,
+        "rank": 1, "delisted": False,
+    }  # fmt: skip
 
 
 def _with_users(configs, users):  # type: ignore[no-untyped-def]
@@ -164,6 +185,35 @@ def _with_users(configs, users):  # type: ignore[no-untyped-def]
             return users
 
     return Store()
+
+
+def test_the_run_record_says_what_each_followed_edge_did_tonight(following: Desk) -> None:
+    due_night, record = night(following, DAYS[0])
+    assert record.stats["tonight"] == {"drift": {"state": "signalled", "reason": ""}}
+    _, off = night(following, DAYS[1])  # not due: the schedule is every second session
+    assert off.stats["tonight"]["drift"]["state"] == "not_due"
+    broken = desk(build_world(no_features=[DAYS[2]]))
+    _, failed = night(broken, DAYS[2])  # due, but the screen could not read its features
+    state = failed.stats["tonight"]["drift"]
+    assert state["state"] == "skipped" and state["reason"]
+    assert failed.stats["skipped"][0]["reason"] == state["reason"]
+    assert due_night.signalled == {"drift": 5}
+
+
+def test_a_due_edge_whose_screen_qualifies_nothing_says_no_picks() -> None:
+    empty = desk(build_world(price_of=lambda day, i: -1.0))  # the rule needs price > 0
+    _, record = night(empty, DAYS[0])
+    assert record.stats["tonight"]["drift"] == {"state": "no_picks", "reason": ""}
+
+
+def test_a_due_session_the_nightly_skipped_is_recorded_as_missed(following: Desk) -> None:
+    night(following, DAYS[0])
+    _, later = night(following, DAYS[4])  # DAYS[2] was due and nobody ran it
+    assert later.stats["missed"] == [
+        {"edge": "drift", "session": DAYS[2].isoformat(), "reason": MISSED}
+    ]
+    _, adjacent = night(following, DAYS[2])
+    assert adjacent.stats["missed"] == []
 
 
 def test_the_schema_keys_one_row_per_trade() -> None:

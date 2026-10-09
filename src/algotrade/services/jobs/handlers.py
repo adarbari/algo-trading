@@ -175,6 +175,7 @@ def edge_signals_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str,
         "signalled": night.signalled,
         "settled": night.settled,
         "skipped": night.skipped,
+        "missed": night.missed,
         "rows": night.rows,
     }
 

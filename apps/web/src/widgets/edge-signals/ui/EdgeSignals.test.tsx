@@ -37,6 +37,9 @@ const DESK = {
       edgeId: 'drift',
       name: 'Drift',
       state: 'following',
+      tonight: 'skipped',
+      tonightReason: 'no features for 2026-10-05',
+      missed: ['2026-10-01'],
       record: { state: 'on_track', closed: 20, open: 3, winRate: 0.6 },
     },
   ],
@@ -53,7 +56,7 @@ describe('EdgeSignals', () => {
     hooks.useEdgeDesk.mockReturnValue(fakeQuery(DESK));
     const h = handlers();
     const { container } = render(<EdgeSignals {...h} />);
-    const buys = screen.getByRole('grid', { name: 'Buy tonight' });
+    const buys = screen.getByRole('grid', { name: 'Buy next session' });
     expect(within(buys).getByText('AAA')).toBeVisible();
     expect(within(buys).getByText('EQ:X')).toBeVisible(); // no symbol: the id
     expect(
@@ -61,6 +64,10 @@ describe('EdgeSignals', () => {
     ).toBeVisible();
     const followed = screen.getByRole('grid', { name: 'Followed edges' });
     expect(within(followed).getByText('On track')).toBeVisible();
+    expect(within(followed).getByText('Skipped')).toBeVisible();
+    expect(within(followed).getByText('no features for 2026-10-05')).toBeVisible();
+    expect(screen.getByText('help edge_tonight')).toBeVisible();
+    expect(within(buys).getByRole('columnheader', { name: /Buy on/ })).toBeVisible();
     expect(within(followed).getByText('60%')).toBeVisible();
     expect(screen.getByText('help paper_trading')).toBeVisible();
     await userEvent.setup().click(within(buys).getByText('AAA'));
@@ -99,7 +106,7 @@ describe('EdgeSignals', () => {
   it('says so when a followed edge has nothing to buy or sell', () => {
     hooks.useEdgeDesk.mockReturnValue(fakeQuery({ ...DESK, buys: [], sells: [] }));
     render(<EdgeSignals {...handlers()} />);
-    expect(screen.getByText('Nothing to buy tonight')).toBeVisible();
+    expect(screen.getByText('Nothing to buy next session')).toBeVisible();
     expect(screen.getByText('Nothing to sell next session')).toBeVisible();
   });
 });

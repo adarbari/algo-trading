@@ -15,7 +15,10 @@ DESK = """query Desk($date: Date) {
     session sellSession
     buys { edgeId instrumentId }
     sells { edgeId instrumentId }
-    followed { edgeId name state since record { state closed headline } }
+    followed {
+      edgeId name state since tonight tonightReason missed
+      record { state closed headline }
+    }
   }
 }"""
 PAPER = """query Paper($id: String!) {
@@ -61,8 +64,16 @@ def test_the_served_types_carry_the_read_models_figures_unchanged() -> None:
     desk = EdgeDesk.of(
         desk_read.EdgeDesk(
             date(2026, 10, 5), date(2026, 10, 6), (TRADE,), (),
-            (desk_read.FollowedEdge("drift", "Drift", "following", date(2026, 9, 1), RECORD),),
+            (desk_read.FollowedEdge(
+                "drift", "Drift", "following", date(2026, 9, 1), RECORD, "skipped",
+                "no features for the session", (date(2026, 10, 2),),
+            ),),
         ),
         None,  # type: ignore[arg-type]
     )  # fmt: skip
     assert [t.instrument_id for t in desk.buys] == ["EQ:A"] and desk.followed[0].record.closed == 20
+    assert (desk.followed[0].tonight, desk.followed[0].tonight_reason) == (
+        "skipped",
+        "no features for the session",
+    )
+    assert desk.followed[0].missed == [date(2026, 10, 2)]

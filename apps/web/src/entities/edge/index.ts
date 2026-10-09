@@ -27,6 +27,8 @@ export {
   recordTone,
   tradeLabel,
   tradeTone,
+  tonightLabel,
+  tonightTone,
   type DeskTrade,
   type EdgePaper,
   type FollowedEdge,

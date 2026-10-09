@@ -160,13 +160,22 @@ class EdgePaper:
         )
 
 
-@strawberry.type(description="An edge the user follows (or tries as a new version) and its record")
+@strawberry.type(
+    description="An edge the user follows (or tries as a new version) and its record. `tonight` "
+    "is what the nightly did for it on the session, so an empty buy list says why: signalled, "
+    "no_picks (due, the screen qualified none), not_due, skipped (due but could not be "
+    "signalled: `tonightReason`) or not_run (no nightly run for the session); `missed` the due "
+    "sessions since the previous night that nobody signalled"
+)
 class FollowedEdge:
     edge_id: str
     name: str
     state: str
     since: dt.date | None
     record: LiveRecord
+    tonight: str
+    tonight_reason: str
+    missed: list[dt.date]
 
     @classmethod
     def of(cls, d: desk_read.FollowedEdge) -> Self:
@@ -176,6 +185,9 @@ class FollowedEdge:
             state=d.state,
             since=d.since,
             record=LiveRecord.of(d.record),
+            tonight=d.tonight,
+            tonight_reason=d.tonight_reason,
+            missed=list(d.missed),
         )
 
 

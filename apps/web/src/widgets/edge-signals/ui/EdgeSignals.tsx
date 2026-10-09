@@ -58,14 +58,14 @@ export function EdgeSignals({ onOpen, onOpenEdge, onOpenEdges }: EdgeSignalsProp
     >
       <Stack gap={3}>
         <Stack gap={1}>
-          <Heading level={3}>Buy tonight</Heading>
+          <Heading level={3}>Buy next session</Heading>
           <DataTable<DeskTrade>
-            label="Buy tonight"
+            label="Buy next session"
             columns={buyColumns}
             rows={data.buys}
             getRowId={tradeId}
             onRowActivate={open}
-            emptyMessage="Nothing to buy tonight"
+            emptyMessage="Nothing to buy next session"
             visibleRows={6}
           />
         </Stack>
@@ -82,7 +82,10 @@ export function EdgeSignals({ onOpen, onOpenEdge, onOpenEdges }: EdgeSignalsProp
           />
         </Stack>
         <Stack gap={1}>
-          <Heading level={3}>Followed edges</Heading>
+          <Stack direction="row" gap={1} align="center">
+            <Heading level={3}>Followed edges</Heading>
+            <GuideHelp entry={{ kind: 'term', id: 'edge_tonight' }} />
+          </Stack>
           <DataTable
             label="Followed edges"
             columns={followedColumns}

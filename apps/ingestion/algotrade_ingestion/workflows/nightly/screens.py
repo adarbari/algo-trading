@@ -13,8 +13,9 @@ expressions).
 
 The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the user's tonight picks of
 the edges they follow and settles the open paper trades whose outcome is stored
-(``services/evaluation/forward``). It needs ``screens`` and ``outcomes`` and is not critical: a
-failed job is a warning naming the user, never a hold on the session or a later one.
+(``services/evaluation/forward``). It needs ``screens`` (settlement leaves a trade open when its
+outcome is not stored) and is not critical: a failed job is a warning naming the user, never a
+hold on the session or a later one.
 """
 
 from collections.abc import Callable
@@ -22,6 +23,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from algotrade.data import StoreReader
 from algotrade.services.configs import nightly_screeners
 from algotrade.services.evaluation.forward.results import paper_users
 from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
@@ -76,12 +78,12 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
     return run
 
 
-def signal_jobs(jobs: JobRunner, configs: ConfigStore) -> ScreenStep:
+def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> ScreenStep:
     """The edge-signals step, submitting through ``jobs`` (run in the nightly's own thread)."""
 
     def run(session: date) -> Outcome:
         summaries, short = [], []
-        for user in paper_users(configs):
+        for user in paper_users(reader, configs, session):
             job = jobs.run("edge-signals", {"session": session.isoformat()}, user, force=True)
             summaries.append(
                 {"user": user.user_id, "job_id": job.job_id, "status": job.status.value}

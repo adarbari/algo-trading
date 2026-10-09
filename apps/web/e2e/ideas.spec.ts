@@ -184,6 +184,9 @@ test('lists what the followed edges say to buy and sell above the table', async 
             edgeId: 'drift',
             name: 'Drift',
             state: 'following',
+            tonight: 'signalled',
+            tonightReason: '',
+            missed: [],
             record: { state: 'on_track', closed: 20, open: 2, winRate: 0.6 },
           },
         ],
@@ -192,7 +195,7 @@ test('lists what the followed edges say to buy and sell above the table', async 
   });
   const errors = collectErrors(page);
   await page.goto('/ideas');
-  const buys = page.getByRole('grid', { name: 'Buy tonight' });
+  const buys = page.getByRole('grid', { name: 'Buy next session' });
   await expect(buys.getByText('MSFT')).toBeVisible();
   await expect(page.getByRole('grid', { name: 'Sell next session' }).getByText('KO')).toBeVisible();
   await expect(

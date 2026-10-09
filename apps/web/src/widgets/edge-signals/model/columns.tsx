@@ -3,9 +3,16 @@
  * followed edges with their record. Rows are served records; every figure and word is the
  * server's (the ticker is the instrument's symbol, else its id).
  */
-import { Mono, StatusBadge, type DataTableColumn } from '@algotrade/ui';
+import { Mono, Stack, StatusBadge, Text, type DataTableColumn } from '@algotrade/ui';
 
-import { recordLabel, recordTone, type DeskTrade, type FollowedEdge } from '@/entities/edge';
+import {
+  recordLabel,
+  recordTone,
+  tonightLabel,
+  tonightTone,
+  type DeskTrade,
+  type FollowedEdge,
+} from '@/entities/edge';
 
 const DATE = { kind: 'date', style: 'short' } as const;
 
@@ -30,7 +37,8 @@ export const buyColumns: DataTableColumn<DeskTrade>[] = [
   ticker,
   edge,
   { id: 'rank', header: 'Rank', value: (t) => t.rank, format: { kind: 'number' } },
-  { id: 'sell', header: 'Sell on', value: (t) => t.sellSession, format: DATE, essential: true },
+  { id: 'buy', header: 'Buy on', value: (t) => t.buySession, format: DATE, essential: true },
+  { id: 'sell', header: 'Sell on', value: (t) => t.sellSession, format: DATE },
 ];
 
 export const sellColumns: DataTableColumn<DeskTrade>[] = [
@@ -41,6 +49,22 @@ export const sellColumns: DataTableColumn<DeskTrade>[] = [
 
 export const followedColumns: DataTableColumn<FollowedEdge>[] = [
   { id: 'edge', header: 'Edge', value: (f) => f.name, grow: true, hideable: false },
+  {
+    id: 'tonight',
+    header: 'Tonight',
+    value: (f) => f.tonight,
+    essential: true,
+    cell: ({ row }) => (
+      <Stack gap={1}>
+        <StatusBadge tone={tonightTone(row.tonight)}>{tonightLabel(row.tonight)}</StatusBadge>
+        {row.tonightReason && (
+          <Text size="xs" tone="muted">
+            {row.tonightReason}
+          </Text>
+        )}
+      </Stack>
+    ),
+  },
   {
     id: 'record',
     header: 'Live record',
@@ -58,5 +82,6 @@ export const followedColumns: DataTableColumn<FollowedEdge>[] = [
     essential: true,
   },
   { id: 'closed', header: 'Closed', value: (f) => f.record.closed, format: { kind: 'number' } },
+  { id: 'missed', header: 'Missed', value: (f) => f.missed.length, format: { kind: 'number' } },
   { id: 'open', header: 'Open', value: (f) => f.record.open, format: { kind: 'number' } },
 ];

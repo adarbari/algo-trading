@@ -123,7 +123,7 @@ export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: 
 export type EdgeDeskQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type EdgeDeskQuery = { edgeDesk: { session: string, sellSession: string, buys: Array<{ edgeId: string, edgeName: string, instrumentId: string, rank: number, buySession: string, sellSession: string, instrument: { symbol: string } | null }>, sells: Array<{ edgeId: string, edgeName: string, instrumentId: string, rank: number, buySession: string, sellSession: string, instrument: { symbol: string } | null }>, followed: Array<{ edgeId: string, name: string, state: string, record: { state: string, closed: number, open: number, winRate: number | null } }> } | null };
+export type EdgeDeskQuery = { edgeDesk: { session: string, sellSession: string, buys: Array<{ edgeId: string, edgeName: string, instrumentId: string, rank: number, buySession: string, sellSession: string, instrument: { symbol: string } | null }>, sells: Array<{ edgeId: string, edgeName: string, instrumentId: string, rank: number, buySession: string, sellSession: string, instrument: { symbol: string } | null }>, followed: Array<{ edgeId: string, name: string, state: string, tonight: string, tonightReason: string, missed: Array<string>, record: { state: string, closed: number, open: number, winRate: number | null } }> } | null };
 
 export type EdgePaperQueryVariables = Exact<{
   id: string;
@@ -701,6 +701,9 @@ export const EdgeDeskDocument = new TypedDocumentString(`
       edgeId
       name
       state
+      tonight
+      tonightReason
+      missed
       record {
         state
         closed

@@ -7,7 +7,7 @@ out-of-sample slice, else the in-sample one while the out-of-sample is hidden, e
 history: ``basis`` says which). If ``p`` held, the wins among ``n`` closed trades are binomial;
 the live win rate is ``on_track`` inside the ``live_low`` to ``live_high`` quantiles of that
 (``quant.edge_statistics.win_rate_band``), ``below`` or ``above`` outside it, ``too_early`` until
-``live_min_trades`` have closed, ``no_backtest`` when the edge has no usable run (a run committed
+``live_min_sessions`` have closed, ``no_backtest`` when the edge has no usable run (a run committed
 after the session is none). Open and skipped trades are counted apart: never a loss. The sentences
 and the bins of the picture are the server's; the browser derives nothing.
 
@@ -58,7 +58,7 @@ class LiveRecord:
     """The record of the closed trades (``closed`` = ``wins`` + losses), the open and skipped
     ones counted apart; ``backtest_rate`` and its ``basis`` (None: no usable run); ``low`` and
     ``high`` the usual range of the live win rate and ``bins`` the picture of its distribution
-    (None / empty until ``live_min_trades`` have closed and a backtest rate exists)."""
+    (None / empty until ``live_min_sessions`` have closed and a backtest rate exists)."""
 
     state: str
     closed: int
@@ -152,15 +152,24 @@ def _counts(trades: Sequence[PaperTrade]) -> tuple[int, int, int, int]:
 
 
 def _judge(
-    closed: int, wins: int, counts: str, p: float | None, basis: str, settings: VerdictSettings
+    closed: int,
+    wins: int,
+    sessions: int,
+    counts: str,
+    p: float | None,
+    basis: str,
+    settings: VerdictSettings,
 ) -> tuple[str, str, tuple[float, float] | None]:
-    """The state, the sentence and the usual range of a record with ``closed`` closed trades."""
+    """The state, the sentence and the usual range of a record with ``closed`` closed trades over
+    ``sessions`` signal sessions. The picks of one session are correlated (one market, one
+    window), so the independent units of the band are the sessions, never the trades."""
     won = f"{wins} of {closed} closed trades won"
-    if closed < settings.live_min_trades:
+    if sessions < settings.live_min_sessions:
         more = f" {counts.capitalize()}." if counts else ""
-        return TOO_EARLY, f"{won}; judged once {settings.live_min_trades} have closed.{more}", None
+        needed = settings.live_min_sessions
+        return TOO_EARLY, f"{won}; judged once {needed} signal sessions have closed.{more}", None
     rate = wins / closed
-    band = None if p is None else win_rate_band(p, closed, settings.live_low, settings.live_high)
+    band = None if p is None else win_rate_band(p, sessions, settings.live_low, settings.live_high)
     if p is None or band is None:
         return (
             NO_BACKTEST,
@@ -170,8 +179,9 @@ def _judge(
     state = BELOW if rate < band[0] else ABOVE if rate > band[1] else ON_TRACK
     where = {BELOW: "below", ABOVE: "above", ON_TRACK: "inside"}[state]
     words = (
-        f"{won} ({_percent(rate)}), {where} the usual range of {_percent(band[0])} to "
-        f"{_percent(band[1])} if the backtest's {basis} of {_percent(p)} held."
+        f"{won} ({_percent(rate)}) over {sessions} signal sessions, {where} the usual range of "
+        f"{_percent(band[0])} to {_percent(band[1])} if the backtest's {basis} of "
+        f"{_percent(p)} held."
     )
     return state, words, band
 
@@ -181,6 +191,7 @@ def live_record(
 ) -> LiveRecord:
     """``edge``'s record over ``trades`` (its own), judged by ``settings``."""
     closed, wins, open_, skipped = _counts(trades)
+    sessions = len({t.signal_session for t in trades if t.status in (WON, LOST)})
     latest = max(trades, key=lambda t: t.signal_session, default=None)
     screener = latest.screener if latest else (edge.screeners[0] if edge.screeners else "")
     horizon = latest.horizon_sessions if latest else (edge.horizons[0] if edge.horizons else 0)
@@ -189,9 +200,9 @@ def live_record(
     state, headline, band = (
         (NO_TRADES, "No paper trades yet.", None)
         if not trades
-        else _judge(closed, wins, counts, p, basis, settings)
+        else _judge(closed, wins, sessions, counts, p, basis, settings)
     )
-    bins = _bins(p, closed) if band is not None and p is not None else ()
+    bins = _bins(p, sessions) if band is not None and p is not None else ()
     return LiveRecord(
         state=state,
         closed=closed,

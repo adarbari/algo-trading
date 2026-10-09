@@ -710,7 +710,7 @@ body = """
 The live record counts the closed paper trades, the wins among them and the win rate, and sets
 it against what the backtest led you to expect (the usual range). Open and skipped trades are
 counted apart. With few closed trades the rate swings widely by chance, so the record is
-judged only once the site's minimum number have closed; before that it says it is too early.
+judged only once the site's minimum number of signal sessions have closed; before that it says it is too early.
 On track means the live win rate is inside the usual range; below or above means it is outside,
 which is worth a look but proves nothing alone.
 """
@@ -724,7 +724,9 @@ body = """
 If the backtest's win rate really held, the share of wins among a given number of trades would
 still vary from one run of trades to the next, by chance alone. The usual range is the middle
 80% of that variation (the 10th to the 90th percentile of a binomial distribution of wins), so
-it narrows as more trades close. The picture shows the whole spread, the live win rate and
+it narrows as more sessions close. The picks of one night are bets on the same market over the
+same window and move together, so the range counts signal sessions, not trades: ten picks on one
+night are one observation, not ten. The picture shows the whole spread, the live win rate and
 the two ends of the range. A live rate outside it is unusual if the backtest was right, but
 one in five honest records falls outside by chance.
 """
@@ -742,3 +744,17 @@ allowed but is recorded on the edge as replaced without a forward test, because 
 a version you have tuned looks better than it will do going forward.
 """
 see_also = ["paper_trading", "live_record", "official_result"]
+
+[[term]]
+id = "edge_tonight"
+term = "Tonight's signal"
+short = "What the nightly run did for a followed edge on the session, so an empty buy list says why."
+body = """
+Signalled: the edge was due and its picks are listed as buys. No picks: it was due but its screen
+qualified no name. Not due: its schedule does not fire on this session (an edge held for 20
+sessions signals about once a month). Skipped: it was due but could not be signalled, and the
+reason says why (an input table was missing, the edge is not paper traded yet); it is never an
+empty record. Not run: the nightly has no finished run for the session. Missed counts due
+sessions between nights that nobody signalled, kept so a gap is never silent.
+"""
+see_also = ["paper_trading", "live_record"]

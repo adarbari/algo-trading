@@ -95,10 +95,12 @@ def test_edge_signals_submit_one_job_per_user_who_follows_an_edge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        screens_module, "paper_users", lambda store: [UserContext("alice"), UserContext("bob")]
+        screens_module,
+        "paper_users",
+        lambda reader, store, session: [UserContext("alice"), UserContext("bob")],
     )
     jobs = SignalJobs()
-    step = screens_module.signal_jobs(jobs, MemoryConfigStore({}))(D)  # type: ignore[arg-type]
+    step = screens_module.signal_jobs(jobs, MemoryConfigStore({}), None)(D)  # type: ignore[arg-type]
     assert jobs.asked == [
         ("edge-signals", "alice", {"session": D.isoformat()}, True),
         ("edge-signals", "bob", {"session": D.isoformat()}, True),
@@ -110,14 +112,16 @@ def test_edge_signals_submit_one_job_per_user_who_follows_an_edge(
 def test_a_failed_edge_signals_job_fails_the_step_naming_the_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(screens_module, "paper_users", lambda store: [UserContext("alice")])
-    step = screens_module.signal_jobs(SignalJobs(("alice",)), MemoryConfigStore({}))(D)  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        screens_module, "paper_users", lambda reader, store, session: [UserContext("alice")]
+    )
+    step = screens_module.signal_jobs(SignalJobs(("alice",)), MemoryConfigStore({}), None)(D)  # type: ignore[arg-type]
     assert (
         step.status is StepStatus.FAILED
         and step.reason == "edge signals not complete: alice failed"
     )
 
 
-def test_the_edge_signals_step_is_optional_and_waits_for_screens_and_outcomes() -> None:
+def test_the_edge_signals_step_is_optional_and_waits_for_screens_only() -> None:
     step = next(s for s in NIGHTLY if s.name == EDGE_SIGNALS)
-    assert not step.critical and set(step.needs) == {"screens", "outcomes"}
+    assert not step.critical and step.needs == ("screens",) and step.latest_only

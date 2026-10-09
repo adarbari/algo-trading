@@ -451,7 +451,7 @@ to 14) on the existing documents, with one new grain still to come.
    (`services/read/edge_desk/`, `Query.edgeDesk`, `Query.edgePaper`: `Edge` has no session) serves
    the Ideas signals and an edge's live record against the backtest's usual range, the 10th to
    90th percentile of the wins `n` closed trades would show if the official win rate held
-   (`quant.edge_statistics.win_rate_band`, thresholds `live_min_trades`, `live_low`, `live_high` in
+   (`quant.edge_statistics.win_rate_band`, thresholds `live_min_sessions`, `live_low`, `live_high` in
    `config/site/verdict.toml`), and a trial's forward test beside the edge it would replace.
    The web follow and builder UI is still to come; it lands with its own tests.
 

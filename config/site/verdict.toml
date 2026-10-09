@@ -23,6 +23,6 @@ random_beat_share = 0.95 # Works: the out-of-sample lift beats at least this sha
                          # random-pick backtests the harness draws (random_picks.DEFAULT_DRAWS)
 
 forward_sessions = 20    # a new version's forward test lasts this many sessions before it may replace
-live_min_trades = 10     # closed paper trades before the live record is judged against the backtest
+live_min_sessions = 10     # closed signal sessions (the picks of one night are correlated: the unit) before judging
 live_low = 0.10          # the usual range of the live win rate: these quantiles of the wins ...
-live_high = 0.90         # ... n trades would show if the backtest's win rate held
+live_high = 0.90         # ... n signal sessions would show if the backtest's win rate held

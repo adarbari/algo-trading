@@ -40,6 +40,9 @@ const EdgeDesk = graphql(`
         edgeId
         name
         state
+        tonight
+        tonightReason
+        missed
         record {
           state
           closed
