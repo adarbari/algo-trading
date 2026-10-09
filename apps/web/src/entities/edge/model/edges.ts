@@ -1,80 +1,46 @@
 /**
- * The edge model: the `EdgesPage` response (ADR 0053) as the page shows it. Each edge keeps what
- * the server sent; its canonical run's frozen-slice rows are picked out and ordered for display
- * (the main variant first, screeners before baselines). Pure: it chooses among served rows, it
- * never computes a figure, and an exploratory row is never among them.
+ * The edge model: the `EdgesPage` response (ADR 0053, ED8) as the pages show it. Each edge keeps
+ * what the server sent, verdict included: the verdict, its reason, every figure and sentence are
+ * the read model's, so this only names the labels and tones of the served codes and their order.
  */
 import type { StatusTone } from '@algotrade/ui';
 
 import type { gqlTypes } from '@/shared/api';
 
 export type EdgesResponse = gqlTypes.EdgesPageQuery;
-export type ServedEdge = EdgesResponse['edges'][number];
-type ServedRow = NonNullable<ServedEdge['canonicalRun']>['rows'][number];
+export type Edge = EdgesResponse['edges'][number];
+export type EdgeVerdict = Edge['verdict'];
+export type VerdictCriterion = EdgeVerdict['criteria'][number];
+export type VerdictYear = EdgeVerdict['years'][number];
 
-/** The slice of a run that is the frozen period: the only one a track record reads. */
-const FROZEN = 'frozen';
-const MAIN = 'main';
-const ROLE_ORDER = ['screener', 'baseline'];
+/** The verdicts, best first: the list's groups in this order. */
+export const VERDICT_ORDER = [
+  'works',
+  'promising',
+  'not_working',
+  'not_enough_data',
+  'waiting_on_data',
+] as const;
 
-/** One stored frozen-slice row of the canonical run: a variant at one horizon. */
-export interface FrozenRow {
-  key: string;
-  edgeVariant: string;
-  variant: string;
-  role: string;
-  horizonSessions: number;
-  sessions: number | null;
-  picks: number | null;
-  hitRate: number | null;
-  baseRate: number | null;
-  lift: number | null;
-}
-
-export interface Edge extends ServedEdge {
-  /** The canonical run's frozen rows (empty: no canonical run, or none stored for the slice). */
-  frozenRows: FrozenRow[];
-}
-
-const rank = (list: readonly string[], value: string): number => {
-  const index = list.indexOf(value);
-  return index < 0 ? list.length : index;
+const VERDICT_LABELS: Record<string, string> = {
+  works: 'Works',
+  promising: 'Promising',
+  not_working: 'Not working',
+  not_enough_data: 'Not enough data',
+  waiting_on_data: 'Waiting on data',
 };
 
-function toRow(row: ServedRow): FrozenRow {
-  return {
-    key: `${row.edgeVariant}/${row.role}/${row.variant}/${String(row.horizonSessions)}`,
-    edgeVariant: row.edgeVariant,
-    variant: row.variant,
-    role: row.role,
-    horizonSessions: row.horizonSessions,
-    sessions: row.sessions ?? null,
-    picks: row.picks ?? null,
-    hitRate: row.hitRate ?? null,
-    baseRate: row.baseRate ?? null,
-    lift: row.lift ?? null,
-  };
-}
+const VERDICT_TONES: Record<string, StatusTone> = {
+  works: 'positive',
+  promising: 'warning',
+  not_working: 'negative',
+  not_enough_data: 'info',
+  waiting_on_data: 'neutral',
+};
 
-/** The frozen, non-exploratory rows of an edge's canonical run, in display order. */
-export function frozenRows(edge: ServedEdge): FrozenRow[] {
-  const rows = edge.canonicalRun?.rows ?? [];
-  return rows
-    .filter((r) => r.sliceKind === FROZEN && !r.exploratory)
-    .map(toRow)
-    .sort(
-      (a, b) =>
-        Number(b.edgeVariant === MAIN) - Number(a.edgeVariant === MAIN) ||
-        a.edgeVariant.localeCompare(b.edgeVariant) ||
-        rank(ROLE_ORDER, a.role) - rank(ROLE_ORDER, b.role) ||
-        a.variant.localeCompare(b.variant) ||
-        a.horizonSessions - b.horizonSessions,
-    );
-}
+export const verdictLabel = (verdict: string): string => VERDICT_LABELS[verdict] ?? verdict;
 
-export function toEdges(data: EdgesResponse): Edge[] {
-  return data.edges.map((edge) => ({ ...edge, frozenRows: frozenRows(edge) }));
-}
+export const verdictTone = (verdict: string): StatusTone => VERDICT_TONES[verdict] ?? 'neutral';
 
 /** An edge status as the list words it ("candidate" to "Candidate"). */
 export function statusLabel(status: string): string {

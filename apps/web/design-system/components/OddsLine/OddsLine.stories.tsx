@@ -9,7 +9,7 @@ const READY = {
   hitRate: 0.62,
   baseRate: 0.51,
   sessions: 118,
-  lift: 1.22,
+  liftPts: 11,
   picks: 340,
   runLabel: 'edge-eval run 2026-10-02',
 };
@@ -23,7 +23,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof OddsLine>;
 
-/** The evidence for a pick: hit rate against base rate, lift, sessions, picks and the run. */
+/** The evidence for a pick: win rate against base rate, lift in points, trades, picks and the run. */
 export const Default: Story = {};
 
 export const Loading: Story = { render: () => <OddsLine state="loading" /> };
@@ -32,7 +32,7 @@ export const Empty: Story = { render: () => <OddsLine state="empty" /> };
 
 export const Error: Story = { render: () => <OddsLine state="error" /> };
 
-/** Read outside the frozen period: labelled EXPLORATORY. */
+/** Read outside the official out-of-sample period: labelled EXPLORATORY. */
 export const Exploratory: Story = { render: () => <OddsLine {...READY} exploratory /> };
 
 /** The required figures only, with the Guide button beside them. */
@@ -52,7 +52,7 @@ export const Dense: Story = {
   render: () => (
     <Stack gap={1}>
       <OddsLine {...READY} />
-      <OddsLine {...READY} hitRate={0.58} baseRate={0.55} sessions={64} lift={1.05} />
+      <OddsLine {...READY} hitRate={0.58} baseRate={0.55} sessions={64} liftPts={3} />
       <OddsLine {...READY} exploratory />
     </Stack>
   ),

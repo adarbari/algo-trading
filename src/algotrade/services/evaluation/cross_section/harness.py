@@ -374,6 +374,7 @@ def _slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool)
     for label in sorted({s.regime for s in stats}):
         slices.append(Slice("regime", label, partial(_in_regime, label)))
     if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
+        slices.append(Slice("in_sample", "in_sample", partial(_before, split)))  # ED8: the IS side
         kind = "split" if exploratory else "frozen"
         slices.append(Slice(kind, kind, partial(_since, split)))
     return slices
@@ -389,6 +390,10 @@ def _in_year(year: int, stat: SessionStat) -> bool:
 
 def _in_regime(label: str, stat: SessionStat) -> bool:
     return stat.regime == label
+
+
+def _before(day: date, stat: SessionStat) -> bool:
+    return stat.session < day
 
 
 def _since(day: date, stat: SessionStat) -> bool:

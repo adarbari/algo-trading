@@ -12,7 +12,8 @@ from algotrade_api.graphql.types.instruments.feature import Unknown
 
 @strawberry.type(
     description="The frozen slice at one horizon: hit rate against the base rate, the lift, the "
-    "independent `sessions` behind them and the `picks` counted"
+    "independent `sessions` (trades) behind them and the `picks` counted; `liftPts`: win rate "
+    "minus base rate, in points"
 )
 class TrackHorizon:
     horizon_sessions: int
@@ -21,6 +22,7 @@ class TrackHorizon:
     lift: float | None
     sessions: int | None
     picks: int | None
+    lift_pts: float | None
 
     @classmethod
     def of(cls, d: track_record.TrackHorizon) -> Self:
@@ -31,6 +33,7 @@ class TrackHorizon:
             lift=d.lift,
             sessions=d.sessions,
             picks=d.picks,
+            lift_pts=d.lift_pts,
         )
 
 

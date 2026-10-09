@@ -1,6 +1,6 @@
 /**
- * The "Run evaluation" button of an edge: evaluates it now under the user's own split (rows are
- * theirs; a split other than the frozen one is EXPLORATORY), shows the job's state, and an admin
+ * The "Run backtest" button of an edge: evaluates it now under the user's own split (rows are
+ * theirs; an out-of-sample date other than the official one is EXPLORATORY), shows the job's state, and an admin
  * also gets "Run as site". The API's refusal (another evaluation running, no outcomes stored) is
  * the message.
  */
@@ -32,7 +32,7 @@ export function RunEvaluation({ edgeId }: RunEvaluationProps) {
           runner.start(false);
         }}
       >
-        Run evaluation
+        Run backtest
       </Button>
       {admin && (
         <Button

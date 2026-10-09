@@ -247,13 +247,12 @@ test('Guide search: the rail button opens the dialog inside the viewport, a tapp
   await expect(page).toHaveURL(/\/guide\/glossary\/session$/);
 });
 
-test('Edges: a tapped edge opens its detail as a sheet', async ({ page }) => {
+test('Edges: a tapped edge opens its page', async ({ page }) => {
   await page.goto('/edges');
   await page.getByRole('row', { name: /Momentum 12-1/ }).tap();
-  const sheet = page.getByRole('dialog', { name: 'momentum_12_1' });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByText('58.0%').first()).toBeVisible();
-  await expect(sheet.getByRole('button', { name: 'Run evaluation' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeVisible();
+  await expect(page.getByText('+7 pts').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Run backtest' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );

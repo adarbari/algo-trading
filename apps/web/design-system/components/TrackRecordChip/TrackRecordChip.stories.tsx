@@ -21,7 +21,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** An edge passed the frozen period. */
+/** An edge passed the out-of-sample period. */
 export const Default: Story = {};
 
 export const Candidate: Story = { args: { status: 'candidate', sessions: 42 } };

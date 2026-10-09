@@ -1,5 +1,5 @@
 /**
- * Feature: set the user's train / test split (`PUT /evaluation/split`): the site's frozen
+ * Feature: set the user's out-of-sample split (`PUT /evaluation/split`): the site's out-of-sample
  * periods, their own split, a date input with Save and Clear. Runs under it are exploratory
  * and come from `evaluate-edges`; the form never starts a run.
  */

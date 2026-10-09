@@ -1,41 +1,32 @@
 /**
- * Trader > Edges: the edges and what their frozen periods say, the list beside the chosen
- * edge's detail (a sheet on a phone). The chosen edge comes from the route (shareable).
+ * Trader > Edges, the Edges Lab (read-only): the edges grouped by verdict, and the chosen edge's
+ * page in place of the list (a back button returns). The chosen edge comes from the route
+ * (shareable).
  */
-import { Heading, MasterDetail, Stack, Text } from '@algotrade/ui';
+import { Heading, Stack, Text } from '@algotrade/ui';
 
-import { EvaluationSplitForm } from '@/features/evaluation-split';
-import { GuideHelp } from '@/features/guide-help';
 import { EdgeDetail } from '@/widgets/edge-detail';
 import { EdgeList } from '@/widgets/edge-list';
 
 export interface EdgesPageProps {
-  /** The chosen edge (from the URL), or null. */
+  /** The chosen edge (from the URL), or null for the list. */
   selected?: string | null;
   onSelect: (id: string) => void;
-  /** Narrow only: the detail sheet was dismissed; the route clears the choice. */
+  /** Back to the list: the route clears the choice. */
   onClear: () => void;
 }
 
 export function EdgesPage({ selected = null, onSelect, onClear }: EdgesPageProps) {
+  if (selected !== null) return <EdgeDetail id={selected} onBack={onClear} />;
   return (
     <Stack gap={3}>
       <Stack gap={1}>
         <Heading level={1}>Edges</Heading>
         <Text size="sm" tone="secondary">
-          Each edge, tested on the stored history, and what its frozen period shows.
+          Strategy ideas, each backtested for an edge
         </Text>
       </Stack>
-      <EvaluationSplitForm renderTermHelp={(id) => <GuideHelp entry={{ kind: 'term', id }} />} />
-      <MasterDetail
-        columns="main-aside"
-        collapse="lg"
-        master={<EdgeList selected={selected} onSelect={onSelect} />}
-        detail={<EdgeDetail id={selected} />}
-        detailKey={selected}
-        detailTitle={selected ?? ''}
-        onDetailClose={onClear}
-      />
+      <EdgeList onSelect={onSelect} />
     </Stack>
   );
 }

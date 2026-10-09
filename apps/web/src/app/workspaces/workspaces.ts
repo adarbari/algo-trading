@@ -39,7 +39,7 @@ export const TRADER: Workspace = {
       path: '/edges',
       label: 'Edges',
       summary:
-        'Each edge, a written reason a pattern should last, with its status, frozen period and the odds of its screeners.',
+        'Each edge, a written reason a pattern should last, backtested out of sample and given a verdict.',
     },
     {
       path: '/explore',

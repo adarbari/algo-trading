@@ -37,7 +37,7 @@ describe('HarnessRunList', () => {
     expect(within(failed).getByText('EXPLORATORY')).toBeInTheDocument();
     expect(within(failed).queryByText('0')).not.toBeInTheDocument();
     expect(screen.getAllByText('help harness_exclusions').length).toBeGreaterThan(0);
-    expect(screen.getByText('help trial_log')).toBeInTheDocument();
+    expect(screen.getByText('help variants_tried')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

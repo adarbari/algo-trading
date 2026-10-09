@@ -41,7 +41,8 @@ export interface RecordFigures {
   edgeName: string;
   hitRate: number;
   baseRate: number;
-  lift: number | null;
+  /** Win rate minus base rate, in points, as served. */
+  liftPts: number | null;
   sessions: number;
   horizonSessions: number;
   runLabel: string | null;
@@ -62,7 +63,7 @@ export function recordFigures(entries: readonly TrackEntry[]): RecordFigures | n
     edgeName: entry.edgeName,
     hitRate,
     baseRate,
-    lift: horizon.lift ?? null,
+    liftPts: horizon.liftPts ?? null,
     sessions,
     horizonSessions: horizon.horizonSessions,
     runLabel: entry.runLabel ?? null,

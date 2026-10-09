@@ -1,5 +1,5 @@
 /**
- * A screener's track record as a compact card in its opened row (ADR 0053): win rate and base rate, lift (the served ratio),
+ * A screener's track record as a compact card in its opened row (ADR 0053): win rate and base rate, lift (the served points),
  * trades, holding period and edge from the server's frozen-period record (never an
  * exploratory run), with a link to the edge's evidence; the server's words when there is none.
  */
@@ -11,7 +11,8 @@ import { recordFigures, useTrackRecords } from '@/entities/edge';
 import { Facts } from './Facts';
 
 const percent = (value: number) => formatValue(value, { kind: 'percent', digits: 1 }).text;
-const lift = (value: number) => `${formatValue(value, { kind: 'number', digits: 2 }).text}×`;
+const lift = (value: number) =>
+  formatValue(value, { kind: 'delta', unit: 'points', digits: 0 }).text;
 const trades = (n: number) => formatValue(n, { kind: 'number' }).text;
 
 export interface RecordCardProps {
@@ -53,9 +54,9 @@ export function RecordCard({ screenerId, onOpenEdge }: RecordCardProps) {
             value: percent(figures.hitRate),
           },
           { id: 'base', label: 'Base rate', value: percent(figures.baseRate) },
-          ...(figures.lift === null
+          ...(figures.liftPts === null
             ? []
-            : [{ id: 'lift', label: 'Lift', value: lift(figures.lift) }]),
+            : [{ id: 'lift', label: 'Lift', value: lift(figures.liftPts) }]),
           { id: 'trades', label: 'Trades', value: trades(figures.sessions) },
           {
             id: 'horizon',

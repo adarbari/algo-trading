@@ -11,9 +11,9 @@ describe('TrackRecordChip', () => {
     rerender(<TrackRecordChip status="not-run" />);
     expect(screen.getByText('Not run')).toBeInTheDocument();
     rerender(<TrackRecordChip status="candidate" sessions={42} />);
-    expect(screen.getByText('Candidate · 42 sessions')).toBeInTheDocument();
+    expect(screen.getByText('Candidate · 42 trades')).toBeInTheDocument();
     rerender(<TrackRecordChip status="candidate" sessions={1} />);
-    expect(screen.getByText('Candidate · 1 session')).toBeInTheDocument();
+    expect(screen.getByText('Candidate · 1 trade')).toBeInTheDocument();
   });
 
   it('renders nothing for an exploratory record, whatever its status', () => {
