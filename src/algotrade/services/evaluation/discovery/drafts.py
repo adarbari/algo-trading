@@ -14,7 +14,7 @@ from typing import Any
 from algotrade.config.edges.document import QUALITY_BAR
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
-from algotrade.services.evaluation.discovery.persist import JOB
+from algotrade.services.evaluation.discovery.persist import JOB, TABLE_VERSION
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.result_writer import ResultWriter
 
@@ -117,12 +117,20 @@ def write_draft(
 ) -> Path:
     """Write the draft of ``run_id`` and return its path. ``ConfigurationError`` (nothing
     written) when the run is unknown, is not a COMPLETE winners study run, did not pass the gate,
-    or ``out_dir`` is under ``config_root/site``."""
+    was written by an older study version (``TABLE_VERSION``: version 1 matched controls on two
+    variables and had no winners-vs-losers gate, so its tells can be variance), or ``out_dir``
+    is under ``config_root/site``."""
     record = writer.load_run(run_id)
     if record is None or record.job != JOB:
         raise ConfigurationError(f"{run_id}: not a winners study run")
     if record.status is not RunStatus.COMPLETE:
         raise ConfigurationError(f"{run_id}: the run is {record.status}, not COMPLETE")
+    version = record.stats.get("table_version", 1)
+    if version < TABLE_VERSION:
+        raise ConfigurationError(
+            f"{run_id}: a version {version} winners study run (current {TABLE_VERSION}); re-run "
+            "`algotrade-backtest study-winners` and draft from the new run"
+        )
     if not record.stats.get("passed"):
         raise ConfigurationError(
             f"{run_id}: the run did not pass the gate "
