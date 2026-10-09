@@ -347,6 +347,16 @@ def test_a_table_without_instrument_ids_has_no_copy(tmp_path: Path) -> None:
         backend.tables.build_history("catalog/demo", [2026])
 
 
+def test_history_size_and_free_bytes_report_the_copy_and_the_volume(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    assert backend.tables.history_size(TABLE) == 0
+    backend.tables.build_history(TABLE, [2026])
+    assert backend.tables.history_size(TABLE) > 0
+    assert backend.tables.free_bytes() > 0
+    assert LocalBackend(tmp_path / "absent").tables.free_bytes() > 0  # a store not yet written
+    assert MemoryBackend().tables.history_size(TABLE) == 0
+
+
 def test_the_memory_backend_keeps_no_copy() -> None:
     backend = MemoryBackend()
     day = date(2026, 1, 2)

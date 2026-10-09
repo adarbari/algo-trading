@@ -57,6 +57,8 @@ allowed = [
     "src/algotrade/storage/backends/local.py",  # serves read_range from it, exposes build_history
     "src/algotrade/storage/backends/memory.py",  # build_history is a no-op there: no copy
     "src/algotrade/storage/tables/interfaces.py",  # declares build_history on TableStore
+    "src/algotrade/storage/tables/writers.py",  # the write facade ingestion calls it through
+    "apps/ingestion/algotrade_ingestion/tasks/derived/history_copy.py",  # the nightly's history-copy step: the one caller (ADR 0060)
 ]
 section = "docs/adr/0060-history-copy.md#decision"
 detect = [{ call = "build_history" }, { call = "HistoryCopy" }]

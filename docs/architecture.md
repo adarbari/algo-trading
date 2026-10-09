@@ -211,7 +211,7 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
 
 - **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `shares`, `macro-calendar`, `filings`, `earnings`, `bars`, `rates`,
   `corporate-actions`, `chains`, `etf-holdings`, `ibkr-contracts`, `ibkr-iv`, `rollups`,
-  `screens`, `descriptions`, `verify`; then `purge-raw` once (`FINALLY`). Each is a registry
+  `screens`, `descriptions`, `verify`, `history-copy` (ADR 0060); then `purge-raw` once (`FINALLY`). Each is a registry
   task (or the `screens` job step) run in isolation, declared with the steps it `needs`, whether
   it is `critical`, its data precondition (`requires`) and its acceptance checks. A step runs
   only when every need is satisfied (SUCCEEDED, WAIVED, or SKIPPED as not applicable); else it
