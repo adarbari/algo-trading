@@ -35,7 +35,6 @@ import { dteReason, earningsCell, expiryDte, iv30, served } from './facts';
 interface MetricColumn {
   key: string;
   header: string;
-  description?: string;
   format: ValueFormat;
 }
 
@@ -43,13 +42,11 @@ const METRIC_COLUMNS: readonly MetricColumn[] = [
   {
     key: 'hv30',
     header: 'HV30',
-    description: '30-day historical volatility',
     format: { kind: 'percent' },
   },
   {
     key: 'iv_hv_ratio',
     header: 'IV / HV',
-    description: 'IV30 over HV30',
     format: { kind: 'number', digits: 2 },
   },
   {
@@ -70,7 +67,6 @@ const METRIC_COLUMNS: readonly MetricColumn[] = [
   {
     key: 'put_roc',
     header: 'Put ROC',
-    description: 'Best put: return on capital',
     format: { kind: 'percent' },
   },
 ];
@@ -92,7 +88,6 @@ function metricColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
   return METRIC_COLUMNS.filter((m) => anyValue(ideas, (idea) => numeric(idea, m.key))).map((m) => ({
     id: m.key,
     header: m.header,
-    description: m.description ?? m.header,
     value: (idea) => numeric(idea, m.key),
     format: m.format,
   }));
@@ -106,7 +101,6 @@ function ivColumns(ideas: readonly Idea[]): HelpedColumn<Idea>[] {
     fieldColumn<Idea>(IDEA_FACTS.iv30, {
       id: 'iv30',
       header: 'IV30',
-      description: '30-day implied volatility',
       value: iv30,
       format: valueFormat(served.info),
     }),
@@ -116,7 +110,6 @@ function ivColumns(ideas: readonly Idea[]): HelpedColumn<Idea>[] {
 const dteColumn = fieldColumn<Idea>(IDEA_FACTS.expiryDte, {
   id: 'dte',
   header: 'Expiry DTE',
-  description: 'Days to the nearest expiry; flagged when earnings come first',
   value: expiryDte,
   format: { kind: 'number' },
   width: 'md',
@@ -138,7 +131,6 @@ const dteColumn = fieldColumn<Idea>(IDEA_FACTS.expiryDte, {
 const RANK: DataTableColumn<Idea> = {
   id: 'rank',
   header: '#',
-  description: 'Your screener priority, then score',
   value: (idea) => idea.rank,
   format: { kind: 'number' },
   width: 'xs',
@@ -149,7 +141,6 @@ const RANK: DataTableColumn<Idea> = {
 const SIZE: DataTableColumn<Idea> = {
   id: 'size',
   header: 'Size',
-  description: 'Share of the normal size the regime allows',
   value: (idea) => idea.sizeMultiplier,
   format: { kind: 'percent', digits: 0 },
   width: 'sm',
@@ -216,7 +207,6 @@ const whyColumn = (onOpenScreener: (screenerId: string) => void): DataTableColum
 const scoreColumn: DataTableColumn<Idea> = {
   id: 'score',
   header: 'Score',
-  description: 'Score of the best pick',
   value: (idea) => idea.best.score,
   format: { kind: 'number', digits: 0 },
   width: 'xs',
@@ -226,7 +216,6 @@ const scoreColumn: DataTableColumn<Idea> = {
 const decisionColumn: DataTableColumn<Idea> = {
   id: 'decision',
   header: 'Decision',
-  description: 'Best decision across the screeners',
   value: (idea) => idea.best.decision,
   essential: true,
   cell: ({ row }) => <DecisionBadge decision={row.best.decision} />,
@@ -283,7 +272,6 @@ const priceColumn: DataTableColumn<Idea> = {
 const watchOutColumn: DataTableColumn<Idea> = {
   id: 'watch-out',
   header: 'Watch out',
-  description: 'Reasons to look twice',
   value: (idea) => idea.watchOut.length,
   width: 'lg',
   grow: true,
