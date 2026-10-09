@@ -25,7 +25,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade_api.auth.local import require_loopback
 from algotrade_api.auth.mode import AuthMode
 from algotrade_api.ops.build import Fetch, fetch_http, running_mismatches, write_web_stamp
-from algotrade_api.ops.deploy import CHECKS, actions, verify
+from algotrade_api.ops.deploy import CHECKS, actions, holds_ingest, verify
 from algotrade_api.ops.schedule import (
     DEFAULT_PORT,
     DEPLOY_LABEL,
@@ -72,6 +72,9 @@ def _parser() -> argparse.ArgumentParser:
     dp = sub.add_parser("deploy-plan", help="what a deploy of the commits A..B must run")
     dp.add_argument("--since", required=True)
     dp.add_argument("--to", required=True)
+    dp.add_argument(
+        "--locks", action="store_true", help="print `ingest` if the deploy needs the ingest lock"
+    )
     dv = sub.add_parser("deploy-verify", help="wait until the running site is at a commit")
     dv.add_argument("--expect", required=True)
     dv.add_argument("--check", choices=CHECKS, default="full")
@@ -171,7 +174,11 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(plan, indent=2))
         return
     if args.command == "deploy-plan":
-        print(" ".join(a.value for a in actions(changed_paths(args.since, args.to))))
+        paths = changed_paths(args.since, args.to)
+        if args.locks:
+            print("ingest" if holds_ingest(paths) else "")
+        else:
+            print(" ".join(a.value for a in actions(paths)))
         return
     if args.command == "deploy-verify":
         url = f"http://{HOST}:{args.agent_port}"

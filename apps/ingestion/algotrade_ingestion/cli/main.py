@@ -195,6 +195,7 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     dh = sub.add_parser(
         "deploy-hold", help="run a command under the deploy and ingest locks (exit 75: busy)"
     )
+    dh.add_argument("--deploy-only", action="store_true", help="take the deploy lock alone")
     dh.add_argument("cmd", nargs=argparse.REMAINDER)
     sc = sub.add_parser(
         "schedule",
@@ -370,7 +371,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         cmd = args.cmd[1:] if args.cmd[:1] == ["--"] else args.cmd
         if not cmd:
             parser.error("deploy-hold needs a command after --")
-        return hold(backend, lambda: subprocess.run(cmd, check=False).returncode)
+        return hold(
+            backend,
+            lambda: subprocess.run(cmd, check=False).returncode,
+            ingest=not args.deploy_only,
+        )
     try:
         if args.command == "nightly":  # never an unmerged branch against the real store
             ensure_main_checkout()
