@@ -52,6 +52,7 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/reference/company_details.py"
 [[table]]
 name = "instruments/shares"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"]
 
 [[table]]
 name = "instruments/description"

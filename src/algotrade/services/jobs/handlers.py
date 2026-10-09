@@ -8,6 +8,7 @@ the dates and the user are the same, so editing a config and resubmitting runs a
 """
 
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -105,19 +106,22 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     """params: ``edge`` (id), ``start``, ``end`` (ISO dates), optional ``as_of`` (ISO instant:
     the outcomes known by then; default now), ``iv_field`` (the one implied-vol field of the run;
     default our IV30), ``split_from`` (ISO date: the run's test split, over the user's and the
-    edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory). The harness's rows
-    land in ``results/edge_eval``."""
+    edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory), ``extra_baselines``
+    (screener ids scored as baselines besides the edge's own: the golden evaluation's, never a
+    real edge document's). The harness's rows land in ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
         raise ConfigurationError(f"unknown edge {params['edge']!r}; known: {sorted(edges)}")
     as_of = datetime.fromisoformat(params["as_of"]) if params.get("as_of") else now
+    edge = edges[params["edge"]]
+    extra = tuple(b for b in params.get("extra_baselines") or () if b not in edge.baselines)
     evaluation = evaluate_edge(
         ctx.resources["reader"],
         ctx.resources["writer"],
         configs,
         ctx.user,
-        edges[params["edge"]],
+        replace(edge, baselines=(*edge.baselines, *extra)),
         date.fromisoformat(params["start"]),
         date.fromisoformat(params["end"]),
         as_of,

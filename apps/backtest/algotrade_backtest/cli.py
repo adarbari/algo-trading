@@ -93,6 +93,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="first session of the test slice (default: the user's evaluation.toml, else each "
         "edge's frozen_from); another split than frozen_from is exploratory",
     )
+    ee.add_argument(
+        "--extra-baseline",
+        action="append",
+        default=[],
+        metavar="SCREENER",
+        help="score this screener as a baseline besides the edge's own (repeatable; the golden "
+        "evaluation's baselines, `make evaluate`)",
+    )
     ee.add_argument("--report", type=Path, help="also write the report here")
     ee.add_argument(
         "--baseline",
