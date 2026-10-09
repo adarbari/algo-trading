@@ -242,6 +242,7 @@ test('Edges: a tapped edge opens its detail as a sheet', async ({ page }) => {
   const sheet = page.getByRole('dialog', { name: 'momentum_12_1' });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText('58.0%').first()).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Run evaluation' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );

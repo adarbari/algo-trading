@@ -19,7 +19,7 @@
 #   keep       true: stays REST by design (health, job polling, live quotes); false: retires
 #   retire_in  the read-model PR that moves it to GraphQL and removes this entry
 
-max_get_routes = 4
+max_get_routes = 5
 
 # ---------------------------------------------------------------------------- stays REST
 
@@ -34,6 +34,12 @@ method = "GET"
 path = "/screens/{config_id}/run/{job_id}"
 keep = true
 reason = "job polling for POST /screens/{config_id}/run (ADR 0033): transport plumbing, kept with its POST"
+
+[[route]]
+method = "GET"
+path = "/edges/{edge_id}/evaluate/{job_id}"
+keep = true
+reason = "job polling for POST /edges/{edge_id}/evaluate (ADR 0059, amending 0037): transport plumbing, kept with its POST"
 
 [[route]]
 method = "GET"

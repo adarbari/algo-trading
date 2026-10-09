@@ -41,6 +41,7 @@ from algotrade.services.authoring.scope import ConfigWriter, author, open_writer
 from algotrade.services.explaining.cache import TextCache
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
+from algotrade.services.ondemand.edges import OnDemandEdges
 from algotrade.services.ondemand.screens import OnDemandScreens
 from algotrade.services.read.context import (
     ConfigStore,
@@ -255,6 +256,18 @@ def get_ondemand(request: Request) -> OnDemandScreens:
 
 
 OnDemand = Annotated[OnDemandScreens, Depends(get_ondemand)]
+
+
+def get_ondemand_edges(request: Request) -> OnDemandEdges:
+    """The on-request edge evaluator ``create_app`` set up (ADR 0059); off in tests and the
+    OpenAPI export unless one is given."""
+    runner = cast(OnDemandEdges | None, request.app.state.ondemand_edges)
+    if runner is None:
+        raise ConfigurationError("on-request evaluations are off in this app")
+    return runner
+
+
+OnDemandEvaluations = Annotated[OnDemandEdges, Depends(get_ondemand_edges)]
 
 
 def get_text_model(request: Request) -> TextModel:

@@ -4,7 +4,7 @@
  * the user sees) and each screener's track records (`Screener.trackRecords`) for the Screeners
  * list's chip and the Ideas odds line. Never reads an exploratory run as a track record.
  */
-export { useEdges } from './api/edges';
+export { refreshEdges, useEdges } from './api/edges';
 export { refreshEvaluationSplit, useEvaluationSplit } from './api/split';
 export { useTrackRecords } from './api/track-records';
 export {

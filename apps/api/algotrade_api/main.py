@@ -33,6 +33,7 @@ from algotrade.services.authoring.scope import ConfigWriter, ConflictError, Scre
 from algotrade.services.explaining.cache import open_text_cache
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
+from algotrade.services.ondemand.edges import OnDemandEdges, open_ondemand_edges
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
 from algotrade.services.read.availability.cause import (
     GENERIC_REASONS,
@@ -107,17 +108,19 @@ def create_app(
     writer: ConfigWriter | None = None,
     live: LiveQuotes | None = None,
     ondemand: OnDemandScreens | None = None,
+    ondemand_edges: OnDemandEdges | None = None,
     authenticator: Authenticator | None = None,
     text_model: TextModel | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
     ``live``: the live quotes (default: IB Gateway when ``settings.live``, else switched off).
-    ``ondemand``: the on-request screen runner (default: over the store when ``settings.live``,
-    the served app; else off: a request answers 400). ``authenticator``: who is calling
-    (default: ``settings.auth`` over the store's user registry; ADR 0040). ``text_model``: the
-    text model behind screener drafts (default: the one ``config/site/llm.toml`` enables
-    when ``settings.live``, else off: a request answers 503; ADR 0041)."""
+    ``ondemand``: the on-request screen runner and ``ondemand_edges`` the edge evaluator
+    (default: over the store when ``settings.live``, the served app; else off: a request answers
+    400). ``authenticator``: who is calling (default: ``settings.auth`` over the store's user
+    registry; ADR 0040). ``text_model``: the text model behind screener drafts (default: the
+    one ``config/site/llm.toml`` enables when ``settings.live``, else off: a request answers
+    503; ADR 0041)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -126,8 +129,9 @@ def create_app(
         close = getattr(app.state.text_model, "close", None)
         if close is not None:
             close()  # flush the queued usage rows
-        if app.state.ondemand is not None:
-            app.state.ondemand.close()
+        for runner in (app.state.ondemand, app.state.ondemand_edges):
+            if runner is not None:
+                runner.close()
 
     app = FastAPI(
         title=TITLE,
@@ -135,8 +139,8 @@ def create_app(
         description=(
             "Read-only API over the algotrade stores (ADR 0024); it writes only user configs "
             "and user features, through services.authoring (ADR 0029), and the live option "
-            "quotes it served, to live/* tables (ADR 0028); a screener run on request writes its "
-            "results as the nightly does (ADR 0033)."
+            "quotes it served, to live/* tables (ADR 0028); a screener run or an edge evaluation "
+            "on request writes its results as the nightly and the CLI do (ADR 0033, 0059)."
         ),
         lifespan=lifespan,
     )
@@ -147,9 +151,16 @@ def create_app(
     if live is None:
         live = open_live(settings.data_url, app.state.store.configs) if settings.live else no_live()
     app.state.live = live
-    if ondemand is None and settings.live:
-        ondemand = open_ondemand(settings.data_url, app.state.store.configs)
-    app.state.ondemand = ondemand
+    configs = app.state.store.configs
+    live_on = settings.live
+    app.state.ondemand = (
+        open_ondemand(settings.data_url, configs) if ondemand is None and live_on else ondemand
+    )
+    app.state.ondemand_edges = (
+        open_ondemand_edges(settings.data_url, configs)
+        if ondemand_edges is None and live_on
+        else ondemand_edges
+    )
     users = load_users(app.state.store.configs)
     app.state.users = users
     if authenticator is None:
