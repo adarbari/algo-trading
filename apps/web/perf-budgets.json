@@ -27,9 +27,9 @@
       "dom_nodes": 293
     },
     "/screeners": {
-      "first_load_js_gzip_bytes": 208500,
-      "requests": 45,
-      "dom_nodes": 188
+      "first_load_js_gzip_bytes": 208900,
+      "requests": 46,
+      "dom_nodes": 189
     },
     "/regime": {
       "first_load_js_gzip_bytes": 301400,
@@ -37,9 +37,9 @@
       "dom_nodes": 1593
     },
     "/screeners/vrp_scanner": {
-      "first_load_js_gzip_bytes": 253700,
+      "first_load_js_gzip_bytes": 254500,
       "requests": 72,
-      "dom_nodes": 293
+      "dom_nodes": 296
     },
     "/admin/ingestion": {
       "first_load_js_gzip_bytes": 232900,
@@ -54,15 +54,15 @@
   },
   "reasons": {
     "e2e./ideas.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
-    "e2e./screeners.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
+    "e2e./screeners.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +295 B)",
     "e2e./regime.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
-    "e2e./screeners/vrp_scanner.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #447 the criteria scorecard reads the resolved config's rules table (resolvedRules, +2 B over the exact budget)",
+    "e2e./screeners/vrp_scanner.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #447 the criteria scorecard reads the resolved config's rules table (resolvedRules, +2 B over the exact budget); then 2026-10-09 #452 the criteria scorecard reads typed criteria through the screeners list query (+685 B)",
     "e2e./admin/ingestion.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) +53 B from the merged shared chunk graph (the page-cache chunk is listed in the entry's chunk table)",
     "bundle.routes.src/pages/trader-calendar/index.ts": "2026-10-09 #440 the page chunk starts its reads and the saved page cache when loaded (hover preload); the entry chunk stays under budget; then 2026-10-09 #452 shared chunk graph after the typed screen criteria (+50 B)",
     "bundle.routes.src/pages/admin-ingestion/index.ts": "2026-10-09 #438 Guide entries in one batched read: the batch document and loader (replacing four single-entry documents) move into this page chunk (+645 B gzip)",
     "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
     "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #440 the page chunk starts its read and the saved page cache when loaded (hover preload); then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +312 B)",
-    "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
+    "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #452 the typed criteria mapping (+1 node)",
     "e2e./screeners/vrp_scanner.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
     "e2e./explore?focus=AAPL&tab=chart.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
     "bundle.routes.src/pages/screener-builder/index.ts": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk; then 2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
@@ -74,6 +74,8 @@
     "bundle.routes.src/pages/trader-edges/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; plus the Edges Lab pages",
     "bundle.routes.src/pages/trader-regime/index.ts": "2026-10-09 #425 ED8 step 1: the same shared DataTable groupBy / OddsLine code lands in this chunk (+20 B gzip)",
     "e2e./regime.requests": "2026-10-09 #425 ED8 step 1: the shared DataTable / OddsLine code splits into one more chunk on this route (82 -> 83)",
-    "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks"
+    "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
+    "e2e./screeners.requests": "2026-10-09 #452 one more script chunk from the build split; the GraphQL operations are unchanged (8, checked)",
+    "e2e./screeners/vrp_scanner.dom_nodes": "2026-10-09 #452 the criteria scorecard shows each rule again (it read none before #447)"
   }
 }
