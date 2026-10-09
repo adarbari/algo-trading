@@ -6,15 +6,83 @@
  */
 import type { DistributionBin, DistributionMarker, StatusTone } from '@algotrade/ui';
 
-import type { gqlTypes } from '@/shared/api';
+interface Side {
+  closed: number;
+  wins: number;
+  winRate: number | null;
+}
 
-type Desk = NonNullable<gqlTypes.EdgeDeskQuery['edgeDesk']>;
-export type DeskTrade = Desk['buys'][number];
-export type FollowedEdge = Desk['followed'][number];
-export type EdgePaper = NonNullable<gqlTypes.EdgePaperQuery['edgePaper']>;
-export type PaperRecord = EdgePaper['record'];
-export type PaperTrade = EdgePaper['trades'][number];
-export type ForwardTest = NonNullable<EdgePaper['forward']>;
+export interface DeskTrade {
+  edgeId: string;
+  edgeName: string;
+  instrumentId: string;
+  rank: number;
+  buySession: string;
+  sellSession: string;
+  instrument: { symbol: string } | null;
+}
+
+export interface FollowedEdge {
+  edgeId: string;
+  name: string;
+  state: string;
+  tonight: string;
+  tonightReason: string;
+  missed: string[];
+  record: { state: string; closed: number; open: number; winRate: number | null };
+}
+
+export interface Desk {
+  session: string;
+  sellSession: string;
+  buys: DeskTrade[];
+  sells: DeskTrade[];
+  followed: FollowedEdge[];
+}
+
+export interface PaperRecord {
+  state: string;
+  closed: number;
+  wins: number;
+  open: number;
+  skipped: number;
+  winRate: number | null;
+  backtestRate: number | null;
+  basis: string;
+  low: number | null;
+  high: number | null;
+  headline: string;
+  bins: { start: number; end: number; chance: number }[];
+}
+
+export interface PaperTrade {
+  instrumentId: string;
+  rank: number;
+  signalSession: string;
+  buySession: string;
+  sellSession: string;
+  status: string;
+  reason: string;
+  excessReturn: number | null;
+  instrument: { symbol: string } | null;
+}
+
+export interface ForwardTest {
+  replaces: string;
+  replacesName: string;
+  since: string;
+  sessions: number;
+  needed: number;
+  headline: string;
+  this: Side;
+  replaced: Side;
+}
+
+export interface EdgePaper {
+  record: PaperRecord;
+  trades: PaperTrade[];
+  forward: ForwardTest | null;
+}
 
 const RECORD_LABELS: Record<string, string> = {
   on_track: 'On track',

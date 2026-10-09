@@ -1,7 +1,7 @@
 {
   "bundle": {
     "entry_gzip_bytes": 24800,
-    "entry_closure_gzip_bytes": 204100,
+    "entry_closure_gzip_bytes": 203800,
     "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
       "src/pages/admin-harness-runs/index.ts": 31800,
@@ -53,7 +53,6 @@
     }
   },
   "reasons": {
-    "bundle.entry_closure_gzip_bytes": "2026-10-09 #457 ED8 PR-D: the EdgeDesk / EdgePaper operations in the shared generated GraphQL client (CI measured 203921 B; +121 B)",
     "bundle.routes.src/pages/admin-llm-usage/index.ts": "2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
     "e2e./explore?focus=AAPL&tab=chart.dom_nodes": "2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks",
     "e2e./explore?focus=AAPL&tab=chart.first_load_js_gzip_bytes": "2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",

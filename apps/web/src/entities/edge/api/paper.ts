@@ -7,108 +7,29 @@
  */
 import { useQuery } from '@tanstack/react-query';
 
-import { gql, graphql, queryKeys } from '@/shared/api';
+import { gql, queryKeys, TypedDocumentString } from '@/shared/api';
 
-const EdgeDesk = graphql(`
-  query EdgeDesk {
-    edgeDesk {
-      session
-      sellSession
-      buys {
-        edgeId
-        edgeName
-        instrumentId
-        instrument {
-          symbol
-        }
-        rank
-        buySession
-        sellSession
-      }
-      sells {
-        edgeId
-        edgeName
-        instrumentId
-        instrument {
-          symbol
-        }
-        rank
-        buySession
-        sellSession
-      }
-      followed {
-        edgeId
-        name
-        state
-        tonight
-        tonightReason
-        missed
-        record {
-          state
-          closed
-          open
-          winRate
-        }
-      }
-    }
-  }
-`);
+import type { Desk, EdgePaper } from '../model/paper';
 
-const EdgePaper = graphql(`
-  query EdgePaper($id: String!) {
-    edgePaper(id: $id) {
-      record {
-        state
-        closed
-        wins
-        open
-        skipped
-        winRate
-        backtestRate
-        basis
-        low
-        high
-        headline
-        bins {
-          start
-          end
-          chance
-        }
-      }
-      trades {
-        instrumentId
-        instrument {
-          symbol
-        }
-        rank
-        signalSession
-        buySession
-        sellSession
-        status
-        reason
-        excessReturn
-      }
-      forward {
-        replaces
-        replacesName
-        since
-        sessions
-        needed
-        headline
-        this {
-          closed
-          wins
-          winRate
-        }
-        replaced {
-          closed
-          wins
-          winRate
-        }
-      }
-    }
-  }
-`);
+// Compact documents as TypedDocumentString (not `graphql()`): the generated operation map is in
+// the entry chunk, and these two reads load with their pages.
+const DESK_TRADE = 'edgeId edgeName instrumentId instrument { symbol } rank buySession sellSession';
+const EdgeDesk = new TypedDocumentString<{ edgeDesk: Desk | null }, Record<string, never>>(
+  `query EdgeDesk { edgeDesk { session sellSession buys { ${DESK_TRADE} } sells { ${DESK_TRADE} }
+    followed { edgeId name state tonight tonightReason missed
+      record { state closed open winRate } } } }`,
+);
+
+const SIDE = 'closed wins winRate';
+const EdgePaper = new TypedDocumentString<{ edgePaper: EdgePaper | null }, { id: string }>(
+  `query EdgePaper($id: String!) { edgePaper(id: $id) {
+    record { state closed wins open skipped winRate backtestRate basis low high headline
+      bins { start end chance } }
+    trades { instrumentId instrument { symbol } rank signalSession buySession sellSession status
+      reason excessReturn }
+    forward { replaces replacesName since sessions needed headline this { ${SIDE} }
+      replaced { ${SIDE} } } } }`,
+);
 
 /** The signals of the edges the user follows (null: nothing stored for the session). */
 export function useEdgeDesk() {
