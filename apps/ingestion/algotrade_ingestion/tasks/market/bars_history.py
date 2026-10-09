@@ -27,9 +27,11 @@ say how many are left.
 - **From the listings** (``--from-listings``): instead of the scope list, the names are the
   listings of the universe on any session of ``since..until`` (``data.listings.listings_over``,
   ADR 0018 amendment, edges ED6; not with ``--fill``; ``--symbols`` narrows them by ticker). A
-  listing is fetched by its ``permaTicker`` when it has one, else by its ticker; a listing whose
-  ticker another listing also used and that has no ``permaTicker`` is NEVER fetched (the
-  ticker's bars would be the other company's): item ``perma:<id>`` (``NO_PERMA``), counted in
+  listing is fetched by its ``permaTicker`` when it has one, else by its ticker. A reused ticker
+  without a ``permaTicker`` is fetched by ticker only when the listing is OPEN (the ticker URL
+  serves only the ticker's current owner; Tiingo's meta has no ETFs, so most current ETFs have
+  none); a DELISTED such listing is NEVER fetched (by ticker it would get the later owner's
+  bars): item ``perma:<id>`` (``NO_PERMA``), counted in
   ``stats["no_perma"]``. The request asks only for the listing's own dates and every row is
   clipped to ``start_date..end_date`` (``stats["clipped_rows"]``).
 - **Scope** is resolved once, by the owner, as of ``--until``'s session (ADR 0018): ids come
@@ -134,8 +136,9 @@ NO_PERMA = "NO_PERMA"
 def listing_names(
     listings: pd.DataFrame, requested: Collection[str] = ()
 ) -> tuple[list[Name], list[Name]]:
-    """-> (names to fetch, names never fetched): a listing of a reused ticker without a
-    ``permaTicker`` is the second kind. ``requested`` (tickers) narrows when not empty."""
+    """-> (names to fetch, names never fetched): a DELISTED listing of a reused ticker without a
+    ``permaTicker`` is the second kind (an open one is fetched by ticker: the ticker URL serves
+    its current owner). ``requested`` (tickers) narrows when not empty."""
     wanted = {r.strip().upper() for r in requested}
     fetch: list[Name] = []
     never: list[Name] = []
@@ -149,7 +152,7 @@ def listing_names(
             cast(date, row.start_date),
             None if pd.isna(row.end_date) else cast(date, row.end_date),
         )
-        (never if bool(row.reused) and not name.perma else fetch).append(name)
+        (never if bool(row.reused) and not name.perma and name.end else fetch).append(name)
     return fetch, never
 
 
@@ -377,8 +380,8 @@ def ingest_bars_history(
             for name in never:
                 run.record_item(
                     f"perma:{name.instrument_id}",
-                    f"{NO_PERMA}: {name.symbol} was used by several listings and this one has "
-                    "no permaTicker",
+                    f"{NO_PERMA}: {name.symbol} was used by several listings and this delisted "
+                    "one has no permaTicker",
                 )
         else:
             scope = scoped_instruments(

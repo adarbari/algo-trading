@@ -408,23 +408,42 @@ def write_listings(writer: StoreWriter, rows_: list[tuple[str, str, str, str, st
 
 
 def test_recycled_without_perma_never_fetched_by_ticker(writer: StoreWriter) -> None:
-    """The winners-sample's bars:0 (ACCL, CEG, MEMS, OPEN, PRM): a ticker Tiingo serves for
-    another company must not be asked by ticker; the listing with a permaTicker is."""
+    """The winners-sample's bars:0 (ACCL, CEG, MEMS, OPEN, PRM): a DELISTED listing of a ticker
+    another company uses now has no permaTicker; asking by ticker would store the later owner's
+    bars under it, so it is never asked. The listing with a permaTicker is."""
     write_listings(writer, [
         ("EQ:TIINGO:US0001", "RCY", "US0001", "2019-06-03", "2020-01-03"),  # the old company
-        ("EQ:BBG000NEW", "RCY", "", "2020-01-06", None),  # the new one: no permaTicker yet
+        ("EQ:BBG000OLD", "RCY", "", "2020-01-01", "2020-01-02"),  # delisted, no permaTicker
         ("EQ:AAA", "AAA", "", "2000-01-03", None),  # a ticker never reused
     ])  # fmt: skip
     vendor = Vendor({"US0001": payloads.prices(rows(10)), "AAA": payloads.prices(rows(20)),
                      "RCY": payloads.prices(rows(99))})  # fmt: skip
     record = run(writer, vendor, (), from_listings=True)
     assert sorted(vendor.asked) == ["AAA", "US0001"]  # never "RCY"
-    assert record.items["perma:EQ:BBG000NEW"].startswith("NO_PERMA")
+    assert record.items["perma:EQ:BBG000OLD"].startswith("NO_PERMA")
     assert record.stats["no_perma"] == 1 and record.stats["fetched"] == 2
-    assert "hist:EQ:BBG000NEW" not in record.items
+    assert "hist:EQ:BBG000OLD" not in record.items
     ids = {d: list(stored(writer, d)["instrument_id"]) for d in DAYS[:2]}
     assert ids == {d: ["EQ:AAA", "EQ:TIINGO:US0001"] for d in DAYS[:2]}
     assert list(stored(writer, DAYS[2])["instrument_id"]) == ["EQ:AAA"]  # US0001 ended 01-03
+
+
+def test_open_reused_ticker_without_perma_is_fetched_by_ticker(writer: StoreWriter) -> None:
+    """The live backfill's 246 NO_PERMA of 293 (SPYM, IMCB, NORW...): current listings (ETFs
+    have no Tiingo meta, so no permaTicker) whose ticker was once used by another listing were
+    never fetched. An OPEN one is asked by ticker (the URL serves the current owner) under its
+    `hist:` key, and clipped to its own dates."""
+    write_listings(writer, [
+        ("EQ:TIINGO:US0001", "RCY", "US0001", "2019-06-03", "2020-01-03"),  # the old company
+        ("EQ:BBG000NEW", "RCY", "", "2020-01-06", None),  # open, reused, no permaTicker
+    ])  # fmt: skip
+    vendor = Vendor({"US0001": payloads.prices(rows(10)), "RCY": payloads.prices(rows(99))})
+    record = run(writer, vendor, (), from_listings=True)
+    assert sorted(vendor.asked) == ["RCY", "US0001"]
+    assert "hist:EQ:BBG000NEW" in record.items and "perma:EQ:BBG000NEW" not in record.items
+    assert record.stats["no_perma"] == 0
+    assert list(stored(writer, DAYS[2])["instrument_id"]) == ["EQ:BBG000NEW"]
+    assert list(stored(writer, DAYS[0])["instrument_id"]) == ["EQ:TIINGO:US0001"]  # clipped
 
 
 def test_rows_are_clipped_to_the_listing_dates_and_the_request_asks_only_for_them(
