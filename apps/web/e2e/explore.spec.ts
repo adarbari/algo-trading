@@ -1,8 +1,9 @@
 /**
  * Trader > Explore end to end, against the production build with the API mocked from
- * recorded fixtures (explore-api.ts): the ticker table over the full universe one server page
- * per request (sorted, filtered and paged by the server), the compare set and detail tabs, URL
- * state (shareable links) and accessibility in dark and light.
+ * recorded fixtures (explore-api.ts): the ticker search (type-ahead over the universe, `/`,
+ * arrows and Enter), open tickers as closable tabs, the detail tabs of the selected one, the
+ * "Why it is an idea" tab for a ticker Ideas opened, URL state (shareable links) and
+ * accessibility in dark and light.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -26,8 +27,8 @@ async function useTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   }, theme);
 }
 
-const tickers = (page: Page) => page.getByRole('grid', { name: 'Tickers' });
-const summary = (page: Page) => page.getByText(/^[\d,]+ tickers? ·/);
+const open = (page: Page) => page.getByRole('tablist', { name: 'Open tickers' });
+const view = (page: Page) => page.getByRole('tablist', { name: 'View' });
 
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
@@ -38,12 +39,11 @@ for (const theme of ['dark', 'light'] as const) {
     const errors = collectErrors(page);
     await page.goto(COMPARE);
     await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
-    await expect(summary(page)).toHaveText('11,427 tickers · 3 selected');
-    for (const symbol of ['AAPL', 'MSFT', 'NVDA']) {
-      await expect(
-        page.getByRole('button', { name: `Remove ${symbol} from compare` }),
-      ).toBeVisible();
-    }
+    await expect(open(page).getByRole('tab')).toHaveText(['AAPL', 'MSFT', 'NVDA']);
+    await expect(view(page).getByRole('tab', { name: 'Compare' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await expect(
       page.getByRole('heading', { name: 'Performance · rebased to 100 · 1Y' }),
     ).toBeVisible();
@@ -75,94 +75,109 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
+test('with nothing open the page asks for a ticker', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/explore');
+  await expect(page.getByText('No ticker open')).toBeVisible();
+  await expect(open(page)).toHaveCount(0);
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('one ticker opens on its overview', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/explore?sel=AAPL');
-  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+  await expect(view(page).getByRole('tab', { name: 'Overview' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
+  await expect(view(page).getByRole('tab', { name: 'Compare' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'AAPL · overview' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'AAPL headline numbers' })).toContainText(
     'Market cap',
   );
   await expect(page.getByLabel('In rough markets')).toContainText('Tariff shock, spring 2025');
-  await page.getByRole('tab', { name: 'Compare' }).click();
-  await expect(page).toHaveURL(/tab=compare/);
   await expectAccessible(page);
   expect(errors).toEqual([]);
 });
 
-test('the tabs, the compare set and the columns live in the URL', async ({ page }) => {
+test('search adds a ticker as a tab: type, arrows, Enter; / focuses the box', async ({ page }) => {
+  await page.goto('/explore?sel=AAPL');
+  const box = page.getByRole('combobox', { name: 'Search tickers' });
+  await expect(box).toBeVisible();
+  await page.keyboard.press('/');
+  await expect(box).toBeFocused();
+  await box.fill('nvda');
+  const options = page.getByRole('option');
+  await expect(options.first()).toContainText('NVDA');
+  await expectAccessible(page);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/sel=AAPL%2CNVDA|sel=AAPL,NVDA/);
+  await expect(page).toHaveURL(/focus=NVDA/);
+  await expect(open(page).getByRole('tab')).toHaveText(['AAPL', 'NVDA']);
+  await expect(open(page).getByRole('tab', { name: 'NVDA' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(box).toHaveValue('');
+  // Escape closes the list and leaves the box.
+  await box.fill('msft');
+  await expect(options.first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(options).toHaveCount(0);
+  // No console-error check: the mocks record only AAPL's detail reads, so NVDA's 404.
+});
+
+test('the tabs and the open tickers live in the URL; a closed tab leaves the list', async ({
+  page,
+}) => {
   const errors = collectErrors(page);
-  await page.goto(COMPARE);
-  await expect(summary(page)).toBeVisible();
-  await page.getByRole('tab', { name: 'Events' }).click();
+  await page.goto(`${COMPARE}&focus=AAPL`);
+  await view(page).getByRole('tab', { name: 'Events' }).click();
   await expect(page).toHaveURL(/tab=events/);
   await expect(page.getByRole('grid', { name: 'AAPL events' }).getByText('Earnings')).toBeVisible();
-  await page.getByRole('button', { name: 'Remove MSFT from compare' }).click();
+  await open(page).getByRole('tab', { name: 'MSFT' }).focus();
+  await page.keyboard.press('Delete');
   await expect(page).toHaveURL(/sel=AAPL%2CNVDA|sel=AAPL,NVDA/);
   await page.reload();
-  await expect(page.getByRole('tab', { name: 'Events' })).toHaveAttribute('aria-selected', 'true');
-  await expect(summary(page)).toHaveText(/2 selected/);
-  await page.getByRole('tab', { name: 'Features' }).click();
+  await expect(open(page).getByRole('tab')).toHaveText(['AAPL', 'NVDA']);
+  await expect(view(page).getByRole('tab', { name: 'Events' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByLabel('Close NVDA').click({ force: true });
+  await expect(open(page).getByRole('tab')).toHaveText(['AAPL']);
+  await expect(page).toHaveURL(/sel=AAPL(&|$)/);
+  await view(page).getByRole('tab', { name: 'Features' }).click();
   await expect(page.getByRole('grid', { name: 'AAPL features' })).toBeVisible();
-  await page.getByRole('tab', { name: 'Screener hits' }).click();
+  expect(errors).toEqual([]);
+});
+
+test('a ticker Ideas opened shows why it is an idea, from the screener that surfaced it', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/explore?sel=AAPL&focus=AAPL&via=vrp_scanner');
+  const why = view(page).getByRole('tab', { name: 'Why it is an idea' });
+  await expect(why).toBeVisible();
+  await why.click();
+  const panel = page.getByRole('region', { name: 'Why it is an idea' });
+  await expect(panel).toContainText('Watch');
+  await expect(panel).toContainText('#3');
+  await expect(panel).toContainText('iv_hv_ratio 1.10 below 1.25');
+  await expect(panel.getByRole('button', { name: 'Open VRP scanner' })).toBeVisible();
+  await expectAccessible(page);
+  // Another tab of the ticker, then another ticker: the Why tab goes with the screener.
+  await page.goto('/explore?sel=AAPL');
+  await expect(view(page).getByRole('tab', { name: 'Why it is an idea' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'AAPL · overview' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('the screener hits tab lists the screeners that picked the ticker', async ({ page }) => {
+  await page.goto('/explore?sel=AAPL&tab=hits');
   const hits = page.getByRole('region', { name: 'Screener hits' });
   await expect(hits).toContainText('VRP scanner');
   await expect(hits).toContainText('Watch');
-  await page.goto('/explore?cols=feature.market_cap,instrument.sector&sort=-feature.market_cap');
-  await expect(tickers(page).getByRole('columnheader', { name: /Mkt cap/ })).toHaveAttribute(
-    'aria-sort',
-    'descending',
-  );
-  await expect(tickers(page).getByRole('columnheader', { name: /Sector/ })).toBeVisible();
-  await expect(tickers(page).getByRole('columnheader', { name: /IV30/ })).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
-
-test('ticking a row adds it to the compare set', async ({ page }) => {
-  await page.goto('/explore');
-  await expect(summary(page)).toHaveText('11,427 tickers · 0 selected');
-  await page.getByRole('searchbox', { name: 'Filter tickers' }).fill('AAPL');
-  await tickers(page).getByRole('checkbox', { name: 'Select AAPL', exact: true }).check();
-  await expect(page).toHaveURL(/sel=AAPL/);
-  await expect(page.getByRole('button', { name: 'Remove AAPL from compare' })).toBeVisible();
-});
-
-test('one server page per request: sort, search and paging', async ({ page }) => {
-  const errors = collectErrors(page);
-  const asked: Record<string, unknown>[] = [];
-  page.on('request', (request) => {
-    const body = request.postData();
-    if (request.url().endsWith('/api/graphql') && body?.includes('query FeatureTable')) {
-      asked.push((JSON.parse(body) as { variables: Record<string, unknown> }).variables);
-    }
-  });
-  await page.goto('/explore');
-  await expect(summary(page)).toHaveText('11,427 tickers · 0 selected');
-  await expect(page.getByText('Page 1 of 115')).toBeVisible();
-  expect(asked).toHaveLength(1); // the whole universe in one page request, not 12
-  expect(asked[0]).toMatchObject({ page: 1, size: 100, sort: null });
-  const grid = tickers(page);
-  const close = grid.getByRole('button', { name: 'Close', exact: true });
-  await close.click();
-  await expect(page).toHaveURL(
-    /sort=-rollup\.price_stats%40v2\.close|sort=-rollup\.price_stats@v2\.close/,
-  );
-  const header = page.getByRole('button', { name: 'Close', exact: true });
-  await expect(grid.getByRole('columnheader').filter({ has: header })).toHaveAttribute(
-    'aria-sort',
-    'descending',
-  );
-  expect(asked.at(-1)).toMatchObject({ sort: '-rollup.price_stats@v2.close', page: 1 });
-  await expect(grid.getByText('MSFT', { exact: true })).toBeVisible(); // $517.53 is the top
-  await page.getByRole('button', { name: 'Next page' }).click();
-  await expect(page.getByText('Page 2 of 115')).toBeVisible();
-  expect(asked.at(-1)).toMatchObject({ page: 2 });
-  await page.getByRole('searchbox', { name: 'Filter tickers' }).fill('NVDA');
-  await expect(summary(page)).toHaveText(/^1 ticker ·/);
-  expect(asked.at(-1)).toMatchObject({ q: 'NVDA', page: 1 });
-  await expect(grid.getByText('NVDA', { exact: true })).toBeVisible();
-  expect(errors).toEqual([]);
 });

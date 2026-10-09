@@ -5,6 +5,11 @@
  * `filter="none"`, fetch on `onInputChange`, and set `options` and `loading`. Keyboard per the
  * ARIA combobox pattern: ArrowDown / ArrowUp open and move, Enter selects, Escape closes, Tab
  * leaves; the active option is announced through aria-activedescendant.
+ *
+ * `search` turns it into a search box that adds things: it holds no selection (the input is
+ * the query and clears after a choice), shows a search icon and, with `focusKey`, the key that
+ * jumps to it from anywhere outside a text field ("/"). Choosing again an item already chosen
+ * still calls `onValueChange`, so a caller can re-open it. Built to be the app's palette box.
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 
@@ -12,6 +17,7 @@ import { Text } from '../../primitives/Text';
 import { useFieldControl } from '../Field';
 import { Icon } from '../Icon';
 import { Input } from '../Input';
+import { Kbd } from '../Kbd';
 import styles from './Combobox.module.css';
 
 export interface ComboboxOption {
@@ -60,6 +66,12 @@ export interface ComboboxProps {
   invalid?: boolean;
   disabled?: boolean;
   name?: string;
+  /** A search box that adds: no selection is kept, the list shows only once something is typed,
+   * and the input clears after a choice. */
+  search?: boolean;
+  /** With `search`: the key that focuses the box from anywhere outside a text field ("/"); shown
+   * as a hint at the end while the box is idle. */
+  focusKey?: string;
 }
 
 function matches(option: ComboboxOption, query: string): boolean {
@@ -90,6 +102,8 @@ export function Combobox({
   invalid = false,
   disabled = false,
   name,
+  search = false,
+  focusKey,
 }: ComboboxProps) {
   const field = useFieldControl();
   const baseId = useId();
@@ -101,10 +115,12 @@ export function Combobox({
   const [active, setActive] = useState(-1);
   const [known, setKnown] = useState<ComboboxOption | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const selected =
-    options.find((o) => o.value === selectedValue) ??
-    (known?.value === selectedValue ? known : null);
+  const selected = search
+    ? null
+    : (options.find((o) => o.value === selectedValue) ??
+      (known?.value === selectedValue ? known : null));
   const shown = useMemo(
     () =>
       byGroup(filter === 'contains' && query ? options.filter((o) => matches(o, query)) : options),
@@ -112,6 +128,27 @@ export function Combobox({
   );
   const enabled = shown.map((o, i) => (o.disabled ? -1 : i)).filter((i) => i >= 0);
   const optionId = (i: number) => `${baseId}opt${i}`;
+  const shownOpen = open && (!search || (query ?? '') !== '');
+
+  useEffect(() => {
+    if (!search || !focusKey) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable === true;
+      if (event.key !== focusKey || typing || event.metaKey || event.ctrlKey || event.altKey)
+        return;
+      event.preventDefault();
+      inputRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [search, focusKey]);
 
   useEffect(() => {
     if (open && active >= 0) {
@@ -133,8 +170,8 @@ export function Combobox({
   const choose = (option: ComboboxOption) => {
     if (option.disabled) return;
     setKnown(option);
-    if (value === undefined) setInternal(option.value);
-    if (option.value !== selectedValue) onValueChange?.(option.value, option);
+    if (value === undefined && !search) setInternal(option.value);
+    if (search || option.value !== selectedValue) onValueChange?.(option.value, option);
     close();
   };
   const step = (delta: 1 | -1) => {
@@ -152,6 +189,7 @@ export function Combobox({
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
+      if (search && (query ?? '') === '') return;
       if (!open) {
         const current = shown.findIndex((o) => o.value === selectedValue);
         openAt(
@@ -164,9 +202,10 @@ export function Combobox({
       event.preventDefault();
       const option = shown[active];
       if (option) choose(option);
-    } else if (event.key === 'Escape' && open) {
+    } else if (event.key === 'Escape' && (open || (search && query !== null))) {
       event.preventDefault();
       close();
+      if (search) event.currentTarget.blur();
     } else if (event.key === 'Tab') {
       close();
     }
@@ -222,10 +261,11 @@ export function Combobox({
       <Input
         role="combobox"
         aria-label={ariaLabel}
-        aria-expanded={open}
+        ref={inputRef}
+        aria-expanded={shownOpen}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
+        aria-activedescendant={shownOpen && active >= 0 ? optionId(active) : undefined}
         value={query ?? selected?.inputLabel ?? selected?.label ?? ''}
         onValueChange={(text) => {
           setQuery(text);
@@ -246,10 +286,15 @@ export function Combobox({
         disabled={disabled}
         autoComplete="off"
         spellCheck={false}
-        end={<Icon name={open ? 'chevron-up' : 'chevron-down'} />}
+        {...(search
+          ? {
+              start: <Icon name="search" />,
+              ...(focusKey && query === null ? { end: <Kbd keys={[focusKey]} size="xs" /> } : {}),
+            }
+          : { end: <Icon name={open ? 'chevron-up' : 'chevron-down'} /> })}
         {...(name ? { name } : {})}
       />
-      {open && (
+      {shownOpen && (
         <div className={styles.popover}>
           <div
             ref={listRef}

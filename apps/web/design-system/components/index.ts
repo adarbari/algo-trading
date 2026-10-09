@@ -172,6 +172,7 @@ export { Sparkline, type SparklineProps, type SparklineTone } from './Sparkline'
 export { StackedBar, type StackedBarProps, type StackedBarSegment } from './StackedBar';
 export { StatStrip, type StatItem, type StatStripProps } from './StatStrip';
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge';
+export { TabStrip, type TabStripItem, type TabStripProps } from './TabStrip';
 export {
   StatusStrip,
   type StatusIssue,

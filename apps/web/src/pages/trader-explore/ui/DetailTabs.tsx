@@ -1,10 +1,11 @@
 /**
- * The detail side of Explore (the compare bar is CompareBar): the detail tabs (Overview, Compare,
- * Chart, Options, Features, Events, Screener hits), each tab a widget for the compare set or
- * the focused ticker. Compare is the rebased chart over the compare set's features side by
- * side (the feature table for those tickers, sorted in the table).
+ * The detail of Explore, the page's hero: the tabs of the ticker in focus (Overview, Compare,
+ * Chart, Options, Features, Events, Screener hits, Why it is an idea), only the selected tab's
+ * widget mounted. Compare is the rebased chart over the open tickers with their features side by
+ * side (the feature table for those tickers, sorted in the table). A ticker named inside a panel
+ * (a holding, a peer, a row of the comparison) opens in a tab of its own.
  */
-import { EmptyState, Stack } from '@algotrade/ui';
+import { Stack } from '@algotrade/ui';
 
 import { ComparePanel } from '@/widgets/compare-panel';
 import { EventStudyPanel } from '@/widgets/event-study-panel';
@@ -15,44 +16,66 @@ import { HoldingsPanel } from '@/widgets/holdings-panel';
 import { OptionsPanel } from '@/widgets/options-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
-import { ScreenerHitsPanel } from '@/widgets/screener-hits-panel';
+import { ScreenerHitsPanel, WhyIdeaPanel } from '@/widgets/screener-hits-panel';
 
 import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch } from '@/entities/explore';
-import { exploreState, type SearchPatch } from '../model/state';
+import { exploreState, openTicker, type SearchPatch } from '../model/state';
 
 import { ExploreTabs } from './ExploreTabs';
 
 export interface DetailTabsProps {
+  /** The ticker in focus: the tabs are its own. */
+  symbol: string;
   search: ExploreSearch;
   onSearchChange: (patch: SearchPatch) => void;
-  /** Opens one screener's results (the Screener hits tab). */
+  /** Opens one screener's results (the Screener hits and Why tabs). */
   onOpenScreener: (screenerId: string) => void;
 }
 
-function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symbol: string }) {
-  const { tab, range } = exploreState(search);
-  switch (tab) {
-    case 'overview':
+function Content({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsProps) {
+  const state = exploreState(search);
+  const open = (other: string) => {
+    onSearchChange(openTicker(state, other));
+  };
+  switch (state.tab) {
+    case 'compare':
       return (
-        <OverviewPanel
-          symbol={symbol}
-          fund={
-            <HoldingsPanel
-              symbol={symbol}
-              onSelectSymbol={(holding) => {
-                onSearchChange({ focus: holding, expiry: undefined, feature: undefined });
-              }}
-            />
-          }
-        />
+        <Stack gap={4}>
+          <ComparePanel
+            symbols={state.open}
+            range={state.range}
+            onRangeChange={(range) => {
+              onSearchChange({ range });
+            }}
+          />
+          <FeatureTable
+            label="Side by side"
+            keys={state.open}
+            columns={state.dimensions}
+            onColumnsChange={(dims) => {
+              onSearchChange({ dims: joinList(dims, DEFAULT_DIMENSIONS) });
+            }}
+            pickerLabel="Dimension"
+            pickerIcon="plus"
+            sortMode="client"
+            emptyMessage="None of these tickers is in the reference snapshot."
+            onRowActivate={open}
+          />
+        </Stack>
       );
+    case 'hits':
+      return <ScreenerHitsPanel symbol={symbol} onOpenScreener={onOpenScreener} />;
+    case 'why':
+      return state.via ? (
+        <WhyIdeaPanel symbol={symbol} screenerId={state.via} onOpenScreener={onOpenScreener} />
+      ) : null;
     case 'chart':
       return (
         <PriceChartPanel
           symbol={symbol}
-          range={range}
-          onRangeChange={(r) => {
-            onSearchChange({ range: r });
+          range={state.range}
+          onRangeChange={(range) => {
+            onSearchChange({ range });
           }}
         />
       );
@@ -91,81 +114,25 @@ function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symb
     case 'events':
       return (
         <Stack gap={4}>
-          <EventStudyPanel
-            symbol={symbol}
-            onSelectSymbol={(focus) => {
-              onSearchChange({ focus, expiry: undefined, feature: undefined });
-            }}
-          />
+          <EventStudyPanel symbol={symbol} onSelectSymbol={open} />
           <EventsPanel symbol={symbol} />
         </Stack>
       );
     default:
-      return null;
+      return (
+        <OverviewPanel
+          symbol={symbol}
+          fund={<HoldingsPanel symbol={symbol} onSelectSymbol={open} />}
+        />
+      );
   }
 }
 
-export function DetailTabs({ search, onSearchChange, onOpenScreener }: DetailTabsProps) {
-  const state = exploreState(search);
-  const { selected, focused, tab } = state;
-  let content;
-  if (tab === 'compare') {
-    const chart = (
-      <ComparePanel
-        symbols={selected}
-        range={state.range}
-        onRangeChange={(range) => {
-          onSearchChange({ range });
-        }}
-      />
-    );
-    content =
-      selected.length === 0 ? (
-        chart
-      ) : (
-        <Stack gap={4}>
-          {chart}
-          <FeatureTable
-            label="Side by side"
-            keys={selected}
-            columns={state.dimensions}
-            onColumnsChange={(dims) => {
-              onSearchChange({ dims: joinList(dims, DEFAULT_DIMENSIONS) });
-            }}
-            pickerLabel="Dimension"
-            pickerIcon="plus"
-            sortMode="client"
-            emptyMessage="None of these tickers is in the reference snapshot."
-            onRowActivate={(focus) => {
-              onSearchChange({ focus, expiry: undefined, feature: undefined });
-            }}
-          />
-        </Stack>
-      );
-  } else if (tab === 'hits' && focused) {
-    content = <ScreenerHitsPanel symbol={focused} onOpenScreener={onOpenScreener} />;
-  } else if (!focused) {
-    content = (
-      <EmptyState
-        bordered
-        icon="search"
-        title="No ticker chosen"
-        description="Click a row in the table (or tick tickers to compare) to see its detail here."
-      />
-    );
-  } else {
-    content = (
-      <FocusedTab
-        search={search}
-        onSearchChange={onSearchChange}
-        onOpenScreener={onOpenScreener}
-        symbol={focused}
-      />
-    );
-  }
+export function DetailTabs(props: DetailTabsProps) {
+  const { open, tab, via } = exploreState(props.search);
   return (
-    <ExploreTabs tab={tab} selectedCount={selected.length} onSearchChange={onSearchChange}>
-      {content}
+    <ExploreTabs tab={tab} openCount={open.length} via={via} onSearchChange={props.onSearchChange}>
+      <Content {...props} />
     </ExploreTabs>
   );
 }

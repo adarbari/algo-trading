@@ -109,4 +109,58 @@ describe('Combobox', () => {
     expect(input).toHaveValue('Last close');
     expect(input.closest('[title]')).toHaveAttribute('title', 'rollup.price_stats@v2.close');
   });
+
+  describe('search', () => {
+    const PEOPLE = [
+      { value: 'NVDA', label: 'NVDA', description: 'NVIDIA Corp' },
+      { value: 'NVO', label: 'NVO', description: 'Novo Nordisk' },
+    ];
+
+    it('lists only once something is typed, adds on Enter and clears', async () => {
+      const onValueChange = vi.fn();
+      render(<Combobox search aria-label="Add" options={PEOPLE} onValueChange={onValueChange} />);
+      const input = screen.getByRole('combobox', { name: 'Add' });
+      await userEvent.click(input);
+      expect(screen.queryByRole('listbox')).toBeNull();
+      await userEvent.type(input, 'nv');
+      expect(screen.getAllByRole('option')).toHaveLength(2);
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+      expect(onValueChange).toHaveBeenCalledWith('NVO', PEOPLE[1]);
+      expect(input).toHaveValue('');
+      await userEvent.type(input, 'nv{ArrowDown}{Enter}');
+      expect(onValueChange).toHaveBeenLastCalledWith('NVDA', PEOPLE[0]);
+    });
+
+    it('Escape closes the list and leaves the box', async () => {
+      render(<Combobox search aria-label="Add" options={PEOPLE} />);
+      const input = screen.getByRole('combobox');
+      await userEvent.type(input, 'nv');
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(input).not.toHaveFocus();
+    });
+
+    it('focuses on its key from outside a text field, not from inside one', async () => {
+      render(
+        <>
+          <input aria-label="Other" />
+          <Combobox search focusKey="/" aria-label="Add" options={PEOPLE} />
+        </>,
+      );
+      const box = screen.getByRole('combobox', { name: 'Add' });
+      await userEvent.keyboard('/');
+      expect(box).toHaveFocus();
+      await userEvent.click(screen.getByLabelText('Other'));
+      await userEvent.keyboard('/');
+      expect(screen.getByLabelText('Other')).toHaveFocus();
+    });
+
+    it('has no accessibility violations, open', async () => {
+      const { container } = render(
+        <Combobox search focusKey="/" aria-label="Add" options={PEOPLE} />,
+      );
+      await userEvent.type(screen.getByRole('combobox'), 'nv');
+      await expectNoA11yViolations(container);
+    });
+  });
 });
