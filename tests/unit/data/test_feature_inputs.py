@@ -474,3 +474,13 @@ def test_bar_windows_hold_only_instruments_with_a_bar_in_the_chunk() -> None:
     both = inputs.load_input(reader, "bars/1d", days[5:], 0, windows=((days[0], days[-1]),))
     seen = both.at(days[-1], 0)
     assert seen is not None and set(seen["instrument_id"].astype(str)) == {"EQ:A", "EQ:GONE"}
+
+
+def test_first_stored_session_is_the_earliest_partition_or_none() -> None:
+    """When an input began: the earliest stored partition, whatever the write order, and None for
+    a table never stored. Catches: the latest (or the first written) partition read as the start,
+    which would let a 2026 snapshot pass as history."""
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(5)})
+    assert inputs.first_stored_session(reader, "bars/1d") == days[0]
+    assert inputs.first_stored_session(reader, "universe") is None

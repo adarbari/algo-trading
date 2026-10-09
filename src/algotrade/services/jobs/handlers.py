@@ -14,9 +14,11 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.winners import load_winners
 from algotrade.config.site.settings import load_sources
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.engines.screening.runner import RunCoverage
+from algotrade.features.site import site_features
 from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.harness import edge_universe, evaluate_edge
@@ -28,6 +30,8 @@ from algotrade.services.evaluation.cross_section.results import (
     survivorship,
     write_edge_eval,
 )
+from algotrade.services.evaluation.discovery.persist import write_winners_study
+from algotrade.services.evaluation.discovery.tells import discover
 from algotrade.services.evaluation.training.fit import fit_scorer
 from algotrade.services.evaluation.training.frame import training_frame
 from algotrade.services.evaluation.training.render import render_scorer
@@ -175,9 +179,20 @@ def edge_score_fit_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[st
     }
 
 
+def winners_study_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+    """No params: the study's settings are ``config/site/studies/winners.toml``. Reads every grid
+    session, finds the tells and persists the one run in ``results/winners_study`` (atomic). The
+    result is the run's summary (the gate, the blocks, the clusters), not its rows."""
+    configs = ctx.resources["configs"]
+    result = discover(ctx.resources["reader"], load_winners(configs), site_features(configs))
+    record = write_winners_study(ctx.resources["writer"], result, datetime.now(UTC))
+    return {"run_id": record.run_id, **record.stats}
+
+
 LIBRARY_HANDLERS: Mapping[str, JobKind] = {
     "backtest": JobKind(backtest_job, backtest_identity),
     "screen": JobKind(screen_job, screen_identity),
     "edge-eval": JobKind(edge_eval_job),
     "edge-score-fit": JobKind(edge_score_fit_job),
+    "winners-study": JobKind(winners_study_job),
 }

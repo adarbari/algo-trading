@@ -177,6 +177,7 @@ const whyColumn = (onOpenScreener: (screenerId: string) => void): DataTableColum
   width: 'xl',
   grow: true,
   sortable: false,
+  essential: true,
   cell: ({ row }) => (
     <Stack gap={0}>
       {row.best.reasons && (
@@ -184,22 +185,17 @@ const whyColumn = (onOpenScreener: (screenerId: string) => void): DataTableColum
           {row.best.reasons}
         </Text>
       )}
-      <Stack direction="row" gap={1} align="center">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            onOpenScreener(row.best.screenerId);
-          }}
-        >
-          {row.best.screenerName}
-        </Button>
-        {row.picks.length > 1 && (
-          <Text size="xs" tone="muted">
-            {`+${String(row.picks.length - 1)} more`}
-          </Text>
-        )}
-      </Stack>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          onOpenScreener(row.best.screenerId);
+        }}
+      >
+        {row.picks.length > 1
+          ? `${row.best.screenerName} +${String(row.picks.length - 1)} more`
+          : row.best.screenerName}
+      </Button>
     </Stack>
   ),
 });

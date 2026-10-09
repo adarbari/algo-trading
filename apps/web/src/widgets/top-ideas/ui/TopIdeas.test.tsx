@@ -199,11 +199,16 @@ describe('TopIdeas', () => {
       'title',
       'IV rank high, spread tight',
     );
-    expect(within(aapl).getByText('+1 more')).toBeInTheDocument();
+    expect(within(aapl).getByRole('button', { name: 'VRP scanner +1 more' })).toBeInTheDocument();
     expect(within(aapl).getByText('200.50')).toBeInTheDocument();
     expect(within(aapl).getByText('−1.2%')).toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
     expect(within(ko).queryByText(/more/)).not.toBeInTheDocument();
+  });
+
+  it('gives every row two lines, so the name under a ticker and the move under a price fit', () => {
+    const { grid } = setup();
+    expect(grid()).toHaveAttribute('data-lines', '2');
   });
 
   it('draws one labelled square per criterion of the best pick', () => {
@@ -234,7 +239,7 @@ describe('TopIdeas', () => {
   it("opens a screener's results from its name in a row", async () => {
     const { grid, onOpenScreener } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
-    await userEvent.click(within(aapl).getByRole('button', { name: 'VRP scanner' }));
+    await userEvent.click(within(aapl).getByRole('button', { name: 'VRP scanner +1 more' }));
     expect(onOpenScreener).toHaveBeenCalledWith('vrp');
   });
 

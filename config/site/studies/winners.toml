@@ -1,0 +1,40 @@
+# The ED6 winners study (ADR 0053 amendment 2026-10-09): what was true of the big winners
+# before they won. Typed by src/algotrade/config/edges/winners.py (WinnersStudySettings).
+# The outcomes task computes its horizon and benchmark in a backfill (horizons_and_benchmarks).
+
+[outcome]
+horizon_sessions = 504  # backfill-only (NIGHTLY_MAX_HORIZON)
+benchmark = "SPY"
+
+[grid]
+step_sessions = 63          # one grid session S every 63 sessions
+min_history_sessions = 252  # first S has this many sessions of bars
+frozen_from = 2026-04-01    # the grid closes before the purge cutoff (training/frame.py)
+max_missing_fraction = 0.02 # refuse S when more of its eligible names lack an outcome row
+
+[eligible]
+min_price = 5.0
+min_adv_usd_20d = 1000000.0
+
+[winner]
+top_fraction = 0.02  # top 2% of fwd_excess_return among the eligible
+
+[controls]
+per_winner = 5
+liquidity_quantiles = 5
+listing_age_edges_years = [2, 5]  # <2, 2-5, 5+ years from the listing start_date
+seed = 20261009
+
+[discovery]
+min_coverage = 0.80           # a feature counts at S only if covered in both groups
+max_coverage_gap = 0.10       # ... and the two coverages differ by less than this
+cluster_rank_corr = 0.7       # tells above this rank correlation form one cluster
+stable_blocks = 5             # sign stable in at least this many non-overlapping blocks
+block_sessions = 504
+split_date = 2018-01-01       # halves for the sign-stability check
+permutations = 200
+
+[gate]
+min_clusters = 5
+min_abs_hedges_g = 0.3
+null_percentile = 95

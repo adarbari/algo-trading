@@ -27,9 +27,11 @@ say how many are left.
 - **From the listings** (``--from-listings``): instead of the scope list, the names are the
   listings of the universe on any session of ``since..until`` (``data.listings.listings_over``,
   ADR 0018 amendment, edges ED6; not with ``--fill``; ``--symbols`` narrows them by ticker). A
-  listing is fetched by its ``permaTicker`` when it has one, else by its ticker; a listing whose
-  ticker another listing also used and that has no ``permaTicker`` is NEVER fetched (the
-  ticker's bars would be the other company's): item ``perma:<id>`` (``NO_PERMA``), counted in
+  listing is fetched by its ``permaTicker`` when it has one, else by its ticker. A reused ticker
+  without a ``permaTicker`` is fetched by ticker only when the listing is OPEN (the ticker URL
+  serves only the ticker's current owner; Tiingo's meta has no ETFs, so most current ETFs have
+  none); a DELISTED such listing is NEVER fetched (by ticker it would get the later owner's
+  bars): item ``perma:<id>`` (``NO_PERMA``), counted in
   ``stats["no_perma"]``. The request asks only for the listing's own dates and every row is
   clipped to ``start_date..end_date`` (``stats["clipped_rows"]``).
 - **Scope** is resolved once, by the owner, as of ``--until``'s session (ADR 0018): ids come
@@ -51,8 +53,11 @@ say how many are left.
   nightly ``bars`` task must fill from Massive (it skips stored dates), so Tiingo rows for it are
   counted (``no_partition_rows``) and not written.
 - **Split check**: the days Tiingo's ``splitFactor`` is not 1 are compared with ``events/split``
-  (``ratio`` = to / from) over the span of the fetched bars; each difference (a split on one
-  side only, or another ratio) is an item ``split:<id>`` (``SPLIT_MISMATCH: <n> ...``) and
+  (``ratio`` = to / from) over the span of the fetched bars. An ex-date with no stored split
+  becomes an ``events/split`` row (source ``tiingo``, ratio = factor as given), for ANY id
+  (Massive's history is shallow: AAPL 2014 and 2020 were missing); a stored row always wins and
+  is never shadowed, and the rows are published with the same run's bars (all or none). A date
+  both have with another ratio is an item ``split:<id>`` (``SPLIT_MISMATCH: <n> ...``) and
   counts in ``stats["split_mismatches"]``. Reported, never a failure and never a reason not
   to write: the bars are what the vendor sent.
 """
@@ -61,14 +66,13 @@ import math
 from collections import Counter
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from functools import partial
 from itertools import islice
 from typing import cast
 
 import pandas as pd
 
-from algotrade.core.model.instruments import is_perma_id
 from algotrade.data.events import read_events
 from algotrade.data.listings.universe import listings_over
 from algotrade.services.events.fill import FillCandidate, fill_order
@@ -103,6 +107,7 @@ SPLIT_MISMATCH = "SPLIT_MISMATCH"
 CHECKPOINT_EVERY = 5
 STOP_AFTER_FAILED = 3  # names Tiingo did not answer in a row (key, caps, outage): stop the run
 RATIO_TOLERANCE = 1e-3
+NEAR_DAYS = 5  # a stored split this close to Tiingo's ex-date is the same split, dated apart
 DETAIL_LIMIT = 20  # split mismatches listed in the run stats (every one is an item)
 HOURLY_FREE_PACE_S = 72.0
 
@@ -134,8 +139,9 @@ NO_PERMA = "NO_PERMA"
 def listing_names(
     listings: pd.DataFrame, requested: Collection[str] = ()
 ) -> tuple[list[Name], list[Name]]:
-    """-> (names to fetch, names never fetched): a listing of a reused ticker without a
-    ``permaTicker`` is the second kind. ``requested`` (tickers) narrows when not empty."""
+    """-> (names to fetch, names never fetched): a DELISTED listing of a reused ticker without a
+    ``permaTicker`` is the second kind (an open one is fetched by ticker: the ticker URL serves
+    its current owner). ``requested`` (tickers) narrows when not empty."""
     wanted = {r.strip().upper() for r in requested}
     fetch: list[Name] = []
     never: list[Name] = []
@@ -149,7 +155,7 @@ def listing_names(
             cast(date, row.start_date),
             None if pd.isna(row.end_date) else cast(date, row.end_date),
         )
-        (never if bool(row.reused) and not name.perma else fetch).append(name)
+        (never if bool(row.reused) and not name.perma and name.end else fetch).append(name)
     return fetch, never
 
 
@@ -179,7 +185,8 @@ def split_findings(
 ) -> list[str]:
     """Differences between the splits in Tiingo's ``actions`` (``ts``, ``split_factor``) and the
     stored ``events/split`` rows (``ts``, ``ratio``) of one instrument, over ``first..last`` (the
-    span of the fetched bars): one line per day with a split on one side only or two ratios."""
+    span of the fetched bars): one line per day where both sides have a split with two ratios (a
+    day only Tiingo has is written by ``tiingo_split_rows``, not a finding)."""
     ours = {
         pd.Timestamp(t).date(): float(f)
         for t, f in zip(tiingo["ts"], tiingo["split_factor"], strict=True)
@@ -194,12 +201,23 @@ def split_findings(
         }
     )
     found = []
-    for day in sorted(set(ours) | {d for d in theirs if first <= d <= last}):
-        a, b = ours.get(day), theirs.get(day)
-        if a is None or b is None or not math.isclose(a, b, rel_tol=RATIO_TOLERANCE):
-            ours_text, theirs_text = ("none" if v is None else f"{v:g}" for v in (a, b))
-            found.append(f"{day.isoformat()}: tiingo {ours_text} vs events/split {theirs_text}")
+    for day in sorted(set(ours) & {d for d in theirs if first <= d <= last}):
+        a, b = ours[day], theirs[day]
+        if not math.isclose(a, b, rel_tol=RATIO_TOLERANCE):
+            found.append(f"{day.isoformat()}: tiingo {a:g} vs events/split {b:g}")
+    for day in sorted(d for d in ours if first <= d <= last and d not in theirs):
+        if (near := _near_stored(day, theirs)) is not None:
+            found.append(
+                f"{day.isoformat()}: tiingo {ours[day]:g} not written, events/split has "
+                f"{theirs[near]:g} on {near.isoformat()}"
+            )
     return found
+
+
+def _near_stored(day: date, stored: dict[date, float]) -> date | None:
+    """The stored split date within ``NEAR_DAYS`` of ``day`` (the closest), else None."""
+    near = [d for d in stored if abs((d - day).days) <= NEAR_DAYS]
+    return min(near, key=lambda d: abs((d - day).days)) if near else None
 
 
 def tiingo_split_rows(
@@ -207,16 +225,22 @@ def tiingo_split_rows(
 ) -> pd.DataFrame:
     """The ``events/split`` rows (``ts``, ``split_from``, ``split_to``, ``ratio``) to write for
     one instrument from Tiingo's ``actions`` (``ts``, ``split_factor``) over ``first..last``:
-    only for an ``EQ:TIINGO:`` id (module docstring), and not for a day ``stored`` (the stored
-    ``events/split`` rows of the instrument) already has."""
+    for any id, but only when ``stored`` (the stored ``events/split`` rows of the instrument) has
+    none within ``NEAR_DAYS`` of the day: Massive's history is shallow and its rows win where they
+    exist, and two rows for one split a few days apart would be adjusted for twice
+    (``adjust_bars`` divides by each); ``split_findings`` reports those."""
     rows = []
-    if is_perma_id(instrument_id):
-        known = set() if stored.empty else {pd.Timestamp(t).date() for t in stored["ts"]}
-        for t, factor in zip(tiingo["ts"], tiingo["split_factor"], strict=True):
-            day = pd.Timestamp(t).date()
-            if factor != 1.0 and factor > 0 and first <= day <= last and day not in known:
-                rows.append({"ts": pd.Timestamp(day, tz="UTC"), "split_from": 1.0,
-                             "split_to": float(factor), "ratio": float(factor)})  # fmt: skip
+    known = {} if stored.empty else {pd.Timestamp(t).date(): 0.0 for t in stored["ts"]}
+    for t, factor in zip(tiingo["ts"], tiingo["split_factor"], strict=True):
+        day = pd.Timestamp(t).date()
+        if (
+            factor != 1.0
+            and factor > 0
+            and first <= day <= last
+            and _near_stored(day, known) is None
+        ):
+            rows.append({"ts": pd.Timestamp(day, tz="UTC"), "split_from": 1.0,
+                         "split_to": float(factor), "ratio": float(factor)})  # fmt: skip
     cols = ["ts", "split_from", "split_to", "ratio"]
     return pd.DataFrame(rows, columns=cols).assign(instrument_id=instrument_id)
 
@@ -253,11 +277,9 @@ def _fetch_name(
     run.stage_sessions(BARS, f"hist_{name.instrument_id}", frame, source.name)
     mine = stored_splits[stored_splits["instrument_id"] == name.instrument_id]
     actions = normalized.parsed["actions"]
-    if is_perma_id(name.instrument_id):  # no other source's splits: write ours
-        splits = tiingo_split_rows(name.instrument_id, actions, mine, days.min(), days.max())
-        if not splits.empty:
-            run.stage(SPLITS, f"split_{name.instrument_id}", splits, source.name)
-        return f"OK: {_window(since, until)}"
+    splits = tiingo_split_rows(name.instrument_id, actions, mine, days.min(), days.max())
+    if not splits.empty:  # only the ex-dates Massive's history lacks
+        run.stage(SPLITS, f"split_{name.instrument_id}", splits, source.name)
     found = split_findings(actions, mine, days.min(), days.max())
     if found:
         shown = "; ".join(found[:3]) + ("; ..." if len(found) > 3 else "")
@@ -318,7 +340,8 @@ def _fetch_pending(
     run: IngestRun, source: Source, todo: Sequence[Name], since: date, until: date
 ) -> None:
     ids = [n.instrument_id for n in todo]
-    stored = read_events(run.reader, SPLITS, since, until, ids).frame
+    pad = timedelta(days=NEAR_DAYS)  # a stored split dated a few days apart from Tiingo's
+    stored = read_events(run.reader, SPLITS, since - pad, until + pad, ids).frame
     failed_in_a_row = 0
     for i, name in enumerate(todo, 1):
         item = f"hist:{name.instrument_id}"
@@ -377,8 +400,8 @@ def ingest_bars_history(
             for name in never:
                 run.record_item(
                     f"perma:{name.instrument_id}",
-                    f"{NO_PERMA}: {name.symbol} was used by several listings and this one has "
-                    "no permaTicker",
+                    f"{NO_PERMA}: {name.symbol} was used by several listings and this delisted "
+                    "one has no permaTicker",
                 )
         else:
             scope = scoped_instruments(

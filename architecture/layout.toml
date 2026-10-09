@@ -64,7 +64,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges"
-purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, and the user's evaluation split (evaluation.py, ADR 0015 layering)"
+purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, and the user's evaluation split (evaluation.py, ADR 0015 layering), and the winners study's settings (winners.py, ADR 0053 amendment 2026-10-09)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
@@ -246,7 +246,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/quant"
-purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, edge statistics (lift, effect size, deciles, deflated Sharpe, PBO)"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, edge statistics (lift, effect size, deciles, deflated Sharpe, PBO), discovery statistics (sign stability, rank-correlation clusters, the permutation null)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -273,11 +273,15 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); learned edge scorers (training/)"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); learned edge scorers (training/); the winners study's discovery (discovery/)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
 purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), the report-containment diagnostic of an earnings_expected edge (report_containment.py) and its results/edge_eval rows and report"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/discovery"
+purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): the session grid and the eligible names at each (grid.py), the winners from a stored outcome (labels.py, with the harness and the training frame the only importer of outcomes), the matched controls (controls.py), the features of both read at the grid session only (frame.py), the effects, sign stability, tell clusters and the gate against the permutation null (tells.py), the probit proposer (proposer.py), the typed result (results.py), its results/winners_study rows and run record (persist.py, atomic, one run) and the candidate edge draft written to var/edge_drafts only from a run that passed the gate (drafts.py); pure over frames except the reads and the two writers"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/training"
@@ -862,6 +866,10 @@ purpose = "expression features of the market entity: regime.toml (the context si
 [[config_dir]]
 path = "config/site/edges"
 purpose = "edge documents, one <id>.toml per edge: thesis, mechanism, persistence, outcome, schedule, universe, the screeners that implement it, status and the quality-bar answers (typed by src/algotrade/config/edges; ADR 0053); rendered to docs/edges.md by make features-doc"
+
+[[config_dir]]
+path = "config/site/studies"
+purpose = "research-study settings, one <name>.toml per study: winners.toml, the ED6 winners study's outcome window, grid, winner and control definitions, discovery thresholds and gate (typed by src/algotrade/config/edges/winners.py; ADR 0053 amendment 2026-10-09)"
 
 [[config_dir]]
 path = "config/site/events"

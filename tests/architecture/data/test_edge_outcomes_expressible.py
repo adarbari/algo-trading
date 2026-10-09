@@ -2,8 +2,9 @@
 measure and drawdown fields are outcome fields, its horizons and benchmark are ones the outcomes
 task writes, the implied vol a ratio measure divides by is in the catalogue, and its schedule is
 one the harness runs (an event schedule with screeners only once its event field's group is in
-the catalogue). And among the services/evaluation modules only the harness and the training frame
-(learned scorers, ED7) read outcomes, so the picks cannot see one."""
+the catalogue). And among the services/evaluation modules only the harness, the training frame
+(learned scorers, ED7) and the winners study's labels (ED6) read outcomes, so the picks cannot see
+one."""
 
 import ast
 from datetime import date
@@ -32,6 +33,7 @@ STORE = FileConfigStore(REPO_ROOT / "config", local=False)
 EDGES = [e for e in load_edges(STORE) if e.status not in CLOSED]  # a closed edge is not scored
 HARNESS = "src/algotrade/services/evaluation/cross_section/harness.py"
 TRAINING = "src/algotrade/services/evaluation/training/frame.py"  # the one door for fit labels
+DISCOVERY = "src/algotrade/services/evaluation/discovery/labels.py"  # the winners of the ED6 study
 PROTECTED = "algotrade.data.outcomes"
 
 
@@ -124,7 +126,7 @@ def test_the_variants_horizons_and_benchmark_are_written_by_the_outcomes_task(ed
         assert v.outcome.benchmark in {*benchmarks, "none"}
 
 
-def test_only_the_harness_and_the_training_frame_read_outcomes_within_services_evaluation() -> None:
+def test_only_the_harness_the_training_frame_and_the_winners_labels_read_outcomes() -> None:
     offenders = []
     for path in sorted((REPO_ROOT / "src/algotrade/services/evaluation").rglob("*.py")):
         rel = path.relative_to(REPO_ROOT).as_posix()
@@ -136,11 +138,11 @@ def test_only_the_harness_and_the_training_frame_read_outcomes_within_services_e
                 [node.module or ""] if isinstance(node, ast.ImportFrom) else []
             )
         }  # fmt: skip
-        if rel not in (HARNESS, TRAINING) and any(
+        if rel not in (HARNESS, TRAINING, DISCOVERY) and any(
             n == PROTECTED or n.startswith(f"{PROTECTED}.") for n in names
         ):
             offenders.append(rel)
-    assert not offenders, f"only {HARNESS} and {TRAINING} may read outcomes: {offenders}"
+    assert not offenders, f"only {HARNESS}, {TRAINING}, {DISCOVERY} may read outcomes: {offenders}"
 
 
 # Owner decision 2026-10-08 (ADR 0053 amendment): fixed, never rolling.
