@@ -12,6 +12,8 @@ algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [-
                                     [--split-from D]
                                   [--report edges.md] [--baseline benchmarks/baseline.json
                                   [--update-baseline]]
+algotrade-backtest study-winners                           (the ED6 winners study, one run)
+algotrade-backtest draft-edges --run ID [--out-dir DIR]    (a candidate edge draft, if it passed)
 """
 
 import argparse
@@ -26,10 +28,12 @@ from algotrade_backtest.commands import (
     cmd_backtest,
     cmd_config,
     cmd_datasets,
+    cmd_draft_edges,
     cmd_evaluate,
     cmd_evaluate_edges,
     cmd_fit_edge_scorer,
     cmd_regime_scorecard,
+    cmd_study_winners,
 )
 
 DEFAULT_BASELINE = Path("benchmarks/baseline.json")
@@ -117,6 +121,12 @@ def build_parser() -> argparse.ArgumentParser:
     fs.add_argument("--from", dest="start", type=date.fromisoformat, help="first decision session")
     fs.add_argument("--until", type=date.fromisoformat, help="last decision session")
     fs.add_argument("--out", type=Path, help="the features file (default edge_scores.toml)")
+    sub.add_parser("study-winners", help="the ED6 winners study: find the tells, persist one run")
+    de = sub.add_parser(
+        "draft-edges", help="write the candidate edge draft of a winners study run that passed"
+    )
+    de.add_argument("--run", required=True, help="the run id printed by study-winners")
+    de.add_argument("--out-dir", type=Path, help="where the draft goes (default var/edge_drafts)")
     return parser
 
 
@@ -130,6 +140,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "regime-scorecard": cmd_regime_scorecard,
         "evaluate-edges": cmd_evaluate_edges,
         "fit-edge-scorer": cmd_fit_edge_scorer,
+        "study-winners": cmd_study_winners,
+        "draft-edges": cmd_draft_edges,
         "config": cmd_config,
     }
     try:

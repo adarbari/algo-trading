@@ -281,7 +281,7 @@ purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (s
 
 [[dir]]
 path = "src/algotrade/services/evaluation/discovery"
-purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): the session grid and the eligible names at each (grid.py), the winners from a stored outcome (labels.py, with the harness and the training frame the only importer of outcomes), the matched controls (controls.py), the features of both read at the grid session only (frame.py), the effects, sign stability, tell clusters and the gate against the permutation null (tells.py), the probit proposer (proposer.py) and the typed result (results.py); pure over frames except the reads"
+purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): the session grid and the eligible names at each (grid.py), the winners from a stored outcome (labels.py, with the harness and the training frame the only importer of outcomes), the matched controls (controls.py), the features of both read at the grid session only (frame.py), the effects, sign stability, tell clusters and the gate against the permutation null (tells.py), the probit proposer (proposer.py), the typed result (results.py), its results/winners_study rows and run record (persist.py, atomic, one run) and the candidate edge draft written to var/edge_drafts only from a run that passed the gate (drafts.py); pure over frames except the reads and the two writers"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/training"

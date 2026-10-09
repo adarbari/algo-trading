@@ -636,6 +636,28 @@ EDGE_EVAL = _fixed(
         "slice_value", "range_from", "split_from",
     ),
 )  # fmt: skip
+# The ED6 winners study's results (ADR 0053 amendment 2026-10-09): one run's rows, written by
+# ``services/evaluation/discovery/persist.py``. ``row_kind`` is ``block`` (a feature's mean effect
+# over the counted grid sessions of one block), ``tell`` (a feature pooled over the blocks: sign,
+# agreeing blocks, stable, qualifies, cluster), ``proposal`` (the probit proposer's rank, never a
+# verdict) or ``exclusion`` (a feature left out, with ``reason`` and the ``sessions`` it was left
+# out of). ``block`` is -1 on every row that is not a block's; ``cluster`` -1 when none. ``blocks``
+# is the count of blocks of the run: not independent sessions, neighbouring blocks' outcome windows
+# overlap. ``run_id`` is in the key, so every run keeps its own rows; a reader picks a run by
+# ``run_id``. Partition ``session_date`` is the run's last grid session.
+WINNERS_STUDY = _fixed(
+    "results/winners_study",
+    "results",
+    ("row_kind", "feature", "block"),
+    *_strings("row_kind", "feature", "reason", "proposed_by"),
+    "block int64!",
+    *(f"{n} int64" for n in ("sessions", "sign", "agreeing_blocks", "cluster", "rank", "rows",
+                             "blocks")),
+    *(f"{n} bool" for n in ("halves_agree", "stable", "qualifies", "converged", "passed")),
+    *_floats("mean_g", "coefficient", "gain"),
+    runs="merge",
+    key=("row_kind", "feature", "block", "run_id"),
+)  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -668,6 +690,7 @@ KNOWN: dict[str, TableSpec] = {
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
         EDGE_EVAL,
+        WINNERS_STUDY,
         LIVE_OPTION_QUOTES,
         USAGE_LLM_CALLS,
         ETF_HOLDINGS,
