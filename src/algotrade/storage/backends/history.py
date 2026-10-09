@@ -284,9 +284,11 @@ class HistoryCopy:
             ):
                 raise StaleSnapshotError(f"{table} {day}: a commit above {upto} is applied")
             data = resolve(day, upto)
-            if data is None or data.num_rows == 0:
+            if data is None:
                 continue
-            shapes[day.isoformat()] = _shape(data)
+            shapes[day.isoformat()] = _shape(data)  # an empty partition's columns count too
+            if data.num_rows == 0:
+                continue
             marked = data.append_column(DAY, pa.array([day] * data.num_rows, pa.date32()))
             parts.append(
                 marked.append_column(POS, pa.array(np.arange(data.num_rows, dtype=np.int32)))
