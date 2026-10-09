@@ -6,7 +6,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
-import { FAIL, mockAdminApi } from './admin-api';
+import { FAIL, mockAdminApi, mockNoGuideEntries } from './admin-api';
 import { mockViewer } from './auth-api';
 import { mockRegimeApi } from './regime-api';
 
@@ -21,6 +21,7 @@ for (const theme of ['dark', 'light'] as const) {
     const errors = collectErrors(page);
     await mockRegimeApi(page); // the top-bar chip reads the regime
     await mockViewer(page);
+    await mockNoGuideEntries(page);
     await mockAdminApi(page);
     await page.goto('/admin/llm-usage');
     await page.evaluate((t) => {
@@ -46,6 +47,7 @@ test('a call opens its detail and the choice is in the URL', async ({ page }) =>
   const errors = collectErrors(page);
   await mockRegimeApi(page);
   await mockViewer(page);
+  await mockNoGuideEntries(page);
   await mockAdminApi(page);
   await page.goto('/admin/llm-usage');
   await page.getByText('2026-10-08 13:00:00 UTC').click();
@@ -57,6 +59,7 @@ test('a call opens its detail and the choice is in the URL', async ({ page }) =>
 test('a failed read shows its error with a retry', async ({ page }) => {
   await mockRegimeApi(page);
   await mockViewer(page);
+  await mockNoGuideEntries(page);
   await mockAdminApi(page, { llmUsage: FAIL });
   await page.goto('/admin/llm-usage');
   await expect(page.getByText('Text-model usage could not load.').first()).toBeVisible();

@@ -58,6 +58,17 @@ column pruning, `ParquetFile` + filter) cannot remove the per-file cost.
   lock. Which tables and years are built is a configuration of that step: every market table in
   full, and the instrument tables the Explore charts read for the last two years (disk budget).
 
+- **The nightly step (`history-copy`).** A non-critical `NIGHTLY` step, last (after the screens,
+  descriptions and verify) and latest-session-only, `needs` bars, rollups and market-rollups, so
+  every publish of the copied tables has committed and no commit contends for the build's
+  fallback hold of the commit lock (13-48 s on the real store). Tables are site config
+  (`nightly.toml [history_copy]`): every table under `market_prefix` for all years, the listed
+  `instrument_tables` for the last `recent_years` calendar years. A table is skipped with a
+  WARN when free disk is below `free_disk_floor_gb` plus the table's current copy (a rebuilt year
+  exists twice), or when the instrument copies already hold `budget_gb` (a table not yet copied
+  is not started; a table is added to the list only after its size is measured). Reads need no
+  change: a skipped or failed night leaves a copy that reads detect as stale.
+
 ## Consequences
 - Measured on the real store (read-only; copy written to a temp directory): `market_trend@v2`,
   all 56 years: built in 48 s, 1.9 MB (partitions 123 MB), full-history read 1.4 s (39 s from

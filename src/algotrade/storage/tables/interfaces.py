@@ -99,6 +99,14 @@ class TableStore(Protocol):
         Not part of a run: ingestion calls it after its commits."""
         ...
 
+    def history_size(self, table: str) -> int:
+        """Bytes the table's history copy takes (0 when it has none)."""
+        ...
+
+    def free_bytes(self) -> int:
+        """Bytes free on the volume the store is on (the history build's disk floor)."""
+        ...
+
     def dates(self, table: str, own_run: str | None = None) -> list[date]: ...
 
     def names(self, own_run: str | None = None) -> list[str]:

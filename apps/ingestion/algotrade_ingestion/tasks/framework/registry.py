@@ -21,7 +21,7 @@ from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.derived import market_rollups, outcomes, rollups
+from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import index_membership, listing_history, winners_sample
@@ -425,6 +425,10 @@ def _gateway_down(ctx: TaskContext) -> str | None:
 
 def _quality(ctx: TaskContext, p: Params) -> RunRecord:
     return quality.run_quality(ctx, session_of(p))
+
+
+def _history_copy(ctx: TaskContext, p: Params) -> RunRecord:
+    return history_copy.build_copies(ctx, session_of(p))
 
 
 def _purge(ctx: TaskContext, p: Params) -> RunRecord:
@@ -868,6 +872,16 @@ TASKS: dict[str, Task] = {
             _quality,
             settings="sources.toml [quality]",
             params=(SESSION,),
+        ),
+        Task(
+            "history-copy",
+            "bring the derived history copies (read-optimised, one file per year) up to date",
+            history_copy,
+            (),  # derived files beside the tables, not a table (ADR 0060)
+            _history_copy,
+            settings="nightly.toml [history_copy]",
+            params=(SESSION,),
+            skip=history_copy.skip_reason,
         ),
         Task(
             "purge-raw",

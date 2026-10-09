@@ -26,6 +26,35 @@ def clock_time(table: Table, key: str, default: time) -> time:
 
 
 @dataclass(frozen=True)
+class HistoryCopySettings:
+    """``[history_copy]``: which tables the nightly's ``history-copy`` step keeps a history
+    copy of (ADR 0060) and the disk it may use."""
+
+    enabled: bool = True
+    market_prefix: str = ""  # every table under it, all years (nightly.toml names it; "": none)
+    instrument_tables: tuple[str, ...] = ()  # the Explore charts' tables, the last years only
+    recent_years: int = 2  # calendar years (the session's and the ones before) kept for those
+    budget_gb: float = (
+        2.0  # the instrument tables' copies together; one that would not fit is skipped
+    )
+    free_disk_floor_gb: float = (
+        10.0  # no build below this much free disk (a rebuilt year exists twice)
+    )
+
+    @classmethod
+    def from_table(cls, section: Table) -> "HistoryCopySettings":
+        d = cls()
+        return cls(
+            enabled=section.boolean("enabled", d.enabled),
+            market_prefix=section.text("market_prefix", d.market_prefix),
+            instrument_tables=section.strings("instrument_tables", d.instrument_tables),
+            recent_years=section.integer("recent_years", d.recent_years, 1),
+            budget_gb=section.number("budget_gb", d.budget_gb, 0),
+            free_disk_floor_gb=section.number("free_disk_floor_gb", d.free_disk_floor_gb, 0),
+        )
+
+
+@dataclass(frozen=True)
 class NightlySettings:
     """``config/site/nightly.toml``: sessions, catch-up, the duration alert, notification."""
 
@@ -45,6 +74,7 @@ class NightlySettings:
     step_deadlines: Mapping[str, time] = field(default_factory=dict)
     # [steps.<name>] settle_minutes: wait this long after the close before fetching (0: no wait)
     step_settle_minutes: Mapping[str, int] = field(default_factory=dict)
+    history_copy: HistoryCopySettings = field(default_factory=HistoryCopySettings)
 
     def deadline_for(self, step: str) -> time:
         return self.step_deadlines.get(step, self.data_deadline)
@@ -58,7 +88,7 @@ class NightlySettings:
     ) -> "NightlySettings":
         d = cls()
         root = Table(doc, where)
-        root.only(["sessions", "alerts", "notify", "schedule", "steps"])
+        root.only(["sessions", "alerts", "notify", "schedule", "steps", "history_copy"])
         schedule = root.table("schedule", ["data_deadline"])
         declared = root.raw("steps") or {}
         steps_table = root.table("steps", list(declared))
@@ -67,7 +97,17 @@ class NightlySettings:
         alerts = root.table("alerts", ["max_duration_minutes"])
         notify = root.table("notify", ["enabled", "desktop", "summary_path", "email"])
         email = notify.table("email", ["enabled", "smtp_host", "smtp_port", "max_examples"])
+        history_copy = HistoryCopySettings.from_table(
+            root.table(
+                "history_copy",
+                [
+                    *("enabled", "market_prefix", "instrument_tables", "recent_years"),
+                    *("budget_gb", "free_disk_floor_gb"),
+                ],
+            )
+        )
         return cls(
+            history_copy=history_copy,
             settle_minutes=sessions.integer("settle_minutes", d.settle_minutes, 0),
             max_catch_up=sessions.integer("max_catch_up", d.max_catch_up, 1),
             max_duration_minutes=alerts.number("max_duration_minutes", d.max_duration_minutes, 0),

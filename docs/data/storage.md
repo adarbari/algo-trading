@@ -90,7 +90,7 @@ no `own_run` and every requested day's partition index (`_runs.json`) still has 
 `(inode, mtime, size)` signature the manifest recorded at the build; anything else (a restated,
 new or purged partition) reads the partitions, with the same frame. An all-instrument read of
 under 180 days does too. One-session reads (ADR 0036) never use it; the memory backend has none.
-Deleting `_history/` loses nothing.
+Deleting `_history/` loses nothing. The nightly's `history-copy` step builds the copies (`nightly.toml [history_copy]`: market tables in full, the listed instrument tables for the last two years, within a disk budget and above a free-disk floor).
 
 ### Retention
 

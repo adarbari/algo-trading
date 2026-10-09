@@ -42,6 +42,7 @@ from algotrade.config.site.settings import NightlySettings, SourcesSettings, loa
 from algotrade.core.time.calendar import close_time, last_closed_session, local_deadline
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
+from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
 from algotrade_ingestion.tasks.framework.run import (
@@ -212,6 +213,20 @@ NIGHTLY: tuple[Step, ...] = (
     # Read-only live verification vs IBKR (ADR 0026): SKIPPED with a WARN when [ibkr] is
     # disabled or IB Gateway is not reachable; optional.
     Step("verify", latest_only=True, critical=False, accept=(check_verification,)),
+    # The derived history copies (ADR 0060), last: every step that publishes the copied tables
+    # (bars, the rollups, the market rollups) has committed and the screens' jobs are done, so
+    # ingestion commits no more. The API can still commit (screener runs, ADR 0033; edge
+    # evaluations, ADR 0059): the build refuses half-applied commits, and its fallback may hold
+    # the commit lock up to ~48 s. Latest session only (a catch-up
+    # night would rebuild the same year per session). Optional: a missed night leaves the old
+    # copy, which reads detect as stale and replace by the partitions.
+    Step(
+        "history-copy",
+        needs=("bars", "rollups", "market-rollups"),
+        latest_only=True,
+        critical=False,
+        accept_stats=(check_history_copy,),
+    ),
 )
 FINALLY: tuple[Step, ...] = (Step(PURGE, critical=False),)  # once, after every session
 

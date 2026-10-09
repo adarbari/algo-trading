@@ -263,6 +263,14 @@ class LocalTables:
 
         return self.history.build(table, years, self.dates(table), resolved)
 
+    def history_size(self, table: str) -> int:
+        """Bytes of the table's history copy (``history.py``)."""
+        return self.history.size(table)
+
+    def free_bytes(self) -> int:
+        """Bytes free on the volume the store is on (a build checks it before writing)."""
+        return self.history.free_bytes()
+
     def _own_partitions(self, own_run: str | None) -> set[tuple[str, date]]:
         if own_run is None:
             return set()

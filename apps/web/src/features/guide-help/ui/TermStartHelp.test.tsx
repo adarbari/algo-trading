@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql, TestQueryProvider } from '@/shared/api';
-import { expectNoA11yViolations } from '@/shared/lib/testing';
+import { expectNoA11yViolations, servedEntries } from '@/shared/lib/testing';
 
 import { GuideHelpProvider } from '../model/navigation';
 import { GuideHelp, type GuideHelpProps } from './GuideHelp';
@@ -69,7 +69,7 @@ beforeEach(() => {
 
 describe('GuideHelp for a glossary term', () => {
   beforeEach(() => {
-    GQL.mockResolvedValue(TERM);
+    GQL.mockResolvedValue(servedEntries(TERM));
   });
 
   it('opens the term: its one-sentence definition and its body, with the hover being the short line', async () => {
@@ -84,7 +84,7 @@ describe('GuideHelp for a glossary term', () => {
     expect(within(drawer).getByText('No run exists for the session being read.')).toBeVisible();
     expect(within(drawer).getByText(/has no hits, not zero hits/)).toBeVisible();
     await expectNoA11yViolations(container);
-    expect(GQL.mock.calls[0]?.[1]).toEqual({ id: 'not_run' });
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ refs: [{ kind: 'TERM', id: 'not_run' }] });
   });
 
   it('opens the full glossary page through the app navigation', async () => {
@@ -95,7 +95,7 @@ describe('GuideHelp for a glossary term', () => {
   });
 
   it('says so when the Guide has no such term', async () => {
-    GQL.mockResolvedValue({ guideTerm: null });
+    GQL.mockResolvedValue(servedEntries({ guideTerm: null }));
     setup({ kind: 'term', id: 'nope' });
     await userEvent.click(await screen.findByRole('button', { name: /^What is/ }));
     expect(await screen.findByText(/no entry for this term yet/)).toBeVisible();
@@ -104,7 +104,7 @@ describe('GuideHelp for a glossary term', () => {
 
 describe('GuideHelp for a Start here page', () => {
   beforeEach(() => {
-    GQL.mockResolvedValue(START);
+    GQL.mockResolvedValue(servedEntries(START));
   });
 
   it('opens the summary and the first section only', async () => {

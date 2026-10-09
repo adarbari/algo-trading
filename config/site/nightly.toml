@@ -26,3 +26,15 @@ enabled = true                   # needs ALGOTRADE_NOTIFY_EMAIL_TO / ALGOTRADE_S
 smtp_host = "smtp.gmail.com"     # SMTP server (STARTTLS on 587; 465 uses implicit TLS)
 smtp_port = 587
 max_examples = 5                 # examples listed per failure group
+
+[history_copy]                   # the history-copy step (ADR 0060): a read-optimised copy of long reads
+enabled = true                   # false: the nightly skips the step (the copies already built still serve)
+market_prefix = "rollups/market/"   # every table under it is copied, all years (a few MB each)
+instrument_tables = [            # the tables Explore charts read, copied for the last `recent_years` years
+    "bars/1d",                   # measured 2025-2026: 176 MB
+    "rollups/instrument/price_stats@v2",   # measured 2025-2026: 280 MB
+]
+recent_years = 2                 # calendar years kept: the session's and the one before
+budget_gb = 2.0                  # the instrument tables' copies together; the step skips (WARN) a table
+                                 # whose copy would not fit. Add a table only after measuring its size
+free_disk_floor_gb = 10.0        # no build when the disk has less free (WARN): a rebuilt year exists twice
