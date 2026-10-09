@@ -18,13 +18,12 @@ Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`) 
 main checkout is busy; never `--no-verify` / `SKIP=`. In any worktree (yours under
 `.claude/worktrees/` too) never run `uv sync`, `uv run` or `make install`: `.venv` is the
 main checkout's, and syncing it points the owner's nightly and API at your branch. Run code
-through `source worktree.env` (its `PYTHONPATH`; link `.venv` to the main checkout's first if
-your worktree has none); a dependency change is `uv lock` plus the PR, installed in the main
+through `source worktree.env` (its `PYTHONPATH`; `scripts/worktree.sh` already links `.venv`); a dependency change is `uv lock` plus the PR, installed in the main
 checkout after merge. A worktree not made by `scripts/worktree.sh` (an agent worktree under
-`.claude/worktrees/`) has neither: `ln -s <main>/.venv .venv` (stop and report if that is
-denied), then write `worktree.env` yourself with
-`PYTHONPATH=<wt>/src:<wt>/libs/sources:<wt>/apps/ingestion:<wt>/apps/api:<wt>/apps/backtest`
-(absolute `<wt>`). Where the shell refuses `export` / `source`, prefix each command that runs
+`.claude/worktrees/`) has neither `.venv` nor `worktree.env`, and the auto-mode classifier
+refuses an agent's own `ln -s <main>/.venv .venv` (2026-10-09). Owner decision 2026-10-09: an
+agent that needs the hooks gets a worktree made by `scripts/worktree.sh` from the orchestrator;
+stop and report instead of linking it yourself. Where the shell refuses `export` / `source`, prefix each command that runs
 Python with it instead: `env PYTHONPATH=... make check ...`, `env PYTHONPATH=... git commit`
 (the hooks run Python). Check with `python -c "import algotrade; print(algotrade.__file__)"`
 that it imports this worktree's code, not main's. On the shared machine run

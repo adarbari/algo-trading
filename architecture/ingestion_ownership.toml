@@ -9,6 +9,13 @@
 scope = ["apps/ingestion/"]
 
 [[responsibility]]
+id = "bad-bar-detection"
+description = "Decide which stored daily bars cannot be right (a close below the floor, high / low / close out of order, an unexplained jump cutting a series, the trusted segment being the one with the most Massive bars) and write them to events/bar_flag with a reason; raw bars are never edited (ADR 0061)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/bar_quality.py"]
+section = "docs/adr/0061-bad-bar-flags.md#decision"
+detect = [{ call = "bad_bars" }]
+
+[[responsibility]]
 id = "coverage-acceptance"
 description = "Per key feature and tier, the share of the instruments it applies to (Feature.applies_to) that have a value for the session, graded against [quality.coverage.*] (minimum per tier, day-over-day drop, WARN or FAIL): the acceptance check of the rollups step and a quality check (ADR 0043)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"]

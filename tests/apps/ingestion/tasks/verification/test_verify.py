@@ -10,11 +10,12 @@ import pytest
 
 from algotrade.config.site.settings import VerificationSettings
 from algotrade.data import StoreReader
+from algotrade.data.prices import raw_bars
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.derived.rollups import compute_rollups
-from algotrade_ingestion.tasks.verification.verify import TABLE, verify
+from algotrade_ingestion.tasks.verification.verify import TABLE, load_ours, verify
 from algotrade_ingestion.workflows.nightly.steps import StepStatus, from_record
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
@@ -30,7 +31,7 @@ from tests.helpers.rollup_store import (
     write_curve,
     write_dividends,
 )
-from tests.helpers.stored_frames import write_reference
+from tests.helpers.stored_frames import stamped, write_reference
 
 NEAR, FAR = date(2026, 10, 16), date(2026, 11, 20)
 SETTINGS = VerificationSettings(core_symbols=("A",), rotating=0, option_symbols=("A",))
@@ -173,3 +174,13 @@ def test_needs_a_session_source() -> None:
     ctx = task_ctx(writer, reader, sources={"ibkr": "not a source"})  # type: ignore[dict-item]
     with pytest.raises(TypeError, match="SessionSource"):
         verify(ctx, END, settings=SETTINGS)
+
+
+def test_a_flagged_bar_is_left_out_of_the_comparison_not_the_whole_sample() -> None:
+    writer, reader, _ = market()
+    stored = raw_bars(reader, "1d", END, END, ["EQ:A"])
+    flag = [{"instrument_id": "EQ:A", "ts": stored["ts"].iloc[0], "reason": "BAD_OHLC",
+             "detail": "d", "status": "FLAGGED"}]  # fmt: skip
+    writer.write_table("events/bar_flag", END, "flag", stamped(flag, END, "flag"))
+    ours = load_ours(reader, END, ["EQ:A"], 20)
+    assert "EQ:A" in ours.bars and END not in set(ours.bars["EQ:A"]["date"])

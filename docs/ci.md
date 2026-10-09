@@ -194,6 +194,9 @@ fails a route budget that rose against `origin/main`'s file without a new entry 
 a shared budget (where `origin/main` is not fetched the comparison is skipped and review of the JSON is the
 check); both gates print the reason of a raised budget once a route is within 5 % of it.
 
+CI measures after merging `main`, so set a route budget from CI's numbers, not the laptop's. An entry
+budget is never raised: lazy-load the code instead of raising a budget.
+
 Otherwise budgets only shrink. The `update` commands write the measured value + 1 % headroom (CI measures a few hundred
 bytes more than a laptop: gzip and build variance), rounded up (bytes to the next 100 B, requests and DOM
 nodes to the next integer, at least +1), and never a value above the current budget: new =
@@ -202,6 +205,12 @@ min(current, measured with headroom). The check itself passes when measured <= b
 raise one); a new page needs its first budget the same way. Raising a route budget is a hand edit of the
 JSON with a `reasons` entry, as above. A heavy new dependency belongs behind a
 dynamic import (as the chart engine is), not in the entry.
+
+## Watching CI from an orchestrating session
+
+Never poll CI in the conversation. Run a token-free background watcher script that exits only on news
+(a check failed, or all green) and send each failure back to the agent that built the PR, which has
+the context. The 2-agents cap can be lifted by the owner explicitly for one work item.
 
 ## Flaky specs
 

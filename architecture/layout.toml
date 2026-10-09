@@ -641,7 +641,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/maintenance"
-purpose = "maintenance tasks: quality checks, raw purge, id migration, golden load"
+purpose = "maintenance tasks: quality checks, bad-bar flags, raw purge, id migration, golden load"
 kind = "task-domain"
 
 [[dir]]
