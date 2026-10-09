@@ -310,8 +310,20 @@ def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | Non
 
 
 def stored_dates(ctx: Stores, table: str) -> tuple[date, ...]:
-    """Every date ``table`` has a partition for, oldest first (an inventory, not a pick)."""
-    return tuple(ctx.reader.dates(table))
+    """Every date ``table`` has a partition for, oldest first (an inventory, not a pick).
+    Kept until the next publish, as the resolved session is: listing stats every partition
+    directory of the table (the ingestion grid's 47 tables: 73 000 of them, 5.6 s). One cache
+    entry holds every table's listing, so the grid does not evict the pages' entries."""
+    if ctx.reader.own_run is not None:  # its pending writes add dates without a publish
+        return tuple(ctx.reader.dates(table))
+    key = ("stored-dates", ctx.reader.visible_seq())  # read before listing (ADR 0022)
+    listed: dict[str, tuple[date, ...]] | None = ctx.cache.get(key)
+    if listed is None:
+        listed = {}
+        ctx.cache.put(key, listed)
+    if table not in listed:
+        listed[table] = tuple(ctx.reader.dates(table))
+    return listed[table]
 
 
 def partition_on(ctx: Stores, table: str, day: date) -> pd.DataFrame | None:
