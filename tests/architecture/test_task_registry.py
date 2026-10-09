@@ -32,6 +32,8 @@ FACTS_OF_RECORD_REASONS = {
     "events/dividend": "applied to bars at read time (ADR 0016), as events/split",
     "events/reference_change": "the diff of two reference snapshots: a fact of record of the "
     "listing, read by event date",
+    "events/bar_flag": "bars the quality check rejects are dropped at read time (ADR 0061), "
+    "like a split applied to them: a retroactive fact about the stored bar",
     "events/index_change": "the diff of two reference snapshots (S&P 500 membership), as "
     "events/reference_change",
 }

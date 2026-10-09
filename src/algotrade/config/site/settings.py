@@ -231,6 +231,10 @@ class SourcesSettings:
     max_type_disagreement: float = 0.10  # reference_classification (ADR 0045)
     max_name_over_vendor: float = 0.02
     max_bar_unresolved: float = 0.01
+    min_bar_close: float = 0.01  # bar-quality (ADR 0061): a close below this is flagged
+    max_bar_jump: float = 10.0  # a one-day close ratio above this (either way) is a jump
+    split_window_sessions: int = 5  # a jump within this many bars of a split event is explained
+    max_bad_bar_share: float = 0.02  # bar-quality: FAIL if over 2% of the bars are flagged
     max_chain_fetch_failures: float = 0.02
     max_chain_stale_share: float = 0.20  # the "rest" tier
     max_chain_stale_share_core: float = 0.02  # core tier (tasks/market/tiers.py)
@@ -280,6 +284,7 @@ class SourcesSettings:
                 "max_type_disagreement",
                 "max_name_over_vendor",
                 "max_bar_unresolved",
+                *("min_bar_close", "max_bar_jump", "split_window_sessions", "max_bad_bar_share"),
                 "max_chain_fetch_failures",
                 *("max_chain_stale_share", "max_chain_stale_share_core"),
                 "max_chain_stale_sessions",
@@ -357,6 +362,12 @@ class SourcesSettings:
                 "max_type_disagreement", d.max_type_disagreement
             ),
             max_bar_unresolved=quality.fraction("max_bar_unresolved", d.max_bar_unresolved),
+            min_bar_close=quality.number("min_bar_close", d.min_bar_close, 0),
+            max_bar_jump=quality.number("max_bar_jump", d.max_bar_jump, 1),
+            split_window_sessions=quality.integer(
+                "split_window_sessions", d.split_window_sessions, 0
+            ),
+            max_bad_bar_share=quality.fraction("max_bad_bar_share", d.max_bad_bar_share),
             max_chain_fetch_failures=quality.fraction(
                 "max_chain_fetch_failures", d.max_chain_fetch_failures
             ),

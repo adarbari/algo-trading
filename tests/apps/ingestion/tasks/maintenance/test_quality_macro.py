@@ -1,11 +1,18 @@
 """The macro step's acceptance (``check_macro``): FAIL when over ``max_macro_stale_share`` of
 the enabled series have no observation newer than cadence + lag + 2 days, WARN on any fewer,
-FAIL when a series holds fewer vintages than an earlier macro run recorded."""
+FAIL when a series holds fewer vintages than an earlier macro run recorded.
+
+The ``macro-calendar`` step's acceptance (``check_macro_calendar``): FAIL naming the FRED
+releases with fewer scheduled dates after the session than ``[quality] min_calendar_future_dates``,
+a release the latest run skipped is not graded, nothing without FRED releases."""
 
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
+import pandas as pd
 import pytest
 
+from algotrade.config.site.events.releases import FOLDER, NAME, MacroReleases
 from algotrade.config.site.macro import MacroSettings
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
@@ -13,7 +20,21 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus, start_run
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.maintenance.quality import check_macro, macro_checks
+from algotrade_ingestion.tasks.framework.run import TaskContext
+from algotrade_ingestion.tasks.macro.calendar import TABLE, ingest_macro_calendar, release_rows
+from algotrade_ingestion.tasks.maintenance.quality import (
+    check_macro,
+    check_macro_calendar,
+    macro_checks,
+)
+from tests.apps.ingestion.tasks.macro.test_calendar import (
+    CPI,
+    FOMC,
+    Feed,
+    context,
+    entry,
+    rule,
+)
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped
 
@@ -179,3 +200,99 @@ def test_when_every_series_was_skipped_the_check_warns_instead_of_failing() -> N
     status, detail = by_name(checks)["macro_fresh"]
     assert status == "WARN" and "no macro series was fetchable" in detail and "2 skipped" in detail
     assert by_name(checks)["macro_vintages"][0] == "PASS"
+
+
+CAL_SESSION = date(2026, 10, 6)
+CAL_DOCUMENT: dict[str, Any] = {
+    "release": [
+        entry("CPI"),
+        entry("FOMC", release_id=101, time_et="14:00"),
+        rule("ISM_MFG", 1),
+    ]
+}
+
+
+def with_configs(ctx: TaskContext, document: dict[str, Any] | None = CAL_DOCUMENT) -> TaskContext:
+    ctx.configs = MemoryConfigStore({("site", FOLDER, NAME): document} if document else {})
+    return ctx
+
+
+def calendar_store(days: dict[str, list[date]]) -> TaskContext:
+    """A context over a store holding the given dates of each release, stored on CAL_SESSION."""
+    ctx = with_configs(task_ctx(StoreWriter(MemoryBackend())))
+    specs = {"CPI": CPI, "FOMC": FOMC}
+    for run, (key, dates) in enumerate(days.items()):
+        rows = release_rows(specs[key], dates, CAL_SESSION)
+        rows = rows.assign(
+            session_date=CAL_SESSION,
+            knowledge_ts=rows["ts"].iloc[0],
+            source="fred",
+            run_id=f"r{run}",
+        )
+        ctx.writer.write_table(TABLE, CAL_SESSION, f"r{run}", rows)
+    return ctx
+
+
+def test_every_fred_release_listing_a_future_date_passes() -> None:
+    ctx = calendar_store(
+        {"CPI": [date(2026, 10, 14)], "FOMC": [date(2026, 10, 28), date(2026, 12, 9)]}
+    )
+    [check] = check_macro_calendar(ctx, CAL_SESSION)
+    assert check.name == "macro_calendar_future" and check.status == "PASS"
+    assert "2 FRED releases" in check.detail
+
+
+def test_a_release_with_only_past_dates_fails_by_name() -> None:
+    ctx = calendar_store({"CPI": [date(2026, 9, 11)], "FOMC": [date(2026, 10, 28)]})
+    [check] = check_macro_calendar(ctx, CAL_SESSION)
+    assert check.status == "FAIL" and "CPI" in check.detail and "FOMC" not in check.detail
+
+
+def test_a_release_never_stored_fails() -> None:
+    [check] = check_macro_calendar(calendar_store({"FOMC": [date(2026, 10, 28)]}), CAL_SESSION)
+    assert check.status == "FAIL" and "CPI" in check.detail
+
+
+def test_the_threshold_is_the_setting() -> None:
+    ctx = calendar_store({"CPI": [date(2026, 10, 14)], "FOMC": [date(2026, 10, 28)]})
+    assert check_macro_calendar(ctx, CAL_SESSION)[0].status == "PASS"  # one date each: the default
+    ctx.settings = SourcesSettings(min_calendar_future_dates=2)
+    assert "CPI, FOMC" in check_macro_calendar(ctx, CAL_SESSION)[0].detail
+
+
+def test_a_date_stored_after_the_session_is_not_known_by_it() -> None:
+    ctx = calendar_store({"CPI": [date(2026, 10, 14)], "FOMC": [date(2026, 10, 28)]})
+    [check] = check_macro_calendar(ctx, date(2026, 10, 5))  # both rows were stored on 10-06
+    assert check.status == "FAIL"
+
+
+def test_releases_the_latest_run_skipped_are_not_graded() -> None:
+    registry = {"release": [entry("CPI"), entry("FOMC", release_id=101), rule("ISM_MFG", 1)]}
+    ctx = with_configs(context(Feed(), fred=False), registry)
+    ingest_macro_calendar(
+        ctx, MacroReleases.from_document(registry), CAL_SESSION
+    )  # no key: all skipped
+    [check] = check_macro_calendar(ctx, CAL_SESSION)
+    assert check.status == "WARN" and "no FRED release was fetchable" in check.detail
+
+
+def test_nothing_to_grade_without_configs_or_fred_releases() -> None:
+    assert check_macro_calendar(task_ctx(StoreWriter(MemoryBackend())), CAL_SESSION) == []
+    only_rules = {"release": [CAL_DOCUMENT["release"][2]]}
+    assert check_macro_calendar(with_configs(calendar_store({}), only_rules), CAL_SESSION) == []
+    assert check_macro_calendar(with_configs(calendar_store({}), None), CAL_SESSION) == []
+
+
+def test_a_moved_date_does_not_count_as_a_scheduled_one() -> None:
+    ctx = calendar_store({"CPI": [date(2026, 10, 14)], "FOMC": [date(2026, 10, 28)]})
+    rows = release_rows(CPI, [date(2026, 10, 14)], CAL_SESSION).assign(
+        status="moved", known_from=CAL_SESSION, session_date=CAL_SESSION, source="fred", run_id="r9"
+    )
+    ctx.writer.write_table(
+        TABLE,
+        CAL_SESSION,
+        "r9",
+        rows.assign(knowledge_ts=rows["ts"].iloc[0] + pd.Timedelta(days=1)),
+    )
+    [check] = check_macro_calendar(ctx, CAL_SESSION)
+    assert check.status == "FAIL" and "CPI" in check.detail  # its only future date moved
