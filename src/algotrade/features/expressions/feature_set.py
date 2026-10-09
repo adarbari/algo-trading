@@ -17,6 +17,9 @@ computing every other one (virtual) in dependency order; ``stored_columns(names)
 group columns that needs, so a reader loads nothing else. ``moved_field`` maps a field of a
 superseded group (``rollup.price_stats@v1.pct_from_high_52w``) to where it lives now.
 
+``coverage(fields, missing)`` says which missing tables stop a screen from being complete
+(ADR 0055, "coverage of coalescing expressions").
+
 ``with_user(definitions)`` is a user's catalogue (ADR 0023 step 4): this set plus the user's
 expression features (``scope == "user"``), checked on top of the site's (never materialised).
 """
@@ -40,6 +43,7 @@ from algotrade.features.expressions.evaluator import (
 )
 from algotrade.features.expressions.frame import join
 from algotrade.features.expressions.functions import Type
+from algotrade.features.expressions.nodes import Call, Node, Ref
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, Superseded
 from algotrade.features.framework.feature import Feature, StatusRule
@@ -133,6 +137,69 @@ class FeatureSet:
     def optional_tables(self) -> frozenset[str]:
         """The stored tables of the optional groups (``FeatureGroup.optional``, ADR 0055)."""
         return frozenset(g.table for g in self.code.values() if g.optional)
+
+    def coverage(
+        self, fields: Sequence[str], missing: Sequence[str]
+    ) -> tuple[list[str], list[str]]:
+        """``missing`` tables -> (blocking, tolerated) for a screen reading ``fields`` (ADR 0055).
+        A field is *covered* when it can have a value from stored data: a stored field when its
+        table has rows or its group is optional; a materialised expression when its own table
+        has rows; a virtual one when all its operands are covered, except ``coalesce(...)``
+        (covered when one leg that reads tables has all of them present; a literal leg never
+        counts) and ``exists(g)`` (always). A missing table that keeps a field uncovered is
+        blocking; one read only by covered fields is tolerated; one no field explains stays
+        blocking. ``fields``: ``rollup.<group>.<col>``, ``feature.<name>`` (others read no
+        stored table)."""
+        gone = set(missing)
+        culprits: set[str] = set()
+        touched: set[str] = set()
+        for field in fields:
+            tables, uncovered = self._field_coverage(field, gone)
+            touched |= tables & gone
+            culprits |= uncovered
+        blocking = [t for t in missing if t in culprits or t not in touched]
+        return blocking, [t for t in missing if t not in blocking]
+
+    def _field_coverage(self, field: str, gone: set[str]) -> tuple[set[str], set[str]]:
+        """-> (the stored tables the field reads, the missing ones that leave it uncovered)."""
+        if field.startswith("feature."):
+            return self._expression_coverage(field.removeprefix("feature."), gone)
+        if field.startswith("rollup."):
+            group = self.code.get(field.removeprefix("rollup.").rpartition(".")[0])
+            if group is not None:
+                return {group.table}, ({group.table} & gone if not group.optional else set())
+        return set(), set()
+
+    def _expression_coverage(self, name: str, gone: set[str]) -> tuple[set[str], set[str]]:
+        e = self.expressions[name]
+        if e.materialise:
+            table = self.table(name)
+            return {table}, {table} & gone
+        return self._node_coverage(e.node, gone)
+
+    def _ref_coverage(self, name: str, gone: set[str]) -> tuple[set[str], set[str]]:
+        group, _, column = name.partition(".")
+        if column and group in self._by_name:
+            g = self._by_name[group]
+            return {g.table}, ({g.table} & gone if not g.optional else set())
+        if name in self.expressions:
+            return self._expression_coverage(name, gone)
+        if column:
+            raise ConfigurationError(f"coverage: unknown field {name!r}")
+        return set(), set()  # a bound parameter
+
+    def _node_coverage(self, node: Node, gone: set[str]) -> tuple[set[str], set[str]]:
+        if isinstance(node, Ref):
+            return self._ref_coverage(node.name, gone)
+        if isinstance(node, Call) and node.func == "exists":
+            return set(), set()
+        parts = [self._node_coverage(c, gone) for c in _children(node)]
+        read: set[str] = set().union(*(t for t, _ in parts))
+        if isinstance(node, Call) and node.func == "coalesce":
+            if any(t and not t & gone for t, _ in parts):
+                return read, set()
+            return read, read & gone
+        return read, set().union(*(u for _, u in parts))
 
     def applicability(self, name: str) -> tuple[frozenset[str], tuple[StatusRule, ...]]:
         """What a value's absence may be put down to (ADRs 0042, 0046), inherited by an
@@ -284,6 +351,15 @@ class FeatureSet:
             partial(_compute_materialised, self, e.name),
             entity=e.feature.entity,
         )
+
+
+def _children(node: Node) -> list[Node]:
+    """The direct operands of a node."""
+    if isinstance(node, Call):
+        return list(node.args)
+    if isinstance(node, Ref) or not hasattr(node, "pos"):
+        return []
+    return [c for c in (getattr(node, k, None) for k in ("operand", "left", "right")) if c]
 
 
 def _compute_materialised(

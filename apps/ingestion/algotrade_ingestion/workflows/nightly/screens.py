@@ -4,9 +4,11 @@ Screens run through the job runner (``services/jobs``), never inline (ADR 0019, 
 screener (every site preset as ``site``, then each user's finalised ones) becomes a ``screen``
 job for its owner; exports are that job's output. The step SUCCEEDS when every job is
 COMPLETE (each screener reached its coverage threshold, ADR 0039), else it FAILS naming the
-screeners that did not. A screener that ran without an optional source's table
-(``missing_optional_tables``, e.g. ``ibkr_iv@v1`` with IB Gateway down) is a WARN check on
-the step, never its failure (ADR 0055).
+screeners that did not. A screener that ran without a table none of its fields
+needed (``missing_optional_tables``: an optional source's, e.g. ``ibkr_iv@v1`` with IB Gateway
+down, or a required one whose coalesce fallback is present, e.g. ``iv30@v1`` before it was
+stored) is a WARN check on the step, never its failure (ADR 0055, coverage of coalescing
+expressions).
 """
 
 from collections.abc import Callable
