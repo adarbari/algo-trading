@@ -213,7 +213,7 @@ Source: `design-system/components/Banner`
 
 ### BarList
 
-BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the bar (long labels, narrow panels). Bars are decorative: each row reads as "label value".
+BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the bar (long labels, narrow panels). `diverging` takes signed values: bars grow right of a zero axis when positive and left when negative (a return by decile), scaled to the largest magnitude. Bars are decorative: each row reads as "label value".
 
 Source: `design-system/components/BarList`
 
@@ -224,7 +224,8 @@ Source: `design-system/components/BarList`
 | `max` | `number` | no | The value of a full-length bar (default: the largest value). A funnel passes its universe. |
 | `format` | `ValueFormat` | no | Format of the values (default grouped number). |
 | `layout` | `'inline' \| 'stacked'` | no | `inline` (label \| bar \| value) or `stacked` (label above bar, value at the end). |
-| `tone` | `DataTone` | no | Bar colour for every row (default `accent`). |
+| `tone` | `DataTone` | no | Bar colour for every row (default `accent`; a `diverging` list's rows are positive or negative). |
+| `diverging` | `boolean` | no | Signed values around a zero axis, scaled to the largest magnitude (`max`: the magnitude of a full half). |
 | `loading` | `boolean` | no |  |
 | `error` | `ReactNode` | no | Replaces the rows with this message. |
 | `emptyMessage` | `ReactNode` | no |  |

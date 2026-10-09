@@ -3,7 +3,7 @@ and slice with the independent sessions beside the numbers; a missing number rea
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
-from algotrade.services.evaluation.cross_section.report import render_edge_report
+from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     historical_identity,

@@ -457,8 +457,9 @@ not read what it needed. Not enough data: too few out-of-sample trades, or a fig
 not measured. Not working: the out-of-sample win rate is not above the base rate, or the top
 vs bottom decile, the deflated Sharpe ratio or the overfitting chance is poor, or it does not
 beat the plain baselines. Promising: it passes all of those with enough out-of-sample trades. Works: more
-trades, stricter thresholds and a win over the best of many random-pick backtests, which are not
-measured yet, so no edge can read Works for now. The reason line names the first test it fails;
+trades, stricter thresholds and an out-of-sample lift above nearly all of 1,000 backtests of
+random picks (95% by default; see Robustness). A result with no random-pick backtests stops at
+Promising. The reason line names the first test it fails;
 the details list every test with its value and its threshold.
 """
 see_also = ["win_rate", "trades", "out_of_sample", "official_result"]
@@ -535,9 +536,11 @@ On each test session every eligible name is ranked by the edge's own score (for 
 group minus the bottom group. A positive spread says the ranking itself carries information,
 beyond the few names a screen picks. Sessions where too few names have a score are left out of
 the deciles and counted. Its t statistic says how far the spread is from luck: 2 or more is
-promising, 3 or more strong.
+promising, 3 or more strong. The bars show the average outcome of each group on the in-sample
+period, best-ranked first: a ranking that works falls from left to right, one that does not
+is flat or jagged. A bar is missing where the run stored none, never drawn as zero.
 """
-see_also = ["trades", "base_rate"]
+see_also = ["trades", "base_rate", "robustness"]
 
 [[term]]
 id = "out_of_sample"
@@ -586,6 +589,19 @@ in one half of history fails in the other. A result shown without its count of v
 is not comparable.
 """
 see_also = ["out_of_sample", "trades"]
+
+[[term]]
+id = "robustness"
+term = "Robustness"
+short = "How the out-of-sample lift compares with backtests of random picks: the chance it is luck."
+body = """
+On each out-of-sample session the screen was measured, the harness draws as many names at random
+as the screen held (1,000 times, the same draws on every run of the same data) and measures each draw like the screen's
+picks. The histogram is those random lifts; the marker is the edge's. Beating 95% of the draws
+is what Works asks for. The count of variants tried is beside it because trying more versions
+makes the best one look better than it is.
+"""
+see_also = ["lift", "variants_tried", "verdict", "out_of_sample"]
 
 [[term]]
 id = "harness_exclusions"

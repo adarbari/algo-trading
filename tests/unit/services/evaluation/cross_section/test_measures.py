@@ -99,9 +99,22 @@ def test_counts_of_excluded_and_delisted_picks_and_survivorship_sessions_add_up(
 
 
 def test_deciles_need_ten_names_and_split_best_first() -> None:
-    assert decile_means([0.1] * 9) is None
-    top, spread = decile_means([float(v) for v in range(20, 0, -1)])  # 20 names, 2 per decile
-    assert top == pytest.approx(19.5) and spread == pytest.approx(19.5 - 1.5)
+    assert decile_means([0.1] * 9) == ()
+    means = decile_means([float(v) for v in range(20, 0, -1)])  # 20 names, 2 per decile
+    assert means == pytest.approx([19.5 - 2 * i for i in range(10)])
+    assert means[0] == pytest.approx(19.5) and means[0] - means[-1] == pytest.approx(19.5 - 1.5)
+
+
+def test_slice_decile_means_average_the_sessions_that_had_deciles_and_are_empty_otherwise() -> None:
+    first = stat(date(2026, 1, 5), (0.01,), (0.0,), 1, deciles=tuple(float(i) for i in range(10)))
+    second = stat(
+        date(2026, 1, 6), (0.01,), (0.0,), 1, deciles=tuple(float(i) for i in range(10, 20))
+    )
+    bare = stat(date(2026, 1, 7), (0.01,), (0.0,), 1)  # too few scored names: no deciles
+    (m,) = slice_measures([first, second, bare], [ALL])
+    assert m.decile_means == pytest.approx([5.0 + i for i in range(10)])
+    (none,) = slice_measures([bare], [ALL])
+    assert none.decile_means == ()  # not measured: never ten zeros
 
 
 def test_a_model_screener_slice_is_in_sample_when_it_keeps_a_session_before_frozen_from() -> None:
