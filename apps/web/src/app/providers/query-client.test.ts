@@ -40,10 +40,8 @@ describe('shouldRetry', () => {
     const busy = new ApiError(503, 'busy', 2);
     expect(shouldRetry(4, busy)).toBe(true);
     expect(shouldRetry(5, busy)).toBe(false);
-    expect(retryDelay(0, busy)).toBeGreaterThanOrEqual(2000);
-    expect(retryDelay(0, busy)).toBeLessThan(2600);
+    expect(retryDelay(0, busy)).toBe(2000);
     expect(retryDelay(3, busy)).toBeGreaterThan(retryDelay(0, busy));
-    expect(retryDelay(20, busy)).toBeLessThanOrEqual(15_000);
   });
 });
 

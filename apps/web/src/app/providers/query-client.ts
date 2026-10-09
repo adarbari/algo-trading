@@ -10,17 +10,12 @@ const REQUEST_CODES = new Set(['BAD_REQUEST', 'NOT_FOUND', 'UNKNOWN_FEATURE']);
 /** A 503 is the API shedding load, not a failure: retried quietly this many times, each after
  * the `Retry-After` it sent (or a growing backoff), before it shows as an error. */
 const BUSY_RETRIES = 5;
-const MAX_WAIT_MS = 15_000;
 
-/** The wait before retry number `failureCount`: the server's `Retry-After` for a 503, growing,
- * plus a jitter so a page's reads do not all return in the same tick; the library's backoff
- * otherwise. */
+/** The wait before retry number `failureCount`: for a 503 the server's `Retry-After`, growing
+ * with each try; one second for the other failures (they are retried once). */
 export function retryDelay(failureCount: number, error: unknown): number {
-  if (error instanceof ApiError && error.status === 503) {
-    const asked = (error.retryAfterS ?? 1) * 1000 * (1 + failureCount / 2);
-    return Math.min(MAX_WAIT_MS, asked + Math.random() * 500);
-  }
-  return Math.min(1000 * 2 ** failureCount, 30_000);
+  if (!(error instanceof ApiError && error.status === 503)) return 1000;
+  return (error.retryAfterS ?? 1) * 1000 * (1 + failureCount / 2);
 }
 
 /** Retry a failed read once, but only when it may be transient: a 4xx answer (nothing stored,
