@@ -28,6 +28,7 @@ from algotrade_ingestion.tasks.listings import index_membership, listing_history
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
 from algotrade_ingestion.tasks.macro import series as macro_series
 from algotrade_ingestion.tasks.maintenance import (
+    bar_quality,
     golden,
     migrate_ids,
     purge,
@@ -425,6 +426,16 @@ def _gateway_down(ctx: TaskContext) -> str | None:
 
 def _quality(ctx: TaskContext, p: Params) -> RunRecord:
     return quality.run_quality(ctx, session_of(p))
+
+
+def _bar_quality(ctx: TaskContext, p: Params) -> RunRecord:
+    start = p.get("start")
+    if start is None:
+        raise ValueError("bar-quality needs --from (the first session to read)")
+    ids = _symbols(p, "only")
+    return bar_quality.run_bar_quality(
+        ctx, session_of(p), start, p.get("end"), list(ids) if ids else None
+    )
 
 
 def _history_copy(ctx: TaskContext, p: Params) -> RunRecord:
@@ -872,6 +883,22 @@ TASKS: dict[str, Task] = {
             _quality,
             settings="sources.toml [quality]",
             params=(SESSION,),
+        ),
+        Task(
+            "bar-quality",
+            "flag stored daily bars that cannot be right (a close below the floor, bad OHLC, an "
+            "unexplained jump) in events/bar_flag; reads are the stored bars of --from..--to",
+            bar_quality,
+            ("events/bar_flag",),
+            _bar_quality,
+            settings="sources.toml [quality] min_bar_close, max_bar_jump, split_window_sessions, "
+            "max_bad_bar_share",
+            params=(
+                SESSION,
+                FROM,
+                TO,
+                Param("only", ("--only",), str, "instrument ids (comma separated)"),
+            ),
         ),
         Task(
             "history-copy",
