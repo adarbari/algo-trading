@@ -11,13 +11,13 @@
       "src/pages/login/index.ts": 1800,
       "src/pages/screener-builder/index.ts": 69700,
       "src/pages/screener-results/index.ts": 69300,
-      "src/pages/trader-calendar/index.ts": 12600,
+      "src/pages/trader-calendar/index.ts": 12800,
       "src/pages/trader-edges/index.ts": 37900,
       "src/pages/trader-explore/index.ts": 61100,
       "src/pages/trader-explore/ui/OtherTabs.tsx": 93400,
       "src/pages/trader-ideas/index.ts": 40900,
       "src/pages/trader-regime/index.ts": 57700,
-      "src/pages/trader-screeners/index.ts": 16500
+      "src/pages/trader-screeners/index.ts": 16600
     }
   },
   "e2e": {
@@ -53,8 +53,9 @@
     }
   },
   "reasons": {
+    "bundle.routes.src/pages/trader-calendar/index.ts": "2026-10-09 #440 the page chunk starts its reads and the saved page cache when loaded (hover preload); the entry chunk stays under budget",
     "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
-    "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
+    "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #440 the page chunk starts its read and the saved page cache when loaded (hover preload)",
     "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
     "e2e./screeners/vrp_scanner.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
     "e2e./explore?focus=AAPL&tab=chart.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",

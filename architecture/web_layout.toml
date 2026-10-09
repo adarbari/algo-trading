@@ -233,11 +233,6 @@ path = "apps/web/src/shared/api/generated/graphql"
 purpose = "the GraphQL client preset output: typed documents and the graphql() tag, from apps/api/schema.graphql (codegen.ts, npm run api:generate)"
 
 [[web_dir]]
-path = "apps/web/src/shared/page-cache"
-purpose = "the page cache kept between visits (IndexedDB, 10 MB cap, busted by the session date) and the warm-up a trader page's chunk runs; loaded lazily, never in the entry chunk"
-kind = "slice"
-
-[[web_dir]]
 path = "apps/web/src/shared/config"
 purpose = "build-time configuration (Vite env); the one place app code reads env"
 kind = "slice"

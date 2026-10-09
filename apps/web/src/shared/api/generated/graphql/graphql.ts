@@ -454,11 +454,6 @@ export type StatusScreensQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type StatusScreensQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }> };
 
-export type SessionDateQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type SessionDateQuery = { session: { date: string } | null };
-
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -491,6 +486,11 @@ export type TableViewQueryVariables = Exact<{
 
 
 export type TableViewQuery = { view: { scope: string, name: string | null, saved: boolean, columns: Array<string>, narrowColumns: Array<string>, sort: string | null, decisions: Array<string>, names: Array<string> } | null };
+
+export type SessionDateQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SessionDateQuery = { session: { date: string } | null };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -2591,13 +2591,6 @@ export const StatusScreensDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<StatusScreensQuery, StatusScreensQueryVariables>;
-export const SessionDateDocument = new TypedDocumentString(`
-    query SessionDate {
-  session {
-    date
-  }
-}
-    `) as unknown as TypedDocumentString<SessionDateQuery, SessionDateQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {
@@ -2693,3 +2686,10 @@ export const TableViewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<TableViewQuery, TableViewQueryVariables>;
+export const SessionDateDocument = new TypedDocumentString(`
+    query SessionDate {
+  session {
+    date
+  }
+}
+    `) as unknown as TypedDocumentString<SessionDateQuery, SessionDateQueryVariables>;

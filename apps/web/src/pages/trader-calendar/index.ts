@@ -1,12 +1,14 @@
+/** Page: Trader > Calendar (the next 90 days of events across names). */
 import { prefetchCalendar } from '@/entities/event';
 import { prefetchScreeners } from '@/entities/screen';
-import { warmPage } from '@/shared/page-cache';
+import { active } from '@/shared/api';
 
-/** Page: Trader > Calendar (the next 90 days of events across names). */
 export { CalendarPage } from './ui/CalendarPage';
 
-// This chunk loads when the page's link is hovered: start its reads then.
-warmPage((client) => {
+// This chunk loads when the page's link is hovered: start the read, and the saved page cache.
+const { client } = active;
+if (client) {
   prefetchCalendar(client);
   prefetchScreeners(client);
-});
+  void import('@/entities/page-cache').then((m) => m.startQueryPersistence(client));
+}

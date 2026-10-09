@@ -12,7 +12,7 @@ import { createStore, del, get, set } from 'idb-keyval';
 
 import { queryKeys } from '@/shared/api';
 
-import { fitToCap, isPersistableKey, type StoredQuery } from './persist-cap';
+import { fitToCap, isPersistableKey, type StoredQuery } from '../model/persist-cap';
 import { fetchSessionDate } from './session-date';
 
 /** Where the record lives (one key, one value: a JSON text, so its size is measured exactly). */

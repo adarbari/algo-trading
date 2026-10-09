@@ -1,5 +1,5 @@
 /** Entity: ideas (one row per ticker with every screener that picked it) and the screeners. */
-export { IDEAS_LIMIT, IDEAS_OPERATION, prefetchIdeas, useIdeas } from './api/hooks';
+export { IDEAS_LIMIT, IDEAS_OPERATION, useIdeas } from './api/hooks';
 export { IDEA_FACTS, IDEA_FEATURES } from './model/facts';
 export {
   earningsBeforeExpiry,
