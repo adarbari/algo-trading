@@ -4,7 +4,7 @@
  * figures, the criteria and the year rows), how it is defined, its sources, and every run the
  * user sees so exploratory ones can be listed and labelled. The cache holds the response.
  */
-import { useQuery, type QueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -86,11 +86,18 @@ const EdgesPage = graphql(`
 
 /** Every edge the user sees (empty: none declared). */
 export function useEdges() {
-  return useQuery({
+  return useQuery({ ...edgesQuery(), select: (data) => data.edges });
+}
+
+const edgesQuery = () =>
+  queryOptions({
     queryKey: queryKeys.gql('EdgesPage', {}),
     queryFn: () => gql(EdgesPage, {}),
-    select: (data) => data.edges,
   });
+
+/** Start reading the edges before the page opens (a link was hovered): a no-op while fresh. */
+export function prefetchEdges(client: QueryClient): void {
+  void client.query(edgesQuery()).catch(() => undefined);
 }
 
 /** Read the edges (and their runs) again, after an evaluation finished. */
