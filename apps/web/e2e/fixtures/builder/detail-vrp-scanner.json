@@ -17,17 +17,20 @@
     "id": "vrp_scanner",
     "kind": "screener",
     "impl": "rules",
-    "criteria": {
-      "iv_hv_ratio": {
-        "field": "feature.iv_hv_ratio",
-        "op": "gte",
-        "value": 1.25,
-        "mode": "soft"
-      }
-    },
     "selection": {
       "name": "liquid_optionable",
       "where": {}
+    },
+    "rules": {
+      "version": 1,
+      "criteria": {
+        "iv_hv_ratio": {
+          "field": "feature.iv_hv_ratio",
+          "op": "gte",
+          "value": 1.25,
+          "mode": "soft"
+        }
+      }
     }
   },
   "error": null,

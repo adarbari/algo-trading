@@ -18,7 +18,11 @@ export function useCriterionLines(screenerId: string): {
   const detail = useScreener(screenerId);
   const features = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
   const lines = useMemo(
-    () => criterionLines(criteriaOf(resolvedRules(detail.data?.resolved), { id: screenerId }), features),
+    () =>
+      criterionLines(
+        criteriaOf(resolvedRules(detail.data?.resolved), { id: screenerId }),
+        features,
+      ),
     [detail.data, screenerId, features],
   );
   return { lines, isPending: detail.isPending };
