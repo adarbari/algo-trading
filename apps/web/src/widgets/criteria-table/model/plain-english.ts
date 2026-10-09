@@ -2,9 +2,15 @@
  * The screen read back as a sentence ("In plain English"): the criteria that must hold, the ones
  * that tolerate a near miss, and the ones that only raise the score. Pure.
  */
-import { featureLabel, type CatalogueFeature } from '@/entities/feature';
+import {
+  featureLabel,
+  operatorSymbol,
+  scaleOf,
+  shapeOf,
+  toTyped,
+  type CatalogueFeature,
+} from '@/entities/feature';
 import type { Criterion } from '@/entities/screen';
-import { operatorSymbol, scaleOf, shapeOf, toTyped } from '@/features/screener-builder';
 
 /** 50_000_000 -> `50M`, 1_500_000_000 -> `1.5B`. */
 function compact(n: number): string {

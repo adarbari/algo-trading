@@ -3,7 +3,7 @@
  * a decision's words and badge tone, and the tint behind a criterion's cell (a near miss or a
  * miss; the cell's text still says which).
  */
-import type { DataTableFill } from '@algotrade/ui';
+import type { DataTableFill, StatusTone } from '@algotrade/ui';
 
 /** "EVENT_RISK" -> "Event risk". */
 export function decisionLabel(decision: string): string {
@@ -30,3 +30,26 @@ export const OUTCOME_FILL: Readonly<Record<string, DataTableFill>> = {
   FAIL: 'negative',
   MISSING: 'negative',
 };
+
+const OUTCOME_TONE: Readonly<Record<string, StatusTone>> = {
+  PASS: 'positive',
+  NEAR: 'warning',
+  FAIL: 'negative',
+  MISSING: 'negative',
+};
+const OUTCOME_WORDS: Readonly<Record<string, string>> = {
+  PASS: 'Passed',
+  NEAR: 'Near miss',
+  FAIL: 'Missed',
+  MISSING: 'No value',
+};
+
+/** The badge tone of a criterion outcome (PASS / NEAR / FAIL / MISSING). */
+export function outcomeTone(outcome: string): StatusTone {
+  return OUTCOME_TONE[outcome] ?? 'neutral';
+}
+
+/** The badge words of a criterion outcome. */
+export function outcomeLabel(outcome: string): string {
+  return OUTCOME_WORDS[outcome] ?? outcome;
+}

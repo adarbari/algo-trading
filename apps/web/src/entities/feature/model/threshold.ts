@@ -3,7 +3,7 @@
  * allows, the shape of the threshold (none, one value, a range, a list), and how a stored
  * value reads in the field's unit (a fraction is typed as a percent). Pure.
  */
-import { featureFormat, isNumericFeature, type CatalogueFeature } from '@/entities/feature';
+import { featureFormat, isNumericFeature, type CatalogueFeature } from './catalogue';
 
 export type FieldKind = 'number' | 'bool' | 'text' | 'date';
 export type ThresholdShape = 'none' | 'single' | 'range' | 'list';

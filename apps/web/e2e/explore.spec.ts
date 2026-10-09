@@ -165,7 +165,7 @@ test('a ticker Ideas opened shows why it is an idea, from the screener that surf
   const panel = page.getByRole('region', { name: 'Why it is an idea' });
   await expect(panel).toContainText('Watch');
   await expect(panel).toContainText('#3');
-  await expect(panel).toContainText('iv_hv_ratio 1.10 below 1.25');
+  await expect(panel.getByLabel('VRP scanner criteria for AAPL')).toContainText('Near miss');
   await expect(panel.getByRole('button', { name: 'Open VRP scanner' })).toBeVisible();
   await expectAccessible(page);
   // Another tab of the ticker, then another ticker: the Why tab goes with the screener.
@@ -180,4 +180,19 @@ test('the screener hits tab lists the screeners that picked the ticker', async (
   const hits = page.getByRole('region', { name: 'Screener hits' });
   await expect(hits).toContainText('VRP scanner');
   await expect(hits).toContainText('Watch');
+  // The row opens into the criteria scorecard: value and distance in the field's format, the
+  // screen's rule, the outcome.
+  await hits.getByRole('button', { name: /VRP scanner/ }).click();
+  const scorecard = hits.getByLabel('VRP scanner criteria for AAPL');
+  await expect(scorecard).toContainText('1.10');
+  await expect(scorecard).toContainText('≥ 1.25');
+  await expect(scorecard).toContainText('short by 0.15');
+  await expect(scorecard).toContainText('Near miss');
+  await expect(scorecard).not.toContainText('1.1012345678');
+});
+
+test('the screener hits tab opens the screener the reader came from', async ({ page }) => {
+  await page.goto('/explore?sel=AAPL&tab=hits&via=vrp_scanner');
+  const hits = page.getByRole('region', { name: 'Screener hits' });
+  await expect(hits.getByLabel('VRP scanner criteria for AAPL')).toBeVisible();
 });

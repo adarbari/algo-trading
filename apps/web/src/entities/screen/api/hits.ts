@@ -1,7 +1,8 @@
 /**
  * Which of the user's screeners picked one instrument in the latest session (GraphQL
  * `Instrument.screenerHits`, ADR 0037): each screener's run for exactly that session, and its
- * result for the instrument. The Explore detail pane's "Screener hits".
+ * result for the instrument, with the criteria it was judged on. The Explore detail pane's
+ * "Screener hits".
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -27,6 +28,14 @@ const InstrumentScreenerHits = graphql(`
           reasons
           flags
           change
+          criteria {
+            id
+            field
+            mode
+            outcome
+            value
+            distance
+          }
         }
       }
     }

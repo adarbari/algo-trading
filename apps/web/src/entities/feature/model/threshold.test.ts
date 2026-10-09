@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CatalogueFeature } from '@/entities/feature';
-
+import type { CatalogueFeature } from './catalogue';
 import {
   allowsTolerance,
   coerceValue,

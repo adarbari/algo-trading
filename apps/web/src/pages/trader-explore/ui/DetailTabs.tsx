@@ -64,7 +64,7 @@ function Content({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsP
         </Stack>
       );
     case 'hits':
-      return <ScreenerHitsPanel symbol={symbol} onOpenScreener={onOpenScreener} />;
+      return <ScreenerHitsPanel symbol={symbol} onOpenScreener={onOpenScreener} via={state.via} />;
     case 'why':
       return state.via ? (
         <WhyIdeaPanel symbol={symbol} screenerId={state.via} onOpenScreener={onOpenScreener} />

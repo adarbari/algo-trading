@@ -477,6 +477,16 @@ function graphqlAnswer(operation: Operation): Json | null {
                   reasons: 'iv_hv_ratio 1.10 below 1.25',
                   flags: [],
                   change: 'new',
+                  criteria: [
+                    {
+                      id: 'iv_hv_ratio',
+                      field: 'feature.iv_hv_ratio',
+                      mode: 'soft',
+                      outcome: 'NEAR',
+                      value: 1.1012345678,
+                      distance: 0.1487654322,
+                    },
+                  ],
                 },
               },
             ],

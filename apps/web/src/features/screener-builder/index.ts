@@ -5,15 +5,6 @@ export {
   PREVIEW_DEBOUNCE_MS,
   type ScreenerBuilder,
 } from './model/builder';
-export { describeCriterion } from './model/describe';
-export {
-  allowsTolerance,
-  fieldKind,
-  operatorSymbol,
-  scaleOf,
-  shapeOf,
-  toTyped,
-} from './model/threshold';
 export { previewPanelState, type PreviewPanelState } from './model/preview-state';
 export { CriterionRow } from './ui/CriterionRow';
 export { FeaturePicker } from './ui/FeaturePicker';

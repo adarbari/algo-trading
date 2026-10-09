@@ -11,9 +11,13 @@ import {
   type MissDecision,
   type Tolerance,
 } from '@/entities/screen';
-import type { CatalogueFeature } from '@/entities/feature';
-
-import { scaleOf, toStored, toTyped, type ToleranceUnit } from '../model/threshold';
+import {
+  scaleOf,
+  toStored,
+  toTyped,
+  type CatalogueFeature,
+  type ToleranceUnit,
+} from '@/entities/feature';
 
 const UNITS = [
   { value: 'absolute', label: 'amount' },

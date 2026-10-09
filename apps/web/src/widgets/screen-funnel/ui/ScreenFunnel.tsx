@@ -6,11 +6,8 @@
 import { BarList, Panel, Text } from '@algotrade/ui';
 
 import { byName, useFeatureCatalogue } from '@/entities/feature';
-import {
-  describeCriterion,
-  previewPanelState,
-  useScreenerBuilder,
-} from '@/features/screener-builder';
+import { describeCriterion } from '@/entities/screen';
+import { previewPanelState, useScreenerBuilder } from '@/features/screener-builder';
 
 export function ScreenFunnel() {
   const { preview, criteria } = useScreenerBuilder();

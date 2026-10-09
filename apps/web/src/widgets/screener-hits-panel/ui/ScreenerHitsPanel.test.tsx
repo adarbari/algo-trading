@@ -1,4 +1,6 @@
+import { Text } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
@@ -10,11 +12,22 @@ const hooks = vi.hoisted(() => ({ useScreenerHits: vi.fn() }));
 vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreenerHits: hooks.useScreenerHits,
+  CriteriaScorecard: (props: { screenerId: string; label?: string }) => (
+    <Text>{`scorecard of ${props.screenerId}`}</Text>
+  ),
 }));
 
 const hit = (id: string, name: string, decision: string, score: number | null) => ({
   screener: { id, name },
-  result: { rank: 2, decision, score, reasons: 'iv rank near', flags: [], change: 'new' },
+  result: {
+    rank: 2,
+    decision,
+    score,
+    reasons: 'iv rank near',
+    flags: [],
+    change: 'new',
+    criteria: [],
+  },
 });
 
 beforeEach(() => {
@@ -27,23 +40,39 @@ beforeEach(() => {
 });
 
 describe('ScreenerHitsPanel', () => {
-  it("opens a screener's results from its name when given the callback", () => {
+  it("opens a screener's results from its open row when given the callback", async () => {
     const onOpenScreener = vi.fn();
-    render(<ScreenerHitsPanel symbol="AAPL" onOpenScreener={onOpenScreener} />);
-    screen.getByRole('button', { name: 'VRP scanner' }).click();
+    render(<ScreenerHitsPanel symbol="AAPL" onOpenScreener={onOpenScreener} via="vrp" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open VRP scanner' }));
     expect(onOpenScreener).toHaveBeenCalledWith('vrp');
   });
 
-  it('lists the screeners that picked the ticker, with what their run stored', async () => {
+  it('lists the screeners that picked the ticker, each with its decision, rank and score', async () => {
     const { container } = render(<ScreenerHitsPanel symbol="AAPL" />);
     expect(hooks.useScreenerHits).toHaveBeenCalledWith('AAPL');
-    const list = screen.getByLabelText('Screeners that picked AAPL');
-    expect(list).toHaveTextContent('VRP scanner');
-    expect(list).toHaveTextContent('#2 · score 72 · new · iv rank near');
-    expect(list).toHaveTextContent('Watch');
-    expect(list).toHaveTextContent('Qualified');
+    const row = screen.getByRole('button', { name: /VRP scanner/ });
+    expect(row).toHaveTextContent('Watch');
+    expect(row).toHaveTextContent('#2');
+    expect(row).toHaveTextContent('score 72');
+    expect(screen.getByRole('button', { name: /Mine/ })).toHaveTextContent('Qualified');
     expect(screen.getByText('Session 2026-10-02')).toBeInTheDocument();
+    expect(screen.queryByText(/scorecard of/)).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it('opens the scorecard of a screener on click, one at a time', async () => {
+    render(<ScreenerHitsPanel symbol="AAPL" />);
+    await userEvent.click(screen.getByRole('button', { name: /VRP scanner/ }));
+    expect(screen.getByText('scorecard of vrp')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Mine/ }));
+    expect(screen.queryByText('scorecard of vrp')).toBeNull();
+    expect(screen.getByText('scorecard of mine')).toBeInTheDocument();
+  });
+
+  it('opens the screener the reader came from (via) first', () => {
+    render(<ScreenerHitsPanel symbol="AAPL" via="mine" />);
+    expect(screen.getByText('scorecard of mine')).toBeInTheDocument();
+    expect(screen.queryByText('scorecard of vrp')).toBeNull();
   });
 
   it('says when none picked it, or the ticker is unknown', () => {
