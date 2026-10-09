@@ -196,6 +196,11 @@ def sessions_to(start: date, end: date) -> int:
     return len(sessions_between(start + timedelta(1), end))
 
 
+def session_offset(start: date, end: date) -> int:
+    """Exchange sessions from ``start`` to ``end`` (negative when ``end`` is before it)."""
+    return sessions_to(start, end) if end >= start else -sessions_to(end, start)
+
+
 def session_on_or_before(day: date) -> date:
     """``day`` when it is a session, else the last session before it."""
     return day if is_session(day) else previous_session(day)
