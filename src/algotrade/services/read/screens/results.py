@@ -184,7 +184,35 @@ def _values(
     """The stored value rows of ``ids`` (None: every instrument) in each run, by (run id,
     instrument id). ``wanted`` (``{run id: instrument ids}``): a run's rows only for the
     instruments it is asked for (the rest are never read back, and turning them into records
-    was most of an Ideas read)."""
+    was most of an Ideas read). A run's stored values are the same for every caller until the
+    next publish: the answer is kept in ``ctx.cache`` under the runs and instruments asked for
+    and the published state (read first, ADR 0022), so a page asked again (the Ideas page's
+    read of the session's 4.9 million value rows took 0.75 s) reads nothing. The rows are only
+    read by callers."""
+    asked = tuple(
+        (r.run_id, None if wanted is None else tuple(sorted(wanted.get(r.run_id) or ())))
+        for r in runs
+    )
+    key = (
+        "screen-values",
+        ctx.session.date,
+        ctx.reader.own_run,
+        ctx.reader.visible_seq(),
+        None if ids is None else tuple(sorted(ids)),
+        asked,
+    )
+    cached: dict[ResultKey, list[Mapping[str, Any]]] = ctx.cache.get_or_compute(
+        key, lambda: _read_values(ctx, runs, ids, wanted)
+    )
+    return cached
+
+
+def _read_values(
+    ctx: ReadContext,
+    runs: Sequence[ScreenerRun],
+    ids: Sequence[str] | None,
+    wanted: Mapping[str, Sequence[str]] | None,
+) -> dict[ResultKey, list[Mapping[str, Any]]]:
     stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, ids)
     if isinstance(stored, Unknown) or stored.empty:
         return {}

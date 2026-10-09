@@ -155,7 +155,18 @@ def _gate_verdict(label: object, gate: Sequence[str]) -> bool | None:
 def load_episode_signals(ctx: ReadContext, episode_key: str) -> EpisodeSignals | None:
     """The signal timing of episode ``episode_key`` as ``ctx.session`` knew it; ``None`` for a
     key the site has not declared, an episode the session does not know yet (its trough has
-    not come)."""
+    not come). The same for every caller (site episodes and cards, stored market fields) until
+    the next publish (in the key, read first, ADR 0022; the catalogue is not in it: the card
+    features and the label are site-only stored fields, the same for every user): kept in
+    ``ctx.cache`` (the regime page's History asks for every episode at once, 1.2 s)."""
+    key = ("episode-signals", episode_key, ctx.session.date, ctx.reader.visible_seq())
+    cached: tuple[EpisodeSignals | None] = ctx.cache.get_or_compute(
+        key, lambda: (_signals(ctx, episode_key),)
+    )
+    return cached[0]
+
+
+def _signals(ctx: ReadContext, episode_key: str) -> EpisodeSignals | None:
     config = load_episodes(ctx.configs)
     found = next((e for e in config.episodes if e.key == episode_key), None)
     if found is None or found.known_from > ctx.session.date:

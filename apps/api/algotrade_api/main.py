@@ -8,6 +8,8 @@ model off or not answering -> 503), and, when ``settings.web_dist`` is set, the 
 on the same origin (``web``, ADR 0044: mounted last, so every API route keeps precedence);
 the build identity it started with (``ops/build.py``) is taken here, once."""
 
+import asyncio
+import contextlib
 import json
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -55,6 +57,7 @@ from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.graphql.schema import graphql_router, sdl
+from algotrade_api.graphql.warm import CacheWarmer
 from algotrade_api.live import no_live, open_live
 from algotrade_api.ops.build import api_stamp
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
@@ -102,6 +105,13 @@ def _rate_limited(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _stop(task: asyncio.Task[None]) -> None:
+    """Cancel ``task`` and wait for it, so its read-pool call is not left to outlive the app."""
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+
 def create_app(
     settings: ApiSettings,
     store: ReadStore | None = None,
@@ -124,7 +134,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        warmer = app.state.warmer  # the served app's: reads ahead of the regime page (warm.py)
+        warming = asyncio.create_task(warmer.run()) if warmer is not None else None
         yield
+        if warming is not None:
+            await _stop(warming)
         app.state.live.close()
         close = getattr(app.state.text_model, "close", None)
         if close is not None:
@@ -180,14 +194,17 @@ def create_app(
         allow_methods=["GET", "PUT", "POST", "DELETE"],
         allow_headers=["*"],
     )
-    app.add_exception_handler(NotFoundError, _not_found)
-    app.add_exception_handler(MissingDataError, _not_found)
-    app.add_exception_handler(ScreenNotFoundError, _not_found)
-    app.add_exception_handler(ConflictError, _conflict)
-    app.add_exception_handler(ConfigurationError, _bad_request)
-    app.add_exception_handler(PermissionDeniedError, _forbidden)
-    app.add_exception_handler(ModelUnavailableError, _unavailable)
-    app.add_exception_handler(RateLimitedError, _rate_limited)
+    for error, handler in (
+        (NotFoundError, _not_found),
+        (MissingDataError, _not_found),
+        (ScreenNotFoundError, _not_found),
+        (ConflictError, _conflict),
+        (ConfigurationError, _bad_request),
+        (PermissionDeniedError, _forbidden),
+        (ModelUnavailableError, _unavailable),
+        (RateLimitedError, _rate_limited),
+    ):
+        app.add_exception_handler(error, handler)
     for router in PUBLIC_ROUTERS:
         app.include_router(router)
     caller = [Depends(get_caller)]
@@ -196,12 +213,14 @@ def create_app(
     cache = ResultCache(READ_CACHE_SIZE)
     reads, stores = _reads(app.state.store, cache), _stores(app.state.store, cache)
     app.include_router(graphql_router(reads, settings.debug, stores), dependencies=caller)
+    user = app.state.store.user
+    app.state.warmer = CacheWarmer(lambda: reads(user, None)) if settings.live else None
     if settings.web_dist is not None:  # last: its catch-all GET must not shadow an API route
         app.include_router(web_router(settings.web_dist))
     return app
 
 
-READ_CACHE_SIZE = 32
+READ_CACHE_SIZE = 64  # room for the warmed market tables (warm.py) beside the pages' entries
 
 
 def _reads(

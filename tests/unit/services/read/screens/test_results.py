@@ -69,6 +69,31 @@ def test_only_the_asked_instruments_values_become_records(
     assert one[("r1", "EQ:AAA")] == both[("r1", "EQ:AAA")]
 
 
+def test_the_value_rows_of_a_page_are_read_once_per_published_state(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the Ideas page read the session's 4.9 million value rows on every load (0.75 s)
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    read: list[str] = []
+    real = results.partition
+
+    def counting(c: ReadContext, table: str, *args: Any) -> Any:
+        read.append(table)
+        return real(c, table, *args)
+
+    monkeypatch.setattr(results, "partition", counting)
+    first = load_results(ctx, {"r1": ["EQ:AAA"]}, [run])
+    assert load_results(replace(ctx, memo={}), {"r1": ["EQ:AAA"]}, [run]) == first
+    assert len(read) == 1  # another request, the same answer, nothing read
+    load_results(ctx, {"r1": ["EQ:AAA", "EQ:BBB"]}, [run])
+    assert len(read) == 2  # other instruments: read
+    seq = ctx.reader.visible_seq()
+    monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
+    load_results(ctx, {"r1": ["EQ:AAA"]}, [run])
+    assert len(read) == 3
+
+
 def test_a_runs_rows_are_filtered_once_per_request(
     ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

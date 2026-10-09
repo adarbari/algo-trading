@@ -2,6 +2,7 @@
 shared result cache, and ``partition``, which reads a session-grain table for exactly the
 session and never an older partition (ADR 0036 decision 6)."""
 
+import threading
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -227,7 +228,7 @@ def test_result_cache_holds_32_entries_by_default() -> None:
 def test_result_cache_is_bounded_by_the_bytes_of_its_frames() -> None:
     frame = pd.DataFrame({"x": range(1000)})  # 8 000 bytes and its index
     held = weigh(frame)
-    assert held >= 8000 and weigh((frame, {"k": frame})) == 2 * held and weigh("text") == 0
+    assert held >= 8000 and weigh((frame, {"k": frame})) >= 2 * held and weigh("text") == 4
     cache = ResultCache(size=32, max_bytes=2 * held + 1)
     for key in "abc":
         cache.put(key, frame)
@@ -270,3 +271,40 @@ def test_open_read_stores_opens_the_store_and_the_configs(tmp_path: Path) -> Non
     reader, configs = open_read_stores("memory://", tmp_path)
     assert reader.table_names() == []
     assert configs.names("local", "screeners") == []
+
+
+def test_weigh_prices_a_list_of_record_dicts() -> None:
+    """Value rows held as records weighed 0 and never counted against the byte bound."""
+    records = [{"id": "EQ:AAPL", "value": 1.5} for _ in range(100)]
+    assert weigh(records) > 100 * 2 * 8
+
+
+def test_get_or_compute_computes_once_for_concurrent_misses() -> None:
+    """A hundred cold requests for one key each computed (and held) their own frame."""
+    cache = ResultCache()
+    started, release, calls = threading.Event(), threading.Event(), []
+
+    def compute() -> str:
+        calls.append(1)
+        started.set()
+        release.wait(5)
+        return "value"
+
+    results: list[str] = []
+    first = threading.Thread(target=lambda: results.append(cache.get_or_compute("k", compute)))
+    first.start()
+    started.wait(5)
+    second = threading.Thread(target=lambda: results.append(cache.get_or_compute("k", compute)))
+    second.start()
+    release.set()
+    first.join(5)
+    second.join(5)
+    assert results == ["value", "value"] and len(calls) == 1
+
+
+def test_get_or_compute_lets_a_waiter_compute_after_a_failure() -> None:
+    cache = ResultCache()
+    with pytest.raises(OSError):
+        cache.get_or_compute("k", lambda: (_ for _ in ()).throw(OSError("mid-publish")))
+    assert cache.get_or_compute("k", lambda: "ok") == "ok"
+    assert cache.get_or_compute("k", lambda: "never") == "ok"

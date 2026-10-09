@@ -44,6 +44,12 @@ def is_picked(decision: str) -> bool:
     return decision not in NOT_PICKED
 
 
+def picked_mask(decisions: pd.Series) -> pd.Series:
+    """``is_picked`` of every row at once (a run has thousands of rows: a Python loop over an
+    Arrow column cost the ideas page a second)."""
+    return ~decisions.astype(str).isin(NOT_PICKED)
+
+
 @dataclass(frozen=True)
 class DecisionCount:
     decision: str
@@ -92,10 +98,10 @@ class LatestRun:
 def screen_rows(ctx: ReadContext) -> pd.DataFrame | Unknown:
     """Every rule screen's rows for the session (column-pruned), read once per publish."""
     key = ("rule_screen", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
-    found: pd.DataFrame | Unknown | None = ctx.cache.get(key)  # key read first (ADR 0022)
-    if found is None:
-        found = partition(ctx, RULE_SCREEN, ROW_COLUMNS)
-        ctx.cache.put(key, found)
+    # key read first (ADR 0022)
+    found: pd.DataFrame | Unknown = ctx.cache.get_or_compute(
+        key, lambda: partition(ctx, RULE_SCREEN, ROW_COLUMNS)
+    )
     return found
 
 
@@ -108,8 +114,8 @@ def _regime(rows: pd.DataFrame) -> str | None:
     """The label the run stamped (every row of a run carries the session's)."""
     if "regime" not in rows.columns:
         return None
-    found = [str(r) for r in rows["regime"] if to_scalar(r) is not None]
-    return found[0] if found else None
+    found = rows["regime"].dropna()  # every row carries it: the first stored one
+    return str(found.iloc[0]) if not found.empty else None
 
 
 def _tables(stats: Mapping[str, Any], key: str) -> tuple[str, ...]:
@@ -197,20 +203,31 @@ def latest_run(ctx: ReadContext, owner: str, config_id: str) -> LatestRun:
 def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
     """The rows ``run`` stored (one per instrument), in rank order. Filtering the session's
     whole partition for a run is the cost, and a page asks for each run's rows several times:
-    kept in the request's ``ctx.memo`` (read only by callers)."""
-    key = ("run_rows", ctx.session.date, run.owner, run.config_id, run.run_id)
-    found: pd.DataFrame | None = ctx.memo.get(key)
-    if found is None:
+    the partition is split by run once per request and kept in ``ctx.memo`` (read only by
+    callers; filtering it once per run and call took the Ideas page 0.2 s)."""
+    key = ("run_rows", ctx.session.date)
+    by_run: dict[tuple[str, str, str], pd.DataFrame] | None = ctx.memo.get(key)
+    if by_run is None:
         stored = screen_rows(ctx)
-        if isinstance(stored, Unknown):  # pragma: no cover - the run was found in these rows
-            return pd.DataFrame(columns=["instrument_id", *ROW_COLUMNS])
-        mine = stored[
-            (stored["user_id"] == run.owner)
-            & (stored["config_id"] == run.config_id)
-            & (stored["run_id"] == run.run_id)
-        ]
-        found = mine.sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
-        ctx.memo[key] = found
+        ranked = (
+            None
+            if isinstance(stored, Unknown)
+            else stored.sort_values(["rank", "instrument_id"], kind="stable")
+        )
+        by_run = (
+            {}
+            if ranked is None
+            else {
+                (str(o), str(c), str(r)): rows.reset_index(drop=True)
+                for (o, c, r), rows in ranked.groupby(
+                    ["user_id", "config_id", "run_id"], sort=False
+                )
+            }
+        )
+        ctx.memo[key] = by_run
+    found = by_run.get((run.owner, run.config_id, run.run_id))
+    if found is None:  # pragma: no cover - the run was found in these rows
+        return pd.DataFrame(columns=["instrument_id", *ROW_COLUMNS])
     return found
 
 

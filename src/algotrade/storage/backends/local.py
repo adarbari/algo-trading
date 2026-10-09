@@ -28,7 +28,10 @@ import glob
 import gzip
 import os
 import shutil
+import threading
+from collections import OrderedDict
 from collections.abc import Collection, Sequence
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -386,9 +389,50 @@ class LocalStaging:
         return len(old)
 
 
+MAX_PARSED_BYTES = 64 * 1024 * 1024  # the run files ``LocalRuns`` keeps parsed, by file size
+
+
 class LocalRuns:
     def __init__(self, root: Path) -> None:
         self.root = root / "runs"
+        # file name -> (its stat when parsed, the record): a record is parsed again only once
+        # its file changed (``save`` replaces the file); never handed out, only copies of it
+        # (an LRU bounded by the files' sizes: ``MAX_PARSED_BYTES``)
+        self._parsed: OrderedDict[str, tuple[tuple[int, int, int], RunRecord]] = OrderedDict()
+        self._parsed_bytes = 0
+        self._parsed_lock = threading.Lock()
+
+    def _record(self, name: str) -> RunRecord | None:
+        """The record in file ``name``, parsed once per version of the file; a copy (its
+        ``items`` and ``stats`` too), so a caller that changes it changes no other's. ``None``
+        when the file is gone (a concurrent cleanup)."""
+        path = self.root / name
+        try:
+            st = path.stat()
+            stamp = (st.st_ino, st.st_mtime_ns, st.st_size)
+            with self._parsed_lock:
+                held = self._parsed.get(name)
+                if held is not None and held[0] == stamp:
+                    self._parsed.move_to_end(name)
+            if held is None or held[0] != stamp:
+                held = (stamp, RunRecord.from_json(path.read_text()))
+                self._remember(name, held, st.st_size)
+        except FileNotFoundError:
+            return None
+        record = held[1]
+        return replace(record, items=dict(record.items), stats=dict(record.stats))
+
+    def _remember(self, name: str, held: tuple[tuple[int, int, int], RunRecord], size: int) -> None:
+        """Keep ``held`` as the most recent entry; evict the least recent past the byte bound."""
+        with self._parsed_lock:
+            old = self._parsed.pop(name, None)
+            if old is not None:
+                self._parsed_bytes -= old[0][2]
+            self._parsed[name] = held
+            self._parsed_bytes += size
+            while self._parsed_bytes > MAX_PARSED_BYTES and len(self._parsed) > 1:
+                _, (evicted, _record) = self._parsed.popitem(last=False)
+                self._parsed_bytes -= evicted[2]
 
     def save(self, record: RunRecord) -> None:
         atomic_write(self.root / f"{safe(record.run_id)}.json", record.to_json().encode())
@@ -400,7 +444,20 @@ class LocalRuns:
     def find(self, job: str, session_date: date | None = None) -> list[RunRecord]:
         if not self.root.exists():
             return []
-        records = [RunRecord.from_json(p.read_text()) for p in self.root.glob("*.json")]
+        # a ``new_run_id`` file names its job and session: only the job's own (of the session
+        # asked for) are opened; a file in any other form (a services/jobs id) is opened too
+        # (parsing every record took 0.9 s a call over 6 400 files: the edges page made 26)
+        prefix = f"{safe(job)}-"
+        names = [
+            path.name
+            for path in self.root.iterdir()
+            if (name := path.name).endswith(".json")
+            and (
+                (day := run_session(stem := name.removesuffix(".json"))) is None
+                or (stem.startswith(prefix) and session_date in (None, day))
+            )
+        ]
+        records = [r for name in names if (r := self._record(name)) is not None]
         hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]
         return sorted(hits, key=lambda r: r.started_at)
 
@@ -418,7 +475,7 @@ class LocalRuns:
             for path in self.root.glob(f"{glob.escape(safe(job))}-*.json")
             if (day := run_session(path.stem)) is not None and first <= day <= last
         }
-        records = [RunRecord.from_json(path.read_text()) for path in sorted(paths)]
+        records = [r for path in sorted(paths) if (r := self._record(path.name)) is not None]
         hits = [r for r in records if r.job in jobs]
         return sorted(hits, key=lambda r: r.started_at)
 

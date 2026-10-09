@@ -12,7 +12,11 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.market.buckets import Point, Segment
-from algotrade.services.read.market.history import MAX_POINTS, load_market_history
+from algotrade.services.read.market.history import (
+    MAX_POINTS,
+    load_market_history,
+    warm_market_frames,
+)
 from algotrade.storage.tables.writers import StoreWriter
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 from tests.unit.services.read.regime.conftest import (
@@ -127,7 +131,7 @@ def _spy_reads(monkeypatch: pytest.MonkeyPatch, ctx: Any) -> list[tuple[Any, ...
     return reads
 
 
-def test_a_window_reads_only_its_own_days_and_is_cached_until_something_is_published(
+def test_the_whole_history_is_read_once_per_published_state_and_every_window_is_a_slice(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ctx = regime_ctx()
@@ -135,21 +139,29 @@ def test_a_window_reads_only_its_own_days_and_is_cached_until_something_is_publi
     whole = load_market_history(ctx, [RISK], SEP28, D1)
     recent = load_market_history(ctx, [RISK], SEP30, D1)  # another window, same session
     narrow = load_market_history(ctx, [RISK, LABEL], SEP29, SEP29)
-    # a day is a partition: each window reads its own days (never the whole stored history
-    # since 1971 for a one-year chart), once per start
-    assert reads == [
-        ("rollups/market/regime@v3", SEP28, D1),
-        ("rollups/market/regime@v3", SEP30, D1),
-        ("rollups/market/regime@v3", SEP29, D1),
-    ]
+    # one read of the table's whole history up to the session, whatever the windows (keyed on
+    # each window's start, the regime page's sixteen episodes read 14 000 partitions each)
+    assert reads == [("rollups/market/regime@v3", date.min, D1)]
     assert [p.session for p in whole[0].points] == [SEP28, SEP29, SEP30, D1]
     assert [p.session for p in recent[0].points] == [SEP30, D1]
     assert narrow[0].points == (Point(SEP29, 10.0),)
-    assert load_market_history(ctx, [RISK], SEP28, D1) == whole and len(reads) == 3
+    assert load_market_history(ctx, [RISK], SEP28, D1) == whole and len(reads) == 1
     seq = ctx.reader.visible_seq()
     monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
     load_market_history(ctx, [RISK], SEP28, D1)
-    assert len(reads) == 4
+    assert len(reads) == 2
     # a window with no stored row at all is still a gap series
     [empty] = load_market_history(ctx, [RISK], date(2020, 1, 1), date(2020, 1, 10))
     assert [p.value for p in empty.points] == [None]
+
+
+def test_warming_reads_every_market_table_ahead_so_a_chart_reads_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = regime_ctx()
+    reads = _spy_reads(monkeypatch, ctx)
+    tables = warm_market_frames(ctx)
+    assert "rollups/market/regime@v3" in tables and len(reads) == len(tables)
+    assert all(start == date.min for _, start, _ in reads)  # each table's whole history
+    load_market_history(ctx, [RISK, CURVE_ON], SEP28, D1)
+    assert len(reads) == len(tables)

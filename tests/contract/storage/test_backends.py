@@ -145,6 +145,27 @@ def test_run_store(backend: Backend) -> None:
     assert backend.runs.load("missing") is None
 
 
+def test_find_returns_the_job_s_records_in_any_id_form_and_copies_of_them(
+    backend: Backend,
+) -> None:
+    """A job's records whatever their id (a services/jobs id does not name its session), none
+    of a job sharing its prefix, and a record a caller changes is not changed in the store."""
+    mine = start_run("job", D1, T0)
+    backend.runs.save(mine)
+    backend.runs.save(start_run("job-extra", D1, T0))
+    odd = RunRecord("job-screen-0123456789abcdef", "job", D2, T0 + timedelta(1))
+    backend.runs.save(odd)
+    found = backend.runs.find("job")
+    assert [r.run_id for r in found] == [mine.run_id, odd.run_id]
+    assert [r.run_id for r in backend.runs.find("job", D2)] == [odd.run_id]
+    found[0].items["EQ:A"] = "OK"
+    found[0].stats["n"] = 1
+    again = backend.runs.find("job")[0]
+    assert again.items == {} and again.stats == {}
+    backend.runs.save(mine.finish(T0 + timedelta(2)))  # a record saved again is read again
+    assert backend.runs.find("job")[0].status is RunStatus.COMPLETE
+
+
 def test_find_many_reads_the_jobs_sessions_by_run_id(backend: Backend) -> None:
     """Run ids are ``{job}-{session}-{time}``: one pass for several jobs, a session window, and
     a job sharing another's prefix is not mixed in."""

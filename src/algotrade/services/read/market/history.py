@@ -15,13 +15,13 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import GROUP_FIELD_HEADS
+from algotrade.core.model.fields import GROUP_FIELD_HEADS, field_source
 from algotrade.core.model.instruments import market_id
 from algotrade.core.time.calendar import sessions_between
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
-from algotrade.services.read.instruments.series import load_series
+from algotrade.services.read.instruments.series import load_series, market_frame
 from algotrade.services.read.market.buckets import (
     UNKNOWN,
     Point,
@@ -117,3 +117,19 @@ def load_market_history(
         )
         for i, name in enumerate(wanted)
     )
+
+
+def warm_market_frames(ctx: ReadContext, market: str = US) -> tuple[str, ...]:
+    """Read every stored table of the market catalogue into ``ctx.cache`` (``market_frame``)
+    for ``ctx``'s session and published state, so the first chart after a publish or a start
+    does not read thousands of partitions on a request; the tables read, in name order."""
+    tables = sorted(
+        {
+            field_source(name)[0]
+            for name in ctx.features.field_types("market")
+            if name.startswith(HEAD)
+        }
+    )
+    for table in tables:
+        market_frame(ctx, table, [market_id(market)])
+    return tuple(tables)
