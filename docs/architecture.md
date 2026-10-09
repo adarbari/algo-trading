@@ -13,7 +13,7 @@ versus planned. Detail lives in companion docs:
 | Screeners | [screeners/](screeners/README.md) |
 | Web app architecture (layers, component-only rules, workspaces) | [ui/architecture.md](ui/architecture.md) |
 | UI design system | [ui/design-system.md](ui/design-system.md) |
-| Who owns each responsibility (machine-readable) | `architecture/ownership.toml`, [ADR 0019](adr/0019-ownership-and-boundaries.md) |
+| Who owns each responsibility (machine-readable) | `architecture/*_ownership.toml`, [ADR 0019](adr/0019-ownership-and-boundaries.md) |
 | Why each decision was made | [adr/](adr/README.md) |
 | Order of work and follow-ups | [roadmap.md](roadmap.md) |
 
@@ -99,7 +99,7 @@ vendor responses, run and job records); above them sit outputs (results, per use
 | 10 | **The universe is coverage, not a filter:** every US-listed common stock, ADR and ETF (including leveraged and inverse), with S&P 500 membership as data, saved as a dated snapshot. Coverage is a site decision (`config/site/universe.toml`). **Each strategy picks its subset with a `Selection`** in a site (L3) or user (L4) config, resolved defaults < site < user < run; a user can narrow coverage but never widen it. Every run records the user and the config hash. | [0013](adr/0013-universe.md), [0015](adr/0015-configs-selections-users.md) |
 | 11 | The UI is built **design-system first**. | [0011](adr/0011-design-system-first-ui.md) |
 | 12 | Local first, hostable later: config from env vars, storage and configs behind URLs and protocols, the API serves the web build. | [0004](adr/0004-apps-and-shared-libraries.md) |
-| 13 | **Every responsibility has exactly one owner** (`architecture/ownership.toml`). Extend the owner; never re-implement. CI rejects new duplicates (`make ownership`, `make dupes`). | [0019](adr/0019-ownership-and-boundaries.md) |
+| 13 | **Every responsibility has exactly one owner** (`architecture/*_ownership.toml`). Extend the owner; never re-implement. CI rejects new duplicates (`make ownership`, `make dupes`). | [0019](adr/0019-ownership-and-boundaries.md) |
 
 ---
 
@@ -636,7 +636,7 @@ queue-backed job runner (phases 4–6).
 
 [ADR 0019](adr/0019-ownership-and-boundaries.md). Layers say who may import whom; ownership
 says who may *do* what. Each responsibility below has exactly one owner; the restructure
-(roadmap track R) that moved them there is complete. `architecture/ownership.toml` is the
+(roadmap track R) that moved them there is complete. `architecture/*_ownership.toml` is the
 source of truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone else
 doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fails CI.
 

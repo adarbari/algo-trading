@@ -1,0 +1,59 @@
+# Ownership registry (ADR 0019), api: the API app (ADR 0024; GraphQL is read_ownership.toml).
+# Every responsibility has exactly ONE owner. The registry is every architecture/*_ownership.toml
+# but web_ownership.toml, one file per layer: an entry lives in the file whose `scope` holds its
+# first owner (the longest prefix wins), sorted by id. Fields and detect rules: the docstring of
+# scripts/check_ownership.py. Before writing code that does X, find X
+# (`grep <keyword> architecture/*ownership.toml`) and extend its owner; a new responsibility
+# needs an entry + owner in the same PR (.claude/skills/add-responsibility).
+
+scope = ["apps/api/"]
+
+[[responsibility]]
+id = "api-authentication"
+description = "Resolve the caller of an API request (ADR 0040): the Authenticator seam, Supabase access tokens verified offline (JWKS cached by kid and refreshed on an unknown kid, or the legacy HS256 secret; iss, aud, exp), the token's email mapped to a registry user (401 no or bad token, 403 no registry user), and ALGOTRADE_AUTH=off on loopback only; REST deps and the GraphQL context call it, nothing else reads the Authorization header or decodes a token"
+owner = ["apps/api/algotrade_api/auth/*"]
+section = "docs/adr/0040-identity-and-roles.md#decision"
+detect = [
+    { import = "jwt" },
+    { import = "fastapi.security" },
+    { string = "authorization" },
+    { call = "get_unverified_header" },
+]
+
+[[responsibility]]
+id = "build-identity"
+description = "Say when the running API is out of step with the code it serves (ADR 0044, amended 2026-10-07): the API's stamp taken once at startup (its checkout's commit, a hash of the live GraphQL schema), the web build's build.json stamp (written by make web-build through algotrade-api stamp-web), the checkout read now, the mismatches with their fix (restart the agent, rebuild the web) on GET /health, and the probe of a running API that make status, make doctor and make web-build print; never restarts anything"
+owner = ["apps/api/algotrade_api/ops/build.py"]
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#amendment-2026-10-07-build-identity"
+detect = [
+    { string = "build.json" },
+    { call = "schema_hash" },
+]
+
+[[responsibility]]
+id = "deploy-cycle"
+description = "Decide what a deploy of origin/main must do: map the changed paths to actions (sync, web, restart, plists), hold the deploy and ingest locks around it (the ingestion app's `algotrade-ingest deploy-hold`), poll the running API until it serves the deployed commit; scripts/ops/deploy.sh orchestrates (git, build, swap, notify, log) and calls this through `algotrade-api deploy-plan|deploy-verify` and `algotrade-ingest deploy-hold` (ADR 0057)"
+owner = [
+    "apps/api/algotrade_api/ops/deploy.py",
+    "apps/ingestion/algotrade_ingestion/ops/hold.py",
+]
+section = "docs/adr/0057-auto-deploy-from-origin-main.md#decision"
+detect = [{ call = "fnmatchcase" }]
+
+[[responsibility]]
+id = "http-api"
+description = "Serve HTTP: FastAPI routers (one per area: writes, job polling, health, live quotes, preview POSTs), response schemas, CORS, error mapping and the ASGI server; routes call one library function each (page reads are GraphQL: graphql-schema)"
+owner = ["apps/api/algotrade_api/*"]
+section = "docs/adr/0024-api.md#http-layer"
+detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn" }]
+
+[[responsibility]]
+id = "web-on-api-origin"
+description = "Serve the built web app on the API's origin (ADR 0044): the files of ALGOTRADE_WEB_DIST, the SPA fallback to index.html, confinement to the build directory, cache headers; create_app mounts it last so every API route keeps precedence"
+owner = ["apps/api/algotrade_api/web.py"]
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
+detect = [
+    { call = "FileResponse" },
+    { import = "starlette.staticfiles" },
+    { import = "fastapi.staticfiles" },
+]

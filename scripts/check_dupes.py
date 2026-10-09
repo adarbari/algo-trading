@@ -6,7 +6,7 @@ Runs pylint's ``duplicate-code`` check (R0801) alone over the tracked Python fil
 docstrings, comments and signatures ignored) and compares the number of duplicate blocks with
 ``architecture/dupes_baseline.txt``:
 
-- more blocks than the baseline fails: reuse the owner (architecture/ownership.toml) instead;
+- more blocks than the baseline fails: reuse the owner (architecture/*_ownership.toml) instead;
 - fewer blocks fails too until the baseline is lowered (``make dupes-update``), so a removed
   duplicate can never silently come back.
 
@@ -71,7 +71,7 @@ def verdict(found: int, baseline: int) -> tuple[int, str]:
     if found > baseline:
         return 1, (
             f"duplicate-code: {found} duplicate blocks, baseline {baseline}. Extract the shared "
-            "logic into its owner (architecture/ownership.toml) instead of copying it."
+            "logic into its owner (architecture/*_ownership.toml) instead of copying it."
         )
     if found < baseline:
         return 1, (

@@ -3,16 +3,12 @@
  * table. Only src/features/table-view/api names the preferences path (`/preferences/...`):
  * every table reads and saves its view through `useTableView(scope)`, never a REST call of its
  * own.
- *
- * ALLOWED (each with its reason) are the other preference writes, which are not table views.
  */
 import { readModelMessage } from './guide.js';
 
 const ADAPTER = 'src/features/table-view/api/**';
 
-const ALLOWED = [
-  'src/features/ideas-priority/api/**', // PUT /preferences/ideas: the Ideas screener priority, not a table view
-];
+const ALLOWED = [];
 
 const PATH = /\/preferences\//;
 

@@ -131,16 +131,6 @@ describe('IngestionSummary', () => {
     expect(screen.getByText('26m 0s')).toBeInTheDocument();
     expect(screen.getByText(/chains_coverage: 86.2%/)).toBeInTheDocument();
     expect(screen.getByText(/1 FIGI reviews/)).toBeInTheDocument();
-    expect(screen.queryByText(/Latest session not ingested/)).not.toBeInTheDocument();
     await expectAccessible(container);
-  });
-
-  it('warns when the exchange closed a session the store lacks', async () => {
-    serve({
-      completeness: { ...COMPLETENESS, lastClosed: '2026-10-05' },
-      nightlyRuns: [],
-    });
-    renderWith(<IngestionSummary />);
-    expect(await screen.findByText(/Latest session not ingested/)).toBeInTheDocument();
   });
 });

@@ -81,11 +81,19 @@ test('Explore: a tapped ticker opens its detail in a sheet, closing it shows the
   await expect(tickers).toBeVisible();
 });
 
-test('Ideas: a screener name opens its results', async ({ page }) => {
+test('Ideas: the views and filter chips fit the screen and a tapped view narrows the table', async ({
+  page,
+}) => {
   await page.goto('/ideas');
-  const screeners = page.getByRole('list', { name: 'Screener priority' });
-  await screeners.getByRole('button', { name: 'VRP scanner', exact: true }).tap();
-  await expect(page).toHaveURL(/\/screeners\/[^/]+$/);
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    innerWidth,
+  );
+  await page.getByRole('button', { name: 'High conviction' }).tap();
+  await expect(page).toHaveURL(/view=conviction/);
+  const chip = page.getByRole('button', { name: 'Liquidity', exact: true });
+  const box = await chip.boundingBox();
+  expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
 });
 
 test('Explore chart: the zoom buttons are there', async ({ page }) => {

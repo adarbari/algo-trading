@@ -12,6 +12,7 @@
 
 import ast
 import fnmatch
+import importlib.util
 import re
 import subprocess
 import sys
@@ -21,10 +22,20 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from algotrade.storage.tables import schemas
 from tests.conftest import REPO_ROOT
 
-REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
+_SPEC = importlib.util.spec_from_file_location(
+    "check_ownership", REPO_ROOT / "scripts" / "check_ownership.py"
+)
+assert _SPEC and _SPEC.loader
+checker = importlib.util.module_from_spec(_SPEC)
+sys.modules["check_ownership"] = checker  # dataclasses need the module registered
+_SPEC.loader.exec_module(checker)
+# The per-layer files (architecture/*_ownership.toml), read and placed as the checker reads them.
+REGISTRY = {"responsibility": checker.read_registry(REPO_ROOT)}
 WEB_REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "web_ownership.toml").read_text())
 TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
 KNOWN = tomllib.loads((REPO_ROOT / "architecture" / "known_violations.toml").read_text())
@@ -112,7 +123,7 @@ def test_registry_paths_exist() -> None:
         for path in [table["owner"], *table.get("also_written_by", [])]:
             if not (REPO_ROOT / path).is_file():
                 missing.append(f"table {table['name']}: {path}")
-    assert not missing, f"ownership.toml names paths that do not exist: {missing}"
+    assert not missing, f"the ownership registry names paths that do not exist: {missing}"
 
 
 def test_responsibilities_are_unique_and_cite_real_doc_sections() -> None:
@@ -136,7 +147,9 @@ def test_restructure_is_complete_no_known_violations_or_pending_contracts() -> N
     """The ratchet is at zero: any ownership hit fails CI, and every planned import contract
     is enforced. Exceptions go through an ADR into ``allowed``, never back into these lists."""
     assert KNOWN.get("violation", []) == [], "known_violations.toml must stay empty (ADR 0019)"
-    assert "pending_contract" not in REGISTRY, "enable the contract in pyproject.toml instead"
+    for path in checker.registry_files(REPO_ROOT):
+        top = tomllib.loads(path.read_text())
+        assert "pending_contract" not in top, "enable the contract in pyproject.toml instead"
     for resp in REGISTRY["responsibility"]:
         assert "target_pr" not in resp, f"{resp['id']}: the restructure track is complete"
 
@@ -226,6 +239,27 @@ def test_ownership_ratchet_passes() -> None:
         check=False,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_the_split_by_layer_changed_no_entry() -> None:
+    """architecture/ownership.toml reached the 1000-line cap and was split into one file per
+    layer (2026-10-08): the union of the split files is the single file entry for entry (same
+    ids, owners, allowed, sections, detect rules). It compares with the first parent (a PR's
+    merge commit: its base), so it runs while the base still has the single file and skips
+    after; a merge of main that resolves a conflict on the registry is checked the same way.
+    Delete it once no open branch predates the split."""
+    proc = subprocess.run(
+        ["git", "show", "HEAD^1:architecture/ownership.toml"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        pytest.skip("the first parent has no single-file registry: the split is already in")
+    by_id = lambda entries: sorted(entries, key=lambda r: r["id"])  # noqa: E731
+    old = by_id(tomllib.loads(proc.stdout)["responsibility"])
+    assert by_id(REGISTRY["responsibility"]) == old
 
 
 # ----------------------------------------------------------------------------- web app

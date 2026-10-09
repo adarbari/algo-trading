@@ -66,12 +66,9 @@ test('a user runs an evaluation of the chosen edge and sees it finish', async ({
   expect(errors).toEqual([]);
 });
 
-test('Screeners shows the track-record chip and Ideas the odds line', async ({ page }) => {
+test('Screeners shows the track-record chip', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/screeners');
   await expect(page.getByText('Candidate · 120 sessions').first()).toBeVisible();
-  await page.goto('/ideas');
-  const screeners = page.getByRole('list', { name: 'Screener priority' });
-  await expect(screeners.getByText('vs 51.0% base')).toBeVisible();
   expect(errors).toEqual([]);
 });

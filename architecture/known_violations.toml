@@ -1,4 +1,4 @@
 # Ratchet for scripts/check_ownership.py (ADR 0019): ownership violations, one entry per
 # file doing work another module owns. EMPTY, and a fitness test
-# keeps it empty: extend the owner named in architecture/ownership.toml instead. A real
+# keeps it empty: extend the owner named in architecture/*_ownership.toml instead. A real
 # exception needs an ADR and goes in that responsibility's `allowed` list, with why.

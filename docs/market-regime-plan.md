@@ -250,7 +250,7 @@ change architecture and need `write-adr` plus an `architect` review.
    unchanged; or (b) a synthetic instrument per index. Recommend (a): breadth is a property of
    the universe, not of an instrument, and (a) keeps `SymbolResolver` honest (ADR 0018). New
    owner entries: `features.rollups.market` (compute), `storage.tables.market_features`
-   (table), in `architecture/ownership.toml` and `architecture/layout.toml`.
+   (table), in `architecture/*_ownership.toml` and `architecture/layout.toml`.
 2. **Index history (small ADR or an amendment to ADR 0009).** Our bars start when our
    ingestion started, so the 1990-2020 episodes cannot be replayed from `bars/1d`. Add
    `asset_class = "index"` instruments (`IDX:SPX`, `IDX:COMP`, `IDX:VIX`, `IDX:VIX3M`) fed

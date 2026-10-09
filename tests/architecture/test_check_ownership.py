@@ -2,7 +2,9 @@
 pass, hits outside fail, and stale ratchet entries fail so the lists only shrink."""
 
 import importlib.util
+import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
@@ -24,6 +26,8 @@ checker = _load("check_ownership")
 dupes = _load("check_dupes")
 
 REGISTRY = """
+scope = ["src/", "apps/"]
+
 [[responsibility]]
 id = "snapshot-selection"
 description = "pick the snapshot"
@@ -44,7 +48,7 @@ detect = [
 
 def _tree(tmp_path: Path, files: dict[str, str], known: str = "") -> Path:
     (tmp_path / "architecture").mkdir()
-    (tmp_path / "architecture" / "ownership.toml").write_text(REGISTRY)
+    (tmp_path / "architecture" / "code_ownership.toml").write_text(REGISTRY)
     if known:
         (tmp_path / "architecture" / "known_violations.toml").write_text(known)
     for rel, text in files.items():
@@ -118,10 +122,45 @@ def test_unknown_responsibility_in_ratchet_fails(tmp_path: Path) -> None:
 
 def test_a_detect_rule_needs_exactly_one_kind(tmp_path: Path) -> None:
     root = _tree(tmp_path, {})
-    (root / "architecture/ownership.toml").write_text(
+    (root / "architecture/code_ownership.toml").write_text(
         REGISTRY.replace('{ call = "latest_date" }', '{ call = "a", attr = "b" }')
     )
     with pytest.raises(ValueError, match="exactly one"):
+        checker.load_registry(root)
+
+
+def test_registry_is_every_layer_file_but_the_web_one(tmp_path: Path) -> None:
+    root = _tree(tmp_path, {})
+    (root / "architecture/web_ownership.toml").write_text('[[web_responsibility]]\nid = "w"\n')
+    (root / "architecture/libs_ownership.toml").write_text(
+        'scope = ["libs/"]\n\n[[responsibility]]\nid = "vendor-http"\nowner = ["libs/h.py"]\n'
+        'section = "docs/x.md#r2"\ndetect = [{ import = "urllib.request" }]\n'
+    )
+    assert [r.id for r in checker.load_registry(root)] == ["snapshot-selection", "vendor-http"]
+
+
+@pytest.mark.parametrize(
+    ("edit", "message"),
+    [
+        (lambda t: t.replace('scope = ["src/", "apps/"]', 'scope = ["apps/"]'), "a new file"),
+        (lambda t: t.replace('scope = ["src/", "apps/"]', ""), "declare its `scope`"),
+        (lambda t: "pending_contract = []\n" + t, "unknown top-level keys"),
+        (lambda t: t + t.split("\n", 3)[3], "duplicate responsibility id"),
+    ],
+)
+def test_a_misplaced_or_duplicate_entry_fails(
+    edit: Callable[[str], str], message: str, tmp_path: Path
+) -> None:
+    root = _tree(tmp_path, {})
+    (root / "architecture/code_ownership.toml").write_text(edit(REGISTRY))
+    with pytest.raises(ValueError, match=re.escape(message)):
+        checker.load_registry(root)
+
+
+def test_an_entry_lives_in_the_file_of_the_longest_scope(tmp_path: Path) -> None:
+    root = _tree(tmp_path, {})
+    (root / "architecture/data_ownership.toml").write_text('scope = ["src/pkg/"]\n')
+    with pytest.raises(ValueError, match=re.escape("belongs in data_ownership.toml")):
         checker.load_registry(root)
 
 

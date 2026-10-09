@@ -4,6 +4,8 @@
  * serious first. An issue's id says what it is about and changes when the cause does, so a
  * snooze ends with the cause. No JSX: the widget draws it.
  */
+import { isStale } from '@/entities/explore';
+import { staleSince, type Completeness } from '@/entities/ingestion';
 import type { NightlyRun } from '@/entities/run';
 
 export interface SystemIssue {
@@ -66,13 +68,32 @@ function screenerIssues(states: ScreenerStates): SystemIssue[] {
   }));
 }
 
+function staleIssue(
+  screens: ScreenerStates | null | undefined,
+  completeness: Completeness | null | undefined,
+): SystemIssue | null {
+  // An admin's completeness grid says exactly which session the exchange closed without us;
+  // everyone else gets the calendar rule on the session the pages read.
+  const since = completeness ? staleSince(completeness) : null;
+  const session = since ?? (screens && isStale(screens.session) ? screens.session : null);
+  if (session === null) return null;
+  return {
+    id: `stale:${session}`,
+    severity: 'warning',
+    title: `Latest stored session is ${session}: a nightly run may have been missed`,
+    links: [{ label: 'View runs', href: '/admin/ingestion' }],
+  };
+}
+
 /** The open issues, failing ones first (each group keeps its order). */
 export function systemIssues(
   nightly: NightlyRun | null | undefined,
   screens: ScreenerStates | null | undefined,
+  completeness?: Completeness | null,
 ): SystemIssue[] {
   const all = [
     ...(nightly ? [nightlyIssue(nightly)] : []),
+    staleIssue(screens, completeness),
     ...(screens ? screenerIssues(screens) : []),
   ].filter((i): i is SystemIssue => i !== null);
   return [

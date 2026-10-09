@@ -3,7 +3,7 @@
  * feature table (GraphQL `Query.table`), with the column picker, sorting and paging.
  *
  * `sortMode="server"` (the universe): one page per request, filtered, sorted and paged by the
- * server, with the session notes (a stale session, nightly tables missing for it, a universe
+ * server, with the table's notes (nightly tables missing for it, a universe
  * snapshot from after it). `sortMode="client"` (a few instruments asked for by `keys`, e.g.
  * the compare set): every row in one request, sorted in the table. A row click focuses the
  * ticker; ticked rows are the caller's selection.

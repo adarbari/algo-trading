@@ -32,6 +32,14 @@ describe('explore search params', () => {
     );
   });
 
+  it('keeps the screener that surfaced the ticker (via)', () => {
+    expect(parseExploreSearch({ sel: 'AAPL', via: ' vrp-scanner ' })).toEqual({
+      sel: 'AAPL',
+      via: 'vrp-scanner',
+    });
+    expect(parseExploreSearch({ via: '  ' })).toEqual({});
+  });
+
   it('reads the columns added on a narrow table from ncols', () => {
     expect(parseExploreSearch({ ncols: 'name,change' })).toEqual({ ncols: 'name,change' });
   });

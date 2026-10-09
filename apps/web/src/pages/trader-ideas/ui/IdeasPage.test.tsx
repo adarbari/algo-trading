@@ -6,31 +6,8 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { IdeasPage } from './IdeasPage';
 
-const widgets = vi.hoisted(() => ({ ranking: vi.fn(), top: vi.fn() }));
+const widgets = vi.hoisted(() => ({ top: vi.fn() }));
 
-vi.mock('@/widgets/screener-ranking', async () => {
-  const { Button } = await import('@algotrade/ui');
-  return {
-    ScreenerRanking: (props: {
-      onNewScreener: () => void;
-      onOpenScreener: (id: string) => void;
-    }) => {
-      widgets.ranking(props);
-      return (
-        <>
-          <Button onClick={props.onNewScreener}>new screener</Button>
-          <Button
-            onClick={() => {
-              props.onOpenScreener('vrp');
-            }}
-          >
-            ranked screener
-          </Button>
-        </>
-      );
-    },
-  };
-});
 vi.mock('@/widgets/regime-strip', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
@@ -42,11 +19,14 @@ vi.mock('@/widgets/regime-strip', async () => {
 vi.mock('@/widgets/paused-ideas', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
-    PausedIdeas: (props: { onOpen: (s: string) => void; onOpenScreener: (id: string) => void }) => (
+    PausedIdeas: (props: {
+      onOpen: (s: string, via: string) => void;
+      onOpenScreener: (id: string) => void;
+    }) => (
       <>
         <Button
           onClick={() => {
-            props.onOpen('XOM');
+            props.onOpen('XOM', 'vrp');
           }}
         >
           paused
@@ -70,8 +50,10 @@ vi.mock('@/widgets/top-ideas', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
     TopIdeas: (props: {
+      search: { view?: string };
+      onSearchChange: (patch: { view: string }) => void;
       onCompare: (s: { sel: string; focus: string }) => void;
-      onOpen: (s: string) => void;
+      onOpen: (s: string, via: string) => void;
       onScreeners: () => void;
     }) => {
       widgets.top(props);
@@ -87,7 +69,14 @@ vi.mock('@/widgets/top-ideas', async () => {
           <Button onClick={props.onScreeners}>screeners</Button>
           <Button
             onClick={() => {
-              props.onOpen('KO');
+              props.onSearchChange({ view: 'conviction' });
+            }}
+          >
+            conviction
+          </Button>
+          <Button
+            onClick={() => {
+              props.onOpen('KO', 'liq');
             }}
           >
             open
@@ -99,37 +88,39 @@ vi.mock('@/widgets/top-ideas', async () => {
 });
 
 describe('IdeasPage', () => {
-  it('shows the screener ranking beside the top ideas and passes navigation through', async () => {
+  it('shows the ideas table alone and passes the search and navigation through', async () => {
     const user = userEvent.setup();
     const onCompare = vi.fn();
     const onOpen = vi.fn();
-    const onNewScreener = vi.fn();
+    const onSearchChange = vi.fn();
     const onScreeners = vi.fn();
     const onOpenRegime = vi.fn();
     const onOpenScreener = vi.fn();
     const { container } = render(
       <IdeasPage
+        search={{ view: 'no-earnings' }}
+        onSearchChange={onSearchChange}
         onCompare={onCompare}
         onOpen={onOpen}
-        onNewScreener={onNewScreener}
         onScreeners={onScreeners}
         onOpenScreener={onOpenScreener}
         onOpenRegime={onOpenRegime}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
+    expect(widgets.top).toHaveBeenCalledWith(
+      expect.objectContaining({ search: { view: 'no-earnings' } }),
+    );
     await user.click(screen.getByRole('button', { name: 'regime strip' }));
     expect(onOpenRegime).toHaveBeenCalledOnce();
-    await user.click(screen.getByRole('button', { name: 'new screener' }));
-    expect(onNewScreener).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'conviction' }));
+    expect(onSearchChange).toHaveBeenCalledWith({ view: 'conviction' });
     await user.click(screen.getByRole('button', { name: 'compare' }));
     expect(onCompare).toHaveBeenCalledWith({ sel: 'AAPL,MSFT', focus: 'AAPL' });
     await user.click(screen.getByRole('button', { name: 'open' }));
-    expect(onOpen).toHaveBeenCalledWith('KO');
+    expect(onOpen).toHaveBeenCalledWith('KO', 'liq');
     await user.click(screen.getByRole('button', { name: 'paused' }));
-    expect(onOpen).toHaveBeenLastCalledWith('XOM');
-    await user.click(screen.getByRole('button', { name: 'ranked screener' }));
-    expect(onOpenScreener).toHaveBeenLastCalledWith('vrp');
+    expect(onOpen).toHaveBeenLastCalledWith('XOM', 'vrp');
     await user.click(screen.getByRole('button', { name: 'paused screener' }));
     expect(onOpenScreener).toHaveBeenLastCalledWith('liq');
     await user.click(screen.getByRole('button', { name: 'screeners' }));
