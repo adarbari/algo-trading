@@ -14,7 +14,7 @@
       "src/pages/trader-calendar/index.ts": 12600,
       "src/pages/trader-edges/index.ts": 36000,
       "src/pages/trader-explore/index.ts": 60100,
-      "src/pages/trader-explore/ui/OtherTabs.tsx": 92000,
+      "src/pages/trader-explore/ui/OtherTabs.tsx": 92100,
       "src/pages/trader-ideas/index.ts": 40100,
       "src/pages/trader-regime/index.ts": 57100,
       "src/pages/trader-screeners/index.ts": 16500
@@ -24,7 +24,7 @@
     "/ideas": {
       "first_load_js_gzip_bytes": 229500,
       "requests": 42,
-      "dom_nodes": 265
+      "dom_nodes": 293
     },
     "/screeners": {
       "first_load_js_gzip_bytes": 206000,
@@ -53,12 +53,13 @@
     }
   },
   "reasons": {
+    "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
     "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
     "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
     "e2e./screeners/vrp_scanner.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
     "e2e./explore?focus=AAPL&tab=chart.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
     "bundle.routes.src/pages/screener-builder/index.ts": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk",
     "bundle.routes.src/pages/trader-explore/index.ts": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk",
-    "bundle.routes.src/pages/trader-explore/ui/OtherTabs.tsx": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk"
+    "bundle.routes.src/pages/trader-explore/ui/OtherTabs.tsx": "2026-10-09 #428 ideas row: why on phones, shared with Explore (owner-approved +100 B)"
   }
 }
