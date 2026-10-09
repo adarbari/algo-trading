@@ -77,11 +77,12 @@ def run(
     writer: StoreWriter,
     vendor: Vendor,
     symbols: tuple[str, ...] = ("AAA", "BBB"),
+    until: date = UNTIL,
     **kwargs: object,
 ) -> RunRecord:
     source = TiingoDailyPrices(http_for(vendor, RetryPolicy(tries=1)))
     ctx = task_ctx(writer, clock=advancing_clock)
-    return ingest_bars_history(ctx, source, symbols, SINCE, UNTIL, **kwargs)  # type: ignore[arg-type]
+    return ingest_bars_history(ctx, source, symbols, SINCE, until, **kwargs)  # type: ignore[arg-type]
 
 
 def stored(writer: StoreWriter, day: str) -> pd.DataFrame:
@@ -505,10 +506,13 @@ def test_tiingo_split_fills_only_dates_without_a_stored_split(writer: StoreWrite
     Massive has stays Massive's and, agreeing, is no mismatch."""
     write_listings(writer, [("EQ:AAA", "AAA", "", "2000-01-03", None)])
     write_split(writer, "EQ:AAA", date(2020, 1, 3), 2.0, date(2020, 1, 4))
-    vendor = Vendor({"AAA": payloads.prices(rows(20), {"2020-01-03": 2.0, "2020-01-06": 3.0})})
-    record = run(writer, vendor, (), from_listings=True)
+    days = [*DAYS, "2020-01-13"]  # a week past the stored split: not "near" it
+    vendor = Vendor(
+        {"AAA": payloads.prices(rows(20, days), {"2020-01-03": 2.0, "2020-01-13": 3.0})}
+    )
+    record = run(writer, vendor, (), until=date(2020, 1, 14), from_listings=True)
     out = _splits(writer).sort_values("ts")
-    assert list(out["ts"].dt.date) == [date(2020, 1, 3), date(2020, 1, 6)]
+    assert list(out["ts"].dt.date) == [date(2020, 1, 3), date(2020, 1, 13)]
     assert list(out["source"]) == ["test", "tiingo"] and record.stats["tiingo_split_rows"] == 1
     row = out.to_dict("records")[1]
     assert (row["ratio"], row["split_to"], row["split_from"]) == (3.0, 3.0, 1.0)
@@ -525,15 +529,34 @@ def test_split_mismatch_reports_only_true_disagreements(writer: StoreWriter) -> 
     assert list(_splits(writer)["source"]) == ["test"]
 
 
+def test_tiingo_split_near_a_stored_one_is_a_finding_not_a_second_row(
+    writer: StoreWriter,
+) -> None:
+    """Massive 2:1 on 01-03 and Tiingo on 01-06 is one split dated apart: a second row would make
+    adjust_bars divide twice (a quarter of the price). No tiingo row, one finding."""
+    write_listings(writer, [("EQ:AAA", "AAA", "", "2000-01-03", None)])
+    write_split(writer, "EQ:AAA", date(2020, 1, 3), 2.0, date(2020, 1, 4))
+    vendor = Vendor({"AAA": payloads.prices(rows(20), {"2020-01-06": 2.0})})
+    record = run(writer, vendor, (), from_listings=True)
+    assert list(_splits(writer)["source"]) == ["test"] and record.stats["split_mismatches"] == 1
+    assert "events/split has 2 on 2020-01-03" in record.items["split:EQ:AAA"]
+
+
 def test_tiingo_split_never_shadows_massive_row(writer: StoreWriter) -> None:
     """The read keeps the latest knowledge_ts per (instrument, ts): a day the store already
     has a split for is not written again, whatever the ratio."""
-    write_listings(writer, [("EQ:TIINGO:US0001", "OLD", "US0001", "2019-06-03", "2020-01-07")])
+    write_listings(writer, [("EQ:TIINGO:US0001", "OLD", "US0001", "2019-06-03", None)])
     write_split(writer, "EQ:TIINGO:US0001", date(2020, 1, 3), 2.0, date(2020, 1, 4))
-    vendor = Vendor({"US0001": payloads.prices(rows(10), {"2020-01-03": 3.0, "2020-01-06": 5.0})})
-    run(writer, vendor, (), from_listings=True)
+    vendor = Vendor(
+        {
+            "US0001": payloads.prices(
+                rows(10, [*DAYS, "2020-01-13"]), {"2020-01-03": 3.0, "2020-01-13": 5.0}
+            )
+        }
+    )
+    run(writer, vendor, (), until=date(2020, 1, 14), from_listings=True)
     out = _splits(writer).sort_values("ts")
-    assert list(out["ts"].dt.date) == [date(2020, 1, 3), date(2020, 1, 6)]
+    assert list(out["ts"].dt.date) == [date(2020, 1, 3), date(2020, 1, 13)]
     assert list(out["ratio"]) == [2.0, 5.0] and list(out["source"]) == ["test", "tiingo"]
 
 

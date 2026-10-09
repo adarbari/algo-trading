@@ -66,7 +66,7 @@ import math
 from collections import Counter
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from functools import partial
 from itertools import islice
 from typing import cast
@@ -107,6 +107,7 @@ SPLIT_MISMATCH = "SPLIT_MISMATCH"
 CHECKPOINT_EVERY = 5
 STOP_AFTER_FAILED = 3  # names Tiingo did not answer in a row (key, caps, outage): stop the run
 RATIO_TOLERANCE = 1e-3
+NEAR_DAYS = 5  # a stored split this close to Tiingo's ex-date is the same split, dated apart
 DETAIL_LIMIT = 20  # split mismatches listed in the run stats (every one is an item)
 HOURLY_FREE_PACE_S = 72.0
 
@@ -204,7 +205,19 @@ def split_findings(
         a, b = ours[day], theirs[day]
         if not math.isclose(a, b, rel_tol=RATIO_TOLERANCE):
             found.append(f"{day.isoformat()}: tiingo {a:g} vs events/split {b:g}")
+    for day in sorted(d for d in ours if first <= d <= last and d not in theirs):
+        if (near := _near_stored(day, theirs)) is not None:
+            found.append(
+                f"{day.isoformat()}: tiingo {ours[day]:g} not written, events/split has "
+                f"{theirs[near]:g} on {near.isoformat()}"
+            )
     return found
+
+
+def _near_stored(day: date, stored: dict[date, float]) -> date | None:
+    """The stored split date within ``NEAR_DAYS`` of ``day`` (the closest), else None."""
+    near = [d for d in stored if abs((d - day).days) <= NEAR_DAYS]
+    return min(near, key=lambda d: abs((d - day).days)) if near else None
 
 
 def tiingo_split_rows(
@@ -212,13 +225,20 @@ def tiingo_split_rows(
 ) -> pd.DataFrame:
     """The ``events/split`` rows (``ts``, ``split_from``, ``split_to``, ``ratio``) to write for
     one instrument from Tiingo's ``actions`` (``ts``, ``split_factor``) over ``first..last``:
-    for any id, but only for a day ``stored`` (the stored ``events/split`` rows of the instrument)
-    does not have: Massive's history is shallow, and its rows win where they exist."""
+    for any id, but only when ``stored`` (the stored ``events/split`` rows of the instrument) has
+    none within ``NEAR_DAYS`` of the day: Massive's history is shallow and its rows win where they
+    exist, and two rows for one split a few days apart would be adjusted for twice
+    (``adjust_bars`` divides by each); ``split_findings`` reports those."""
     rows = []
-    known = set() if stored.empty else {pd.Timestamp(t).date() for t in stored["ts"]}
+    known = {} if stored.empty else {pd.Timestamp(t).date(): 0.0 for t in stored["ts"]}
     for t, factor in zip(tiingo["ts"], tiingo["split_factor"], strict=True):
         day = pd.Timestamp(t).date()
-        if factor != 1.0 and factor > 0 and first <= day <= last and day not in known:
+        if (
+            factor != 1.0
+            and factor > 0
+            and first <= day <= last
+            and _near_stored(day, known) is None
+        ):
             rows.append({"ts": pd.Timestamp(day, tz="UTC"), "split_from": 1.0,
                          "split_to": float(factor), "ratio": float(factor)})  # fmt: skip
     cols = ["ts", "split_from", "split_to", "ratio"]
@@ -320,7 +340,8 @@ def _fetch_pending(
     run: IngestRun, source: Source, todo: Sequence[Name], since: date, until: date
 ) -> None:
     ids = [n.instrument_id for n in todo]
-    stored = read_events(run.reader, SPLITS, since, until, ids).frame
+    pad = timedelta(days=NEAR_DAYS)  # a stored split dated a few days apart from Tiingo's
+    stored = read_events(run.reader, SPLITS, since - pad, until + pad, ids).frame
     failed_in_a_row = 0
     for i, name in enumerate(todo, 1):
         item = f"hist:{name.instrument_id}"
