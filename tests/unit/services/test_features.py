@@ -1,9 +1,11 @@
 """Expression features on read: a range series, selections on ``feature.<name>`` fields,
 ``FeatureView`` columns, and the selection catalogue of a config store's features."""
 
+import inspect
 import tomllib
 from datetime import UTC, date, datetime
 
+import pandas as pd
 import pytest
 
 from algotrade.config.strategy.schema import Group, Rule, Selection
@@ -64,6 +66,29 @@ def test_narrowed_reads_tell_no_rows_from_no_partition(reader: StoreReader) -> N
         reader, ["near_52w"], D1, instruments=["EQ:NONE"], as_of=datetime(2000, 1, 1, tzinfo=UTC)
     )
     assert before.missing == (PS,)  # nothing of it was known then
+
+
+def test_a_narrowed_read_with_exists_reads_only_its_instruments(
+    reader: StoreReader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # exists(group) once made a narrowed read evaluate every formula over every instrument:
+    # 14 s for one name's 90-day Features history. Only a one-column presence read is whole.
+    names = ["liquidity_class", "option_chain_known", "near_52w"]
+    whole = read_expressions(reader, names, D1, D2).frame
+    reads: list[tuple[object, object]] = []
+    table_range = StoreReader.table_range
+
+    def spy(self: StoreReader, table: str, *args: object, **kwargs: object) -> object:
+        bound = inspect.signature(table_range).bind(self, table, *args, **kwargs)
+        reads.append((bound.arguments.get("instruments"), bound.arguments.get("columns")))
+        return table_range(self, table, *args, **kwargs)
+
+    monkeypatch.setattr(StoreReader, "table_range", spy)
+    ids = ["EQ:BULL", "EQ:NONE"]
+    narrowed = read_expressions(reader, names, D1, D2, instruments=ids).frame
+    assert reads and all(i == ids or c == ["instrument_id"] for i, c in reads)
+    expected = whole[whole["instrument_id"].isin(ids)].reset_index(drop=True)
+    pd.testing.assert_frame_equal(narrowed, expected)
 
 
 def test_selections_and_feature_views_name_expression_features(reader: StoreReader) -> None:

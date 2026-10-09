@@ -99,6 +99,39 @@ describe('instrument hooks', () => {
     expect(result.current.series).toEqual([{ names: ['x'], points: [] }]);
   });
 
+  it('read the first history chunk alone, the rest once it settled (failed too)', async () => {
+    // All chunks at once kept the API busy for seconds before the first came back (Features).
+    GQL.mockClear();
+    const names = Array.from({ length: 2 * NAMES_PER_REQUEST + 1 }, (_, i) => `feature.f${i}`);
+    let fail: () => void = () => undefined;
+    GQL.mockImplementation((_document, variables) => {
+      const asked = (variables as { names: string[] }).names;
+      if (asked[0] === names[0]) {
+        return new Promise((_resolve, reject) => {
+          fail = () => {
+            reject(new Error('down'));
+          };
+        });
+      }
+      return Promise.resolve({
+        instrument: { instrumentId: 'EQ:A', series: { names: asked, points: [] } },
+      });
+    });
+    const { result } = renderHook(
+      () => useFeatureHistory('AAPL', names, '2026-07-04', '2026-10-02'),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(GQL).toHaveBeenCalledOnce();
+    });
+    fail();
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+    });
+    expect(GQL).toHaveBeenCalledTimes(3);
+    expect(result.current.series).toHaveLength(2);
+  });
+
   it('read nothing without a ticker', () => {
     GQL.mockClear();
     const { result } = renderHook(() => useInstrumentEvents(null), { wrapper });

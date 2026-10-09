@@ -20,12 +20,8 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const SCREENS = {
-  ideas: {
-    session: '2026-10-08',
-    screeners: [
-      { screener: { id: 'a', name: 'A' }, notRun: { code: 'NOT_RUN', kindText: 'Not run' } },
-    ],
-  },
+  session: { date: '2026-10-08' },
+  screeners: [{ id: 'a', name: 'A', notRun: { code: 'NOT_RUN', kindText: 'Not run' } }],
 };
 const NIGHTLY = {
   nightlyRuns: [
@@ -69,6 +65,21 @@ describe('useSystemIssues', () => {
       expect(result.current).toHaveLength(2);
     });
     expect(result.current.map((i) => i.severity)).toEqual(['failing', 'warning']);
+  });
+
+  it('asks only for what the strip shows: no picks, a one-session grid', async () => {
+    // The ranked ideas and a ten-session grid cost the API 6 s of reads on every page.
+    GQL.mockImplementation((doc) =>
+      Promise.resolve(String(doc).includes('NightlyRuns') ? NIGHTLY : SCREENS),
+    );
+    renderHook(() => useSystemIssues(true), { wrapper });
+    await waitFor(() => {
+      expect(GQL).toHaveBeenCalledTimes(3);
+    });
+    const calls = GQL.mock.calls.map(([doc, variables]) => ({ doc: String(doc), variables }));
+    expect(calls.some((c) => c.doc.includes('ideas'))).toBe(false);
+    const grid = calls.find((c) => c.doc.includes('query IngestionCompleteness'));
+    expect(grid?.variables).toEqual({ sessions: 1 });
   });
 
   it('adds no issue while a read fails', async () => {

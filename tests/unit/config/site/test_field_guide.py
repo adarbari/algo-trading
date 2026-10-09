@@ -140,6 +140,17 @@ def test_files_load_in_name_order_and_a_field_is_guided_once() -> None:
         FieldGuideSettings.from_documents({"b": {"field": [{"name": "x", "reads": "r"}]}})
 
 
+def test_the_guide_is_read_once_per_store(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Every Guide read and help button loads it: parsing it per request held the GIL 0.12 s.
+    store = MemoryConfigStore({("site", "field_guide", "a"): {"field": [ENTRY]}})
+    loads: list[str] = []
+    load = store.load
+    monkeypatch.setattr(store, "load", lambda *key: loads.append(key[2]) or load(*key))
+    first = load_field_guide(store)
+    assert load_field_guide(store) is first and loads == ["a"]
+    assert load_field_guide(MemoryConfigStore({})) == FieldGuideSettings()  # another store
+
+
 def test_the_shipped_guide_is_complete() -> None:
     store = FileConfigStore(REPO_ROOT / "config")
     assert store.names("site", "field_guide") == [

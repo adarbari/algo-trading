@@ -9,12 +9,16 @@ columns; ``None`` when the group has none) and returns the row keys, one row per
                        that session but not this instrument, null (NaN) when the group has no
                        rows at all for that session (unknown: not computed, not "absent")
 
-Instruments without a row in any group are not rows: an expression over them is null. Keys
+``covered`` (group -> the sessions it has rows for) says when a group has rows, for frames
+narrowed to some instruments: without it, a session with no rows of theirs would read as no
+rows at all. Instruments without a row in any group are not rows: an expression over them is
+null. Keys
 are aligned as integer codes (sessions x instruments), so a two-year range of every
 instrument joins in about a second.
 """
 
 from collections.abc import Collection, Mapping
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -47,10 +51,14 @@ def _scatter(values: pd.Series, at: np.ndarray, n: int) -> np.ndarray:
 
 
 def join(
-    frames: Mapping[str, pd.DataFrame | None], columns: Mapping[str, Collection[str]]
+    frames: Mapping[str, pd.DataFrame | None],
+    columns: Mapping[str, Collection[str]],
+    covered: Mapping[str, Collection[date]] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
     """-> (row keys, ``{"<group>.<column>": values, "exists:<group>": 1 / 0 / NaN}``) for
-    the ``columns`` wanted of each group in ``frames`` (by group name)."""
+    the ``columns`` wanted of each group in ``frames`` (by group name); ``covered``: the
+    sessions a group has rows for, when its frame is narrowed (default: its frame's)."""
+    covered = covered or {}
     present = {g: f for g, f in frames.items() if f is not None and len(f)}
     if not present:
         return _empty(columns)
@@ -78,19 +86,21 @@ def join(
         spans[group] = slice(start, start + len(frame))
         start += len(frame)
     for group, wanted in columns.items():
+        has_rows = np.zeros(len(day_names), dtype=bool)
+        if group in covered:
+            has_rows = pd.Index(day_names).isin(list(covered[group]))
+        found = np.zeros(len(rows), dtype=bool)
         if group not in present:
             for column in wanted:
                 out[f"{group}.{column}"] = np.full(len(rows), None, dtype=object)
-            out[f"exists:{group}"] = np.full(len(rows), np.nan)
-            continue
-        frame, span = present[group], spans[group]
-        at = np.searchsorted(rows, codes[span])
-        for column in wanted:
-            out[f"{group}.{column}"] = _scatter(frame[column].reset_index(drop=True), at, len(rows))
-        found = np.zeros(len(rows), dtype=bool)
-        found[at] = True
-        has_rows = np.zeros(len(day_names), dtype=bool)
-        has_rows[days[span]] = True
-        covered = has_rows[row_day]
-        out[f"exists:{group}"] = np.where(found, 1.0, np.where(covered, 0.0, np.nan))
+        else:
+            frame, span = present[group], spans[group]
+            at = np.searchsorted(rows, codes[span])
+            for column in wanted:
+                out[f"{group}.{column}"] = _scatter(
+                    frame[column].reset_index(drop=True), at, len(rows)
+                )
+            found[at] = True
+            has_rows[days[span]] = True
+        out[f"exists:{group}"] = np.where(found, 1.0, np.where(has_rows[row_day], 0.0, np.nan))
     return keys, out

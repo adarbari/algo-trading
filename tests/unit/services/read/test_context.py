@@ -145,6 +145,24 @@ def test_inventory_reads_name_their_dates(stored: tuple[StoreWriter, StoreReader
     assert snapshot_on(ctx, "instruments/reference", D2) is None
 
 
+def test_stored_dates_are_listed_once_until_a_publish(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Listing stats every partition directory: the ingestion grid's 47 tables took 5.6 s a
+    # request. One cache entry holds them all, so the grid evicts no page's entry.
+    backend = MemoryBackend()
+    publish_bar(backend, D1)
+    reader = StoreReader(backend)
+    ctx = open_for(reader)  # resolving the session lists the expected tables itself
+    listed: list[str] = []
+    dates = reader.dates
+    monkeypatch.setattr(reader, "dates", lambda table: listed.append(table) or dates(table))
+    before = len(ctx.cache._items)
+    assert stored_dates(ctx, "bars/1d") == (D1,) and stored_dates(ctx, EARNINGS) == ()
+    assert stored_dates(ctx, "bars/1d") == (D1,) and listed == ["bars/1d", EARNINGS]
+    assert len(ctx.cache._items) == before + 1
+    publish_bar(backend, D2)
+    assert stored_dates(ctx, "bars/1d") == (D1, D2)  # a publish lists again
+
+
 def test_partition_prunes_columns_and_instruments(stored: tuple[StoreWriter, StoreReader]) -> None:
     writer, reader = stored
     rows = [{"instrument_id": i, "days_to_earnings": n, "next_earnings_date": None}

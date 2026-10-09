@@ -4,7 +4,8 @@
  * features (values for the session and their recent history), asked in chunks the API's
  * `features(names)` cap allows.
  */
-import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
 
@@ -173,7 +174,9 @@ const InstrumentHistory = graphql(`
 /**
  * Each of `names` (features with a history: not `instrument.*` facts) per session from
  * `start` to the session `date` (either null: not known yet, nothing is read), one request
- * per chunk.
+ * per chunk: the first (the rows a table shows first) alone, the rest once it has settled. A
+ * history is a read per stored day of every table: all chunks at once kept the API busy for
+ * seconds before the first came back (Explore's Features).
  */
 export function useFeatureHistory(
   key: string | null,
@@ -181,24 +184,33 @@ export function useFeatureHistory(
   start: string | null,
   date: string | null,
 ): FeatureHistory {
-  return useQueries({
-    queries: chunks(names, NAMES_PER_REQUEST).map((chunk) => {
-      const variables = { key: key ?? '', names: chunk, start: start ?? '', date: date ?? '' };
+  const client = useQueryClient();
+  const ready = Boolean(key) && start !== null && date !== null;
+  const keys = chunks(names, NAMES_PER_REQUEST).map((chunk) => {
+    const variables = { key: key ?? '', names: chunk, start: start ?? '', date: date ?? '' };
+    return { variables, queryKey: queryKeys.gql('InstrumentHistory', variables) };
+  });
+  const { series, isPending } = useQueries({
+    queries: keys.map(({ variables, queryKey }, n) => {
+      const first = n === 0 ? null : client.getQueryState(keys[0]?.queryKey ?? []);
       return {
-        queryKey: queryKeys.gql('InstrumentHistory', variables),
+        queryKey,
         queryFn: () => gql(InstrumentHistory, variables),
-        enabled: Boolean(key) && start !== null && date !== null,
+        enabled: ready && (n === 0 || first?.status === 'success' || first?.status === 'error'),
       };
     }),
     combine: combineHistory,
   });
+  return useMemo(() => ({ series, isPending }), [series, isPending]);
 }
 
 function combineHistory(
   results: readonly UseQueryResult<gqlTypes.InstrumentHistoryQuery>[],
-): FeatureHistory {
+): FeatureHistory & { settled: number } {
   return {
     series: results.flatMap((r) => (r.data?.instrument ? [r.data.instrument.series] : [])),
     isPending: results.some((r) => r.isPending),
+    // a chunk that fails changes no series: counted, so the hook re-renders to start the rest
+    settled: results.filter((r) => r.isSuccess || r.isError).length,
   };
 }

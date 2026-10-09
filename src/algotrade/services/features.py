@@ -174,12 +174,14 @@ def _with_expressions(
     return joined, tuple(sorted({*missing, *computed.missing}))
 
 
-def _stored(
+def _sessions(
     reader: StoreReader, table: str, start: date, end: date, as_of: datetime | None
-) -> bool:
-    """Does ``table`` have rows in ``start..end`` known at ``as_of`` (None: now)? An empty
-    partition has none (ADR 0055 amendment: it holds no value, so it is missing)."""
-    return feature_rows(reader, table, ["instrument_id"], start, end, as_of) is not None
+) -> frozenset[date]:
+    """The sessions of ``start..end`` that ``table`` has rows for, known at ``as_of`` (None:
+    now). An empty partition has none (ADR 0055 amendment: it holds no value, so it is
+    missing). Reads only the ``instrument_id`` column of every row."""
+    rows = feature_rows(reader, table, ["instrument_id"], start, end, as_of)
+    return frozenset() if rows is None else frozenset(rows["session_date"])
 
 
 def read_expressions(
@@ -192,25 +194,33 @@ def read_expressions(
     features: FeatureSet | None = None,
 ) -> ExpressionRows:
     """Expression features ``names`` for ``start..end`` (``end``: ``start``), point in time,
-    for ``instruments`` only when given. Rows are read only for them unless a formula uses
-    ``exists(group)``, which needs every row of the session to tell "no row for this
-    instrument" from "no rows at all". ``missing``: the tables read with no partition in the
-    range (never one that merely has no rows for ``instruments``)."""
+    for ``instruments`` only when given: rows are read only for them. ``exists(group)`` must
+    tell "no row for this instrument" from "no rows at all", so the sessions such a group has
+    rows for are read from its whole population (one column), never every formula evaluated
+    over every instrument (that took 14 s for one name's 90-day history). ``missing``: the
+    tables read with no partition in the range (never one that merely has no rows for
+    ``instruments``)."""
     fs = features or site_features()
     _, todo = fs.plan(names)
-    whole = instruments is None or any(fs.expressions[n].exists for n in todo)
-    only = None if whole else instruments
     last = end or start
     frames: dict[str, pd.DataFrame | None] = {}
     for table, columns in fs.stored_columns(names).items():
-        frames[table] = feature_rows(reader, table, columns, start, last, as_of, only)
-    # Narrowed to some instruments, no rows may only mean none of theirs: then the table is
-    # missing only when it has no partition in the range at all.
-    empty = [t for t, f in frames.items() if f is None]
-    if only is not None:
-        empty = [t for t in empty if not _stored(reader, t, start, last, as_of)]
+        frames[table] = feature_rows(reader, table, columns, start, last, as_of, instruments)
+    if instruments is None:
+        covered = None
+        empty = [t for t, f in frames.items() if f is None]
+    else:
+        # Narrowed, no rows may only mean none of theirs: a table is missing only when it has
+        # no rows in the range at all. The exists tables' sessions come with that read.
+        exists = {fs.table(g) for n in todo for g in fs.expressions[n].exists}
+        covered = {t: _sessions(reader, t, start, last, as_of) for t in exists}
+
+        def has_rows(table: str) -> bool:
+            if table in covered:
+                return bool(covered[table])
+            return _sessions(reader, table, start, last, as_of) != frozenset()
+
+        empty = [t for t, f in frames.items() if f is None and not has_rows(t)]
     missing = tuple(sorted(empty))
-    out = fs.evaluate(frames, names)
-    if instruments is not None:
-        out = out[out["instrument_id"].isin(set(instruments))].reset_index(drop=True)
+    out = fs.evaluate(frames, names, covered=covered)
     return ExpressionRows(out, missing)
