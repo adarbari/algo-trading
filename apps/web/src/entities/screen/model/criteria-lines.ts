@@ -4,9 +4,24 @@
  * Pure.
  */
 import { featureLabel, type CatalogueFeature } from '@/entities/feature';
+import type { gqlTypes } from '@/shared/api';
 
 import { describeRule } from './rule';
-import type { Criterion } from './spec';
+import { MODES, type Criterion } from './spec';
+
+/** A criterion as the typed `Screener` serves it (`id`, `field`, `mode`, `op`, `value`). */
+export type ServedCriterion = gqlTypes.ScreenerRunsQuery['screeners'][number]['criteria'][number];
+
+/** The served criteria as `Criterion`s, in the screen's order (the mode narrowed to the known ones). */
+export function toCriteria(served: readonly ServedCriterion[] | undefined): Criterion[] {
+  return (served ?? []).map((c) => ({
+    id: c.id,
+    field: c.field,
+    op: c.op,
+    mode: MODES.find((m) => m === c.mode) ?? 'hard',
+    ...(c.value === null || c.value === undefined ? {} : { value: c.value }),
+  }));
+}
 
 export interface CriterionLine {
   id: string;

@@ -1,7 +1,7 @@
 /**
  * The criteria of one screener's judgement of one ticker, the same list wherever it is shown
  * (the pick under review, a screener's hit in Explore): per criterion its field, the value in
- * the field's format, the rule from the screen (read from the screen's own criteria), how far a
+ * the field's format, the rule from the screen (the typed criteria of its `Screener`), how far a
  * near miss or a miss was from passing, and the outcome. The gates (who is screened) have no
  * line. Entries come as the run served them, in the screen's order.
  */
@@ -10,14 +10,15 @@ import { useMemo } from 'react';
 
 import { byName, useFeatureCatalogue } from '@/entities/feature';
 
-import { useScreener } from '../api/hooks';
+import { useScreenerRuns } from '../api/runs';
 import { outcomeLabel, outcomeTone } from '../model/decisions';
 import { isShownCriterion } from '../model/results';
 import { scorecardRows, type ScorecardEntry } from '../model/scorecard';
-import { criteriaOf, resolvedRules, type Criterion } from '../model/spec';
+import { toCriteria } from '../model/criteria-lines';
+import type { Criterion } from '../model/spec';
 
 export interface CriteriaScorecardProps {
-  /** The screener the criteria belong to (its rules are read from it). */
+  /** The screener the criteria belong to (its rules are the typed criteria of its `Screener`). */
   screenerId: string;
   entries: readonly ScorecardEntry[];
   /** Accessible name of the list (default: Criteria). */
@@ -30,14 +31,14 @@ export function CriteriaScorecard({
   label = 'Criteria',
 }: CriteriaScorecardProps) {
   const catalogue = useFeatureCatalogue();
-  const detail = useScreener(screenerId);
+  const runs = useScreenerRuns();
   const features = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
   const rules = useMemo(
     () =>
       new Map<string, Criterion>(
-        criteriaOf(resolvedRules(detail.data?.resolved), { id: screenerId }).map((c) => [c.id, c]),
+        toCriteria(runs.data?.byId.get(screenerId)?.criteria).map((c) => [c.id, c]),
       ),
-    [detail.data, screenerId],
+    [runs.data, screenerId],
   );
   const rows = scorecardRows(entries.filter(isShownCriterion), features, rules);
   const items = rows.map((row): KeyValueItem => ({

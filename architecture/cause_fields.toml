@@ -94,10 +94,6 @@ name = "ScreenDetail.draft"
 reason = "the caller's own screen document"
 
 [[fact]]
-name = "ScreenDetail.resolved"
-reason = "the caller's own screen document"
-
-[[fact]]
 name = "ScreenDetail.working"
 reason = "the caller's own screen document"
 

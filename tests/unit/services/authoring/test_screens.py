@@ -90,7 +90,7 @@ def test_detail_and_versions_and_finalising_puts_a_screen_on_the_nightly(
     assert documents.screen_detail(writer, ALICE, "mine") is None
     preset = documents.screen_detail(writer, ALICE, "vrp")  # an uncopied site preset
     assert preset is not None
-    assert preset.versions == () and preset.layers[0] == "site/screeners/vrp"
+    assert preset.versions == () and preset.working is not None
     screens.save_draft(writer, "alice", "mine", OWN)
     assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == []
     screens.finalise(writer, "alice", "mine")
@@ -98,7 +98,7 @@ def test_detail_and_versions_and_finalising_puts_a_screen_on_the_nightly(
     detail = documents.screen_detail(writer, ALICE, "mine")
     assert detail is not None and (detail.versions, detail.latest) == ((1,), 1)
     assert detail.draft_error and "nope" in detail.draft_error
-    assert detail.error is None and detail.resolved is not None
+    assert detail.error is None and detail.working is not None
     assert [v.version for v in documents.screen_versions(writer, ALICE, "mine")] == [1]
     # Finalising is what puts a screen on the nightly: no switch, and a draft alone is not run.
     assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == ["mine"]

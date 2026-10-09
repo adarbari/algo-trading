@@ -1,7 +1,7 @@
 """A user's rule screens as the Builder reads them (ADR 0029): the screens they own
 (``ScreenListing``: finalised and draft-only), one screen's working state (``ScreenDetail``:
 its draft and whether it would finalise, its versions, the site preset it is pinned to, the
-latest version resolved through its layers) and its finalised versions (``ScreenVersion``).
+working copy resolved through its layers) and its finalised versions (``ScreenVersion``).
 
 Configs, not session data: what is stored now under ``config/users/<id>/screeners/``, read
 through the ``ConfigStore`` (``services.authoring`` writes it). The user is ``ctx.user``; the
@@ -44,11 +44,10 @@ def _pin(preset_id: str, pinned: int | None, current: int | None) -> PresetPin:
 @dataclass(frozen=True)
 class ScreenDetail:
     """One screen of the user (or a site preset they have not copied yet). ``draft_error``: why
-    the draft would not finalise (None: it would); ``hash`` / ``layers`` / ``resolved``: the
-    latest version (or, with none, the site preset) resolved; ``error``: why that does not
-    resolve (e.g. a stale pin: rebase); ``working``: the rule keys (criteria, flags, ...) of
-    the working copy resolved through its layers (the draft when it resolves, else the latest
-    version, else the preset): what the Builder edits."""
+    the draft would not finalise (None: it would); ``error``: why the latest version (or,
+    with none, the site preset) does not resolve (e.g. a stale pin: rebase); ``working``: the
+    rule keys (criteria, flags, ...) of the working copy resolved through its layers (the draft
+    when it resolves, else the latest version, else the preset): what the Builder edits."""
 
     screener_id: str
     user: str
@@ -57,9 +56,6 @@ class ScreenDetail:
     versions: tuple[int, ...]
     latest: int | None
     preset: PresetPin | None
-    hash: str | None
-    layers: tuple[str, ...]
-    resolved: dict[str, Any] | None
     error: str | None
     working: dict[str, Any] | None
 
@@ -132,9 +128,6 @@ def screen_detail(configs: ConfigStore, user: UserContext, name: str) -> ScreenD
         versions=tuple(versions),
         latest=versions[-1] if versions else None,
         preset=preset_pin(configs, draft if draft is not None else latest) or _uncopied(name, site),
-        hash=resolved.hash if resolved else None,
-        layers=tuple(resolved.layers) if resolved else (),
-        resolved=resolved.canonical() if resolved else None,
         error=error,
         working=working,
     )

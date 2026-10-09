@@ -73,7 +73,7 @@ def test_an_uncopied_preset_names_itself_and_its_version(writer: MemoryConfigWri
     detail = documents.load_screen_detail(_ctx(writer, ALICE), "vrp")
     assert detail is not None and detail.draft is None and detail.versions == ()
     assert detail.preset == documents.PresetPin("vrp", None, 3, False)
-    assert detail.layers[0] == "site/screeners/vrp" and detail.working is not None
+    assert detail.working is not None
 
 
 def test_a_draft_that_would_not_finalise_says_why(writer: MemoryConfigWriter) -> None:
