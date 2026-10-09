@@ -165,7 +165,10 @@ All gated numbers are counts or sizes, never durations. LCP and total blocking t
 runners they move 20-50 % between identical runs, so a gate on them would fail PRs at random and
 teach people to ignore it. Read them as a trend, not a verdict.
 
-Budgets only shrink. Budgets sit at the size when they were set + 10 %. After an improvement run
+Budgets only shrink. The `update` commands write the measured value + 1 % headroom (CI measures a few hundred
+bytes more than a laptop: gzip and build variance), rounded up (bytes to the next 100 B, requests and DOM
+nodes to the next integer, at least +1), and never a value above the current budget: new =
+min(current, measured with headroom). The check itself passes when measured <= budget. After an improvement run
 `npm run perf:bundle -- update` and `PERF_UPDATE=1 npm run perf:e2e` to lower them (they never
 raise one); a new page needs its first budget the same way. Raising a budget is a hand edit of the
 JSON that a reviewer sees, with the reason in the PR. A heavy new dependency belongs behind a

@@ -1,7 +1,7 @@
 /**
  * The web performance budgets file (perf-budgets.json): its shape, loading, and the one rule that
  * changes it. Budgets only shrink: `shrunk` keeps the old budget unless the measured value plus
- * the headroom is lower, so a script never raises a budget (raising one is a visible edit of the
+ * the 1 % headroom is lower, so a script never raises a budget (raising one is a visible edit of the
  * JSON in the PR). Shared by the bundle check and the Playwright request / DOM budgets.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -41,10 +41,17 @@ export function saveBudgets(budgets: Budgets, file: URL = BUDGETS_FILE): void {
 }
 
 /**
- * The budget after seeing `measured`: the old one, or measured + 10 % (rounded up to `step`, 100 B
- * for sizes, 1 for counts) when that is lower, or when there is none.
+ * The budget after seeing `measured`: measured + 1 % headroom (CI measures a few hundred bytes more
+ * than a laptop: gzip and build variance), rounded UP to `step` (100 B for sizes, 1 for counts) and
+ * at least `measured + 1`; never above the old budget, so it only shrinks. With no old budget
+ * (a new page or route) the headroom value is its first budget.
  */
+export function withHeadroom(measured: number, step = 100): number {
+  const rounded = Math.ceil((measured * 101) / (100 * step)) * step; // integer maths: 1.01 is inexact
+  return Math.max(rounded, measured + 1);
+}
+
 export function shrunk(old: number | undefined, measured: number, step = 100): number {
-  const wanted = Math.ceil((measured * 11) / (10 * step)) * step; // integer maths: 12 000 * 1.1 is not exact;
+  const wanted = withHeadroom(measured, step);
   return old === undefined ? wanted : Math.min(old, wanted);
 }
