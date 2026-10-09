@@ -1,9 +1,9 @@
-"""``POST /edges/{id}/evaluate`` and ``GET /edges/{id}/evaluate/{job_id}``: run an edge evaluation
+"""``POST /edges/{id}/evaluate``: run an edge evaluation
 on request (ADR 0059). The run is the owner's ``edge-eval`` job under the caller's own split (rows
 keyed by their user id; EXPLORATORY unless the split is the edge's frozen one); an admin may run
 it as the site (``as_site``). One evaluation at a time per user (409 while another runs). The
-request answers at once with the job, which the page polls; only its owner or an admin may read
-it (ADR 0040)."""
+request answers at once with the job, which the page polls at ``GET /jobs/{job_id}`` (ADR 0037,
+amended)."""
 
 from typing import Annotated
 
@@ -34,14 +34,3 @@ def evaluate(
     )
     response.status_code = 202
     return redact(started, caller.role)
-
-
-@router.get("/{edge_id}/evaluate/{job_id}")
-def evaluate_status(
-    runner: OnDemandEvaluations, caller: Caller, edge_id: str, job_id: str
-) -> EvaluationRequest:
-    """403 for another user's job unless the caller is an admin (the job's owner is its user)."""
-    found = runner.status(
-        edge_id, job_id, UserContext(caller.user_id), admin=caller.role is Role.ADMIN
-    )
-    return redact(found, caller.role)

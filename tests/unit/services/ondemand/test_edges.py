@@ -15,6 +15,7 @@ from algotrade.services.evaluation.cross_section.harness import stored_outcome_s
 from algotrade.services.jobs import JobContext
 from algotrade.services.ondemand import edges as ondemand_edges
 from algotrade.services.ondemand.edges import EvaluationRequest, OnDemandEdges
+from algotrade.services.ondemand.status import read_job
 from algotrade.services.read.session import NotFoundError
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -41,7 +42,7 @@ def configs() -> MemoryConfigStore:
 def wait(runner: OnDemandEdges, request: EvaluationRequest, timeout: float = 20.0) -> Any:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        found = runner.status(request.edge_id, request.job_id, ALICE, admin=True)
+        found = read_job(runner, request.job_id, ALICE, admin=True)
         if found.state not in ("queued", "running"):
             return found
         time.sleep(0.02)
@@ -121,20 +122,6 @@ def test_an_unknown_edge_and_an_empty_store_are_refused(world: World) -> None:
             empty.request("drift", ALICE)
     finally:
         empty.close()
-
-
-def test_a_job_is_read_by_its_owner_or_an_admin_for_its_edge_only(
-    runner: OnDemandEdges,
-) -> None:
-    started = runner.request("drift", ALICE)
-    wait(runner, started)
-    assert runner.status("drift", started.job_id, ALICE).state == "complete"
-    with pytest.raises(PermissionDeniedError):
-        runner.status("drift", started.job_id, BOB)
-    with pytest.raises(NotFoundError):
-        runner.status("other", started.job_id, ALICE)
-    with pytest.raises(NotFoundError):
-        runner.status("drift", "job-edge-eval-nope", ALICE)
 
 
 def test_a_job_a_stopped_process_left_running_does_not_block_a_new_request(

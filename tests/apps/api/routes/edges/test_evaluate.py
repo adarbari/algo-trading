@@ -1,5 +1,5 @@
-"""``POST /edges/{id}/evaluate`` and its status: an evaluation on request, one at a time per user,
-the site's for an admin only (ADR 0059)."""
+"""``POST /edges/{id}/evaluate``: an evaluation on request, one at a time per user, the site's
+for an admin only (ADR 0059); its job is read at ``GET /jobs/{id}`` (``test_jobs.py``)."""
 
 import time
 from collections.abc import Iterator
@@ -67,7 +67,7 @@ def test_an_evaluation_is_started_polled_and_stored_for_the_caller(client: TestC
     assert started.status_code == 202, started.text
     body = started.json()
     assert body["user"] == "alice" and body["state"] in ("queued", "running")
-    done = poll(client, f"{EVALUATE}/{body['job_id']}")
+    done = poll(client, f"/jobs/{body['job_id']}")
     assert done["state"] == "complete" and done["run_id"]
 
 
@@ -78,12 +78,11 @@ def test_a_trader_cannot_run_as_the_site_but_an_admin_can(
     stub.user = UserRecord("ana", Role.ADMIN)
     site = client.post(EVALUATE, params={"as_site": "true"})
     assert site.status_code == 202 and site.json()["user"] == "site"
-    poll(client, f"{EVALUATE}/{site.json()['job_id']}")
+    poll(client, f"/jobs/{site.json()['job_id']}")
 
 
 def test_what_cannot_be_run_is_refused(client: TestClient) -> None:
     assert client.post("/edges/nope/evaluate").status_code == 404
-    assert client.get(f"{EVALUATE}/job-edge-eval-nope").status_code == 404
 
 
 def test_evaluations_are_off_without_a_runner() -> None:
