@@ -188,6 +188,12 @@ class RunStore(Protocol):
         pass over the store, not one per job."""
         ...
 
+    def generation(self) -> tuple[int, int]:
+        """A token that changes whenever a record is saved and only then (a read never moves it):
+        a cache over the run records is valid while it is equal. Read it before the records it
+        guards (ADR 0022); it says nothing about which record changed."""
+        ...
+
 
 class Backend(Protocol):
     @property

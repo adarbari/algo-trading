@@ -3,21 +3,27 @@ an error-free query, kept until the next publish and served again without runnin
 no ``ETag`` / 304: a browser does not revalidate a POST and the web client sends no
 ``If-None-Match``, so only the server-side cache is kept.
 
-Only the operations in ``SHARED_OPERATIONS`` and ``USER_OPERATIONS`` are cached (the safe
-default is not cached): those whose answer depends on the published tables and the configs
-alone. An operation that reads run records or jobs (nightly runs, ingestion, screener runs and
-results, ideas, edges, harness runs, status) can change without a publish (an on-request screen
-run, a failed job's record), so it always runs. The key (``response_key``) is the published
-state (``StoreReader.visible_seq()``), the writes the API itself served since it started
-(``WriteEpoch``, moved by ``CountWrites`` after the routes that write: a config save changes
-the caller's next read without a publish), a hash of the operation document, its variables and
-the caller's role. A ``USER_OPERATIONS`` entry also holds the user id; a ``SHARED_OPERATIONS``
-one (the same for every caller of a role: market and regime history, prices, Guide index) does
-not. The role is always in the key (ADR 0056: an admin's answer carries causes a trader must
-never read). ``ResponseCache`` is an LRU bounded by bytes (``MAX_BYTES``, a constant) and by
-age (``TTL_S``: a write made outside this process, such as a CLI config edit, is seen within
-it). Only queries (the schema has no mutation), only answers without ``errors``; the cache
-lives in one process, which is the only process the API runs as."""
+Every operation the web sends is in exactly one of four groups (a test fails a new one until it
+is classified; the safe default is not cached): ``SHARED_OPERATIONS`` (published tables and
+configs, the same for every caller of a role: market and regime history, prices, Guide index),
+``USER_OPERATIONS`` (published tables and configs that depend on the caller's catalogue or
+configs: user features, the Guide's field entries), ``RUN_OPERATIONS`` (they also read run
+records or jobs: nightly runs, ingestion, screener runs and results, ideas, edges, status) and
+``NEVER_CACHED`` (live, explain, previews, the caller's own state, and detail reads not yet
+audited). The key (``response_key``) is the published state (``StoreReader.visible_seq()``), the
+writes the API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
+the routes that write: a config save changes the caller's next read without a publish), a hash
+of the operation document, its variables and the caller's role. A ``RUN_OPERATIONS`` key also
+holds the runs generation (``StoreReader.runs_generation()``: it moves on every saved run
+record, a job's too, which a publish does not cover: a failed job's record, an on-request run),
+read before the answer is computed like ``visible_seq`` (ADR 0022); an operation whose loader
+reads the clock (``CLOSED_SESSION_OPERATIONS``: the ingestion grid's "last closed session")
+also holds that session. A ``SHARED_OPERATIONS`` entry does not hold the user id; every other
+cached one does. The role is always in the key (ADR 0056: an admin's answer carries causes a
+trader must never read). ``ResponseCache`` is an LRU bounded by bytes (``MAX_BYTES``, a
+constant) and by age (``TTL_S``: a write made outside this process, such as a CLI config edit,
+is seen within it). Only queries (the schema has no mutation), only answers without
+``errors``; the cache lives in one process, which is the only process the API runs as."""
 
 import hashlib
 import json
@@ -25,6 +31,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
+from datetime import date
 from functools import lru_cache
 from typing import Any
 
@@ -75,6 +82,49 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "GuideStartPage",
         "GuideTerm",
         "GuideSearch",
+        "GuideEntries",
+    }
+)
+# Operations that also read run records or jobs: cached per user, keyed on the runs generation.
+RUN_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "IdeasPage",
+        "StatusStrip",
+        "ScreenerConfigs",
+        "ScreenerRuns",
+        "ScreenerTrackRecords",
+        "EdgesPage",
+        "IngestionCompleteness",
+        "NightlyRuns",
+        "QualityChecks",
+    }
+)
+# The run operations whose loader reads the clock (``load_completeness``: the last session the
+# exchange closed): the closed session is in their key too.
+CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", "StatusStrip"})
+# Never kept: the text model's usage (clock), run detail and item reads, reviews and the
+# caller's own screens, which no hot page asks for. Moving one into a cached group needs its
+# dependencies checked first (what it reads, whether the clock is in it).
+NEVER_CACHED: frozenset[str] = frozenset(
+    {
+        "EvaluationSplit",
+        "FigiReview",
+        "HarnessRun",
+        "HarnessRuns",
+        "IngestionCell",
+        "InstrumentScreenerHits",
+        "LeverageReview",
+        "LlmUsage",
+        "MyScreens",
+        "OptionChain",
+        "RunItems",
+        "RunRecord",
+        "ScreenDetail",
+        "ScreenVersions",
+        "ScreenerPicks",
+        "ScreenerResults",
+        "Verification",
+        "Viewer",
     }
 )
 # The route packages whose endpoints write (configs, screen results, evaluations); a preview,
@@ -103,7 +153,7 @@ def operation_name(document: str) -> str | None:
 def cacheable(document: str) -> bool:
     """Whether the operation in ``document`` is one whose answers are kept."""
     name = operation_name(document)
-    return name in SHARED_OPERATIONS or name in USER_OPERATIONS
+    return name in SHARED_OPERATIONS or name in USER_OPERATIONS or name in RUN_OPERATIONS
 
 
 class WriteEpoch:
@@ -136,14 +186,26 @@ class CountWrites:
 
 
 def response_key(
-    seq: int, epoch: int, viewer: UserRecord, document: str, variables: Any, name: str | None
+    seq: int,
+    epoch: int,
+    viewer: UserRecord,
+    document: str,
+    variables: Any,
+    name: str | None,
+    runs: tuple[int, int] = (0, 0),
+    closed: date | None = None,
 ) -> str:
-    """The hex digest identifying one cacheable answer."""
+    """The hex digest identifying one cacheable answer. ``runs`` (the runs generation) is part
+    of a ``RUN_OPERATIONS`` key, ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one."""
     who = (
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )
     text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
-    parts = (str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text)
+    parts = [str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text]
+    if name in RUN_OPERATIONS:
+        parts.append(f"runs:{runs[0]}:{runs[1]}")
+    if name in CLOSED_SESSION_OPERATIONS:
+        parts.append(f"closed:{closed}")
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
 
 
