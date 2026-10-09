@@ -52,8 +52,14 @@ export interface ScreenerDetailProps {
   playbook?: ReactNode;
 }
 
-function CriteriaFacts({ screenerId }: { screenerId: string }) {
-  const { lines, isPending } = useCriterionLines(screenerId);
+function CriteriaFacts({
+  screenerId,
+  criteria,
+}: {
+  screenerId: string;
+  criteria: ScreenerRunSummary['criteria'] | undefined;
+}) {
+  const { lines, isPending } = useCriterionLines(criteria);
   return (
     <Facts
       label={`Criteria of ${screenerId}`}
@@ -162,7 +168,7 @@ export function ScreenerDetail({
       </Section>
       <Grid columns={2} gap={5} collapse="md">
         <Section title="Criteria">
-          {row.rules ? <CriteriaFacts screenerId={row.id} /> : null}
+          {row.rules ? <CriteriaFacts screenerId={row.id} criteria={summary?.criteria} /> : null}
         </Section>
         <Section title="Today">
           {run ? (

@@ -66,6 +66,10 @@ name = "CriterionResult.value"
 reason = "the value a criterion judged"
 
 [[fact]]
+name = "ScreenCriterion.value"
+reason = "the threshold a criterion compares with, as the screen stores it (a number, text or list; null when the operator takes none)"
+
+[[fact]]
 name = "ResultColumn.value"
 reason = "the value of a display column"
 
@@ -91,10 +95,6 @@ reason = "the caller's own saved backtest metrics"
 
 [[fact]]
 name = "ScreenDetail.draft"
-reason = "the caller's own screen document"
-
-[[fact]]
-name = "ScreenDetail.resolved"
 reason = "the caller's own screen document"
 
 [[fact]]

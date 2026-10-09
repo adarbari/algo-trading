@@ -8,7 +8,7 @@ from tests.apps.api.graphql.conftest import Graph
 READS = """query R($id: String!) {
   myScreens { screenerId }
   screenDetail(screenerId: $id) {
-    screenerId draft versions layers working preset { presetId pinned current rebaseAvailable }
+    screenerId draft versions working preset { presetId pinned current rebaseAvailable }
   }
   screenVersions(screenerId: $id) { version }
 }"""
@@ -22,7 +22,7 @@ def test_an_uncopied_site_preset_reads_as_itself(graph: Graph) -> None:
     detail = data["screenDetail"]
     assert (detail["screenerId"], detail["draft"], detail["versions"]) == ("vrp_scanner", None, [])
     assert detail["preset"]["presetId"] == "vrp_scanner" and detail["preset"]["pinned"] is None
-    assert detail["layers"] and detail["working"]["criteria"]
+    assert detail["working"]["criteria"]
 
 
 def test_an_unknown_screen_is_null(graph: Graph) -> None:

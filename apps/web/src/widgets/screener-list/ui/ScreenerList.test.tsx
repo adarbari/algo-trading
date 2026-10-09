@@ -117,7 +117,7 @@ const own = (screenerId: string, patch: Partial<ScreenerListItem> = {}): Screene
 const summary = (id: string, picked: number | null): ScreenerRunSummary => ({
   id,
   name: `Name of ${id}`,
-  criteria: [{ id: 'iv', field: 'iv_rank', mode: 'hard' }],
+  criteria: [{ id: 'iv', field: 'iv_rank', mode: 'hard', op: 'gte', value: 50 }],
   pickHistory: [
     { session: '2026-10-06', picked: 1 },
     { session: '2026-10-07', picked: null },

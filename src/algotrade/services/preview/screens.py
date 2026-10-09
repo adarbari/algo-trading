@@ -328,7 +328,10 @@ def preview_screen(
             universe_snapshot=frame.universe.snapshot_date,
         ),
         total=len(result.rows),
-        criteria=[ScreenCriterion(c.id, c.field, c.mode.value) for c in rules.criteria],
+        criteria=[
+            ScreenCriterion(c.id, c.field, c.mode.value, c.rule.op, c.rule.value)
+            for c in rules.criteria
+        ],
         display_columns=[ScreenColumn(n, f) for n, f in rules.columns],
         rows=[_row(r, symbols.get(r.instrument_id), names.get(r.instrument_id)) for r in top],
         cached=cached,

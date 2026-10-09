@@ -1893,15 +1893,19 @@ type ScreenColumn {
   field: String!
 }
 
-"""A criterion of a screen, in funnel order: the field it judges"""
+"""
+A criterion of a screen, in funnel order: the field it judges, its `mode` and its rule as the config states it: the operator `op` and the threshold `value` in the field's stored unit (a number, a string or boolean, a list for `in` / `between`; null: the operator takes none)
+"""
 type ScreenCriterion {
   id: String!
   field: String!
   mode: String!
+  op: String!
+  value: JSON
 }
 
 """
-A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, the latest version resolved (`hash`, `layers`, `resolved`, `error`) and `working`, the rule keys the Builder edits
+A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, why the latest version does not resolve (`error`) and `working`, the rule keys the Builder edits
 """
 type ScreenDetail {
   screenerId: String!
@@ -1911,9 +1915,6 @@ type ScreenDetail {
   versions: [Int!]!
   latest: Int
   preset: PresetPin
-  hash: String
-  layers: [String!]!
-  resolved: JSON
   error: String
   working: JSON
 }
