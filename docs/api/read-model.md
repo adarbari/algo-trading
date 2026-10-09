@@ -304,6 +304,29 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
   surface and the read model"), moves the REST allow-list tests out of `test_structure.py` into
   `tests/architecture/api/test_rest_allowlist.py`, and adds `tests/architecture/api/test_read_model.py`.
 
+## Performance rules (page-load work, 2026-10-09: PRs #435-#446)
+
+Owner goal: every page under 1 s cold, warm and on a first visit, memory and CPU bounded under
+hundreds of concurrent requests, no hacks, and no UX trade-off that costs the customer.
+
+1. **Measure first.** Time each GraphQL operation per page, then run `make load` (`scripts/perf/load.py`,
+   by hand on an idle machine; scenarios `realistic` and `stress`). Pass criterion (`CRITERIA`): 300
+   realistic users, page p95 <= 2.5 s, errors after retries <= 0.5 %, RSS <= 2 GB, `/health` p99 < 250 ms.
+   A perf PR states the before and after numbers in its description.
+2. **A per-publish cache key never holds a request window.** Read the whole series and slice (the
+   regime page's 16 episodes each re-read 14,000 partitions: 150 s). Keys read `visible_seq` (and
+   `runs_generation` for a read that depends on run records, the closed session where the clock
+   matters) BEFORE computing (ADR 0022, ADR 0037 amendment 2026-10-09). Compute through
+   `ResultCache.get_or_compute` (single-flight), never get-then-set.
+3. **Never scan every run record** (`LocalRuns.find` opens each file): a run id names its job and
+   session, so read that one record.
+4. **A page with many small reads batches them** (Guide entries: `Query.guideEntries`; one
+   `StatusStrip` operation). The web shell's operations (Viewer, StatusStrip, Regime) count against
+   every page.
+5. **Long-history reads go through the history copy** (ADR 0060, [storage.md](../data/storage.md#history-copy-adr-0060)),
+   not 14,000 partitions. A new chart table is added to `nightly.toml [history_copy]` within the disk budget.
+6. **Every new operation is classified** in the response-cache groups (see `add-graphql-field`).
+
 ## GraphQL conventions
 
 - **Library**: Strawberry (code-first from typed Python, first-party FastAPI router, built-in
