@@ -156,6 +156,7 @@ export {
   type SegmentedControlProps,
   type SegmentedOption,
 } from './SegmentedControl';
+export { SectionNav, type SectionNavItem, type SectionNavProps } from './SectionNav';
 export { Select, type SelectOption, type SelectProps } from './Select';
 export { ShareBar, type ShareBarProps } from './ShareBar';
 export { Skeleton, type SkeletonProps } from './Skeleton';
@@ -174,6 +175,15 @@ export {
 } from './StatusStrip';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { TickerTag, type TickerTagProps } from './TickerTag';
+export {
+  Timeline,
+  timelineDomain,
+  type TimelineDomain,
+  type TimelineMarker,
+  type TimelineProps,
+  type TimelineRow,
+  type TimelineSpan,
+} from './Timeline';
 export {
   Toast,
   ToastProvider,

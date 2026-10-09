@@ -11,11 +11,13 @@ import { gql, graphql, queryKeys } from '@/shared/api';
 
 import type { SeriesHistory } from '../model/history';
 import type { Recession, Regime, RegimeBand, RegimeEpisode } from '../model/regime';
+import type { EpisodeSignals } from '../model/signals';
 
 /** The GraphQL operations' names: their cached responses share these key prefixes. */
 export const REGIME_OPERATION = 'Regime';
 export const REGIME_BANDS_OPERATION = 'RegimeBands';
 export const REGIME_EPISODES_OPERATION = 'RegimeEpisodes';
+export const REGIME_SIGNALS_OPERATION = 'RegimeSignals';
 export const MARKET_HISTORY_OPERATION = 'MarketHistory';
 
 const RegimeQuery = graphql(`
@@ -229,6 +231,68 @@ const RegimeEpisodesQuery = graphql(`
   }
 `);
 
+const RegimeSignalsQuery = graphql(`
+  query RegimeSignals {
+    regime {
+      episodes {
+        key
+        signals {
+          gate {
+            indicator
+            kind
+            state
+            flaggedDay
+            clearedDay
+            flaggedDayFromTrough
+            firstKnownDay
+            neverFired
+            unknownReason {
+              code
+              kind
+              guideTerm
+              kindText
+              cause {
+                links {
+                  level
+                  subject
+                  status
+                  message
+                  runId
+                }
+              }
+            }
+          }
+          indicators {
+            indicator
+            kind
+            state
+            flaggedDay
+            clearedDay
+            flaggedDayFromTrough
+            firstKnownDay
+            neverFired
+            unknownReason {
+              code
+              kind
+              guideTerm
+              kindText
+              cause {
+                links {
+                  level
+                  subject
+                  status
+                  message
+                  runId
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`);
+
 const MarketHistoryQuery = graphql(`
   query MarketHistory($names: [String!]!, $start: Date!, $end: Date!, $points: Int!) {
     market {
@@ -285,6 +349,24 @@ export function useRegimeEpisodes() {
       episodes: data.regime?.episodes ?? [],
       recessions: data.regime?.recessions ?? [],
     }),
+  });
+}
+
+/**
+ * When each indicator and the screener gate flagged and cleared around every reference episode,
+ * as the session knew it (`Episode.signals`), by episode key (null: none for the session). One
+ * request for the overview, which marks every episode; the History section asks, the Now and Why
+ * sections never do.
+ */
+export function useRegimeSignals(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.gql(REGIME_SIGNALS_OPERATION, {}),
+    queryFn: () => gql(RegimeSignalsQuery, {}),
+    enabled,
+    select: (data): ReadonlyMap<string, EpisodeSignals | null> =>
+      new Map(
+        (data.regime?.episodes ?? []).map((episode) => [episode.key, episode.signals ?? null]),
+      ),
   });
 }
 

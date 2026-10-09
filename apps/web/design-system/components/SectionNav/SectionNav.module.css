@@ -1,0 +1,50 @@
+/* SectionNav: a sticky row of quiet links under the page heading; the section in view in the accent tint. */
+.nav {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  align-items: center;
+  min-width: 0;
+  overflow-x: auto;
+  padding-block: var(--space-1-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  scrollbar-width: none;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2-5);
+  border-radius: var(--radius-md);
+  color: var(--color-text-2);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  text-decoration: none;
+  white-space: nowrap;
+  transition-duration: var(--duration-fast);
+  transition-property: background-color, color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.link:hover {
+  background: var(--color-row);
+  color: var(--color-text);
+}
+
+.link[aria-current='location'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-weight: var(--font-weight-medium);
+}
+
+@media (pointer: coarse) {
+  .link {
+    min-height: var(--density-control-height);
+  }
+}

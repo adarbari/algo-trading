@@ -133,6 +133,7 @@ test('Regime: a tapped card help button opens the indicator drawer as a sheet', 
 }) => {
   await page.goto('/regime');
   const card = page.getByRole('region', { name: 'Slow-moving warning signs' });
+  await card.getByRole('listitem').first().getByRole('button').first().tap();
   await card
     .getByRole('button', { name: /^What is / })
     .first()

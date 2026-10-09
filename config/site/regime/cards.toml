@@ -59,7 +59,7 @@ one_liner = "The gap between the 10-year Treasury yield and the 3-month bill yie
 why_it_matters = "Normally lenders want more to lend for longer. When the 10-year pays less than the 3-month bill, markets expect the Fed to cut because the economy will weaken, and banks earn less on new loans."
 what_on_means = "On when the gap has been below zero for a month or more. The return to a positive gap after a long inversion is the later, more urgent warning."
 lead_time = "6 to 18 months before a recession."
-false_alarms = "Warned before all 8 recessions since 1969; false alarms in 1998 (brief) and 2022-24 (inverted for two years, no recession so far)."
+false_alarms = "Warned before 7 of the 8 recessions since 1969 (it missed 1990: only the 10-year minus 2-year spread inverted). False alarms in 1998 (brief) and 2022-24 (inverted for two years, no recession so far); 2019 was right only for the wrong reason, as the recession that followed came from the virus."
 range = { min = -0.02, max = 0.04 }
 how = "The 10-year Treasury yield minus the 3-month bill yield, from the Treasury's daily par yield curve (FRED's T10Y3M on a day it lacks), and on how many of the last 252 sessions that gap was below zero."
 terms = [
@@ -141,7 +141,7 @@ plain_name = "Has a recession already started?"
 one_liner = "The Sahm rule: the 3-month average unemployment rate against its lowest point of the past year."
 why_it_matters = "A half-point rise in unemployment from its low has marked the start of every US recession since 1970 before 2020. It does not warn early; it tells you the downturn is here."
 what_on_means = "On when the 3-month average unemployment rate is 0.5 percentage points or more above its 12-month low."
-lead_time = "Concurrent: it fires around the start of a recession."
+lead_time = "None: it turns 1 to 8 months after the recession has started, plus a month for the unemployment figures to be published."
 false_alarms = "Right every time before 2020; false alarms in November 1976 and July 2024."
 range = { min = 0, max = 0.015 }
 how = "The Sahm rule, computed from the unemployment rate: its 3-month average minus the lowest 3-month average of the previous 12 months."

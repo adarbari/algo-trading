@@ -1076,6 +1076,17 @@ Source: `design-system/components/SearchInput`
 | `disabled` | `boolean` | no |  |
 | `name` | `string` | no |  |
 
+### SectionNav
+
+SectionNav: a sticky in-page navigation for one long scroll (Now, Why, History). Each item scrolls to the element with its `id` (a `Box` with that `id`) and the one in view is marked `aria-current="location"`. A row of quiet links that scrolls sideways on a phone. For switching views inside a page use Tabs, for a workspace's pages NavTabs.
+
+Source: `design-system/components/SectionNav`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly SectionNavItem[]` | yes | The sections, in page order. |
+| `'aria-label'` | `string` | yes | The navigation landmark's name ("Regime sections"). |
+
 ### SegmentedControl
 
 SegmentedControl: pick exactly one of a few options shown side by side (Hard / Soft, Simple / Pro, 3M / 1Y / 2Y, the workspace switch). A radio group: Tab enters at the selected option, arrow keys (and Home / End) move and select, the selection is shown by an inverted fill, not colour alone. For navigation between pages use NavTabs; for many options, Select.
@@ -1296,6 +1307,25 @@ Source: `design-system/components/TickerTag`
 | `name` | `string` | no | Full name on hover ("Apple Inc."). |
 | `onRemove` | `() => void` | no | Adds a remove button named "Remove <symbol>" (plus `removeContext`). |
 | `removeContext` | `string` | no | Completes the remove button's name: "from compare" gives "Remove AAPL from compare". |
+
+### Timeline
+
+Timeline: rows that share one numeric axis, each with spans (a bar from one value to another, open at an end while it is still going) and markers (a point on the axis). Days from an event, sessions from a peak, minutes into a run: the axis is just numbers, `format` says how to write them. An optional reference line marks the zero point (the peak). Pure CSS, no chart library. Colour is never the only key: every mark has a text label for screen readers and the native tooltip, a row can carry a `note` (its state in words), and marker shapes differ. The axis range is the rows' extent unless `domain` is given; share one `domain` (see `timelineDomain`) to line up several timelines.
+
+Source: `design-system/components/Timeline`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rows` | `readonly TimelineRow[]` | yes |  |
+| `label` | `string` | yes | What the timeline shows, naming the list ("When each warning sign flagged"). |
+| `domain` | `TimelineDomain` | no | The axis range (default: the extent of the rows and the reference). |
+| `reference` | `{ at: number; label: string }` | no | A line through every row (the peak, "0"), labelled under the axis. |
+| `axisLabel` | `string` | no | What the axis counts ("Sessions from the peak"). |
+| `format` | `ValueFormat` | no | How axis values and mark positions are written (default grouped number). |
+| `size` | `'sm' \| 'md'` | no | Row height: `md` (default) or `sm` for an overview of many rows. |
+| `loading` | `boolean` | no | Placeholder rows while loading. |
+| `error` | `ReactNode` | no | Replaces the rows with this message. |
+| `emptyMessage` | `ReactNode` | no | Shown when there are no rows. |
 
 ### Toast
 
