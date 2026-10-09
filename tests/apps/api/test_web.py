@@ -70,6 +70,14 @@ def test_a_get_on_a_post_only_api_path_is_405_not_the_app(client: TestClient, pa
     assert response.status_code == 405 and response.text != INDEX
 
 
+@pytest.mark.parametrize("path", ["/screeners/momentum_12_1", "/screeners/preview"])
+def test_a_browser_navigation_to_a_rest_path_gets_the_app(client: TestClient, path: str) -> None:
+    """A reload of ``/screeners/<id>`` shared a path with a REST route and answered 405."""
+    response = client.get(path, headers={"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"})
+    assert response.status_code == 200 and response.text == INDEX
+    assert response.headers["content-type"].startswith("text/html")
+
+
 def test_head_answers_like_get_without_a_body(client: TestClient) -> None:
     response = client.head("/login")
     assert response.status_code == 200 and response.content == b""
