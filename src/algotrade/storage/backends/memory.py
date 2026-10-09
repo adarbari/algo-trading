@@ -182,6 +182,10 @@ class MemoryTables:
             frames = [f[[c for c in f.columns if c in keep_columns(columns)]] for f in frames]
         return concat_frames(frames)
 
+    def build_history(self, table: str, years: Sequence[int]) -> list[int]:
+        """No history copy in memory (ADR 0060): reads are already one lookup per partition."""
+        return []
+
     def size(self, table: str) -> int:
         with self._index_lock:
             frames = [f for (key, _, _), f in self._frames.items() if key[0] == table]

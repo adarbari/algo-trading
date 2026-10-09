@@ -64,6 +64,8 @@ $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
   tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   + _runs.json (knowledge_ts per run;
                                                          a dict with restates / visible_at /
                                                          seq / file / prev when needed)
+  tables/<table>/_history/year=YYYY~<hex>.parquet        derived read copy, one per year,
+  tables/<table>/_history/manifest.json                  sorted by instrument; see below (ADR 0060)
   tables/_txn/pending/<run_id>.jsonl                     a running run's uncommitted writes
   tables/_txn/commits/<run_id>.json, seq                 commit markers + commit sequence
                                                          (ADR 0022)
@@ -76,6 +78,19 @@ $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
 ```
 
 What each nightly run adds, table by table, with sizes: [nightly-footprint.md](nightly-footprint.md).
+
+### History copy (ADR 0060)
+
+A derived, read-optimised copy of a table's resolved rows, one Parquet file per year, written
+only by `TableStore.build_history(table, years)` (ingestion; backends only). It holds exactly the
+rows a read with `as_of` None resolves (`select_runs` / `merge_rows`), sorted by
+`(instrument_id, session_date)` in 50,000-row groups, so one instrument's year is one row-group
+read instead of ~250 files. `read_range` serves a year from it only when `as_of` is None, there is
+no `own_run` and every requested day's partition index (`_runs.json`) still has the
+`(inode, mtime, size)` signature the manifest recorded at the build; anything else (a restated,
+new or purged partition) reads the partitions, with the same frame. An all-instrument read of
+under 180 days does too. One-session reads (ADR 0036) never use it; the memory backend has none.
+Deleting `_history/` loses nothing.
 
 ### Retention
 
