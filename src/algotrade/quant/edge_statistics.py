@@ -5,6 +5,9 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
 
     lift                 hit rate over base rate
     standardised_effect  Hedges' g between picks and eligible non-picks
+    moments              (n, mean, m2) of values: the running form a side is kept in
+    merge_moments        Chan et al.: moments of parts -> moments of their union
+    effect_vs_moments    Hedges' g of an array over a side given only as moments
     decile_spread        mean of the best bucket minus mean of the worst, in rank order
     spread_summary       (mean, sd, t, n) of a series of per-session spreads
     sharpe               per-period mean over sample sd
@@ -18,6 +21,7 @@ The normal CDF is ``black_scholes.norm_cdf``, its owner.
 
 import itertools
 import math
+from collections.abc import Sequence
 
 import numpy as np
 import numpy.typing as npt
@@ -47,18 +51,51 @@ def lift(hit_rate: float | None, base_rate: float | None) -> float | None:
     return hit_rate / base_rate
 
 
+type Moments = tuple[int, float, float]  # n, mean, m2 (sum of squared deviations from the mean)
+
+
+def moments(values: ArrayLike) -> Moments:
+    """``(n, mean, m2)`` of the finite values, ``m2`` the sum of squared deviations about the
+    mean (the numerically stable running form of the sum and sum of squares)."""
+    v = _finite(values)
+    if v.size == 0:
+        return 0, 0.0, 0.0
+    mean = float(v.mean())
+    return int(v.size), mean, float(((v - mean) ** 2).sum())
+
+
+def merge_moments(parts: Sequence[Moments]) -> Moments:
+    """The moments of the union of disjoint samples (Chan, Golub, LeVeque 1979)."""
+    n, mean, m2 = 0, 0.0, 0.0
+    for pn, pmean, pm2 in parts:
+        if pn == 0:
+            continue
+        total = n + pn
+        delta = pmean - mean
+        m2 += pm2 + delta * delta * n * pn / total
+        mean += delta * pn / total
+        n = total
+    return n, mean, m2
+
+
+def effect_vs_moments(a: ArrayLike, b: Moments) -> float | None:
+    """Hedges' g of the array ``a`` over a side given as ``moments``: ``standardised_effect``
+    without needing that side's values."""
+    x = _finite(a)
+    nx, (ny, mean_y, m2_y) = x.size, b
+    if nx < 2 or ny < 2:
+        return None
+    pooled = ((nx - 1) * x.var(ddof=1) + m2_y) / (nx + ny - 2)
+    if pooled <= 0.0:
+        return None
+    d = (x.mean() - mean_y) / math.sqrt(pooled)
+    return float(d * (1.0 - 3.0 / (4.0 * (nx + ny) - 9.0)))
+
+
 def standardised_effect(a: ArrayLike, b: ArrayLike) -> float | None:
     """Hedges' g of ``a`` over ``b`` (pooled sd, small-sample correction); None under two
     observations on a side or a zero pooled sd."""
-    x, y = _finite(a), _finite(b)
-    nx, ny = x.size, y.size
-    if nx < 2 or ny < 2:
-        return None
-    pooled = ((nx - 1) * x.var(ddof=1) + (ny - 1) * y.var(ddof=1)) / (nx + ny - 2)
-    if pooled <= 0.0:
-        return None
-    d = (x.mean() - y.mean()) / math.sqrt(pooled)
-    return float(d * (1.0 - 3.0 / (4.0 * (nx + ny) - 9.0)))
+    return effect_vs_moments(a, moments(b))
 
 
 def decile_spread(values_in_rank_order: ArrayLike, buckets: int = 10) -> float | None:

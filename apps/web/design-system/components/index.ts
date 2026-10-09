@@ -144,6 +144,12 @@ export {
   type OddsLineReady,
 } from './OddsLine';
 export { OptionList, type OptionListItem, type OptionListProps } from './OptionList';
+export {
+  OutcomeDots,
+  type OutcomeDot,
+  type OutcomeDotsProps,
+  type OutcomeTone,
+} from './OutcomeDots';
 export { Panel, type PanelProps, type PanelState } from './Panel';
 export {
   Popover,

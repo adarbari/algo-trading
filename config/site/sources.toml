@@ -129,15 +129,15 @@ base_url = "https://api.stlouisfed.org/fred"
 
 [tiingo]                         # daily prices from 2018 for the event-study names (`bars-history`, ADR 0050); key in .env
 enabled = true                   # ALGOTRADE_TIINGO_API_KEY (free: tiingo.com account); no key: the source is skipped
-min_interval_s = 72              # free tier: 50 requests an hour (3600 / 50), 1,000 a day, 500 UNIQUE symbols a month
-                                 # (a refetch of a symbol already fetched that month is free). The ~140 scoped names
-                                 # take ~3 hours; the whole tier A / B set needs the Power tier ($10 a month: no
-                                 # symbol cap, 5,000 requests an hour), then lower this to 1 or less.
-licence = "personal"             # Tiingo's terms: personal use; features derived from its bars inherit it
-monthly_symbol_budget = 450      # distinct tickers `bars-history` fetches in a calendar month (its run records
-                                 # count them). The free tier allows 500; 450 leaves a buffer for the names a
-                                 # failed run asked for, a ticker fetched outside this task and a month-boundary
-                                 # skew. 0: fetch none. The monthly launchd agent runs `bars-history --fill 450`.
+min_interval_s = 0.4             # POWER PLAN, bought 2026-10-09 for ONE MONTH (the 2010+ bars backfill): 10,000 requests an
+                                 # hour, ~110,000 distinct symbols a month; 0.4 s = 9,000 an hour, 10% headroom.
+                                 # ON OR AFTER 2026-11-09 go back to the FREE tier: min_interval_s = 72 (50 requests an
+                                 # hour, 1,000 a day, 500 unique symbols a month; a refetch of a symbol already fetched
+                                 # that month is free) and monthly_symbol_budget = 100_000  # distinct tickers `bars-history` fetches in a calendar month (its run records
+                                 # count them). POWER PLAN until 2026-11-09 (allows ~110,000; 100,000 leaves a buffer
+                                 # and covers the ~12k listings as they were); FREE tier: 450 (allows 500; the buffer
+                                 # covers names a failed run asked for and a month-boundary skew). 0: fetch none.
+                                 # `bars-history --fill N` (by hand, N = 12000, or the monthly agent) is capped by it.
 
 [sp500_history]                  # S&P 500 membership intervals since 1996 (fja05680/sp500, MIT licence, GitHub):
 enabled = true                   # the `index-membership` task (in no workflow until the owner runs it), one 28 KB file

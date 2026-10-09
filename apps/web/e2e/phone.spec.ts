@@ -100,6 +100,15 @@ test('Ideas: the views and filter chips fit the screen and a tapped view narrows
   expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
 });
 
+test('Ideas: a phone row keeps the ticker, decision and score', async ({ page }) => {
+  await page.goto('/ideas');
+  const headers = page.getByRole('grid', { name: 'Top ideas' }).getByRole('columnheader');
+  await expect(headers).toContainText(['Ticker', 'Decision', 'Score']);
+  await expect(headers.filter({ hasText: /Why it's here|Criteria|Price|Watch out/ })).toHaveCount(
+    0,
+  );
+});
+
 test('Explore chart: the zoom buttons are there', async ({ page }) => {
   await page.goto('/explore?focus=AAPL&tab=chart');
   await expect(page.getByRole('button', { name: 'Zoom in' })).toBeVisible();

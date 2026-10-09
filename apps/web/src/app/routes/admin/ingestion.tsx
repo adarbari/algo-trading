@@ -6,7 +6,7 @@
 import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/react-router';
 
 import type { CellRef } from '@/entities/ingestion';
-import { lazyPage } from '../lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 const AdminIngestionPage = lazyPage(() => import('@/pages/admin-ingestion'), 'AdminIngestionPage');
 

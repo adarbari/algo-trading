@@ -7,7 +7,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
-import { lazyPage } from '../lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 const NewScreenerPage = lazyPage(() => import('@/pages/screener-builder'), 'NewScreenerPage');
 const ScreenerBuilderPage = lazyPage(

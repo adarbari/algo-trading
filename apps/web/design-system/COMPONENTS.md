@@ -1017,6 +1017,17 @@ Source: `design-system/components/OptionList`
 | `loading` | `boolean` | no | Placeholders while the items load. |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
 
+### OutcomeDots
+
+OutcomeDots: a row of small squares, one per item, each filled in the tone of its outcome (a criterion passed, nearly passed, failed or had no value). The row is one image named by its `label` and the items' labels in order ("Criteria: Price above 50-day: Passed, ..."), so colour is never the only signal and nothing is counted: the caller says what each square means.
+
+Source: `design-system/components/OutcomeDots`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly OutcomeDot[]` | yes | The squares, in order. |
+| `label` | `string` | yes | Accessible name of the row, e.g. "Criteria". |
+
 ### Panel
 
 Panel: a bordered section of a screen, built on Surface. A header (title as a heading, optional description, actions on the end: chips, buttons, a legend), a body, and an optional footer note. `state` swaps the body for a calm loading, empty or error message (with Retry), so every panel handles the four data states the same way. `flush` drops body padding for tables.

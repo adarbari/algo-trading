@@ -11,6 +11,11 @@ export const IDEA_FACTS = {
   expiryDte: feature('rollup.nearest_expiry@v1.dte'),
   earningsBeforeExpiry: feature('feature.earnings_before_expiry'),
   iv30: feature('feature.vrp_iv30'),
+  /** The session's close and the 1-session return, shown beside the ticker. */
+  close: feature('rollup.price_stats@v2.close'),
+  ret1d: feature('rollup.trend_stats@v2.ret_1d'),
+  /** The ticker of the sector ETF the company's sector maps to (the sector line under the name). */
+  sectorEtf: feature('rollup.relative_strength@v1.sector_etf'),
 } as const;
 
 export const IDEA_FEATURES = Object.values(IDEA_FACTS);

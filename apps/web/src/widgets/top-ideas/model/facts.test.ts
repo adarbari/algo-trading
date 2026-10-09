@@ -40,6 +40,7 @@ const pick: IdeaPick = {
   flags: [],
   columns: {},
   criterionValues: {},
+  criteria: [],
   decision: 'QUALIFIED',
   score: 1,
   reasons: '',
@@ -47,6 +48,7 @@ const pick: IdeaPick = {
 const idea = (facts: ServedValue[]): Idea => ({
   instrumentId: 'id',
   symbol: 'X',
+  name: 'X Inc',
   rank: 1,
   picks: [pick],
   best: pick,

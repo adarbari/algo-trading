@@ -15,6 +15,7 @@ from strawberry.types import Info
 from algotrade.services.read.availability.cause import public_audit
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.table import DEFAULT_SIZE
+from algotrade.services.read.screens import pick_history as picks
 from algotrade.services.read.screens import results, runs, screeners
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.offload import off_loop
@@ -157,9 +158,31 @@ class ScreenColumn:
 
 
 @strawberry.type(
+    description="One session of a screener's pick history: how many tickers its latest run of "
+    "the session picked and how many the regime gate held back (`paused`); both null when it "
+    "has no run for the session, and `notRun` says why (NOT_RUN)"
+)
+class PickCount:
+    session: dt.date
+    picked: int | None
+    paused: int | None
+    not_run: Unknown | None
+
+    @classmethod
+    def of(cls, d: picks.PickCount) -> Self:
+        return cls(
+            session=d.session,
+            picked=d.picked,
+            paused=d.paused,
+            not_run=Unknown.of(d.not_run) if d.not_run is not None else None,
+        )
+
+
+@strawberry.type(
     description="A rule screen as the user sees it (their own config, else the site preset): "
     "`owner` is whose runs are its; `criteria` and `displayColumns` the current config's; "
-    "`latestRun` its run for the session, else `notRun` says why (NOT_RUN)"
+    "`latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its "
+    "picked count per session over a window ending at the session"
 )
 class Screener:
     id: str
@@ -208,3 +231,16 @@ class Screener:
     async def track_records(self, info: Info) -> list[TrackRecord]:
         found = await self.ctx.loaders.track_records.load((self.id,))
         return [TrackRecord.of(t) for t in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Its picked count for each of the last `sessions` (default 30, at most 90) "
+        "exchange sessions ending at the session, oldest first, one entry per session: a "
+        "session it did not run in has `picked` null and `notRun` says why (never an older "
+        "run); a session with several runs counts the latest; each entry is what `latestRun` "
+        "says at that session"
+    )
+    async def pick_history(
+        self, info: Info, sessions: int = picks.DEFAULT_SESSIONS
+    ) -> list[PickCount]:
+        found = await self.ctx.loaders.screener_pick_history.load((self.owner, self.id, sessions))
+        return [PickCount.of(p) for p in found]

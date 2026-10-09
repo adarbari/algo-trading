@@ -6,13 +6,15 @@ from typing import Any
 import numpy as np
 import pytest
 
+from algotrade.config.strategy.schema import Selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
+from algotrade.core.model.predicates import Group, Rule
 from algotrade.core.model.types import Side
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.engines.selection.evaluate import SelectionResult
-from algotrade.services.backtests.rebalance import rebalances
+from algotrade.services.backtests.rebalance import evaluate_sessions, rebalances
 from algotrade.services.backtests.run import BacktestOutcome, run_configured_backtest
 from algotrade.services.configs import resolve_config
 from algotrade.storage.backends.memory import MemoryBackend
@@ -166,3 +168,34 @@ def test_effective_bars_respect_the_lag() -> None:
 
 def _empty() -> SelectionResult:
     return SelectionResult("s", 0, (), 0, 0, ())
+
+
+IBKR = "rollups/instrument/ibkr_iv@v1"
+CBOE = "rollups/instrument/iv30@v1"
+VRP = Selection("vrp", Group("all", (Rule("feature.vrp_iv30", "gt", 0.1),)))
+
+
+def _vrp_backend(ibkr: bool, cboe: bool) -> StoreReader:
+    backend = golden(sessions=[START])
+    writer = StoreWriter(backend)
+    later = date(2020, 2, 3)  # the first monthly rebalance after START
+    for table, column, present in ((IBKR, "iv30_ibkr", ibkr), (CBOE, "iv30_cboe", cboe)):
+        if present:
+            rows = [{"instrument_id": "EQ:BULL", column: 0.3}]
+            writer.write_table(table, later, "iv", stamped(rows, later, "iv"))
+    return StoreReader(backend)
+
+
+def test_a_coalesce_with_one_leg_present_does_not_raise_on_a_rebalance_session() -> None:
+    """ADR 0055 amendment: the Cboe leg of ``vrp_iv30`` has no rows, IBKR's does; the backtest
+    reads the selection through the same coverage rule as the screens."""
+    reader = _vrp_backend(ibkr=True, cboe=False)
+    out = evaluate_sessions(reader, VRP, START, date(2020, 2, 28), "monthly", T0)
+    assert [s for s, _ in out] == [START, date(2020, 2, 3)]
+    assert CBOE in out[1][1].missing_tables
+
+
+def test_every_leg_of_a_coalesce_missing_still_raises() -> None:
+    reader = _vrp_backend(ibkr=False, cboe=False)
+    with pytest.raises(MissingDataError, match="rebalance session 2020-02-03"):
+        evaluate_sessions(reader, VRP, START, date(2020, 2, 28), "monthly", T0)

@@ -34,7 +34,7 @@ const item = (
   instrumentId: `id-${String(rank)}`,
   regime: rank === 1 ? 'STRESS' : null,
   sizeMultiplier: rank === 1 ? 0.5 : null,
-  instrument: symbol === null ? null : { symbol, features: facts },
+  instrument: symbol === null ? null : { symbol, name: `${symbol} Inc`, features: facts },
   picks,
 });
 
@@ -172,8 +172,8 @@ describe('display values and watch-outs', () => {
                 { name: 'hv30', value: 0.2 },
               ],
               criteria: [
-                { id: 'iv30', value: 0.99 },
-                { id: 'adv', value: 4.5e7 },
+                { id: 'iv30', outcome: 'PASS', value: 0.99 },
+                { id: 'adv', outcome: 'NEAR', value: 4.5e7 },
               ],
             },
             {
