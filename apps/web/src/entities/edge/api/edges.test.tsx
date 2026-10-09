@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gql } from '@/shared/api';
 
 import { EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from '../model/fixtures';
-import { useEdges } from './edges';
+import { useEdgeProblems, useEdges } from './edges';
 import { useTrackRecords } from './track-records';
 
 vi.mock('@/shared/api', async (importOriginal) => {
@@ -34,6 +34,17 @@ describe('useEdges', () => {
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgesPage');
     expect(result.current.data?.[0]?.verdict.verdict).toBe('promising');
+  });
+});
+
+describe('useEdgeProblems', () => {
+  it('serves the files that did not load from the same read', async () => {
+    GQL.mockResolvedValue(EDGES_FIXTURE);
+    const { result } = renderHook(() => useEdgeProblems(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data?.map((p) => p.edgeId)).toEqual(['broken']);
   });
 });
 

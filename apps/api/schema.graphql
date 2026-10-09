@@ -310,6 +310,14 @@ type EdgePaper {
 }
 
 """
+One of the user's own edge files that does not load (or loads only in part), with the reason: the edge is left out of `edges` rather than vanishing without a word
+"""
+type EdgeProblem {
+  edgeId: String!
+  reason: String!
+}
+
+"""
 One stored row of a run: a screener or baseline (`variant`, its `role`) of an edge variant (`main`: the edge itself) over a horizon, for one slice (all, year, regime, frozen, split), with its measures (null: not stored); `exploratory`: the run's split is not the edge's frozen_from
 """
 type EdgeRow {
@@ -1750,6 +1758,11 @@ type Query {
   Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data
   """
   edges: [Edge!]!
+
+  """
+  The user's own edge files `edges` leaves out (or reads only in part), by id, with the reason; empty: every file of theirs loads
+  """
+  edgeProblems: [EdgeProblem!]!
 
   """
   The Ideas signals of the edges the user follows for the session: what to buy (the paper trades signalled on it), what to sell next session and each followed edge's live record. Null: nothing stored

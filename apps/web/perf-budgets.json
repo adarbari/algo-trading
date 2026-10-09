@@ -12,22 +12,22 @@
       "src/pages/screener-builder/index.ts": 69700,
       "src/pages/screener-results/index.ts": 70560,
       "src/pages/trader-calendar/index.ts": 12900,
-      "src/pages/trader-edges/index.ts": 42300,
+      "src/pages/trader-edges/index.ts": 41900,
       "src/pages/trader-explore/index.ts": 61100,
       "src/pages/trader-explore/ui/OtherTabs.tsx": 93400,
-      "src/pages/trader-ideas/index.ts": 41000,
+      "src/pages/trader-ideas/index.ts": 41100,
       "src/pages/trader-regime/index.ts": 57700,
       "src/pages/trader-screeners/index.ts": 17300
     }
   },
   "e2e": {
     "/ideas": {
-      "first_load_js_gzip_bytes": 234200,
-      "requests": 45,
-      "dom_nodes": 297
+      "first_load_js_gzip_bytes": 232200,
+      "requests": 43,
+      "dom_nodes": 293
     },
     "/screeners": {
-      "first_load_js_gzip_bytes": 209500,
+      "first_load_js_gzip_bytes": 209400,
       "requests": 48,
       "dom_nodes": 191
     },
@@ -37,17 +37,17 @@
       "dom_nodes": 1593
     },
     "/screeners/vrp_scanner": {
-      "first_load_js_gzip_bytes": 255000,
+      "first_load_js_gzip_bytes": 254900,
       "requests": 74,
       "dom_nodes": 298
     },
     "/admin/ingestion": {
       "first_load_js_gzip_bytes": 233500,
-      "requests": 55,
+      "requests": 56,
       "dom_nodes": 634
     },
     "/explore?focus=AAPL&tab=chart": {
-      "first_load_js_gzip_bytes": 304000,
+      "first_load_js_gzip_bytes": 304200,
       "requests": 61,
       "dom_nodes": 216
     }
@@ -55,14 +55,17 @@
   "reasons": {
     "bundle.routes.src/pages/admin-llm-usage/index.ts": "2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
     "e2e./explore?focus=AAPL&tab=chart.dom_nodes": "2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks",
-    "e2e./ideas.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #457 ED8 PR-D: the edge-signals widget loads on the Ideas page as its own chunk (+2.5 kB: the widget, its columns and the EdgeDesk operation)",
-    "e2e./screeners.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +295 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #457 ED8 PR-D: the EdgeDesk and EdgePaper operations in the generated documents and the paper hooks in the edge entity move into shared chunks (+~250 B)",
-    "e2e./regime.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #457 ED8 PR-D: the EdgeDesk and EdgePaper operations in the generated documents and the paper hooks in the edge entity move into shared chunks (+~250 B)",
-    "e2e./screeners/vrp_scanner.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #447 the criteria scorecard reads the resolved config's rules table (resolvedRules, +2 B over the exact budget); then 2026-10-09 #452 the criteria scorecard reads typed criteria through the screeners list query (+685 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #457 ED8 PR-D: the EdgeDesk and EdgePaper operations in the generated documents and the paper hooks in the edge entity move into shared chunks (+~250 B)",
-    "e2e./admin/ingestion.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) +53 B from the merged shared chunk graph (the page-cache chunk is listed in the entry's chunk table); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #457 ED8 PR-D: the EdgeDesk and EdgePaper operations in the generated documents and the paper hooks in the edge entity move into shared chunks (+~250 B)",
+    "e2e./explore?focus=AAPL&tab=chart.first_load_js_gzip_bytes": "2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
+    "e2e./ideas.requests": "2026-10-09 #456 ED8 E7: the version comparison is its own lazy read, so the shared edge hooks load as one more small chunk here",
+    "e2e./admin/ingestion.requests": "2026-10-09 #456 ED8 E7: the version comparison is its own lazy read, so the shared edge hooks load as one more small chunk here",
+    "e2e./ideas.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
+    "e2e./screeners.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +295 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
+    "e2e./regime.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
+    "e2e./screeners/vrp_scanner.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #447 the criteria scorecard reads the resolved config's rules table (resolvedRules, +2 B over the exact budget); then 2026-10-09 #452 the criteria scorecard reads typed criteria through the screeners list query (+685 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
+    "e2e./admin/ingestion.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) +53 B from the merged shared chunk graph (the page-cache chunk is listed in the entry's chunk table); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI)",
     "bundle.routes.src/pages/trader-calendar/index.ts": "2026-10-09 #440 the page chunk starts its reads and the saved page cache when loaded (hover preload); the entry chunk stays under budget; then 2026-10-09 #452 shared chunk graph after the typed screen criteria (+50 B)",
     "bundle.routes.src/pages/admin-ingestion/index.ts": "2026-10-09 #438 Guide entries in one batched read: the batch document and loader (replacing four single-entry documents) move into this page chunk (+645 B gzip); then 2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
-    "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested); then 2026-10-09 #457 ED8 PR-D: the edge signals' empty state is one ghost button (+4 nodes) when no edge is followed",
+    "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
     "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #440 the page chunk starts its read and the saved page cache when loaded (hover preload); then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +312 B); then 2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
     "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record; then 2026-10-09 #452 the typed criteria mapping (+1 node); then 2026-10-09 #454 ED8 PR-A: measured by CI after merging main; this PR's BarList change adds no nodes, so the two come from screener-page changes merged meanwhile",
     "e2e./screeners/vrp_scanner.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too; then 2026-10-09 #454 ED8 PR-A: making the decile and Robustness panels lazy on the Edges page split the shared BarList code into its own chunks, which this route now loads as two more requests",
@@ -73,12 +76,11 @@
     "bundle.routes.src/pages/admin-harness-runs/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks",
     "bundle.routes.src/pages/guide/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; then 2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
     "bundle.routes.src/pages/screener-results/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; then 2026-10-09 #452 the criteria scorecard reads typed criteria through the screeners list query (useScreenerRuns) instead of the screen detail (+416 B); then 2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk",
-    "bundle.routes.src/pages/trader-edges/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; plus the Edges Lab pages; then 2026-10-09 #457 ED8 PR-D: the edge page's live record, forward test and paper trades (EdgeLive, the paper reads and the Distribution it draws, +3 kB gzip)",
+    "bundle.routes.src/pages/trader-edges/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; plus the Edges Lab pages; then 2026-10-09 #456 ED8 E7: the list views, the user's state column and the follow actions (the dialogs and the comparison panel are lazy chunks, counted here); the route keeps the view names so the entity stays out of the entry chunk",
     "bundle.routes.src/pages/trader-regime/index.ts": "2026-10-09 #425 ED8 step 1: the same shared DataTable groupBy / OddsLine code lands in this chunk (+20 B gzip)",
     "e2e./regime.requests": "2026-10-09 #425 ED8 step 1: the shared DataTable / OddsLine code splits into one more chunk on this route (82 -> 83)",
-    "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; then 2026-10-09 #457 ED8 PR-D: the lazy edge-signals import and its two route handlers (+14 B; the widget itself is its own chunk)",
+    "bundle.routes.src/pages/trader-ideas/index.ts": "2026-10-09 #425 ED8 step 1 (owner-requested): DataTable groupBy and the OddsLine / TrackRecordChip vocabulary change shared code that moves into page chunks; then 2026-10-09 #456 shared entity chunk graph after the edge state fields (+78 B gzip)",
     "e2e./screeners.requests": "2026-10-09 #452 one more script chunk from the build split; the GraphQL operations are unchanged (8, checked); then 2026-10-09 #454 ED8 PR-A: making the decile and Robustness panels lazy on the Edges page split the shared BarList code into its own chunks, which this route now loads as two more requests",
-    "e2e./screeners/vrp_scanner.dom_nodes": "2026-10-09 #452 the criteria scorecard shows each rule again (it read none before #447); then 2026-10-09 #454 ED8 PR-A: measured by CI after merging main; this PR's BarList change adds no nodes, so the two come from screener-page changes merged meanwhile",
-    "e2e./ideas.requests": "2026-10-09 #457 ED8 PR-D: the lazy edge-signals chunk, its shared helper chunks and the EdgeDesk request (+3)"
+    "e2e./screeners/vrp_scanner.dom_nodes": "2026-10-09 #452 the criteria scorecard shows each rule again (it read none before #447); then 2026-10-09 #454 ED8 PR-A: measured by CI after merging main; this PR's BarList change adds no nodes, so the two come from screener-page changes merged meanwhile"
   }
 }

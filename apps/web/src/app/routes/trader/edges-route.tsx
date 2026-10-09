@@ -5,25 +5,39 @@
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
+import type { EdgeView } from '@/entities/edge';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const EdgesPage = lazyPage(() => import('@/pages/trader-edges'), 'EdgesPage');
 
+// The views a link may name (`all` is the bare list); a type import only keeps the entity out of
+// the entry chunk.
+const VIEWS: readonly EdgeView[] = ['mine', 'following', 'rejected'];
+
 interface EdgesSearch {
   edge?: string;
+  view?: EdgeView;
 }
 
 export function validateEdgesSearch(search: Record<string, unknown>): EdgesSearch {
-  const { edge } = search;
-  return typeof edge === 'string' && edge ? { edge } : {};
+  const { edge, view } = search;
+  const found = VIEWS.find((v) => v === view);
+  return {
+    ...(typeof edge === 'string' && edge ? { edge } : {}),
+    ...(found ? { view: found } : {}),
+  };
 }
 
 function EdgesRoute() {
-  const { edge } = validateEdgesSearch(useSearch({ strict: false }));
+  const { edge, view } = validateEdgesSearch(useSearch({ strict: false }));
   const navigate = useNavigate();
   return (
     <EdgesPage
       selected={edge ?? null}
+      {...(view ? { view } : {})}
+      onViewChange={(next) =>
+        void navigate({ to: '/edges', search: next === 'all' ? {} : { view: next }, replace: true })
+      }
       onSelect={(id) => void navigate({ to: '/edges', search: { edge: id }, replace: true })}
       onClear={() => void navigate({ to: '/edges', search: {}, replace: true })}
     />

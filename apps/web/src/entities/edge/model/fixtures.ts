@@ -38,13 +38,21 @@ const verdict = (over: Record<string, unknown>) => ({
 
 const edge = (over: Record<string, unknown>) => ({
   status: 'candidate',
+  state: 'researching',
+  since: null,
+  stateReason: '',
+  labels: [],
+  oosRevealed: false,
+  oosHidden: false,
+  mine: false,
+  extends: null,
+  replaces: null,
   thesis: 'Winners keep winning for months.',
   mechanism: 'Slow reaction to news.',
   persistence: 'Limits to arbitrage.',
   horizons: [20],
   screeners: [],
   baselines: [],
-  mine: false,
   rejectionReason: '',
   sources: [],
   definition: {
@@ -61,6 +69,7 @@ const edge = (over: Record<string, unknown>) => ({
 });
 
 export const EDGES_FIXTURE = {
+  edgeProblems: [{ edgeId: 'broken', reason: "broken.toml extends: no edge 'ghost'" }],
   edges: [
     edge({
       id: 'momentum_12_1',
@@ -155,6 +164,14 @@ export const EDGES_FIXTURE = {
           lostInputs: [],
         },
       ],
+    }),
+    edge({
+      id: 'my_momentum',
+      name: 'My momentum',
+      mine: true,
+      extends: 'momentum_12_1',
+      oosHidden: true,
+      screeners: ['momentum_12_1'],
     }),
     edge({
       id: 'earnings_drift',

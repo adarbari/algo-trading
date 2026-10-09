@@ -164,3 +164,18 @@ def load_edges(ctx: Stores) -> tuple[Edge, ...]:
 def load_edge(ctx: Stores, edge_id: str) -> Edge | None:
     """The edge ``edge_id``; ``None`` when the user has no such edge."""
     return next((e for e in load_edges(ctx) if e.id == edge_id), None)
+
+
+@dataclass(frozen=True)
+class EdgeProblem:
+    """One of the user's own edge files that does not (fully) load: ``edge_id`` and the
+    ``reason`` in the loader's words."""
+
+    edge_id: str
+    reason: str
+
+
+def load_edge_problems(ctx: Stores) -> tuple[EdgeProblem, ...]:
+    """The user's own edge files left out (or only partly read) by ``load_edges``, by id."""
+    found = loading.edge_problems(ctx.configs, ctx.user.user_id)
+    return tuple(EdgeProblem(i, found[i]) for i in sorted(found))
