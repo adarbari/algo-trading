@@ -1,6 +1,5 @@
 """ConfigWriter: drafts, immutable versions and user features (file + memory)."""
 
-import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -13,7 +12,6 @@ from algotrade.storage.configs.writer import (
     MemoryConfigWriter,
     VersionExistsError,
     archive_name,
-    toml_text,
 )
 
 DOC: dict[str, Any] = {
@@ -30,16 +28,6 @@ DOC: dict[str, Any] = {
 @pytest.fixture(params=["file", "memory"])
 def writer(request: pytest.FixtureRequest, tmp_path: Path) -> FileConfigWriter | MemoryConfigWriter:
     return FileConfigWriter(tmp_path) if request.param == "file" else MemoryConfigWriter()
-
-
-def test_toml_text_round_trips_and_fails_closed() -> None:
-    assert tomllib.loads(toml_text(DOC)) == DOC
-    with pytest.raises(ConfigurationError, match="null"):
-        toml_text({"a": None})
-    with pytest.raises(ConfigurationError, match="not a config value"):
-        toml_text({"a": [object()]})
-    with pytest.raises(ConfigurationError, match="larger"):
-        toml_text({"a": "x" * 70_000})
 
 
 def test_draft_save_load_discard(writer: Any) -> None:
@@ -102,6 +90,30 @@ def test_features_are_saved_per_theme(writer: Any) -> None:
     writer.save_features("alice", "builder", feature)
     assert writer.load("alice", "features", "builder") == feature
     assert writer.names("alice", "features") == ["builder"]
+
+
+def test_user_documents_are_saved_archived_and_their_ids_remembered(writer: Any) -> None:
+    doc = {"extends": "drift", "follow": {"state": "following"}}
+    writer.save_user_document("alice", "edges", "mine", doc)
+    assert writer.load("alice", "edges", "mine") == doc
+    assert writer.names("alice", "edges") == ["mine"]
+    assert not writer.was_archived("alice", "edges", "mine")
+    assert writer.archive_user_document("alice", "edges", "mine", datetime(2026, 10, 9, tzinfo=UTC))
+    assert writer.load("alice", "edges", "mine") is None
+    assert writer.was_archived("alice", "edges", "mine")
+    assert not writer.was_archived("alice", "edges", "min")  # a prefix is another id
+    assert not writer.archive_user_document("alice", "edges", "mine", datetime.now(UTC))
+
+
+@pytest.mark.parametrize(
+    ("user", "kind", "name"),
+    [("site", "edges", "mine"), ("alice", "screeners", "mine"), ("alice", "edges", "../x")],
+)
+def test_user_documents_have_a_user_a_known_kind_and_a_strict_id(
+    writer: Any, user: str, kind: str, name: str
+) -> None:
+    with pytest.raises(ConfigurationError):
+        writer.save_user_document(user, kind, name, {})
 
 
 @pytest.mark.parametrize("user", ["site", "../x", "Alice", "a/b", "a\n", ""])

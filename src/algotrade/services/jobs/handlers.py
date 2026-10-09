@@ -110,7 +110,7 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
 def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``edge`` (id), ``start``, ``end`` (ISO dates), optional ``as_of`` (ISO instant:
     the outcomes known by then; default now), ``iv_field`` (the one implied-vol field of the run;
-    default our IV30), ``split_from`` (ISO date: the run's test split, over the user's and the
+    default our IV30), ``split_from`` (ISO date: the run's test split, over the
     edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory), ``extra_baselines``
     (screener ids scored as baselines besides the edge's own: the golden evaluation's, never a
     real edge document's). The harness's rows land in ``results/edge_eval``."""

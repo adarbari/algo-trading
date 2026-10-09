@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 
 import pytest
 
+from algotrade.config.edges.follow import Follow
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
@@ -645,18 +646,13 @@ def test_a_variant_may_override_the_offset_and_reads_its_own_entry_partition() -
 # ---- ED5a: the train / test split
 
 
-def _user_world(split: str | None) -> World:
-    w = build_world()
-    if split:
-        w.configs._docs[("alice", "evaluation", "evaluation")] = {"split_from": split}
-    return w
-
-
-def _split_run(w: World, user: str = "alice", **kw: Any) -> EdgeEvaluation:
+def _split_run(
+    w: World, user: str = "alice", changes: dict[str, Any] | None = None, **kw: Any
+) -> EdgeEvaluation:
+    moved = dataclasses.replace(edge(frozen_from="2026-09-04"), **(changes or {}))
     return evaluate_edge(
-        w.reader, w.results, w.configs, UserContext(user), edge(frozen_from="2026-09-04"),
-        DAYS[0], DAYS[-1], AS_OF, **kw,
-    )  # fmt: skip
+        w.reader, w.results, w.configs, UserContext(user), moved, DAYS[0], DAYS[-1], AS_OF, **kw
+    )
 
 
 def test_the_site_split_is_the_edges_frozen_from_and_not_exploratory(world: World) -> None:
@@ -665,27 +661,35 @@ def test_the_site_split_is_the_edges_frozen_from_and_not_exploratory(world: Worl
     assert ev.results[0].measures[-1].slice_kind == "frozen"
 
 
-def test_a_users_split_makes_the_run_exploratory_with_its_own_test_slice() -> None:
-    ev = _split_run(_user_world("2026-09-09"))
+def test_a_copy_that_moved_its_split_is_exploratory_with_its_own_test_slice(world: World) -> None:
+    ev = _split_run(world, changes={"frozen_from": date(2026, 9, 9)})  # site_frozen_from: Sept 4
     assert (ev.split_from, ev.exploratory) == (date(2026, 9, 9), True)
     test = ev.results[0].measures[-1]
     assert (test.slice_kind, test.sessions) == ("split", 1)  # only the Sept 9 or later start
     assert not any(m.slice_kind == "frozen" for m in ev.results[0].measures)
 
 
-def test_the_run_split_beats_the_users_which_beats_the_edges() -> None:
-    w = _user_world("2026-09-09")
-    assert _split_run(w).split_from == date(2026, 9, 9)  # user over the edge
-    assert _split_run(w, split_from=date(2026, 9, 2)).split_from == date(2026, 9, 2)  # run wins
-    assert _split_run(w, "bob").split_from == date(2026, 9, 4)  # another user: the edge's
-    same = _split_run(w, split_from=date(2026, 9, 4))
-    assert not same.exploratory  # the run restating the frozen_from is the site's split
+def test_a_copy_that_kept_the_site_split_is_not_exploratory_until_a_split_moved_after_viewing(
+    world: World,
+) -> None:
+    assert not _split_run(world).exploratory
+    follow = Follow(labels=("split_moved_after_viewing",))
+    assert _split_run(world, changes={"follow": follow}).exploratory
 
 
-def test_the_split_joins_the_run_hash() -> None:
-    w = _user_world(None)
+def test_the_run_split_beats_the_edges(world: World) -> None:
+    moved = {"frozen_from": date(2026, 9, 9)}
+    assert _split_run(world, changes=moved).split_from == date(2026, 9, 9)  # the copy's own
+    assert _split_run(world, changes=moved, split_from=date(2026, 9, 2)).split_from == date(
+        2026, 9, 2
+    )  # the run wins
+    same = _split_run(world, split_from=date(2026, 9, 4))
+    assert not same.exploratory  # the run restating the site's frozen_from is the site's split
+
+
+def test_the_split_joins_the_run_hash(world: World) -> None:
     hashes = {
-        _split_run(w, split_from=d).run_hash for d in (None, date(2026, 9, 2), date(2026, 9, 9))
+        _split_run(world, split_from=d).run_hash for d in (None, date(2026, 9, 2), date(2026, 9, 9))
     }
     assert len(hashes) == 3
 

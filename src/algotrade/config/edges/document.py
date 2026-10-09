@@ -50,6 +50,9 @@ and the key.
                       the cited run's stored rows show the model ahead
                       (``services/read/evaluation/promotion.py``); a fitness test checks the
                       committed numbers the same way (``test_edge_promotion.py``)
+    extends           a user's copy: the id of the edge (a site edge, or the user's own) whose
+                      document it is layered over (``loading.py``); the copy's own keys win
+    [follow]          the user's own state about the edge (``follow.py``)
     [scorer]          optional: ``features``, the selection fields (``rollup.<group>@v<n>.<column>``
                       or ``feature.<name>``) a learned scorer is fitted on (ED7)
 
@@ -58,10 +61,11 @@ Whether the named presets exist is checked by ``loading.py``, which sees the sto
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, NoReturn
 
+from algotrade.config.edges.follow import Follow, parse_follow
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
@@ -112,6 +116,7 @@ KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
+    "extends", "follow",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -214,6 +219,11 @@ class Edge:
     evidence: Evidence | None = None
     promoted: str | None = None  # the screener that implements the edge for use (ED7c)
     compared: tuple[Compared, ...] = ()  # the numbers the promotion rests on
+    extends: str | None = None  # a user's copy: the edge it is layered over
+    follow: Follow = field(default_factory=Follow)  # the user's own state about the edge
+    # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
+    # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
+    site_frozen_from: date | None = None
 
     @property
     def event_class(self) -> str | None:
@@ -281,6 +291,9 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         evidence=_evidence(t),
         promoted=_promoted(t),
         compared=_compared(t),
+        extends=_extends(t, edge_id),
+        follow=parse_follow(doc, where),
+        site_frozen_from=_frozen_from(t),
     )
     if edge.promoted is not None and edge.promoted not in edge.screeners:
         raise ConfigurationError(
@@ -332,6 +345,15 @@ def _evidence(t: Table) -> Evidence | None:
     if not run_id or split is None:
         raise ConfigurationError(f"{sub.where}: run_id and split_from are both required")
     return Evidence(run_id, _date(sub, "split_from", split))
+
+
+def _extends(t: Table, edge_id: str) -> str | None:
+    raw = t.text("extends", "")
+    if not raw:
+        return None
+    if validate_id("edge", raw) == edge_id:
+        raise ConfigurationError(f"{t.where} extends: an edge cannot extend itself")
+    return raw
 
 
 def _frozen_from(t: Table) -> date | None:

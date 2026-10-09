@@ -134,3 +134,13 @@ reason = "the text model's note on the regime explanation"
 name = "Draft.document"
 surface = "rest"
 reason = "the caller's own draft document"
+
+[[fact]]
+name = "EdgeDocument.document"
+surface = "rest"
+reason = "the caller's own edge document as saved (a copy's keys)"
+
+[[fact]]
+name = "EdgeState.reason"
+surface = "rest"
+reason = "the reason the caller gave for rejecting or retiring their own edge"

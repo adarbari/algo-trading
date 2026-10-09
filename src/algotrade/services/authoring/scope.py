@@ -17,6 +17,7 @@ __all__ = [
     "ConfigWriter",
     "ConflictError",
     "Declared",
+    "EdgeNotFoundError",
     "ScreenNotFoundError",
     "author",
     "open_writer",
@@ -29,6 +30,10 @@ class ConflictError(AlgoTradeError):
 
 class ScreenNotFoundError(AlgoTradeError):
     """No such screen (no draft, no version, no preset) for this user."""
+
+
+class EdgeNotFoundError(ScreenNotFoundError):
+    """The user sees no such edge (a 404 like a missing screen)."""
 
 
 Declared = Callable[[str], bool]  # whether the registry declares this user id
