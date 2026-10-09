@@ -24,7 +24,7 @@ export type FeatureFormat =
   | 'PERCENT'
   | 'TEXT';
 
-/** The kinds of Guide entry `guideEntries` reads in a batch */
+/** The kinds of Guide entry `guideEntries` reads */
 export type GuideEntryKind =
   | 'EPISODE'
   | 'INDICATOR'
