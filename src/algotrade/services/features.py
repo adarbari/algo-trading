@@ -22,9 +22,10 @@ import pandas as pd
 
 from algotrade.config.env import config_dir
 from algotrade.config.strategy.resolve import ResolvedConfig
-from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
+from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, REFERENCE_TABLE, is_feature_field
 from algotrade.data import StoreReader
-from algotrade.data.reference import InstrumentView, instrument_view
+from algotrade.data.listings.identity import HistoricalIdentity, historical_reference
+from algotrade.data.reference import InstrumentView, instrument_view, snapshot
 from algotrade.data.rollups import feature_rows, group_view
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.site import site_features as build_site_features
@@ -121,16 +122,30 @@ def field_view(
     ids: Sequence[str] | None = None,
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
+    historical: bool = False,
 ) -> InstrumentView:
     """``data.reference.instrument_view`` for any catalogue fields: stored ones as read,
     ``feature.<name>`` ones computed for the session, for ``ids`` only when given (tables they
-    need that have no partition for the session are added to ``missing``)."""
+    need that have no partition for the session are added to ``missing``). ``historical``: a
+    session before the first reference snapshot reads the names of the listing history alive
+    then (``data.listings.identity``, ADR 0053 amendment 2026-10-09: the edge harness only)."""
     stored = [f for f in fields if not is_feature_field(f)]
-    view = instrument_view(reader, session, stored, ids, as_of)
+    identity = _historical_identity(reader, session, as_of) if historical else None
+    view = instrument_view(reader, session, stored, ids, as_of, identity)
     frame, missing = _with_expressions(
         reader, session, fields, view.frame, view.missing, ids, as_of, features
     )
     return replace(view, frame=frame, missing=missing)
+
+
+def _historical_identity(
+    reader: StoreReader, session: date, as_of: datetime | None
+) -> HistoricalIdentity | None:
+    snap = snapshot(reader, REFERENCE_TABLE, session)
+    if snap is None or not snap.pre_snapshot:
+        return None
+    today = reader.table(REFERENCE_TABLE, snap.snapshot_date, as_of)
+    return None if today is None else historical_reference(reader, session, today)
 
 
 def entity_field_view(

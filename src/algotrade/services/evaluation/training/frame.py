@@ -95,7 +95,11 @@ def training_frame(
         counted = apply_outcome(edge, by_entry[s][by_entry[s]["instrument_id"].isin(ids)])
         counted = counted[counted["excluded"] == ""]
         view, _ = fields_view(
-            reader, edge.scorer_features, d, [str(i) for i in counted["instrument_id"]]
+            reader,
+            edge.scorer_features,
+            d,
+            [str(i) for i in counted["instrument_id"]],
+            historical=True,
         )
         values = {
             f: [_number(view.get(i, f)) for i in counted["instrument_id"]]

@@ -24,6 +24,7 @@ from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.harness import edge_universe, evaluate_edge
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
+    historical_identity,
     lost_sessions,
     records,
     report_containment,
@@ -144,6 +145,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "trials": evaluation.trials,
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
         "survivorship": {str(h): list(v) for h, v in survivorship(evaluation).items()},
+        "historical_identity": historical_identity(evaluation),
         "unclosed_sessions": {str(h): n for h, n in evaluation.unclosed_sessions.items()},
         "event_unknown": dict(evaluation.event_unknown),
         "lost_sessions": lost_sessions(evaluation),

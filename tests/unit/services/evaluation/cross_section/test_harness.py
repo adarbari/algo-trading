@@ -40,6 +40,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     edge,
     outcome_row,
     screen,
+    with_listing_history,
 )  # fmt: skip
 
 USER = UserContext("site")
@@ -815,3 +816,14 @@ def test_the_eligible_sets_read_for_the_events_are_not_kept_once_the_schedules_a
     monkeypatch.setattr(harness, "_measure", spy)
     run(event_world(EVENTS), event_edge(2))
     assert caches == [0]
+
+
+def test_an_evaluation_before_the_first_snapshot_reads_the_listing_history_and_says_so() -> None:
+    w = with_listing_history(build_world(snapshot=DAYS[3]), DAYS[3])  # first snapshot after D
+    ev = run(w)
+    assert ev.historical is not None and 0 < ev.historical.sessions < len(DAYS)  # before DAYS[3]
+    assert ev.historical.eligible == {"today_flag": N * ev.historical.sessions, "proxy": 0}
+    assert ev.results[0].measures[0].pre_snapshot_sessions == 0  # not a survivorship caveat
+    record = write_edge_eval(w.results, ev, AS_OF)
+    assert record.stats["historical_identity"]["sessions"] == ev.historical.sessions
+    assert run(build_world()).historical is None  # a normal run carries no caveat

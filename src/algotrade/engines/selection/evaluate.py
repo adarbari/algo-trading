@@ -31,6 +31,10 @@ class SelectionResult:
     audit: tuple[RuleAudit, ...]
     missing_tables: tuple[str, ...] = ()  # rollups with no data for the session (UNKNOWN)
     pre_snapshot: bool = False  # the reference snapshot is after the session (survivorship)
+    # Identity from the listing history, not the snapshot (ADR 0053 amendment 2026-10-09):
+    # ``proxy_ids`` are the names whose optionable the universe's liquidity rule decides.
+    historical: bool = False
+    proxy_ids: frozenset[str] = frozenset()
 
     @property
     def empty(self) -> bool:

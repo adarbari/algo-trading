@@ -26,6 +26,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     World,
     build_world,
     edge,
+    with_listing_history,
 )  # fmt: skip
 
 NOW = datetime(2026, 10, 6, 12, tzinfo=AS_OF.tzinfo)
@@ -130,9 +131,11 @@ def test_records_are_json_able_with_none_for_missing(world: World) -> None:
     assert first["range_from"] == DAYS[0]
 
 
-def test_survivorship_counts_sessions_read_from_a_later_snapshot() -> None:
-    w = build_world(snapshot=DAYS[3])  # the snapshot is Sept 4: starts Sept 1 and Sept 3 precede it
-    assert survivorship(evaluate(w)) == {2: (2, 4)}
+def test_sessions_before_the_first_snapshot_are_a_historical_caveat_not_survivorship() -> None:
+    w = with_listing_history(build_world(snapshot=DAYS[3]), DAYS[3])  # starts Sept 1, 3 precede it
+    ev = evaluate(w)
+    assert survivorship(ev) == {2: (0, 4)}  # read from the listing history, not a later snapshot
+    assert ev.historical is not None and ev.historical.sessions == 2
 
 
 def test_an_exploratory_split_writes_rows_under_its_own_key_and_leaves_the_sites(

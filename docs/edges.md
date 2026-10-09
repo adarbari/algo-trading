@@ -158,7 +158,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 - **Outcome:** expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon
 - **Schedule:** every session
-- **Universe:** preset `liquid_optionable`
+- **Universe:** preset `liquid_optionable_floored`
 - **Top K:** 20
 - **Screeners:** `vrp_iv_hv`
 - **Baselines:** `momentum_12_1`, `size_small`
