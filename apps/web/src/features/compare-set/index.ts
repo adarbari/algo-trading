@@ -1,3 +1,2 @@
-/** Feature: the compare set (selected tickers, their series colours, the focused ticker). */
-export { MAX_COMPARE, nextSelection, seriesAt, seriesOf } from './model/compare-set';
-export { CompareSetBar, type CompareSetBarProps } from './ui/CompareSetBar';
+/** Feature: the compare set (the open tickers and their series colours). */
+export { MAX_COMPARE, seriesAt, seriesOf } from './model/compare-set';

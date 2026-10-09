@@ -1,0 +1,78 @@
+/* TabStrip: pill tabs in one scrolling row; the selected tab takes the accent tint and border. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--density-gap);
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  overflow-x: auto;
+  gap: var(--space-1);
+  scrollbar-width: none;
+}
+
+.item {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+}
+
+.item:hover {
+  color: var(--color-text);
+}
+
+.item[data-selected] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.tab {
+  min-height: var(--density-control-height);
+  padding: 0 var(--space-2-5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  cursor: pointer;
+}
+
+.tab[data-mono] {
+  font-family: var(--font-mono);
+}
+
+.tab[data-closable] {
+  padding-inline-end: var(--space-1);
+}
+
+.tab:focus-visible {
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.close {
+  display: inline-flex;
+  padding-inline-end: var(--space-1);
+}
+
+.panel {
+  min-width: 0;
+}
+
+.panel:focus-visible {
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (pointer: coarse) {
+  .tab {
+    min-height: var(--density-control-height);
+  }
+}

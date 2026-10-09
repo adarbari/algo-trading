@@ -1,9 +1,9 @@
 /**
- * Explore's state in the URL's search params, so a view is a shareable link: the compare set,
- * the focused ticker, the tab, the table's columns, filters and sort, and each tab's choices.
- * Lists are comma-separated; absent keys take the defaults below.
+ * Explore's state in the URL's search params, so a view is a shareable link: the open tickers
+ * (`sel`), the one in focus, the tab, and each tab's choices. Lists are comma-separated; absent
+ * keys take the defaults below.
  */
-import type { ChartRange, DataTableSort } from '@algotrade/ui';
+import type { ChartRange } from '@algotrade/ui';
 
 import { feature } from '@/shared/api';
 
@@ -15,28 +15,18 @@ export const EXPLORE_TABS = [
   'features',
   'events',
   'hits',
+  'why',
 ] as const;
 export type ExploreTab = (typeof EXPLORE_TABS)[number];
 
 /** The raw search params (what the URL holds). */
 export interface ExploreSearch {
-  /** The compare set: tickers, comma-separated, in pick order. */
+  /** The open tickers (one tab each), comma-separated, in the order they were opened; also the
+   * compare set. */
   sel?: string;
-  /** The ticker the detail tabs show (default: the first of the compare set). */
+  /** The open ticker whose tab is selected (default: the first); a ticker not yet open opens. */
   focus?: string;
   tab?: ExploreTab;
-  /** Ticker table columns: catalogue feature names, comma-separated. */
-  cols?: string;
-  /** Columns added back on a narrow (phone) table: table column ids, comma-separated. */
-  ncols?: string;
-  /** Sort: a column id, `-` prefix for descending. */
-  sort?: string;
-  q?: string;
-  type?: string;
-  sector?: string;
-  liq?: string;
-  lev?: boolean;
-  opt?: boolean;
   range?: ChartRange;
   /** Compare dimensions: catalogue feature names, comma-separated. */
   dims?: string;
@@ -49,15 +39,6 @@ export interface ExploreSearch {
   /** The screener (config id) that surfaced the ticker, set when Ideas opens it. */
   via?: string;
 }
-
-/** The mockup's columns: close, our IV30, IV / HV, distance from the 52-week high, earnings. */
-export const DEFAULT_COLUMNS: readonly string[] = [
-  feature('rollup.price_stats@v2.close'),
-  feature('rollup.iv30@v1.iv30'),
-  feature('feature.iv_hv_ratio'),
-  feature('feature.pct_from_high_avail'),
-  feature('rollup.earnings@v1.days_to_earnings'),
-];
 
 export const DEFAULT_DIMENSIONS: readonly string[] = [
   feature('rollup.price_stats@v2.close'),
@@ -79,13 +60,6 @@ const text = (value: unknown): string | undefined => {
   return undefined;
 };
 
-const flag = (value: unknown): boolean | undefined =>
-  value === true || value === 'true'
-    ? true
-    : value === false || value === 'false'
-      ? false
-      : undefined;
-
 const oneOf = <T extends string>(options: readonly T[], value: unknown): T | undefined =>
   options.find((o) => o === value);
 
@@ -98,15 +72,6 @@ export function parseExploreSearch(raw: Record<string, unknown>): ExploreSearch 
   set('sel', text(raw['sel'])?.toUpperCase());
   set('focus', text(raw['focus'])?.toUpperCase());
   set('tab', oneOf(EXPLORE_TABS, raw['tab']));
-  set('cols', text(raw['cols']));
-  set('ncols', text(raw['ncols']));
-  set('sort', text(raw['sort']));
-  set('q', text(raw['q']));
-  set('type', text(raw['type']));
-  set('sector', text(raw['sector']));
-  set('liq', text(raw['liq']));
-  set('lev', flag(raw['lev']));
-  set('opt', flag(raw['opt']));
   set('range', oneOf(RANGES, raw['range']));
   set('dims', text(raw['dims']));
   set('expiry', text(raw['expiry']));
@@ -139,15 +104,4 @@ export function joinList(
     return undefined;
   }
   return values.length === 0 ? NONE : values.join(',');
-}
-
-export function parseSort(value: string | undefined): DataTableSort | null {
-  if (!value) return null;
-  const desc = value.startsWith('-');
-  return { columnId: desc ? value.slice(1) : value, direction: desc ? 'desc' : 'asc' };
-}
-
-export function formatSort(sort: DataTableSort | null): string | undefined {
-  if (!sort) return undefined;
-  return `${sort.direction === 'desc' ? '-' : ''}${sort.columnId}`;
 }
