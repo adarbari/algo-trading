@@ -30,6 +30,7 @@ from algotrade.services.evaluation.baseline import (
 )
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.cross_section.report import render_edge_report
+from algotrade.services.evaluation.discovery.drafts import DEFAULT_DIR, write_draft
 from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
 from algotrade.services.evaluation.regime_report import render
 from algotrade.services.evaluation.regime_scorecard import load_history
@@ -336,4 +337,37 @@ def cmd_fit_edge_scorer(args: argparse.Namespace) -> int:
     r = job.result
     print(f"{args.edge}: fitted on {r['rows']} rows ({r['positives']} hits, {r['sessions']} "
           f"sessions) through {r['fitted_through']}; wrote {out}")  # fmt: skip
+    return 0
+
+
+def cmd_study_winners(args: argparse.Namespace) -> int:
+    """The ED6 winners study (ADR 0053 amendment 2026-10-09) through the jobs runner: reads every
+    grid session of the stored outcomes and rollups, finds the tells and persists the run in
+    ``results/winners_study`` (one run, atomic). Prints the gate and the run id; a long read."""
+    backend = open_backend(data_url(args.data_url))
+    resources = {
+        "reader": StoreReader(backend),
+        "writer": ResultWriter(backend),
+        "configs": open_config_store(config_dir(args.config_dir)),
+    }
+    job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "winners-study", {}, _user(args))
+    if job.status is JobStatus.FAILED:
+        print(f"error: winners study: {job.error}", file=sys.stderr)
+        return 2
+    r = job.result
+    print(f"run {r['run_id']}: {'PASSED' if r['passed'] else 'did not pass'} the gate: "
+          f"{r['observed_clusters']} clusters (null threshold {r['null_threshold']:.1f}) over "
+          f"{r['blocks']} blocks (they overlap: not independent sessions)")  # fmt: skip
+    return 0
+
+
+def cmd_draft_edges(args: argparse.Namespace) -> int:
+    """Write the candidate edge draft of the winners study run ``--run`` to ``--out-dir``
+    (default ``var/edge_drafts``), only when the run passed the gate; the owner reviews it and
+    moves it into ``config/site/edges/`` by hand."""
+    backend = open_backend(data_url(args.data_url))
+    path = write_draft(
+        ResultWriter(backend), args.run, args.out_dir or DEFAULT_DIR, config_dir(args.config_dir)
+    )
+    print(f"wrote {path} (a draft: write the TODOs, review, then move it to config/site/edges/)")
     return 0

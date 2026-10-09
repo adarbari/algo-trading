@@ -348,6 +348,12 @@ per_session = false
 note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py"
 
 [[table]]
+name = "results/winners_study"
+owner = "src/algotrade/storage/tables/result_writer.py"
+per_session = false
+note = "the ED6 winners study's rows per run (ADR 0053 amendment 2026-10-09): block effects, pooled tells, the probit proposals and the exclusions; framed and written by services/evaluation/discovery/persist.py, run_id in the key"
+
+[[table]]
 name = "results/*"
 owner = "src/algotrade/storage/tables/result_writer.py"
 note = "one results/<name> per screener (services/screening/run.py) or backtest output (services/backtests/run.py)"
