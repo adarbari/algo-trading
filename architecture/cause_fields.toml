@@ -152,3 +152,7 @@ reason = "a fixed public sentence about the caller's own edge (not run yet, no f
 [[fact]]
 name = "EdgeProblem.reason"
 reason = "why the caller's own edge file does not load (a config fault in their own document: the file and key, no source, step or table)"
+
+[[fact]]
+name = "PaperTrade.reason"
+reason = "a fixed public sentence about why the caller's own paper trade was skipped (no entry bar, no outcome stored, the result could not be computed, the edge's outcome changed): no source, step or table named"

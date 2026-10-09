@@ -34,6 +34,7 @@ from algotrade.services.evaluation.cross_section.results import (
 )
 from algotrade.services.evaluation.discovery.persist import write_winners_study
 from algotrade.services.evaluation.discovery.tells import discover
+from algotrade.services.evaluation.forward.results import run_night
 from algotrade.services.evaluation.training.fit import fit_scorer
 from algotrade.services.evaluation.training.frame import training_frame
 from algotrade.services.evaluation.training.render import render_scorer
@@ -157,6 +158,28 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     }
 
 
+def edge_signals_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+    """params: ``session`` (ISO date: tonight's). The user's followed edges' picks at it and the
+    open paper trades their outcomes close, published atomically into ``results/edge_paper``."""
+    night, record = run_night(
+        ctx.resources["reader"],
+        ctx.resources["writer"],
+        ctx.resources["configs"],
+        ctx.user,
+        date.fromisoformat(params["session"]),
+        datetime.now(UTC),
+    )
+    return {
+        "run_id": record.run_id,
+        "session": night.session.isoformat(),
+        "signalled": night.signalled,
+        "settled": night.settled,
+        "skipped": night.skipped,
+        "missed": night.missed,
+        "rows": night.rows,
+    }
+
+
 def edge_score_fit_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``edge`` (id), ``start`` and ``until`` (ISO dates: the decision sessions; the
     fit also stops before the edge's frozen period). The result's ``table`` is the TOML
@@ -198,6 +221,7 @@ LIBRARY_HANDLERS: Mapping[str, JobKind] = {
     "backtest": JobKind(backtest_job, backtest_identity),
     "screen": JobKind(screen_job, screen_identity),
     "edge-eval": JobKind(edge_eval_job),
+    "edge-signals": JobKind(edge_signals_job),
     "edge-score-fit": JobKind(edge_score_fit_job),
     "winners-study": JobKind(winners_study_job),
 }

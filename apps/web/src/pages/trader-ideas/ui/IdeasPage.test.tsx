@@ -42,6 +42,34 @@ vi.mock('@/widgets/paused-ideas', async () => {
     ),
   };
 });
+vi.mock('@/widgets/edge-signals', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    EdgeSignals: (props: {
+      onOpen: (s: string, via: string) => void;
+      onOpenEdge: (id: string) => void;
+      onOpenEdges: () => void;
+    }) => (
+      <>
+        <Button
+          onClick={() => {
+            props.onOpen('MSFT', 'drift');
+          }}
+        >
+          signal
+        </Button>
+        <Button
+          onClick={() => {
+            props.onOpenEdge('drift');
+          }}
+        >
+          signal edge
+        </Button>
+        <Button onClick={props.onOpenEdges}>edges</Button>
+      </>
+    ),
+  };
+});
 vi.mock('@/widgets/ideas-heading', async () => {
   const { Heading } = await import('@algotrade/ui');
   return { IdeasHeading: () => <Heading level={1}>Ideas for Fri 2 Oct</Heading> };
@@ -96,6 +124,8 @@ describe('IdeasPage', () => {
     const onScreeners = vi.fn();
     const onOpenRegime = vi.fn();
     const onOpenScreener = vi.fn();
+    const onOpenEdge = vi.fn();
+    const onOpenEdges = vi.fn();
     const { container } = render(
       <IdeasPage
         search={{ view: 'no-earnings' }}
@@ -105,6 +135,8 @@ describe('IdeasPage', () => {
         onScreeners={onScreeners}
         onOpenScreener={onOpenScreener}
         onOpenRegime={onOpenRegime}
+        onOpenEdge={onOpenEdge}
+        onOpenEdges={onOpenEdges}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
@@ -125,6 +157,12 @@ describe('IdeasPage', () => {
     expect(onOpenScreener).toHaveBeenLastCalledWith('liq');
     await user.click(screen.getByRole('button', { name: 'screeners' }));
     expect(onScreeners).toHaveBeenCalledOnce();
+    await user.click(await screen.findByRole('button', { name: 'signal' }));
+    expect(onOpen).toHaveBeenLastCalledWith('MSFT', 'drift');
+    await user.click(screen.getByRole('button', { name: 'signal edge' }));
+    expect(onOpenEdge).toHaveBeenCalledWith('drift');
+    await user.click(screen.getByRole('button', { name: 'edges' }));
+    expect(onOpenEdges).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
   });
 });

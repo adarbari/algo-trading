@@ -16,6 +16,8 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
     sharpe               per-period mean over sample sd
     deflated_sharpe      Bailey and Lopez de Prado (2014): the probability the true Sharpe
                          beats what the best of ``n_trials`` noise strategies would show
+    win_rate_pmf         the binomial distribution of the number of wins in n trades
+    win_rate_band        the usual range of a live win rate: two quantiles of that distribution
     pbo_cscv             Bailey, Borwein, Lopez de Prado, Zhu (2017): the probability of
                          backtest overfitting by combinatorially symmetric cross-validation
 
@@ -228,3 +230,35 @@ def _block_sharpe(sums: Array, squares: Array, count: int) -> Array:
     with np.errstate(divide="ignore", invalid="ignore"):
         score = mean / np.sqrt(var)
     return np.where(var > 1e-18, score, -np.inf)
+
+
+def win_rate_pmf(p: float, n: int) -> Array | None:
+    """P(k wins) for k = 0..n when each of ``n`` independent trades wins with probability ``p``
+    (the backtest's win rate): the array of length ``n + 1``. ``None`` when undefined (``n < 1``
+    or ``p`` outside [0, 1])."""
+    if n < 1 or not math.isfinite(p) or not 0.0 <= p <= 1.0:
+        return None
+    k = np.arange(n + 1, dtype=np.float64)
+    if p in (0.0, 1.0):
+        out = np.zeros(n + 1)
+        out[n if p == 1.0 else 0] = 1.0
+        return out
+    log_choose = np.array(
+        [math.lgamma(n + 1) - math.lgamma(i + 1) - math.lgamma(n - i + 1) for i in range(n + 1)]
+    )
+    return np.exp(log_choose + k * math.log(p) + (n - k) * math.log(1.0 - p))
+
+
+def win_rate_band(
+    p: float, n: int, low: float = 0.10, high: float = 0.90
+) -> tuple[float, float] | None:
+    """The usual range of a win rate over ``n`` closed trades if the backtest's win rate ``p``
+    held: the ``low`` and ``high`` quantiles of the binomial wins, as rates (wins / ``n``). The
+    live rate is "on track" inside it. ``None`` when undefined (``win_rate_pmf``)."""
+    pmf = win_rate_pmf(p, n)
+    if pmf is None or not 0.0 < low < high < 1.0:
+        return None
+    cdf = np.cumsum(pmf)
+    lo = int(np.searchsorted(cdf, low - 1e-12))
+    hi = int(np.searchsorted(cdf, high - 1e-12))
+    return lo / n, hi / n

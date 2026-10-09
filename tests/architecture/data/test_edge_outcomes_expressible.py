@@ -34,6 +34,9 @@ EDGES = [e for e in load_edges(STORE) if e.status not in CLOSED]  # a closed edg
 HARNESS = "src/algotrade/services/evaluation/cross_section/harness.py"
 TRAINING = "src/algotrade/services/evaluation/training/frame.py"  # the one door for fit labels
 DISCOVERY = "src/algotrade/services/evaluation/discovery/labels.py"  # the winners of the ED6 study
+FORWARD = (
+    "src/algotrade/services/evaluation/forward/settle.py"  # closes a followed edge's paper trades
+)
 PROTECTED = "algotrade.data.outcomes"
 
 
@@ -126,7 +129,7 @@ def test_the_variants_horizons_and_benchmark_are_written_by_the_outcomes_task(ed
         assert v.outcome.benchmark in {*benchmarks, "none"}
 
 
-def test_only_the_harness_the_training_frame_and_the_winners_labels_read_outcomes() -> None:
+def test_only_the_named_modules_read_outcomes() -> None:
     offenders = []
     for path in sorted((REPO_ROOT / "src/algotrade/services/evaluation").rglob("*.py")):
         rel = path.relative_to(REPO_ROOT).as_posix()
@@ -138,11 +141,13 @@ def test_only_the_harness_the_training_frame_and_the_winners_labels_read_outcome
                 [node.module or ""] if isinstance(node, ast.ImportFrom) else []
             )
         }  # fmt: skip
-        if rel not in (HARNESS, TRAINING, DISCOVERY) and any(
+        if rel not in (HARNESS, TRAINING, DISCOVERY, FORWARD) and any(
             n == PROTECTED or n.startswith(f"{PROTECTED}.") for n in names
         ):
             offenders.append(rel)
-    assert not offenders, f"only {HARNESS}, {TRAINING}, {DISCOVERY} may read outcomes: {offenders}"
+    assert not offenders, (
+        f"only {HARNESS}, {TRAINING}, {DISCOVERY}, {FORWARD} may read outcomes: {offenders}"
+    )
 
 
 # Owner decision 2026-10-08 (ADR 0053 amendment): fixed, never rolling.

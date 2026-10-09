@@ -78,6 +78,7 @@ allowed = [
     "src/algotrade/services/evaluation/cross_section/harness.py",  # the reader of outcomes (ADR 0053)
     "src/algotrade/services/evaluation/training/frame.py",  # the other: the labels of a fit (ED7)
     "src/algotrade/services/evaluation/discovery/labels.py",  # the third: the winners of the ED6 study (ADR 0053 amendment)
+    "src/algotrade/services/evaluation/forward/settle.py",  # the fourth: closes a followed edge's paper trades (ADR 0053 amendment 2026-10-09)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, { call = "read_outcomes" }]

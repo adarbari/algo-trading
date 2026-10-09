@@ -670,6 +670,34 @@ WINNERS_STUDY = _fixed(
     runs="merge",
     key=("row_kind", "feature", "block", "run_id"),
 )  # fmt: skip
+# The forward paper record (ADR 0053 amendment 2026-10-09): one row per (user, edge, signal
+# session, name) the nightly ``edge-signals`` job made when it was tonight's pick of a followed
+# edge, written by ``services/evaluation/forward/results.py``. Partition ``session_date`` =
+# ``signal_session`` (the decision session D), so a later run settles a trade by rewriting its
+# row in its own partition: runs merge, the latest known row wins per key and ``as_of`` reads the
+# book as it was. ``status`` is ``open`` (window not closed), ``won`` / ``lost`` (the edge's own
+# hit; ``excess_return`` the outcome's measure) or ``skipped`` with ``reason`` (never a loss,
+# never a zero); ``delisted`` marks a name measured to its last bar; ``outcome_hash``
+# fingerprints the edge's [outcome] at the signal, so a trade is never judged by a definition the
+# user edited afterwards. ``buy_session`` is the entry session S, ``sell_session`` the window's
+# close, both from the trading calendar.
+EDGE_PAPER = _fixed(
+    "results/edge_paper",
+    "results",
+    ("user_id", "edge_id", "signal_session", "instrument_id"),
+    "instrument_id string!",
+    *_strings("user_id", "edge_id", "config_hash", "outcome_hash", "screener", "status"),
+    *_strings("reason"),
+    "signal_session date!",
+    "buy_session date",
+    "sell_session date",
+    "horizon_sessions int64",
+    "rank int64",
+    "delisted bool",
+    *_floats("excess_return"),
+    runs="merge",
+    key=("user_id", "edge_id", "signal_session", "instrument_id"),
+)  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -703,6 +731,7 @@ KNOWN: dict[str, TableSpec] = {
         RULE_SCREEN_VALUES,
         EDGE_EVAL,
         WINNERS_STUDY,
+        EDGE_PAPER,
         LIVE_OPTION_QUOTES,
         USAGE_LLM_CALLS,
         ETF_HOLDINGS,

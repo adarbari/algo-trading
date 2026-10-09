@@ -12,7 +12,10 @@ If several apps write data, nobody owns its quality and backtests stop being rep
 - Vendor SDKs, credentials and source adapters live only in `apps/ingestion/sources/`.
 - Results of user-triggered jobs (for example a backtest from the UI) are written to the
   `results` grain through a separate `ResultWriter` that `services/` may use. Market and
-  feature data stay ingestion-only.
+  feature data stay ingestion-only. Job-written results include `results/edge_eval` (an edge's
+  evaluation, ADR 0053), `results/winners_study` and `results/edge_paper` (the forward paper
+  record of the edges a user follows, written by the nightly `edge-signals` job, ADR 0053
+  amendment 2026-10-09).
 
 ## Consequences
 - Data lineage is simple: every market or feature row traces back to an ingestion run.

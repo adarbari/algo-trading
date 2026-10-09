@@ -12,6 +12,7 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.jobs import JobRecord, JobStatus
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_ingestion.workflows.nightly import screens as screens_module
+from algotrade_ingestion.workflows.nightly.nightly import EDGE_SIGNALS, NIGHTLY
 from algotrade_ingestion.workflows.nightly.steps import StepStatus
 
 D = date(2026, 10, 2)
@@ -67,3 +68,60 @@ def test_screens_without_optional_misses_carry_no_warning(
     jobs = FakeJobs({"other": {"coverage": "COMPLETE"}})
     step = screens_module.screen_jobs(jobs, MemoryConfigStore({}), None)(D)  # type: ignore[arg-type]
     assert step.status is StepStatus.SUCCEEDED and step.checks == []
+
+
+class SignalJobs:
+    """One job per user, COMPLETE or FAILED as ``failing`` says."""
+
+    def __init__(self, failing: tuple[str, ...] = ()) -> None:
+        self.failing, self.asked = failing, []
+
+    def run(self, kind: str, params: Mapping[str, Any], user: UserContext, force: bool) -> Any:
+        self.asked.append((kind, user.user_id, dict(params), force))
+        failed = user.user_id in self.failing
+        return JobRecord(
+            job_id=f"job-{user.user_id}",
+            kind=kind,
+            params=dict(params),
+            user=user.user_id,
+            submitted_at=datetime(2026, 10, 2, 22, tzinfo=UTC),
+            status=JobStatus.FAILED if failed else JobStatus.COMPLETE,
+            result={} if failed else {"signalled": {"drift": 5}},
+            error="boom" if failed else None,
+        )
+
+
+def test_edge_signals_submit_one_job_per_user_who_follows_an_edge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        screens_module,
+        "paper_users",
+        lambda reader, store, session: [UserContext("alice"), UserContext("bob")],
+    )
+    jobs = SignalJobs()
+    step = screens_module.signal_jobs(jobs, MemoryConfigStore({}), None)(D)  # type: ignore[arg-type]
+    assert jobs.asked == [
+        ("edge-signals", "alice", {"session": D.isoformat()}, True),
+        ("edge-signals", "bob", {"session": D.isoformat()}, True),
+    ]
+    assert step.status is StepStatus.SUCCEEDED
+    assert [s["user"] for s in step.result["signals"]] == ["alice", "bob"]
+
+
+def test_a_failed_edge_signals_job_fails_the_step_naming_the_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        screens_module, "paper_users", lambda reader, store, session: [UserContext("alice")]
+    )
+    step = screens_module.signal_jobs(SignalJobs(("alice",)), MemoryConfigStore({}), None)(D)  # type: ignore[arg-type]
+    assert (
+        step.status is StepStatus.FAILED
+        and step.reason == "edge signals not complete: alice failed"
+    )
+
+
+def test_the_edge_signals_step_is_optional_and_waits_for_screens_only() -> None:
+    step = next(s for s in NIGHTLY if s.name == EDGE_SIGNALS)
+    assert not step.critical and step.needs == ("screens",) and step.latest_only

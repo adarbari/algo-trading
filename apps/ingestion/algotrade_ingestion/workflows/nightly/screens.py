@@ -1,4 +1,5 @@
-"""The nightly ``screens`` step: one ``screen`` job per screener (ADR 0033).
+"""The nightly's job steps: ``screens`` (one ``screen`` job per screener, ADR 0033) and
+``edge-signals`` (one job per user who follows an edge, ADR 0053 amendment 2026-10-09).
 
 Screens run through the job runner (``services/jobs``), never inline (ADR 0019, R5): each
 screener (every site preset as ``site``, then each user's finalised ones) becomes a ``screen``
@@ -9,6 +10,12 @@ needed (``missing_optional_tables``: an optional source's, e.g. ``ibkr_iv@v1`` w
 down, or a required one whose coalesce fallback is present, e.g. ``iv30@v1`` before it was
 stored) is a WARN check on the step, never its failure (ADR 0055, coverage of coalescing
 expressions).
+
+The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the user's tonight picks of
+the edges they follow and settles the open paper trades whose outcome is stored
+(``services/evaluation/forward``). It needs ``screens`` (settlement leaves a trade open when its
+outcome is not stored) and is not critical: a failed job is a warning naming the user, never a
+hold on the session or a later one.
 """
 
 from collections.abc import Callable
@@ -16,7 +23,9 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from algotrade.data import StoreReader
 from algotrade.services.configs import nightly_screeners
+from algotrade.services.evaluation.forward.results import paper_users
 from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
 from algotrade.storage.configs.store import ConfigStore
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
@@ -65,5 +74,29 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
             reason = f"screeners not complete: {', '.join(short)}"
             return Outcome(StepStatus.FAILED, result, reason, warnings)
         return Outcome(StepStatus.SUCCEEDED, result, None, warnings)
+
+    return run
+
+
+def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> ScreenStep:
+    """The edge-signals step, submitting through ``jobs`` (run in the nightly's own thread)."""
+
+    def run(session: date) -> Outcome:
+        summaries, short = [], []
+        for user in paper_users(reader, configs, session):
+            job = jobs.run("edge-signals", {"session": session.isoformat()}, user, force=True)
+            summaries.append(
+                {"user": user.user_id, "job_id": job.job_id, "status": job.status.value}
+                | ({"error": job.error} if job.error else {})
+                | dict(job.result)
+            )
+            if job.status is not JobStatus.COMPLETE:
+                short.append(f"{user.user_id} {job.status.value}")
+        result = {"signals": summaries}
+        if short:
+            return Outcome(
+                StepStatus.FAILED, result, f"edge signals not complete: {', '.join(short)}"
+            )
+        return Outcome(StepStatus.SUCCEEDED, result, None)
 
     return run

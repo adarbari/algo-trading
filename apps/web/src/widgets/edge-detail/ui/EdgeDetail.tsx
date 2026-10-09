@@ -37,6 +37,7 @@ import { lazyPage } from '@/shared/lib/lazy';
 import { EdgeDefinition } from './EdgeDefinition';
 import { EdgeDetails } from './EdgeDetails';
 import { EdgeFigures } from './EdgeFigures';
+import { EdgeLive } from './EdgeLive';
 import { EdgeYears } from './EdgeYears';
 
 /** The decile bars and the robustness histogram load on demand: their own chunk, so the page's first paint stays small. */
@@ -144,6 +145,7 @@ export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
         </Suspense>
       )}
       <EdgeYears years={v.years} />
+      <EdgeLive edgeId={edge.id} />
       <EdgeDefinition edge={edge} />
       <EdgeDetails edge={edge} />
     </Stack>

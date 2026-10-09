@@ -193,3 +193,38 @@ def test_running_moments_equal_the_raw_formula_even_with_a_large_offset() -> Non
             got, _old_effect(a, whole), rel_tol=1e-9 if offset == 0 else 1e-6
         )
         assert es.standardised_effect(a, whole) == pytest.approx(got, rel=1e-6)
+
+
+def test_win_rate_pmf_is_the_binomial_and_sums_to_one() -> None:
+    pmf = es.win_rate_pmf(0.5, 4)
+    assert pmf is not None and pmf.tolist() == pytest.approx(
+        [1 / 16, 4 / 16, 6 / 16, 4 / 16, 1 / 16]
+    )
+    big = es.win_rate_pmf(0.37, 300)
+    assert big is not None and big.sum() == pytest.approx(1.0)
+
+
+def test_win_rate_pmf_at_the_certain_ends_and_undefined_inputs() -> None:
+    assert es.win_rate_pmf(0.0, 3).tolist() == [1.0, 0.0, 0.0, 0.0]  # type: ignore[union-attr]
+    assert es.win_rate_pmf(1.0, 3).tolist() == [0.0, 0.0, 0.0, 1.0]  # type: ignore[union-attr]
+    assert es.win_rate_pmf(0.5, 0) is None
+    assert es.win_rate_pmf(1.2, 5) is None and es.win_rate_pmf(float("nan"), 5) is None
+
+
+def test_win_rate_band_is_the_10th_to_90th_percentile_of_wins_over_n() -> None:
+    # 10 trades at 50%: P(wins <= 2) = 5.5% < 10% <= P(<= 3) = 17.2%;
+    # P(<= 6) = 82.8% < 90% <= P(<= 7)
+    assert es.win_rate_band(0.5, 10) == (0.3, 0.7)
+    assert es.win_rate_band(0.5, 10, 0.05, 0.95) == (0.2, 0.8)
+
+
+def test_win_rate_band_narrows_with_more_trades_and_contains_the_true_rate() -> None:
+    few, many = es.win_rate_band(0.6, 20), es.win_rate_band(0.6, 400)
+    assert few is not None and many is not None
+    assert many[1] - many[0] < few[1] - few[0] and many[0] < 0.6 < many[1]
+
+
+def test_win_rate_band_is_undefined_without_trades_or_with_a_bad_quantile() -> None:
+    assert es.win_rate_band(0.5, 0) is None
+    assert es.win_rate_band(0.5, 10, 0.9, 0.1) is None
+    assert es.win_rate_band(1.0, 5) == (1.0, 1.0)

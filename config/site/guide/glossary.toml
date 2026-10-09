@@ -763,3 +763,75 @@ tight; a high failure rate means calls are being lost, and a failed attempt of a
 may still have been billed.
 """
 see_also = ["llm_budget", "llm_cost_basis"]
+
+[[term]]
+id = "paper_trading"
+term = "Paper trading"
+short = "What an edge you follow would have bought and sold, recorded every night as it happens."
+body = """
+When you follow an edge, each night the app takes the picks of its screen, using only what was
+known that night, and records them as paper trades: the name, the session to buy it and the
+session to sell it after the edge's holding period. Nothing is ever ordered. A trade stays open
+until its window has closed and the result is stored, and is then won or lost by the same win
+rule as the backtest. A trade whose result could not be read is skipped with the reason; it is
+never counted as a loss. The record is kept as written: editing the edge later does not change
+the trades already made.
+"""
+see_also = ["live_record", "usual_range", "forward_test", "win_rate"]
+
+[[term]]
+id = "live_record"
+term = "Live record"
+short = "How the closed paper trades of a followed edge have done so far."
+body = """
+The live record counts the closed paper trades, the wins among them and the win rate, and sets
+it against what the backtest led you to expect (the usual range). Open and skipped trades are
+counted apart. With few closed trades the rate swings widely by chance, so the record is
+judged only once the site's minimum number of signal sessions have closed; before that it says it is too early.
+On track means the live win rate is inside the usual range; below or above means it is outside,
+which is worth a look but proves nothing alone.
+"""
+see_also = ["paper_trading", "usual_range", "win_rate"]
+
+[[term]]
+id = "usual_range"
+term = "Usual range"
+short = "The spread of win rates the backtest's own win rate would give over the same number of trades."
+body = """
+If the backtest's win rate really held, the share of wins among a given number of trades would
+still vary from one run of trades to the next, by chance alone. The usual range is the middle
+80% of that variation (the 10th to the 90th percentile of a binomial distribution of wins), so
+it narrows as more sessions close. The picks of one night are bets on the same market over the
+same window and move together, so the range counts signal sessions, not trades: ten picks on one
+night are one observation, not ten. The picture shows the whole spread, the live win rate and
+the two ends of the range. A live rate outside it is unusual if the backtest was right, but
+one in five honest records falls outside by chance.
+"""
+see_also = ["live_record", "win_rate", "paper_trading"]
+
+[[term]]
+id = "forward_test"
+term = "Forward test"
+short = "A new version of an edge tried on live paper trades beside the edge it would replace."
+body = """
+A new version of an edge is first tried on paper next to the version you follow: both record
+the same nights' picks from the day the trial starts. The version can replace the old one once
+the site's number of sessions have passed and its win rate is not behind. Replacing earlier is
+allowed but is recorded on the edge as replaced without a forward test, because the backtest of
+a version you have tuned looks better than it will do going forward.
+"""
+see_also = ["paper_trading", "live_record", "official_result"]
+
+[[term]]
+id = "edge_tonight"
+term = "Tonight's signal"
+short = "What the nightly run did for a followed edge on the session, so an empty buy list says why."
+body = """
+Signalled: the edge was due and its picks are listed as buys. No picks: it was due but its screen
+qualified no name. Not due: its schedule does not fire on this session (an edge held for 20
+sessions signals about once a month). Skipped: it was due but could not be signalled, and the
+reason says why (an input table was missing, the edge is not paper traded yet); it is never an
+empty record. Not run: the nightly has no finished run for the session. Missed counts due
+sessions between nights that nobody signalled, kept so a gap is never silent.
+"""
+see_also = ["paper_trading", "live_record"]

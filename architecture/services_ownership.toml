@@ -28,6 +28,19 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pbo_cscv" }, { string = "results/edge_eval" }]
 
 [[responsibility]]
+id = "edge-paper-trading"
+description = "The forward paper record of the edges a user follows (ADR 0053 amendment 2026-10-09): for each edge in state following or trial, at each night's session when its schedule fires (the harness's decision sessions counted from the state's `since`), the harness's own picks (cross_section/picks: the screener's qualified names among the edge's eligible names, best first, top_k, only what was known at the session) as open paper trades with buy and sell sessions from the trading calendar; for every open trade whose sell session has come, the stored outcome read as of now and judged by the edge's own [outcome] (cross_section/hit) as won, lost or skipped with the reason (never a loss or a zero for a missing result; a trade whose edge's outcome changed since is skipped); one atomic run per user per night into results/edge_paper with the run record edge-paper:<user>; idempotent per night"
+owner = ["src/algotrade/services/evaluation/forward/*"]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares results/edge_paper's one schema
+    "src/algotrade/services/jobs/handlers.py",  # the edge-signals job kind (ADR 0010)
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/screens.py",  # the nightly step submits one job per user
+    "src/algotrade/data/paper/*",  # the read of the stored record, shared with the read model
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "run_night" }, { call = "settle_group" }, { call = "edge_signals" }, { string = "results/edge_paper" }]
+
+[[responsibility]]
 id = "edge-scorer-fit"
 description = "Fit a learned scorer for an edge (ADR 0053 amendment, ED7): the training frame (the edge's eligible names at each decision session D with the features its document declares under [scorer] read at D only, and the edge's hit at the entry session S as the label, only windows closing before frozen_from less one horizon: purged and embargoed, never the frozen period), the probit of the hit on the standardised features (quant/probit.py is the model), and the coefficients written as the TOML expression feature edge_score_<edge> in config/site/features/scores/edge_scores.toml with fitted_through; run by algotrade-backtest fit-edge-scorer through the edge-score-fit job; nightly scoring is the expression engine's ncdf over the file, with no label at score time"
 owner = ["src/algotrade/services/evaluation/training/*"]

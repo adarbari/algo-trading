@@ -24,6 +24,9 @@ KEYS = (
     "oos_lift_share",
     "random_beat_share",
     "forward_sessions",
+    "live_min_sessions",
+    "live_low",
+    "live_high",
 )
 
 
@@ -49,6 +52,13 @@ class VerdictSettings:
     oos_lift_share: float = 0.5
     random_beat_share: float = 0.95
     forward_sessions: int = 20  # a new version's forward test, in sessions (ED8; owner 2026-10-09)
+    # The live record (paper trades) is judged against the backtest's usual range, the ``live_low``
+    # to ``live_high`` quantiles of the wins n closed signal sessions (the picks of one night are
+    # correlated, so a session is the independent unit) would show if the backtest's win rate held,
+    # once ``live_min_sessions`` have closed (ED8, ADR 0053 amendment; owner-delegated).
+    live_min_sessions: int = 10
+    live_low: float = 0.10
+    live_high: float = 0.90
 
     @classmethod
     def from_document(
@@ -72,4 +82,7 @@ class VerdictSettings:
             oos_lift_share=t.number("oos_lift_share", d.oos_lift_share, 0),
             random_beat_share=t.fraction("random_beat_share", d.random_beat_share),
             forward_sessions=t.integer("forward_sessions", d.forward_sessions, 1),
+            live_min_sessions=t.integer("live_min_sessions", d.live_min_sessions, 1),
+            live_low=t.fraction("live_low", d.live_low),
+            live_high=t.fraction("live_high", d.live_high),
         )

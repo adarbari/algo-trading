@@ -357,6 +357,12 @@ per_session = false
 note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py"
 
 [[table]]
+name = "results/edge_paper"
+owner = "src/algotrade/storage/tables/result_writer.py"
+per_session = false
+note = "the forward paper record (ADR 0053 amendment 2026-10-09): one row per (user, edge, signal session, name) the nightly edge-signals job made for a followed edge, settled by rewriting its own row (runs merge per key); framed and written by services/evaluation/forward/results.py, read through data/paper"
+
+[[table]]
 name = "results/winners_study"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false

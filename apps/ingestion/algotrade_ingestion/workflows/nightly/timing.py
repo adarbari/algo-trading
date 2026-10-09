@@ -40,6 +40,7 @@ UNITS: Mapping[str, str] = {
     "rollups": "rows",
     "market-rollups": "rows",
     "screens": "screens",
+    "edge-signals": "users",
     "quality": "checks",
 }
 RESULT_ITEMS: Mapping[str, str] = {
@@ -123,6 +124,8 @@ def _items(step: str, result: Any, record_items: int | None) -> int | None:
         return int(sum(rows)) if rows else record_items
     if step == "screens":
         return len(result.get("screens", []))
+    if step == "edge-signals":
+        return len(result.get("signals", []))
     key = RESULT_ITEMS.get(step)
     if key and isinstance(result.get(key), int):
         return int(result[key])

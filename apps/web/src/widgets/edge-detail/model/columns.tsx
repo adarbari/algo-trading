@@ -1,11 +1,25 @@
 /**
  * The columns of an edge page's tables: the year-by-year rows of the verdict's basis, the tests
- * of the verdict (value, threshold, pass / fail / not measured) and a copy's comparison. Rows are served records,
- * not instruments; every figure and word is the server's.
+ * of the verdict (value, threshold, pass / fail / not measured), a copy's comparison and the paper
+ * trades of a followed edge. Rows are served records, not instruments; every figure and word is
+ * the server's.
  */
-import { Stack, StatusBadge, Text, type DataTableColumn, type StatusTone } from '@algotrade/ui';
+import {
+  Mono,
+  Stack,
+  StatusBadge,
+  Text,
+  type DataTableColumn,
+  type StatusTone,
+} from '@algotrade/ui';
 
-import type { VerdictCriterion, VerdictYear } from '@/entities/edge';
+import {
+  tradeLabel,
+  tradeTone,
+  type PaperTrade,
+  type VerdictCriterion,
+  type VerdictYear,
+} from '@/entities/edge';
 import type { CompareRow } from '@/features/edge-compare';
 
 export const yearColumns: DataTableColumn<VerdictYear>[] = [
@@ -59,6 +73,39 @@ export const criterionColumns: DataTableColumn<VerdictCriterion>[] = [
       return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
     },
   },
+];
+
+const DATE = { kind: 'date', style: 'short' } as const;
+
+export const tradeColumns: DataTableColumn<PaperTrade>[] = [
+  { id: 'signal', header: 'Signal', value: (t) => t.signalSession, format: DATE, hideable: false },
+  {
+    id: 'ticker',
+    header: 'Ticker',
+    value: (t) => t.instrument?.symbol ?? t.instrumentId,
+    cell: ({ row }) => <Mono weight="medium">{row.instrument?.symbol ?? row.instrumentId}</Mono>,
+    essential: true,
+  },
+  { id: 'rank', header: 'Rank', value: (t) => t.rank, format: { kind: 'number' } },
+  { id: 'buy', header: 'Bought', value: (t) => t.buySession, format: DATE },
+  { id: 'sell', header: 'Sell on', value: (t) => t.sellSession, format: DATE },
+  {
+    id: 'result',
+    header: 'Result',
+    value: (t) => t.status,
+    essential: true,
+    cell: ({ row }) => (
+      <StatusBadge tone={tradeTone(row.status)}>{tradeLabel(row.status)}</StatusBadge>
+    ),
+  },
+  {
+    id: 'return',
+    header: 'Return over the market',
+    value: (t) => t.excessReturn,
+    format: { kind: 'delta', unit: 'percent', digits: 1 },
+    essential: true,
+  },
+  { id: 'reason', header: 'Why skipped', value: (t) => t.reason },
 ];
 
 /** The comparison of a copy with the edge it extends and the baselines: in-sample, then

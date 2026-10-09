@@ -429,12 +429,31 @@ to 14) on the existing documents, with one new grain still to come.
    `save_user_document` / `archive_user_document` for the kinds in `USER_DOCUMENT_KINDS`; its
    TOML serialiser moves to `storage/configs/toml_text.py` so the read model can render the
    published document.
-7. **Still to come under this decision (not in this PR).** Paper trades and nightly signals: one
-   new job-written grain `results/edge_paper` (ADR 0005's list gets it then; D4: the first cut of
-   Ideas shows ahead or behind only after settlement); random-pick backtests and decile means on
-   `results/edge_eval` (D5: 1,000 draws, out-of-sample slice only, Works needs at least 95%
-   beaten); the web follow and builder UI. Each lands with its own tests and, where it touches
-   point-in-time reads or jobs, an `architect` review.
+7. **Paper trades and nightly signals (ED8 PR-D, landed).** One new job-written grain
+   `results/edge_paper` (ADR 0005's list has it; D4: Ideas shows ahead or behind only after
+   settlement). A paper trade is stored when it is made, never derived at read time: the read
+   model may not reach the harness or the outcomes, and re-deriving history from today's
+   documents would rewrite the record when the user edits an edge. The nightly `edge-signals`
+   step (after `screens` and `outcomes`, not critical) runs one `edge-signals` job per user with
+   a followed, tried or retired edge (`services/evaluation/forward/`): for each edge in state
+   `following` or `trial` whose schedule fires that night (the harness's decision sessions from
+   the state's `since`), the harness's own picks at the session (`cross_section/picks`, only what
+   was known then) become open trades with buy and sell sessions from the trading calendar; every
+   open trade whose sell session has come is closed from the stored outcome read as of now,
+   judged by the edge's own `[outcome]` (`cross_section/hit`) as won or lost, or skipped with
+   the reason (no entry bar, a value that cannot be computed, no outcome five sessions after the
+   window closed, the edge's outcome changed since the signal): a missing result is never a loss.
+   Rows are partitioned by signal session and merge per (user, edge, signal session, name), so a
+   settlement rewrites its own row and `as_of` still gives the book as an earlier night saw it;
+   one atomic run and one run record `edge-paper:<user>` per user per night; a re-run writes the
+   same rows. First cut: event schedules and outcomes that need the implied vol are not paper
+   traded (the run record says so, never an empty record). The read model
+   (`services/read/edge_desk/`, `Query.edgeDesk`, `Query.edgePaper`: `Edge` has no session) serves
+   the Ideas signals and an edge's live record against the backtest's usual range, the 10th to
+   90th percentile of the wins `n` closed trades would show if the official win rate held
+   (`quant.edge_statistics.win_rate_band`, thresholds `live_min_sessions`, `live_low`, `live_high` in
+   `config/site/verdict.toml`), and a trial's forward test beside the edge it would replace.
+   The web follow and builder UI is still to come; it lands with its own tests.
 
 ## Amendment (2026-10-09, ADR 0061): the grain is `forward_returns@v2`
 A window that needs a bar `bar-quality` flagged is `outcome_status = UNMEASURED` with
