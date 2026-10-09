@@ -49,7 +49,8 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
 
 test('a user sets and clears their out-of-sample split', async ({ page }) => {
   const errors = collectErrors(page);
-  await page.goto('/edges');
+  await page.goto('/edges?edge=momentum_12_1');
+  await page.getByText('Details').click();
   await expect(page.getByText('2026-06-01').first()).toBeVisible();
   await page.getByLabel('Out-of-sample starts').fill('2026-04-01');
   await page.getByRole('button', { name: 'Save' }).click();

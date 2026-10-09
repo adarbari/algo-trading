@@ -19,6 +19,19 @@
       "picks": 0.0,
       "sessions": 0.0
     },
+    "momentum_12_1:momentum_12_1@h20/in_sample=in_sample": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463524,
+      "decile_sessions": 6.0,
+      "decile_spread": 0.05686709971869885,
+      "decile_t": 3.142140856476347,
+      "hit_rate": 0.63,
+      "lift": 1.1544976076555025,
+      "mean_excess_picks": 0.01743540584226573,
+      "picks": 300.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.039796221506499536
+    },
     "momentum_12_1:momentum_12_1@h20/regime=UNKNOWN": {
       "base_rate": 0.5456919060052219,
       "bh_mean": 0.008990060438463524,
@@ -74,6 +87,19 @@
       "decile_sessions": 0.0,
       "picks": 0.0,
       "sessions": 0.0
+    },
+    "momentum_12_1:size_small@h20/in_sample=in_sample": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 16.0,
+      "decile_spread": -0.0035108458408938175,
+      "decile_t": -0.42549696213679467,
+      "hit_rate": 0.53875,
+      "lift": 0.9872787081339713,
+      "mean_excess_picks": 0.007792232363845143,
+      "picks": 800.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.0038274642204863176
     },
     "momentum_12_1:size_small@h20/regime=UNKNOWN": {
       "base_rate": 0.5456919060052219,
