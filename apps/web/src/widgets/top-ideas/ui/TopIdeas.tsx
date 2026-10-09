@@ -137,6 +137,7 @@ export function TopIdeas({
           emptyMessage={
             all.length === 0 ? 'No screener picked anything in this session.' : filteredEmpty
           }
+          rowLines={2}
           visibleRows={14}
         />
       </Panel>
