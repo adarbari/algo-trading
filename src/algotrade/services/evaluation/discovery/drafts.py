@@ -53,7 +53,8 @@ def render_draft(run_id: str, stats: dict[str, Any]) -> str:
     )
     lines = [
         f"# DRAFT from the winners study run {run_id}: a proposal, not evidence. {stats['blocks']}",
-        "# blocks of 504 sessions overlap at their edges, so they are not independent sessions.",
+        f"# blocks of {stats['horizon_sessions']} sessions overlap at their edges, so they are not"
+        " independent sessions.",
         "# Write every TODO, review it, then move it to config/site/edges/ by hand.",
         f"id = {_quote(edge_id)}",
         f"name = {_quote(TODO)}",
