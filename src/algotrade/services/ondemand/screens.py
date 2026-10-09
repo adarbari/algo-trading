@@ -23,12 +23,13 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from algotrade.config.user import SITE_USER, UserContext
-from algotrade.core.model.errors import AlgoTradeError, ConfigurationError, PermissionDeniedError
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.configs import config_ids, resolve_config
 from algotrade.services.jobs.api import open_runner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
+from algotrade.services.jobs.runner import LocalJobRunner
 from algotrade.services.read.availability.cause import ADMIN_CAUSE, GENERIC
 from algotrade.services.read.session import NotFoundError, latest_session
 from algotrade.services.screening.run import run_job_name
@@ -106,26 +107,15 @@ class OnDemandScreens:
         job_id = self._jobs.submit(KIND, params, owner, force=stored is not None)
         return self._view(config_id, session, self._jobs.status(job_id))
 
-    def status(
-        self, config_id: str, job_id: str, viewer: UserContext, *, admin: bool = False
-    ) -> RunRequest:
-        """The state of a requested run for ``viewer`` (``NotFoundError`` for a job that is not
-        a screen of ``config_id``; ``PermissionDeniedError`` for another user's job unless
-        ``admin``: the job is the viewer's own, or the site's shared run of a preset)."""
-        try:
-            job = self._jobs.status(job_id)
-        except AlgoTradeError as exc:
-            raise NotFoundError(str(exc)) from exc
-        if job.kind != KIND or job.params.get("config") != config_id:
-            raise NotFoundError(f"{job_id} is not a run of {config_id}")
-        if not (admin or job.user in (viewer.user_id, SITE_USER)):
-            raise PermissionDeniedError(f"{job_id} is another user's run")
-        return self._view(config_id, date.fromisoformat(job.params["session"]), job)
-
     @staticmethod
     def _view(config_id: str, session: date, job: JobRecord) -> RunRequest:
         run_id = job.result.get("run_id") if job.status in STORED else None
         return RunRequest(job.status.value, config_id, session, job.job_id, run_id, job.error)
+
+    @property
+    def jobs(self) -> LocalJobRunner:
+        """The runner whose records ``read_job`` (``status.py``) serves."""
+        return self._jobs
 
     def close(self) -> None:
         self._jobs.shutdown()

@@ -5,7 +5,7 @@
 - ``rollup.<name>@v<N>.<column>``  a rollup (``rollups/instrument/<name>@v<N>``)
 - ``market.<name>@v<N>.<column>``  a market-entity feature group (``rollups/market/<name>@v<N>``,
                                    one ``MKT:<market>`` row per session; ADR 0047)
-- ``feature.<name>``               an expression feature (``config/site/features/*.toml``),
+- ``feature.<name>``               an expression feature (``config/site/features/*/*.toml``),
                                    computed on read from the stored features it names
 
 A feature group's table is ``rollup_table(entity, key)``: the ``rollups/<entity>/`` family

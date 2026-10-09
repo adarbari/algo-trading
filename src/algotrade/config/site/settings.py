@@ -13,7 +13,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     users.toml     -> UsersSettings     (config/site/users.py: the user registry, ADR 0040)
     users/<id>/identity.toml -> the user's sign-in email / subject on its UserRecord (git-ignored)
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
-    features/<theme>.toml -> FeatureDefinition per expression feature (ADR 0023 step 3)
+    features/<kind>/<theme>.toml -> FeatureDefinition per expression feature (ADR 0023 step 3)
     users/<id>/features/<theme>.toml -> the same, owned by a user (always virtual; step 4)
     defaults.toml  -> ScreeningSettings, BacktestSettings (layered per config by ``resolve``)
 
@@ -861,7 +861,7 @@ def load_rollup(configs: SiteDocuments, key: str, defaults: Any) -> Any:
 
 
 def load_features(configs: SiteDocuments) -> tuple[FeatureDefinition, ...]:
-    """The site's expression features (``config/site/features/*.toml``; none without files)."""
+    """The site's expression features (``config/site/features/*/*.toml``; none without files)."""
     names = configs.names("site", "features")
     return feature_definitions({n: configs.load("site", "features", n) for n in names})
 

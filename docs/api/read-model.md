@@ -148,7 +148,7 @@ series, `RANGE_GRAIN_FIELDS` in `test_read_model.py`, as `Bar.close` was on REST
 **A fact a page needs that is computed on read becomes a stored feature first**
 (`.claude/skills/add-feature`): `rollup.nearest_expiry@v1.{expiry_date,dte,sessions_to_expiry}`
 (new group `features/rollups/options/nearest_expiry.py`, kind `chain`) and the expression
-`feature.earnings_before_expiry` (`config/site/features/earnings.toml`) land in PR 3.
+`feature.earnings_before_expiry` (`config/site/features/options/earnings.toml`) land in PR 3.
 `earnings.days_to_earnings` already exists.
 
 ## The domain objects
@@ -439,7 +439,7 @@ query IdeasPage($date: Date, $limit: Int!, $names: [FeatureName!]!) {
 | Stays REST | Why |
 |---|---|
 | Writes: `routes/authoring/*`, `POST /screens/{id}/run`, `POST /edges/{id}/evaluate` | a different contract (ADRs 0029, 0033, 0059); mutations would be a second write surface |
-| `GET /screens/{id}/run/{job_id}` | job polling, kept with its POST |
+| `GET /jobs/{job_id}` | job polling for every on-request job (screen runs, edge evaluations; ADR 0037 amended) |
 | `GET /health` | liveness probe for scripts and `make doctor` |
 | `GET /chains/{id}/live` | latency-bound, records to `live/*`, bypasses the session model on purpose (ADR 0028) |
 | `POST /screeners/preview`, `POST /features/check` | compute over a request body with its own cache |
@@ -453,8 +453,8 @@ query parameter on any route (`tests/apps/api/test_main.py` asserts it). An admi
 another user names them in the `X-Act-For` header on a write (one dependency, `deps.write_user`;
 a trader naming someone else is 403, and `services.authoring` refuses an id the registry does
 not declare: 400) or, on the preview POSTs, in the body's `user`. A route never reads either by
-hand. `GET /screens/{id}/run/{job_id}` is 403 for another user's job unless the caller is an
-admin (a site preset's run is the site's: shared by everyone who may request the preset).
+hand. `GET /jobs/{job_id}` is 404 for another user's job unless the caller is an admin (a site
+preset's run is the site's: shared by everyone who may request the preset).
 
 **Who a GraphQL field is for:** the Admin area (nightly runs, run records, quality,
 verification, completeness, ingestion cells, review lists: `Query` fields returning the

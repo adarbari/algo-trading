@@ -2,7 +2,7 @@
 
 A feature is what a selection, a screener or a report reads: ``<group>.<column>@v<N>``
 (selectable as ``rollup.<group>@v<N>.<column>``), or a site expression feature
-``<name>@v<N>`` with no group (``config/site/features/*.toml``; selectable as
+``<name>@v<N>`` with no group (``config/site/features/*/*.toml``; selectable as
 ``feature.<name>``, computed on read unless materialised: ``features.expressions``). Its
 metadata is declared next to the compute that produces it (``features/rollups/<group>.py``)
 and drives the generated feature catalogue (``docs/data/features.md``), the stored column

@@ -49,18 +49,19 @@ export async function mockEdgesApi(page: Page): Promise<void> {
   const evaluation = (state: string) => ({
     state,
     edge_id: 'momentum_12_1',
+    kind: 'edge-eval',
     user: 'ann',
+    session: null,
     job_id: 'job-edge-eval-1',
     run_id: state === 'complete' ? 'run-9' : null,
     exploratory: state === 'complete' ? true : null,
     error: null,
   });
   await page.route('**/api/edges/*/evaluate**', async (route: Route) => {
-    if (route.request().method() === 'POST') {
-      polls = 0;
-      await route.fulfill({ status: 202, json: evaluation('running') });
-      return;
-    }
+    polls = 0;
+    await route.fulfill({ status: 202, json: evaluation('running') });
+  });
+  await page.route('**/api/jobs/*', async (route: Route) => {
     polls += 1; // the first poll still sees it running
     await route.fulfill({ json: evaluation(polls > 1 ? 'complete' : 'running') });
   });

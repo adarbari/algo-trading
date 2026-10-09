@@ -105,7 +105,7 @@ events/earnings ─────────────────────�
   never a substitute.
 - The code package is `features/`: a feature is a column of a rollup definition
   ([Rollups as built](#rollups-as-built)), or an expression feature: a formula over stored
-  features in `config/site/features/*.toml`, computed on read unless materialised
+  features in `config/site/features/*/*.toml`, computed on read unless materialised
   ([configuration.md](../configuration.md#expression-features), ADR 0023 step 3).
 
 ## L3: Site configuration (shared, reviewed)
@@ -313,7 +313,7 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   death cross, ...) and the bear-state probit (`bear_prob_6m`, `bear_prob_source`: its
   coefficients are params; `make regime-scorecard` prints a fit to paste, with
   `fitted_through`, and a pasted fit is a version bump) are market expression features in
-  `config/site/features/regime.toml`.
+  `config/site/features/market/regime.toml`.
 
 Per-column meanings, units, ranges and null meanings: [features.md](features.md). Floats of
 the v2 groups are stored as 32-bit (`float32`). Columns computed from other columns are
@@ -361,7 +361,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `relative_strength@v1` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_spy_trend_20d` (relative strength against SPY), `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d` (the return's rank among the universe's stocks), `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` (the sector ETF and the name against it) ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 252 sessions back; `instruments/symbol_ids` (SPY and the sector ETFs), `universe` (the population of the percentiles), `instruments/company` (sector); `min_members`, `min_sector_etfs` in `config/site/rollups.toml` | built |
 | `anchored_vwap@v2` | `avwap_earnings`, `avwap_anchor_date` (v1), `avwap_swing_low`, `avwap_swing_high` (VWAP from the swing pivots `swing_levels@v1` found) | `events/earnings`, `bars/1d` split-adjusted as of the session, 251 sessions back, `swing_levels@v1` | built |
 | `oi_walls@v1` | `wall_status` (OK / PARTIAL / NO_OI / NO_SPOT / NO_CHAIN / NO_EXPIRY), `call_wall` + `call_wall_oi` (most call OI at or above spot), `put_wall` + `put_wall_oi` (most put OI at or below spot); OI summed across expiries 1..60 days out, ties nearer spot | the session's `chains/option_quotes`, `chains/underlying_quotes` | built |
-| `nearest_expiry@v1` | `expiry_date` (the nearest listed expiry on or after the session; 0-DTE counts), `dte` (calendar days to it), `sessions_to_expiry` (exchange sessions after the session up to it); a row per underlying with a chain, null when every listed expiry is past. `feature.earnings_before_expiry` (`config/site/features/earnings.toml`) compares it with `earnings@v1.next_earnings_date` | the session's `chains/option_quotes` | built |
+| `nearest_expiry@v1` | `expiry_date` (the nearest listed expiry on or after the session; 0-DTE counts), `dte` (calendar days to it), `sessions_to_expiry` (exchange sessions after the session up to it); a row per underlying with a chain, null when every listed expiry is past. `feature.earnings_before_expiry` (`config/site/features/options/earnings.toml`) compares it with `earnings@v1.next_earnings_date` | the session's `chains/option_quotes` | built |
 
 **`fundamentals@v3` rules.** Among facts FILED on or before the session: the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
@@ -500,7 +500,7 @@ back-filled from before chains were collected. The expression features
 `iv_hv_spread = iv30 - hv30` and `iv_hv_ratio = iv30 / hv30` (`price_stats@v2`) are the
 variance-risk-premium inputs.
 
-**Liquidity class (expression features, `config/site/features/liquidity.toml`).** HIGH when
+**Liquidity class (expression features, `config/site/features/company/liquidity.toml`).** HIGH when
 every HIGH threshold holds (ADV, close, the worse of the put / call option tier, chain open
 interest and volume), else MEDIUM when every MEDIUM one does, else LOW. A threshold that cannot
 be checked (null ADV; no `option_liquidity@v1` for the session; a failed chain fetch) is

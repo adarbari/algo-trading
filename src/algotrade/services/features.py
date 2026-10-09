@@ -39,7 +39,7 @@ def _default_store(root: Path) -> FileConfigStore:
 
 
 def site_features(store: ConfigStore | None = None) -> FeatureSet:
-    """The site's features: code groups + ``config/site/features/*.toml`` of ``store``."""
+    """The site's features: code groups + ``config/site/features/*/*.toml`` of ``store``."""
     return build_site_features(store if store is not None else _default_store(config_dir()))
 
 

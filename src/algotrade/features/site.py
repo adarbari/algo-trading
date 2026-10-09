@@ -1,5 +1,5 @@
 """The site's feature catalogue: the code groups (``registry``) plus the expression features
-of ``config/site/features/*.toml`` (loaded by the one settings loader), as one ``FeatureSet``;
+of ``config/site/features/*/*.toml`` (loaded by the one settings loader), as one ``FeatureSet``;
 and a user's catalogue: the site's plus ``config/users/<id>/features/*.toml`` (ADR 0023 step 4).
 
 ``site_features(configs)`` is what the ``rollups`` task, the read path (selections,

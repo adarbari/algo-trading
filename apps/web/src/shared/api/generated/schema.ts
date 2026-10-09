@@ -39,26 +39,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/edges/{edge_id}/evaluate/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Evaluate Status
-         * @description 403 for another user's job unless the caller is an admin (the job's owner is its user).
-         */
-        get: operations["evaluate_status_edges__edge_id__evaluate__job_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/evaluation/split": {
         parameters: {
             query?: never;
@@ -136,6 +116,23 @@ export interface paths {
         };
         /** Health */
         get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Status */
+        get: operations["job_status_jobs__job_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -332,26 +329,6 @@ export interface paths {
         put?: never;
         /** Run */
         post: operations["run_screens__config_id__run_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/screens/{config_id}/run/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Run Status
-         * @description 403 for another user's job unless the caller is an admin (the job's owner is its user).
-         */
-        get: operations["run_status_screens__config_id__run__job_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -653,6 +630,46 @@ export interface components {
              * @description screener ids, highest priority first
              */
             priority: string[];
+        };
+        /** JobStatus */
+        JobStatus: {
+            /**
+             * Error
+             * @description why it failed (admins only: anyone else is told it failed)
+             */
+            error: string | null;
+            /**
+             * Exploratory
+             * @description an evaluation's verdict, once it finished
+             */
+            exploratory: boolean | null;
+            /** Job Id */
+            job_id: string;
+            /**
+             * Kind
+             * @description screen or edge-eval
+             */
+            kind: string;
+            /**
+             * Run Id
+             * @description the stored run (complete or partial)
+             */
+            run_id: string | null;
+            /**
+             * Session
+             * @description the session a screen run is for
+             */
+            session: string | null;
+            /**
+             * State
+             * @description queued, running, complete, partial or failed
+             */
+            state: string;
+            /**
+             * User
+             * @description whose job: the caller, or the site
+             */
+            user: string;
         };
         /** LiveOptionChain */
         LiveOptionChain: {
@@ -1341,38 +1358,6 @@ export interface operations {
             };
         };
     };
-    evaluate_status_edges__edge_id__evaluate__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                edge_id: string;
-                job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvaluationRequest"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     save_split_evaluation_split_put: {
         parameters: {
             query?: never;
@@ -1514,6 +1499,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    job_status_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1953,38 +1969,6 @@ export interface operations {
             };
             path: {
                 config_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RunRequest"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_status_screens__config_id__run__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                config_id: string;
-                job_id: string;
             };
             cookie?: never;
         };

@@ -1,6 +1,6 @@
 """Expression features: a small, safe, typed formula language over features (ADR 0023 step 3).
 
-Definitions live in ``config/site/features/*.toml`` (loaded by ``config/site/settings.py``).
+Definitions live in ``config/site/features/*/*.toml`` (loaded by ``config/site/settings.py``).
 A formula is parsed (``lexer``, ``parser`` -> ``nodes``), type checked against the catalogue
 (``checker``) and evaluated vectorised over a frame of stored feature columns
 (``evaluator``, ``functions``); nothing is ever passed to Python ``eval``. ``definitions``

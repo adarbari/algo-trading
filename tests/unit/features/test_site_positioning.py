@@ -1,4 +1,5 @@
-"""The skew and term-structure expression features of ``config/site/features/positioning.toml``
+"""The skew and term-structure expression features of
+``config/site/features/options/positioning.toml``
 (``skew_rr25``, ``term_ratio_30_90``, ``term_ratio_next_30``): values, the sign conventions
 (backwardation above 1, contango below), and nulls (UNKNOWN, never zero or infinity)."""
 

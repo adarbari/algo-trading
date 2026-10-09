@@ -467,3 +467,69 @@ def test_a_current_listing_with_a_symbol_history_id_is_fetched_by_its_perma_tick
     vendor = Vendor({"US0001": payloads.prices(rows(10)), "US0002": payloads.prices(rows(20))})
     record = run(writer, vendor, (), from_listings=True)
     assert sorted(vendor.asked) == ["US0001", "US0002"] and record.stats["no_perma"] == 0
+
+
+def _splits(writer: StoreWriter) -> pd.DataFrame:
+    parts = [StoreReader(writer._backend).table("events/split", d) for d in
+             StoreReader(writer._backend).dates("events/split")]  # fmt: skip
+    return pd.concat([p for p in parts if p is not None], ignore_index=True)
+
+
+def test_tiingo_split_rows_only_for_tiingo_namespace_ids(writer: StoreWriter) -> None:
+    """A delisted name (EQ:TIINGO:) has no Massive split row, so Tiingo's splitFactor becomes
+    one (ex-date midnight UTC, ratio = factor = split_to, split_from 1, no known_from); a FIGI
+    id's split stays Massive's: Tiingo's is only compared."""
+    write_listings(writer, [
+        ("EQ:TIINGO:US0001", "OLD", "US0001", "2019-06-03", "2020-01-07"),
+        ("EQ:AAA", "AAA", "", "2000-01-03", None),
+    ])  # fmt: skip
+    split_days = {"2020-01-03": 2.0}
+    vendor = Vendor({"US0001": payloads.prices(rows(10), split_days),
+                     "AAA": payloads.prices(rows(20), split_days)})  # fmt: skip
+    record = run(writer, vendor, (), from_listings=True)
+    out = _splits(writer)
+    assert (
+        list(out["instrument_id"]) == ["EQ:TIINGO:US0001"]
+        and record.stats["tiingo_split_rows"] == 1
+    )
+    [row] = out.to_dict("records")
+    assert row["ts"] == pd.Timestamp("2020-01-03", tz="UTC") and row["source"] == "tiingo"
+    assert (row["ratio"], row["split_to"], row["split_from"]) == (2.0, 2.0, 1.0)
+    assert "known_from" not in out.columns or pd.isna(row["known_from"])
+    assert "tiingo 2 vs events/split none" in record.items["split:EQ:AAA"]  # FIGI: report only
+
+
+def test_tiingo_split_never_shadows_massive_row(writer: StoreWriter) -> None:
+    """The read keeps the latest knowledge_ts per (instrument, ts): a day the store already
+    has a split for is not written again, whatever the ratio."""
+    write_listings(writer, [("EQ:TIINGO:US0001", "OLD", "US0001", "2019-06-03", "2020-01-07")])
+    write_split(writer, "EQ:TIINGO:US0001", date(2020, 1, 3), 2.0, date(2020, 1, 4))
+    vendor = Vendor({"US0001": payloads.prices(rows(10), {"2020-01-03": 3.0, "2020-01-06": 5.0})})
+    run(writer, vendor, (), from_listings=True)
+    out = _splits(writer).sort_values("ts")
+    assert list(out["ts"].dt.date) == [date(2020, 1, 3), date(2020, 1, 6)]
+    assert list(out["ratio"]) == [2.0, 5.0] and list(out["source"]) == ["test", "tiingo"]
+
+
+def test_bars_and_tiingo_splits_are_published_together_or_not_at_all(
+    writer: StoreWriter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bars without their split would read as a -50% return: one failing write leaves neither."""
+    write_listings(writer, [("EQ:TIINGO:US0001", "OLD", "US0001", "2019-06-03", "2020-01-07")])
+    vendor = Vendor({"US0001": payloads.prices(rows(10), {"2020-01-03": 2.0})})
+    real = StoreWriter.write_table
+
+    def failing(self: StoreWriter, table: str, *args: object, **kwargs: object) -> None:
+        if table == "events/split":
+            raise OSError("disk full")
+        real(self, table, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(StoreWriter, "write_table", failing)
+    with pytest.raises(OSError, match="disk full"):
+        run(writer, vendor, (), from_listings=True)
+    monkeypatch.undo()
+    reader = StoreReader(writer._backend)
+    assert not any(reader.table(BARS, date.fromisoformat(d)) for d in DAYS)  # no bars either
+    assert not reader.dates("events/split")
+    run(writer, vendor, (), from_listings=True)  # the retry publishes both
+    assert len(stored(writer, DAYS[0])) == 1 and len(_splits(writer)) == 1

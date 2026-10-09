@@ -22,7 +22,7 @@ never a shorter window, unless every session of it has a bar.
 
 The windows named in the columns (14, 5, 20, 50) and the warm-up are part of the definition:
 changing one is a new version. Formulas over these columns (``atr_pct``, ``range_20d_pct``,
-``trend_state``, ...) are expression features (``config/site/features/swing.toml``).
+``trend_state``, ...) are expression features (``config/site/features/technical/swing.toml``).
 """
 
 from datetime import date
