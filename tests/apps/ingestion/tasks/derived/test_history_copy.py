@@ -37,6 +37,7 @@ def _document(**keys: Any) -> dict[str, Any]:
             "market_prefix": "rollups/market/",
             "instrument_tables": [BARS, OTHER],
             "recent_years": 2,
+            "free_disk_floor_gb": 0,  # the machine's own free space must not decide a test
             **keys,
         },
     }
@@ -57,7 +58,10 @@ def _ctx(root: Path, **keys: Any) -> TaskContext:
 def test_the_settings_come_from_nightly_toml_and_default_to_no_instrument_tables() -> None:
     store = MemoryConfigStore({("site", "settings", "nightly"): _document(budget_gb=1.5)})
     assert load_nightly(store).history_copy == HistoryCopySettings(
-        market_prefix="rollups/market/", instrument_tables=(BARS, OTHER), budget_gb=1.5
+        market_prefix="rollups/market/",
+        instrument_tables=(BARS, OTHER),
+        budget_gb=1.5,
+        free_disk_floor_gb=0.0,
     )
     assert load_nightly(MemoryConfigStore({})).history_copy.instrument_tables == ()
 
