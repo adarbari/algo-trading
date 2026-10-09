@@ -925,7 +925,7 @@ TASKS: dict[str, Task] = {
             "golden-load",
             "load the golden CSVs into the store (a fixture store, never production)",
             golden,
-            ("bars/1d", "instruments/reference", "universe", golden.CATALOG),
+            ("bars/1d", "instruments/reference", "instruments/shares", "universe", golden.CATALOG),
             _golden_load,
             sources=("synthetic",),
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),

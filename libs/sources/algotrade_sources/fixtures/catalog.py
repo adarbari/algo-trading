@@ -7,7 +7,7 @@ baseline in ``benchmarks/baseline.json`` is keyed by dataset name. Edit here, th
 ``algotrade-ingest golden build`` and commit the CSVs and manifest.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 import numpy as np
@@ -28,6 +28,7 @@ BARS = 756  # three years of daily bars
 START = "2020-01-01"
 
 type Builder = Callable[[np.random.Generator], dict[str, PriceSeries]]
+type SharesBuilder = Callable[[np.random.Generator, Iterable[str]], dict[str, float]]
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class GoldenSpec:
     seed: int
     tags: tuple[str, ...]
     build: Builder
+    shares: SharesBuilder | None = None  # shares outstanding per symbol (stock fixtures only)
 
 
 def _single(symbol: str, closes_fn: Callable[[np.random.Generator], np.ndarray]) -> Builder:
@@ -103,6 +105,15 @@ def _cross_section(rng: np.random.Generator) -> dict[str, PriceSeries]:
     return out
 
 
+def _cross_section_shares(rng: np.random.Generator, symbols: Iterable[str]) -> dict[str, float]:
+    """Shares outstanding of each stock (``X01``..``X60``; the benchmark is an ETF and has none):
+    log-uniform from 20 million to 2 billion, drawn apart from the planted drift so the market
+    cap ranking (the size baseline's signal) is unrelated to 12-1 momentum."""
+    names = sorted(s for s in symbols if s != CROSS_SECTION_BENCHMARK)
+    counts = np.exp(rng.uniform(np.log(20e6), np.log(2e9), len(names)))
+    return {s: float(round(c, -3)) for s, c in zip(names, counts, strict=True)}
+
+
 GOLDEN_DATASETS: tuple[GoldenSpec, ...] = (
     GoldenSpec(
         "bull_trend", "Steady uptrend, moderate volatility", 101, ("trend",),
@@ -143,7 +154,7 @@ GOLDEN_DATASETS: tuple[GoldenSpec, ...] = (
     ),
     GoldenSpec(
         "cross_section", "60 names and SPY with a planted persistent drift (edge harness)",
-        109, ("edge", CROSS_SECTION_TAG), _cross_section,
+        109, ("edge", CROSS_SECTION_TAG), _cross_section, _cross_section_shares,
     ),
 )  # fmt: skip
 
@@ -152,5 +163,7 @@ def build_golden(files: GoldenFiles) -> list[str]:
     """(Re)generate every golden dataset's CSV files. Returns the dataset names."""
     for spec in GOLDEN_DATASETS:
         rng = np.random.default_rng(spec.seed)
-        files.write(spec.name, spec.description, spec.build(rng), spec.tags)
+        series = spec.build(rng)  # the shares are drawn after the bars: the bars never change
+        shares = spec.shares(rng, series) if spec.shares else None
+        files.write(spec.name, spec.description, series, spec.tags, shares)
     return [s.name for s in GOLDEN_DATASETS]

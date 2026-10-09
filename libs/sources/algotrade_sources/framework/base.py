@@ -154,6 +154,11 @@ class FixtureDataset(Protocol):
     def symbols(self) -> tuple[str, ...]: ...
 
     @property
+    def shares(self) -> Mapping[str, float]:
+        """Shares outstanding per symbol, for the datasets that declare them (else empty)."""
+        ...
+
+    @property
     def tags(self) -> tuple[str, ...]: ...
 
 
