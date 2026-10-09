@@ -165,8 +165,10 @@ def test_deploy_plan_prints_the_actions_between_two_commits(
     ("paths", "expected"),
     [
         (["apps/web/src/a.ts", "docs/x.md", "tests/unit/a.py", ".github/w.yml"], False),
-        (["apps/api/algotrade_api/a.py", "apps/api/schema.graphql", "architecture/x.toml"], False),
-        (["datasets/golden/a.parquet", ".claude/skills/x/SKILL.md"], False),
+        (["apps/api/algotrade_api/a.py", "apps/api/schema.graphql"], False),
+        ([".claude/skills/x/SKILL.md"], False),
+        (["datasets/golden/a.parquet"], True),  # `golden load` reads it at runtime
+        (["architecture/tables.toml"], True),  # read at import by services/read/session.py
         (["README.md", "CLAUDE.md"], False),
         (["src/algotrade/a.py"], True),
         (["apps/web/src/a.ts", "src/algotrade/a.py"], True),

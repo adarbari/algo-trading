@@ -73,8 +73,6 @@ _INGEST_FREE = (
     "tests/*",
     ".claude/*",
     ".github/*",
-    "architecture/*",
-    "datasets/golden/*",
 )
 
 

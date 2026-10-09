@@ -110,7 +110,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.algotrade.deploy.pli
   reason and lets the agent run again); a manual `scripts/ops/deploy.sh` that succeeds clears it too.
 - **Ingest:** a deploy takes the `deploy` lock, and the ingest run lock too when the change
   touches anything a running ingest loads (anything but web, API, docs, tests, `.claude`,
-  `.github`, `architecture`, root `*.md`; a dependency change always does), without waiting, so
+  `.github`, root `*.md`; a dependency change always does), without waiting, so
   it never runs over an ingest it could disturb (the cycle logs "skipped" and retries in 5
   minutes); a web-only deploy goes ahead during a backfill. While it holds them, a nightly that finds the lock busy is rerun by its watchdog, and a manual
   `algotrade-ingest` exits busy like any second run.

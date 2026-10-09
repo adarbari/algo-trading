@@ -397,6 +397,18 @@ def test_a_deploy_only_skip_names_the_deploy_alone(site: Site) -> None:
     assert "ingest/deploy" not in site.log()
 
 
+def test_a_failed_locks_plan_blocks_and_runs_no_hold(site: Site) -> None:
+    site._stub(
+        "algotrade-api",
+        API_STUB.replace('*" --locks "*) echo', '*" --locks "*) exit 1; echo'),
+    )
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    out = site.run("--auto", STUB_PLAN="web")
+    assert out.returncode == 1 and "deploy-plan failed" in site.state("blocked").read_text()
+    assert not any(c.startswith("ingest") for c in site.called())
+
+
 def test_the_dry_run_says_which_locks_it_would_take(site: Site) -> None:
     out = site.run("--dry-run")
     assert "locks (dry-run): deploy, ingest" in out.stdout

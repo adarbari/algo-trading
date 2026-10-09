@@ -36,9 +36,8 @@ without a bad deploy silently taking the site down.
    something a running ingest loads, because a multi-hour backfill otherwise blocked even
    web-only deploys. The ingest runs from the same checkout and venv, so a merge that rewrites
    `src/`, `libs/`, `apps/ingestion`, `config/` or a `uv sync` mid-run gives a mixed-version run
-   whose record names one commit (ADR 0007 provenance) or crashes a late import. Web, API (apps
-   never import each other; the API only reads stores), docs, tests, `.claude`, `.github`,
-   `architecture`, `datasets/golden` and root `*.md` are on a deny-by-default allowlist
+   with mixed-version code inside one run, and a late import or a `uv sync` can crash it. Web, API (apps
+   never import each other; the API only reads stores), docs, tests, `.claude`, `.github` and root `*.md` are on a deny-by-default allowlist
    (`holds_ingest`, `algotrade-api deploy-plan --locks`); a dependency change, an unknown path
    or a new folder holds the ingest lock, and an empty diff holds nothing. The others run under
    the `deploy` lock alone (`algotrade-ingest deploy-hold --deploy-only`). The manual deploy
