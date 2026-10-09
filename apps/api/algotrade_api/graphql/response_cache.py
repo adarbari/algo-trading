@@ -56,6 +56,7 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
         "OptionQuotes",
         "EtfHoldings",
         "InstrumentEvents",
+        "SessionDate",
     }
 )
 # Operations over published tables and configs that depend on the caller's catalogue or
