@@ -6,9 +6,12 @@ const auth = {
   signOut: vi.fn(),
   onAuthStateChange: vi.fn(),
 };
-const createClient = vi.fn(() => ({ auth }));
+// Called with `new`: a plain function returning the stub object.
+const AuthClient = vi.fn(function (_options: Record<string, unknown>) {
+  return auth;
+});
 
-vi.mock('@supabase/supabase-js', () => ({ createClient }));
+vi.mock('@supabase/auth-js', () => ({ AuthClient }));
 
 /** A fresh copy of the module (it creates its client once) under the given config. */
 async function load(config: { url?: string; key?: string }) {
@@ -21,7 +24,7 @@ async function load(config: { url?: string; key?: string }) {
   return import('./auth');
 }
 
-const CONFIGURED = { url: 'https://p.supabase.test', key: 'anon' };
+const CONFIGURED = { url: 'https://p.supabase.co', key: 'anon' };
 
 beforeEach(() => {
   auth.getSession.mockResolvedValue({
@@ -29,6 +32,7 @@ beforeEach(() => {
   });
   auth.signInWithPassword.mockResolvedValue({ error: null });
   auth.signOut.mockResolvedValue({ error: null });
+  auth.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
 });
 
 afterEach(() => {
@@ -36,18 +40,44 @@ afterEach(() => {
 });
 
 describe('with Supabase configured', () => {
-  it('creates the client once, from the keys, persisting the session', async () => {
-    const { accessToken } = await load(CONFIGURED);
+  it('creates the client once, with exactly the options supabase-js used', async () => {
+    const { accessToken } = await load({ url: 'https://abcd.supabase.co/', key: 'anon' });
     await accessToken();
     await accessToken();
-    expect(createClient).toHaveBeenCalledTimes(1);
-    const [url, key, options] = createClient.mock.calls[0] as unknown as [
-      string,
-      string,
-      { auth: { persistSession: boolean } },
-    ];
-    expect([url, key]).toEqual(['https://p.supabase.test', 'anon']);
-    expect(options.auth.persistSession).toBe(true);
+    expect(AuthClient).toHaveBeenCalledTimes(1);
+    expect(AuthClient.mock.calls[0]).toEqual([
+      {
+        url: 'https://abcd.supabase.co/auth/v1',
+        headers: { apikey: 'anon', Authorization: 'Bearer anon' },
+        storageKey: 'sb-abcd-auth-token',
+        flowType: 'implicit',
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    ]);
+    expect(AuthClient.mock.calls[0]?.[0]).not.toHaveProperty('lock');
+  });
+
+  it('derives the storage key from the project ref, trimming the URL', async () => {
+    const { accessToken } = await load({ url: '  https://proj.supabase.co  ', key: 'k' });
+    await accessToken();
+    expect(AuthClient.mock.calls[0]?.[0]).toMatchObject({
+      url: 'https://proj.supabase.co/auth/v1',
+      storageKey: 'sb-proj-auth-token',
+    });
+  });
+
+  it('refuses a plain-http project URL, but allows a local one', async () => {
+    const remote = await load({ url: 'http://p.supabase.co', key: 'k' });
+    await expect(remote.accessToken()).rejects.toMatchObject({ code: 'insecure_url' });
+    expect(AuthClient).not.toHaveBeenCalled();
+    const local = await load({ url: 'http://127.0.0.1:54321', key: 'k' });
+    await local.accessToken();
+    expect(AuthClient.mock.calls[0]?.[0]).toMatchObject({
+      url: 'http://127.0.0.1:54321/auth/v1',
+      storageKey: 'sb-127-auth-token',
+    });
   });
 
   it('gives the current access token, or null when signed out', async () => {
@@ -88,6 +118,28 @@ describe('with Supabase configured', () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
+  it('a SIGNED_OUT from elsewhere (another tab) tells the listeners; our own sign-out does not', async () => {
+    const callbacks: ((event: string) => void)[] = [];
+    auth.onAuthStateChange.mockImplementation((cb: (event: string) => void) => {
+      callbacks.push(cb);
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    });
+    const { accessToken, onUnauthorized, signOutSession } = await load(CONFIGURED);
+    await accessToken();
+    const listener = vi.fn();
+    onUnauthorized(listener);
+    callbacks[0]?.('TOKEN_REFRESHED');
+    expect(listener).not.toHaveBeenCalled();
+    callbacks[0]?.('SIGNED_OUT');
+    expect(listener).toHaveBeenCalledTimes(1);
+    auth.signOut.mockImplementation(() => {
+      callbacks[0]?.('SIGNED_OUT'); // auth-js emits it for the tab's own sign-out too
+      return Promise.resolve({ error: null });
+    });
+    await signOutSession();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('on a 401 signs out locally and tells the listeners', async () => {
     const { handleUnauthorized, onUnauthorized } = await load(CONFIGURED);
     const listener = vi.fn();
@@ -109,7 +161,7 @@ describe('without Supabase keys (the API runs with auth off)', () => {
     const seen: unknown[] = [];
     subscribeSession((s) => seen.push(s))();
     expect(seen).toEqual([null]);
-    expect(createClient).not.toHaveBeenCalled();
+    expect(AuthClient).not.toHaveBeenCalled();
   });
 
   it('says why sign-in cannot work', async () => {

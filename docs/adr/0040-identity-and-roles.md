@@ -1,6 +1,6 @@
 # ADR 0040: Users are declared in a site registry with a role; Supabase Auth authenticates them behind one Authenticator seam
 
-**Status:** accepted (2026-10-05; owner decision; implementation: roadmap ID1-ID4), amended 2026-10-05: the owner wants outside users on a hosted API within a week, so Supabase Auth replaces the local login (decision 3) and the seam of decision 5 is its home. Closes the
+**Status:** accepted (2026-10-05; owner decision; implementation: roadmap ID1-ID4), amended 2026-10-08 (the web uses `@supabase/auth-js`, not `supabase-js`; decision 3 and Consequences), amended 2026-10-05: the owner wants outside users on a hosted API within a week, so Supabase Auth replaces the local login (decision 3) and the seam of decision 5 is its home. Closes the
 open decision "User identity scheme" (phase 4) and extends [0015](0015-configs-selections-users.md)
 (users as labels), [0024](0024-api.md), [0029](0029-rule-screener.md) (`?user=` on writes),
 [0025](0025-frontend-architecture.md) (the role-gating seam `guard.ts`) and
@@ -28,7 +28,7 @@ not own, and a hosted identity provider stops being over-engineering.
    replaced by the authenticated user (an admin may still name another user: ID4 made it the `X-Act-For` header on writes and
    the body's `user` on the preview POSTs; the Admin GraphQL fields are `AdminOnly`).
 3. **Supabase Auth authenticates users (amended 2026-10-05; replaces the local login).** The
-   web signs in through `supabase-js` (email and password first; social providers are Supabase
+   web signs in through `@supabase/auth-js` (the auth client `supabase-js` wraps, pinned exactly; email and password first; social providers are Supabase
    configuration, not code) inside `src/shared/api`, the one HTTP layer, and sends the Supabase
    access token as `Authorization: Bearer` on every REST and GraphQL request. The API verifies
    the token offline: the project's JWKS (`SUPABASE_URL`, fetched once at startup, cached,
@@ -61,7 +61,7 @@ not own, and a hosted identity provider stops being over-engineering.
   resolved user and role become fields on it then).
 - No new REST route at all: sign-in is the provider's, the allow-list does not grow. `?user=`
   on writes retires in ID4 (the web client regenerates). The API gains `PyJWT` (its own
-  pyproject), the web `@supabase/supabase-js`; CI verifies tokens with a test key pair, no network.
+  pyproject), the web `@supabase/auth-js` (amended 2026-10-08, was `@supabase/supabase-js`: the same auth code without the database, realtime and storage clients, 54 kB less on every page and a smaller attack surface; the Supabase URL must be https, plain http only for localhost; the session key stays `sb-<project ref>-auth-token`, so sessions survive; ESLint bans `@supabase/supabase-js`, everywhere); CI verifies tokens with a test key pair, no network.
 - A hosted dependency: Supabase project keys live in `.env` (rule 8); the web's origin joins
   the API's CORS list from the environment when it is hosted (roadmap H1).
 - The CLIs and the nightly are unaffected (they run as `site` / `ALGOTRADE_USER` locally).

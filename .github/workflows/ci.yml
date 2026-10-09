@@ -228,6 +228,9 @@ jobs:
       - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
         if: needs.changes.outputs.web_deps == 'true' # 44 s; only a dependency change can alter the answer
         run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
+      - name: Registry signatures and provenance of every installed package
+        if: needs.changes.outputs.web_deps == 'true'
+        run: npm audit signatures
       - run: npm run generated:check
       - run: npm run ds:check
       - run: npm run lint
