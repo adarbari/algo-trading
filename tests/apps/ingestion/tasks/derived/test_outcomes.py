@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from algotrade.core.time.calendar import close_time, next_session, sessions_ending
+from algotrade.data.prices import FLAGS_TABLE, raw_bars
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -33,7 +34,7 @@ from tests.helpers.rollup_store import (
     write_rows,
     write_split,
 )
-from tests.helpers.stored_frames import universe_rows
+from tests.helpers.stored_frames import stamped, universe_rows
 
 N = 70  # sessions of bars: room for the 60-session horizon
 IDS = {"A": "EQ:A", "B": "EQ:B", "D": "EQ:D", "SPY": SPY}
@@ -48,9 +49,9 @@ def _reference(delisted: date | None) -> list[dict[str, object]]:
     ]  # fmt: skip
 
 
-def _store() -> tuple[StoreWriter, StoreReader, list[date]]:
+def _store(a: list[float] | None = None) -> tuple[StoreWriter, StoreReader, list[date]]:
     writer, reader = store()
-    closes = {"EQ:A": series(N), "EQ:B": series(N, seed=2), SPY: series(N, seed=3),
+    closes = {"EQ:A": a or series(N), "EQ:B": series(N, seed=2), SPY: series(N, seed=3),
               "EQ:D": series(N - 3, seed=4)}  # fmt: skip
     # D's bars start three sessions in and stop four before END (skip: indexes from day 0)
     days = write_bars(writer, closes, skip={"EQ:D": [N - 3, N - 2, N - 1]})
@@ -203,3 +204,40 @@ def test_a_reference_delisting_noticed_after_the_recheck_span_is_not_counted() -
     write_rows(writer, "instruments/reference", days[0], _reference(next_session(noticed)))
     record = compute_outcomes(task_ctx(writer), days[-3])
     assert record.stats["h6"]["examples"] == {"EQ:D": NO_END_BAR}
+
+
+def _flag(writer: StoreWriter, reader: StoreReader, iid: str, day: date) -> None:
+    """Flag ``iid``'s bar on ``day`` as ``bar-quality`` would (ADR 0061)."""
+    stored = raw_bars(reader, "1d", day, day, [iid])
+    row = [{"instrument_id": iid, "ts": stored["ts"].iloc[0], "reason": "UNEXPLAINED_JUMP",
+            "detail": "d", "status": "FLAGGED"}]  # fmt: skip
+    writer.write_table(FLAGS_TABLE, END, f"flag-{iid}", stamped(row, END, f"flag-{iid}"))
+
+
+def test_a_flagged_bar_in_the_window_is_an_unmeasured_row_with_a_reason() -> None:
+    writer, reader, days = _store()
+    start = sessions_ending(END, 7)[0]
+    _flag(writer, reader, "EQ:B", days[days.index(start) + 2])  # mid-window
+    _flag(writer, reader, "EQ:A", start)  # the entry bar itself: still eligible, never dropped
+    record = compute_outcomes(task_ctx(writer), END)
+    part = _partition(reader, start, END).set_index("instrument_id")
+    for iid in ("EQ:A", "EQ:B"):
+        assert part.loc[iid, "outcome_status"] == "UNMEASURED"
+        assert part.loc[iid, "outcome_reason"] == "BAD_BAR" and pd.isna(part.loc[iid, "fwd_return"])
+    assert part.loc["EQ:D", "outcome_status"] == "DELISTED" and part.loc["EQ:D", "fwd_return"] < 1
+    assert record.stats["h6"]["rows"] == 4  # A, B, D and SPY: every eligible name has a row
+    settings = task_ctx(writer).settings
+    assert [c.status for c in check_outcomes(reader, END, settings)] == ["PASS"]
+
+
+def test_outcome_rows_bounded() -> None:
+    """An outlandish COMPLETE short-horizon return that no flag explains FAILs the acceptance."""
+    jump = [100.0] * (N - 3) + [5000.0] * 3  # +4900% inside the 6-session window, no flag
+    writer, reader, _ = _store(jump)
+    compute_outcomes(task_ctx(writer), END)
+    settings = task_ctx(writer).settings
+    [check] = check_outcomes(reader, END, settings)
+    assert check.status == "FAIL" and "EQ:A" in check.detail and "bar-quality" in check.detail
+    _flag(writer, reader, "EQ:A", END)  # flagged: the row becomes UNMEASURED, nothing to explain
+    compute_outcomes(task_ctx(writer), END)
+    assert [c.status for c in check_outcomes(reader, END, settings)] == ["PASS"]

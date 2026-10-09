@@ -35,9 +35,26 @@ forward outcomes above +300% at h = 60 since 2018, which the edge harness would 
   `CLEARED` rows for bars no longer flagged). Judgement is within the range read, so a rebuild
   reads from the first stored session.
 
+## Q2: flags travel with the bars, outcomes say UNMEASURED (2026-10-09)
+- `bars-history` stages the flags of the names it fetched (the detector over the stored bars plus
+  the rows it adds, with the splits it stages) and publishes them with the same run's bars, all
+  or none; a flag found is a WARN in the run stats, never a failure. A nightly `bar-quality` step
+  (after `bars` and `corporate-actions`, which explain real splits) checks the trailing 60
+  sessions; an `UNEXPLAINED_JUMP` flag is cleared only by a run that starts at the instrument's
+  first bar.
+- `outcomes/instrument/forward_returns@v2` (the grain is renamed: the v1 table is a different
+  schema and is never read again; nothing is deleted by this change). A name with a flagged bar
+  in S..T (S included: a flagged S is eligible) has `outcome_status = UNMEASURED`,
+  `outcome_reason = BAD_BAR`, and null returns (`fwd_return`, `fwd_max_return`,
+  `fwd_max_drawdown` are nullable). The harness excludes it like a screen it could not measure
+  (`excluded_coverage`, "unmeasured, not a miss"); the winners labels count it as no row. The
+  acceptance check FAILS a COMPLETE row over `[quality] max_bounded_return` at a horizon of at
+  most 60 sessions (a bad bar no flag explains).
+- Rollups: a dropped bar is a missing bar, so a window needing it is null by each group's gap
+  rule; groups that tolerate a few missing bars (52-week range, volume profile) use the others.
+
 ## Consequences
-Outcomes and rollups over a flagged bar are a later change (outcome status UNMEASURED, flags
-published with the bars, a nightly check): until then a flagged bar is simply absent from reads.
+## Consequences
 The trusted-segment rule can flag good bars when a name's only Massive bars are on the wrong
 side of a real jump; the flag's `detail` names the trusted segment and a later `CLEARED` row
 corrects it.

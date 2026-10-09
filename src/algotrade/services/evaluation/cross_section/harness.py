@@ -62,6 +62,7 @@ from algotrade.services.evaluation.cross_section.historical import (
 )
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
+    UNMEASURED,
     apply_outcome,
     needs_implied_vol,
 )
@@ -351,6 +352,8 @@ def _stat(
     chosen = [i for i in in_universe if i in pickable]
     picks = chosen if edge.top_k is None else chosen[: edge.top_k]
     pick_set = set(picks)
+    if any(res["excluded"].get(i) == UNMEASURED for i in picks):  # a pick on a bad bar (ADR 0061)
+        return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     have = set(res.index)
     got = [i for i in picks if i in counted.index]
     ranked = (

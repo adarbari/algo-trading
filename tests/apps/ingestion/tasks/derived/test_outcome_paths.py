@@ -8,9 +8,12 @@ from datetime import date
 import numpy as np
 import pandas as pd
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade_ingestion.tasks.derived.outcome_paths import (
+    BAD_BAR,
     NO_END_BAR,
     TRADING_DAYS,
     Window,
@@ -119,3 +122,31 @@ def test_no_eligible_name_gives_no_rows() -> None:
     rows, reasons = window_rows(_bars({"EQ:A": [None, 1, 1, 1, 1]}), WINDOW, {"EQ:A"}, None, {})
     assert rows.empty and reasons == {}
     assert WINDOW.horizon == 4 and WINDOW.start < WINDOW.end == T
+
+
+@given(position=st.integers(0, 4), others_flagged=st.booleans())
+def test_window_rows_bad_bar_unmeasured(position: int, others_flagged: bool) -> None:
+    """A flagged bar anywhere in S..T (S included; the reader dropped it, so the panel has a
+    hole there) makes the name UNMEASURED with no returns, never a row over a bad price and never
+    silently dropped; the other names are measured as before."""
+    a = [100.0, 104.0, 96.0, 102.0, 110.0]
+    a[position] = None  # type: ignore[call-overload]
+    bars = _bars({"EQ:A": a, "EQ:B": [10, 11, 12, 13, 14], SPY: [400, 404, 400, 408, 420]})
+    day = WINDOW.sessions[position]
+    flagged = {("EQ:A", day)} | ({("EQ:ZZ", day)} if others_flagged else set())  # not eligible
+    rows, reasons = window_rows(bars, WINDOW, {"EQ:A", "EQ:B", SPY}, SPY, {}, flagged)
+    by_id = _by_id(rows)
+    assert reasons == {}
+    assert by_id["EQ:A"]["outcome_status"] == "UNMEASURED"
+    assert by_id["EQ:A"]["outcome_reason"] == BAD_BAR
+    for column in ("fwd_return", "fwd_excess_return", "fwd_max_return", "fwd_max_drawdown"):
+        assert pd.isna(by_id["EQ:A"][column])
+    assert by_id["EQ:B"]["outcome_status"] == "COMPLETE" and by_id["EQ:B"]["fwd_return"] > 0
+    assert "EQ:ZZ" not in by_id
+
+
+def test_a_flag_outside_the_window_changes_nothing() -> None:
+    bars = _bars({"EQ:A": [100, 104, 96, 102, 110]})
+    before = date(2020, 1, 2)
+    rows, _ = window_rows(bars, WINDOW, {"EQ:A"}, None, {}, {("EQ:A", before)})
+    assert _by_id(rows)["EQ:A"]["outcome_status"] == "COMPLETE"

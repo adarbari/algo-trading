@@ -117,7 +117,7 @@ acceptance checks; a stored grain is backfilled once and verified like any table
 
 ## Amendment (2026-10-07, ED2): the grain as built
 Decision 3 holds; ED2 fixes what it left open.
-- **One table, no stored hit.** `outcomes/instrument/forward_returns@v1` (fixed schema in
+- **One table, no stored hit.** `outcomes/instrument/forward_returns@v2` (fixed schema in
   `storage/tables/schemas.py`), one row per (instrument, start session S, horizon, benchmark):
   `window_end` (T, the h-th exchange session after S), `fwd_return`, `fwd_excess_return`,
   `fwd_max_return` and `fwd_max_drawdown` (intraday highs and lows after S: the path a drawdown
@@ -317,7 +317,7 @@ sessions. Plan: `docs/edges-plan.md`. W1 (this change) is configuration and the 
 itself follows.
 
 1. **The study is a second reader of outcomes.** Besides the edge harness, the winners study reads
-   `outcomes/instrument/forward_returns@v1` (through `data/outcomes`, from `services/evaluation`
+   `outcomes/instrument/forward_returns@v2` (through `data/outcomes`, from `services/evaluation`
    only: the exception to the one-session rule stays confined to that package). Its horizon (504)
    and benchmark (SPY) are declared in `config/site/studies/winners.toml` (typed by
    `config/edges/winners.py`), and the outcomes task's `horizons_and_benchmarks` adds them to those
@@ -372,3 +372,10 @@ These sessions no longer count as `pre_snapshot` (a store with no listing histor
 names unsaid). The read is opt-in (`historical=True`
 through `fields_view` / `select` / `screen_session`): reads, backtests and the API are unchanged.
 `end_date` stays behind `universe_asof` (a name is in only while `start <= S <= end`).
+
+## Amendment (2026-10-09, ADR 0061): the grain is `forward_returns@v2`
+A window that needs a bar `bar-quality` flagged is `outcome_status = UNMEASURED` with
+`outcome_reason = BAD_BAR` and null returns (the three return columns are nullable); the harness
+counts it `excluded_coverage` ("unmeasured, not a miss"). The table name carries the new version,
+every reader follows it (`data/outcomes`, `services/evaluation`, the winners labels), and the v1
+table is no longer read.

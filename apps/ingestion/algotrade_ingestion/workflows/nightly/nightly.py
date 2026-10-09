@@ -128,6 +128,9 @@ NIGHTLY: tuple[Step, ...] = (
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),
     Step("corporate-actions", task_complete=True),
+    # Flag the trailing 60 sessions' bars that cannot be right (ADR 0061), after the splits that
+    # explain a real jump. Optional; the outcomes need it (a window over a bad bar is UNMEASURED).
+    Step("bar-quality", needs=("bars", "corporate-actions"), critical=False),
     # Chains finish PARTIAL by design (NO_CHAIN and the like are items); the checks decide.
     # They need a universe snapshot, not today's build to succeed: chains can be fetched only
     # for the current session, and a failed build already fails the session and holds the
@@ -205,7 +208,12 @@ NIGHTLY: tuple[Step, ...] = (
     ),
     # Forward outcomes of the windows the session closes (ADR 0053), read only by the edge
     # harness: bars and the splits that adjust them. Optional: never holds back the screens.
-    Step("outcomes", needs=("bars", "corporate-actions"), critical=False, accept=(check_outcomes,)),
+    Step(
+        "outcomes",
+        needs=("bars", "corporate-actions", "bar-quality"),
+        critical=False,
+        accept=(check_outcomes,),
+    ),
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.
