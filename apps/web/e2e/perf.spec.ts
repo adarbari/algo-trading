@@ -25,8 +25,7 @@ const ROUTES: { name: string; url: string; ready?: (page: Page) => Locator }[] =
   {
     name: 'Explore with a ticker (chart tab)',
     url: '/explore?focus=AAPL&tab=chart',
-    ready: (page) =>
-      page.getByRole('dialog', { name: 'AAPL' }).getByRole('button', { name: 'Zoom in' }),
+    ready: (page) => page.getByRole('button', { name: 'Zoom in' }),
   },
   { name: 'Regime', url: '/regime' },
   { name: 'Screener results', url: '/screeners/vrp_scanner' },

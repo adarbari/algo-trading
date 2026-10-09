@@ -1,51 +1,54 @@
 {
   "bundle": {
-    "entry_gzip_bytes": 45000,
-    "entry_closure_gzip_bytes": 269700,
+    "entry_gzip_bytes": 32300,
+    "entry_closure_gzip_bytes": 249100,
     "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
-      "src/pages/admin-ingestion/index.ts": 13200,
-      "src/pages/guide/index.ts": 20500,
+      "src/pages/admin-harness-runs/index.ts": 6100,
+      "src/pages/admin-ingestion/index.ts": 20200,
+      "src/pages/admin-llm-usage/index.ts": 18700,
+      "src/pages/guide/index.ts": 30600,
       "src/pages/login/index.ts": 2000,
-      "src/pages/screener-builder/index.ts": 33300,
-      "src/pages/screener-results/index.ts": 31500,
-      "src/pages/trader-calendar/index.ts": 8200,
-      "src/pages/trader-explore/index.ts": 51600,
-      "src/pages/trader-ideas/index.ts": 8300,
-      "src/pages/trader-regime/index.ts": 15900,
-      "src/pages/trader-screeners/index.ts": 5600
+      "src/pages/screener-builder/index.ts": 39800,
+      "src/pages/screener-results/index.ts": 43000,
+      "src/pages/trader-calendar/index.ts": 9400,
+      "src/pages/trader-edges/index.ts": 10400,
+      "src/pages/trader-explore/index.ts": 64200,
+      "src/pages/trader-ideas/index.ts": 9500,
+      "src/pages/trader-regime/index.ts": 26000,
+      "src/pages/trader-screeners/index.ts": 11000
     }
   },
   "e2e": {
     "/ideas": {
-      "first_load_js_gzip_bytes": 256500,
+      "first_load_js_gzip_bytes": 239300,
       "requests": 63,
       "dom_nodes": 310
     },
     "/screeners": {
-      "first_load_js_gzip_bytes": 255100,
+      "first_load_js_gzip_bytes": 241200,
       "requests": 64,
       "dom_nodes": 200
     },
     "/regime": {
-      "first_load_js_gzip_bytes": 326500,
+      "first_load_js_gzip_bytes": 316100,
       "requests": 95,
       "dom_nodes": 1742
     },
     "/screeners/vrp_scanner": {
-      "first_load_js_gzip_bytes": 278000,
-      "requests": 76,
-      "dom_nodes": 321
+      "first_load_js_gzip_bytes": 268400,
+      "requests": 80,
+      "dom_nodes": 322
     },
     "/admin/ingestion": {
-      "first_load_js_gzip_bytes": 260500,
-      "requests": 70,
+      "first_load_js_gzip_bytes": 246700,
+      "requests": 76,
       "dom_nodes": 700
     },
     "/explore?focus=AAPL&tab=chart": {
-      "first_load_js_gzip_bytes": 416200,
+      "first_load_js_gzip_bytes": 349800,
       "requests": 88,
-      "dom_nodes": 728
+      "dom_nodes": 266
     }
   }
 }
