@@ -1,4 +1,5 @@
 import { Text } from '@algotrade/ui';
+import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -196,7 +197,7 @@ describe('OverviewPanel', () => {
     expect(screen.queryByText('In rough markets')).not.toBeInTheDocument();
   });
 
-  it('tells what the session is missing, by kind', () => {
+  it('tells what the session is missing, by kind', async () => {
     hooks.useInstrumentFacts.mockReturnValue(
       fakeQuery({
         session: {
@@ -215,6 +216,8 @@ describe('OverviewPanel', () => {
       }),
     );
     render(<OverviewPanel symbol="KO" />);
+    for (const line of screen.getAllByRole('button', { name: /unavailable/ }))
+      await userEvent.click(line);
     expect(screen.getByText('Not available: system error')).toBeInTheDocument();
   });
 

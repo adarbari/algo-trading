@@ -1,1 +1,1 @@
-export { MasterDetail, type MasterDetailProps } from './MasterDetail';
+export { MasterDetail, type MasterDetailProps, type MasterDetailStep } from './MasterDetail';

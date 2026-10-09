@@ -235,7 +235,7 @@ describe('ScreenerResults', () => {
 
   // 2026-10-07: breakout's PARTIAL run lacked trend_stats and vol_stats when it ran; the note
   // named only what the session lacks as read now. Now each is told by kind, never by table.
-  it("tells a PARTIAL run's own gaps apart from the session's, by kind", () => {
+  it("tells a PARTIAL run's own gaps apart from the session's, by kind", async () => {
     const base = served();
     hooks.useScreenerResults.mockReturnValue(
       fakeQuery({
@@ -272,6 +272,8 @@ describe('ScreenerResults', () => {
       }),
     );
     setup();
+    for (const line of screen.getAllByRole('button', { name: /unavailable/ }))
+      await userEvent.click(line);
     expect(
       screen.getByText('The run for 2026-10-02 is PARTIAL; Run now re-runs it.'),
     ).toBeVisible();
@@ -281,7 +283,7 @@ describe('ScreenerResults', () => {
   });
 
   // ADR 0055: a COMPLETE run without ibkr_iv (IB Gateway down) looked clean on the page.
-  it('warns, by kind, that a COMPLETE run ran without an optional source', () => {
+  it('warns, by kind, that a COMPLETE run ran without an optional source', async () => {
     const base = served();
     hooks.useScreenerResults.mockReturnValue(
       fakeQuery({
@@ -304,6 +306,8 @@ describe('ScreenerResults', () => {
       }),
     );
     setup();
+    for (const line of screen.getAllByRole('button', { name: /unavailable/ }))
+      await userEvent.click(line);
     expect(screen.getByText('Not available: system error')).toBeVisible();
     expect(screen.queryByText('Partial run')).toBeNull();
   });
