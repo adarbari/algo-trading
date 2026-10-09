@@ -226,3 +226,25 @@ def test_replacing_after_the_forward_test_carries_no_label(writer: MemoryConfigW
     edges.copy_edge(writer, "alice", "drift", "drift_v2", today=date(2026, 8, 3), as_version=True)
     done = edges.set_state(writer, "alice", "drift_v2", StateChange("following"), today=TODAY)
     assert done.labels == ()
+
+
+def test_a_failed_second_write_never_leaves_two_versions_following(
+    writer: MemoryConfigWriter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    edges.set_state(writer, "alice", "drift", StateChange("following"), today=date(2026, 6, 1))
+    edges.copy_edge(writer, "alice", "drift", "drift_v2", today=date(2026, 8, 3), as_version=True)
+    real = writer.save_user_document
+    calls: list[str] = []
+
+    def failing(user: str, kind: str, name: str, document: Any) -> None:
+        calls.append(name)
+        if name == "drift_v2":  # the follow of the new version is the second write
+            raise OSError("disk full")
+        real(user, kind, name, document)
+
+    monkeypatch.setattr(writer, "save_user_document", failing)
+    with pytest.raises(OSError):
+        edges.set_state(writer, "alice", "drift_v2", StateChange("following"), today=TODAY)
+    assert calls == ["drift", "drift_v2"]  # the old version is retired first
+    following = [e.id for e in seen(writer).values() if e.follow.state == "following"]
+    assert following == []  # a trial and a retired edge: never two following

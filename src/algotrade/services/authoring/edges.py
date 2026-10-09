@@ -26,7 +26,7 @@ from typing import Any
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.follow import KEY, LABELS, STATES, Follow
-from algotrade.config.edges.loading import KIND, SITE, load_edges
+from algotrade.config.edges.loading import KIND, SITE, edge_problems, load_edges
 from algotrade.config.site.fields import reject_secrets
 from algotrade.config.site.settings import load_verdict
 from algotrade.core.model.errors import ConfigurationError
@@ -92,7 +92,13 @@ def _checked(writer: ConfigWriter, user: str, edge_id: str, document: Mapping[st
     """The edge ``document`` would be for ``user`` (a ``ConfigurationError`` with the file and
     key when it is not valid); nothing is written."""
     reject_secrets(document, f"users/{user}/edges/{edge_id}")
-    return {e.id: e for e in load_edges(_Overlay(writer, user, edge_id, document), user)}[edge_id]
+    overlay = _Overlay(writer, user, edge_id, document)
+    found = {e.id: e for e in load_edges(overlay, user)}
+    if edge_id not in found:  # the loader isolates a user's faulty file; a write must not
+        raise ConfigurationError(
+            edge_problems(overlay, user).get(edge_id, f"{edge_id}: not loadable")
+        )
+    return found[edge_id]
 
 
 def _not_found(user: str, edge_id: str) -> EdgeNotFoundError:
@@ -261,9 +267,11 @@ def set_state(
         labels=labels,
         oos_revealed=follow.oos_revealed or change.reveal_oos or state == "following",
     )
-    _write_follow(writer, who, edge, table)
+    # Two files cannot change atomically: the old version is retired FIRST, so a failure between
+    # the writes leaves a trial and nothing followed, never two versions following.
     if replaced is not None:
         _retire_replaced(writer, who, replaced, today)
+    _write_follow(writer, who, edge, table)
     return _visible(writer, who)[edge_id].follow
 
 

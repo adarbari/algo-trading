@@ -403,11 +403,12 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The edge `id` as one whole TOML document (extends resolved, the user's "
         "state left out): what an admin lands in config/site/edges/ by pull request to publish "
-        "it site-wide (the site's config changes only by PR); null: no such edge",
+        "it site-wide (the site's config changes only by PR); null: no such edge. `user`: "
+        "whose copy (an admin may publish any user's; default: their own)",
         extensions=[AdminOnly()],
     )
-    def published_edge_document(self, info: Ctx, id: str) -> str | None:
-        ctx = info.context.stores()
+    def published_edge_document(self, info: Ctx, id: str, user: str | None = None) -> str | None:
+        ctx = info.context.stores_for(user)
         return versions.load_published_document(ctx, id) if ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]

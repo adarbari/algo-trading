@@ -55,44 +55,76 @@ def load_edges(
     configs: Documents, user: str = SITE_USER, catalog: FieldCatalog | None = None
 ) -> tuple[Edge, ...]:
     """Every edge ``user`` sees, by id; none without files. With ``catalog`` (the user's
-    ``services.configs.field_catalog``) every inline universe's fields are checked too."""
+    ``services.configs.field_catalog``) every inline universe's fields are checked too.
+
+    A fault in the USER's own files never costs them every edge (the site can change under a
+    user's file: it publishes an edge of the same id, or drops one a copy extends): that edge is
+    left out, or for a site id kept as the site's with only its ``[follow]`` read, and
+    ``edge_problems`` says why. A fault in a site document still raises."""
+    return _load(configs, user, catalog)[0]
+
+
+def edge_problems(
+    configs: Documents, user: str = SITE_USER, catalog: FieldCatalog | None = None
+) -> dict[str, str]:
+    """The reasons the user's own edge files do not (fully) load, by edge id: what ``load_edges``
+    left out or ignored so a page can say so instead of the edge silently vanishing."""
+    return _load(configs, user, catalog)[1]
+
+
+def _load(
+    configs: Documents, user: str, catalog: FieldCatalog | None
+) -> tuple[tuple[Edge, ...], dict[str, str]]:
     scopes = (SITE,) if user == SITE_USER else (SITE, user)
-    layered = _layered(configs, user)
+    layered, problems = _layered(configs, user)
     screeners = _screeners(configs, scopes)
     selections = {n for scope in scopes for n in configs.names(scope, SELECTIONS)}
     parsed: dict[str, Edge] = {}
     for name, (doc, where, _root) in sorted(layered.items()):
-        edge = parse_edge(doc, name, where)
-        _check_presets(edge, where, screeners, selections)
-        if catalog is not None and not isinstance(edge.universe, str):
-            catalog.check(edge.universe.where, f"{where} universe")
+        try:
+            edge = parse_edge(doc, name, where)
+            _check_presets(edge, where, screeners, selections)
+            if catalog is not None and not isinstance(edge.universe, str):
+                catalog.check(edge.universe.where, f"{where} universe")
+        except ConfigurationError as exc:
+            if not where.startswith(f"config/users/{user}/"):
+                raise
+            problems[name] = str(exc)
+            continue
         parsed[name] = edge
     edges = []
     for name, edge in parsed.items():
         root = layered[name][2]
-        edges.append(
-            edge if root is None else replace(edge, site_frozen_from=parsed[root].frozen_from)
-        )
-    return tuple(edges)
+        parent = parsed.get(root) if root is not None else None
+        edges.append(edge if parent is None else replace(edge, site_frozen_from=parent.frozen_from))
+    return tuple(edges), problems
 
 
 def layered_documents(configs: Documents, user: str = SITE_USER) -> dict[str, dict[str, Any]]:
     """Every edge ``user`` sees as one layered document (before it is typed), by id: a copy with
     its ``extends`` resolved, a site edge with the user's ``[follow]``. What an admin publishes
-    (``services/authoring/edges.py``)."""
-    return {name: dict(doc) for name, (doc, _, _) in _layered(configs, user).items()}
+    (``services/read/evaluation/versions.py``)."""
+    return {name: dict(doc) for name, (doc, _, _) in _layered(configs, user)[0].items()}
 
 
-def _layered(configs: Documents, user: str) -> dict[str, tuple[dict[str, Any], str, str | None]]:
-    """(document, the file it is named by, the id of its chain's root) by edge id."""
+def _layered(
+    configs: Documents, user: str
+) -> tuple[dict[str, tuple[dict[str, Any], str, str | None]], dict[str, str]]:
+    """((document, the file it is named by, the id of its chain's root) by edge id, the problems
+    of the user's own files by edge id): a file that cannot be layered is a problem, not an
+    error."""
     site = _documents(configs, SITE)
     own = {} if user == SITE_USER else _documents(configs, user)
     layered: dict[str, tuple[dict[str, Any], str, str | None]] = {
         n: (dict(d), f"{_folder(SITE)}/{n}.toml", None) for n, d in site.items()
     }
+    problems: dict[str, str] = {}
     for name, doc in own.items():
-        layered[name] = _own_document(name, doc, site, own, user)
-    return layered
+        try:
+            layered[name] = _own_document(name, doc, site, own, user, problems)
+        except ConfigurationError as exc:
+            problems[name] = str(exc)
+    return layered, problems
 
 
 def _documents(configs: Documents, scope: str) -> dict[str, Mapping[str, Any]]:
@@ -105,23 +137,24 @@ def _own_document(
     site: Mapping[str, Mapping[str, Any]],
     own: Mapping[str, Mapping[str, Any]],
     user: str,
+    problems: dict[str, str],
 ) -> tuple[dict[str, Any], str, str | None]:
     """(layered document, the file it is named by, the id of its chain's root) for the user's
     file ``name``: a copy over what it extends, a follow-only file over a site edge, or a new
     edge."""
     where = f"{_folder(user)}/{name}.toml"
     extends = doc.get("extends")
-    if extends is None and name in site:
+    if name in site:
+        # The site has an edge of this id (it may have been published from this user's copy):
+        # the file is the user's state about it, nothing else; the rest is ignored, with a reason.
         stray = sorted(set(doc) - {FOLLOW})
         if stray:
-            raise ConfigurationError(
-                f"{where}: a site edge's file holds only [follow] (found {stray}); "
-                f"change its settings in a copy (extends = {name!r} under a new id)"
+            problems[name] = (
+                f"{where}: the site now has an edge {name!r}, so this file holds only [follow]; "
+                f"ignored {stray} (change its settings in a copy under a new id)"
             )
         parse_follow(doc, where)
         return {**site[name], FOLLOW: doc.get(FOLLOW, {})}, f"{_folder(SITE)}/{name}.toml", None
-    if extends is not None and name in site:
-        raise ConfigurationError(f"{where} extends: a copy takes a new id, not {name!r}")
     chain: list[tuple[str, Mapping[str, Any]]] = [(name, doc)]  # outermost first
     base: Mapping[str, Any] = {}
     root = name

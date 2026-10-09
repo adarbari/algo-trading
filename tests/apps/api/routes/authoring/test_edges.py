@@ -7,6 +7,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.services.read.evaluation import versions
+
 ALICE = {"X-Act-For": "alice"}  # an admin writing for another declared user
 
 SITE_EDGE = """id = "drift"
@@ -170,3 +172,37 @@ def test_the_published_document_is_for_admins_only(
     assert 'id = "mine"' in text and "top_k = 3" in text and "extends" not in text
     denied = trader_client.post("/graphql", json={"query": document, "variables": {"id": "drift"}})
     assert denied.json()["errors"][0]["extensions"]["code"] == "FORBIDDEN"
+
+
+def test_following_is_judged_against_the_acted_for_users_verdict_not_the_callers(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen_users: list[str] = []
+
+    def verdict_level(ctx: Any, edge_id: str) -> str:
+        seen_users.append(ctx.user.user_id)
+        return "not_working"
+
+    monkeypatch.setattr(versions, "verdict_level", verdict_level)
+    done = client.put("/edges/drift/state", json={"state": "following"}, headers=ALICE)
+    assert done.status_code == 200
+    assert seen_users == ["alice"]  # the admin is "local"; the verdict is alice's view
+    assert done.json()["labels"] == ["followed_against_verdict"]
+
+
+def test_an_admin_publishes_any_users_copy(client: TestClient) -> None:
+    assert (
+        client.post("/edges/drift/copy", json={"new_id": "mine"}, headers=ALICE).status_code == 201
+    )
+    assert (
+        client.put(
+            "/edges/mine", json={"document": {"extends": "drift", "top_k": 4}}, headers=ALICE
+        ).status_code
+        == 200
+    )
+    document = (
+        "query D($id: String!, $user: String) { publishedEdgeDocument(id: $id, user: $user) }"
+    )
+    assert read(client, document, id="mine") is None  # the admin's own view has no such edge
+    text = read(client, document, id="mine", user="alice")
+    assert 'id = "mine"' in text and "top_k = 4" in text

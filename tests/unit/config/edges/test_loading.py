@@ -2,12 +2,13 @@
 shipped ``config/site/edges/*.toml``: every document validates, its presets and inline fields
 exist, and every edge not rejected or blocked answers all nine quality-bar questions."""
 
+import re
 from typing import Any
 
 import pytest
 
 from algotrade.config.edges.document import CLOSED
-from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.loading import edge_problems, load_edges
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import field_catalog
@@ -122,18 +123,18 @@ def test_follow_is_never_inherited_by_a_copy() -> None:
 @pytest.mark.parametrize(
     ("user_doc", "message"),
     [
-        ({"top_k": 2}, r"holds only \[follow\] \(found \['top_k'\]\)"),
-        ({"extends": "drift"}, "a copy takes a new id"),
+        ({"top_k": 2}, r"holds only \[follow\].*ignored \['top_k'\]"),
+        ({"extends": "drift"}, r"holds only \[follow\].*ignored \['extends'\]"),
         ({"follow": {"state": "bogus"}}, "state"),
         ({"follow": {"labels": ["nope"]}}, r"unknown \['nope'\]"),
     ],
 )
-def test_a_site_edges_own_file_holds_only_valid_follow(
+def test_a_site_edges_own_file_is_only_state_and_a_fault_in_it_is_a_problem_not_a_failed_load(
     user_doc: dict[str, Any], message: str
 ) -> None:
     configs = store(site__drift=document(), alice__drift=user_doc)
-    with pytest.raises(ConfigurationError, match=message):
-        load_edges(configs, "alice")
+    assert [e.id for e in load_edges(configs, "alice")] == ["drift"]  # the site edge stays
+    assert re.search(message, edge_problems(configs, "alice")["drift"])
 
 
 @pytest.mark.parametrize(
@@ -147,30 +148,53 @@ def test_a_site_edges_own_file_holds_only_valid_follow(
         ({"extends": "drift", "rejection_reason": "Back."}, r"\['rejection_reason'\] are the"),
         ({"extends": "ghost"}, "extends: no edge 'ghost'"),
         ({"extends": "mine"}, "makes a cycle"),
+        ({"extends": "drift", "top_k": 0}, r"mine\.toml top_k"),
     ],
 )
-def test_a_copy_never_sets_what_the_site_decides_and_must_extend_something_real(
+def test_a_faulty_copy_is_left_out_with_its_reason_and_the_other_edges_load(
     user_doc: dict[str, Any], message: str
 ) -> None:
-    configs = store(site__drift=document(), alice__mine=user_doc)
-    with pytest.raises(ConfigurationError, match=message):
-        load_edges(configs, "alice")
+    configs = store(site__drift=document(), alice__mine=user_doc, alice__fine={"extends": "drift"})
+    assert [e.id for e in load_edges(configs, "alice")] == ["drift", "fine"]
+    assert re.search(message, edge_problems(configs, "alice")["mine"])
 
 
-def test_extends_cycles_between_two_copies_are_refused() -> None:
-    configs = store(
-        site__drift=document(),
-        alice__a={"extends": "b"},
-        alice__b={"extends": "a"},
-    )
-    with pytest.raises(ConfigurationError, match="makes a cycle"):
-        load_edges(configs, "alice")
+def test_extends_cycles_between_two_copies_are_isolated() -> None:
+    configs = store(site__drift=document(), alice__a={"extends": "b"}, alice__b={"extends": "a"})
+    assert [e.id for e in load_edges(configs, "alice")] == ["drift"]
+    assert set(edge_problems(configs, "alice")) == {"a", "b"}
 
 
 def test_a_new_edge_is_only_a_candidate() -> None:
     configs = store(alice__idea=document(id="idea", status="evidenced"))
-    with pytest.raises(ConfigurationError, match="status: a user's edge is a 'candidate'"):
-        load_edges(configs, "alice")
+    assert load_edges(configs, "alice") == ()
+    assert "a user's edge is a 'candidate'" in edge_problems(configs, "alice")["idea"]
+
+
+def test_the_site_publishing_a_users_copy_by_its_id_keeps_all_their_edges() -> None:
+    """The publish path: the site gets an edge under the copy's id; the user's file of that id
+    becomes their state about it, and their other edges still load."""
+    mine = {"extends": "drift", "top_k": 3, "follow": {"state": "following"}}
+    before = store(site__drift=document(), alice__mine=mine, alice__other={"extends": "mine"})
+    assert [e.id for e in load_edges(before, "alice")] == ["drift", "mine", "other"]
+    after = store(
+        site__drift=document(),
+        site__mine=document(id="mine", top_k=3),
+        alice__mine=mine,
+        alice__other={"extends": "mine"},
+    )
+    by_id = {e.id: e for e in load_edges(after, "alice")}
+    assert set(by_id) == {"drift", "mine", "other"}
+    assert by_id["mine"].follow.state == "following" and by_id["mine"].extends is None
+    assert by_id["other"].extends == "mine"
+    assert "the site now has an edge 'mine'" in edge_problems(after, "alice")["mine"]
+
+
+def test_the_site_removing_the_parent_of_a_copy_isolates_that_copy_only() -> None:
+    configs = store(site__keep=document(id="keep"), alice__mine={"extends": "drift"},
+                    alice__fine={"extends": "keep"})  # fmt: skip
+    assert [e.id for e in load_edges(configs, "alice")] == ["fine", "keep"]
+    assert "extends: no edge 'drift'" in edge_problems(configs, "alice")["mine"]
 
 
 def test_with_a_catalog_inline_universe_fields_must_exist() -> None:
@@ -183,8 +207,7 @@ def test_with_a_catalog_inline_universe_fields_must_exist() -> None:
 
 def test_an_invalid_user_layer_names_the_user_file() -> None:
     configs = store(site__drift=document(), alice__mine={"extends": "drift", "top_k": 0})
-    with pytest.raises(ConfigurationError, match=r"config/users/alice/edges/mine\.toml top_k"):
-        load_edges(configs, "alice")
+    assert "config/users/alice/edges/mine.toml top_k" in edge_problems(configs, "alice")["mine"]
 
 
 # ----------------------------------------------------------------------------- fitness

@@ -7,10 +7,12 @@ The write is for the caller; an admin names another user in the ``X-Act-For`` he
 
 from fastapi import APIRouter
 
+from algotrade.config.user import UserContext
 from algotrade.services.authoring import edges
 from algotrade.services.authoring.edges import StateChange
+from algotrade.services.read.context import open_stores
 from algotrade.services.read.evaluation import versions
-from algotrade_api.deps import Context, User, Writer
+from algotrade_api.deps import Context, Store, User, Writer
 from algotrade_api.schemas.authoring.edges import (
     CopyEdgeBody,
     EdgeDocument,
@@ -51,11 +53,15 @@ def delete(writer: Writer, user: User, edge_id: str) -> None:
 
 
 @router.put("/{edge_id}/state")
-def set_state(writer: Writer, user: User, ctx: Context, edge_id: str, body: StateBody) -> EdgeState:
+def set_state(
+    writer: Writer, user: User, ctx: Context, store: Store, edge_id: str, body: StateBody
+) -> EdgeState:
     """Move the user's state about an edge (follow, reject, retire, replace) and/or show its
     out-of-sample result. The server decides the permanent labels (a warning, never a block)."""
     change = StateChange(body.state, body.reason, body.reveal_oos)
-    verdict = versions.verdict_level(ctx, edge_id) if body.state == "following" else None
+    # The verdict is the one the acted-for user sees (X-Act-For), not the caller's.
+    theirs = open_stores(store.reader, store.configs, UserContext(user), store.cache)
+    verdict = versions.verdict_level(theirs, edge_id) if body.state == "following" else None
     follow = edges.set_state(writer, user, edge_id, change, today=ctx.session.date, verdict=verdict)
     return EdgeState(
         edge_id=edge_id,
