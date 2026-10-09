@@ -11,7 +11,7 @@ ALICE = {"X-Act-For": "alice"}  # an admin writing for another declared user
 
 DETAIL = """query S($id: String!) {
   screenDetail(screenerId: $id) {
-    screenerId user draft draftError versions latest hash layers resolved error working
+    screenerId user draft draftError versions latest error working
     preset { presetId pinned current rebaseAvailable }
   }
 }"""
@@ -57,12 +57,13 @@ def test_copy_finalise_and_rebase(writer_client: TestClient, root: Path) -> None
         "rebaseAvailable": False,
     }
     assert c.put("/screeners/my_vrp/schedule", json={}).status_code == 404  # gone
-    assert detail["hash"] == done["hash"]
     presets = root / "site" / "presets" / "screeners" / "vrp"
     v3 = (presets / "v3.toml").read_text()
     (presets / "v4.toml").write_text(v3.replace("version = 3", "version = 4").replace("5", "7"))
     stale = _detail(c, "my_vrp")
-    assert stale["error"] is None and stale["hash"] == done["hash"]  # the pin still resolves
+    assert (
+        stale["error"] is None and stale["working"] == detail["working"]
+    )  # the pin still resolves
     assert stale["preset"]["rebaseAvailable"]
     assert c.post("/screeners/my_vrp/rebase").json()["document"]["extends"] == "vrp@4"
     assert c.post("/screeners/my_vrp/finalise").json()["version"] == 2

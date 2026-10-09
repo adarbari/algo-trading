@@ -53,7 +53,28 @@ def test_criteria_and_display_columns_in_spec_order(reader: StoreReader) -> None
     found = load_screener(context(reader, {("me", "screeners", "cols@1"): doc}), "cols")
     assert found is not None
     assert found.criteria == (
-        ScreenCriterion("price", "rollup.price_stats@v2.close", "hard"),
-        ScreenCriterion("adv", "rollup.price_stats@v2.adv_usd_20d", "hard"),
+        ScreenCriterion("price", "rollup.price_stats@v2.close", "hard", "gt", 5),
+        ScreenCriterion("adv", "rollup.price_stats@v2.adv_usd_20d", "hard", "gte", 1),
     )
     assert found.display_columns == (ScreenColumn("close", "rollup.price_stats@v2.close"),)
+
+
+def test_criteria_carry_the_configs_op_and_threshold(reader: StoreReader) -> None:
+    """The web reads each rule from here, not from the untyped resolved config (whose criteria
+    sit under ``rules``): op and value are the config's, a list stays a tuple, none is None."""
+    doc = {
+        "id": "ops", "kind": "screener", "impl": "rules", "version": 1,
+        "selection": "all_active",
+        "criteria": {
+            "band": {"field": "rollup.price_stats@v2.close", "op": "between", "value": [5, 10]},
+            "kind": {"field": "instrument.security_type", "op": "in", "value": ["ETF", "ADR"]},
+            "has": {"field": "instrument.sector", "op": "not_null"},
+        },
+    }  # fmt: skip
+    found = load_screener(context(reader, {("me", "screeners", "ops@1"): doc}), "ops")
+    assert found is not None
+    assert [(c.id, c.op, c.value) for c in found.criteria] == [
+        ("band", "between", (5, 10)),
+        ("kind", "in", ("ETF", "ADR")),
+        ("has", "not_null", None),
+    ]

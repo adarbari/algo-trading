@@ -42,8 +42,7 @@ def test_a_stale_pin_keeps_resolving_and_rebase_is_optional(writer: MemoryConfig
     price = {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 50}
     _bump(writer, criteria={"price": price})
     detail = _detail(writer, "my_vrp")
-    assert detail.error is None and detail.hash == before.hash  # still v3's preset
-    assert detail.layers[0] == "site/screeners/vrp@3"
+    assert detail.error is None and detail.working == before.working  # still v3's preset
     assert detail.preset and detail.preset.rebase_available
     draft = presets.rebase(writer, "alice", "my_vrp")
     assert draft == {"id": "my_vrp", "extends": "vrp@4", "criteria": {"price": {"value": 7}}}

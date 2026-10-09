@@ -14,6 +14,7 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import RULE_IMPLS
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.predicates import RuleValue
 from algotrade.services.configs import config_ids, resolve_config
 from algotrade.services.read.context import ReadContext
 
@@ -23,12 +24,16 @@ SITE_SCOPE = "site"
 
 @dataclass(frozen=True)
 class ScreenCriterion:
-    """One criterion of the screen, in spec (funnel) order: the catalogue field it judges and
-    its mode (``hard``, ``soft``, ``score``)."""
+    """One criterion of the screen, in spec (funnel) order: the catalogue field it judges, its
+    mode (``hard``, ``soft``, ``score``) and its rule as the config states it: the operator
+    ``op`` and the threshold ``value`` (a scalar, a tuple for ``in`` / ``between``; ``None``
+    for an operator without one), in the field's stored unit."""
 
     id: str
     field: str
     mode: str
+    op: str
+    value: RuleValue = None
 
 
 @dataclass(frozen=True)
@@ -72,7 +77,10 @@ def _screener(config: ResolvedConfig) -> Screener:
         name=(config.config.name or "").strip() or config.config.id,
         version=spec.version,
         hash=config.hash,
-        criteria=tuple(ScreenCriterion(c.id, c.field, c.mode.value) for c in spec.criteria),
+        criteria=tuple(
+            ScreenCriterion(c.id, c.field, c.mode.value, c.rule.op, c.rule.value)
+            for c in spec.criteria
+        ),
         display_columns=tuple(ScreenColumn(n, f) for n, f in spec.columns),
         regime_enabled=regime.enabled,
         pause_in=tuple(label for label in REGIME_LABELS if label in config.gate_pauses),

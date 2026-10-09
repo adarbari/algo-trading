@@ -410,7 +410,7 @@ export type ScreenDetailQueryVariables = Exact<{
 }>;
 
 
-export type ScreenDetailQuery = { screenDetail: { screenerId: string, user: string, draft: unknown, draftError: string | null, versions: Array<number>, latest: number | null, hash: string | null, layers: Array<string>, resolved: unknown, error: string | null, working: unknown, preset: { presetId: string, pinned: number | null, current: number | null, rebaseAvailable: boolean } | null } | null };
+export type ScreenDetailQuery = { screenDetail: { screenerId: string, user: string, draft: unknown, draftError: string | null, versions: Array<number>, latest: number | null, error: string | null, working: unknown, preset: { presetId: string, pinned: number | null, current: number | null, rebaseAvailable: boolean } | null } | null };
 
 export type ScreenVersionsQueryVariables = Exact<{
   id: string;
@@ -444,7 +444,7 @@ export type ScreenerResultsQuery = { session: { date: string, unavailable: Array
 export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, notRun: { kindText: string } | null, pickHistory: Array<{ session: string, picked: number | null }>, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }> } | null }> };
+export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, criteria: Array<{ id: string, field: string, mode: string, op: string, value: unknown }>, notRun: { kindText: string } | null, pickHistory: Array<{ session: string, picked: number | null }>, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }> } | null }> };
 
 export type StatusStripQueryVariables = Exact<{
   admin: boolean;
@@ -2329,9 +2329,6 @@ export const ScreenDetailDocument = new TypedDocumentString(`
       current
       rebaseAvailable
     }
-    hash
-    layers
-    resolved
     error
     working
   }
@@ -2542,6 +2539,8 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
       id
       field
       mode
+      op
+      value
     }
     notRun {
       kindText

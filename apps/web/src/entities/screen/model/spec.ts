@@ -10,10 +10,9 @@ type ServedDetail = NonNullable<gqlTypes.ScreenDetailQuery['screenDetail']>;
 type Table = Record<string, unknown>;
 
 /** One screen as `screenDetail` serves it; its JSON documents are TOML tables (objects). */
-export type ScreenerDetail = Omit<ServedDetail, 'draft' | 'working' | 'resolved'> & {
+export type ScreenerDetail = Omit<ServedDetail, 'draft' | 'working'> & {
   draft: Table | null;
   working: Table | null;
-  resolved: Table | null;
 };
 export type ScreenerListItem = gqlTypes.MyScreensQuery['myScreens'][number];
 export type ScreenerSummary = gqlTypes.ScreenerConfigsQuery['configs'][number];
@@ -94,17 +93,6 @@ function toCriterion(id: string, table: Record<string, unknown>): Criterion {
   if (table['tolerance'] !== undefined) criterion.tolerance = table['tolerance'] as Tolerance;
   if (typeof table['on_miss'] === 'string') criterion.on_miss = table['on_miss'] as MissDecision;
   return criterion;
-}
-
-/**
- * The rules table of a screen's resolved config (`screenDetail.resolved`): the whole canonical
- * config, whose criteria sit under `rules`, not at its top level. The base for `criteriaOf`
- * when reading what the finalised screen runs.
- */
-export function resolvedRules(
-  resolved: Readonly<Record<string, unknown>> | null | undefined,
-): Readonly<Record<string, unknown>> {
-  return tableOf(resolved?.['rules']);
 }
 
 /**

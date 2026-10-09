@@ -9,7 +9,6 @@ import {
   isScreenId,
   newCriterionId,
   previewDocument,
-  resolvedRules,
   tieBreakOf,
   toDocument,
   withCriterion,
@@ -69,18 +68,6 @@ describe('criteriaOf', () => {
 
   it('reads a draft with nothing resolved', () => {
     expect(criteriaOf(null, { id: 'x' })).toEqual([]);
-  });
-
-  it("reads a resolved config's criteria from its rules table, not its top level", () => {
-    const resolved = {
-      id: 'vrp',
-      kind: 'screener',
-      settings: {},
-      rules: { version: 1, criteria: { iv: { field: 'feature.iv30', op: 'gte', value: 0.5 } } },
-    };
-    expect(criteriaOf(resolvedRules(resolved), { id: 'vrp' }).map((c) => c.id)).toEqual(['iv']);
-    expect(criteriaOf(resolved, { id: 'vrp' })).toEqual([]);
-    expect(resolvedRules(null)).toEqual({});
   });
 });
 

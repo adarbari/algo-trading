@@ -1,5 +1,5 @@
 """A user's rule screens as the Builder reads them: ``ScreenListing`` (one of their screens),
-``ScreenDetail`` (a screen's draft, versions, preset pin and resolved working copy) and
+``ScreenDetail`` (a screen's draft, versions, preset pin and working copy) and
 ``ScreenVersion`` (a finalised version's document). Writes stay REST (ADR 0029)."""
 
 from typing import Self
@@ -54,9 +54,8 @@ class ScreenListing:
 
 @strawberry.type(
     description="A screen of the user (or a preset not copied yet): the `draft` and why it "
-    "would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, the "
-    "latest version resolved (`hash`, `layers`, `resolved`, `error`) and `working`, the rule "
-    "keys the Builder edits"
+    "would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, why the "
+    "latest version does not resolve (`error`) and `working`, the rule keys the Builder edits"
 )
 class ScreenDetail:
     screener_id: str
@@ -66,9 +65,6 @@ class ScreenDetail:
     versions: list[int]
     latest: int | None
     preset: PresetPin | None
-    hash: str | None
-    layers: list[str]
-    resolved: JSON | None
     error: str | None
     working: JSON | None
 
@@ -82,9 +78,6 @@ class ScreenDetail:
             versions=list(d.versions),
             latest=d.latest,
             preset=PresetPin.of(d.preset) if d.preset is not None else None,
-            hash=d.hash,
-            layers=list(d.layers),
-            resolved=JSON(d.resolved) if d.resolved is not None else None,
             error=d.error,
             working=JSON(d.working) if d.working is not None else None,
         )
