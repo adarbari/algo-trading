@@ -22,26 +22,28 @@ IDS = ("EQ:A", "EQ:B", "EQ:C", "EQ:D", "EQ:E")
 FUTURE = datetime(2200, 1, 1, tzinfo=UTC)
 BASE = datetime(2026, 1, 1, tzinfo=UTC)
 
-type Write = tuple[date, int, list[str], bool]  # day, run number, instruments in order, restates
+type Write = tuple[date, int, list[str], bool, bool]  # day, run, ids in order, restates, x
 
 days = st.integers(0, 70).map(lambda n: START + timedelta(days=n))
 id_sets = st.lists(st.sampled_from(IDS), min_size=1, max_size=5, unique=True)
-writes = st.tuples(days, st.integers(1, 3), id_sets, st.booleans())
+writes = st.tuples(days, st.integers(1, 3), id_sets, st.booleans(), st.booleans())
 queries = st.fixed_dictionaries(
     {
         "instruments": st.one_of(st.none(), st.lists(st.sampled_from([*IDS, "EQ:Z"]), max_size=4)),
-        "columns": st.one_of(st.none(), st.just(["a"]), st.just(["b", "c"])),
+        "columns": st.one_of(st.none(), st.just(["a"]), st.just(["b", "c"]), st.just(["x"])),
     }
 )
 
 
 def write(backend: LocalBackend, table: str, item: Write) -> None:
-    day, run, ids, restates = item
+    day, run, ids, restates, extra = item
     rows: list[dict[str, Any]] = [
         {"instrument_id": s, "a": float(run * 10 + k), "b": run + k, "c": f"{s}{run}"}
         for k, s in enumerate(ids)
     ]
     frame = stamped(rows, day, f"r{run}", BASE + timedelta(hours=run))
+    if extra:  # a column some partitions have and others lack (added mid-year)
+        frame = frame.assign(x=float(run))
     if table.startswith("events/"):
         frame = frame.assign(ts=pd.Timestamp(day, tz="UTC"), known_from=day)
     backend.tables.write(table, day, f"r{run}", frame, restates=restates)

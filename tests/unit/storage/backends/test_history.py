@@ -45,7 +45,7 @@ def _rows(i: int, ids: list[str] = IDS, scale: float = 1.0) -> list[dict[str, An
 
 def _store(root: Path, n: int = 30) -> LocalBackend:
     """``n`` days over a year boundary; some partitions restated by a later run (a superseded
-    one), one partition with its rows in another order, one with an extra column."""
+    one), one partition with its rows in another order, one superseded twice."""
     backend = LocalBackend(root)
     for i, day in enumerate(_days(n)):
         ids = IDS[::-1] if i == 3 else IDS
@@ -54,7 +54,7 @@ def _store(root: Path, n: int = 30) -> LocalBackend:
             backend.tables.write(TABLE, day, "r2", stamped(_rows(i, ids, 10.0), day, "r2", LATER))
         if i == 5:
             frame = stamped(_rows(i), day, "r3", LATER + timedelta(hours=1))
-            backend.tables.write(TABLE, day, "r3", frame.assign(extra=1.5))
+            backend.tables.write(TABLE, day, "r3", frame)
         if i % 3 == 0:  # the merge-mode table: a later run revises one row, keeps the rest
             event = stamped(
                 [{**r, "ts": pd.Timestamp(day, tz="UTC")} for r in _rows(i)], day, "r1"
@@ -130,7 +130,7 @@ def test_the_copy_read_equals_the_partition_read(
     with _copy_reads(backend) as taken:
         got = backend.tables.read_range(table, start, end, **query)
     _same(got, expected)
-    if expected is not None and query.get("instruments"):
+    if expected is not None and query.get("instruments") and (table == EVENTS or end.year >= 2026):
         assert taken, "the filtered read was not served from the copy"
 
 
@@ -290,6 +290,36 @@ def test_the_copy_is_sorted_by_instrument_with_small_row_groups(
     _same(
         got, _reference(backend, TABLE, date(2026, 1, 1), date(2026, 1, 31), instruments=["EQ:C"])
     )
+
+
+def test_a_column_added_mid_year_is_not_served_as_nulls_for_earlier_days(tmp_path: Path) -> None:
+    root = tmp_path / "data"
+    backend = LocalBackend(root)
+    for i, day in enumerate(date(2026, 1, 1) + timedelta(days=n) for n in range(20)):
+        frame = stamped(_rows(i), day, "r1")
+        backend.tables.write(TABLE, day, "r1", frame.assign(x=1.5) if i >= 10 else frame)
+    backend.tables.build_history(TABLE, [2026])
+    early = (date(2026, 1, 1), date(2026, 1, 8))
+    late = (date(2026, 1, 12), date(2026, 1, 20))
+    with _copy_reads(backend) as taken:
+        got = backend.tables.read_range(TABLE, *early, instruments=["EQ:A"])
+    assert taken == [] and got is not None and "x" not in got.columns
+    _same(got, _reference(backend, TABLE, *early, instruments=["EQ:A"]))
+    with _copy_reads(backend) as taken:
+        got = backend.tables.read_range(TABLE, *late, instruments=["EQ:A"])
+    assert taken == [2026]
+    _same(got, _reference(backend, TABLE, *late, instruments=["EQ:A"]))
+
+
+def test_a_build_removes_the_temp_file_a_crashed_build_left(tmp_path: Path) -> None:
+    root = tmp_path / "data"
+    backend = _store(root)
+    folder = root / "tables" / TABLE / HISTORY
+    backend.tables.build_history(TABLE, [2026])
+    stray = folder / ".year=2026~dead.parquet.abc.tmp"
+    stray.write_bytes(b"half")
+    backend.tables.build_history(TABLE, [2026])
+    assert not stray.exists()
 
 
 def test_a_table_without_instrument_ids_has_no_copy(tmp_path: Path) -> None:

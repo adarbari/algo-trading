@@ -70,6 +70,7 @@ class YearCopy:
     seq: int
     rows: int
     days: dict[str, str]  # ISO date -> signature of the partition's index
+    ragged: frozenset[str] = frozenset()  # ISO dates whose partition schema is not the file's
 
 
 Resolve = Callable[[date, int], pa.Table | None]  # (day, commit sequence) -> the resolved rows
@@ -121,7 +122,13 @@ class HistoryCopy:
                 return held_[1]
             loaded = json.loads(path.read_text())
             years = {
-                int(y): YearCopy(v["file"], int(v["seq"]), int(v["rows"]), dict(v["days"]))
+                int(y): YearCopy(
+                    v["file"],
+                    int(v["seq"]),
+                    int(v["rows"]),
+                    dict(v["days"]),
+                    frozenset(v.get("ragged", ())),
+                )
                 for y, v in loaded["years"].items()
             }
         except FileNotFoundError:
@@ -149,6 +156,7 @@ class HistoryCopy:
                 continue
             if all(
                 self._signature(table, day) == copy.days.get(day.isoformat())
+                and day.isoformat() not in copy.ragged
                 for day in _each_day(low, high)
             ):
                 out[year] = copy
@@ -222,14 +230,20 @@ class HistoryCopy:
             payload = {
                 "format": FORMAT,
                 "years": {
-                    str(y): {"file": c.file, "seq": c.seq, "rows": c.rows, "days": c.days}
+                    str(y): {
+                        "file": c.file,
+                        "seq": c.seq,
+                        "rows": c.rows,
+                        "days": c.days,
+                        "ragged": sorted(c.ragged),
+                    }
                     for y, c in sorted(kept.items())
                 },
             }
             atomic_write(folder / MANIFEST, json.dumps(payload, sort_keys=True).encode())
             used = {c.file for c in kept.values()}
-            for path in folder.glob("year=*.parquet"):
-                if path.name not in used:
+            for path in (*folder.glob("year=*.parquet"), *folder.glob(".year=*.tmp")):
+                if path.name not in used:  # also the temp file a crashed build left
                     path.unlink(missing_ok=True)
         return built
 
@@ -248,6 +262,7 @@ class HistoryCopy:
         ``upto`` does not include, or changed while the rows were read."""
         before = {d.isoformat(): self._signature(table, d) for d in days}
         parts: list[pa.Table] = []
+        shapes: dict[str, list[tuple[str, str]]] = {}
         for day in days:
             if any(
                 e.seq is not None and e.seq > upto
@@ -257,6 +272,7 @@ class HistoryCopy:
             data = resolve(day, upto)
             if data is None or data.num_rows == 0:
                 continue
+            shapes[day.isoformat()] = _shape(data)
             marked = data.append_column(DAY, pa.array([day] * data.num_rows, pa.date32()))
             parts.append(
                 marked.append_column(POS, pa.array(np.arange(data.num_rows, dtype=np.int32)))
@@ -273,9 +289,17 @@ class HistoryCopy:
             data, sort_keys=[("instrument_id", "ascending"), (DAY, "ascending"), (POS, "ascending")]
         )
         data = data.take(order)
+        whole = _shape(data.drop_columns([DAY, POS]))
+        # a day whose partition lacks a column the year has (one added mid-year) reads without
+        # it on the partition path: such a year serves only the days that match the file
+        ragged = frozenset(day for day, shape in shapes.items() if shape != whole)
         name = f"year={days[0].year}~{secrets.token_hex(4)}.parquet"
         atomic_write(self._folder(table) / name, parquet_bytes(data, ROW_GROUP_ROWS))
-        return YearCopy(name, upto, data.num_rows, signatures)
+        return YearCopy(name, upto, data.num_rows, signatures, ragged)
+
+
+def _shape(data: pa.Table) -> list[tuple[str, str]]:
+    return [(f.name, str(f.type)) for f in data.schema]
 
 
 def _each_day(low: date, high: date) -> list[date]:

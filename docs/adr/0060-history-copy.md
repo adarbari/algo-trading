@@ -46,7 +46,11 @@ column pruning, `ParquetFile` + filter) cannot remove the per-file cost.
   reading the partitions and refuses (re-reads at a fresh sequence, `pinned_read`) when a commit
   was applied to an index but not yet published, or a partition changed meanwhile; so a matching
   signature can only mean the index was untouched since a state the build read in full. A copy
-  that cannot be read (file gone after a rebuild, damaged) counts as stale.
+  that cannot be read (file gone after a rebuild, damaged) counts as stale. **Schema:** the year
+  file holds the union of its partitions' columns, so a column added mid-year would read as nulls
+  for earlier days where the partitions have none; the manifest lists the days whose resolved
+  schema differs from the file's (`ragged`) and a read serves a year only if none of its
+  requested days is ragged.
 - **Building** is `TableStore.build_history(table, years)`: make the copy hold exactly these years
   and be current. A year whose signatures still match is kept; others are rebuilt, the rest
   removed; -> the years built. Ingestion calls it after its commits (a later change adds the
@@ -62,6 +66,8 @@ column pruning, `ParquetFile` + filter) cannot remove the per-file cost.
   equals the partition frame on that data.
 - Disk: about 90 to 140 MB per instrument table-year (more for wide tables); the two-year,
   2 GB budget holds around seven wide instrument tables, so the step lists them.
+- `TableStore.size(table)` counts the copy's bytes too (it is under the table's folder). A build
+  deletes the temp file a crashed build left.
 - A build holds one year of one table in memory (the sort); ingestion builds tables one after
   another.
 - Two code paths return the same frame, kept equal by a property test (random runs, restates,
