@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { accessToken, handleUnauthorized } from './auth';
 import { ApiError } from './client';
 import { TypedDocumentString } from './generated/graphql/graphql';
-import { gql, GraphQLRequestError } from './graphql';
+import { busyDelayMs, gql, GraphQLRequestError } from './graphql';
 
 const document = new TypedDocumentString<{ session: { date: string } | null }, { day: string }>(
   'query Day($day: Date) { session(date: $day) { date } }',
@@ -81,22 +81,40 @@ describe('gql', () => {
     expect(handleUnauthorized).toHaveBeenCalledTimes(1);
   });
 
+  it('waits the Retry-After of a 503 and asks again, quietly', async () => {
+    vi.useFakeTimers();
+    const busy = new Response('{}', { status: 503, headers: { 'retry-after': '2' } });
+    const ok = new Response(JSON.stringify({ data: { session: null } }), { status: 200 });
+    const fetch = vi.fn().mockResolvedValueOnce(busy).mockResolvedValueOnce(ok);
+    vi.stubGlobal('fetch', fetch);
+    const result = gql(document, { day: 'x' });
+    await vi.advanceTimersByTimeAsync(3000); // at most 2 s * 1.5
+    await expect(result).resolves.toEqual({ session: null });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('rejects with the 503 once the retries are used up', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn(() => Promise.resolve(new Response('{}', { status: 503 })));
+    vi.stubGlobal('fetch', fetch);
+    const settled = expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 503 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    await settled;
+    expect(fetch).toHaveBeenCalledTimes(6);
+    vi.useRealTimers();
+  });
+
+  it('spreads the wait by jitter around the growing Retry-After', () => {
+    expect(busyDelayMs('2', 0)).toBeGreaterThanOrEqual(1000);
+    expect(busyDelayMs('2', 0)).toBeLessThanOrEqual(3000);
+    expect(busyDelayMs(null, 4)).toBeGreaterThan(1400);
+    expect(new Set([1, 2, 3, 4, 5].map(() => busyDelayMs('2', 0))).size).toBeGreaterThan(1);
+  });
+
   it('keeps the session on a 403 (a user the registry does not know)', async () => {
     vi.stubGlobal('fetch', answer({}, 403));
     await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 403 });
     expect(handleUnauthorized).not.toHaveBeenCalled();
-  });
-
-  it('carries the Retry-After of a 503 (the API shedding load) on the ApiError', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve(new Response('{}', { status: 503, headers: { 'retry-after': '2' } })),
-      ),
-    );
-    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({
-      status: 503,
-      retryAfterS: 2,
-    });
   });
 });

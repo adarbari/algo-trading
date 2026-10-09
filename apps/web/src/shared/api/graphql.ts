@@ -9,8 +9,9 @@
  * "Nothing stored yet" is never an error: it is a null field or an UNKNOWN value.
  * Every request carries the Supabase access token as a bearer (ADR 0040); a 401 ends the
  * session (`handleUnauthorized`) and rejects with an `ApiError`. A 503 is the API shedding load
- * (it queues only a few dozen reads): the `ApiError` carries its `Retry-After`, and the query
- * client retries it quietly (`app/providers/query-client.ts`).
+ * (it queues only a few dozen reads): `gql` waits the `Retry-After` it sent, spread by jitter so
+ * refused clients do not return in lockstep, and asks again, up to `BUSY_RETRIES` times, before
+ * it rejects (here, not in the query client: the entry chunk has no bytes to spare).
  */
 import { apiBaseUrl } from '@/shared/config';
 
@@ -39,13 +40,21 @@ interface Body<TResult> {
   errors?: GraphQLErrorEntry[];
 }
 
+const BUSY_RETRIES = 5;
+
+/** The wait before retry number `attempt` (0-based): the server's `Retry-After` (seconds),
+ * growing with each try, times a factor between one half and one and a half. */
+export function busyDelayMs(retryAfter: string | null, attempt: number): number {
+  return (Number(retryAfter) || 1) * 1000 * (1 + attempt / 2) * (0.5 + Math.random());
+}
+
 /** Runs `document` with `variables`; rejects on an HTTP failure or any GraphQL error. */
 export async function gql<TResult, TVariables>(
   document: TypedDocumentString<TResult, TVariables>,
   variables: TVariables,
 ): Promise<TResult> {
   const token = await accessToken();
-  const response = await fetch(`${apiBaseUrl}/graphql`, {
+  const init = {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -53,12 +62,15 @@ export async function gql<TResult, TVariables>(
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ query: document.toString(), variables }),
-  });
-  if (response.status === 401) await handleUnauthorized();
-  if (!response.ok) {
-    const wait = Number(response.headers.get('retry-after'));
-    throw new ApiError(response.status, response.statusText, wait > 0 ? wait : undefined);
+  };
+  let response = await fetch(`${apiBaseUrl}/graphql`, init);
+  for (let attempt = 0; response.status === 503 && attempt < BUSY_RETRIES; attempt++) {
+    const wait = busyDelayMs(response.headers.get('retry-after'), attempt);
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    response = await fetch(`${apiBaseUrl}/graphql`, init);
   }
+  if (response.status === 401) await handleUnauthorized();
+  if (!response.ok) throw new ApiError(response.status, response.statusText);
   const body = (await response.json()) as Body<TResult>;
   if (body.errors?.length) throw new GraphQLRequestError(body.errors);
   if (body.data == null) throw new GraphQLRequestError([{ message: 'no data in the response' }]);

@@ -30,15 +30,12 @@ export class ApiError extends Error {
   readonly status: number;
   /** The server's message alone (what a user reads), without the status prefix. */
   readonly detail: string;
-  /** Seconds the server asked to wait before asking again (`Retry-After`), when it said. */
-  readonly retryAfterS: number | undefined;
 
-  constructor(status: number, detail: string, retryAfterS?: number) {
+  constructor(status: number, detail: string) {
     super(`API ${String(status)}: ${detail}`);
     this.name = 'ApiError';
     this.status = status;
     this.detail = detail;
-    this.retryAfterS = retryAfterS;
   }
 }
 

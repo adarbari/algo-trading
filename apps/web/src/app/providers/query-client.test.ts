@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError, GraphQLRequestError, queryKeys } from '@/shared/api';
 
-import { createQueryClient, retryDelay, shouldRetry } from './query-client';
+import { createQueryClient, shouldRetry } from './query-client';
 
 /** The listeners `onUnauthorized` registered: the test plays a sign-out arriving. */
 const signOuts = vi.hoisted(() => new Set<() => void>());
@@ -32,16 +32,8 @@ describe('shouldRetry', () => {
 
   it('retries a network failure or a 5xx once, then settles', () => {
     expect(shouldRetry(0, new TypeError('Failed to fetch'))).toBe(true);
-    expect(shouldRetry(0, new ApiError(500, 'down'))).toBe(true);
-    expect(shouldRetry(1, new ApiError(500, 'down'))).toBe(false);
-  });
-
-  it('retries a 503 (the API shedding load) several times, waiting as long as it asked', () => {
-    const busy = new ApiError(503, 'busy', 2);
-    expect(shouldRetry(4, busy)).toBe(true);
-    expect(shouldRetry(5, busy)).toBe(false);
-    expect(retryDelay(0, busy)).toBe(2000);
-    expect(retryDelay(3, busy)).toBeGreaterThan(retryDelay(0, busy));
+    expect(shouldRetry(0, new ApiError(503, 'down'))).toBe(true);
+    expect(shouldRetry(1, new ApiError(503, 'down'))).toBe(false);
   });
 });
 
