@@ -5,8 +5,9 @@ For a window-end session T and each horizon h, S is the h-th exchange session be
 rows are the names in the universe at S with a bar at S, measured from S's close to T's
 (``outcome_paths``) on bars split-adjusted as of T, and written to partition S. Horizons and
 benchmarks come from the site's edge documents that are not rejected or blocked
-(``config.edges``), plus the harness default (``DEFAULT_HORIZON`` sessions over
-``DEFAULT_BENCHMARK``): a new edge needs no code change. Before the first
+(``config.edges``), the winners study's (``config/site/studies/winners.toml``), plus the harness
+default (``DEFAULT_HORIZON`` sessions over ``DEFAULT_BENCHMARK``): a new edge needs no code
+change. Before the first
 universe snapshot the names are the listing history's alive on S (``data.listings.universe_asof``,
 survivors and the delisted alike), not today's snapshot; a name with no bar at T is DELISTED when
 the reference snapshot, or the listing history (``delisted_by``: a last trading day on or
@@ -38,6 +39,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import CLOSED
 from algotrade.config.edges.loading import Documents, load_edges
+from algotrade.config.edges.winners import load_winners
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
@@ -71,11 +73,13 @@ SITE = FileConfigStore(config_dir())
 
 def horizons_and_benchmarks(configs: Documents | None = None) -> tuple[list[int], list[str]]:
     """The horizons (sessions) and benchmark tickers of the site's open edge documents and their
-    ``[[variants]]``, with the harness default."""
+    ``[[variants]]``, with the harness default and the winners study's (ADR 0053, ED6)."""
     edges = [e for e in load_edges(configs or SITE) if e.status not in CLOSED]
     outcomes = [o for e in edges for o in (e.outcome, *(v.outcome for v in e.variants))]
-    horizons = {DEFAULT_HORIZON, *(h for o in outcomes for h in o.horizon_sessions)}
-    benchmarks = {DEFAULT_BENCHMARK, *(o.benchmark for o in outcomes)} - {"none"}
+    study = load_winners(configs or SITE)
+    horizons = {DEFAULT_HORIZON, study.horizon_sessions}
+    horizons |= {h for o in outcomes for h in o.horizon_sessions}
+    benchmarks = {DEFAULT_BENCHMARK, study.benchmark, *(o.benchmark for o in outcomes)} - {"none"}
     return sorted(horizons), sorted(benchmarks)
 
 

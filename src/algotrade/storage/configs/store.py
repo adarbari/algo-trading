@@ -18,6 +18,7 @@ KINDS = (
     "guide",
     "guide_playbooks",
     "events",
+    "studies",
     "edges",
     "screeners",
     "preferences",
@@ -35,7 +36,9 @@ class ConfigStore(Protocol):
         (``site/field_guide/<theme>.toml``, site-only); ``regime`` the site's regime reference
         files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only); ``events`` the site's
         event-sensitivity files (``site/events/{scope,releases}.toml``, ADR 0050, site-only);
-        ``guide`` the Guide's own files (``site/guide/sections.toml``, ADR 0051, site-only);
+        ``studies`` the site's research-study settings (``site/studies/<name>.toml``, ADR 0053,
+        site-only); ``guide`` the Guide's own files (``site/guide/sections.toml``, ADR 0051,
+        site-only);
         ``guide_playbooks`` its playbook prose (``site/guide/playbooks/<family>/<id>.toml``);
         ``edges`` the edge documents (``site/edges/<id>.toml``, or a user's draft under
         ``users/<id>/edges/``, ADR 0053).
