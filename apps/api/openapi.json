@@ -756,6 +756,91 @@
         "title": "IdeasPriorityBody",
         "type": "object"
       },
+      "JobStatus": {
+        "properties": {
+          "error": {
+            "admin_cause": "generic",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why it failed (admins only: anyone else is told it failed)",
+            "title": "Error"
+          },
+          "exploratory": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "an evaluation's verdict, once it finished",
+            "title": "Exploratory"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "kind": {
+            "description": "screen or edge-eval",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the stored run (complete or partial)",
+            "title": "Run Id"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the session a screen run is for",
+            "title": "Session"
+          },
+          "state": {
+            "description": "queued, running, complete, partial or failed",
+            "title": "State",
+            "type": "string"
+          },
+          "user": {
+            "description": "whose job: the caller, or the site",
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "kind",
+          "state",
+          "user",
+          "session",
+          "run_id",
+          "exploratory",
+          "error"
+        ],
+        "title": "JobStatus",
+        "type": "object"
+      },
       "LiveOptionChain": {
         "properties": {
           "as_of": {
@@ -2241,58 +2326,6 @@
         ]
       }
     },
-    "/edges/{edge_id}/evaluate/{job_id}": {
-      "get": {
-        "description": "403 for another user's job unless the caller is an admin (the job's owner is its user).",
-        "operationId": "evaluate_status_edges__edge_id__evaluate__job_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "edge_id",
-            "required": true,
-            "schema": {
-              "title": "Edge Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EvaluationRequest"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Evaluate Status",
-        "tags": [
-          "edges"
-        ]
-      }
-    },
     "/evaluation/split": {
       "put": {
         "operationId": "save_split_evaluation_split_put",
@@ -2493,6 +2526,48 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "operationId": "job_status_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Status",
+        "tags": [
+          "jobs"
         ]
       }
     },
@@ -3287,58 +3362,6 @@
           }
         },
         "summary": "Run",
-        "tags": [
-          "screens"
-        ]
-      }
-    },
-    "/screens/{config_id}/run/{job_id}": {
-      "get": {
-        "description": "403 for another user's job unless the caller is an admin (the job's owner is its user).",
-        "operationId": "run_status_screens__config_id__run__job_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "config_id",
-            "required": true,
-            "schema": {
-              "title": "Config Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RunRequest"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Run Status",
         "tags": [
           "screens"
         ]

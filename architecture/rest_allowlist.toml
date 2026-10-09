@@ -19,7 +19,7 @@
 #   keep       true: stays REST by design (health, job polling, live quotes); false: retires
 #   retire_in  the read-model PR that moves it to GraphQL and removes this entry
 
-max_get_routes = 5
+max_get_routes = 4
 
 # ---------------------------------------------------------------------------- stays REST
 
@@ -31,15 +31,9 @@ reason = "liveness probe for scripts and make doctor"
 
 [[route]]
 method = "GET"
-path = "/screens/{config_id}/run/{job_id}"
+path = "/jobs/{job_id}"
 keep = true
-reason = "job polling for POST /screens/{config_id}/run (ADR 0033): transport plumbing, kept with its POST"
-
-[[route]]
-method = "GET"
-path = "/edges/{edge_id}/evaluate/{job_id}"
-keep = true
-reason = "job polling for POST /edges/{edge_id}/evaluate (ADR 0059, amending 0037): transport plumbing, kept with its POST"
+reason = "job polling for every on-request job (ADR 0037 amended; ADR 0033 and 0059 start them): transport plumbing, one route for all kinds, owner or admin only"
 
 [[route]]
 method = "GET"

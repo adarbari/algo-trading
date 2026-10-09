@@ -34,6 +34,11 @@ one could pick a different session (ADR 0036).
    shrinks (two fitness tests). A new GET that is not a page read needs an amendment here.
    Amended by [0044](0044-hosting-from-the-owners-mac.md): the files include the built web
    app (`GET /{path}`, mounted last, only when `ALGOTRADE_WEB_DIST` is set).
+   Amended (2026-10-08): job polling is one route for every on-request job, `GET /jobs/{job_id}`
+   (`services/ondemand/status.py` over the `services/jobs` record): the caller reads their own
+   jobs, an admin any, a site job (a preset's shared run) everyone; anyone else's job is 404, like
+   an unknown id. It replaces the per-kind polls `GET /screens/{id}/run/{job_id}` (0033) and
+   `GET /edges/{id}/evaluate/{job_id}` (0059): `max_get_routes` goes from 5 to 4.
 5. **Migration in ten PRs** (the spec's plan), each green and shippable; `services/explore` is
    deleted in the last.
 

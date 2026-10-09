@@ -270,6 +270,20 @@ def get_ondemand_edges(request: Request) -> OnDemandEdges:
 OnDemandEvaluations = Annotated[OnDemandEdges, Depends(get_ondemand_edges)]
 
 
+def get_job_runner(request: Request) -> OnDemandScreens | OnDemandEdges:
+    """The job records the on-request runners write (they share one store: either serves any
+    job's status); off when neither runner is."""
+    runner = cast(OnDemandScreens | None, request.app.state.ondemand) or cast(
+        OnDemandEdges | None, request.app.state.ondemand_edges
+    )
+    if runner is None:
+        raise ConfigurationError("on-request jobs are off in this app")
+    return runner
+
+
+JobRunner = Annotated[OnDemandScreens | OnDemandEdges, Depends(get_job_runner)]
+
+
 def get_text_model(request: Request) -> TextModel:
     """The text model behind screener drafts ``create_app`` set up (ADR 0041); off (no
     ``llm.toml`` enabling it, tests, the OpenAPI export): 503 with the reason."""

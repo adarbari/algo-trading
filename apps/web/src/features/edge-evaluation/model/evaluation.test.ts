@@ -4,10 +4,6 @@ import { evaluationMessage, isActive, type EvaluationRun } from './evaluation';
 
 const run = (state: string, extra: Partial<EvaluationRun> = {}): EvaluationRun => ({
   state,
-  edge_id: 'drift',
-  user: 'ann',
-  job_id: 'j1',
-  run_id: null,
   exploratory: null,
   error: null,
   ...extra,
