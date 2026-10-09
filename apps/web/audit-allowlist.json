@@ -1,0 +1,12 @@
+{
+  "doc": "Reviewed exceptions to the dependency audit gate (docs/ci.md 'Dependency audit'; scripts/check-audit.ts). `npm run audit:check` fails on any high or critical advisory in all dependencies (dev tools included) unless it is listed here. An entry is for an advisory with no fixed release yet: it names the GHSA id, the package, why the risk is accepted, the date it was added and an expiry at most 90 days later, after which the gate fails until the entry is re-reviewed (a new date) or the fix lands. An entry whose advisory is no longer reported fails the gate too: drop it. tests/architecture/pipeline/test_audit_allowlist.py keeps the list honest.",
+  "allowed": [
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "reason": "stack-exhaustion denial of service on deeply nested brace patterns; braces 3.0.3 (the latest) is affected and no fixed release exists. It is reached only by dev tools (stylelint, eslint-plugin-boundaries, graphql-codegen via micromatch / fast-glob / globby) expanding the repo's own glob patterns, never user input, and is not in the shipped bundle (npm audit --omit=dev is clean). Upgrade when braces ships a fix.",
+      "added": "2026-10-08",
+      "expires": "2026-12-31"
+    }
+  ]
+}

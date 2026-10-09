@@ -44,7 +44,7 @@ jobs:
             case "$f" in
               "") ;;
               .github/workflows/ci.yml | apps/api/openapi.json | apps/api/schema.graphql) python=true web=true ;;
-              apps/web/package-lock.json | apps/web/package.json | apps/web/design-system/package.json) web=true web_deps=true ;;
+              apps/web/package-lock.json | apps/web/package.json | apps/web/design-system/package.json | apps/web/audit-allowlist.json) web=true web_deps=true ;;
               apps/web/*) web=true ;;
               docs/* | .claude/* | *.md | LICENSE) ;; # docs only: the architecture tests cover them
               *) python=true ;;
@@ -225,9 +225,12 @@ jobs:
           key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci --no-fund --no-audit
-      - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
+      - name: No high or critical advisories in shipped dependencies
         if: needs.changes.outputs.web_deps == 'true' # 44 s; only a dependency change can alter the answer
-        run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
+        run: npm audit --omit=dev --audit-level=high
+      - name: No high or critical advisories in any dependency, dev tools included, outside the reviewed allow-list
+        if: needs.changes.outputs.web_deps == 'true'
+        run: npm run audit:check # scripts/check-audit.ts over audit-allowlist.json (docs/ci.md "Dependency audit")
       - name: Registry signatures and provenance of every installed package
         if: needs.changes.outputs.web_deps == 'true'
         run: npm audit signatures

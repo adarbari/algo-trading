@@ -8,7 +8,7 @@ import { parseExploreSearch, type ExploreSearch } from '@/entities/explore';
 import type { SearchPatch } from '@/pages/trader-explore';
 
 import { traderRoute } from './layout-route';
-import { lazyPage } from '../lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 const ExplorePage = lazyPage(() => import('@/pages/trader-explore'), 'ExplorePage');
 

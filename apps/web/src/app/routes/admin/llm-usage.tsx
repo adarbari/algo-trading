@@ -4,7 +4,7 @@
  */
 import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/react-router';
 
-import { lazyPage } from '../lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 const AdminLlmUsagePage = lazyPage(() => import('@/pages/admin-llm-usage'), 'AdminLlmUsagePage');
 

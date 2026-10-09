@@ -51,7 +51,7 @@ from algotrade.data import StoreReader
 from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes, stored_sessions
 from algotrade.data.reference import UNIVERSE_TABLE
 from algotrade.engines.screening.runner import RunCoverage
-from algotrade.quant.edge_statistics import deflated_sharpe, pbo_cscv
+from algotrade.quant.edge_statistics import deflated_sharpe, moments, pbo_cscv
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.hit import (
@@ -341,7 +341,7 @@ def _stat(
         regime=session.label(day),
         pick_values=tuple(float(v) for v in counted.loc[got, "oriented"]),
         pick_hits=int(counted.loc[got, "hit"].sum()),
-        rest_values=tuple(float(v) for v in counted.loc[~counted.index.isin(pick_set), "oriented"]),
+        rest=moments(counted.loc[~counted.index.isin(pick_set), "oriented"].to_numpy(dtype=float)),
         base_hits=int(counted["hit"].sum()),
         top_decile=deciles[0] if deciles else None,
         spread=deciles[1] if deciles else None,
