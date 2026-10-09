@@ -34,6 +34,7 @@ from algotrade.services.features import catalogue
 from algotrade.services.read.availability.cause import UnavailableKind, table_cause
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
 from algotrade.services.read.values import KIND_OF_CODE, Unknown, UnknownCode
+from algotrade.storage.backends.arrow_memory import limit_threads, release_unused
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
@@ -47,6 +48,7 @@ __all__ = [
     "StoreReader",
     "Stores",
     "at_session",
+    "limit_threads",
     "open_context",
     "open_read_stores",
     "open_stores",
@@ -62,15 +64,19 @@ __all__ = [
 STRING_CELL_BYTES = 60  # what a Python string in an object column costs, about
 
 SLOT_BYTES = 8  # a pointer in a tuple, list or dict
+STR_OVERHEAD_BYTES = 49  # a CPython str object's header, beside its characters
+NUMBER_BYTES = 24  # a boxed float or int
+DICT_BASE_BYTES = 64  # an empty-ish dict
+DICT_ENTRY_BYTES = 40  # one key/value entry of a dict, its hash table share included
 MAX_CACHE_BYTES = 400 * 1024 * 1024  # the frames a cache holds, together (the hosted API's RSS)
 
 
 def weigh(value: Any) -> int:
     """About how many bytes ``value`` holds: a DataFrame's buffers, a container's slots
-    (``SLOT_BYTES`` each) and what they hold, a string's characters; any other object weighs
-    nothing (the cache's count bound covers it). Cheap: no deep walk of a frame's strings, an
-    object column's cells are priced at ``STRING_CELL_BYTES``. Records (a dict per row) are
-    priced too: a page's value rows held as records weighed nothing before."""
+    (``SLOT_BYTES`` each) and what they hold, a string's characters and header, a number; any
+    other object weighs nothing (the cache's count bound covers it). Cheap: no deep walk of a
+    frame's strings, an object column's cells are priced at ``STRING_CELL_BYTES``. Records (a
+    dict per row) are priced too: a page's value rows held as records weighed nothing before."""
     if isinstance(value, pd.DataFrame):
         # only a NumPy object column holds Python strings ``memory_usage`` cannot see; the
         # string dtype (pandas 3's default) and categoricals are counted from their buffers
@@ -79,11 +85,16 @@ def weigh(value: Any) -> int:
             STRING_CELL_BYTES * len(value) * objects
         )
     if isinstance(value, str):
-        return len(value)
+        return STR_OVERHEAD_BYTES + len(value)
+    if isinstance(value, float | int) and not isinstance(value, bool):
+        return NUMBER_BYTES
     if isinstance(value, tuple | list):
         return SLOT_BYTES * len(value) + sum(weigh(v) for v in value)
     if isinstance(value, dict):
-        return 2 * SLOT_BYTES * len(value) + sum(weigh(v) for v in value.values())
+        # keys are the few column names every row shares: not priced per row
+        return (
+            DICT_BASE_BYTES + DICT_ENTRY_BYTES * len(value) + sum(weigh(v) for v in value.values())
+        )
     return 0
 
 
@@ -146,11 +157,16 @@ class ResultCache:
             self._weights[key] = weight
             self._held += weight
             # the newest entry stays even when it alone is over the byte bound
+            evicted = False
             while len(self._items) > 1 and (
                 len(self._items) > self._size or self._held > self._max_bytes
             ):
                 old, _ = self._items.popitem(last=False)
                 self._held -= self._weights.pop(old, 0)
+                evicted = True
+        if evicted:
+            # the evicted frames' Arrow buffers are freed but the pool keeps them: hand them back
+            release_unused()
 
 
 @dataclass(frozen=True)
