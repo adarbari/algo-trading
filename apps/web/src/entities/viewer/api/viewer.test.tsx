@@ -58,10 +58,14 @@ describe('the viewer', () => {
       expect(result.current.data).toEqual(TRADER);
     });
     client.setQueryData(['gql', 'Secret'], { private: 1 });
+    const draft = client.getMutationCache().build(client, { mutationFn: () => Promise.resolve(1) });
+    await draft.execute({ draft: 'a screener' });
+    expect(client.getMutationCache().getAll()).toHaveLength(1);
     act(() => {
       forgetUser(client);
     });
     expect(client.getQueryData(['gql', 'Secret'])).toBeUndefined();
+    expect(client.getMutationCache().getAll()).toHaveLength(0);
     await waitFor(() => {
       expect(result.current.data).toBeNull();
     });
