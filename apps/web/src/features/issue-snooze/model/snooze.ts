@@ -1,5 +1,5 @@
 /**
- * Snoozing a status issue for 24 hours, per viewer: a map from issue id to the time the snooze
+ * Snoozing a status issue for 24 hours, per browser (not per user; a sign-out does not clear it): a map from issue id to the time the snooze
  * ends, in localStorage (guarded: storage can throw or be empty, and then a snooze lasts only
  * this page load). Pure helpers plus the guarded read and write; an expired entry is dropped,
  * and an issue whose id changed is a different issue, so it shows.

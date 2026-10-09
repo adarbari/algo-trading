@@ -55,6 +55,18 @@ export default defineConfig({
               test: /node_modules[\\/]@tanstack[\\/](react-router|router-core|history|react-query|query-core|store|react-store)[\\/]/,
               priority: 20,
             },
+            {
+              // Small modules shared by lazy chunks (the guide paths, the table paging): a chunk of
+              // their own, so a lazy chunk shared by pages never pulls them into the entry.
+              name: 'links',
+              test: /(entities[\\/]guide[\\/]model[\\/]paths|components[\\/]TextLink[\\/]|feature-table[\\/]model[\\/]paging|entities[\\/]feature[\\/]model[\\/]catalogue)/,
+              priority: 10,
+            },
+            {
+              name: 'tables',
+              test: /(feature-table[\\/]model[\\/]rows|features[\\/]guide-help[\\/]ui[\\/]helped)/,
+              priority: 10,
+            },
           ],
         },
       },
