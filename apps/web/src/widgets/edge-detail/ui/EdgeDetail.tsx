@@ -1,6 +1,7 @@
 /**
  * One edge's page: its name, verdict (with the server's reason) and status, the Run backtest
- * button, the headline sentence, the out-of-sample figures, year by year, how the edge is
+ * button, the headline sentence, the out-of-sample figures, year by year, its live record on
+ * paper (once followed), how the edge is
  * defined, why it should last with its sources, and the details (tests, backtests, figures, the
  * user's own split). Each term carries its Guide button; every word and number is the server's.
  */
@@ -13,6 +14,7 @@ import { GuideHelp } from '@/features/guide-help';
 import { EdgeDefinition } from './EdgeDefinition';
 import { EdgeDetails } from './EdgeDetails';
 import { EdgeFigures } from './EdgeFigures';
+import { EdgeLive } from './EdgeLive';
 import { EdgeYears } from './EdgeYears';
 
 export interface EdgeDetailProps {
@@ -69,6 +71,7 @@ export function EdgeDetail({ id, onBack }: EdgeDetailProps) {
       </Stack>
       <EdgeFigures verdict={v} />
       <EdgeYears years={v.years} />
+      <EdgeLive edgeId={edge.id} />
       <EdgeDefinition edge={edge} />
       <EdgeDetails edge={edge} />
     </Stack>

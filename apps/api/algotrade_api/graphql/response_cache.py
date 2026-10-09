@@ -99,6 +99,8 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "ScreenerRuns",
         "ScreenerTrackRecords",
         "EdgesPage",
+        "EdgeDesk",  # the paper record plus the official run it is judged against
+        "EdgePaper",
         "IngestionCompleteness",
         "NightlyRuns",
         "QualityChecks",

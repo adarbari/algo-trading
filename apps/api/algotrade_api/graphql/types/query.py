@@ -15,6 +15,8 @@ from typing import Annotated
 import strawberry
 from strawberry.types import Info
 
+from algotrade.services.read.edge_desk import desk as edge_desk
+from algotrade.services.read.edge_desk import live as edge_live
 from algotrade.services.read.evaluation import edges as edge_reads
 from algotrade.services.read.evaluation import runs as edge_runs
 from algotrade.services.read.evaluation import versions
@@ -50,6 +52,7 @@ from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeRun
+from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.guide.entries import GuideEntries
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
@@ -391,6 +394,26 @@ class Query:
         ctx = info.context.stores()
         found = edge_reads.load_edges(ctx) if ctx is not None else ()
         return [Edge.of(e, ctx) for e in found] if ctx is not None else []
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Ideas signals of the edges the user follows for the session: what to "
+        "buy (the paper trades signalled on it), what to sell next session and each followed "
+        "edge's live record. Null: nothing stored"
+    )
+    async def edge_desk(self, info: Ctx, date: Day = None) -> EdgeDesk | None:
+        ctx = await info.context.aread(date)
+        found = await off_loop(edge_desk.load_edge_desk, ctx) if ctx is not None else None
+        return EdgeDesk.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The paper record of the edge `id` as the session knew it: the live record "
+        "against the backtest's usual range, the trades and, for a trial, the forward test; "
+        "null: no such edge or nothing stored"
+    )
+    async def edge_paper(self, info: Ctx, id: str, date: Day = None) -> EdgePaper | None:
+        ctx = await info.context.aread(date)
+        found = await off_loop(edge_live.load_edge_paper, ctx, id) if ctx is not None else None
+        return EdgePaper.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The edge `id`; null: the user has no such edge"

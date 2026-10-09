@@ -23,7 +23,8 @@ const PENDING = [
 
 // Not feature tables: their rows are not instruments x catalogue features.
 const STRUCTURE = [
-  'src/widgets/edge-detail/model/columns.tsx', // one edge's years and verdict tests, one row each
+  'src/widgets/edge-detail/model/columns.tsx', // one edge's years, verdict tests and paper trades, one row each
+  'src/widgets/edge-signals/model/columns.tsx', // an edge's paper trades and the followed edges, one row each
   'src/widgets/edge-list/model/columns.tsx', // the edge documents, one row each
   'src/widgets/events-panel/ui/EventsPanel.tsx', // an instrument's stored events
   'src/widgets/event-study-panel/model/columns.tsx', // an instrument's events ahead and its 8-Ks

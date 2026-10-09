@@ -49,6 +49,7 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 allowed = [
     "apps/api/algotrade_api/graphql/*",  # Edge.verdict serves it
     "src/algotrade/services/authoring/edges.py",  # reads the one threshold it needs (forward_sessions) from the site's verdict.toml; the rule stays here
+    "src/algotrade/services/read/edge_desk/*",  # the live record's band thresholds (live_min_trades, live_low, live_high) and the forward test's forward_sessions
 ]
 detect = [{ call = "load_edge_verdict" }, { call = "load_verdict" }]
 

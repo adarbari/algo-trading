@@ -148,3 +148,7 @@ reason = "the reason the caller gave for rejecting or retiring their own edge"
 [[fact]]
 name = "EdgeCompare.reason"
 reason = "a fixed public sentence about the caller's own edge (not run yet, no figures): no source, step or table named"
+
+[[fact]]
+name = "PaperTrade.reason"
+reason = "a fixed public sentence about why the caller's own paper trade was skipped (no entry bar, no outcome stored, the result could not be computed, the edge's outcome changed): no source, step or table named"

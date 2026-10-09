@@ -147,6 +147,10 @@ purpose = "reads of the outcomes grain (outcomes/instrument/, ADR 0053): what ha
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
 
 [[dir]]
+path = "src/algotrade/data/paper"
+purpose = "reads of the forward paper record (results/edge_paper, ADR 0053 amendment 2026-10-09): one user's trades with a signal session in a window, as of a session; read by services/evaluation/forward (to settle) and the read model (Ideas signals, an edge's live record)"
+
+[[dir]]
 path = "src/algotrade/data/usage"
 purpose = "reads of the usage grain (usage/, ADR 0058): what the API's text model spent, over a date range; seeds the budget ledger and feeds the Admin usage page"
 
@@ -273,7 +277,7 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); learned edge scorers (training/); the winners study's discovery (discovery/)"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); the forward paper record of the edges a user follows (forward/); learned edge scorers (training/); the winners study's discovery (discovery/)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
@@ -282,6 +286,10 @@ purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (s
 [[dir]]
 path = "src/algotrade/services/evaluation/discovery"
 purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): the session grid and the eligible names at each (grid.py), the winners from a stored outcome (labels.py, with the harness and the training frame the only importer of outcomes), the matched controls (controls.py), the features of both read at the grid session only (frame.py), the effects, sign stability, tell clusters and the gate against the permutation null (tells.py), the probit proposer (proposer.py), the typed result (results.py), its results/winners_study rows and run record (persist.py, atomic, one run) and the candidate edge draft written to var/edge_drafts only from a run that passed the gate (drafts.py); pure over frames except the reads and the two writers"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/forward"
+purpose = "the forward paper record (ADR 0053 amendment 2026-10-09): a followed edge's tonight picks by the harness's own picker (signals.py), the open trades a stored outcome closes (settle.py, with the harness and the training frame an importer of outcomes) and one night's rows and run record published atomically into results/edge_paper (results.py)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/training"
@@ -333,6 +341,11 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 [[dir]]
 path = "src/algotrade/services/read/availability"
 purpose = "why a fact is not available, and who may know (ADR 0056): the public UnavailableKind / Unavailable (kind, features, Guide term) and the admin-only Cause chain (source -> step -> table -> features) with explain(), which expands a leaf from the nightly run record's recorded step tables; served only to admins by the GraphQL AdminCause and the REST redact"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/edge_desk"
+purpose = "read objects over the forward paper record (ADR 0053 amendment 2026-10-09) for one session: the paper trades as the session knew them (paper.py), an edge's live record against the backtest's usual range, its trades and a trial's forward test (live.py), and the Ideas signals of the followed edges (desk.py: buys, sells, followed)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

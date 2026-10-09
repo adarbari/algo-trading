@@ -281,11 +281,32 @@ type EdgeDefinition {
 }
 
 """
+The Ideas signals of the edges the user follows for the session: `buys` the paper trades signalled on it, `sells` the open ones whose window closes at `sellSession` (the next session), `followed` every followed edge with its record. Empty lists with no followed edge
+"""
+type EdgeDesk {
+  session: Date!
+  sellSession: Date!
+  buys: [PaperTrade!]!
+  sells: [PaperTrade!]!
+  followed: [FollowedEdge!]!
+}
+
+"""
 The run an evidenced or live edge cites and the split it was measured at
 """
 type EdgeEvidence {
   runId: String!
   splitFrom: Date!
+}
+
+"""
+One edge's paper record as the session knew it: the live record, the trades (newest signal first) and, for a trial, the forward test
+"""
+type EdgePaper {
+  edgeId: String!
+  record: LiveRecord!
+  trades: [PaperTrade!]!
+  forward: ForwardTest
 }
 
 """
@@ -587,6 +608,30 @@ type Fill {
   price: Float
   commission: Float
   multiplier: Float
+}
+
+"""An edge the user follows (or tries as a new version) and its record"""
+type FollowedEdge {
+  edgeId: String!
+  name: String!
+  state: String!
+  since: Date
+  record: LiveRecord!
+}
+
+"""
+A trial's forward test: its record and the replaced edge's over the trades signalled from the trial's start, `sessions` of `needed` passed, and whether it `canReplace` the edge (the sessions have passed and it is not behind)
+"""
+type ForwardTest {
+  replaces: String!
+  replacesName: String!
+  since: Date!
+  sessions: Int!
+  needed: Int!
+  this: LiveRecord!
+  replaced: LiveRecord!
+  canReplace: Boolean!
+  headline: String!
 }
 
 """
@@ -1239,6 +1284,24 @@ type LadderRung {
 }
 
 """
+An edge's live record over its closed paper trades. `state`: on_track, below or above the backtest's usual range (`low` to `high`: quantiles of the wins n closed trades would show if the backtest's win rate held), too_early (fewer than the site's minimum closed), no_backtest or no_trades. `backtestRate` and its `basis`; `bins` the picture; open and skipped trades are counted apart; `headline` the sentence
+"""
+type LiveRecord {
+  state: String!
+  closed: Int!
+  wins: Int!
+  open: Int!
+  skipped: Int!
+  winRate: Float
+  backtestRate: Float
+  basis: String!
+  low: Float
+  high: Float
+  bins: [RangeBin!]!
+  headline: String!
+}
+
+"""
 The text model's usage and cost up to `today` (exchange date): windows with their caps, 30-day breakdowns, a daily series, reliability and the latest calls. A date range, not one session (ADR 0058); `recorded` false when the log is empty
 """
 type LlmUsage {
@@ -1370,6 +1433,26 @@ type OptionQuote {
   theta: Float
   vega: Float
   rho: Float
+}
+
+"""
+One paper trade of an edge: `rank` 1 is the screener's best name, `status` open, won, lost or skipped (`reason` says why a skipped one is: never a loss), `excessReturn` only once settled (null while open), `delisted` measured to the name's last bar
+"""
+type PaperTrade {
+  edgeId: String!
+  edgeName: String!
+  instrumentId: String!
+  instrument: Instrument
+  screener: String!
+  rank: Int!
+  signalSession: Date!
+  buySession: Date!
+  sellSession: Date!
+  horizonSessions: Int!
+  status: String!
+  reason: String!
+  excessReturn: Float
+  delisted: Boolean!
 }
 
 """
@@ -1660,6 +1743,28 @@ type Query {
   """
   edges: [Edge!]!
 
+  """
+  The Ideas signals of the edges the user follows for the session: what to buy (the paper trades signalled on it), what to sell next session and each followed edge's live record. Null: nothing stored
+  """
+  edgeDesk(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): EdgeDesk
+
+  """
+  The paper record of the edge `id` as the session knew it: the live record against the backtest's usual range, the trades and, for a trial, the forward test; null: no such edge or nothing stored
+  """
+  edgePaper(
+    id: String!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): EdgePaper
+
   """The edge `id`; null: the user has no such edge"""
   edge(id: String!): Edge
 
@@ -1771,6 +1876,15 @@ type Query {
 
   """The edge evaluation run `runId`, with its rows; null: no such run"""
   harnessRun(runId: String!): HarnessRun
+}
+
+"""
+One bar of the picture: the win rates `start` to `end` and the `chance` (0 to 1) the live win rate falls there if the backtest's held
+"""
+type RangeBin {
+  start: Float!
+  end: Float!
+  chance: Float!
 }
 
 """

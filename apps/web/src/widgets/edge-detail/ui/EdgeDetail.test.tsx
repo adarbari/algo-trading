@@ -7,10 +7,11 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { EdgeDetail } from './EdgeDetail';
 
-const hooks = vi.hoisted(() => ({ useEdges: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useEdges: vi.fn(), useEdgePaper: vi.fn() }));
 vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEdges: hooks.useEdges,
+  useEdgePaper: hooks.useEdgePaper,
 }));
 vi.mock('@/features/edge-evaluation', async () => {
   const { Text } = await import('@algotrade/ui');
@@ -25,6 +26,7 @@ stubElementSize();
 
 beforeEach(() => {
   hooks.useEdges.mockReturnValue(fakeQuery(EDGES_FIXTURE.edges));
+  hooks.useEdgePaper.mockReturnValue(fakeQuery(null));
 });
 
 describe('EdgeDetail', () => {

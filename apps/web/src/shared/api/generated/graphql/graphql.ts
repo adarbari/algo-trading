@@ -120,6 +120,18 @@ export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type EdgesPageQuery = { edges: Array<{ id: string, name: string, status: string, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }> }, canonicalRun: { runId: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
+export type EdgeDeskQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EdgeDeskQuery = { edgeDesk: { session: string, sellSession: string, buys: Array<{ edgeId: string, edgeName: string, instrumentId: string, rank: number, buySession: string, sellSession: string, instrument: { symbol: string } | null }>, sells: Array<{ edgeId: string, edgeName: string, instrumentId: string, rank: number, buySession: string, sellSession: string, instrument: { symbol: string } | null }>, followed: Array<{ edgeId: string, name: string, state: string, record: { state: string, closed: number, open: number, winRate: number | null } }> } | null };
+
+export type EdgePaperQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgePaperQuery = { edgePaper: { edgeId: string, record: { state: string, closed: number, wins: number, open: number, skipped: number, winRate: number | null, backtestRate: number | null, basis: string, low: number | null, high: number | null, headline: string, bins: Array<{ start: number, end: number, chance: number }> }, trades: Array<{ instrumentId: string, rank: number, signalSession: string, buySession: string, sellSession: string, status: string, reason: string, excessReturn: number | null, instrument: { symbol: string } | null }>, forward: { replaces: string, replacesName: string, since: string, sessions: number, needed: number, canReplace: boolean, headline: string, this: { closed: number, wins: number, winRate: number | null }, replaced: { closed: number, wins: number, winRate: number | null } } | null } | null };
+
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -643,6 +655,104 @@ export const EdgesPageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+export const EdgeDeskDocument = new TypedDocumentString(`
+    query EdgeDesk {
+  edgeDesk {
+    session
+    sellSession
+    buys {
+      edgeId
+      edgeName
+      instrumentId
+      instrument {
+        symbol
+      }
+      rank
+      buySession
+      sellSession
+    }
+    sells {
+      edgeId
+      edgeName
+      instrumentId
+      instrument {
+        symbol
+      }
+      rank
+      buySession
+      sellSession
+    }
+    followed {
+      edgeId
+      name
+      state
+      record {
+        state
+        closed
+        open
+        winRate
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeDeskQuery, EdgeDeskQueryVariables>;
+export const EdgePaperDocument = new TypedDocumentString(`
+    query EdgePaper($id: String!) {
+  edgePaper(id: $id) {
+    edgeId
+    record {
+      state
+      closed
+      wins
+      open
+      skipped
+      winRate
+      backtestRate
+      basis
+      low
+      high
+      headline
+      bins {
+        start
+        end
+        chance
+      }
+    }
+    trades {
+      instrumentId
+      instrument {
+        symbol
+      }
+      rank
+      signalSession
+      buySession
+      sellSession
+      status
+      reason
+      excessReturn
+    }
+    forward {
+      replaces
+      replacesName
+      since
+      sessions
+      needed
+      canReplace
+      headline
+      this {
+        closed
+        wins
+        winRate
+      }
+      replaced {
+        closed
+        wins
+        winRate
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgePaperQuery, EdgePaperQueryVariables>;
 export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
     query ScreenerTrackRecords {
   edges {

@@ -18,3 +18,8 @@ max_pbo = 0.5            # probability of overfitting above this: Not working
 works_max_pbo = 0.2
 
 oos_lift_share = 0.5     # OOS lift must keep this share of the whole-history lift
+
+forward_sessions = 20    # a new version's forward test lasts this many sessions before it may replace
+live_min_trades = 10     # closed paper trades before the live record is judged against the backtest
+live_low = 0.10          # the usual range of the live win rate: these quantiles of the wins ...
+live_high = 0.90         # ... n trades would show if the backtest's win rate held

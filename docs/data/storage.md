@@ -125,7 +125,7 @@ L1 `instruments/reference`, `instruments/symbol_history`, `instruments/id_map` (
 FIGI id upgrades, ADR 0018), `instruments/listing_history` (every US stock / ETF a vendor ever listed with its dates; a full snapshot per pull session; `instrument_id` null until a trusted id exists; `end_date` read only by `data.listings.universe_asof`; ADR 0018 amendment 2026-10-08), `instruments/index_membership` (S&P 500 membership intervals by ticker, from fja05680/sp500; a full snapshot per pull session; read by `data.listings.universe_asof`), `instruments/company`, `instruments/description` (ADR 0034); L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
 `chains/status`, `events/<type>`, `rates/treasury` (one partition per curve date), `holdings/etf` (ETF holdings, runs merge); rollups `rollups/daily/*` and `rollups/instrument/*`
-(e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`;
+(e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>` (incl. `results/edge_paper`, the forward paper record: partition = signal session, runs merge per trade, read through `data/paper`);
 the fixed rule-screen results `results/rule_screen` and `results/rule_screen_values` (ADR 0029).
 ## Column types and schema version
 

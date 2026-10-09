@@ -2,9 +2,11 @@
  * Entity: edges (ADR 0053), documents whose screeners are tested out of sample: the edges
  * pages' read (`Query.edges`: status, verdict, how it is defined, sources and the runs the user
  * sees) and each screener's track records (`Screener.trackRecords`) for the Screeners
- * list's chip and the Ideas odds line. Never reads an exploratory run as a track record.
+ * list's chip and the Ideas odds line, and the paper record (`Query.edgeDesk`, `Query.edgePaper`:
+ * the Ideas signals and an edge's live record). Never reads an exploratory run as a track record.
  */
 export { prefetchEdges, refreshEdges, useEdges } from './api/edges';
+export { useEdgeDesk, useEdgePaper } from './api/paper';
 export { useTrackRecords } from './api/track-records';
 export {
   statusLabel,
@@ -18,6 +20,20 @@ export {
   type VerdictCriterion,
   type VerdictYear,
 } from './model/edges';
+export {
+  rangeBins,
+  rangeMarkers,
+  recordLabel,
+  recordTone,
+  tradeLabel,
+  tradeTone,
+  type DeskTrade,
+  type EdgePaper,
+  type FollowedEdge,
+  type ForwardTest,
+  type PaperRecord,
+  type PaperTrade,
+} from './model/paper';
 export {
   oddsEntry,
   recordFigures,

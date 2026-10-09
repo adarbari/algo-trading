@@ -8,6 +8,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
+import { mockIdeasApi } from './ideas-api';
 import { mockApi } from './mock-api';
 
 function collectErrors(page: Page): string[] {
@@ -159,4 +160,44 @@ test('opens a ticker and a compare set in Explore', async ({ page }) => {
   await grid(page).getByRole('row', { name: /KO/ }).getByText('KO', { exact: true }).click();
   await expect(page).toHaveURL(/focus=KO/);
   await expect(page).toHaveURL(/via=short-premium-liquidity/);
+});
+
+test('lists what the followed edges say to buy and sell above the table', async ({ page }) => {
+  const trade = (symbol: string) => ({
+    edgeId: 'drift',
+    edgeName: 'Drift',
+    instrumentId: `EQ:${symbol}`,
+    instrument: { symbol },
+    rank: 1,
+    buySession: '2026-10-05',
+    sellSession: '2026-11-02',
+  });
+  await mockIdeasApi(page, {
+    data: {
+      edgeDesk: {
+        session: '2026-10-02',
+        sellSession: '2026-10-05',
+        buys: [trade('MSFT')],
+        sells: [trade('KO')],
+        followed: [
+          {
+            edgeId: 'drift',
+            name: 'Drift',
+            state: 'following',
+            record: { state: 'on_track', closed: 20, open: 2, winRate: 0.6 },
+          },
+        ],
+      },
+    },
+  });
+  const errors = collectErrors(page);
+  await page.goto('/ideas');
+  const buys = page.getByRole('grid', { name: 'Buy tonight' });
+  await expect(buys.getByText('MSFT')).toBeVisible();
+  await expect(page.getByRole('grid', { name: 'Sell next session' }).getByText('KO')).toBeVisible();
+  await expect(
+    page.getByRole('grid', { name: 'Followed edges' }).getByText('On track'),
+  ).toBeVisible();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
 });

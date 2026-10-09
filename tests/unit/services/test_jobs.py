@@ -20,6 +20,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     edge_document,
     screen,
 )
+from tests.unit.services.evaluation.forward.conftest import desk
 
 T0 = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
 USER = UserContext("alice")
@@ -247,4 +248,20 @@ def test_edge_eval_handler_runs_the_harness_and_reports_rows() -> None:
     assert w.reader.table("results/edge_eval", DAYS[-1]) is not None
     missing = runner.wait(runner.submit("edge-eval", {**params, "edge": "nope"}, USER))
     assert missing.status is JobStatus.FAILED and "unknown edge" in (missing.error or "")
+    runner.shutdown()
+
+
+def test_edge_signals_handler_signals_the_followed_edge_and_reports_the_night() -> None:
+    d = desk()
+    runner = LocalJobRunner(
+        MemoryRuns(),
+        LIBRARY_HANDLERS,
+        {"reader": d.world.reader, "writer": d.world.results, "configs": d.configs},
+    )
+    job = runner.wait(
+        runner.submit("edge-signals", {"session": DAYS[0].isoformat()}, UserContext("u1"))
+    )
+    assert job.status is JobStatus.COMPLETE, job.error
+    assert job.result["signalled"] == {"drift": 5} and job.result["rows"] == 5
+    assert d.world.reader.table("results/edge_paper", DAYS[0]) is not None
     runner.shutdown()
