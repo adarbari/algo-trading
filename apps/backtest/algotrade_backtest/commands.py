@@ -259,6 +259,7 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
         params = {
             "edge": edge.id, "start": start.isoformat(), "end": end.isoformat(),
             "as_of": as_of.isoformat(), "iv_field": args.iv_field,
+            "extra_baselines": list(args.extra_baseline),
             "split_from": args.split_from.isoformat() if args.split_from else None,
         }  # fmt: skip
         job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-eval", params, user)

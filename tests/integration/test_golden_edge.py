@@ -48,6 +48,7 @@ def _evaluate(backend: MemoryBackend) -> dict[str, object]:
     params = {
         "edge": "momentum_12_1", "start": FROM.isoformat(), "end": TO.isoformat(),
         "as_of": datetime.now(UTC).isoformat(), "iv_field": None, "split_from": None,
+        "extra_baselines": ["size_small"],
     }  # fmt: skip
     job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-eval", params, UserContext("t"))
     assert job.status is JobStatus.COMPLETE, job.error

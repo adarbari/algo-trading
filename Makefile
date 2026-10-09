@@ -152,6 +152,7 @@ GOLDEN_FROM = 2020-01-01
 GOLDEN_TO = 2021-08-10
 GOLDEN_ROLLUPS = price_stats@v2,trend_stats@v2,fundamentals@v3
 GOLDEN_EDGE = momentum_12_1
+GOLDEN_BASELINES = --extra-baseline size_small  # scored on the golden store only, not in the edge document
 
 golden-store:    ## (re)load the golden CSVs into the fixture store, then its rollups and outcomes
 	rm -rf datasets/golden/store
@@ -161,7 +162,7 @@ golden-store:    ## (re)load the golden CSVs into the fixture store, then its ro
 
 evaluate: golden-store  ## strategy scorecard vs committed baseline, the golden edge line, then the regime scorecard
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --report scorecard.md
-	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) --baseline benchmarks/baseline.json
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) $(GOLDEN_BASELINES) --baseline benchmarks/baseline.json
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) regime-scorecard
 
 regime-scorecard:  ## the regime episode scorecard over the configured store (ALGOTRADE_DATA_URL)
@@ -169,7 +170,7 @@ regime-scorecard:  ## the regime episode scorecard over the configured store (AL
 
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
-	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) --baseline benchmarks/baseline.json --update-baseline
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) $(GOLDEN_BASELINES) --baseline benchmarks/baseline.json --update-baseline
 
 # ----------------------------------------------------------------------------- web (apps/web, ADR 0025)
 # Node 24 + npm (npm workspaces: apps/web and its design-system package); lockfile apps/web/package-lock.json.
