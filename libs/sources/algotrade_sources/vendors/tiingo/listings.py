@@ -10,14 +10,20 @@ has no ``permaTicker`` (that comes from the per-ticker meta endpoint, a later ad
 ``perma_ticker`` is empty here and the task decides ids.
 
 Kept: USD, the exchanges ``EXCHANGES`` (Tiingo's ``NYSE MKT`` / ``NYSE ARCA`` are our
-``AMEX`` / ``ARCA``), asset type Stock or ETF, a parseable ``startDate``. The rest is counted in
-``Normalized.notes``. The file is one request, so the shared ``tiingo`` limiter is not a
+``AMEX`` / ``ARCA``), asset type Stock or ETF, a plain ticker (``TICKER``: share classes ``BRK-B``
+are kept; the file also lists preferreds, units, notes and expiring warrants under tickers such
+as ``BC/PA``, ``CFX 5.75`` or ``CAPTW(EXP20260807)``, which are not names we trade) and a
+parseable ``startDate``. The rest is counted in ``Normalized.notes``. Recorded 2026-10-08
+(108,972 rows, 24,550 of them kept at the first pull; a live name's ``endDate`` is the file's
+latest day). The file is one request, so the shared ``tiingo`` limiter is not a
 constraint.
 """
 
 import io
+import re
 import zipfile
 from collections.abc import Mapping
+from datetime import date
 
 import pandas as pd
 
@@ -40,6 +46,7 @@ EXCHANGES: Mapping[str, str] = {
     "BATS": "BATS",
 }
 ASSET_TYPES = {"STOCK": "Stock", "ETF": "ETF"}
+TICKER = re.compile(r"[A-Z0-9]+(?:[.-][A-Z0-9]+)*")
 COLUMNS = [
     "ticker",
     "exchange",
@@ -76,6 +83,7 @@ def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
         "other_asset_type": asset.isna(),
         "no_start_date": start.isna(),
         "no_ticker": ticker == "",
+        "odd_ticker": (ticker != "") & ~ticker.str.fullmatch(TICKER),
     }
     drop = pd.Series(False, index=raw.index)
     dropped: dict[str, int] = {}
@@ -93,8 +101,12 @@ def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
             "perma_ticker": "",
         }
     )[~drop]
-    kept = kept.drop_duplicates(["ticker", "start_date"], keep="last")
-    return kept.sort_values(["ticker", "start_date"]).reset_index(drop=True)[COLUMNS], dropped
+    # The file lists a few (ticker, startDate) twice (a Stock and an ETF row, a re-listing on its
+    # first day): keep the row that is still open, else the one that lasted longest.
+    kept = kept.assign(_last=kept["end_date"].fillna(date.max))
+    kept = kept.sort_values(["ticker", "start_date", "_last"], kind="stable")
+    kept = kept.drop_duplicates(["ticker", "start_date"], keep="last").drop(columns="_last")
+    return kept.reset_index(drop=True)[COLUMNS], dropped
 
 
 class TiingoSupportedTickers:
