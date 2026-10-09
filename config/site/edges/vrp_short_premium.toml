@@ -124,9 +124,20 @@ the same sessions, and log windows without an earnings date as a variant."""
 
 [[sources]]
 title = "Carr, P. and Wu, L., Variance Risk Premiums, Review of Financial Studies, 2009"
+url = "https://doi.org/10.1093/rfs/hhn038"
 
 [[sources]]
 title = "Bakshi, G. and Kapadia, N., Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies, 2003"
+url = "https://doi.org/10.1093/rfs/hhg002"
 
 [[sources]]
 title = "Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk: Evidence from Equity Options, Journal of Finance, 2009"
+url = "https://doi.org/10.1111/j.1540-6261.2009.01467.x"
+
+[[sources]]
+title = "AQR, Understanding the Volatility Risk Premium (white paper)"
+url = "https://www.aqr.com/Insights/Research/White-Papers/Understanding-the-Volatility-Risk-Premium"
+
+[[sources]]
+title = "Quantpedia, Volatility Risk Premium Effect (strategy page)"
+url = "https://quantpedia.com/strategies/volatility-risk-premium-effect/"

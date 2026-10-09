@@ -35,9 +35,16 @@ decoys = "Plain intraday momentum on volatile days, which needs no fund at all."
 
 [[sources]]
 title = "Cheng, M. and Madhavan, A., The Dynamics of Leveraged and Inverse Exchange-Traded Funds, Journal of Investment Management, 2009"
+url = "https://joim.com/article/the-dynamics-of-leveraged-and-inverse-exchange-traded-funds/"
 
 [[sources]]
 title = "Ivanov, I. and Lenkey, S., Are Concerns About Leveraged ETFs Overblown?, Federal Reserve FEDS working paper, 2014"
+url = "https://doi.org/10.17016/FEDS.2014.106"
 
 [[sources]]
 title = "Shum, P., Hejazi, W., Haryanto, E. and Rodier, A., Intraday Share Price Volatility and Leveraged ETF Rebalancing, Review of Finance, 2016"
+url = "https://doi.org/10.1093/rof/rfv061"
+
+[[sources]]
+title = "CXO Advisory, Front-running Leveraged ETFs at the End of the Day?"
+url = "https://www.cxoadvisory.com/volatility-effects/front-running-leveraged-etfs-at-the-end-of-the-day/"
