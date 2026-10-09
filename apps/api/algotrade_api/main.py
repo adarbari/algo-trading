@@ -56,6 +56,8 @@ from algotrade_api.auth.local import LocalAuthenticator
 from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
+from algotrade_api.graphql.offload import OverloadedError
+from algotrade_api.graphql.response_cache import CountWrites, WriteEpoch
 from algotrade_api.graphql.schema import graphql_router, sdl
 from algotrade_api.graphql.warm import CacheWarmer
 from algotrade_api.live import no_live, open_live
@@ -100,6 +102,17 @@ def _rate_limited(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, RateLimitedError)
     return JSONResponse(
         status_code=429,
+        content={"detail": str(exc)},
+        headers={"Retry-After": str(exc.retry_after_s)},
+    )
+
+
+def _overloaded(request: Request, exc: Exception) -> JSONResponse:
+    """The read pool and its queue are full (``graphql.offload.Admission``): ask the caller to
+    come back rather than queue without bound."""
+    assert isinstance(exc, OverloadedError)
+    return JSONResponse(
+        status_code=503,
         content={"detail": str(exc)},
         headers={"Retry-After": str(exc.retry_after_s)},
     )
@@ -188,6 +201,8 @@ def create_app(
     app.state.explain_limiter = RateLimiter()
     # Compress what is big (the bundle, GraphQL answers): the app is served over a remote link.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
+    # the writes served: part of every GraphQL response's cache key
+    app.add_middleware(CountWrites, epoch=(epoch := WriteEpoch()))
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -203,6 +218,7 @@ def create_app(
         (PermissionDeniedError, _forbidden),
         (ModelUnavailableError, _unavailable),
         (RateLimitedError, _rate_limited),
+        (OverloadedError, _overloaded),
     ):
         app.add_exception_handler(error, handler)
     for router in PUBLIC_ROUTERS:
@@ -212,7 +228,10 @@ def create_app(
         app.include_router(router, dependencies=caller)
     cache = ResultCache(READ_CACHE_SIZE)
     reads, stores = _reads(app.state.store, cache), _stores(app.state.store, cache)
-    app.include_router(graphql_router(reads, settings.debug, stores), dependencies=caller)
+    app.include_router(
+        graphql_router(reads, settings.debug, stores, app.state.store.reader.visible_seq, epoch),
+        dependencies=caller,
+    )
     user = app.state.store.user
     app.state.warmer = CacheWarmer(lambda: reads(user, None)) if settings.live else None
     if settings.web_dist is not None:  # last: its catch-all GET must not shadow an API route
