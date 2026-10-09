@@ -60,6 +60,10 @@ say how many are left.
   both have with another ratio is an item ``split:<id>`` (``SPLIT_MISMATCH: <n> ...``) and
   counts in ``stats["split_mismatches"]``. Reported, never a failure and never a reason not
   to write: the bars are what the vendor sent.
+- **Bad-bar flags** (ADR 0061): the run judges the bars it adds together with the stored bars of
+  the same names and the splits it stages (``bar_quality.plan_flags``) and publishes the
+  ``events/bar_flag`` rows with the same run's bars (all or none). Found flags are a WARN: item
+  ``bar_flags`` (``BAD_BARS``) and ``stats["flagged"]``; never a failure of the run.
 """
 
 import math
@@ -75,6 +79,7 @@ import pandas as pd
 
 from algotrade.data.events import read_events
 from algotrade.data.listings.universe import listings_over
+from algotrade.data.prices import FLAGS_TABLE
 from algotrade.services.events.fill import FillCandidate, fill_order
 from algotrade.services.events.scope import (
     LIST,
@@ -94,11 +99,14 @@ from algotrade_ingestion.tasks.framework.run import (
     status_label,
 )
 from algotrade_ingestion.tasks.framework.tiingo_budget import month_symbols
+from algotrade_ingestion.tasks.maintenance.bar_quality import compact, flag_stats, plan_flags
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "bars_history"
 BARS = "bars/1d"
 SPLITS = "events/split"
+FLAGS = FLAGS_TABLE  # events/bar_flag: the bar-quality flags of the bars this run adds (ADR 0061)
+TASK_FLAGS = "bar_quality"  # their ``source``: the detector's name
 DEFAULT_SINCE = date(2018, 1, 1)
 DEFAULT_REASONS = (LIST, REQUESTED, REFERENCE)  # the tier names need Tiingo's Power tier
 DONE = ("OK", "NO_DATA")  # item statuses that need no refetch
@@ -287,15 +295,16 @@ def _fetch_name(
     return f"OK: {_window(since, until)}"
 
 
-def _publish(run: IngestRun, source_name: str) -> dict[str, int]:
+def _publish(run: IngestRun, source_name: str) -> tuple[dict[str, int], pd.DataFrame]:
     """Write the staged bars, one partition per session, WITHOUT replacing rows the session's
-    partition already holds (see the module docstring) -> counts."""
+    partition already holds (see the module docstring) -> (counts, the rows written)."""
     staged = run.writer.staging.collect(run.run_id, BARS)
     counts = dict.fromkeys(
         ("sessions_written", "rows", "overlap_rows", "already_stored_rows", "no_partition_rows"), 0
     )
+    written: list[pd.DataFrame] = []
     if staged is None:
-        return counts
+        return counts, pd.DataFrame()
     staged["session_date"] = pd.to_datetime(staged["session_date"]).dt.date
     stored_days = run.reader.dates(BARS)
     frontier = min(stored_days) if stored_days else None
@@ -322,7 +331,34 @@ def _publish(run: IngestRun, source_name: str) -> dict[str, int]:
         run.writer.write_table(BARS, day, run.run_id, part, pending=True)
         counts["sessions_written"] += 1
         counts["rows"] += len(fresh)
-    return counts
+        written.append(fresh)
+    return counts, pd.concat(written, ignore_index=True) if written else pd.DataFrame()
+
+
+def _publish_flags(ctx: TaskContext, run: IngestRun, added: pd.DataFrame) -> dict[str, object]:
+    """Stage the ``bar-quality`` flags of the instruments whose bars this run adds (the stored
+    bars plus ``added``, with the splits this run stages), and publish them with the bars (all
+    or none: the run's commit holds both). Never a failure: a flag is a WARN in the stats and an
+    item, and the share guard of the ``bar-quality`` task is that task's. -> stats."""
+    if added.empty:
+        return {}
+    ids = sorted(set(added["instrument_id"].astype(str)))
+    days = pd.to_datetime(added["ts"], utc=True).dt.date
+    staged = run.writer.staging.collect(run.run_id, SPLITS)
+    plan = plan_flags(ctx, days.min(), days.max(), ids, compact(added), staged)
+    if len(plan.write):
+        run.stage(FLAGS, "flags", plan.write, TASK_FLAGS)
+        run.stats["flag_rows"] = run.publish(FLAGS)
+    stats = flag_stats(plan)
+    if plan.found.empty:
+        return {"flagged": 0}
+    run.record_item(
+        "bar_flags",
+        f"BAD_BARS: {len(plan.found)} of {plan.bars} bars flagged "
+        f"({stats['flagged_share']:.2%}, {stats['instruments_flagged']} names), "
+        "dropped from reads until cleared",
+    )
+    return {k: stats[k] for k in ("flagged", "flagged_share", "by_reason", "split_like_ids")}
 
 
 def _mismatches(items: dict[str, str]) -> tuple[int, list[str]]:
@@ -425,8 +461,10 @@ def ingest_bars_history(
         remaining = max(0, budget - len(month_symbols(run)))
         todo = pending[: remaining if limit is None else min(remaining, max(0, limit))]
         _fetch_pending(run, source, todo, since, until)
-        run.stats.update(_publish(run, source.name))
+        counts, added = _publish(run, source.name)
+        run.stats.update(counts)
         run.stats["tiingo_split_rows"] = run.publish(SPLITS)  # pending, committed with the bars
+        run.stats.update(_publish_flags(ctx, run, added))  # likewise: bars, splits, flags
         mismatches, shown = _mismatches(run.items)
         statuses = [status_label(run.items.get(f"hist:{n.instrument_id}", "")) for n in todo]
         left = len(pending) - sum(1 for s in statuses if s in DONE)

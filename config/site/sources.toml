@@ -195,6 +195,8 @@ min_bar_close = 0.01             # bar-quality (ADR 0061): a stored close below 
 max_bar_jump = 10                # a one-day close ratio above this, either way, with no split event nearby, cuts the series
 split_window_sessions = 5        # a split event within this many bars of a jump explains it
 max_bad_bar_share = 0.02         # bar-quality: FAIL if over 2% of the bars read are flagged (0.97% on the full history, 2026-10-09)
+max_bounded_return = 10          # outcomes: FAIL if a COMPLETE forward return over a window of <= 60 sessions exceeds +1000%
+                                 # (a bad bar that bar-quality did not flag; ADR 0061)
 max_chain_fetch_failures = 0.02  # chains: FAIL if over 2% of optionable names failed to fetch (FETCH_ERROR,
                                  # incl. an open circuit, or never attempted)
 max_chain_stale_share = 0.20     # chains: FAIL if over 20% of the "rest" tier's chains are STALE_DATA (the feed

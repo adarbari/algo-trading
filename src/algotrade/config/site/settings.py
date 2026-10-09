@@ -235,6 +235,7 @@ class SourcesSettings:
     max_bar_jump: float = 10.0  # a one-day close ratio above this (either way) is a jump
     split_window_sessions: int = 5  # a jump within this many bars of a split event is explained
     max_bad_bar_share: float = 0.02  # bar-quality: FAIL if over 2% of the bars are flagged
+    max_bounded_return: float = 10.0  # outcomes: a COMPLETE fwd_return above this (h <= 60) FAILs
     max_chain_fetch_failures: float = 0.02
     max_chain_stale_share: float = 0.20  # the "rest" tier
     max_chain_stale_share_core: float = 0.02  # core tier (tasks/market/tiers.py)
@@ -285,6 +286,7 @@ class SourcesSettings:
                 "max_name_over_vendor",
                 "max_bar_unresolved",
                 *("min_bar_close", "max_bar_jump", "split_window_sessions", "max_bad_bar_share"),
+                "max_bounded_return",
                 "max_chain_fetch_failures",
                 *("max_chain_stale_share", "max_chain_stale_share_core"),
                 "max_chain_stale_sessions",
@@ -368,6 +370,7 @@ class SourcesSettings:
                 "split_window_sessions", d.split_window_sessions, 0
             ),
             max_bad_bar_share=quality.fraction("max_bad_bar_share", d.max_bad_bar_share),
+            max_bounded_return=quality.number("max_bounded_return", d.max_bounded_return, 0),
             max_chain_fetch_failures=quality.fraction(
                 "max_chain_fetch_failures", d.max_chain_fetch_failures
             ),

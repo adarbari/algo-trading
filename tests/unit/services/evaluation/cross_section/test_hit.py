@@ -95,6 +95,15 @@ def test_delisted_rows_count_and_are_flagged() -> None:
     assert list(out["hit"]) == [False, True]
 
 
+def test_an_unmeasured_row_is_excluded_with_its_reason_never_a_miss() -> None:
+    out = apply_outcome(
+        edge(),
+        rows(fwd_excess_return=[None, 0.1], outcome_status=["UNMEASURED", "COMPLETE"]),
+    )
+    assert list(out["excluded"]) == ["unmeasured", ""]
+    assert list(out["hit"]) == [False, True] and np.isnan(out["value"].iloc[0])
+
+
 def test_the_implied_vol_is_required_for_a_ratio_measure() -> None:
     with pytest.raises(ConfigurationError, match="implied"):
         apply_outcome(edge(outcome=VRP, schedule="every_session"), rows(fwd_excess_return=[0.0]))

@@ -19,7 +19,7 @@ from typing import Any
 
 from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.settings import load_macro, load_universe
-from algotrade.core.time.calendar import sessions_between
+from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
@@ -429,12 +429,11 @@ def _quality(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _bar_quality(ctx: TaskContext, p: Params) -> RunRecord:
-    start = p.get("start")
-    if start is None:
-        raise ValueError("bar-quality needs --from (the first session to read)")
+    session = session_of(p)
+    start = p.get("start") or sessions_ending(session, bar_quality.TRAILING_SESSIONS)[0]
     ids = _symbols(p, "only")
     return bar_quality.run_bar_quality(
-        ctx, session_of(p), start, p.get("end"), list(ids) if ids else None
+        ctx, session, start, p.get("end"), list(ids) if ids else None
     )
 
 
@@ -651,7 +650,7 @@ TASKS: dict[str, Task] = {
             "unadjusted daily bars from Tiingo since 2018 for the scope list and its funds' "
             "references (resumable backfill: 50 requests an hour on the free tier)",
             bars_history,
-            ("bars/1d", "events/split"),
+            ("bars/1d", "events/split", "events/bar_flag"),
             _bars_history,
             sources=("tiingo_prices",),
             settings="sources.toml [tiingo]; events/scope.toml",

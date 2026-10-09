@@ -1,5 +1,5 @@
 """Whether an edge's outcome held for one row: the one place an edge document's ``[outcome]``
-meets the stored fields of ``outcomes/instrument/forward_returns@v1`` (ADR 0053).
+meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053).
 
 - ``excess_return``: ``value = fwd_excess_return - cost_bps / 1e4`` (a round trip, charged
   once); a hit is ``value > 0``.
@@ -20,8 +20,11 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v1`` (ADR 0053)
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
 zero (a window not closed has no stored row: the harness counts it unclosed). DELISTED
-rows count: they are measured to the last bar. ``oriented`` is the value with higher =
-better, so a ``below`` edge's ranks and effect sizes point the same way as an ``above`` one's.
+rows count: they are measured to the last bar. An ``UNMEASURED`` row (a flagged bar in its
+window, ``outcome_reason``) is excluded as ``UNMEASURED`` before anything else: no return was
+measured, and the harness counts a pick of it like a screen it could not measure. ``oriented``
+is the value with higher = better, so a ``below`` edge's ranks and effect sizes point the same way
+as an ``above`` one's.
 """
 
 from collections.abc import Mapping
@@ -46,6 +49,7 @@ NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not posi
 INVALID_IMPLIED_VOL = "invalid_implied_vol"  # ... or non-finite or above MAX_IMPLIED_VOL: garbage
 MAX_IMPLIED_VOL = 5.0  # the catalogue's declared range of an IV field is (0, 5] (decimal)
 MISSING_DRAWDOWN = "missing_drawdown"
+UNMEASURED = "unmeasured"  # an UNMEASURED outcome row (a flagged bar in its window, ADR 0061)
 TRADING_DAYS = 252  # sessions per year: T of an expires_otm strike
 RESULT_COLUMNS = (
     "instrument_id", "value", "oriented", "hit", "excluded", "delisted", "reference", "touch",
@@ -117,6 +121,26 @@ def _numbers(frame: pd.DataFrame, column: str) -> np.ndarray:
     return pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=np.float64, na_value=np.nan)
 
 
+def _vol_ratio(
+    edge: Edge,
+    outcomes: pd.DataFrame,
+    implied: Mapping[str, float | None] | None,
+    excluded: np.ndarray,
+) -> np.ndarray:
+    """The realised over the implied vol per row; ``excluded`` gets the reason of each row that
+    has none."""
+    if implied is None:
+        raise ConfigurationError(f"{edge.id}: realised_to_implied_vol needs the implied vol")
+    vol = _numbers(outcomes, "fwd_realised_vol")
+    iv = _implied_array(outcomes, implied)
+    reasons = _implied_reasons(iv)
+    value = np.full(len(outcomes), np.nan)
+    np.divide(vol, iv, out=value, where=reasons == "")
+    excluded[~np.isfinite(vol)] = MISSING_VALUE
+    excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
+    return value
+
+
 def apply_outcome(
     edge: Edge, outcomes: pd.DataFrame, implied: Mapping[str, float | None] | None = None
 ) -> pd.DataFrame:
@@ -143,17 +167,11 @@ def apply_outcome(
         value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE
     elif o.measure == "realised_to_implied_vol":
-        if implied is None:
-            raise ConfigurationError(f"{edge.id}: realised_to_implied_vol needs the implied vol")
-        vol = _numbers(outcomes, "fwd_realised_vol")
-        iv = _implied_array(outcomes, implied)
-        reasons = _implied_reasons(iv)
-        value = np.full(n, np.nan)
-        np.divide(vol, iv, out=value, where=reasons == "")
-        excluded[~np.isfinite(vol)] = MISSING_VALUE
-        excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
+        value = _vol_ratio(edge, outcomes, implied, excluded)
     else:
         raise ConfigurationError(f"{edge.id}: no measure {o.measure!r}")
+    unmeasured = (outcomes["outcome_status"] == "UNMEASURED").to_numpy()
+    excluded[unmeasured] = UNMEASURED  # before any other reason: there is no row to read
     counted = excluded == ""
     if otm_hit is not None:
         hit = otm_hit

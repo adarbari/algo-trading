@@ -23,10 +23,15 @@ A bar is flagged when:
 Zero volume is not flagged. A bar flagged for two reasons keeps the first in the order above.
 Rows: ``instrument_id``, ``ts`` (the bar's close), ``reason``, ``detail``, ``status``
 (``FLAGGED``, or ``CLEARED`` for a bar flagged earlier that is fine now: the table keeps the
-latest row per (instrument, ts)). A rerun writes only what changed. The range limits the
+latest row per (instrument, ts)). A rerun writes only what changed. Without ``--from`` the task
+reads the trailing ``TRAILING_SESSIONS`` sessions (the nightly step, after ``bars`` and
+``corporate-actions``, which explain real splits): an ``UNEXPLAINED_JUMP`` flag clears only when
+a run starts at the instrument's first bar, so the nightly never retracts one. The range limits the
 read: segments are judged within it (the full history for a rebuild).
 """
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
 from itertools import pairwise
 
@@ -37,6 +42,7 @@ from pandas.api.types import union_categoricals
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import sessions_between
+from algotrade.data import StoreReader
 from algotrade.data.events import read_events
 from algotrade.data.prices import FLAGGED, FLAGS_TABLE, raw_bars
 from algotrade.storage.runs import RunRecord
@@ -46,6 +52,7 @@ TASK = "bar_quality"
 CLEARED = "CLEARED"
 BELOW_FLOOR, BAD_OHLC, UNEXPLAINED_JUMP = "BELOW_FLOOR", "BAD_OHLC", "UNEXPLAINED_JUMP"
 TRUSTED_SOURCE = "massive"
+TRAILING_SESSIONS = 60  # the nightly step reads this many sessions ending on its own
 PIECE = 60  # sessions read at a time: each piece is kept compact before the next is read
 FLAG_COLUMNS = ["instrument_id", "ts", "reason", "detail"]
 _NO_FLAGS = pd.DataFrame(columns=FLAG_COLUMNS)
@@ -196,6 +203,21 @@ def bad_bars(bars: pd.DataFrame, splits: pd.DataFrame, s: SourcesSettings) -> pd
     return out.reset_index(drop=True)
 
 
+def compact(frame: pd.DataFrame) -> pd.DataFrame:
+    """Bars (``instrument_id``, ``ts``, ``high``, ``low``, ``close``, ``source``) as ``bad_bars``
+    reads them: categorical id and source, four numbers a row."""
+    return pd.DataFrame(
+        {
+            "instrument_id": pd.Categorical(frame["instrument_id"].astype(str)),
+            "ts": pd.to_datetime(frame["ts"], utc=True),
+            "high": frame["high"].to_numpy(dtype=float),
+            "low": frame["low"].to_numpy(dtype=float),
+            "close": frame["close"].to_numpy(dtype=float),
+            "source": pd.Categorical(frame["source"].astype(str)),
+        }
+    )
+
+
 def read_compact(
     ctx: TaskContext, start: date, end: date, instruments: list[str] | None
 ) -> pd.DataFrame:
@@ -211,18 +233,7 @@ def read_compact(
             frame = raw_bars(ctx.reader, "1d", part[0], part[-1], instruments, None, columns)
         except MissingDataError:
             continue
-        pieces.append(
-            pd.DataFrame(
-                {
-                    "instrument_id": pd.Categorical(frame["instrument_id"].astype(str)),
-                    "ts": pd.to_datetime(frame["ts"], utc=True),
-                    "high": frame["high"].to_numpy(dtype=float),
-                    "low": frame["low"].to_numpy(dtype=float),
-                    "close": frame["close"].to_numpy(dtype=float),
-                    "source": pd.Categorical(frame["source"].astype(str)),
-                }
-            )
-        )
+        pieces.append(compact(frame))
     if not pieces:
         return pd.DataFrame(columns=["instrument_id", "ts", "high", "low", "close", "source"])
     return pd.concat(_unified(pieces), ignore_index=True)
@@ -284,6 +295,68 @@ def _with_earlier_bars(
     return frozenset(earlier["instrument_id"].astype(str))
 
 
+@dataclass(frozen=True)
+class FlagPlan:
+    """What a read of ``start..end`` found: the bars read, the flags found, the rows to write."""
+
+    bars: int
+    found: pd.DataFrame
+    write: pd.DataFrame
+
+
+def plan_flags(
+    ctx: TaskContext,
+    start: date,
+    end: date,
+    instruments: list[str] | None,
+    added_bars: pd.DataFrame | None = None,
+    added_splits: pd.DataFrame | None = None,
+) -> FlagPlan:
+    """Read the stored bars and splits of ``start..end`` and decide the flag rows to write.
+    ``added_bars`` / ``added_splits``: rows a running task is about to publish (``read_compact``
+    columns; ``instrument_id``, ``ts``), judged as if stored, so its flags can be published with
+    them (``bars-history``)."""
+    s = ctx.settings
+    bars = read_compact(ctx, start, end, instruments)
+    if added_bars is not None and len(added_bars):
+        both = [added_bars.copy()] if bars.empty else [bars, added_bars.copy()]
+        bars = pd.concat(_unified(both), ignore_index=True)
+    day = timedelta(days=1)
+    window = timedelta(days=30)  # calendar slack for split_window_sessions
+    splits = read_events(ctx.reader, "events/split", start - window, end + window, instruments)
+    frame = splits.frame
+    if added_splits is not None and len(added_splits):
+        keep = ["instrument_id", "ts"]
+        frame = pd.concat([frame[keep] if len(frame) else frame, added_splits[keep]])
+    found = bad_bars(bars, frame, s)
+    stored = read_events(ctx.reader, FLAGS_TABLE, start - day, end + day, instruments).frame
+    if len(stored) and len(bars):
+        seen = set(bars["instrument_id"].astype(str).unique())
+        first, last = bars["ts"].min(), bars["ts"].max()
+        inside = stored["instrument_id"].astype(str).isin(seen)
+        when = pd.to_datetime(stored["ts"], utc=True)
+        stored = stored[inside & (when >= first) & (when <= last)]
+    protected = _with_earlier_bars(ctx, stored, start, instruments)
+    return FlagPlan(len(bars), found, changes(found, stored, protected))
+
+
+def flag_stats(plan: FlagPlan) -> dict[str, object]:
+    """The run stats every flag-writing task reports."""
+    found, write = plan.found, plan.write
+    return {
+        "bars": plan.bars,
+        "flagged": len(found),
+        "flagged_share": round(len(found) / max(plan.bars, 1), 6),
+        "by_reason": {k: int(v) for k, v in found["reason"].value_counts().items()},
+        "instruments_flagged": int(found["instrument_id"].nunique()),
+        "split_like_ids": sorted(
+            found.loc[found["detail"].str.contains("split_like="), "instrument_id"].unique()
+        ),
+        "written": len(write),
+        "cleared": int((write["status"] == CLEARED).sum()),
+    }
+
+
 def run_bar_quality(
     ctx: TaskContext,
     session: date,
@@ -295,39 +368,25 @@ def run_bar_quality(
     end = end or session
     s = ctx.settings
     with IngestRun(ctx, TASK, session) as run:
-        bars = read_compact(ctx, start, end, instruments)
-        day = timedelta(days=1)
-        window = timedelta(days=30)  # calendar slack for split_window_sessions
-        splits = read_events(ctx.reader, "events/split", start - window, end + window, instruments)
-        found = bad_bars(bars, splits.frame, s)
-        stored = read_events(ctx.reader, FLAGS_TABLE, start - day, end + day, instruments).frame
-        if len(stored) and len(bars):
-            seen = set(bars["instrument_id"].astype(str).unique())
-            first, last = bars["ts"].min(), bars["ts"].max()
-            inside = stored["instrument_id"].astype(str).isin(seen)
-            when = pd.to_datetime(stored["ts"], utc=True)
-            stored = stored[inside & (when >= first) & (when <= last)]
-        protected = _with_earlier_bars(ctx, stored, start, instruments)
-        write = changes(found, stored, protected)
-        share = len(found) / max(len(bars), 1)
-        run.stats.update(
-            window=[start.isoformat(), end.isoformat()],
-            bars=len(bars),
-            flagged=len(found),
-            flagged_share=round(share, 6),
-            by_reason={k: int(v) for k, v in found["reason"].value_counts().items()},
-            instruments_flagged=int(found["instrument_id"].nunique()),
-            split_like_ids=sorted(
-                found.loc[found["detail"].str.contains("split_like="), "instrument_id"].unique()
-            ),
-            written=len(write),
-            cleared=int((write["status"] == CLEARED).sum()),
-        )
+        plan = plan_flags(ctx, start, end, instruments)
+        run.stats.update(window=[start.isoformat(), end.isoformat()], **flag_stats(plan))
+        share = len(plan.found) / max(plan.bars, 1)
         if share > s.max_bad_bar_share:
             run.failed(
-                f"{len(found)} of {len(bars)} bars flagged ({share:.2%}, max "
+                f"{len(plan.found)} of {plan.bars} bars flagged ({share:.2%}, max "
                 f"{s.max_bad_bar_share:.2%}): check the detector before trusting the flags"
             )
-        elif len(write):
-            run.write(FLAGS_TABLE, write, TASK)
+        elif len(plan.write):
+            run.write(FLAGS_TABLE, plan.write, TASK)
     return run.record
+
+
+def suspect_instruments(
+    reader: StoreReader, ids: Sequence[str], start: date, end: date, s: SourcesSettings
+) -> list[str]:
+    """The ``ids`` whose stored bars over ``start..end`` hold a bar the detector flags (flagged
+    already or not): a return over it is a bad datum, not a squeeze (``outcomes``' acceptance)."""
+    bars = compact(raw_bars(reader, "1d", start, end, list(ids), None, ("high", "low", "close")))
+    day = timedelta(days=30)  # slack for the split window
+    splits = read_events(reader, "events/split", start - day, end + day, list(ids)).frame
+    return sorted(set(bad_bars(bars, splits, s)["instrument_id"].astype(str)))

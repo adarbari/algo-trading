@@ -35,9 +35,34 @@ forward outcomes above +300% at h = 60 since 2018, which the edge harness would 
   `CLEARED` rows for bars no longer flagged). Judgement is within the range read, so a rebuild
   reads from the first stored session.
 
+## Q2: flags travel with the bars, outcomes say UNMEASURED (2026-10-09)
+- `bars-history` stages the flags of the names it fetched (the detector over the stored bars plus
+  the rows it adds, with the splits it stages) and publishes them with the same run's bars, all
+  or none; a flag found is a WARN in the run stats, never a failure. A nightly `bar-quality` step
+  (after `bars` and `corporate-actions`, which explain real splits) checks the trailing 60
+  sessions; an `UNEXPLAINED_JUMP` flag is cleared only by a run that starts at the instrument's
+  first bar.
+- `outcomes/instrument/forward_returns@v2` (the grain is renamed: the v1 table is a different
+  schema and is never read again; nothing is deleted by this change). A name with a flagged bar
+  in S..T (S included: a flagged S is eligible) has `outcome_status = UNMEASURED`,
+  `outcome_reason = BAD_BAR`, and null returns (`fwd_return`, `fwd_max_return`,
+  `fwd_max_drawdown` are nullable). The harness counts it per pick: an UNMEASURED row is not
+  counted, so picks, hits, the base and the deciles leave out the same names;
+  `excluded_unmeasured` (picks) and `unmeasured_base` (eligible names) report it, apart from
+  `excluded_missing`; a session is `excluded_coverage` only when more than half its picks are
+  UNMEASURED. The winners labels count it as no row. The acceptance check FAILS a COMPLETE row
+  over `[quality] max_bounded_return` at a horizon of at most 60 sessions only when its window
+  holds a bar the detector would flag (a missing flag); any other such row (a real squeeze) is a
+  WARN naming it.
+- Rollups: a dropped bar is a missing bar, so a window needing it is null by each group's gap
+  rule; groups that tolerate a few missing bars (52-week range, volume profile) use the others.
+  Known gap: `price_history` reads a flagged bar on the session as `NO_TRADE`, which is wrong (a
+  flagged bar is a bad datum, not a day without a trade) and which `price_stats` treats as an
+  explained null, hiding the gap. Follow-up (roadmap): a `BAD_BAR` `bar_status` that is
+  unexplained, so the close reads UNKNOWN with a reason.
+
 ## Consequences
-Outcomes and rollups over a flagged bar are a later change (outcome status UNMEASURED, flags
-published with the bars, a nightly check): until then a flagged bar is simply absent from reads.
+## Consequences
 The trusted-segment rule can flag good bars when a name's only Massive bars are on the wrong
 side of a real jump; the flag's `detail` names the trusted segment and a later `CLEARED` row
 corrects it.
