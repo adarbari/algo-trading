@@ -496,7 +496,7 @@ contracts = ["API: routes reach the library only through services.read, services
 
 [[dir]]
 path = "apps/api/algotrade_api/graphql"
-purpose = "the GraphQL read layer (ADR 0037): Strawberry schema at POST /graphql, scalars, errors, request context, dataloaders, the event-loop offload (offload.py); thin types over services.read in types/"
+purpose = "the GraphQL read layer (ADR 0037): Strawberry schema at POST /graphql, scalars, errors, request context, dataloaders, the event-loop offload and admission control (offload.py), the response cache (response_cache.py); thin types over services.read in types/"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
@@ -825,6 +825,10 @@ purpose = "tests for the delivery-pipeline scripts in scripts/ (changed_tests, c
 [[test_dir]]
 path = "tests/scripts/ops"
 purpose = "tests for the operator scripts in scripts/ops/ (deploy)"
+
+[[test_dir]]
+path = "tests/scripts/perf"
+purpose = "tests for the manual API load test in scripts/perf/ (load.py: percentiles, page-mix parsing, report)"
 
 # --------------------------------------------------------------------------- config (config/)
 # Every config/site/*.toml is loaded by the one settings loader (config/site/settings.py;

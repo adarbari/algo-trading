@@ -14,6 +14,11 @@ export {
   useScreenPreview,
   useScreeners,
 } from './api/hooks';
+export {
+  SCREENER_PICKS_OPERATION,
+  useScreenerPicks,
+  type ScreenerPicksResponse,
+} from './api/picks';
 export { useScreenerRuns, type ScreenerRunSummary } from './api/runs';
 export { useScreenerHits, type ScreenerHitsResponse } from './api/hits';
 export {

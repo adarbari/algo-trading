@@ -10,6 +10,8 @@ Layout under the root directory (an internal detail; nothing else may rely on it
                                                            new version: run=<id>~<hex>)
                                                           typed per storage/tables/schemas.py,
                                                           ~64k-row groups + page index
+    tables/<table>/_history/                              the derived history copy (history.py,
+                                                          ADR 0060): a year per file + manifest
     tables/_txn/pending/<run_id>.jsonl                    a run's writes not yet committed
     tables/_txn/commits/<run_id>.json, seq, commit.lock   commits (local_index.py, ADR 0022)
     raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
@@ -47,6 +49,7 @@ from algotrade.storage.backends.arrow import (
     to_arrow,
     to_frame,
 )
+from algotrade.storage.backends.history import HistoryCopy
 from algotrade.storage.backends.local_index import (
     INDEX,
     TXN,
@@ -109,6 +112,7 @@ class LocalTables:
     def __init__(self, root: Path) -> None:
         self.root = root / "tables"
         self.commits = Commits(self.root)
+        self.history = HistoryCopy(self.root, self.commits.published, self.commits.no_commits)
 
     def _dir(self, table: str, session_date: date) -> Path:
         return self.root / table / f"date={session_date.isoformat()}"
@@ -224,19 +228,40 @@ class LocalTables:
         columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         def at(upto: int) -> list[pa.Table]:  # one commit sequence for the whole range
-            return [
-                data
-                for d in self.dates(table, own_run)
-                if start <= d <= end
-                and (data := self._partition(table, d, as_of, instruments, own_run, upto, columns))
-                is not None
-            ]
+            by_year: dict[int, pa.Table] = {}
+            if as_of is None and own_run is None:  # what the history copy holds (ADR 0060)
+                for year, copy in self.history.usable(
+                    table, start, end, instruments is not None, upto
+                ).items():
+                    low, high = max(start, date(year, 1, 1)), min(end, date(year, 12, 31))
+                    rows = self.history.read_year(
+                        table, year, copy, low, high, instruments, columns
+                    )
+                    if rows is not None:
+                        by_year[year] = rows
+            parts: dict[int, list[pa.Table]] = {y: [t] for y, t in by_year.items() if t.num_rows}
+            if any(y not in by_year for y in range(start.year, end.year + 1)):
+                for d in self.dates(table, own_run):
+                    if start <= d <= end and d.year not in by_year:
+                        data = self._partition(table, d, as_of, instruments, own_run, upto, columns)
+                        if data is not None:
+                            parts.setdefault(d.year, []).append(data)
+            return [t for year in sorted(parts) for t in parts[year]]
 
         parts = pinned_read(at, self.commits.published, self.commits.no_commits)
         if not parts:
             return None
         frame = to_frame(concat(table, parts))
         return None if frame.empty else frame.reset_index(drop=True)
+
+    def build_history(self, table: str, years: Sequence[int]) -> list[int]:
+        """Make the table's history copy hold ``years`` and be current (``history.py``); -> the
+        years built. Written only by ingestion (ADR 0005)."""
+
+        def resolved(day: date, upto: int) -> pa.Table | None:
+            return self._partition(table, day, None, None, None, upto)
+
+        return self.history.build(table, years, self.dates(table), resolved)
 
     def _own_partitions(self, own_run: str | None) -> set[tuple[str, date]]:
         if own_run is None:

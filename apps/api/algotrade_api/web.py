@@ -5,12 +5,13 @@ fallback: the browser router owns deep links such as ``/login``).
 ``create_app`` mounts it last and only when the directory is set, so every API route
 (``/health``, ``/graphql``, ``/docs``, the REST writes and polls) keeps precedence; a path an
 API route serves under another method (``GET /screeners/preview``) answers 405, never the
-page. ``HEAD`` is answered as ``GET`` without a body (uptime probes). It is
-public: the bundle is the same for every visitor and holds no data (the API behind it checks
-the caller on every request). A path never leaves the build directory: it is resolved and
-must stay inside it, symlinks included. Vite's hashed ``assets/`` are cached for good and a
-missing one is 404 (never ``index.html`` in place of a script); everything else is
-revalidated, so a rebuild shows on the next load."""
+page, unless the request is a browser navigation (``Accept: text/html``: a reload or deep
+link of ``/screeners/<id>``, which a REST route shares). ``HEAD`` is answered as ``GET``
+without a body (uptime probes). It is public: the bundle is the same for every visitor and
+holds no data (the API behind it checks the caller on every request). A path never leaves
+the build directory: it is resolved and must stay inside it, symlinks included. Vite's
+hashed ``assets/`` are cached for good and a missing one is 404 (never ``index.html`` in
+place of a script); everything else is revalidated, so a rebuild shows on the next load."""
 
 from pathlib import Path
 
@@ -48,6 +49,12 @@ def api_path(request: Request) -> bool:
     )
 
 
+def navigation(request: Request) -> bool:
+    """Whether the browser is loading a page (it asks for ``text/html``; the app's own API
+    calls ask for JSON)."""
+    return "text/html" in request.headers.get("accept", "")
+
+
 def web_router(dist: Path) -> APIRouter:
     """The router serving the build in ``dist``; refuses a directory without ``index.html``
     (the web was not built: ``make web-build``)."""
@@ -60,7 +67,7 @@ def web_router(dist: Path) -> APIRouter:
     router = APIRouter(tags=["web"])
 
     def web_app(path: str, request: Request) -> FileResponse:
-        if api_path(request):
+        if api_path(request) and not navigation(request):
             raise HTTPException(405, "method not allowed")
         asset = path.split("/", 1)[0] == ASSETS
         found = build_file(root, path)

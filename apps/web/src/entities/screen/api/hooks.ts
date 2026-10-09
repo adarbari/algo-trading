@@ -20,6 +20,7 @@ import { api, gql, graphql, queryKeys, unwrap } from '@/shared/api';
 import type { ScreenDocument, ScreenerDetail } from '../model/spec';
 import { isActive } from '../model/run';
 
+import { SCREENER_PICKS_OPERATION } from './picks';
 import { SCREENER_RESULTS_OPERATION } from './results';
 
 const ScreenerConfigs = graphql(`
@@ -88,6 +89,7 @@ const SCREEN_OPERATIONS = [
   'ScreenDetail',
   'ScreenVersions',
   SCREENER_RESULTS_OPERATION,
+  SCREENER_PICKS_OPERATION,
 ];
 
 /** Read every screen list and detail again (after a draft, finalise, copy or delete). */
@@ -191,7 +193,11 @@ export function useRunScreener(id: string) {
   const client = useQueryClient();
   const [jobId, setJobId] = useState<string | null>(null);
   const refresh = () =>
-    client.invalidateQueries({ queryKey: queryKeys.gqlAll(SCREENER_RESULTS_OPERATION) });
+    Promise.all(
+      [SCREENER_RESULTS_OPERATION, SCREENER_PICKS_OPERATION].map((name) =>
+        client.invalidateQueries({ queryKey: queryKeys.gqlAll(name) }),
+      ),
+    );
   const start = useMutation({
     mutationFn: () =>
       unwrap(api.POST('/screens/{config_id}/run', { params: { path: { config_id: id } } })),

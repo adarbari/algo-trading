@@ -24,7 +24,8 @@ def test_too_deep(graph: Graph, monkeypatch: pytest.MonkeyPatch) -> None:
     query = '{ instrument(key: "AAA") { features(names: []) { info { name } } } }'
     assert "errors" not in graph(query)
     monkeypatch.setattr(limits, "MAX_DEPTH", 2)
-    _bad_request(graph(query), "exceeds maximum operation depth of 2")
+    # another document: the first answer is in the response cache, which a patched cap bypasses
+    _bad_request(graph(query + " # capped"), "exceeds maximum operation depth of 2")
 
 
 def test_too_many_aliases(graph: Graph) -> None:

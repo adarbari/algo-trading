@@ -50,6 +50,18 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-
 detect = [{ call = "historical_reference" }, { call = "require_liquidity_rule" }]
 
 [[responsibility]]
+id = "history-copy"
+description = "The derived, read-optimised history copy of a table's resolved rows (one Parquet file per year under tables/<table>/_history/, a manifest of the source partitions' index signatures): built by TableStore.build_history (ingestion calls it, ADR 0005), served by read_range only for as_of None and no own_run while every requested partition still has the signature recorded at the build, else the partitions; no other code builds or reads these files"
+owner = ["src/algotrade/storage/backends/history.py"]
+allowed = [
+    "src/algotrade/storage/backends/local.py",  # serves read_range from it, exposes build_history
+    "src/algotrade/storage/backends/memory.py",  # build_history is a no-op there: no copy
+    "src/algotrade/storage/tables/interfaces.py",  # declares build_history on TableStore
+]
+section = "docs/adr/0060-history-copy.md#decision"
+detect = [{ call = "build_history" }, { call = "HistoryCopy" }]
+
+[[responsibility]]
 id = "locking"
 description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock (services/jobs)"
 owner = ["src/algotrade/storage/locks.py", "src/algotrade/services/jobs/exclusive.py"]
