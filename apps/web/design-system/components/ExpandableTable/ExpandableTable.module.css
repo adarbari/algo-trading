@@ -1,0 +1,99 @@
+/*
+ * ExpandableTable: header and rows share one track list (--et-wide, --et-narrow, set by
+ * ExpandableTable.tsx from the columns), so cells line up. A narrow container keeps only the
+ * columns marked narrow. The toggle's stretched hit area covers the row, so the whole row
+ * opens by mouse while the button stays the one keyboard stop.
+ */
+.root {
+  container-type: inline-size;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.row {
+  display: grid;
+  position: relative;
+  grid-template-columns: var(--et-wide);
+  align-items: center;
+  column-gap: var(--space-3);
+  padding: var(--space-2) var(--space-2-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.row[data-open] {
+  border-bottom-color: transparent;
+}
+
+.row:hover:not(.head) {
+  background: var(--color-row);
+}
+
+.head {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-xs);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.cell[data-align='end'] {
+  align-items: flex-end;
+  text-align: end;
+}
+
+.toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-0-5) var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.toggle > :first-child {
+  grid-row: 1 / span 2;
+  margin-block-start: var(--space-0-5);
+  transition: transform var(--duration-fast) var(--easing-standard);
+}
+
+.row[data-open] .toggle > :first-child {
+  transform: rotate(90deg);
+}
+
+.detail {
+  padding: var(--space-2) var(--space-2-5) var(--space-3);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+  background: var(--color-row);
+  color: var(--color-text-2);
+}
+
+@container (width < 720px) {
+  .row {
+    grid-template-columns: var(--et-narrow);
+  }
+
+  .cell[data-wide] {
+    display: none;
+  }
+}

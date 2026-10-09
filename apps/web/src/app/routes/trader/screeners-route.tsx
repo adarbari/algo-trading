@@ -29,6 +29,10 @@ function ScreenersIndex() {
       onNew={() => void navigate({ to: '/screeners/new' })}
       onOpen={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
       onEdit={(id) => void navigate({ to: '/screeners/$id/edit', params: { id } })}
+      onOpenTicker={(symbol, via) =>
+        void navigate({ to: '/explore', search: { sel: symbol, focus: symbol, via } })
+      }
+      onOpenEdge={(edge) => void navigate({ to: '/edges', search: { edge } })}
     />
   );
 }

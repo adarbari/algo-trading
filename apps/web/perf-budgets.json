@@ -9,27 +9,27 @@
       "src/pages/admin-llm-usage/index.ts": 48700,
       "src/pages/guide/index.ts": 56300,
       "src/pages/login/index.ts": 1800,
-      "src/pages/screener-builder/index.ts": 68600,
+      "src/pages/screener-builder/index.ts": 68700,
       "src/pages/screener-results/index.ts": 68200,
       "src/pages/trader-calendar/index.ts": 12600,
       "src/pages/trader-edges/index.ts": 36000,
-      "src/pages/trader-explore/index.ts": 60000,
-      "src/pages/trader-explore/ui/OtherTabs.tsx": 91600,
+      "src/pages/trader-explore/index.ts": 60100,
+      "src/pages/trader-explore/ui/OtherTabs.tsx": 92000,
       "src/pages/trader-ideas/index.ts": 40100,
       "src/pages/trader-regime/index.ts": 57100,
-      "src/pages/trader-screeners/index.ts": 14900
+      "src/pages/trader-screeners/index.ts": 16500
     }
   },
   "e2e": {
     "/ideas": {
       "first_load_js_gzip_bytes": 229500,
       "requests": 42,
-      "dom_nodes": 268
+      "dom_nodes": 265
     },
     "/screeners": {
       "first_load_js_gzip_bytes": 206000,
-      "requests": 47,
-      "dom_nodes": 171
+      "requests": 45,
+      "dom_nodes": 188
     },
     "/regime": {
       "first_load_js_gzip_bytes": 299800,
@@ -38,7 +38,7 @@
     },
     "/screeners/vrp_scanner": {
       "first_load_js_gzip_bytes": 253500,
-      "requests": 69,
+      "requests": 72,
       "dom_nodes": 293
     },
     "/admin/ingestion": {
@@ -48,8 +48,17 @@
     },
     "/explore?focus=AAPL&tab=chart": {
       "first_load_js_gzip_bytes": 304000,
-      "requests": 59,
+      "requests": 61,
       "dom_nodes": 215
     }
+  },
+  "reasons": {
+    "bundle.routes.src/pages/trader-screeners/index.ts": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
+    "e2e./screeners.dom_nodes": "2026-10-09 #420 Screeners rows v2 (owner-requested): sparkline, decision bar, track record",
+    "e2e./screeners/vrp_scanner.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
+    "e2e./explore?focus=AAPL&tab=chart.requests": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) load on this route too",
+    "bundle.routes.src/pages/screener-builder/index.ts": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk",
+    "bundle.routes.src/pages/trader-explore/index.ts": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk",
+    "bundle.routes.src/pages/trader-explore/ui/OtherTabs.tsx": "2026-10-09 #420 Screeners rows v2: shared chunks the row now imports (decisions, threshold) move into this page chunk"
   }
 }

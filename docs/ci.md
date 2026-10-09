@@ -184,13 +184,23 @@ All gated numbers are counts or sizes, never durations. LCP and total blocking t
 runners they move 20-50 % between identical runs, so a gate on them would fail PRs at random and
 teach people to ignore it. Read them as a trend, not a verdict.
 
-Budgets only shrink. The `update` commands write the measured value + 1 % headroom (CI measures a few hundred
+Budget policy (owner decision 2026-10-09). The shared budgets (the entry chunk, the entry plus its static
+imports, i.e. every first visit, and the chart engine staying out of the entry) only ever go down.
+A single route's own budgets (its page chunk, first-load JS, requests, DOM nodes) may rise only in a
+PR that adds an owner-requested feature, with the reason recorded in the top-level `reasons` object of
+`perf-budgets.json`: budget path (`bundle.routes.<page>`, `e2e.<url>.requests`, ...) -> "YYYY-MM-DD #PR
+what was asked for". The checks ignore `reasons` and the `update` commands keep it. `npm run perf:bundle`
+fails a route budget that rose against `origin/main`'s file without a new entry for it, and any rise of
+a shared budget (where `origin/main` is not fetched the comparison is skipped and review of the JSON is the
+check); both gates print the reason of a raised budget once a route is within 5 % of it.
+
+Otherwise budgets only shrink. The `update` commands write the measured value + 1 % headroom (CI measures a few hundred
 bytes more than a laptop: gzip and build variance), rounded up (bytes to the next 100 B, requests and DOM
 nodes to the next integer, at least +1), and never a value above the current budget: new =
 min(current, measured with headroom). The check itself passes when measured <= budget. After an improvement run
 `npm run perf:bundle -- update` and `PERF_UPDATE=1 npm run perf:e2e` to lower them (they never
-raise one); a new page needs its first budget the same way. Raising a budget is a hand edit of the
-JSON that a reviewer sees, with the reason in the PR. A heavy new dependency belongs behind a
+raise one); a new page needs its first budget the same way. Raising a route budget is a hand edit of the
+JSON with a `reasons` entry, as above. A heavy new dependency belongs behind a
 dynamic import (as the chart engine is), not in the entry.
 
 ## Flaky specs

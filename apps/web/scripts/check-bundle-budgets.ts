@@ -11,7 +11,16 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-import { loadBudgets, saveBudgets, shrunk, type Budgets } from './perf-budgets';
+import { execFileSync } from 'node:child_process';
+
+import {
+  loadBudgets,
+  nearBudgetNotes,
+  saveBudgets,
+  shrunk,
+  unexplainedRises,
+  type Budgets,
+} from './perf-budgets';
 
 export interface ManifestChunk {
   file: string;
@@ -151,6 +160,27 @@ export function table(sizes: Sizes, budgets: Budgets['bundle']): string {
   ].join('\n');
 }
 
+/**
+ * Budgets raised against the base branch's file without a reason (see `unexplainedRises`). The base
+ * is `origin/main` (BUDGETS_BASE_REF); where git or that ref is not there (a shallow CI checkout)
+ * the comparison is skipped and review of the JSON is the check.
+ */
+function risesAgainstBase(head: Budgets): string[] {
+  const ref = process.env['BUDGETS_BASE_REF'] ?? 'origin/main';
+  try {
+    const raw = execFileSync('git', ['show', `${ref}:apps/web/perf-budgets.json`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return unexplainedRises(JSON.parse(raw) as Budgets, head);
+  } catch {
+    console.log(
+      `budget rises: ${ref} not available, skipped (a reviewer checks perf-budgets.json)`,
+    );
+    return [];
+  }
+}
+
 const DIST = new URL('../dist/', import.meta.url);
 
 function main(): number {
@@ -175,7 +205,18 @@ function main(): number {
     console.log('perf-budgets.json: bundle budgets shrunk to the current sizes + 1 %');
     return 0;
   }
-  const problems = violations(sizes, budgets.bundle);
+  const notes = nearBudgetNotes(
+    {
+      'bundle.entry_gzip_bytes': sizes.entry,
+      'bundle.entry_closure_gzip_bytes': sizes.entryClosure,
+      ...Object.fromEntries(
+        Object.entries(sizes.routes).map(([page, size]) => [`bundle.routes.${page}`, size]),
+      ),
+    },
+    budgets,
+  );
+  for (const note of notes) console.log(note);
+  const problems = [...violations(sizes, budgets.bundle), ...risesAgainstBase(budgets)];
   for (const problem of problems) console.error(`FAIL ${problem}`);
   return problems.length === 0 ? 0 : 1;
 }

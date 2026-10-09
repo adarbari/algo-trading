@@ -15,6 +15,7 @@ const ScreenerRuns = graphql(`
     }
     screeners {
       id
+      name
       criteria {
         id
         field
@@ -23,6 +24,10 @@ const ScreenerRuns = graphql(`
       notRun {
         kindText
       }
+      pickHistory {
+        session
+        picked
+      }
       latestRun {
         runId
         session
@@ -30,6 +35,10 @@ const ScreenerRuns = graphql(`
         paused
         decisions {
           decision
+          count
+        }
+        changes {
+          change
           count
         }
       }
