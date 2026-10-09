@@ -229,7 +229,14 @@ def create_app(
     cache = ResultCache(READ_CACHE_SIZE)
     reads, stores = _reads(app.state.store, cache), _stores(app.state.store, cache)
     app.include_router(
-        graphql_router(reads, settings.debug, stores, app.state.store.reader.visible_seq, epoch),
+        graphql_router(
+            reads,
+            settings.debug,
+            stores,
+            app.state.store.reader.visible_seq,
+            epoch,
+            runs=app.state.store.reader.runs_generation,
+        ),
         dependencies=caller,
     )
     user = app.state.store.user

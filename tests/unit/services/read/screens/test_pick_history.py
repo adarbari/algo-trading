@@ -146,3 +146,20 @@ def test_a_real_gated_run_is_counted_as_latest_run_counts_it() -> None:
     assert _counted(DAY, decisions).picked == run.picked and _counted(DAY, decisions).paused == 2
     entry = load_pick_histories(ctx, [key], 2)[key]
     assert [e.picked for e in entry] == [None, run.picked]  # the day before: no run
+
+
+def test_a_record_saved_without_a_publish_is_seen_by_the_next_read(
+    backend: MemoryBackend, ctx: ReadContext
+) -> None:
+    """The cached records are keyed on the runs generation too: an on-request run saves its
+    record without moving ``visible_seq``."""
+    before = load_pick_histories(ctx, [DELTA], 2)[DELTA][0]
+    assert before.picked is None and before.not_run is not None
+    when = T0 + timedelta(hours=24)
+    record = RunRecord("late", run_job_name("delta", "me"), D0, when)
+    seq = ctx.reader.visible_seq()
+    stats = {"summary": {"decisions": {"QUALIFIED": 3}}}
+    StoreWriter(backend).save_run(record.finish(when, stats=stats))
+    assert ctx.reader.visible_seq() == seq
+    after = load_pick_histories(ctx, [DELTA], 2)[DELTA][0]
+    assert after.picked == 3 and after.not_run is None

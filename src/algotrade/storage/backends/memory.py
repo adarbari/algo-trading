@@ -287,9 +287,14 @@ class MemoryStaging:
 class MemoryRuns:
     def __init__(self) -> None:
         self._data: dict[str, str] = {}
+        self._saves = 0
+
+    def generation(self) -> tuple[int, int]:
+        return (0, self._saves)
 
     def save(self, record: RunRecord) -> None:
         self._data[record.run_id] = record.to_json()
+        self._saves += 1
 
     def load(self, run_id: str) -> RunRecord | None:
         text = self._data.get(run_id)

@@ -467,6 +467,16 @@ class LocalRuns:
                 _, (evicted, _record) = self._parsed.popitem(last=False)
                 self._parsed_bytes -= evicted[2]
 
+    def generation(self) -> tuple[int, int]:
+        """``(inode, mtime_ns)`` of the runs directory: ``save`` is an atomic rename into it,
+        which changes the directory's mtime (checked on APFS: 2000 of 2000 saves); a read, a
+        stat of a file or a parse does not. ``(0, 0)`` while the directory does not exist."""
+        try:
+            st = self.root.stat()
+        except FileNotFoundError:
+            return (0, 0)
+        return (st.st_ino, st.st_mtime_ns)
+
     def save(self, record: RunRecord) -> None:
         atomic_write(self.root / f"{safe(record.run_id)}.json", record.to_json().encode())
 
