@@ -54,6 +54,10 @@ from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, moments, pbo_cscv
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
+from algotrade.services.evaluation.cross_section.historical import (
+    HistoricalCaveat,
+    IdentityTally,
+)
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
     apply_outcome,
@@ -148,6 +152,9 @@ class EdgeEvaluation:
     event_unknown: Mapping[str, int] = field(default_factory=dict)  # reason -> names excluded
     split_from: date | None = None  # the test slice's first session (None: no split)
     exploratory: bool = False  # the split is not the edge's frozen_from: never evidence
+    # Sessions before the first reference snapshot, read from the listing history (ADR 0053
+    # amendment 2026-10-09): the rule and the names by path; None when none was read.
+    historical: HistoricalCaveat | None = None
 
 
 def run_hash(
@@ -209,6 +216,7 @@ class _Session:
         self._labels: dict[date, str] = {}
         self._implied: dict[tuple[str, date], dict[str, float | None]] = {}
         self._snapshots: set[date] = set()
+        self._identity = IdentityTally()
         self.errors: dict[str, MissingDataError] = {}  # variant -> its first lost session's error
         self.lost: dict[tuple[str, date], str] = {}  # (variant, D) -> the table it had no data in
 
@@ -229,12 +237,19 @@ class _Session:
             self.errors.setdefault(variant.id, error)
             return None
         self._snapshots.add(found.snapshot)
+        self._identity.note("screened", day, found.identity)
         return found
 
     def eligible(self, key: str, universe: Selection, day: date) -> frozenset[str]:
         if (key, day) not in self._eligible:
-            self._eligible[key, day] = self._selections.eligible(universe, day).ids
+            found = self._selections.eligible(universe, day)
+            self._identity.note("eligible", day, found.identity)
+            self._eligible[key, day] = found.ids
         return self._eligible[key, day]
+
+    def caveat(self) -> HistoricalCaveat | None:
+        """What the sessions read before the first reference snapshot covered (None: none)."""
+        return self._identity.caveat()
 
     def snapshots(self) -> list[date]:
         """The universe snapshot dates the screens read."""
@@ -259,7 +274,7 @@ class _Session:
     ) -> dict[str, float | None]:
         if (key, day) not in self._implied:
             wanted = sorted(ids)
-            view, _ = fields_view(self._reader, (field_name,), day, wanted)
+            view, _ = fields_view(self._reader, (field_name,), day, wanted, historical=True)
             values = {i: view.get(i, field_name) for i in wanted}
             self._implied[key, day] = {
                 i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
@@ -579,6 +594,7 @@ def evaluate_edge(
         event_unknown=unknown,
         split_from=split,
         exploratory=exploratory,
+        historical=session.caveat(),
     )
 
 

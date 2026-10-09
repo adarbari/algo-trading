@@ -97,6 +97,7 @@ def screen_rules(
     features: FeatureSet,
     gate: RegimeGate | None = None,
     excluded: Mapping[str, str] | None = None,
+    historical: bool = False,
 ) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...], tuple[str, ...]]:
     """A rule screen over the selected instruments: the spec's fields read for the session
     (missing values stay missing: a HARD criterion rejects the row), evaluated once, through
@@ -104,7 +105,9 @@ def screen_rules(
     tables that had no rows for the session and the fields the spec reads."""
     screener = RuleScreener(config.screen_spec)
     ids = list(selected.instruments)
-    view, source = fields_view(reader, screener.spec.fields(), session_date, ids, features=features)
+    view, source = fields_view(
+        reader, screener.spec.fields(), session_date, ids, features=features, historical=historical
+    )
     result = exclude_rule_result(gate_rule_result(screener.evaluate(view), gate), excluded or {})
     run = rule_run(result, ids, config.screening)
     return run, result, tuple(source.missing), screener.spec.fields()
@@ -195,10 +198,13 @@ def screen_session(
     now: datetime | None = None,
     *,
     sources: SourcesSettings | None = None,
+    historical: bool = False,
 ) -> ScreenSession:
     """Select -> screen -> audit for one resolved screener config on what was known at
     ``session_date``: no run record, no write (``run_screener`` saves it; the edge harness
-    scores it, ADR 0053). Without ``sources`` no stale chain is tolerated (fail closed)."""
+    scores it, ADR 0053). Without ``sources`` no stale chain is tolerated (fail closed).
+    ``historical``: a session before the first reference snapshot reads the names of the
+    listing history alive then (``data.listings.identity``; the edge harness only)."""
     now = now or datetime.now(UTC)
     if config.config.kind != "screener":
         raise ConfigurationError(f"{config.config.id} is a {config.config.kind}, not a screener")
@@ -207,7 +213,9 @@ def screen_session(
     screening = config.screening
     universe = load_universe(reader, session_date)
     features = config_features(config)
-    selected = select(reader, config.selection, session_date, features=features)
+    selected = select(
+        reader, config.selection, session_date, features=features, historical=historical
+    )
     rules: RuleScreenResult | None = None
     missing_tables: tuple[str, ...] = ()
     fields: tuple[str, ...] = ()
@@ -216,7 +224,7 @@ def screen_session(
     excluded = _tolerated_stale(reader, session_date, now, sources)
     if config.config.impl in RULE_IMPLS:
         run, rules, missing_tables, fields = screen_rules(
-            reader, config, session_date, selected, features, gate, excluded
+            reader, config, session_date, selected, features, gate, excluded, historical
         )
     else:
         screener = create_screener(config.config.impl, params=config.config.params)

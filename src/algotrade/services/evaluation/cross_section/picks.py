@@ -6,8 +6,8 @@ and returns its rows best-first: a rule screen by its stored rank (score, tie-br
 Python screener by (score, id). ``eligible`` is the edge's universe at the session: the base
 rate and the decile spread are taken over it."""
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 from algotrade.config.strategy.resolve import ResolvedConfig
@@ -15,9 +15,11 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.data import StoreReader
+from algotrade.data.listings.identity import PROXY, TODAY_FLAG
 from algotrade.data.reference import InstrumentView
 from algotrade.engines.screening.runner import RunCoverage
-from algotrade.engines.selection.evaluate import evaluate_selection
+from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection
+from algotrade.services.evaluation.cross_section.historical import require_liquidity_rule
 from algotrade.services.screening.run import screen_session
 from algotrade.services.selection import fields_view, select, selection_fields
 from algotrade.strategies.screeners.base import Decision
@@ -38,17 +40,21 @@ class RankedRun:
     coverage: RunCoverage
     snapshot: date  # the universe snapshot the screen read (the run itself is not kept)
     scores: Mapping[str, float]
+    identity: Mapping[str, int] = field(default_factory=dict)  # historical: ranked names by path
 
 
 @dataclass(frozen=True)
 class Eligible:
     ids: frozenset[str]
     pre_snapshot: bool
+    identity: Mapping[str, int] = field(default_factory=dict)  # historical: names by path
 
 
 def screen_variant(reader: StoreReader, config: ResolvedConfig, session: date) -> RankedRun:
     """``config`` screened at ``session`` on what was known then."""
-    screened = screen_session(reader, config, session)
+    screened = screen_session(reader, config, session, historical=True)
+    if screened.selected.historical and config.selection is not None:
+        require_liquidity_rule(config.selection)
     if screened.rules is not None:
         rows = sorted(screened.rules.rows, key=lambda r: r.rank)
         ranked = [(r.instrument_id, r.decision) for r in rows]
@@ -68,17 +74,35 @@ def screen_variant(reader: StoreReader, config: ResolvedConfig, session: date) -
         session=session,
         ranking=tuple(i for i, _ in ranked),
         qualified=tuple(i for i, d in ranked if d is Decision.QUALIFIED),
-        pre_snapshot=screened.universe.pre_snapshot,
+        pre_snapshot=screened.universe.pre_snapshot and not screened.selected.historical,
         coverage=screened.run.coverage,
         snapshot=screened.universe.snapshot_date,
         scores=scores,
+        identity=_paths(screened.selected, [i for i, _ in ranked]),
     )
 
 
+def _paths(chosen: SelectionResult, ids: Sequence[str]) -> dict[str, int]:
+    """Historical sessions only: how many of ``ids`` took each identity path (empty otherwise)."""
+    if not chosen.historical:
+        return {}
+    proxy = len(set(ids) & chosen.proxy_ids)
+    return {TODAY_FLAG: len(ids) - proxy, PROXY: proxy}
+
+
+def _eligible(chosen: SelectionResult, universe: Selection, pre_snapshot: bool) -> Eligible:
+    if chosen.historical:
+        require_liquidity_rule(universe)
+    ids = frozenset(chosen.instruments)
+    return Eligible(ids, pre_snapshot and not chosen.historical, _paths(chosen, tuple(ids)))
+
+
 def eligible(reader: StoreReader, universe: Selection, session: date) -> Eligible:
-    """The ids ``universe`` selects at ``session`` (the edge's own, over the site's features)."""
-    chosen = select(reader, universe, session)
-    return Eligible(frozenset(chosen.instruments), chosen.pre_snapshot)
+    """The ids ``universe`` selects at ``session`` (the edge's own, over the site's features).
+    Before the first reference snapshot: the listing history's names alive then, with today's
+    optionable flag or the universe's liquidity floor (``historical.py``)."""
+    chosen = select(reader, universe, session, historical=True)
+    return _eligible(chosen, universe, chosen.pre_snapshot)
 
 
 class SelectionReads:
@@ -94,8 +118,14 @@ class SelectionReads:
     def eligible(self, universe: Selection, session: date) -> Eligible:
         key = (tuple(selection_fields(universe)), session)
         if self._last is None or self._last[0] != key:
-            view, source = fields_view(self._reader, key[0], session)
+            view, source = fields_view(self._reader, key[0], session, historical=True)
             self._last = (key, view, source)
         _, view, source = self._last
         chosen = evaluate_selection(universe, view)
-        return Eligible(frozenset(chosen.instruments), source.pre_snapshot)
+        identity = source.identity
+        chosen = replace(
+            chosen,
+            historical=identity is not None,
+            proxy_ids=frozenset() if identity is None else identity.proxy_ids,
+        )
+        return _eligible(chosen, universe, source.pre_snapshot)

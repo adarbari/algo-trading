@@ -342,3 +342,27 @@ itself follows.
    eligible set is `universe_asof(S)` (survivors and the delisted alike) with a bar at S. Company
    snapshots start in 2026, so sector is never a control; Russell reconstitution stays blocked (no
    historical membership).
+
+## Amendment 2026-10-09: historical eligibility before the first snapshot
+
+For a decision session before the first reference snapshot (2026-10-02) the harness read today's
+names: `data.reference` falls back to the earliest snapshot, so a delisted name has no row, the
+rest carry today's `status`, and every edge was measured on survivors. **Owner decision
+2026-10-09, "today's flag + proxy"**: such a session reads the names of the listing history alive
+on it (`data.listings.universe_asof`: survivors and the delisted alike, `status` ACTIVE). A name
+alive in today's snapshot keeps today's `optionable` flag and `security_type`; a name absent from
+it (delisted) counts as a common stock (Tiingo `Stock`; an ETF stays an ETF) and its `optionable`
+is replaced by the liquidity proxy: the universe's own close and `adv_usd_20d` floors (for
+`liquid_common_stocks`, above $5 and $50M), so a universe that reads `optionable` without both is
+a `ConfigurationError`, never a number of our own. After 2026-10-02, the real snapshot. This
+applies to the frozen period before 2026-10-02 as well, and to the training frame, which calls the
+same `eligible`.
+
+**Disclosed tilt.** Today's flag is lookahead: it favours names that later grew into optionable
+ones, so every number over these sessions is read with it. The run says so: its record
+(`stats["historical_identity"]`) and its report (`HISTORICAL IDENTITY`) carry the rule, the number
+of such sessions and the names by path (today's flag, liquidity proxy), eligible and screened.
+These sessions no longer count as `pre_snapshot` (that caveat stays for a store with no listing
+history, where the earliest snapshot still stands in). The read is opt-in (`historical=True`
+through `fields_view` / `select` / `screen_session`): reads, backtests and the API are unchanged.
+`end_date` stays behind `universe_asof` (a name is in only while `start <= S <= end`).

@@ -815,3 +815,30 @@ def test_the_eligible_sets_read_for_the_events_are_not_kept_once_the_schedules_a
     monkeypatch.setattr(harness, "_measure", spy)
     run(event_world(EVENTS), event_edge(2))
     assert caches == [0]
+
+
+def test_an_evaluation_before_the_first_snapshot_reads_the_listing_history_and_says_so() -> None:
+    w = build_world(snapshot=DAYS[3])  # the first reference snapshot is after D = DAYS[0]
+    listings = stamped(
+        [
+            {"instrument_id": i, "ticker": f"N{k:02d}", "exchange": "NASDAQ", "asset_type": "Stock",
+             "perma_ticker": "", "start_date": date(2000, 1, 3), "end_date": None,
+             "ts": datetime(2026, 9, 1, tzinfo=UTC)}
+            for k, i in enumerate(IDS)
+        ],
+        DAYS[3], "l",
+    )  # fmt: skip
+    members = stamped(
+        [{"index_name": "SP500", "ticker": "ZZZ", "start_date": date(2000, 1, 3),
+          "end_date": None, "ts": datetime(2026, 9, 1, tzinfo=UTC)}],
+        DAYS[3], "m",
+    )  # fmt: skip
+    w.writer.write_table("instruments/listing_history", DAYS[3], "l", listings)
+    w.writer.write_table("instruments/index_membership", DAYS[3], "m", members)
+    ev = run(w)
+    assert ev.historical is not None and 0 < ev.historical.sessions < len(DAYS)  # before DAYS[3]
+    assert ev.historical.eligible == {"today_flag": N * ev.historical.sessions, "proxy": 0}
+    assert ev.results[0].measures[0].pre_snapshot_sessions == 0  # not a survivorship caveat
+    record = write_edge_eval(w.results, ev, AS_OF)
+    assert record.stats["historical_identity"]["sessions"] == ev.historical.sessions
+    assert run(build_world()).historical is None  # a normal run carries no caveat

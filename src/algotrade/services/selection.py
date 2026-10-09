@@ -22,12 +22,17 @@ def fields_view(
     ids: Sequence[str] | None = None,
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
+    historical: bool = False,
 ) -> tuple[FeatureView, InstrumentView]:
     """One row per instrument known on ``session`` (only ``ids``, each with a row even when
     nothing is known of it, when given), keyed by field name; missing values are left out
     (UNKNOWN). ``feature.<name>`` fields are computed from the stored features they need.
-    Also the ``InstrumentView`` it came from (``missing`` tables; ``pre_snapshot``)."""
-    view = field_view(reader, session, sorted(set(fields)), ids, as_of=as_of, features=features)
+    Also the ``InstrumentView`` it came from (``missing`` tables; ``pre_snapshot``).
+    ``historical``: see ``services.features.field_view``."""
+    view = field_view(
+        reader, session, sorted(set(fields)), ids, as_of=as_of, features=features,
+        historical=historical,
+    )  # fmt: skip
     columns = [c for c in view.frame.columns if c != "instrument_id"]
     rows: dict[str, dict[str, FeatureValue]] = {i: {} for i in ids or ()}
     for record in view.frame.to_dict("records"):
@@ -45,10 +50,14 @@ def selection_view(
     session: date,
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
+    historical: bool = False,
 ) -> tuple[FeatureView, InstrumentView]:
     """``fields_view`` of the fields ``selection`` reads, for every instrument known on
     ``session``."""
-    return fields_view(reader, selection_fields(selection), session, as_of=as_of, features=features)
+    return fields_view(
+        reader, selection_fields(selection), session, as_of=as_of, features=features,
+        historical=historical,
+    )  # fmt: skip
 
 
 def selection_fields(selection: Selection) -> list[str]:
@@ -65,13 +74,17 @@ def select(
     session: date,
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
+    historical: bool = False,
 ) -> SelectionResult:
     """Point in time: the reference snapshot and rollups for ``session``, read ``as_of``.
     ``features``: the catalogue ``feature.<name>`` fields come from (default: the site's; a
     user's config: ``services.features.config_features``)."""
-    view, source = selection_view(reader, selection, session, as_of, features)
+    view, source = selection_view(reader, selection, session, as_of, features, historical)
+    identity = source.identity
     return replace(
         evaluate_selection(selection, view),
         missing_tables=source.missing,
         pre_snapshot=source.pre_snapshot,
+        historical=identity is not None,
+        proxy_ids=frozenset() if identity is None else identity.proxy_ids,
     )

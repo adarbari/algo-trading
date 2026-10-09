@@ -42,6 +42,15 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
             f"SURVIVORSHIP: {n} of {m} sessions (h={horizon}) before the first universe "
             f"snapshot {result['universe_snapshot']}"
         )
+    historical = result.get("historical_identity")
+    if historical:
+        e, k = historical["eligible"], historical["screened"]
+        lines.append(
+            f"HISTORICAL IDENTITY: {historical['sessions']} sessions before the first reference "
+            f"snapshot. Rule: {historical['rule']}. Eligible names: {e['today_flag']} by today's "
+            f"flag, {e['proxy']} by the liquidity proxy; screened: {k['today_flag']} and "
+            f"{k['proxy']}"
+        )
     for horizon, n in result["unclosed_sessions"].items():
         lines.append(f"UNCLOSED: {n} start sessions at h={horizon} have no closed window")
     for lost in result.get("lost_sessions", []):

@@ -152,6 +152,12 @@ def survivorship(evaluation: EdgeEvaluation) -> dict[int, tuple[int, int]]:
     return out
 
 
+def historical_identity(evaluation: EdgeEvaluation) -> dict[str, Any] | None:
+    """The caveat of sessions read before the first reference snapshot (the rule and the names
+    by path: today's flag, liquidity proxy); None when the run read none."""
+    return None if evaluation.historical is None else evaluation.historical.as_dict()
+
+
 def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datetime) -> RunRecord:
     """Save ``evaluation``: its rows (both visible or neither) and its run record, whose stats
     hold the trial log. Returns the finished record."""
@@ -170,6 +176,7 @@ def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datet
         "unclosed_sessions": dict(evaluation.unclosed_sessions),
         "event_unknown": dict(evaluation.event_unknown),
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
+        "historical_identity": historical_identity(evaluation),
     }
     # The record goes in before the commit: a crash between the two leaves a trial counted
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.

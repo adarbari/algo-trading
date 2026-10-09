@@ -16,6 +16,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -30,6 +31,9 @@ from algotrade.core.model.fields import (
 from algotrade.core.model.instruments import AssetClass, Instrument
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.tables.readers import StoreReader
+
+if TYPE_CHECKING:  # ``data.listings`` reads this module: the type only, no import cycle
+    from algotrade.data.listings.identity import HistoricalIdentity
 
 UNIVERSE_TABLE = "universe"
 IBKR_CONTRACTS = "instruments/ibkr_contracts"
@@ -248,7 +252,9 @@ class InstrumentView:
     ``instrument_id``. A rollup with no partition for ``session`` is listed in ``missing``
     and its fields are absent, which selections treat as UNKNOWN (never as a pass).
     ``pre_snapshot``: the reference came from a snapshot after ``session`` (survivorship);
-    ``company_pre_snapshot``: so did the company facts.
+    ``company_pre_snapshot``: so did the company facts. ``identity``: the reference rows came
+    from the listing history instead (``data.listings.identity``, ADR 0053 amendment
+    2026-10-09): ``pre_snapshot`` is then False and the paths each name took are in it.
     """
 
     session: date
@@ -257,6 +263,7 @@ class InstrumentView:
     missing: tuple[str, ...]
     pre_snapshot: bool = False
     company_pre_snapshot: bool = False
+    identity: "HistoricalIdentity | None" = None
 
 
 def join_fields(
@@ -278,8 +285,10 @@ def instrument_view(
     fields: Sequence[str] | None = None,
     ids: Sequence[str] | None = None,
     as_of: datetime | None = None,
+    identity: "HistoricalIdentity | None" = None,
 ) -> InstrumentView:
-    """Reference snapshot for ``session`` joined with rollups *for* ``session``.
+    """Reference snapshot for ``session`` joined with rollups *for* ``session``. With
+    ``identity`` (a session before the first snapshot) its rows stand in for the snapshot's.
 
     Company fields (``instrument.sector``…) come from the ``instruments/company`` snapshot
     for ``session`` (same rule); without one they are ``missing`` (UNKNOWN). ``fields``
@@ -287,6 +296,10 @@ def instrument_view(
     and no rollups.
     """
     reference, ref = read_snapshot(reader, REFERENCE_TABLE, session, REFERENCE_HINT, as_of, ids)
+    if identity is not None:
+        reference = identity.frame
+        if ids is not None:
+            reference = reference[reference["instrument_id"].isin(set(ids))]
     wanted: dict[str, list[tuple[str, str]]] = {}
     for name in fields if fields is not None else [instrument_field(str(c)) for c in reference]:
         table, column = field_source(name)
@@ -308,7 +321,13 @@ def instrument_view(
             continue
         out = join_fields(out, frame, columns)
     return InstrumentView(
-        session, ref.snapshot_date, out, tuple(sorted(missing)), ref.pre_snapshot, company_pre
+        session,
+        ref.snapshot_date,
+        out,
+        tuple(sorted(missing)),
+        ref.pre_snapshot and identity is None,
+        company_pre,
+        identity,
     )
 
 
