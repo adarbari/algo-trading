@@ -12,6 +12,7 @@ from algotrade_ingestion.tasks.reference.instrument_ids import (
     assign_ids,
     cumulative_map,
     figi_review_rows,
+    match_perma,
     rename_ids,
 )
 from algotrade_ingestion.tasks.reference.universe_build import (
@@ -221,3 +222,55 @@ def test_rename_ids_follows_a_same_session_chain_in_recorded_order() -> None:
     assert renamed is not None and renamed["instrument_id"].tolist() == ["EQ:A", "EQ:KEEP"]
     halfway = rename_ids(previous, chain.iloc[1:])  # before the override: on B
     assert halfway is not None and halfway["instrument_id"].tolist() == ["EQ:B", "EQ:KEEP"]
+
+
+def _listings(*rows: tuple[str, date | None]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "ticker": [t for t, _ in rows],
+            "start_date": [date(2000 + 3 * i, 1, 3) for i in range(len(rows))],
+            "end_date": [e for _, e in rows],
+        }
+    )
+
+
+def _meta(*rows: tuple[str, str, bool]) -> pd.DataFrame:
+    return pd.DataFrame(rows, columns=["ticker", "perma_ticker", "is_active"])
+
+
+def test_prm_matches_primedia_and_perimeter() -> None:
+    listings = _listings(("PRM", date(2008, 5, 1)), ("PRM", None), ("AAPL", None), ("ZZZ", None))
+    meta = _meta(
+        ("PRM", "US000000041372", False),  # PRIMEDIA
+        ("PRM", "US000000101493", True),  # Perimeter
+        ("AAPL", "US000000000033", True),
+    )
+    perma, stats = match_perma(listings, meta)
+    assert list(perma) == ["US000000041372", "US000000101493", "US000000000033", ""]
+    assert stats == {"perma_matched": 3, "perma_no_meta": 1, "perma_ambiguous": 0}
+
+
+def test_recycled_ticker_two_inactive_rows_stays_unmatched() -> None:
+    listings = _listings(("AAC", date(2021, 4, 19)), ("AAC", date(2023, 11, 6)), ("AAC", None))
+    meta = _meta(("AAC", "US1", False), ("AAC", "US2", False), ("AAC", "US3", True))
+    perma, stats = match_perma(listings, meta)
+    assert list(perma) == ["", "", "US3"]  # the open listing still matches the one active row
+    assert stats["perma_ambiguous"] == 2 and stats["perma_matched"] == 1
+    extra = _meta(("AAC", "US1", False), ("AAC", "US2", False))  # one delisted listing, two rows
+    perma, stats = match_perma(_listings(("AAC", date(2021, 4, 19))), extra)
+    assert list(perma) == [""] and stats["perma_ambiguous"] == 1
+
+
+def test_a_listing_that_already_has_an_id_is_not_matched_but_still_counts() -> None:
+    listings = _listings(("PRM", date(2008, 5, 1)), ("PRM", None))
+    meta = _meta(("PRM", "US000000041372", False), ("PRM", "US000000101493", True))
+    perma, stats = match_perma(listings, meta, pd.Series([True, False]))
+    # the open one is not asked for, but its permaTicker is known: the twin stays unambiguous
+    assert list(perma) == ["US000000041372", "US000000101493"] and stats["perma_matched"] == 1
+
+
+def test_single_delisted_listing_never_takes_active_row() -> None:
+    perma, stats = match_perma(_listings(("OLD", date(2012, 1, 3))), _meta(("OLD", "US9", True)))
+    assert list(perma) == [""] and stats["perma_ambiguous"] == 1
+    perma, _ = match_perma(_listings(("LIVE", None)), _meta(("LIVE", "US8", False)))
+    assert list(perma) == [""]  # an open listing never takes an inactive row either

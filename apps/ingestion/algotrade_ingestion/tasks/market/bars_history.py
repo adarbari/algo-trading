@@ -24,6 +24,14 @@ say how many are left.
   and that this run already asked for. ``stats`` carry ``month_budget``, ``month_used`` and
   ``month_remaining`` (all after the run) and ``filled`` (the ``--fill`` picks fetched this run).
   A new month resets it.
+- **From the listings** (``--from-listings``): instead of the scope list, the names are the
+  listings of the universe on any session of ``since..until`` (``data.listings.listings_over``,
+  ADR 0018 amendment, edges ED6; not with ``--fill``; ``--symbols`` narrows them by ticker). A
+  listing is fetched by its ``permaTicker`` when it has one, else by its ticker; a listing whose
+  ticker another listing also used and that has no ``permaTicker`` is NEVER fetched (the
+  ticker's bars would be the other company's): item ``perma:<id>`` (``NO_PERMA``), counted in
+  ``stats["no_perma"]``. The request asks only for the listing's own dates and every row is
+  clipped to ``start_date..end_date`` (``stats["clipped_rows"]``).
 - **Scope** is resolved once, by the owner, as of ``--until``'s session (ADR 0018): ids come
   from that session's reference snapshot. A symbol it does not know is NEVER fetched under a
   made-up id: it is an item ``sym:<SYMBOL>`` (``UNKNOWN``) and listed in
@@ -56,10 +64,12 @@ from dataclasses import dataclass
 from datetime import date
 from functools import partial
 from itertools import islice
+from typing import cast
 
 import pandas as pd
 
 from algotrade.data.events import read_events
+from algotrade.data.listings.universe import listings_over
 from algotrade.services.events.fill import FillCandidate, fill_order
 from algotrade.services.events.scope import (
     LIST,
@@ -98,13 +108,48 @@ HOURLY_FREE_PACE_S = 72.0
 
 @dataclass(frozen=True)
 class Name:
+    """A name to fetch. ``perma`` / ``start`` / ``end`` come from a listing (``--from-listings``):
+    the vendor key is then the ``permaTicker`` and the rows are clipped to the listing's dates."""
+
     symbol: str
     instrument_id: str
+    perma: str = ""
+    start: date | None = None
+    end: date | None = None
+
+    @property
+    def vendor_key(self) -> str:
+        return self.perma or self.symbol
 
 
 def names_of(scope: ScopedInstruments) -> list[Name]:
     """The scoped names that have a ticker in the reference snapshot (one is fetched by it)."""
     return [Name(n.symbol, n.instrument_id) for n in scope.names if n.symbol]
+
+
+NO_PERMA = "NO_PERMA"
+
+
+def listing_names(
+    listings: pd.DataFrame, requested: Collection[str] = ()
+) -> tuple[list[Name], list[Name]]:
+    """-> (names to fetch, names never fetched): a listing of a reused ticker without a
+    ``permaTicker`` is the second kind. ``requested`` (tickers) narrows when not empty."""
+    wanted = {r.strip().upper() for r in requested}
+    fetch: list[Name] = []
+    never: list[Name] = []
+    for row in listings.itertuples():
+        if wanted and str(row.ticker).upper() not in wanted:
+            continue
+        name = Name(
+            str(row.ticker),
+            str(row.instrument_id),
+            str(row.perma_ticker or ""),
+            cast(date, row.start_date),
+            None if pd.isna(row.end_date) else cast(date, row.end_date),
+        )
+        (never if bool(row.reused) and not name.perma else fetch).append(name)
+    return fetch, never
 
 
 def _window(since: date, until: date) -> str:
@@ -164,10 +209,12 @@ def _fetch_name(
     until: date,
     stored_splits: pd.DataFrame,
 ) -> str:
-    key = f"{name.symbol}:{since.isoformat()}:{until.isoformat()}"
+    first = since if name.start is None else max(since, name.start)
+    last = until if name.end is None else min(until, name.end)
+    key = f"{name.vendor_key}:{first.isoformat()}:{last.isoformat()}"
     request = FetchRequest(key, name.instrument_id, until)
     try:
-        normalized = run.fetch(source, request, raw_key=f"{name.symbol}__{since.isoformat()}")
+        normalized = run.fetch(source, request, raw_key=f"{name.vendor_key}__{since.isoformat()}")
     except NoResponseError:  # 404: Tiingo does not list the ticker
         return f"NO_DATA: {_window(since, until)}"
     bars = normalized.tables[BARS] if normalized else pd.DataFrame()
@@ -177,6 +224,11 @@ def _fetch_name(
     if normalized is None or bars.empty:
         return f"NO_DATA: {_window(since, until)}"
     days = bars["ts"].dt.date
+    inside = (days >= first) & (days <= last)  # a listing's own dates, whatever the vendor sent
+    run.stats["clipped_rows"] = run.stats.get("clipped_rows", 0) + int((~inside).sum())
+    bars, days = bars[inside], days[inside]
+    if bars.empty:
+        return f"NO_DATA: {_window(since, until)}"
     frame = bars.drop(columns="symbol").assign(session_date=days)
     run.stage_sessions(BARS, f"hist_{name.instrument_id}", frame, source.name)
     mine = stored_splits[stored_splits["instrument_id"] == name.instrument_id]
@@ -274,26 +326,43 @@ def ingest_bars_history(
     limit: int | None = None,
     include_tiers: bool = False,
     fill: int | None = None,
+    from_listings: bool = False,
 ) -> RunRecord:
     """Daily bars of the scope list, its funds' references and ``requested`` symbols (plus the
     tier A / B names with ``include_tiers``) from ``since`` to ``until`` (``limit``: fetch at
     most that many names this run; ``force``: also the names an earlier run fetched for the
     window; ``fill``: also the first ``fill`` names of the universe without history, most useful
-    first). Never more than the month's remaining symbol budget."""
+    first; ``from_listings``: the listings of the universe over the window instead of the scope
+    list, see the module docstring). Never more than the month's remaining symbol budget."""
     if until < since:
         raise ValueError(f"--until {until} is before --since {since}")
+    if from_listings and fill is not None:
+        raise ValueError("--from-listings and --fill are two ways to pick names: use one")
     with IngestRun(ctx, TASK, until, resume=True) as run:
         runs = finished_runs(run.writer, TASK)
         done: Collection[str] = set() if force else history_done(runs, since, until)
         picks = _fill_picks(run, until, done, max(0, fill)) if fill is not None else []
-        scope = scoped_instruments(
-            run.reader,
-            ctx.configs,
-            until,
-            [*requested, *(p.symbol for p in picks)],
-            DEFAULT_REASONS + ((TIER,) if include_tiers else ()),
-        )
-        names, unknown = names_of(scope), scope.unresolved
+        never: list[Name] = []
+        if from_listings:
+            listings, _ = listings_over(run.reader, since, until)
+            names, never = listing_names(listings, requested)
+            scope = ScopedInstruments(until, None, None, None, (), ())
+            unknown: tuple[str, ...] = ()
+            for name in never:
+                run.record_item(
+                    f"perma:{name.instrument_id}",
+                    f"{NO_PERMA}: {name.symbol} was used by several listings and this one has "
+                    "no permaTicker",
+                )
+        else:
+            scope = scoped_instruments(
+                run.reader,
+                ctx.configs,
+                until,
+                [*requested, *(p.symbol for p in picks)],
+                DEFAULT_REASONS + ((TIER,) if include_tiers else ()),
+            )
+            names, unknown = names_of(scope), scope.unresolved
         for symbol in unknown:
             run.record_item(
                 f"sym:{symbol}", f"{UNKNOWN}: not in the reference of {scope.reference_snapshot}"
@@ -319,6 +388,7 @@ def ingest_bars_history(
             window=_window(since, until),
             licence=ctx.settings.tiingo_licence,  # the rows' terms, in the run record
             symbols=len(names) + len(unknown),
+            no_perma=len(never),
             by_reason=dict(Counter(r for n in scope.names for r in n.reasons)),
             tier_session=scope.tier_session,
             unknown_symbols=list(unknown),
