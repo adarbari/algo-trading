@@ -32,7 +32,7 @@
       "dom_nodes": 188
     },
     "/regime": {
-      "first_load_js_gzip_bytes": 301000,
+      "first_load_js_gzip_bytes": 301400,
       "requests": 83,
       "dom_nodes": 1593
     },
@@ -42,7 +42,7 @@
       "dom_nodes": 293
     },
     "/admin/ingestion": {
-      "first_load_js_gzip_bytes": 232700,
+      "first_load_js_gzip_bytes": 232900,
       "requests": 55,
       "dom_nodes": 634
     },
@@ -55,9 +55,9 @@
   "reasons": {
     "e2e./ideas.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
     "e2e./screeners.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
-    "e2e./regime.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
+    "e2e./regime.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
     "e2e./screeners/vrp_scanner.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages",
-    "e2e./admin/ingestion.first_load_js_gzip_bytes": "2026-10-09 #440 +53 B from the merged shared chunk graph (the page-cache chunk is listed in the entry's chunk table)",
+    "e2e./admin/ingestion.first_load_js_gzip_bytes": "2026-10-09 #440 (measured by CI after merging main, which grew shared chunks by about 100 to 200 B) +53 B from the merged shared chunk graph (the page-cache chunk is listed in the entry's chunk table)",
     "bundle.routes.src/pages/trader-calendar/index.ts": "2026-10-09 #440 the page chunk starts its reads and the saved page cache when loaded (hover preload); the entry chunk stays under budget",
     "bundle.routes.src/pages/admin-ingestion/index.ts": "2026-10-09 #438 Guide entries in one batched read: the batch document and loader (replacing four single-entry documents) move into this page chunk (+645 B gzip)",
     "e2e./ideas.dom_nodes": "2026-10-09 #428 Ideas: Why it's here stays on phones (owner-requested)",
