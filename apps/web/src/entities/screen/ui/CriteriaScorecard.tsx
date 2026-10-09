@@ -14,7 +14,7 @@ import { useScreener } from '../api/hooks';
 import { outcomeLabel, outcomeTone } from '../model/decisions';
 import { isShownCriterion } from '../model/results';
 import { scorecardRows, type ScorecardEntry } from '../model/scorecard';
-import { criteriaOf, type Criterion } from '../model/spec';
+import { criteriaOf, resolvedRules, type Criterion } from '../model/spec';
 
 export interface CriteriaScorecardProps {
   /** The screener the criteria belong to (its rules are read from it). */
@@ -35,7 +35,7 @@ export function CriteriaScorecard({
   const rules = useMemo(
     () =>
       new Map<string, Criterion>(
-        criteriaOf(detail.data?.resolved, { id: screenerId }).map((c) => [c.id, c]),
+        criteriaOf(resolvedRules(detail.data?.resolved), { id: screenerId }).map((c) => [c.id, c]),
       ),
     [detail.data, screenerId],
   );

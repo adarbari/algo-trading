@@ -97,6 +97,17 @@ function toCriterion(id: string, table: Record<string, unknown>): Criterion {
 }
 
 /**
+ * The rules table of a screen's resolved config (`screenDetail.resolved`): the whole canonical
+ * config, whose criteria sit under `rules`, not at its top level. The base for `criteriaOf`
+ * when reading what the finalised screen runs.
+ */
+export function resolvedRules(
+  resolved: Readonly<Record<string, unknown>> | null | undefined,
+): Readonly<Record<string, unknown>> {
+  return tableOf(resolved?.['rules']);
+}
+
+/**
  * The enabled criteria in order: the working copy's (`base`, resolved through the preset)
  * first, then any the draft added; the draft's keys win per criterion; `enabled = false`
  * removes one.
