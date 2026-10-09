@@ -126,3 +126,24 @@ test('signing out in one tab ends the session in the other at once', async ({ pa
   await other.bringToFront();
   await expect(other).toHaveURL(/\/login$/);
 });
+
+test('signing out then in again in one tab leaves the other tab signed in when it returns', async ({
+  page,
+  context,
+}) => {
+  await withAuth(page);
+  await signIn(page);
+  const other = await context.newPage();
+  await withAuth(other);
+  await other.goto('/ideas');
+  await expect(other.getByText('Tess Trader')).toBeVisible();
+  await page.getByRole('button', { name: 'Tess Trader' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await other.bringToFront();
+  await expect(other).toHaveURL(/\/login$/);
+  await signIn(page);
+  await other.goto('/ideas');
+  await expect(other).toHaveURL(/\/ideas$/);
+  await expect(other.getByText('Tess Trader')).toBeVisible();
+});
