@@ -25,7 +25,7 @@ test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
 
-test('the list shows your screeners and the site presets', async ({ page }) => {
+test('the list shows your screeners and the site presets in one list', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/screeners');
   await expect(page.getByRole('heading', { level: 1, name: 'Screeners' })).toBeVisible();
@@ -34,39 +34,55 @@ test('the list shows your screeners and the site presets', async ({ page }) => {
       .getByRole('navigation', { name: 'Trader sections' })
       .getByRole('link', { name: 'Screeners' }),
   ).toHaveAttribute('aria-current', 'page');
-  const mine = page.getByRole('grid', { name: 'Your screeners' });
-  await expect(mine.getByRole('row', { name: /my-vrp/ })).toContainText('v1 + draft');
+  const list = page.getByRole('list', { name: 'Screeners' });
+  await expect(list.getByRole('button', { name: /^my-vrp Mine/ })).toContainText('No run today');
   // A draft that was never finalized is listed too.
-  await expect(mine.getByRole('row', { name: /idea-draft/ })).toContainText('DRAFT');
-  const presets = page.getByRole('grid', { name: 'Site presets' });
-  await expect(
-    presets
-      .getByRole('row', { name: /vrp_scanner/ })
-      .getByRole('button', { name: 'Copy to my screeners' }),
-  ).toBeVisible();
-  await expect(presets.getByRole('row', { name: /short_premium_liquidity/ })).toContainText(
-    'Python',
-  );
-  await expect(
-    presets.getByRole('row', { name: /short_premium_liquidity/ }).getByRole('button'),
-  ).toHaveCount(0);
-  // Every rule-screen preset links to its playbook in the Guide.
-  await expect(
-    presets.getByRole('row', { name: /vrp_scanner/ }).getByRole('link', { name: 'Playbook' }),
-  ).toHaveAttribute('href', '/guide/playbooks/vrp_scanner');
+  await expect(list.getByRole('button', { name: /^idea-draft Mine/ })).toContainText('Draft');
+  const preset = list.getByRole('button', { name: /^vrp_scanner Preset/ });
+  await expect(preset).toContainText('12');
+  await expect(preset).toHaveAttribute('aria-expanded', 'false');
+  await expect(list.getByRole('button', { name: /^short_premium_liquidity Preset/ })).toBeVisible();
+  // The segments and the search narrow the list.
+  await page.getByRole('radio', { name: 'Presets' }).click();
+  await expect(list.getByRole('button', { name: /Mine/ })).toHaveCount(0);
+  await page.getByRole('radio', { name: 'All' }).click();
+  await page.getByRole('searchbox', { name: 'Search screeners' }).fill('idea');
+  await expect(list.getByRole('listitem')).toHaveCount(1);
   await expectAccessible(page);
   expect(errors).toEqual([]);
+});
+
+test('a row opens in place, one at a time, with its criteria, hits and actions', async ({
+  page,
+}) => {
+  await page.goto('/screeners');
+  const list = page.getByRole('list', { name: 'Screeners' });
+  const preset = list.getByRole('button', { name: /^vrp_scanner Preset/ });
+  await preset.click();
+  await expect(preset).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('list', { name: 'Criteria of vrp_scanner' })).toContainText(
+    'iv_rank',
+  );
+  await expect(page.getByRole('button', { name: 'Duplicate to edit' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Playbook' })).toHaveAttribute(
+    'href',
+    '/guide/playbooks/vrp_scanner',
+  );
+  await list.getByRole('button', { name: /^my-vrp Mine/ }).click();
+  await expect(preset).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: 'Edit criteria' })).toBeVisible();
+  await expectAccessible(page);
+  await preset.click();
+  await page.getByRole('button', { name: 'View 12 hits' }).click();
+  await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
 });
 
 test('the list’s Playbook link and the Builder header’s link open the preset’s playbook', async ({
   page,
 }) => {
   await page.goto('/screeners');
-  await page
-    .getByRole('grid', { name: 'Site presets' })
-    .getByRole('row', { name: /vrp_scanner/ })
-    .getByRole('link', { name: 'Playbook' })
-    .click();
+  await page.getByRole('button', { name: /^vrp_scanner Preset/ }).click();
+  await page.getByRole('link', { name: 'Playbook' }).click();
   await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
   await page.goto('/screeners/vrp_scanner/edit');
   await page.getByRole('link', { name: 'Playbook' }).click();
@@ -74,28 +90,16 @@ test('the list’s Playbook link and the Builder header’s link open the preset
 });
 
 for (const width of [800, 1024, 1280]) {
-  test(`the site presets' actions fit their column and can be clicked at ${String(width)} px`, async ({
+  test(`an open row's actions are in view and can be clicked at ${String(width)} px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/screeners');
-    const row = page
-      .getByRole('grid', { name: 'Site presets' })
-      .getByRole('row', { name: /vrp_scanner/ });
-    for (const name of ['Copy to my screeners']) {
-      const button = row.getByRole('button', { name });
-      await expect(button).toBeInViewport({ ratio: 1 });
-      // Inside its own cell: not spilling into (or clipped by) the neighbouring column.
-      const fits = await button.evaluate((el) => {
-        const cell = el.closest('[role="gridcell"]')?.getBoundingClientRect();
-        const box = el.getBoundingClientRect();
-        return cell !== undefined && box.left >= cell.left && box.right <= cell.right;
-      });
-      expect(fits, `${name} fits its cell`).toBe(true);
-    }
-    // The row itself opens the preset (no Open button).
-    await row.getByText('Rules').click();
-    await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
+    await page.getByRole('button', { name: /^vrp_scanner Preset/ }).click();
+    const button = page.getByRole('button', { name: 'Duplicate to edit' });
+    await expect(button).toBeInViewport({ ratio: 1 });
+    await button.click();
+    await expect(page.getByRole('dialog', { name: 'Copy to my screeners' })).toBeVisible();
   });
 }
 
@@ -260,11 +264,8 @@ test('a formula that does not check says why', async ({ page }) => {
 test('a preset is copied to a named screener from the list', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners');
-  await page
-    .getByRole('grid', { name: 'Site presets' })
-    .getByRole('row', { name: /vrp_scanner/ })
-    .getByRole('button', { name: 'Copy to my screeners' })
-    .click();
+  await page.getByRole('button', { name: /^vrp_scanner Preset/ }).click();
+  await page.getByRole('button', { name: 'Duplicate to edit' }).click();
   const dialog = page.getByRole('dialog', { name: 'Copy to my screeners' });
   await expect(dialog.getByLabel('Name of your copy')).toHaveValue('my-vrp_scanner');
   await dialog.getByLabel('Name of your copy').fill('my-copy');

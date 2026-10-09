@@ -53,6 +53,7 @@ export {
 } from './DataTable';
 export { Dialog, type DialogProps } from './Dialog';
 export { Disclosure, type DisclosureProps } from './Disclosure';
+export { ExpandableRow, type ExpandableRowProps } from './ExpandableRow';
 export {
   Distribution,
   type DistributionBin,
@@ -170,6 +171,13 @@ export { Sparkline, type SparklineProps, type SparklineTone } from './Sparkline'
 export { StackedBar, type StackedBarProps, type StackedBarSegment } from './StackedBar';
 export { StatStrip, type StatItem, type StatStripProps } from './StatStrip';
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge';
+export {
+  StatusStrip,
+  type StatusIssue,
+  type StatusIssueSeverity,
+  type StatusStripProps,
+  type StatusStripWords,
+} from './StatusStrip';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { TickerTag, type TickerTagProps } from './TickerTag';
 export { ViewChips, type ViewChipsProps, type ViewOption } from './ViewChips';

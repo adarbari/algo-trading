@@ -120,6 +120,27 @@ export async function mockBuilderApi(
     const id = typeof raw === 'string' ? raw : '';
     if (name === 'ScreenerConfigs') return { configs: CONFIGS };
     if (name === 'MyScreens') return { myScreens: listing() };
+    if (name === 'ScreenerRuns') {
+      const ran12 = {
+        runId: 'r1',
+        session: '2026-10-07',
+        picked: 12,
+        paused: 0,
+        decisions: [
+          { decision: 'QUALIFIED', count: 12 },
+          { decision: 'REJECT', count: 400 },
+        ],
+      };
+      const notRun = { kindText: 'not run for this session' };
+      const criteria = [{ id: 'iv30', field: 'iv_rank', mode: 'hard' }];
+      return {
+        session: { date: '2026-10-07' },
+        screeners: [
+          { id: 'vrp_scanner', criteria, notRun: null, latestRun: ran12 },
+          ...[...own, 'idea-draft'].map((id) => ({ id, criteria, notRun, latestRun: null })),
+        ],
+      };
+    }
     if (name === 'ScreenDetail') return { screenDetail: detailOf(id) };
     if (name === 'ScreenVersions') return { screenVersions: versionsOf(id) };
     if (name === 'ScreenerResults') {

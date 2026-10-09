@@ -2,17 +2,24 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
+import type { ScreenerListItem, ScreenerRunSummary, ScreenerSummary } from '@/entities/screen';
 import { TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { ScreenerList } from './ScreenerList';
 
-const hooks = vi.hoisted(() => ({ useScreeners: vi.fn(), useMyScreeners: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  useScreeners: vi.fn(),
+  useMyScreeners: vi.fn(),
+  useScreenerRuns: vi.fn(),
+  useScreenerResults: vi.fn(),
+}));
 vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreeners: hooks.useScreeners,
   useMyScreeners: hooks.useMyScreeners,
+  useScreenerRuns: hooks.useScreenerRuns,
+  useScreenerResults: hooks.useScreenerResults,
 }));
 vi.mock('@/entities/edge', async () => {
   const { Text } = await import('@algotrade/ui');
@@ -20,30 +27,33 @@ vi.mock('@/entities/edge', async () => {
     ScreenerTrackChip: ({ screenerId }: { screenerId: string }) => (
       <Text>{`record of ${screenerId}`}</Text>
     ),
+    ScreenerOdds: ({ screenerId }: { screenerId: string }) => (
+      <Text>{`odds of ${screenerId}`}</Text>
+    ),
   };
 });
-vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null }));
 vi.mock('@/features/screener-copy', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
     CopyPresetDialog: ({
       preset,
+      own,
       onCopied,
     }: {
       preset: string;
+      own: boolean;
       onCopied: (id: string) => void;
     }) => (
       <Button
         onClick={() => {
-          onCopied(`my-${preset}`);
+          onCopied(`copy-of-${preset}`);
         }}
       >
-        {`finish copy of ${preset}`}
+        {`finish ${own ? 'duplicate' : 'copy'} of ${preset}`}
       </Button>
     ),
   };
 });
-
 vi.mock('@/features/screener-delete', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
@@ -59,28 +69,22 @@ vi.mock('@/features/screener-delete', async () => {
 
 stubElementSize();
 
-const screener = (
+const config = (
   configId: string,
   scope: string,
-  impl: string,
+  impl = 'rules',
   patch: Partial<ScreenerSummary> = {},
 ): ScreenerSummary => ({
   configId,
   scope,
   kind: 'screener',
   impl,
-  selection: 'liquid_optionable',
+  selection: null,
   hash: 'h',
   error: null,
   ...patch,
 });
-const LIST = [
-  screener('vrp_scanner', 'site', 'rules'),
-  screener('short_premium', 'site', 'short_premium_liquidity'),
-  screener('my-vrp', 'abhinav', 'rules'),
-  screener('broken', 'abhinav', 'rules', { error: 'unknown field' }),
-];
-const mine = (screenerId: string, patch: Partial<ScreenerListItem> = {}): ScreenerListItem => ({
+const own = (screenerId: string, patch: Partial<ScreenerListItem> = {}): ScreenerListItem => ({
   screenerId,
   status: 'FINAL',
   latest: 1,
@@ -88,15 +92,57 @@ const mine = (screenerId: string, patch: Partial<ScreenerListItem> = {}): Screen
   presetId: null,
   ...patch,
 });
-const MINE = [
-  mine('my-vrp', { presetId: 'vrp_scanner', hasDraft: true, latest: 2 }),
-  mine('broken'),
-  mine('vrp_scanner', { status: 'DRAFT', latest: null, presetId: 'vrp_scanner' }),
-];
+const summary = (id: string, picked: number | null): ScreenerRunSummary => ({
+  id,
+  criteria: [{ id: 'iv', field: 'iv_rank', mode: 'hard' }],
+  notRun: picked === null ? { kindText: 'not run' } : null,
+  latestRun:
+    picked === null
+      ? null
+      : {
+          runId: 'r',
+          session: '2026-10-07',
+          picked,
+          paused: 0,
+          decisions: [{ decision: 'QUALIFIED', count: picked }],
+        },
+});
+
+const HIT = {
+  instrumentId: 'EQ:1',
+  decision: 'QUALIFIED',
+  instrument: { symbol: 'AAPL' },
+};
 
 beforeEach(() => {
-  hooks.useScreeners.mockReturnValue(fakeQuery(LIST));
-  hooks.useMyScreeners.mockReturnValue(fakeQuery(MINE));
+  hooks.useScreeners.mockReturnValue(
+    fakeQuery([
+      config('vrp_scanner', 'site'),
+      config('short_premium', 'site', 'short_premium_liquidity'),
+      config('my-vrp', 'u'),
+      config('broken', 'u', 'rules', { error: 'unknown field' }),
+    ]),
+  );
+  hooks.useMyScreeners.mockReturnValue(
+    fakeQuery([
+      own('my-vrp', { presetId: 'vrp_scanner' }),
+      own('broken'),
+      own('idea', { status: 'DRAFT', latest: null }),
+    ]),
+  );
+  hooks.useScreenerRuns.mockReturnValue(
+    fakeQuery({
+      session: '2026-10-07',
+      byId: new Map([
+        ['vrp_scanner', summary('vrp_scanner', 12)],
+        ['my-vrp', summary('my-vrp', 3)],
+        ['broken', summary('broken', null)],
+      ]),
+    }),
+  );
+  hooks.useScreenerResults.mockReturnValue(
+    fakeQuery({ screener: { latestRun: { results: { results: [HIT] } } } }),
+  );
 });
 
 const setup = () => {
@@ -109,124 +155,85 @@ const setup = () => {
   );
   return { onOpen, onEdit, ...view };
 };
+const toggle = (name: RegExp) => screen.getByRole('button', { name });
 
 describe('ScreenerList', () => {
-  it('separates your screeners from the site presets', async () => {
+  it('lists mine and presets in one list with type pills, hits and runs', async () => {
     const { container } = setup();
-    const mineTable = screen.getByRole('grid', { name: 'Your screeners' });
-    expect(within(mineTable).getByRole('row', { name: /my-vrp/ })).toHaveTextContent('v2 + draft');
-    expect(within(mineTable).getByRole('row', { name: /broken/ })).toHaveTextContent(
-      'Does not resolve',
-    );
-    const presets = screen.getByRole('grid', { name: 'Site presets' });
-    expect(within(presets).getByRole('row', { name: /short_premium/ })).toHaveTextContent('Python');
-    expect(
-      within(presets)
-        .getByRole('row', { name: /short_premium/ })
-        .querySelector('button'),
-    ).toBeNull();
+    const list = screen.getByRole('list', { name: 'Screeners' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(5);
+    expect(toggle(/^my-vrp Mine/)).toHaveTextContent('3');
+    expect(toggle(/^vrp_scanner Preset/)).toHaveTextContent('Run 2026-10-07');
+    expect(toggle(/^vrp_scanner Preset/)).toHaveTextContent('12');
+    expect(toggle(/^broken Mine/)).toHaveTextContent('No run today');
+    expect(toggle(/^broken Mine/)).toHaveTextContent('Does not resolve');
+    expect(toggle(/^idea Mine/)).toHaveTextContent('Draft');
+    expect(screen.getByText('record of my-vrp')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
-  it("shows each rule screener's track-record chip in both tables", () => {
+  it('narrows by segment and by search', async () => {
     setup();
-    const mine = within(screen.getByRole('grid', { name: 'Your screeners' }));
-    expect(mine.getByText('record of my-vrp')).toBeInTheDocument();
-    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
-    expect(presets.getAllByText(/^record of /).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('radio', { name: 'Presets' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('radio', { name: 'All' }));
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'vrp');
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'zzz');
+    expect(screen.getByText('No screener matches')).toBeInTheDocument();
   });
 
-  it('links every rule-screen preset to its playbook in the Guide, and Python screeners to none', () => {
+  it('opens one row at a time and loads the hits only for the open row', async () => {
     setup();
-    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
-    expect(
-      within(presets.getByRole('row', { name: /vrp_scanner/ })).getByRole('link', {
-        name: 'Playbook',
-      }),
-    ).toHaveAttribute('href', '/guide/playbooks/vrp_scanner');
-    expect(
-      within(presets.getByRole('row', { name: /short_premium/ })).queryByRole('link'),
-    ).toBeNull();
+    expect(hooks.useScreenerResults).not.toHaveBeenCalled();
+    await userEvent.click(toggle(/^my-vrp/));
+    expect(toggle(/^my-vrp/)).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('iv_rank')).toBeInTheDocument();
+    expect(screen.getByText('AAPL')).toBeInTheDocument();
+    expect(screen.getByText('odds of my-vrp')).toBeInTheDocument();
+    await userEvent.click(toggle(/^vrp_scanner/));
+    expect(toggle(/^my-vrp/)).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle(/^vrp_scanner/)).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('lists a draft-only screener, with the preset it copies', () => {
-    setup();
-    const rows = within(screen.getByRole('grid', { name: 'Your screeners' })).getAllByRole('row');
-    const row = rows.find((r) => r.textContent.startsWith('vrp_scanner'));
-    if (!row) throw new Error('no draft row');
-    expect(row).toHaveTextContent('DRAFT');
-    expect(row).toHaveTextContent('vrp_scanner');
-  });
-
-  it('opens a screener in its Builder from Edit; no row has an Open or Results button', async () => {
+  it('offers View N hits, Edit criteria, Duplicate and Delete on one of yours', async () => {
     const { onOpen, onEdit } = setup();
-    const mine = within(screen.getByRole('row', { name: /my-vrp/ }));
-    await userEvent.click(mine.getByRole('button', { name: 'Edit' }));
+    await userEvent.click(toggle(/^my-vrp/));
+    await userEvent.click(screen.getByRole('button', { name: 'View 3 hits' }));
+    expect(onOpen).toHaveBeenCalledWith('my-vrp');
+    await userEvent.click(screen.getByRole('button', { name: 'Edit criteria' }));
     expect(onEdit).toHaveBeenCalledWith('my-vrp');
-    expect(onOpen).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: /^(Open|Results)$/ })).not.toBeInTheDocument();
-  });
-
-  it('shows a Python preset row as not clickable, a rule preset row as clickable', () => {
-    setup();
-    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
-    expect(presets.getByRole('row', { name: /short_premium/ })).not.toHaveAttribute(
-      'data-clickable',
-    );
-    expect(presets.getByRole('row', { name: /vrp_scanner/ })).toHaveAttribute('data-clickable');
-  });
-
-  it('opens a rule screener on a row click; a Python preset row does nothing', async () => {
-    const { onOpen } = setup();
-    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
-    await userEvent.click(
-      within(presets.getByRole('row', { name: /short_premium/ })).getByText('Python'),
-    );
-    expect(onOpen).not.toHaveBeenCalled();
-    await userEvent.click(
-      within(presets.getByRole('row', { name: /vrp_scanner/ })).getByText('Rules'),
-    );
-    expect(onOpen).toHaveBeenLastCalledWith('vrp_scanner');
-    const mineRow = within(screen.getByRole('grid', { name: 'Your screeners' })).getByRole('row', {
-      name: /my-vrp/,
-    });
-    await userEvent.click(within(mineRow).getByText('v2 + draft'));
-    expect(onOpen).toHaveBeenLastCalledWith('my-vrp');
-  });
-
-  it('deletes one of your screeners after a confirmation; presets have no Delete', async () => {
-    setup();
-    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
-    expect(presets.queryByRole('button', { name: /Delete/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+    await userEvent.click(screen.getByRole('button', { name: 'finish duplicate of my-vrp' }));
+    expect(onEdit).toHaveBeenCalledWith('copy-of-my-vrp');
     await userEvent.click(screen.getByRole('button', { name: 'Delete my-vrp' }));
     await userEvent.click(screen.getByRole('button', { name: 'confirm delete of my-vrp' }));
-    expect(screen.queryByRole('button', { name: 'confirm delete of my-vrp' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /confirm delete/ })).toBeNull();
   });
 
-  it('copies a preset and opens the copy', async () => {
+  it('offers Duplicate to edit on a preset, never Edit criteria or Delete', async () => {
     const { onEdit } = setup();
-    await userEvent.click(
-      within(screen.getByRole('grid', { name: 'Site presets' })).getByRole('button', {
-        name: 'Copy to my screeners',
-      }),
+    await userEvent.click(toggle(/^vrp_scanner/));
+    expect(screen.queryByRole('button', { name: 'Edit criteria' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Playbook' })).toHaveAttribute(
+      'href',
+      '/guide/playbooks/vrp_scanner',
     );
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicate to edit' }));
     await userEvent.click(screen.getByRole('button', { name: 'finish copy of vrp_scanner' }));
-    expect(onEdit).toHaveBeenCalledWith('my-vrp_scanner');
-    expect(screen.queryByRole('button', { name: /finish copy/ })).toBeNull();
+    expect(onEdit).toHaveBeenCalledWith('copy-of-vrp_scanner');
   });
 
-  it('says when you have none yet, and when the list failed to load', () => {
-    hooks.useMyScreeners.mockReturnValue(fakeQuery([]));
-    const { rerender } = setup();
-    expect(
-      screen.getByText('You have no screener yet. Create one, or open a preset and change it.'),
-    ).toBeInTheDocument();
-    hooks.useMyScreeners.mockReturnValue(fakeQuery(undefined, { isError: true, isPending: false }));
-    rerender(
-      <TestQueryProvider>
-        <ScreenerList onOpen={vi.fn()} onEdit={vi.fn()} />
-      </TestQueryProvider>,
-    );
-    expect(screen.getAllByText('The screeners failed to load.').length).toBeGreaterThan(0);
+  it('opens a Python preset with no actions', async () => {
+    setup();
+    await userEvent.click(toggle(/^short_premium/));
+    expect(screen.queryByRole('button', { name: /Duplicate|View/ })).toBeNull();
+  });
+
+  it('says when the list failed to load', () => {
+    hooks.useScreeners.mockReturnValue(fakeQuery(undefined, { isError: true }));
+    setup();
+    expect(screen.getByText('The screeners failed to load.')).toBeInTheDocument();
   });
 });

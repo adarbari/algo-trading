@@ -32,7 +32,19 @@ export interface ViewerMockOptions {
 export async function mockViewer(page: Page, options: ViewerMockOptions = {}): Promise<void> {
   const { role = 'admin', requireToken = false, unregistered = false, name } = options;
   await page.route('**/api/graphql', async (route: Route) => {
-    const body = route.request().postDataJSON() as { query?: string } | null;
+    const body = route.request().postDataJSON() as {
+      query?: string;
+      variables?: { limit?: number };
+    } | null;
+    // The status strip (every page) reads these two: nothing wrong, so no strip and no 404s.
+    if (/query\s+StatusScreens\b/.test(body?.query ?? '')) {
+      await route.fulfill({ json: { data: { ideas: null } } });
+      return;
+    }
+    if (/query\s+NightlyRuns\b/.test(body?.query ?? '') && body?.variables?.limit === 1) {
+      await route.fulfill({ json: { data: { nightlyRuns: [] } } });
+      return;
+    }
     if (!/query\s+Viewer\b/.test(body?.query ?? '')) {
       await route.fallback();
       return;
