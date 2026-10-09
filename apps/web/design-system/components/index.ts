@@ -55,6 +55,12 @@ export { Dialog, type DialogProps } from './Dialog';
 export { Disclosure, type DisclosureProps } from './Disclosure';
 export { ExpandableRow, type ExpandableRowProps } from './ExpandableRow';
 export {
+  ExpandableTable,
+  type ExpandableTableColumn,
+  type ExpandableTableProps,
+  type ExpandableTableRow,
+} from './ExpandableTable';
+export {
   Distribution,
   type DistributionBin,
   type DistributionMarker,

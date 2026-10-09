@@ -7,38 +7,64 @@
 import {
   Banner,
   EmptyState,
-  ExpandableRow,
-  Mono,
+  ExpandableTable,
   Panel,
   SearchInput,
   SegmentedControl,
   Stack,
+  StackedBar,
   StatusBadge,
   Text,
+  TextLink,
+  type ExpandableTableColumn,
+  type ExpandableTableRow,
 } from '@algotrade/ui';
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 
-import { ScreenerTrackChip } from '@/entities/edge';
+import { ScreenerEdgeName, ScreenerRecord } from '@/entities/edge';
 import {
+  DecisionBadge,
   useMyScreeners,
   useScreenerRuns,
   useScreeners,
   type ScreenerRunSummary,
 } from '@/entities/screen';
+import { playbookPath } from '@/entities/guide';
 import { CopyPresetDialog } from '@/features/screener-copy';
 import { DeleteScreenerDialog } from '@/features/screener-delete';
 
 import { filterRows, SEGMENTS, toRows, type ListRow, type Segment } from '../model/rows';
-import { ScreenerDetail } from './ScreenerDetail';
+import { changesOf, decisionSegments } from '../model/summary';
+
+/** The opened row loads on demand: its own chunk, so the list's first paint stays small. */
+const ScreenerDetail = lazy(() =>
+  import('./ScreenerDetail').then((m) => ({ default: m.ScreenerDetail })),
+);
 
 export interface ScreenerListProps {
   /** Open a screener's results. */
   onOpen: (id: string) => void;
   /** Open a screener in the Builder (a new copy opens there: it has no run yet). */
   onEdit: (id: string) => void;
+  /** Open a hit's ticker in Explore, arriving through the screener. */
+  onOpenTicker: (symbol: string, via: string) => void;
+  /** Open an edge's evidence. */
+  onOpenEdge: (edgeId: string) => void;
 }
 
-export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
+/**
+ * The columns. A 30-day pick sparkline (`Screener.pickHistory`) slots in between the track
+ * record and the last run once the API serves it, with a `Sparkline` cell.
+ */
+const COLUMNS: readonly ExpandableTableColumn[] = [
+  { id: 'screener', label: 'Screener', grow: 2.2, narrow: true },
+  { id: 'picks', label: 'Picks today', align: 'end', narrow: true },
+  { id: 'decisions', label: 'Decisions', grow: 1.2 },
+  { id: 'record', label: 'Track record', grow: 1.6, narrow: true },
+  { id: 'last', label: 'Last run' },
+];
+
+export function ScreenerList({ onOpen, onEdit, onOpenTicker, onOpenEdge }: ScreenerListProps) {
   const configs = useScreeners();
   const mine = useMyScreeners();
   const runs = useScreenerRuns();
@@ -84,25 +110,23 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
         {rows.length === 0 ? (
           <EmptyState title="No screener matches" />
         ) : (
-          <Stack gap={0} as="ul" aria-label="Screeners">
-            {rows.map((row) => (
-              <Stack as="li" key={`${row.kind}:${row.id}`} gap={0}>
-                <ListEntry
-                  row={row}
-                  summary={runs.data?.byId.get(row.id)}
-                  runsPending={runs.isPending}
-                  open={openId === row.id}
-                  onOpenChange={(open) => {
-                    setOpenId(open ? row.id : null);
-                  }}
-                  onOpen={onOpen}
-                  onEdit={onEdit}
-                  onDelete={setDeleting}
-                  onDuplicate={setCopying}
-                />
-              </Stack>
-            ))}
-          </Stack>
+          <ExpandableTable
+            label="Screeners"
+            columns={COLUMNS}
+            rows={rows.map((row) =>
+              toTableRow(row, runs.data?.byId.get(row.id), runs.isPending, openId === row.id, {
+                onOpenChange: (open) => {
+                  setOpenId(open ? row.id : null);
+                },
+                onOpen,
+                onEdit,
+                onOpenTicker,
+                onOpenEdge,
+                onDelete: setDeleting,
+                onDuplicate: setCopying,
+              }),
+            )}
+          />
         )}
       </Panel>
       {copying && (
@@ -135,52 +159,130 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
   );
 }
 
-interface ListEntryProps {
-  row: ListRow;
-  summary: ScreenerRunSummary | undefined;
-  runsPending: boolean;
-  open: boolean;
+interface RowActions {
   onOpenChange: (open: boolean) => void;
   onOpen: (id: string) => void;
   onEdit: (id: string) => void;
+  onOpenTicker: (symbol: string, via: string) => void;
+  onOpenEdge: (edgeId: string) => void;
   onDelete: (id: string) => void;
   onDuplicate: (row: ListRow) => void;
 }
 
-/** One row: the summary cells over the lazily mounted detail. */
-function ListEntry({ row, summary, runsPending, open, onOpenChange, ...actions }: ListEntryProps) {
+/** One row: the summary cells, and the lazily mounted detail. */
+function toTableRow(
+  row: ListRow,
+  summary: ScreenerRunSummary | undefined,
+  runsPending: boolean,
+  open: boolean,
+  { onOpenChange, ...actions }: RowActions,
+): ExpandableTableRow {
   const run = summary?.latestRun ?? null;
   const noRun = !runsPending && row.rules && !run && !row.draft;
-  return (
-    <ExpandableRow
-      title={<Mono>{row.id}</Mono>}
-      badge={
-        <StatusBadge tone={row.kind === 'mine' ? 'accent' : 'neutral'}>
-          {row.kind === 'mine' ? 'Mine' : 'Preset'}
-        </StatusBadge>
-      }
-      secondary={
+  const changes = changesOf(run?.changes ?? []);
+  const segments = decisionSegments(run?.decisions ?? []);
+  const paused = run !== null && run.picked === 0 && run.paused > 0;
+  const none = '—';
+  return {
+    id: `${row.kind}:${row.id}`,
+    open,
+    onOpenChange,
+    detail: (
+      <Suspense
+        fallback={
+          <Text size="sm" tone="muted">
+            Loading…
+          </Text>
+        }
+      >
+        <ScreenerDetail
+          row={row}
+          summary={summary}
+          {...actions}
+          playbook={
+            <TextLink href={playbookPath(row.id)} icon="book" size="sm">
+              Playbook
+            </TextLink>
+          }
+        />
+      </Suspense>
+    ),
+    cells: {
+      screener: (
         <>
-          {row.error && (
-            <StatusBadge tone="negative" title={row.error}>
-              Does not resolve
+          <Text as="span" weight="medium">
+            {summary?.name ?? row.id}{' '}
+            <StatusBadge tone={row.kind === 'mine' ? 'accent' : 'neutral'}>
+              {row.kind === 'mine' ? 'Mine' : 'Preset'}
             </StatusBadge>
-          )}
-          {row.draft && <StatusBadge tone="accent">Draft</StatusBadge>}
-          {noRun && <StatusBadge tone="warning">No run today</StatusBadge>}
-          {run && (
-            <Text size="sm" tone="secondary">
-              {`Run ${run.session}`}
-            </Text>
-          )}
-          {row.rules && <ScreenerTrackChip screenerId={row.id} />}
+            {row.error && (
+              <>
+                {' '}
+                <StatusBadge tone="negative" title={row.error}>
+                  Does not resolve
+                </StatusBadge>
+              </>
+            )}
+            {row.draft && (
+              <>
+                {' '}
+                <StatusBadge tone="accent">Draft</StatusBadge>
+              </>
+            )}
+          </Text>
+          {row.rules ? <ScreenerEdgeName screenerId={row.id} /> : null}
         </>
-      }
-      essential={run ? <Mono>{String(run.picked)}</Mono> : <Text tone="muted">—</Text>}
-      open={open}
-      onOpenChange={onOpenChange}
-    >
-      <ScreenerDetail row={row} summary={summary} {...actions} />
-    </ExpandableRow>
-  );
+      ),
+      picks: run ? (
+        <>
+          <Text as="span" weight="medium" mono>
+            {String(run.picked)}
+            {changes && (
+              <>
+                {' '}
+                <Text size="xs" tone="up">{`+${String(changes.added)}`}</Text>{' '}
+                <Text size="xs" tone="down">{`−${String(changes.dropped)}`}</Text>
+              </>
+            )}
+          </Text>
+          {run.paused > 0 && <Text size="xs" tone="muted">{`${String(run.paused)} paused`}</Text>}
+        </>
+      ) : (
+        none
+      ),
+      decisions: run ? (
+        <>
+          <StackedBar
+            label={`Decisions of ${row.id}`}
+            size="sm"
+            showLegend={false}
+            segments={segments}
+            emptyMessage="No picks"
+          />
+          <Text size="xs" tone="muted">
+            {segments.map((s) => `${String(s.value)} ${s.label.toLowerCase()}`).join(' · ')}
+          </Text>
+        </>
+      ) : (
+        none
+      ),
+      record: row.rules ? <ScreenerRecord screenerId={row.id} /> : none,
+      last: noRun ? (
+        <StatusBadge tone="warning">No run today</StatusBadge>
+      ) : paused ? (
+        <>
+          <DecisionBadge decision="PAUSED" />
+          <Text size="xs" tone="muted">
+            {run.session}
+          </Text>
+        </>
+      ) : run ? (
+        <Text size="sm" tone="muted">
+          {run.session}
+        </Text>
+      ) : (
+        none
+      ),
+    },
+  };
 }

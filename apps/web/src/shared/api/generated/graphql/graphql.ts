@@ -439,7 +439,7 @@ export type ScreenerResultsQuery = { session: { date: string, unavailable: Array
 export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, criteria: Array<{ id: string, field: string, mode: string }>, notRun: { kindText: string } | null, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }> } | null }> };
+export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, notRun: { kindText: string } | null, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }> } | null }> };
 
 export type StatusScreensQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2499,6 +2499,7 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
   }
   screeners {
     id
+    name
     criteria {
       id
       field
@@ -2514,6 +2515,10 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
       paused
       decisions {
         decision
+        count
+      }
+      changes {
+        change
         count
       }
     }

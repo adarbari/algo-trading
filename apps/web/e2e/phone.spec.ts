@@ -182,8 +182,10 @@ test('Screeners: a tapped row opens in place and its hits button opens the resul
 }) => {
   await page.goto('/screeners');
   const row = page.getByRole('button', { name: /^vrp_scanner Preset/ });
-  // On a phone the row keeps the name, the type pill and the hits only.
-  await expect(row.getByText('Run 2026-10-07')).toBeHidden();
+  // On a phone the row keeps the name, picks today and the track record only.
+  await expect(page.getByRole('columnheader', { name: 'Last run' })).toBeHidden();
+  await expect(page.getByRole('columnheader', { name: 'Decisions' })).toBeHidden();
+  await expect(page.getByRole('columnheader', { name: 'Picks today' })).toBeVisible();
   await row.tap();
   await expect(row).toHaveAttribute('aria-expanded', 'true');
   await expectAccessible(page);

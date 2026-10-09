@@ -130,14 +130,24 @@ export async function mockBuilderApi(
           { decision: 'QUALIFIED', count: 12 },
           { decision: 'REJECT', count: 400 },
         ],
+        changes: [
+          { change: 'new', count: 3 },
+          { change: 'dropped', count: 1 },
+        ],
       };
       const notRun = { kindText: 'not run for this session' };
       const criteria = [{ id: 'iv30', field: 'iv_rank', mode: 'hard' }];
       return {
         session: { date: '2026-10-07' },
         screeners: [
-          { id: 'vrp_scanner', criteria, notRun: null, latestRun: ran12 },
-          ...[...own, 'idea-draft'].map((id) => ({ id, criteria, notRun, latestRun: null })),
+          { id: 'vrp_scanner', name: 'vrp_scanner', criteria, notRun: null, latestRun: ran12 },
+          ...[...own, 'idea-draft'].map((id) => ({
+            id,
+            name: id,
+            criteria,
+            notRun,
+            latestRun: null,
+          })),
         ],
       };
     }
