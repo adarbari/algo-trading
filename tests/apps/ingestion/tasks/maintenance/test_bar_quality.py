@@ -179,7 +179,7 @@ def test_split_like_jumps_are_tagged_and_kept() -> None:
     frame = pd.concat(
         [
             series("EQ:REV", [1.0] * 4 + [20.1] * 4, ["tiingo"] * 8),  # near 20x: split-like
-            series("EQ:JUNK", [1.0] * 4 + [33.3] * 4, ["tiingo"] * 8),
+            series("EQ:JUNK", [1.0] * 4 + [500.0] * 4, ["tiingo"] * 8),
         ],
         ignore_index=True,
     )
