@@ -149,9 +149,20 @@ export function toTimeline(events: readonly InstrumentEvent[]): TimelineEvent[] 
     .sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
 }
 
-/** Dividend, split and earnings markers for the price chart, oldest first. */
+/**
+ * Dividend, split and earnings markers for the price chart, oldest first: one per kind a day
+ * (a report stored by two sources, the calendar's at midnight and the 8-K's at its acceptance
+ * time, is two rows of one date but one marker).
+ */
 export function toChartEvents(events: readonly InstrumentEvent[]): ChartEvent[] {
+  const seen = new Set<string>();
   return toTimeline(events)
+    .filter((e) => {
+      const key = `${e.kind}|${e.date}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .flatMap((e): ChartEvent[] => {
       if (e.kind === 'dividend') {
         const cash = e.detail.split(' cash')[0] ?? '';
