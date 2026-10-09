@@ -123,7 +123,7 @@ def random_pick_sums(
     if v.size == 0 or draws < 1 or k < 1:
         return None
     k = min(k, v.size)
-    keys = rng.random((draws, v.size), dtype=np.float32)
+    keys = rng.random((draws, v.size))
     chosen = np.argpartition(keys, k - 1, axis=1)[:, :k] if k < v.size else None
     if chosen is None:
         return np.full(draws, v.sum()), np.full(draws, h.sum())

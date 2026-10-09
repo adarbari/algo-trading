@@ -45,6 +45,7 @@ def _row(
     role: str,
     horizon: int,
     result: VariantResult | None = None,
+    config_hash: str = "",
 ) -> dict[str, Any]:
     """One stored row of ``m``; ``result``: the screener or baseline it measured (none for a
     random draw, which has no config)."""
@@ -56,7 +57,7 @@ def _row(
         "edge_variant": None if edge_variant == MAIN else edge_variant,
         "variant": variant,
         "role": role,
-        "config_hash": result.config_hash if result else "",
+        "config_hash": result.config_hash if result else config_hash,
         "run_config_hash": evaluation.run_hash,
         "benchmark": evaluation.benchmark,
         "horizon_sessions": horizon,
@@ -85,7 +86,17 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
             rows.append(_row(evaluation, m, r.edge_variant, r.variant, r.role, r.horizon, r))
     for random in evaluation.random_picks:
         for m in random.draws:
-            rows.append(_row(evaluation, m, random.edge_variant, RANDOM, RANDOM, random.horizon))
+            rows.append(
+                _row(
+                    evaluation,
+                    m,
+                    random.edge_variant,
+                    f"{RANDOM}:{random.variant}",
+                    RANDOM,
+                    random.horizon,
+                    config_hash=random.config_hash,
+                )
+            )
     frame = pd.DataFrame(rows)
     frame["session_date"] = evaluation.end
     frame["knowledge_ts"] = pd.Timestamp(now)

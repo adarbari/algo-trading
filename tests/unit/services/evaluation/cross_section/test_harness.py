@@ -867,7 +867,57 @@ def test_random_draws_are_stored_with_the_decile_means_and_leave_the_screener_ro
     frame = edge_eval_frame(ev, "r1", AS_OF)
     drawn = frame[frame["role"] == "random"]
     assert len(drawn) == 1000 and set(drawn["slice_kind"]) == {"draw"}
-    assert set(drawn["variant"]) == {"random"} and drawn["decile_mean_01"].isna().all()
+    assert set(drawn["variant"]) == {"random:momo"} and drawn["decile_mean_01"].isna().all()
     screener = frame[(frame["role"] != "random") & (frame["slice_kind"] == "all")]
     assert screener.iloc[0]["decile_mean_01"] == pytest.approx(0.09)
     assert len(frame[frame["role"] != "random"]) == len(ev.results[0].measures)
+
+
+def test_the_random_null_is_matched_to_the_screener_sessions_and_pick_counts() -> None:
+    e = edge(frozen_from="2026-09-04", top_k=3)
+    ev = run(build_world(no_features=[DAYS[4]]), e)  # the first out-of-sample start is lost
+    frozen = next(m for m in ev.results[0].measures if m.slice_kind == "frozen")
+    (found,) = ev.random_picks
+    assert (found.variant, found.config_hash) == ("momo", ev.results[0].config_hash)
+    first = found.draws[0]
+    # Same sessions, picks (3 a session, not more), eligible names and base as the screener.
+    assert (first.sessions, first.picks, first.eligible, first.base_hits) == (
+        frozen.sessions,
+        frozen.picks,
+        frozen.eligible,
+        frozen.base_hits,
+    )
+    assert frozen.sessions == 1 and frozen.picks == 3
+
+
+def test_every_qualified_name_sizes_the_draws_when_top_k_is_all() -> None:
+    ev = run(build_world(), edge(frozen_from="2026-09-04", top_k="all"))
+    frozen = next(m for m in ev.results[0].measures if m.slice_kind == "frozen")
+    (found,) = ev.random_picks
+    assert found.draws[0].picks == frozen.picks > 0
+
+
+def test_a_screener_that_held_nothing_keeps_the_sessions_base_in_its_draws(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = harness.screen_variant
+
+    def none_qualify(*a: Any, **k: Any) -> Any:
+        return dataclasses.replace(real(*a, **k), qualified=())
+
+    monkeypatch.setattr(harness, "screen_variant", none_qualify)
+    ev = run(build_world(), edge(frozen_from="2026-09-04"))
+    (found,) = ev.random_picks
+    first = found.draws[0]
+    assert (first.sessions, first.picks, first.hits) == (2, 0, 0)
+    assert first.eligible == 40 and first.hit_rate is None
+
+
+def test_the_run_hash_follows_the_random_draws() -> None:
+    e = edge(frozen_from="2026-09-04")
+    a = run(build_world(), e).run_hash
+    b = evaluate_edge(
+        build_world().reader, build_world().results, build_world().configs, USER, e,
+        DAYS[0], DAYS[-1], AS_OF, random_draws=50,
+    ).run_hash  # fmt: skip
+    assert a != b

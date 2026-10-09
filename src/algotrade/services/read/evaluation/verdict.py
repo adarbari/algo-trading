@@ -180,7 +180,7 @@ def _words(x: VerdictCriterion) -> str:
 def _random(c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow]) -> tuple[str, bool | None]:
     """What the out-of-sample lift beats of the random-pick draws at the candidate's holding
     period, in words, and whether that reaches ``random_beat_share`` (None: not measured)."""
-    share, n = beat_share(c.oos.lift, draws, c.horizon)
+    share, n = beat_share(c.oos.lift, draws, c.horizon, c.variant)
     if share is None:
         return "not measured yet", None
     return f"beats {_pct(share)} of {n} random picks", share >= t.random_beat_share
@@ -328,7 +328,7 @@ def _judge_one(
         pbo=whole.pbo if whole.pbo is not None else oos.pbo,
         trials=whole.trials,
         deciles=c.insample.decile_means if c.insample else (),
-        robustness=load_robustness(oos.lift, draws, c.horizon, whole.trials),
+        robustness=load_robustness(oos.lift, draws, c.horizon, c.variant, whole.trials),
     )
 
 

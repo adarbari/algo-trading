@@ -58,7 +58,13 @@ def result(
 def draws(beaten: int, of: int = 100, horizon: int = 20) -> list[EdgeRow]:
     """``of`` random-pick draws, ``beaten`` of them below the screener's own lift (1.2)."""
     return [
-        row("random", "random", "draw", horizon_sessions=horizon, lift=1.0 if i < beaten else 1.5)
+        row(
+            "random:scr",
+            "random",
+            "draw",
+            horizon_sessions=horizon,
+            lift=1.0 if i < beaten else 1.5,
+        )
         for i in range(of)
     ]
 

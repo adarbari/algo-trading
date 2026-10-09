@@ -40,22 +40,25 @@ class Robustness:
     summary: str
 
 
-def draw_lifts(draws: Sequence[EdgeRow], horizon: int) -> list[float]:
-    """The lifts of the random draws of the edge itself at ``horizon`` (a draw with no lift, a
-    base rate of zero, is not a draw)."""
+def draw_lifts(draws: Sequence[EdgeRow], horizon: int, variant: str) -> list[float]:
+    """The lifts of the random draws matched to screener ``variant`` of the edge itself at
+    ``horizon`` (a draw with no lift, a base rate of zero, is not a draw)."""
     return [
         d.lift
         for d in draws
-        if d.edge_variant == runs.MAIN and d.horizon_sessions == horizon and d.lift is not None
+        if d.edge_variant == runs.MAIN
+        and d.variant == f"{runs.RANDOM}:{variant}"
+        and d.horizon_sessions == horizon
+        and d.lift is not None
     ]
 
 
 def beat_share(
-    lift: float | None, draws: Sequence[EdgeRow], horizon: int
+    lift: float | None, draws: Sequence[EdgeRow], horizon: int, variant: str
 ) -> tuple[float | None, int]:
     """``(share of the draws ``lift`` beats, how many draws)``; the share is None without a lift
     or draws."""
-    lifts = draw_lifts(draws, horizon)
+    lifts = draw_lifts(draws, horizon, variant)
     return percentile_of(lift, lifts), len(lifts)
 
 
@@ -72,11 +75,15 @@ def _binned(lifts: Sequence[float], lift: float) -> tuple[RobustnessBin, ...]:
 
 
 def load_robustness(
-    lift: float | None, draws: Sequence[EdgeRow], horizon: int, trials: int | None
+    lift: float | None,
+    draws: Sequence[EdgeRow],
+    horizon: int,
+    variant: str,
+    trials: int | None,
 ) -> Robustness | None:
     """The out-of-sample ``lift`` against the draws at ``horizon``; None when the run drew none
     or the edge has no lift. ``trials``: the variants tried (they make the best look better)."""
-    share, n = beat_share(lift, draws, horizon)
+    share, n = beat_share(lift, draws, horizon, variant)
     if lift is None or share is None:
         return None
     tried = "" if not trials else f" after {trials} variant{'' if trials == 1 else 's'} tried"
@@ -84,6 +91,6 @@ def load_robustness(
         lift=lift,
         draws=n,
         beats=share,
-        bins=_binned(draw_lifts(draws, horizon), lift),
+        bins=_binned(draw_lifts(draws, horizon, variant), lift),
         summary=f"Beats {share * 100:.0f}% of {n:,} random backtests{tried}.",
     )

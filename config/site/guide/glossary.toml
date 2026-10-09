@@ -595,8 +595,8 @@ id = "robustness"
 term = "Robustness"
 short = "How the out-of-sample lift compares with backtests of random picks: the chance it is luck."
 body = """
-The harness draws the same number of names at random on each out-of-sample session (1,000
-times, the same draws on every run of the same data) and measures each draw like the screen's
+On each out-of-sample session the screen was measured, the harness draws as many names at random
+as the screen held (1,000 times, the same draws on every run of the same data) and measures each draw like the screen's
 picks. The histogram is those random lifts; the marker is the edge's. Beating 95% of the draws
 is what Works asks for. The count of variants tried is beside it because trying more versions
 makes the best one look better than it is.

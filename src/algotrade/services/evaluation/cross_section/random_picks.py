@@ -28,6 +28,7 @@ from algotrade.services.evaluation.cross_section.measures import SliceMeasure
 RANDOM = "random"  # the role and the variant of a random-pick row
 DRAW = "draw"  # its slice kind; the slice value is the draw's number
 DEFAULT_DRAWS = 1000
+SEED_VERSION = 2  # the seed scheme: in the run hash, so a change of scheme is a new run
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,14 @@ def random_stat(
 ) -> RandomStat | None:
     """``draws`` draws of ``top_k`` names at ``session``. ``counted``: the names with a counted
     outcome, indexed by instrument with the oriented value and the ``hit``; the names drawn from
-    are those of them in ``pickable``. None when none can be drawn."""
+    are those of them in ``pickable``. ``top_k`` is the screener's own count at the session; at 0
+    nothing is drawn but the base (every counted name) is kept. None when nothing is counted."""
+    if counted.empty:
+        return None
+    base = {"eligible": len(counted), "base_hits": int(counted["hit"].sum())}
+    if top_k < 1:
+        zeros = np.zeros(draws)
+        return RandomStat(session, 0, zeros, zeros, **base)
     names = counted.loc[sorted(counted.index.intersection(list(pickable)))]
     sums = random_pick_sums(
         names["oriented"].to_numpy(dtype=float),
@@ -76,8 +84,7 @@ def random_stat(
         picks=min(top_k, len(names)),
         value_sums=sums[0],
         hit_sums=sums[1],
-        eligible=len(counted),
-        base_hits=int(counted["hit"].sum()),
+        **base,
     )
 
 
