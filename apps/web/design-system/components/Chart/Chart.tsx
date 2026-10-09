@@ -45,7 +45,7 @@ import {
 import { ChartLegend } from './ChartLegend';
 import { readTheme, useThemeVersion } from './chartTheme';
 import { ChartTooltip } from './ChartTooltip';
-import { drawChart, type ChartHandle, type CrosshairInfo } from './engine';
+import type { ChartHandle, CrosshairInfo } from './engine';
 
 export interface ChartProps {
   /** What the chart shows ("AAPL close", "AAPL, MSFT and NVDA"): the summary's first words. */
@@ -202,7 +202,9 @@ export function Chart({
           ),
         ).catch(() => [])
       : Promise.resolve([]);
-    void fontsReady.then(() => {
+    // The library loads with the first chart, not with the app: the engine is its own chunk.
+    const engine = import('./engine');
+    void Promise.all([fontsReady, engine]).then(([, { drawChart }]) => {
       if (cancelled) return;
       drawn = drawChart(
         element,
