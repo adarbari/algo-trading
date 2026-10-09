@@ -29,6 +29,7 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError, PermissionDeniedError
 from algotrade.data import StoreReader
 from algotrade.services.authoring.scope import ConflictError
+from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.jobs.api import open_runner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
@@ -38,7 +39,6 @@ from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
 
 KIND = "edge-eval"
 STORED = (JobStatus.COMPLETE, JobStatus.PARTIAL)  # a job that stored results
@@ -94,11 +94,12 @@ class OnDemandEdges:
         owner = UserContext(SITE_USER) if as_site else user
         if edge_id not in {e.id for e in load_edges(self._configs, owner.user_id)}:
             raise NotFoundError(f"unknown edge {edge_id!r}")
-        stored = self._reader.dates(FORWARD_RETURNS)
+        stored = stored_outcome_sessions(self._reader)
         if not stored:
             raise ConfigurationError("no outcomes are stored yet: nothing to evaluate")
         params = {"edge": edge_id, "start": stored[0].isoformat(), "end": stored[-1].isoformat()}
         with self._guard:
+            self._jobs.recover(STALE, (KIND,))  # a stopped process's job is failed, not in flight
             busy = self._running(owner.user_id)
             if busy is not None:
                 raise ConflictError(

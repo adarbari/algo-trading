@@ -452,7 +452,7 @@ detect = [{ string = "macro/series" }]
 id = "on-request-runs"
 description = "The API's on-request runs: edge evaluations (ADR 0059: the CLI's `edge-eval` job for the caller, or an admin's site run, on its own single-worker runner; a second one while the owner's runs is refused) and screen runs (ADR 0033): resolve the screener for the user, pick the latest session with data, answer ready when this config version has already run for it, else submit the `screen` job (the nightly's job) to a local runner that does not wait for ingestion (results publish atomically); writes only result tables and run records (ResultWriter), never market or feature data"
 owner = ["src/algotrade/services/ondemand/*"]
-section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"
+section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"  # and ADR 0059 (edge evaluations)
 detect = [{ call = "OnDemandScreens" }, { call = "OnDemandEdges" }]
 
 [[responsibility]]

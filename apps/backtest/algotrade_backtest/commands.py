@@ -28,6 +28,7 @@ from algotrade.services.evaluation.baseline import (
     save_baseline,
     save_edge_baseline,
 )
+from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.cross_section.report import render_edge_report
 from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
 from algotrade.services.evaluation.regime_report import render
@@ -39,7 +40,6 @@ from algotrade.services.jobs import JobStatus, run_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade.strategies.trading.registry import create_strategy
 
 SCORECARD_COLUMNS = (
@@ -248,7 +248,7 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
         raise ConfigurationError(
             f"no edge to evaluate ({args.edge or 'no open edge has screeners'})"
         )
-    stored = reader.dates(FORWARD_RETURNS)
+    stored = stored_outcome_sessions(reader)
     if not stored and not (args.start and args.end):
         raise ConfigurationError("no outcomes stored: run `algotrade-ingest run outcomes`")
     start, end = args.start or stored[0], args.end or stored[-1]
@@ -314,7 +314,7 @@ def cmd_fit_edge_scorer(args: argparse.Namespace) -> int:
     reader = StoreReader(backend)
     root = config_dir(args.config_dir)
     configs = open_config_store(root)
-    stored = reader.dates(FORWARD_RETURNS)
+    stored = stored_outcome_sessions(reader)
     if not stored:
         raise ConfigurationError("no outcomes stored: run `algotrade-ingest run outcomes`")
     params = {

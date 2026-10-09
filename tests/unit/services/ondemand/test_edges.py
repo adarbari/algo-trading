@@ -11,6 +11,7 @@ import pytest
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, PermissionDeniedError
 from algotrade.services.authoring.scope import ConflictError
+from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.jobs import JobContext
 from algotrade.services.ondemand import edges as ondemand_edges
 from algotrade.services.ondemand.edges import EvaluationRequest, OnDemandEdges
@@ -134,3 +135,25 @@ def test_a_job_is_read_by_its_owner_or_an_admin_for_its_edge_only(
         runner.status("other", started.job_id, ALICE)
     with pytest.raises(NotFoundError):
         runner.status("drift", "job-edge-eval-nope", ALICE)
+
+
+def test_a_job_a_stopped_process_left_running_does_not_block_a_new_request(
+    world: World,
+) -> None:
+    from datetime import UTC, datetime, timedelta  # noqa: PLC0415
+
+    from algotrade.services.jobs import JobRecord, JobStatus, job_id_for  # noqa: PLC0415
+
+    runner = OnDemandEdges(world.backend, configs())
+    try:
+        stored = stored_outcome_sessions(world.reader)
+        params = {"edge": "drift", "start": stored[0].isoformat(), "end": stored[-1].isoformat()}
+        old = datetime.now(UTC) - ondemand_edges.STALE - timedelta(minutes=1)
+        dead = JobRecord(job_id_for("edge-eval", params, ALICE), "edge-eval", params, "alice", old)
+        dead.status = JobStatus.RUNNING
+        runner._writer.runs_backend.save(dead.to_run())
+        started = runner.request("drift", ALICE)
+        assert started.job_id == dead.job_id  # the same work: failed as abandoned, run again
+        assert wait(runner, started).state == "complete"
+    finally:
+        runner.close()
