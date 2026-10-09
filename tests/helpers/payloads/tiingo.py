@@ -74,3 +74,47 @@ def supported_tickers_zip() -> bytes:
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("supported_tickers.csv", supported_tickers_csv())
     return buffer.getvalue()
+
+
+def meta_payload() -> bytes:
+    """``/tiingo/fundamentals/meta?tickers=prm,aapl,twtr,aac`` HAND-BUILT, NOT RECORDED (the
+    fixture slice is not a Tiingo response). The shape and the PRM rows are from a response
+    verified by hand on 2026-10-09 with our key: a JSON list, one object per listing that ever
+    used the ticker (``permaTicker``, lowercase ``ticker``, ``name``, ``isActive``,
+    ``dataProviderPermaTicker``), the gated fields as the string "Field not available for
+    free/evaluation". PRM: PRIMEDIA (inactive) and Perimeter (active). The AAPL, TWTR and AAC
+    permaTickers are invented. AAC has two inactive rows and an active one (a recycled ticker the
+    matcher must leave alone); a ticker Tiingo does not know is absent from the answer."""
+    gated = "Field not available for free/evaluation"
+
+    def row(perma: str, ticker: str, name: str, active: bool) -> dict[str, object]:
+        return {
+            "permaTicker": perma,
+            "ticker": ticker,
+            "name": name,
+            "isActive": active,
+            "isADR": False,
+            "sector": gated,
+            "industry": gated,
+            "sicCode": gated,
+            "sicSector": gated,
+            "sicIndustry": gated,
+            "reportingCurrency": gated,
+            "location": gated,
+            "companyWebsite": gated,
+            "secFilingWebsite": gated,
+            "statementLastUpdated": "2026-10-08T00:00:00.000Z",
+            "dailyLastUpdated": "2026-10-08T00:00:00.000Z",
+            "dataProviderPermaTicker": perma,
+        }
+
+    rows = [
+        row("US000000041372", "prm", "PRIMEDIA Inc", False),
+        row("US000000101493", "prm", "Perimeter Solutions Inc", True),
+        row("US000000000033", "aapl", "Apple Inc", True),
+        row("US000000012345", "twtr", "Twitter Inc", False),
+        row("US000000020001", "aac", "Aac Holdings Old", False),
+        row("US000000020002", "aac", "Aac Holdings Second", False),
+        row("US000000020003", "aac", "Aac Holdings Now", True),
+    ]
+    return json.dumps(rows).encode()

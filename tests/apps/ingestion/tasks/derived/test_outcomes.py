@@ -161,3 +161,13 @@ def test_acceptance_fails_without_a_run() -> None:
     _, reader, _ = _store()
     [check] = check_outcomes(reader, END, task_ctx(StoreWriter(reader._backend)).settings)
     assert check.status == "FAIL"
+
+
+def test_a_reference_delisting_noticed_after_the_recheck_span_is_not_counted() -> None:
+    writer, _reader, days = _store()
+    noticed = days[-1]
+    for _ in range(RECHECK):
+        noticed = next_session(noticed)  # the notice is RECHECK sessions after END: too late for -3
+    write_rows(writer, "instruments/reference", days[0], _reference(next_session(noticed)))
+    record = compute_outcomes(task_ctx(writer), days[-3])
+    assert record.stats["h6"]["examples"] == {"EQ:D": NO_END_BAR}

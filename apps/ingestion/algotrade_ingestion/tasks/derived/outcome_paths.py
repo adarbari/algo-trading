@@ -5,7 +5,9 @@ path fields from daily bars split-adjusted as of T (``data.prices.SessionBars.wi
 A name is eligible when it was in the universe at S and has a bar at S. Its row is
 - COMPLETE when it has a bar at T: ``fwd_return`` = close(T) / close(S) - 1;
 - DELISTED when it has no bar at T and the reference records it delisted after S (the weekly
-  reference build stamps ``delisted_on`` when it notices, after the last bar): measured to its
+  reference build stamps ``delisted_on`` when it notices, after the last bar; the task passes
+  only the stamps within the ``RECHECK`` sessions after T, the listing history's last trading
+  days on or before T): measured to its
   last bar in the window (a name whose last bar is S: a zero return, no volatility); the
   delisting return itself (a cash-out, a final print) is not measured;
 - otherwise absent, with a reason (a gap at T, or a name not yet recorded as delisted: the

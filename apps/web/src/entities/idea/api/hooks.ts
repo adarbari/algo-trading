@@ -81,6 +81,7 @@ const IdeasPage = graphql(`
         sizeMultiplier
         instrument {
           symbol
+          name
           features(names: $names) {
             name
             value
@@ -115,6 +116,7 @@ const IdeasPage = graphql(`
           flags
           criteria {
             id
+            outcome
             value
           }
           columns {

@@ -12,7 +12,7 @@ from algotrade.core.model.errors import ConfigurationError, DataValidationError,
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.factory import open_backend
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
+from algotrade.storage.runs import RunRecord, RunStatus, new_run_id, start_run
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -143,6 +143,25 @@ def test_run_store(backend: Backend) -> None:
     assert [r.run_id for r in backend.runs.find("job")] == [record.run_id, "job-2"]
     assert [r.run_id for r in backend.runs.find("job", D2)] == ["job-2"]
     assert backend.runs.load("missing") is None
+
+
+def test_find_many_reads_the_jobs_sessions_by_run_id(backend: Backend) -> None:
+    """Run ids are ``{job}-{session}-{time}``: one pass for several jobs, a session window, and
+    a job sharing another's prefix is not mixed in."""
+    ids = {}
+    for n, (job, day) in enumerate([("job", D1), ("job", D2), ("job-extra", D2), ("other", D1)]):
+        record = start_run(job, day, T0 + timedelta(n))
+        backend.runs.save(record)
+        ids[(job, day)] = record.run_id
+    found = backend.runs.find_many({"job", "other"}, D1, D2)
+    assert [r.run_id for r in found] == [ids[("job", D1)], ids[("job", D2)], ids[("other", D1)]]
+    assert [r.run_id for r in backend.runs.find_many({"job"}, D2, D2)] == [ids[("job", D2)]]
+    assert backend.runs.find_many({"missing"}, D1, D2) == []
+    both = backend.runs.find_many({"job", "job-extra"}, D1, D2)  # one a prefix of the other
+    assert sorted(r.run_id for r in both) == sorted(
+        [ids[("job", D1)], ids[("job", D2)], ids[("job-extra", D2)]]
+    )  # nothing twice, each under its own job
+    assert {r.run_id: r.job for r in both}[ids[("job-extra", D2)]] == "job-extra"
 
 
 def test_writer_validates_and_reader_requires(backend: Backend) -> None:

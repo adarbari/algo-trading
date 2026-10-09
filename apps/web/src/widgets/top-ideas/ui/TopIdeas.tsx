@@ -47,7 +47,10 @@ export function TopIdeas({
   const ideas = useIdeas();
   const [selected, setSelected] = useState<string[]>([]);
   const all = useMemo(() => ideas.data?.ideas ?? [], [ideas.data]);
-  const columns = useMemo(() => ideaColumns(all, onOpenScreener), [all, onOpenScreener]);
+  const columns = useMemo(
+    () => ideaColumns(all, onOpenScreener, search.columns),
+    [all, onOpenScreener, search.columns],
+  );
   const rows = useMemo(() => filterIdeas(all, search), [all, search]);
   const symbols = selected.flatMap((id) => {
     const symbol = all.find((idea) => idea.instrumentId === id)?.symbol;
