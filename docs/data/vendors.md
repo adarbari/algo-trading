@@ -118,17 +118,40 @@ tier ($10 a month) lifts the symbol cap (5,000 requests an hour) for the full ti
 Why Tiingo: Stooq's daily CSV now answers with a browser-verification page, and Massive's free
 tier stops at two years.
 
-### Tiingo supported tickers (adapter implemented, payload SYNTHETIC; ADR 0018 amendment)
+### Tiingo supported tickers (adapter on a recorded slice; ADR 0018 amendment)
 
 `https://apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip`: one public ZIP with one
 CSV (`ticker, exchange, assetType, priceCurrency, startDate, endDate`: the first and last day
-Tiingo has prices). The `listing-history` task (in no workflow) keeps USD, NYSE / NASDAQ /
-AMEX / ARCA / BATS, Stock or ETF, and writes `instruments/listing_history`; ids come from
-`instruments/symbol_history` overlap or, once a meta pull fills `perma_ticker`,
-`EQ:TIINGO:<permaTicker>` (never `EQ:<symbol>`). The adapter is tested on a payload built from
-the documentation (`tests/helpers/payloads/tiingo.py`, labelled SYNTHETIC); a real recording
-replaces it before the task joins a workflow. Gate: if `permaTicker` needs a paid fundamentals
-plan, edges ED6b returns to ADR 0018.
+Tiingo has prices; 108,972 rows on 2026-10-08, internal / personal licence, so the repo holds
+only a 244-row slice, `tests/fixtures/sources/tiingo/supported_tickers_slice.csv`). The
+`listing-history` task (in no workflow) keeps USD, NYSE / NASDAQ / AMEX / ARCA / BATS (NYSE
+MKT and NYSE ARCA are ours AMEX and ARCA), Stock or ETF and a plain ticker (the file also lists
+preferreds, units, notes and expiring warrants as `BC/PA`, `CFX 5.75`, `CAPTW(EXP20260807)`),
+and writes `instruments/listing_history`; a live name's `endDate` is the file's latest day and
+is stored open. Ids come from `instruments/symbol_history` overlap or, once a meta pull fills
+`perma_ticker`, `EQ:TIINGO:<permaTicker>` (never `EQ:<symbol>`). Gate: if `permaTicker` needs a
+paid fundamentals plan, edges ED6b returns to ADR 0018.
+
+### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
+
+`sp500_ticker_start_end.csv` of https://github.com/fja05680/sp500 (MIT licence, free, no key):
+one row per membership interval since 1996 (`ticker, start_date, end_date`, a blank end is a
+current member; reliable from about 2001). The `index-membership` task (in no workflow until the
+owner has run it) writes `instruments/index_membership` keyed by the ticker the index used at the
+time; `data.listings.universe_asof` joins it to the listing alive on the session (ADR 0013's
+rule over history). The file is one 28 KB request (`[sp500_history]` in `sources.toml`); the
+project's 5.5 MB daily-snapshot file is not read. The repo holds a 77-row slice of the file
+(`tests/fixtures/sources/sp500_history/`), recorded 2026-10-08.
+
+### The winners-sample test (edges ED6c)
+
+`algotrade-ingest run winners-sample` fetches Tiingo daily bars from 2010 for a seeded 200-name
+sample (100 delisted by year of end date 2011-2020, 50 live since 2010, 50 hand-listed winners)
+and writes `var/logs/winners-sample-<session>.json` (per name: first and last bar against the
+listing's dates, bar count against the exchange sessions, missing sessions, rows outside the
+listing; overall: the share of delisted names with bars to their end date, the gap share, whether
+a recycled ticker leaks another company's rows). It writes no table: the raw payloads are in
+`raw/source=tiingo`. At most 200 unique symbols of the free tier's 500 a month.
 
 ## Company and fund descriptions (implemented, ADR 0034)
 

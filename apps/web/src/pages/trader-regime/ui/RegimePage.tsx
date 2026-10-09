@@ -1,11 +1,12 @@
 /**
- * Trader > Regime: the market as weather, and how to read it. The header (the weather word,
- * its sentence, the three scores, what changed this week), one legend for the colors of every
- * chart, the scores through the cycles, the slow and fast warning signs (each with its meter,
- * sources and history; a help button opens each one's Guide entry) beside the caller's sizing rules
- * (read-only), and the reference market falls (a row sets every chart's window).
+ * Trader > Regime: one scroll in three parts under a sticky section nav. NOW: the market as
+ * weather (the weather word, its sentence, the three scores, what changed this week) beside the
+ * caller's sizing rules (read-only). WHY: the slow and fast warning signs, each a compact row that
+ * opens to its meter, sources and history (a help button opens each one's Guide entry). HISTORY:
+ * one legend for the colors of every chart, the scores through the cycles, the reference market
+ * falls (a row sets every chart's window) and how early each sign flagged around each fall.
  */
-import { Grid, Heading, Stack, Text } from '@algotrade/ui';
+import { Box, Grid, Heading, SectionNav, Stack, Text } from '@algotrade/ui';
 
 import { RegimeRangeProvider } from '@/features/regime-range';
 import { RegimeCycles } from '@/widgets/regime-cycles';
@@ -14,6 +15,13 @@ import { RegimeHeader } from '@/widgets/regime-header';
 import { RegimeIndicators } from '@/widgets/regime-indicators';
 import { RegimeLegend } from '@/widgets/regime-legend';
 import { RegimeSizing } from '@/widgets/regime-sizing';
+import { RegimeTiming } from '@/widgets/regime-timing';
+
+const SECTIONS = [
+  { id: 'regime-now', label: 'Now' },
+  { id: 'regime-why', label: 'Why' },
+  { id: 'regime-history', label: 'History' },
+];
 
 export function RegimePage() {
   return (
@@ -25,15 +33,29 @@ export function RegimePage() {
           positions and pauses some ideas; it never trades for you.
         </Text>
       </Stack>
+      <SectionNav items={SECTIONS} aria-label="Regime sections" />
       <RegimeRangeProvider>
-        <RegimeHeader />
-        <RegimeLegend />
-        <RegimeCycles />
-        <Grid columns="main-aside" gap={4} collapse="lg" align="start">
-          <RegimeIndicators />
-          <RegimeSizing />
-        </Grid>
-        <RegimeEpisodes />
+        <Box as="section" id="regime-now" aria-label="Now">
+          <Grid columns="main-aside" gap={4} collapse="lg" align="start">
+            <RegimeHeader />
+            <RegimeSizing />
+          </Grid>
+        </Box>
+        <Box as="section" id="regime-why" aria-label="Why">
+          <Stack gap={3}>
+            <Heading level={2}>Why</Heading>
+            <RegimeIndicators />
+          </Stack>
+        </Box>
+        <Box as="section" id="regime-history" aria-label="History">
+          <Stack gap={3}>
+            <Heading level={2}>History</Heading>
+            <RegimeLegend />
+            <RegimeCycles />
+            <RegimeEpisodes />
+            <RegimeTiming />
+          </Stack>
+        </Box>
       </RegimeRangeProvider>
     </Stack>
   );

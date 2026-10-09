@@ -10,10 +10,12 @@ export {
   REGIME_BANDS_OPERATION,
   REGIME_EPISODES_OPERATION,
   REGIME_OPERATION,
+  REGIME_SIGNALS_OPERATION,
   useMarketHistory,
   useRegime,
   useRegimeBands,
   useRegimeEpisodes,
+  useRegimeSignals,
 } from './api/hooks';
 export { regimeFixture, unknownRegimeFixture } from './model/fixtures';
 export {
@@ -76,6 +78,17 @@ export {
   type IndicatorSource,
   type TextPart,
 } from './model/regime';
+export {
+  detailRows,
+  overviewRow,
+  SIGNAL_KEY,
+  signalName,
+  signalNote,
+  type EpisodeSignals,
+  type SignalKind,
+  type SignalState,
+  type SignalTiming,
+} from './model/signals';
 export { RegimeChip, type RegimeChipProps } from './ui/RegimeChip';
 export { RegimeHeadline, type RegimeHeadlineProps } from './ui/RegimeHeadline';
 export { RunRegimeChip, type RunRegimeChipProps } from './ui/RunRegimeChip';

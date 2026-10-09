@@ -53,7 +53,7 @@ import math
 from collections import Counter
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from functools import partial
 from itertools import islice
 
@@ -78,6 +78,7 @@ from algotrade_ingestion.tasks.framework.run import (
     finished_runs,
     status_label,
 )
+from algotrade_ingestion.tasks.framework.tiingo_budget import month_symbols
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "bars_history"
@@ -125,33 +126,6 @@ def history_done(runs: Sequence[RunRecord], since: date, until: date) -> set[str
             ):
                 done.add(key.removeprefix("hist:"))
     return done
-
-
-def _months(first: datetime, last: datetime) -> set[tuple[int, int]]:
-    """The UTC (year, month) pairs from ``first`` to ``last``."""
-    year, month = first.year, first.month
-    found = set()
-    while (year, month) <= (last.year, last.month):
-        found.add((year, month))
-        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
-    return found
-
-
-def month_symbols(runs: Sequence[RunRecord], run: IngestRun) -> set[str]:
-    """Instrument ids asked of Tiingo in the UTC calendar month of the run's clock: the ``hist:``
-    items, whatever their status (a ``FETCH_ERROR`` request may still have counted), of EVERY
-    run of the task in any status (a crashed or failed run spent its requests) other than the
-    current run, in each month between its start and its finish (now, when unfinished), plus the
-    current run's own items."""
-    now = run.clock()
-    used = {k for k in run.items if k.startswith("hist:")}
-    for record in runs:
-        if record.run_id == run.run_id:
-            continue
-        end = record.finished_at or max(now, record.started_at)
-        if (now.year, now.month) in _months(record.started_at, end):
-            used |= {k for k in record.items if k.startswith("hist:")}
-    return {k.removeprefix("hist:") for k in used}
 
 
 def split_findings(
@@ -330,7 +304,7 @@ def ingest_bars_history(
             if n.instrument_id not in done and f"hist:{n.instrument_id}" not in run.items
         ]
         budget = ctx.settings.tiingo_monthly_symbol_budget
-        remaining = max(0, budget - len(month_symbols(run.writer.runs_for(TASK), run)))
+        remaining = max(0, budget - len(month_symbols(run)))
         todo = pending[: remaining if limit is None else min(remaining, max(0, limit))]
         _fetch_pending(run, source, todo, since, until)
         run.stats.update(_publish(run, source.name))
@@ -339,7 +313,7 @@ def ingest_bars_history(
         left = len(pending) - sum(1 for s in statuses if s in DONE)
         picked = {p.instrument_id for p in picks}
         fetched = {n.instrument_id for n, s in zip(todo, statuses, strict=True) if s in DONE}
-        used = len(month_symbols(run.writer.runs_for(TASK), run))
+        used = len(month_symbols(run))
         pace = ctx.settings.vendor("tiingo").min_interval_s or HOURLY_FREE_PACE_S
         run.stats.update(
             window=_window(since, until),

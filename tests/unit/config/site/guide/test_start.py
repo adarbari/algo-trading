@@ -36,6 +36,7 @@ SPEC_PAGES = (
     "Build a screen",
     "Draft a screen from a sentence",
     "Read the Regime page",
+    "Reading recession signals",
 )
 
 

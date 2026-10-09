@@ -349,10 +349,10 @@ for (const theme of ['dark', 'light'] as const) {
       .click();
     await expect(page).toHaveURL(/\/guide\/regime$/);
     const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
-    await expect(slow.getByRole('link')).toHaveCount(5);
+    await expect(slow.getByRole('link')).toHaveCount(4);
     await expect(
       page.getByRole('region', { name: 'Fast-moving market signs' }).getByRole('link'),
-    ).toHaveCount(3);
+    ).toHaveCount(4);
     await expect(
       page.getByRole('link', { name: 'Today’s readings on the Regime page' }),
     ).toHaveAttribute('href', '/regime');

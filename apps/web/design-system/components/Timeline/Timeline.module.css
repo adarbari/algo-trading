@@ -1,0 +1,179 @@
+/*
+ * Timeline: a list of rows, each a name column and a plot column sharing one axis. Marks are
+ * positioned by custom properties set by Timeline.tsx: --at (0 to 1) for a marker, gridline or
+ * the reference, --from and --len (0 to 1) for a span. Narrow container: the name sits above
+ * its plot.
+ */
+.root {
+  --timeline-name: var(--size-label);
+  --timeline-row: var(--density-row-height);
+
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.root[data-size='sm'] {
+  --timeline-row: var(--space-5);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row,
+.axis {
+  display: grid;
+  grid-template-columns: var(--timeline-name) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.row {
+  min-height: var(--timeline-row);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.axis {
+  grid-template-columns: var(--timeline-name) minmax(0, 1fr);
+}
+
+.axisPlot {
+  position: relative;
+  grid-column: 2;
+  height: var(--space-4);
+}
+
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+  min-width: 0;
+  color: var(--color-text);
+}
+
+.label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+}
+
+.plot {
+  position: relative;
+  height: var(--timeline-row);
+  min-width: 0;
+}
+
+.grid,
+.reference {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(var(--at) * 100%);
+  width: var(--border-width-thin);
+  background: var(--color-border-soft);
+}
+
+.reference {
+  background: var(--color-text-2);
+}
+
+.span {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: calc(var(--from) * 100%);
+  width: calc(var(--len) * 100%);
+  min-width: var(--space-1);
+  height: var(--space-2);
+  border: var(--border-width-thin) solid var(--tone-fill);
+  border-radius: var(--radius-sm);
+  background: var(--tone-fill);
+  transform: translateY(-50%);
+}
+
+.span[data-variant='outline'] {
+  background: var(--tone-tint);
+}
+
+.span[data-open-start] {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.span[data-open-end] {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.marker {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: calc(var(--at) * 100%);
+  box-sizing: border-box;
+  width: var(--space-2-5);
+  height: var(--space-2-5);
+  border: var(--border-width-thin) solid var(--color-bg);
+  border-radius: var(--radius-lg);
+  background: var(--tone-fill);
+  transform: translate(-50%, -50%);
+}
+
+.marker[data-shape='diamond'] {
+  border-radius: var(--radius-sm);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.marker[data-hollow] {
+  border-color: var(--tone-fill);
+  background: var(--color-bg);
+}
+
+.tick {
+  position: absolute;
+  inset-inline-start: calc(var(--at) * 100%);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+.caption,
+.message {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.message[data-tone='negative'] {
+  color: var(--color-negative);
+}
+
+@container (width < 480px) {
+  .row,
+  .axis {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .row {
+    padding-block: var(--space-1);
+  }
+
+  .axisPlot {
+    grid-column: 1;
+  }
+}

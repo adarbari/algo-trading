@@ -37,7 +37,7 @@ def _listings() -> pd.DataFrame:
 
 
 def test_listing_window_membership_and_etf_rules() -> None:
-    out = listed_asof(_listings(), S, {"EQ:TIINGO:A"})
+    out = listed_asof(_listings(), S, {"AAA"})
     assert list(out.instruments["ticker"]) == ["AAA", "CCC", "DDD", "RCY"]
     assert list(out.instruments["instrument_id"]) == [
         "EQ:TIINGO:A", "EQ:TIINGO:C", "EQ:TIINGO:D", "EQ:TIINGO:NEW",
@@ -59,7 +59,7 @@ def test_the_boundary_days_are_inside_the_window() -> None:
 
 
 def test_end_date_is_not_exposed_as_a_column() -> None:
-    out = listed_asof(_listings(), S, {"EQ:TIINGO:A"}).instruments
+    out = listed_asof(_listings(), S, {"AAA"}).instruments
     assert list(out.columns) == COLUMNS and "end_date" not in out.columns
 
 
@@ -71,11 +71,26 @@ def test_universe_asof_reads_the_latest_snapshot_and_says_which() -> None:
     for day in (date(2026, 9, 28), date(2026, 10, 5)):
         stamped = frame.assign(session_date=day, knowledge_ts=pd.Timestamp(day, tz="UTC"))
         writer.write_table("instruments/listing_history", day, "r", stamped)
-    got = universe_asof(StoreReader(backend), S, {"EQ:TIINGO:A"})
+    members = pd.DataFrame(
+        {
+            "index_name": ["SP500", "SP500"],
+            "ticker": ["AAA", "BBB"],
+            "start_date": [date(1999, 1, 4), date(2013, 1, 2)],  # BBB joins after S
+            "end_date": [None, None],
+            "ts": pd.Timestamp("2026-10-08", tz="UTC"),
+            "session_date": date(2026, 10, 8),
+            "knowledge_ts": pd.Timestamp("2026-10-08", tz="UTC"),
+            "source": "sp500_history",
+            "run_id": "m",
+        }
+    )
+    writer.write_table("instruments/index_membership", date(2026, 10, 8), "m", members)
+    got = universe_asof(StoreReader(backend), S)
     assert got.snapshot == date(2026, 10, 5) and got.session == S
+    assert got.membership_snapshot == date(2026, 10, 8)
     assert list(got.instruments["ticker"]) == ["AAA", "CCC", "DDD", "RCY"]
 
 
 def test_universe_asof_without_a_snapshot_is_missing_data() -> None:
     with pytest.raises(MissingDataError):
-        universe_asof(StoreReader(MemoryBackend()), S, set())
+        universe_asof(StoreReader(MemoryBackend()), S)
