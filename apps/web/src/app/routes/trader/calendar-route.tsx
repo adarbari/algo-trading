@@ -2,7 +2,7 @@
 import { createRoute } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
-import { lazyPage } from '../lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 const CalendarPage = lazyPage(() => import('@/pages/trader-calendar'), 'CalendarPage');
 

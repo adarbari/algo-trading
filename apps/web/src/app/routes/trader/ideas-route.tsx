@@ -10,7 +10,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 import { parseIdeasSearch, type IdeasSearch, type IdeasSearchPatch } from '@/entities/idea';
 
 import { traderRoute } from './layout-route';
-import { lazyPage } from '../lazy-page';
+import { lazyPage } from '@/shared/lib/lazy';
 
 const IdeasPage = lazyPage(() => import('@/pages/trader-ideas'), 'IdeasPage');
 
