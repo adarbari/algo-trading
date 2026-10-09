@@ -2,8 +2,23 @@
 
 Stooq daily CSV (``Date,Open,High,Low,Close,Volume``), the Fed's ``ebp_csv.csv`` (monthly, dated
 ``m/d/yyyy`` on the first of the month) and the OFR financial stress index CSV (daily, one column
-per component). Trimmed copies of the real files are in ``tests/fixtures/sources/published``.
+per component. Trimmed copies of the real files are in ``tests/fixtures/sources/published``.
+
+The S&P 500 membership file (``membership_csv``) is RECORDED: a 77-row slice of
+``sp500_ticker_start_end.csv`` of https://github.com/fja05680/sp500 (MIT licence, by fja05680),
+downloaded 2026-10-08 (1,262 rows), rows exactly as published: the tickers of the Tiingo slice's
+names and a seeded sample, with ones that left and came back (``H``), renamed (``FB`` then
+``META``) and still open (``AAPL``).
 """
+
+from tests.conftest import REPO_ROOT
+
+MEMBERSHIP = REPO_ROOT / "tests/fixtures/sources/sp500_history/sp500_ticker_start_end_slice.csv"
+
+
+def membership_csv() -> bytes:
+    return MEMBERSHIP.read_bytes()
+
 
 STOOQ = b"""Date,Open,High,Low,Close,Volume
 2026-09-28,5710.12,5735.40,5698.77,5721.33,2845000000

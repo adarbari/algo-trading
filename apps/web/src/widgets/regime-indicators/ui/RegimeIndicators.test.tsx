@@ -49,6 +49,17 @@ beforeEach(() => {
   hooks.useRegime.mockReset();
 });
 
+/** Open every card's row (the rows are compact; the detail shows once opened). */
+async function openRows(regime: Regime) {
+  const user = userEvent.setup();
+  for (const indicator of regime.indicators) {
+    const row = screen
+      .getAllByRole('button')
+      .find((button) => button.textContent.includes(indicator.plainName));
+    await user.click(row as HTMLElement);
+  }
+}
+
 describe('RegimeIndicators', () => {
   it('lists the slow and the fast cards in their own lists', async () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
@@ -62,9 +73,10 @@ describe('RegimeIndicators', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('gives each card a help button for its Guide entry, and keeps no explanation of its own', () => {
+  it('gives each card a help button for its Guide entry, and keeps no explanation of its own', async () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
     render(<RegimeIndicators />);
+    await openRows(regimeFixture());
     expect(
       screen.getAllByRole('button', { name: /^Help: / }).map((button) => button.textContent),
     ).toEqual(['Help: indicator curve_10y3m', 'Help: indicator nfci', 'Help: indicator vix_term']);
@@ -74,9 +86,10 @@ describe('RegimeIndicators', () => {
     expect(screen.queryByRole('button', { name: /Why it matters/ })).toBeNull();
   });
 
-  it('places each value on its range with the threshold marked and the rule in words', () => {
+  it('places each value on its range with the threshold marked and the rule in words', async () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
     render(<RegimeIndicators />);
+    await openRows(regimeFixture());
     const curve = screen.getByRole('meter', { name: '10y minus 3m Treasury spread' });
     expect(curve).toHaveAttribute('aria-valuemin', '-1.5');
     expect(curve).toHaveAttribute('aria-valuemax', '3');
@@ -87,9 +100,10 @@ describe('RegimeIndicators', () => {
     expect(screen.getByText('On when above 0.50')).toBeVisible();
   });
 
-  it('writes how it is calculated with its terms linked', () => {
+  it('writes how it is calculated with its terms linked', async () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
     render(<RegimeIndicators />);
+    await openRows(regimeFixture());
     expect(screen.getByRole('link', { name: /10-year Treasury yield/ })).toHaveAttribute(
       'href',
       'https://fred.stlouisfed.org/series/DGS10',
@@ -97,9 +111,10 @@ describe('RegimeIndicators', () => {
     expect(screen.getByText('The VIX divided by the 3-month VIX.')).toBeVisible();
   });
 
-  it('names the exact series and cadence, the one in use first, and its provenance', () => {
+  it('names the exact series and cadence, the one in use first, and its provenance', async () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
     render(<RegimeIndicators />);
+    await openRows(regimeFixture());
     const nfci = screen.getByRole('link', { name: /FRED NFCI/ });
     expect(nfci).toHaveAttribute('href', 'https://fred.stlouisfed.org/series/NFCI');
     const anfci = screen.getByRole('link', { name: /FRED ANFCI/ });
@@ -117,6 +132,7 @@ describe('RegimeIndicators', () => {
   it('mounts the history chart only once its disclosure is opened, on the shared window', async () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
     render(<RegimeIndicators />);
+    await openRows(regimeFixture());
     expect(screen.queryByText(/^history of /)).toBeNull();
     await userEvent
       .setup()
@@ -132,9 +148,10 @@ describe('RegimeIndicators', () => {
     expect(screen.getByText(/Unknown: not available because of a system error/)).toBeVisible();
   });
 
-  it('shows every card UNKNOWN with its reason when the regime is not computed', () => {
+  it('shows every card UNKNOWN with its reason when the regime is not computed', async () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(unknownRegimeFixture()));
     render(<RegimeIndicators />);
+    await openRows(unknownRegimeFixture());
     expect(screen.getAllByText(/Unknown: not available because of a system error/)).toHaveLength(3);
     expect(
       screen.getAllByRole('img', { name: /: unknown\. not available because of a system error/ }),

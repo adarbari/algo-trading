@@ -2,8 +2,9 @@
 dates (ADR 0018 amendment 2026-10-08, edges ED6).
 
 ``algotrade-ingest run listing-history`` pulls Tiingo's supported-tickers file (one request)
-and writes it as a full snapshot for the session. In NO workflow yet: the payload the adapter
-is tested on is SYNTHETIC, a real recording replaces it first.
+and writes it as a full snapshot for the session. In NO workflow until the owner has run it on
+the real file and read the result (the adapter is tested on a recorded slice of the 2026-10-08
+file).
 
 Ids, in the amendment's order: (a) the listing's ticker and dates overlap an
 ``instruments/symbol_history`` row: that row's ``instrument_id``; (b) else, once the listing

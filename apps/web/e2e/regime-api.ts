@@ -4,7 +4,8 @@
  * fixtures recorded from the real API on the golden store (e2e/fixtures/regime/): the regime is
  * UNKNOWN (`NO_PARTITION`: the golden store holds no regime rows) with its eight indicator cards
  * (range, threshold, how-line and sources included), and the band history is one UNKNOWN band.
- * `MarketHistory` is synthetic (the golden store holds no market history; `seriesHistory`). `RegimeEpisodes` answers with the episodes and recessions
+ * `RegimeSignals` is synthetic too (`signalsAnswer`: the golden store holds no verdicts; every
+ * state shows: led, still on, late, never fired, unknown with its reason). `MarketHistory` is synthetic (the golden store holds no market history; `seriesHistory`). `RegimeEpisodes` answers with the episodes and recessions
  * the real loader serves over `episodes.toml` for a 2026 session (`regime-episodes.json`; the
  * golden session of 2022 would not know the 2025 episode). Any other
  * operation falls through to the other areas' mocks. `mockRegimeComputed` serves the same
@@ -25,6 +26,77 @@ const fixture = (name: string): unknown =>
 const REGIME = fixture('regime');
 const BANDS = fixture('regime-bands');
 const EPISODES = fixture('regime-episodes');
+
+interface Timing {
+  indicator: string;
+  kind: 'FAST' | 'SLOW' | 'GATE';
+  state: 'LED' | 'LATE' | 'NEVER_FIRED' | 'UNKNOWN';
+  flaggedDay: number | null;
+  clearedDay: number | null;
+  flaggedDayFromTrough: number | null;
+  firstKnownDay: number | null;
+  neverFired: boolean;
+  unknownReason: unknown;
+}
+
+const NOT_STORED = {
+  code: 'NO_ROW',
+  kind: 'NOT_STORED',
+  guideTerm: 'unavailable_not_stored',
+  kindText: 'not stored for this session',
+  cause: null,
+};
+
+/**
+ * A synthetic `RegimeSignals` answer: for every episode of the fixture the gate and the eight
+ * cards, cycling through the states (the first led and cleared, one still on, one late, one never
+ * fired, one unknown with its reason) so the page draws each. Days are sessions from the peak.
+ */
+function signalsAnswer(): unknown {
+  const episodes = (EPISODES as { data: { regime: { episodes: { key: string }[] } } }).data.regime
+    .episodes;
+  const cards = (REGIME as { data: { regime: { indicators: { key: string; pace: string }[] } } })
+    .data.regime.indicators;
+  const timing = (
+    indicator: string,
+    kind: Timing['kind'],
+    state: Timing['state'],
+    days: [number | null, number | null],
+  ): Timing => ({
+    indicator,
+    kind,
+    state,
+    flaggedDay: days[0],
+    clearedDay: days[1],
+    flaggedDayFromTrough: state === 'LATE' ? 10 : null,
+    firstKnownDay: null,
+    neverFired: state === 'NEVER_FIRED',
+    unknownReason: state === 'UNKNOWN' ? NOT_STORED : null,
+  });
+  const states: [Timing['state'], [number | null, number | null]][] = [
+    ['LED', [-60, 30]],
+    ['LED', [-15, null]],
+    ['LATE', [45, 90]],
+    ['NEVER_FIRED', [null, null]],
+    ['UNKNOWN', [null, null]],
+  ];
+  return {
+    data: {
+      regime: {
+        episodes: episodes.map((episode, e) => ({
+          key: episode.key,
+          signals: {
+            gate: timing('gate', 'GATE', 'LED', [-5 - e, 60]),
+            indicators: cards.map((card, i) => {
+              const [state, days] = states[(i + e) % states.length] as (typeof states)[number];
+              return timing(card.key, card.pace === 'slow' ? 'SLOW' : 'FAST', state, days);
+            }),
+          },
+        })),
+      },
+    },
+  };
+}
 
 interface HistoryVariables {
   names: string[];
@@ -94,7 +166,9 @@ export async function mockRegimeApi(page: Page): Promise<void> {
           data: { market: { history: variables.names.map((n) => seriesHistory(n, variables)) } },
         },
       });
-    } else if (/query\s+RegimeBands\b/.test(query)) await route.fulfill({ json: BANDS });
+    } else if (/query\s+RegimeSignals\b/.test(query))
+      await route.fulfill({ json: signalsAnswer() });
+    else if (/query\s+RegimeBands\b/.test(query)) await route.fulfill({ json: BANDS });
     else if (/query\s+RegimeEpisodes\b/.test(query)) await route.fulfill({ json: EPISODES });
     else if (/query\s+Regime\b/.test(query)) await route.fulfill({ json: REGIME });
     else await route.fallback();
@@ -116,7 +190,7 @@ export async function mockRegimeComputed(page: Page): Promise<void> {
       regime: {
         ...regime,
         label: 'CAUTION',
-        headline: '2 of 5 slow-moving warning signs are on.',
+        headline: '2 of 4 slow-moving warning signs are on.',
         indicators,
       },
     },
