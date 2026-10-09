@@ -83,7 +83,7 @@ const run = (runId: string, startedAt: string, durationS: number, chains: number
 });
 
 describe('RecentRunsPanel', () => {
-  it('lists runs and shows the timing of the chosen one', async () => {
+  it('lists runs, newest open, and opens one at a time', async () => {
     serve({
       nightlyRuns: [
         run('n2', '2026-10-03T13:26:00Z', 1560, 1237),
@@ -91,18 +91,20 @@ describe('RecentRunsPanel', () => {
       ],
     });
     const { container } = renderWith(<RecentRunsPanel />);
-    expect(await screen.findByRole('grid', { name: 'Recent nightly runs' })).toHaveTextContent(
+    expect(await screen.findByRole('list', { name: 'Recent nightly runs' })).toHaveTextContent(
       '26m 0s',
     );
     expect(screen.getByRole('list', { name: /started 2026-10-03 13:26 UTC/ })).toHaveTextContent(
       '20m 37s',
     );
+    expect(screen.getByText('steps not complete: chains')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Re-run nightly' })).toBeDisabled();
     await expectAccessible(container);
-    await userEvent.click(screen.getByText('2026-10-03 11:01 UTC'));
+    await userEvent.click(screen.getByRole('button', { name: /2026-10-03 11:01 UTC/ }));
     expect(
       await screen.findByRole('list', { name: /started 2026-10-03 11:01 UTC/ }),
     ).toHaveTextContent('19s');
+    expect(screen.queryByRole('list', { name: /started 2026-10-03 13:26 UTC/ })).toBeNull();
   });
 
   it('says when there are no runs', async () => {

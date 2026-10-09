@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Completeness } from '@/entities/ingestion';
 import type { NightlyRun } from '@/entities/run';
 
 import { systemIssues, type ScreenerStates } from './issues';
@@ -27,7 +28,34 @@ const screens = (missing: string[], total = 5): ScreenerStates => ({
   })),
 });
 
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-08T12:00:00Z'));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+const grid = (lastClosed: string, latest: string): Completeness => ({
+  sessions: ['2026-10-01', latest],
+  datasets: [],
+  lastClosed,
+  cells: [],
+});
+
 describe('systemIssues', () => {
+  it('flags a session the exchange closed that the store lacks (admin grid)', () => {
+    const [issue] = systemIssues(null, screens([]), grid('2026-10-08', '2026-10-07'));
+    expect(issue?.id).toBe('stale:2026-10-07');
+    expect(issue?.severity).toBe('warning');
+  });
+
+  it('falls back to the calendar rule on the read session for everyone else', () => {
+    const old = { ...screens([]), session: '2026-10-01' };
+    expect(systemIssues(null, old).map((i) => i.id)).toEqual(['stale:2026-10-01']);
+    expect(systemIssues(null, screens([]))).toEqual([]);
+  });
+
   it('is empty when nothing is wrong or nothing has loaded', () => {
     expect(systemIssues(null, null)).toEqual([]);
     expect(systemIssues(run({ status: 'COMPLETE' }), screens([]))).toEqual([]);

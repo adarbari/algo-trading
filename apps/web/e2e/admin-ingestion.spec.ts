@@ -2,7 +2,7 @@
  * Admin › Ingestion end to end against a mocked API (fixtures shaped from real responses): the
  * summary, the completeness grid and its drill-down (deep-linked in the URL), the run record
  * drawer, the CSV download, quality checks, verification vs IBKR, review items and recent runs,
- * accessible in dark and light; the stale-data banner; a failed section shows its error.
+ * accessible in dark and light; the status strip's stale-session issue; a failed section shows its error.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -40,8 +40,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('grid', { name: 'Failing verification checks' })).toContainText(
       'SPY',
     );
-    await expect(page.getByRole('grid', { name: 'Recent nightly runs' })).toContainText('26m 0s');
-    await expect(page.getByText('Latest session not ingested')).toHaveCount(0);
+    await expect(page.getByRole('list', { name: 'Recent nightly runs' })).toContainText('26m 0s');
     await expectAccessible(page);
     expect(errors).toEqual([]);
   });
@@ -100,7 +99,11 @@ test('warns when the latest session is not ingested; a failed section shows its 
     quality: FAIL,
   });
   await page.goto('/admin/ingestion');
-  await expect(page.getByText(/Latest session not ingested/)).toBeVisible();
+  await page
+    .getByRole('region', { name: 'System status' })
+    .getByRole('button', { name: /warnings/ })
+    .click();
+  await expect(page.getByText(/a nightly run may have been missed/)).toBeVisible();
   await expect(page.getByText('Quality checks could not load.')).toBeVisible();
   await expect(page.getByText('No verification for this session')).toBeVisible();
 });

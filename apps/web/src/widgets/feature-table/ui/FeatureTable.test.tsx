@@ -21,10 +21,6 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
   useFeatureTable: hooks.useFeatureTable,
   useFeatureCatalogue: hooks.useFeatureCatalogue,
 }));
-vi.mock('@/entities/explore', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  isStale: () => false,
-}));
 
 stubElementSize();
 

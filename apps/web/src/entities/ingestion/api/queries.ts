@@ -70,8 +70,9 @@ const IngestionCell = graphql(`
 `);
 
 /** The grid; null: nothing stored. */
-export function useCompleteness(sessions = SESSIONS) {
+export function useCompleteness(sessions = SESSIONS, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: queryKeys.gql('IngestionCompleteness', { sessions }),
     queryFn: () => gql(IngestionCompleteness, { sessions }),
     select: (data) => data.completeness,

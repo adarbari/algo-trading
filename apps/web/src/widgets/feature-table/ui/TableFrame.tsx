@@ -1,7 +1,8 @@
 /**
- * The frame every table of the widget shares: a panel (title, actions, states), the session
- * notes (a stale session, nightly tables missing for it, a universe snapshot from after it; for a
- * screener's run, the run's own coverage: a PARTIAL run and what it ran without),
+ * The frame every table of the widget shares: a panel (title, actions, states), the table's own
+ * notes (nightly tables missing for its session, a universe snapshot from after it; for a
+ * screener's run, the run's own coverage: a PARTIAL run and what it ran without; a stale
+ * session is the app status strip's issue, not repeated here),
  * the caller's header (filters), and the design system's `DataTable` over `TableRow`s with a
  * toolbar: the summary, the pager (server paging) and the caller's controls (column picker,
  * views). The columns are a `ColumnPlan` from the factories (ADR 0038); a field column's
@@ -21,7 +22,6 @@ import {
 import type { ReactNode } from 'react';
 
 import { UnavailableNote, type ServedUnavailable } from '@/entities/availability';
-import { isStale } from '@/entities/explore';
 import { featureTitle, type ColumnPlan, type TableRow } from '@/entities/feature';
 import { helped } from '@/features/guide-help';
 
@@ -71,11 +71,6 @@ const count = (n: number) => n.toLocaleString('en-US');
 function Notes({ notes }: { notes: SessionNotes }) {
   return (
     <>
-      {isStale(notes.session) ? (
-        <Banner asOf={notes.session}>
-          The latest stored session is old: a nightly run may have been missed.
-        </Banner>
-      ) : null}
       {notes.preSnapshot ? (
         <Banner tone="warning" title="Partial data">
           The universe snapshot is from after this session.
@@ -95,8 +90,7 @@ function Notes({ notes }: { notes: SessionNotes }) {
 function shows(notes: SessionNotes | null | undefined): notes is SessionNotes {
   return (
     !!notes &&
-    (isStale(notes.session) ||
-      notes.unavailable.length > 0 ||
+    (notes.unavailable.length > 0 ||
       notes.preSnapshot ||
       (!!notes.run && (notes.run.partial || notes.run.unavailable.length > 0)))
   );
