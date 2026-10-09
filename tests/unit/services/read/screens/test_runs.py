@@ -163,7 +163,7 @@ def test_pick_ids_read_the_run_rows_only_in_rank_order(
         return real(c, table, *args)
 
     monkeypatch.setattr(results, "partition", counting)
-    ids, total = runs.load_pick_ids(ctx, run, 100)
+    found = runs.load_pick_ids(ctx, run, 100)
     assert read == []  # no results/rule_screen_values read
     rows = runs.run_rows(ctx, run)
     mine = [
@@ -171,5 +171,5 @@ def test_pick_ids_read_the_run_rows_only_in_rank_order(
         for i, d in zip(rows["instrument_id"], rows["decision"], strict=True)
         if runs.is_picked(str(d)) or d == runs.PAUSED
     ]
-    assert ids == mine and total == len(mine) and total > 0
-    assert runs.load_pick_ids(ctx, run, 1) == (mine[:1], total)
+    assert found.instrument_ids == tuple(mine) and found.total == len(mine) > 0
+    assert runs.load_pick_ids(ctx, run, 1) == runs.PickIds(tuple(mine[:1]), found.total)

@@ -46,6 +46,10 @@ class PickIds:
     instrument_ids: list[str]
     total: int
 
+    @classmethod
+    def of(cls, d: runs.PickIds) -> Self:
+        return cls(instrument_ids=list(d.instrument_ids), total=d.total)
+
 
 @strawberry.type(
     description="A screener's run for the session: whose, which version ran, its run record's "
@@ -124,8 +128,7 @@ class ScreenerRun:
         extensions=[MaxItems("size", MAX_PAGE)],
     )
     async def pick_ids(self, info: Info, size: int = DEFAULT_SIZE) -> PickIds:
-        ids, total = await off_loop(runs.load_pick_ids, self.ctx, self.run, size)
-        return PickIds(instrument_ids=ids, total=total)
+        return PickIds.of(await off_loop(runs.load_pick_ids, self.ctx, self.run, size))
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Its rows as a review table: `decisions` (none: all; any case), `change` "

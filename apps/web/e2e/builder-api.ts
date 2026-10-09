@@ -166,6 +166,33 @@ export async function mockBuilderApi(
     }
     if (name === 'ScreenDetail') return { screenDetail: detailOf(id) };
     if (name === 'ScreenVersions') return { screenVersions: versionsOf(id) };
+    if (name === 'ScreenerPicks') {
+      const results = fixture('results.json') as {
+        screener: { latestRun: { results: { results: { instrumentId: string }[] } } };
+      };
+      const ids = results.screener.latestRun.results.results.map((r) => r.instrumentId);
+      return id === 'vrp_scanner' || ran.has(id)
+        ? {
+            screener: {
+              id,
+              notRun: null,
+              latestRun: { runId: 'r1', pickIds: { total: ids.length, instrumentIds: ids } },
+            },
+          }
+        : {
+            screener: {
+              id,
+              notRun: {
+                code: 'NOT_RUN',
+                kind: 'NOT_RUN',
+                guideTerm: 'not_run',
+                kindText: 'not run for this session',
+                cause: null,
+              },
+              latestRun: null,
+            },
+          };
+    }
     if (name === 'ScreenerResults') {
       mock.tables.push(operation.variables ?? {});
       const results = fixture('results.json') as { screener: Json };
