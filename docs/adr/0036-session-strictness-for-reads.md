@@ -1,6 +1,7 @@
 # ADR 0036: Reads serve one session: point-in-time strictness for everything a page shows
 
-**Status:** accepted (2026-10-05; owner decision). Extends [0007](0007-point-in-time-data.md)
+**Status:** accepted (2026-10-05; owner decision); decision 1's default amended 2026-10-10 by
+[0062](0062-reads-serve-the-last-complete-session.md) (the latest session whose nightly is complete). Extends [0007](0007-point-in-time-data.md)
 (point in time, the one snapshot rule). Spec: [docs/api/read-model.md](../api/read-model.md)
 ("Session resolution"). Implemented over read-model PRs 2-10; PR 1 records it.
 

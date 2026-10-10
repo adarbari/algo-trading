@@ -32,6 +32,7 @@ from algotrade.services.read.context import (
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_rows
 from tests.helpers.stored_frames import stamped
@@ -349,3 +350,25 @@ def test_weigh_tracks_deep_memory_of_representative_values() -> None:
         for r in records
     )
     assert measured / 1.5 <= weigh(records) <= measured * 1.5
+
+
+def test_the_session_is_resolved_again_when_a_nightly_record_is_saved() -> None:
+    """A workflow turning COMPLETE saves a run record, not a table: the default session flips
+    without a publish (ADR 0062)."""
+    backend = MemoryBackend()
+    publish_bar(backend, D2)
+    publish_bar(backend, date(2026, 10, 2))
+    reader = StoreReader(backend)
+    cache = ResultCache()
+
+    def nightly(day: date, status: RunStatus) -> None:
+        stamp = datetime(2026, 10, 3, tzinfo=UTC)
+        backend.runs.save(RunRecord(f"n-{day}", "nightly", day, stamp, status))
+
+    nightly(D2, RunStatus.COMPLETE)
+    nightly(date(2026, 10, 2), RunStatus.FAILED)
+    held = open_context(reader, MemoryConfigStore({}), USER, None, cache).session
+    assert (held.date, held.newer is not None) == (D2, True)
+    nightly(date(2026, 10, 2), RunStatus.COMPLETE)  # same publish state, a new record
+    flipped = open_context(reader, MemoryConfigStore({}), USER, None, cache).session
+    assert (flipped.date, flipped.newer) == (date(2026, 10, 2), None)

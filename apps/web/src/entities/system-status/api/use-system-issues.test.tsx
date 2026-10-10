@@ -53,20 +53,20 @@ describe('useSystemIssues', () => {
     GQL.mockImplementation((_doc, variables) => answer(variables));
     const { result } = renderHook(() => useSystemIssues(false), { wrapper });
     await waitFor(() => {
-      expect(result.current).toHaveLength(1);
+      expect(result.current.issues).toHaveLength(1);
     });
     expect(GQL).toHaveBeenCalledOnce();
-    expect(result.current[0]?.id).toBe('screen:2026-10-08:a');
+    expect(result.current.issues[0]?.id).toBe('screen:2026-10-08:a');
   });
 
   it('adds the failed nightly run for an admin, ahead of the warnings', async () => {
     GQL.mockImplementation((_doc, variables) => answer(variables));
     const { result } = renderHook(() => useSystemIssues(true), { wrapper });
     await waitFor(() => {
-      expect(result.current).toHaveLength(2);
+      expect(result.current.issues).toHaveLength(2);
     });
     expect(GQL).toHaveBeenCalledOnce();
-    expect(result.current.map((i) => i.severity)).toEqual(['failing', 'warning']);
+    expect(result.current.issues.map((i) => i.severity)).toEqual(['failing', 'warning']);
   });
 
   it('asks only for what the strip shows, in one operation: no picks, a one-session grid', async () => {
@@ -92,6 +92,27 @@ describe('useSystemIssues', () => {
     await waitFor(() => {
       expect(GQL).toHaveBeenCalled();
     });
-    expect(result.current).toEqual([]);
+    expect(result.current.issues).toEqual([]);
+  });
+});
+
+describe('the session notice of useSystemIssues', () => {
+  it('hands over the newer incomplete session from the same read', async () => {
+    const newer = { date: '2026-10-09', state: 'FAILED_RETRYING' };
+    GQL.mockResolvedValue({ ...SCREENS, session: { date: '2026-10-01', newer } });
+    const { result } = renderHook(() => useSystemIssues(false), { wrapper });
+    await waitFor(() => {
+      expect(result.current.notice).toMatchObject({ date: '2026-10-01', newer });
+    });
+    expect(GQL).toHaveBeenCalledOnce(); // one request for the strip and the notice
+  });
+
+  it('is null when the served session is the newest', async () => {
+    GQL.mockImplementation((_doc, variables) => answer(variables));
+    const { result } = renderHook(() => useSystemIssues(false), { wrapper });
+    await waitFor(() => {
+      expect(GQL).toHaveBeenCalled();
+    });
+    expect(result.current.notice).toBeNull();
   });
 });

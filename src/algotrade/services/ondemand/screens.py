@@ -1,5 +1,5 @@
-"""Run a screener on request (ADR 0033): for the latest session with data, unless this screener
-version has already run for it.
+"""Run a screener on request (ADR 0033): for the default session (the latest complete one, ADR
+0062), unless this screener version has already run for it.
 
 The API's one result-writing path, narrow like the live recorder's (ADR 0028): a local job
 runner whose only kind is ``screen`` (the same job the nightly submits, so a run stores
@@ -31,7 +31,7 @@ from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
 from algotrade.services.jobs.runner import LocalJobRunner
 from algotrade.services.read.availability.cause import ADMIN_CAUSE, GENERIC
-from algotrade.services.read.session import NotFoundError, latest_session
+from algotrade.services.read.session import NotFoundError, default_session
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend
@@ -85,7 +85,7 @@ class OnDemandScreens:
         return found[-1] if found else None
 
     def request(self, config_id: str, user: UserContext, on: date | None = None) -> RunRequest:
-        """Run ``config_id`` for the latest session with data (or ``on``) unless it has run."""
+        """Run ``config_id`` for the default session (or ``on``) unless it has run."""
         try:
             config = resolve_config(self._configs, config_id, user)
         except ConfigurationError as exc:
@@ -94,7 +94,7 @@ class OnDemandScreens:
             raise
         if config.config.kind != "screener":
             raise NotFoundError(f"{config_id} is a {config.config.kind}, not a screener")
-        session = on or latest_session(self._reader)
+        session = on or default_session(self._reader)
         if session is None:
             raise NotFoundError("no data is stored yet: nothing to screen")
         owner = self._owner(config_id, user)

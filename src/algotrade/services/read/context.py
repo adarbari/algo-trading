@@ -10,9 +10,10 @@ loader that describes storage itself calls them (the Admin completeness grid; RE
 ``test_inventory_reads_only_in_the_completeness_loader``), never a loader of a fact.
 
 ``open_context`` resolves the session once per request (and reuses it while nothing is
-published: keyed on ``StoreReader.visible_seq``); nothing else in ``services/read`` calls
-``resolve_session`` (ownership ``session-resolution``). A loader reads ``ctx.session.date``
-only: another date is a named argument of the loader, never derived."""
+published or saved: keyed on ``StoreReader.visible_seq`` and ``runs_generation``, ADR 0062);
+nothing else in ``services/read`` calls ``resolve_session`` (ownership ``session-resolution``).
+A loader reads ``ctx.session.date`` only: another date is a named argument of the loader, never
+derived."""
 
 import threading
 from collections import OrderedDict
@@ -56,6 +57,7 @@ __all__ = [
     "partition_on",
     "previous_session",
     "run_partition",
+    "served_session",
     "snapshot_on",
     "stored_dates",
 ]
@@ -277,9 +279,18 @@ def open_context(
 def _session(reader: StoreReader, requested: date | None, cache: ResultCache) -> Session:
     """The session ``requested`` resolves to, kept in ``cache`` until the next publish."""
     # Read before resolving (ADR 0022); a run's own pending writes do not move visible_seq.
-    key = ("session", requested, reader.own_run, reader.visible_seq())
+    # the default session follows the nightly's run records (ADR 0062): a saved record moves
+    # the runs generation, not the seq
+    key = ("session", requested, reader.own_run, reader.visible_seq(), reader.runs_generation())
     session: Session = cache.get_or_compute(key, lambda: resolve_session(reader, requested))
     return session
+
+
+def served_session(reader: StoreReader, cache: ResultCache) -> Session:
+    """The session a read with no date serves now (resolved once per publish and saved run
+    record, shared with ``open_context``); ``NotFoundError`` on an empty store. For the API's
+    response cache key (ADR 0062)."""
+    return _session(reader, None, cache)
 
 
 def previous_session(ctx: ReadContext, table: str) -> date | None:

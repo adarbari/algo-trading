@@ -45,7 +45,7 @@ from algotrade.data.reference import resolver as reference_resolver
 from algotrade.data.reference import snapshot
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.configs.store import ConfigStore
-from algotrade.storage.runs import RunRecord, RunStatus, start_run
+from algotrade.storage.runs import RunRecord, RunStatus, done_sessions, start_run
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_sources.framework.base import FetchRequest, Normalized, Source
 
@@ -453,8 +453,7 @@ def recover_unpublished(writer: StoreWriter, now: datetime) -> dict[str, list[st
 def last_finished_session(writer: StoreWriter, task: str) -> date | None:
     """The latest session a run of ``task`` finished COMPLETE or PARTIAL for (FAILED and
     unfinished runs do not count)."""
-    finished = (RunStatus.COMPLETE, RunStatus.PARTIAL)
-    done = [r.session_date for r in writer.runs_for(task) if r.status in finished]
+    done = done_sessions(writer.runs_for(task))
     return max(done) if done else None
 
 

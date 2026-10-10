@@ -14,10 +14,10 @@ from datetime import date, datetime
 from typing import Any
 
 from algotrade.services.read.context import Stores
+from algotrade.services.read.session import NIGHTLY
 from algotrade.services.run_items import failed_items, status_code
 from algotrade.storage.runs import RunRecord
 
-NIGHTLY = "nightly"  # the job name of the nightly workflow's per-session records
 EXAMPLES = 10
 
 

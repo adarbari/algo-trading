@@ -6,10 +6,18 @@
  * read that fails or has not arrived adds no issue: the strip reports known problems, never its own loading.
  */
 import { systemIssues, type SystemIssue } from '../model/issues';
+import type { SessionNotice } from '../model/notice';
 
 import { useStatusStrip } from './queries';
 
-export function useSystemIssues(admin: boolean): SystemIssue[] {
+export function useSystemIssues(admin: boolean): {
+  issues: SystemIssue[];
+  notice: SessionNotice | null;
+} {
   const { data } = useStatusStrip(admin);
-  return systemIssues(data?.nightly, data?.screens, data?.completeness);
+  // the session notice (ADR 0062) comes from the same read: the newer session left out, if any
+  return {
+    issues: systemIssues(data?.nightly, data?.screens, data?.completeness),
+    notice: data?.notice ?? null,
+  };
 }

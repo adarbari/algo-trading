@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 import pytest
 
 from algotrade.core.model.errors import DataValidationError
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id, run_session
+from algotrade.storage.runs import RunRecord, RunStatus, done_sessions, new_run_id, run_session
 from algotrade.storage.tables.schemas import (
     FORWARD_RETURNS,
     TableSpec,
@@ -20,6 +20,20 @@ def test_run_record_json_round_trip() -> None:
                        {"EQ:A": "OK"}, {"n": 1})  # fmt: skip
     assert RunRecord.from_json(record.to_json()) == record
     assert new_run_id("job", date(2026, 10, 2), now) == "job-2026-10-02-20261002T220102Z"
+
+
+def test_a_session_is_done_when_any_record_is_complete_or_partial() -> None:
+    """The one rule of the ingestion planner and the read side's last complete session."""
+    now = datetime(2026, 10, 2, 22, tzinfo=UTC)
+    days = [date(2026, 10, d) for d in (1, 2, 3, 4, 5)]
+    states = (RunStatus.COMPLETE, RunStatus.PARTIAL, RunStatus.FAILED, RunStatus.WAITING)
+    records = [
+        RunRecord(f"r{i}", "nightly", d, now, st)
+        for i, (d, st) in enumerate(zip(days, states, strict=False))
+    ]
+    records.append(RunRecord("late", "nightly", days[0], now, RunStatus.FAILED))  # a later retry
+    records.append(RunRecord("run", "nightly", days[4], now, RunStatus.RUNNING))
+    assert done_sessions(records) == {days[0], days[1]}
 
 
 def test_run_session_reads_the_session_back_from_a_run_id() -> None:

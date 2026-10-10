@@ -7,10 +7,13 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from algotrade.config.user import UserContext
+from algotrade.services.read.availability.cause import UnavailableKind
+from algotrade.services.read.session import NewerSession, NewerState
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api.deps import ApiSettings
 from algotrade_api.graphql.schema import sdl
+from algotrade_api.graphql.types.session import NewerSession as GraphNewer
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import FACTS, Graph
 from tests.helpers.api_store import END, PREVIOUS, as_user, store_over
@@ -86,3 +89,18 @@ def test_get_is_off_and_graphiql_only_in_debug(client: TestClient) -> None:
     assert page.status_code == 200 and "graphiql" in page.text.lower()
     query = debug.get("/graphql", params={"query": "{ session { date } }"})
     assert query.status_code != 200 or "errors" in query.json()  # queries never via GET
+
+
+def test_a_session_discloses_its_workflow_state_and_the_newer_incomplete_session(
+    graph: Graph,
+) -> None:
+    """ADR 0062: the golden store's latest session is complete and nothing is newer;
+    ``Session.of`` carries a newer session's state and public kind."""
+    served = graph("{ session { complete newer { date } } }")["data"]["session"]
+    assert served == {"complete": True, "newer": None}
+    mapped = GraphNewer.of(NewerSession(END, NewerState.FAILED_RETRYING, UnavailableKind.SYSTEM))
+    assert (mapped.date, mapped.state.value, mapped.kind) == (
+        END,
+        "FAILED_RETRYING",
+        UnavailableKind.SYSTEM,
+    )
