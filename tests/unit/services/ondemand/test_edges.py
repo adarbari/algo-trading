@@ -5,7 +5,10 @@ the CLI's with ``trigger = ui`` (ADR 0059, amended 2026-10-10)."""
 import threading
 import time
 from collections.abc import Iterator, Mapping
+from datetime import date
+from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -14,10 +17,13 @@ from algotrade.core.model.errors import ConfigurationError, PermissionDeniedErro
 from algotrade.services.authoring.scope import ConflictError
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.jobs import JobContext
+from algotrade.services.jobs import exclusive as jobs_exclusive
+from algotrade.services.jobs.exclusive import EdgeEvalBusyError, run_edge_eval_claimed
 from algotrade.services.ondemand import edges as ondemand_edges
 from algotrade.services.ondemand.edges import EvaluationRequest, OnDemandEdges
 from algotrade.services.ondemand.status import read_job
 from algotrade.services.read.session import NotFoundError
+from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.evaluation.cross_section.conftest import (
     ACTIVE,
@@ -135,7 +141,7 @@ def test_the_check_and_submit_hold_the_stores_lock_across_processes(
     other_process = world.backend.lock("edge-eval:alice")
     assert other_process.acquire(wait=False)
     try:
-        with pytest.raises(ConflictError, match="being started"):
+        with pytest.raises(ConflictError, match="another process"):
             runner.request("mine", ALICE)
         runner.request("mine", BOB)  # the lock is per owner
     finally:
@@ -181,3 +187,76 @@ def test_a_job_a_stopped_process_left_running_does_not_block_a_new_request(
         assert wait(runner, started).state == "complete"
     finally:
         runner.close()
+
+
+def test_the_cli_and_the_api_exclude_each_other_for_one_owner(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    gate, inside = threading.Event(), threading.Event()
+
+    def blocked(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+        inside.set()
+        gate.wait(10)
+        return {"run_id": "r1", "exploratory": False}
+
+    monkeypatch.setitem(ondemand_edges.LIBRARY_HANDLERS, "edge-eval", blocked)
+    runner = OnDemandEdges(world.backend, configs())
+    params = {"edge": "mine", "start": "2026-01-01", "end": "2026-01-02", "trigger": "cli"}
+    resources = {"reader": world.reader, "writer": world.results, "configs": configs()}
+    try:
+        first = runner.request("mine", ALICE)  # the API's job in flight: the CLI is refused
+        with pytest.raises(EdgeEvalBusyError, match="already running for alice"):
+            run_edge_eval_claimed(world.backend, resources, params, ALICE)
+        gate.set()
+        wait(runner, first)
+        gate.clear()
+        inside.clear()
+        monkeypatch.setitem(jobs_exclusive.LIBRARY_HANDLERS, "edge-eval", blocked)
+        cli = threading.Thread(
+            target=run_edge_eval_claimed, args=(world.backend, resources, params, ALICE)
+        )
+        cli.start()  # the CLI's run in flight: the API is refused, another owner is not
+        assert inside.wait(10)
+        with pytest.raises(ConflictError, match="alice"):
+            runner.request("mine", ALICE)
+        gate.set()
+        cli.join(10)
+        runner.request("mine", ALICE)
+    finally:
+        gate.set()
+        runner.close()
+
+
+def test_two_runners_on_one_local_root_exclude_each_other(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The file lock and the shared run records, as two API processes see them."""
+    gate = threading.Event()
+
+    def blocked(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+        gate.wait(10)
+        return {"run_id": "r1", "exploratory": False}
+
+    monkeypatch.setitem(ondemand_edges.LIBRARY_HANDLERS, "edge-eval", blocked)
+    root = tmp_path / "store"
+    local = LocalBackend(root)
+    first = OnDemandEdges(local, configs())
+    second = OnDemandEdges(LocalBackend(root), configs())
+    try:
+        with patch.object(ondemand_edges, "stored_outcome_sessions", lambda _r: [date(2026, 1, 5)]):
+            started = first.request("mine", ALICE)
+            with pytest.raises(ConflictError, match="already running for alice"):
+                second.request("mine", ALICE)  # its record, read from the shared root
+            other = LocalBackend(root).lock("edge-eval:bob")
+            assert other.acquire(wait=False)  # a third process mid-claim for bob
+            try:
+                with pytest.raises(ConflictError, match="another process"):
+                    second.request("mine", BOB)
+            finally:
+                other.release()
+            gate.set()
+            wait(first, started)
+    finally:
+        gate.set()
+        first.close()
+        second.close()

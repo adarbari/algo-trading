@@ -15,17 +15,17 @@ EXPLORATORY); a site edge is the site's, run by an admin as the site (``as_site`
 a trader, or an admin running it as himself, is refused (``PermissionDeniedError``). The run is
 recorded under its owner with ``trigger = ui``. A run is heavy on the owner's Mac, so one
 evaluation at a time per owner, across processes: the check and the submit are one step under the
-store's lock ``edge-eval:<owner>`` (``Backend.lock``, so a second API process or the CLI sees it
-too); a request while another of that owner's evaluations is queued or running is refused
-(``ConflictError``, 409). A job left running by a stopped process is failed on start, and one
-older than ``STALE`` no longer counts as in flight.
+store's lock ``edge-eval:<owner>`` (``claim_edge_eval``: the same claim the CLI and the nightly
+take, so a second API process, the CLI or the nightly see it too); a request while another of that
+owner's evaluations is queued or running is refused
+(``ConflictError``, 409). A job left running by a stopped process is failed on start, and
+one older than ``STALE`` no longer counts as in flight.
 
 The decision sessions are the stored outcome sessions (the CLI's default); the outcomes are those
 known now; the split is the edge's own ``frozen_from``.
 """
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
 
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.user import SITE_USER, UserContext
@@ -34,6 +34,12 @@ from algotrade.data import StoreReader
 from algotrade.services.authoring.scope import ConflictError
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.jobs.api import open_runner
+from algotrade.services.jobs.exclusive import (
+    EDGE_EVAL,
+    EDGE_EVAL_STALE,
+    EdgeEvalBusyError,
+    claim_edge_eval,
+)
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
 from algotrade.services.jobs.runner import LocalJobRunner
@@ -41,15 +47,13 @@ from algotrade.services.read.availability.cause import ADMIN_CAUSE, GENERIC
 from algotrade.services.read.session import NotFoundError
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend
-from algotrade.storage.locks import held
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
 
-KIND = "edge-eval"
+KIND = EDGE_EVAL
 TRIGGER = "ui"  # what the run record says started it (nightly | ui | cli)
 STORED = (JobStatus.COMPLETE, JobStatus.PARTIAL)  # a job that stored results
-IN_FLIGHT = (JobStatus.QUEUED, JobStatus.RUNNING)
-STALE = timedelta(hours=2)  # the longest evaluation takes ~40 minutes: older, "running", is dead
+STALE = EDGE_EVAL_STALE
 
 
 @dataclass(frozen=True)
@@ -77,15 +81,6 @@ class OnDemandEdges:
             self._writer.runs_backend, {KIND: LIBRARY_HANDLERS[KIND]}, resources, workers=1
         )
         self._jobs.recover(STALE, (KIND,))
-
-    def _running(self, user: str) -> JobRecord | None:
-        """An evaluation of ``user`` still queued or running (None: free to start one)."""
-        now = datetime.now(UTC)
-        for run in self._writer.runs_for(f"job:{KIND}"):
-            job = JobRecord.from_run(run)
-            if job.user == user and job.status in IN_FLIGHT and now - job.submitted_at < STALE:
-                return job
-        return None
 
     def request(
         self, edge_id: str, user: UserContext, *, as_site: bool = False, admin: bool = False
@@ -117,19 +112,13 @@ class OnDemandEdges:
             "end": stored[-1].isoformat(),
             "trigger": TRIGGER,
         }
-        with held(self._backend.lock(f"{KIND}:{owner.user_id}"), wait=False) as taken:
-            if not taken:  # another process is between its check and its submit
-                raise ConflictError(
-                    f"an evaluation for {owner.user_id} is being started: try again shortly"
-                )
-            self._jobs.recover(STALE, (KIND,))  # a stopped process's job is failed, not in flight
-            busy = self._running(owner.user_id)
-            if busy is not None:
-                raise ConflictError(
-                    f"an evaluation of {busy.params.get('edge')} is already running "
-                    f"for {owner.user_id}: wait for it to finish"
-                )
-            job_id = self._jobs.submit(KIND, params, owner, force=True)
+        try:
+            with claim_edge_eval(
+                self._backend, owner.user_id, lambda: self._jobs.recover(STALE, (KIND,))
+            ):
+                job_id = self._jobs.submit(KIND, params, owner, force=True)
+        except EdgeEvalBusyError as busy:
+            raise ConflictError(str(busy)) from busy
         return self._view(self._jobs.status(job_id))
 
     @staticmethod

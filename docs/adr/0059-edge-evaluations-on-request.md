@@ -52,11 +52,17 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
   run uses the site owner and is the site's canonical run. An edge the caller cannot see (another
   user's) is a 404, never a 403, so an id's existence is not disclosed. A run is recorded under
   its owner with `trigger = ui`. Replaces "any user runs a site edge for themselves, exploratory".
-- **One at a time per owner, across processes** (replaces decision 3's in-process lock and the
-  consequence that one API process is assumed). The check-and-submit is one step under
-  `Backend.lock("edge-eval:<owner>")` taken without waiting: a request that finds it held (another
-  process between its check and its submit) is refused with the same 409. A job older than `STALE`
-  still does not count; the job runner stays single-worker.
+- **One at a time per owner, across processes, for every caller** (replaces decision 3's
+  in-process lock and the consequence that one API process is assumed). `claim_edge_eval`
+  (`services/jobs/exclusive.py`) is the one claim: the API, the CLI (`run_edge_eval_claimed`) and
+  the nightly all take it. It holds `Backend.lock("edge-eval:<owner>")` without waiting for the
+  check-and-submit (the CLI holds it for its whole run) and refuses while an evaluation job of
+  the owner is queued or running; a held lock or an in-flight job is `EdgeEvalBusyError` (the API
+  answers 409, the CLI prints it and exits 2). The runner stays single-worker.
+  **Limitation:** liveness is the job record's age (`EDGE_EVAL_STALE`, 2 hours), not a lock held
+  for the whole run: that needs the runner's worker to hold the lock around each job, which is a
+  restructuring of `LocalJobRunner` left for later. A crashed API run blocks its owner for up to
+  two hours, or until the next API start fails it (`recover`).
 - **Who and what in the run stats.** The run record's `stats` carry `owner` (the edge's), `trigger`
   (`nightly` | `ui` | `cli`) and `job_id` (the job that wrote it), written by `write_edge_eval`; the
   job takes `trigger` as a param (default `cli`; the CLI passes `cli`, the on-request runner `ui`,
