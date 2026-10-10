@@ -8,7 +8,9 @@ import { useNavigate, useParams, useRouter } from '@tanstack/react-router';
 
 import { EdgeBuilderPage } from '@/pages/edge-builder';
 
-import { NEW_EDGE } from './return-to-edge';
+// `returnTo` of an edge not saved yet (ADR 0053 amendment, ED8): the Screen Builder it opens goes
+// back in history on "Save and return to edge"; `.` cannot be in an edge id.
+const NEW_EDGE = '.new';
 
 export function BuilderRoute() {
   const { id } = useParams({ strict: false });
