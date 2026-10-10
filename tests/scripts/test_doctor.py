@@ -323,6 +323,21 @@ def test_main_checkout_warns_off_main_behind_or_dirty_site_config(tmp_path: Path
     ]
 
 
+def test_main_checkout_off_main_names_the_deploy_block_and_last_blocked_line(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "var" / "logs").mkdir(parents=True)
+    (tmp_path / "var" / "logs" / "deploy.log").write_text(
+        "t1 ok\nt2 BLOCKED: main checkout is on feat/x\n"
+    )
+    p = probes(tmp_path, {}, main=lambda: tmp_path, run=_git_probe("feat/x", "a", "a", ""))
+    (r,) = doctor.check_main_checkout(p)
+    assert (
+        "auto-deploy is blocked" in r.detail
+        and "t2 BLOCKED: main checkout is on feat/x" in r.detail
+    )
+
+
 def test_running_checks_lists_other_runs_with_their_directory(tmp_path: Path) -> None:
     def run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
         if cmd[0] == "pgrep":
