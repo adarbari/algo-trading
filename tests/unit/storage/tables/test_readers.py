@@ -113,7 +113,7 @@ def test_including_keeps_recording_into_the_same_log() -> None:
         assert own.table(A, D2) is not None  # sees its own pending write
         reader.table(A, D1)
     assert reader.reads(D2) == (
-        ReadRecord(A, D2, D2, "rows", dates_digest([D2])),
+        ReadRecord(A, D2, D2, "rows", dates_digest([])),  # its own write is pending: not listed
         ReadRecord(A, D1, D1, "rows", dates_digest([D1])),
     )
     assert own.reads(D2) == reader.reads(D2)
@@ -138,13 +138,11 @@ def test_a_store_reader_makes_a_recording_one_of_its_own_view() -> None:
     assert recording.reads(D1) == (ReadRecord(A, D1, D1, "rows", dates_digest([D1])),)
 
 
-def test_a_read_filtered_by_instruments_or_as_of_cannot_tell_presence_and_carries_no_digest() -> (
-    None
-):
+def test_a_filtered_read_records_the_committed_partitions_the_store_lists() -> None:
     backend = MemoryBackend()
     publish(backend, "r1", A, D1)
     reader = RecordingReader(backend)
     with reader.attribute(D1):
         reader.table(A, D1, instruments=["EQ:A"])
         reader.table_range(A, D1, D1, T0 + timedelta(days=9))
-    assert reader.reads(D1) == (ReadRecord(A, D1, D1, "rows"),)  # both: one distinct, unknown read
+    assert reader.reads(D1) == (ReadRecord(A, D1, D1, "rows", dates_digest([D1])),)

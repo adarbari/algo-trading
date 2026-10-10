@@ -343,24 +343,55 @@ def test_an_event_edge_reuses_its_legs_until_the_names_of_an_event_session_chang
     same(night, go(T2, full=True))
 
 
-def test_sessions_a_screener_lost_to_a_missing_table_are_reused_as_lost(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def lost_world(monkeypatch: pytest.MonkeyPatch) -> tuple[World, EdgeEvaluation]:
+    """A store whose feature table has no partition at D2: the screen reads it, finds nothing and
+    raises as the real one does; the first run is made under that screen."""
     real = session_reads.screen_variant
 
     def missing_on_second(reader: Any, config: Any, day: date) -> Any:
         if day == D2:
+            reader.table(FEATURE, day)  # the absent read is logged
             raise MissingDataError(FEATURE, "no rows", "ingest")
         return real(reader, config, day)
 
-    w = build_world()
+    w = build_world(no_features=[D2])
     with monkeypatch.context() as patch:
         patch.setattr(session_reads, "screen_variant", missing_on_second)
-        first = run(w, T1)
-    again = run(w, T1)  # the screen would run now: the stored leg says it was lost
+        return w, run(w, T1)
+
+
+def test_sessions_a_screener_lost_to_a_missing_table_are_reused_as_lost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    w, first = lost_world(monkeypatch)
+    again = run(w, T1)  # the table is still absent: the stored leg says it was lost
     assert (again.legs_reused, again.legs_computed) == (4, 0)
     same(first, again)
     assert dict(again.results[0].lost_sessions) == {FEATURE: 1}
+
+
+def test_a_table_that_lands_after_a_session_was_lost_recomputes_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    w, _ = lost_world(monkeypatch)
+    recommit(w, FEATURE, D2, "landed", expensive(D2))
+    night = run(w, T2, write=False)
+    assert dict(night.legs_invalidated) == {"inputs": 1} and night.legs_computed == 1
+    assert dict(night.results[0].lost_sessions) == {}
+    same(night, run(w, T2, full=True, write=False))
+
+
+def test_a_purged_table_recomputes_the_sessions_that_read_it_even_through_a_filter(
+    world: World,
+) -> None:
+    run(world, T1)
+    for table in (FEATURE, "universe"):  # read whole, and read for named instruments
+        found = read_legs(world.reader, "site", "drift", DAYS[0], DAYS[-1])
+        assert any(r.table == table and r.digest for r in found.reads[D2].reads)
+    world.writer.drop_table(FEATURE)
+    night = run(world, T2, write=False)
+    assert night.legs_reused == 0 and dict(night.legs_invalidated) == {"inputs": 4}
+    same(night, run(world, T2, full=True, write=False))
 
 
 def test_reused_sessions_still_count_in_the_historical_caveat_and_the_snapshot() -> None:

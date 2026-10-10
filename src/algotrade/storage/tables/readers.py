@@ -134,18 +134,6 @@ def dates_digest(days: Sequence[date]) -> str:
     return hashlib.sha256(",".join(d.isoformat() for d in days).encode()).hexdigest()[:16]
 
 
-def _rows(table: str, start: date, end: date, found: list[date] | None) -> ReadRecord:
-    """A ``rows`` record; ``found`` the partitions the read returned (None: not known, a read
-    filtered by instruments or ``as_of`` cannot tell an empty partition from none)."""
-    return ReadRecord(table, start, end, "rows", None if found is None else dates_digest(found))
-
-
-def _partition_days(frame: pd.DataFrame) -> list[date] | None:
-    if "session_date" not in frame.columns:
-        return None
-    return sorted({pd.Timestamp(v).date() for v in frame["session_date"].unique()})
-
-
 @dataclass
 class _Attribution:
     """What the readers of one family (a ``RecordingReader`` and its ``including`` copies)
@@ -221,8 +209,7 @@ class RecordingReader(StoreReader):
         recording = self._open()
         frame = super().table(table, session_date, as_of, instruments)
         if recording:
-            found = None if as_of or instruments else ([] if frame is None else [session_date])
-            self._log(_rows(table, session_date, session_date, found))
+            self._log_rows(table, session_date, session_date)
         return frame
 
     def table_range(
@@ -237,11 +224,14 @@ class RecordingReader(StoreReader):
         recording = self._open()
         frame = super().table_range(table, start, end, as_of, instruments, columns)
         if recording:
-            found = None
-            if not (as_of or instruments):
-                found = [] if frame is None else _partition_days(frame)
-            self._log(_rows(table, start, end, found))
+            self._log_rows(table, start, end)
         return frame
+
+    def _log_rows(self, table: str, start: date, end: date) -> None:
+        """Log a ``rows`` read with the committed partition dates the store lists in the range
+        (not what the read returned: a filtered read cannot tell an empty partition from none)."""
+        listed = sorted(StoreReader.partition_seq(self, table, start, end))
+        self._log(ReadRecord(table, start, end, "rows", dates_digest(listed)))
 
     def _log_dates(self, table: str, seen: list[date]) -> None:
         """Log the listing the caller used. A date after the day is a read of the future: the

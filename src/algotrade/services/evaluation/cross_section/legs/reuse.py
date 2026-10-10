@@ -136,7 +136,11 @@ def plan_reuse(
     for n in wanted:
         day = n.leg[4]
         found = mine.get(n.leg)
-        reason = None if found is None else _stale(n, found, sound[day], known, seqs)
+        reason = (
+            None
+            if found is None
+            else _stale(n, found, sound[day], known, seqs, stored.reads.get(day))
+        )
         reasons[n.leg] = reason
         if found is None or reason is not None:
             todo.add(day)
@@ -161,13 +165,18 @@ def _stale(
     sound: bool,
     known: Known,
     seqs: Mapping[date, int],
+    reads: DayReads | None,
 ) -> str | None:
-    """Why ``leg`` cannot stand in for ``need`` (None: it can)."""
+    """Why ``leg`` cannot stand in for ``need`` (None: it can). A leg lost to a missing table
+    needs that table's absent read in the log, or a table that lands later would never be seen."""
     if leg.entry != need.entry:
         return "entry"
     if leg.event_ids != need.events:
         return "events"
-    if not sound:
+    logged = reads is not None and any(
+        r.kind == "rows" and r.table == leg.lost_table for r in reads.reads
+    )
+    if not sound or (leg.lost_table is not None and not logged):
         return "inputs"
     if (
         known[need.entry, need.leg[3]] > leg.outcomes_as_of
