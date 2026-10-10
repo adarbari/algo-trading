@@ -1,0 +1,125 @@
+# L3 site setting: the Guide glossary, how the app thinks about a day (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+# ---------------------------------------------------------------- how the app thinks about a day
+
+[[term]]
+id = "session"
+term = "Session"
+short = "The trading day a page is reading: every value on it is for exactly that day."
+body = """
+A page reads one session, by default the latest trading day whose nightly update has fully
+completed, and says which one it is. Every daily value on the page is the one stored for that day. A value the app did not compute or pull for that day is shown as UNKNOWN with the reason. It is never filled in from an earlier day. So two numbers side by side are always about the same day. The
+list of instruments and their company details come from snapshots taken from time to time:
+the page uses the latest snapshot on or before the session and says which.
+"""
+see_also = ["unknown", "not_run", "knowledge_time", "last_complete_session"]
+
+[[term]]
+id = "last_complete_session"
+term = "Last complete session"
+short = "The newest trading day whose nightly update has finished, which is what pages show by default."
+body = """
+Each night the app pulls prices and options, computes every field and runs every screen for
+the new trading day. Until all of that has finished, the day is incomplete: a page that read it
+would show gaps and screens that never ran. So pages keep showing the last complete session and
+say that a newer one is still in progress, or that a step failed and the app is retrying it. Once the
+update completes, pages switch to the new day by themselves. Asking for a date explicitly
+always shows that date, complete or not.
+"""
+next = "Nothing is needed from you: pages move on by themselves, and a step that keeps failing is for the owner to fix."
+see_also = ["session", "not_run", "run"]
+
+[[term]]
+id = "knowledge_time"
+term = "Knowledge time"
+short = "When the app stored a fact, as opposed to the day the fact is about."
+body = """
+Every stored row carries the market day it describes (its session date) and its knowledge
+time (knowledge_ts), the moment the app learned it. A vendor's correction is added as a new row with a later knowledge time. It is never written over the old one. So a backtest records which version of the data it read and can be repeated exactly. Dated events such as earnings
+announcements carry the day they became known (known_from), and a page for a session only
+uses the events known by that day.
+"""
+see_also = ["session", "run"]
+
+[[term]]
+id = "unknown"
+term = "UNKNOWN"
+short = "A value that is not known for the session, always shown with the reason why."
+body = """
+The app shows UNKNOWN instead of guessing. The reason names one of five cases. Nothing of that kind was stored for the session. The instrument has no row that day. The value is stored empty, and the field's null meaning says what empty means for it. The field does not apply to the instrument. Or the field is a personal-licence one that you cannot read. UNKNOWN is about one value;
+NOT_RUN is about a whole screen. In a screen, missing data never passes: a hard criterion with
+no value rejects the row, a soft or score criterion with no value costs points.
+"""
+see_also = ["not_run", "session", "hard"]
+
+[[term]]
+id = "not_run"
+term = "NOT_RUN"
+short = "A screen with no run for the session: nothing was screened that day, which is not the same as a run that found nothing."
+body = """
+A screen's results always belong to one session. When the screen has no run for the session
+the page reads, it is NOT_RUN: the app never shows an older run's picks in its place. Ideas
+lists only the screens that ran for the session and names the others NOT_RUN. A run that found
+nothing is different: it ran, and every row was rejected. The nightly data-quality check is
+NOT_RUN the same way on a day it did not run.
+"""
+see_also = ["run", "unknown", "session"]
+
+[[term]]
+id = "run"
+term = "Run"
+short = "One execution of a job that writes results, recorded with its own id."
+body = """
+The nightly runs every finalised screen and every site preset screen for the session, and a
+screen can also be run on request. Each result row carries its run's id and the screen's id,
+version and a hash of its settings, so you can always tell which rules produced it. A Builder
+preview is not a run: it evaluates the same rules on the latest session and saves nothing.
+Data loads and backtests are runs too, each with its own record.
+"""
+see_also = ["not_run", "draft", "preset"]
+
+[[term]]
+id = "selection"
+term = "Selection"
+short = "Typed rules that pick which instruments a strategy or a backtest looks at."
+body = """
+A selection is a list of rules (a field, a comparison and a value, combined with all, any and
+not) checked against the field catalogue. Missing data counts as unknown and is left out,
+never passed. Rule screens have no selection. Who is screened (the security type, an ACTIVE listing, having options) is written as hard criteria like any other. So it shows in the funnel with the rest.
+"""
+see_also = ["criterion", "hard", "gating_criterion"]
+
+[[term]]
+id = "draft"
+term = "Draft"
+short = "A screen's working copy: you can edit, save and preview it, but it is never run."
+body = """
+The Builder keeps your edits to a screen as its draft (Save draft). A draft is never run. Finalize checks it (every field exists, every value fits its field) and turns it into the next numbered version. That version cannot change and runs every night from then on. A screen drafted from a sentence (Describe it) is a draft too. The criteria the text model proposes load as unsaved edits. Nothing is saved or run until you save and finalise.
+"""
+see_also = ["preset", "run", "criterion"]
+
+[[term]]
+id = "preset"
+term = "Preset"
+short = "A screen the site ships, reviewed and versioned with the app, that runs every night."
+body = """
+A preset's versions are numbered and never change: a new rule is a new version, and the
+latest is the highest number. You cannot edit a preset itself; your first edit in the Builder
+makes your own copy, which extends the preset at the version you started from. When the site
+publishes a newer version, the Builder offers to rebase your copy onto it. Each site preset
+has a playbook in the Guide.
+"""
+see_also = ["playbook", "draft", "run"]
+
+[[term]]
+id = "playbook"
+term = "Playbook"
+short = "The Guide's page for one site preset screen: the setup it looks for, what it checks and what it leaves to you."
+body = """
+There is one playbook per site preset, grouped by family (trend, breakouts, reversals, option
+income). It says what a hit looks like and what the screen does not check. It lists each criterion in plain words with its field and rule. It gives the caveats to read before acting on a hit and the situations that fool its fields. It also links to related playbooks. Open in Builder
+shows the preset in the Builder, where your first edit makes your own copy.
+"""
+see_also = ["preset", "criterion"]

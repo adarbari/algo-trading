@@ -159,11 +159,11 @@ def test_every_state_term_says_what_happens_next() -> None:
     assert states, f"{COVERAGE.name} maps no value to a term"
     missing = sorted(t.id for t in glossary.terms if t.id in states and not t.next)
     assert not missing, (
-        f"glossary.toml: give these state terms a `next` (what the app does next or what the "
+        f"glossary: give these state terms a `next` (what the app does next or what the "
         f"reader can do; checklist bullet 4): {missing}"
     )
     assert all(len(sentences(t.next)) == 1 for t in glossary.terms if t.next), (
-        "glossary.toml: `next` is one sentence"
+        "glossary: `next` is one sentence"
     )
 
 

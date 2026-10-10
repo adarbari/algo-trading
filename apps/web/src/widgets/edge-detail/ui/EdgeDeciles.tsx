@@ -5,7 +5,7 @@
  */
 import { BarList, Panel, Stack, Text, type BarListItem } from '@algotrade/ui';
 
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 export interface EdgeDecilesProps {
   /** The in-sample mean outcome per tenth, best-ranked first (empty: not stored). */
@@ -26,7 +26,7 @@ export function EdgeDeciles({ deciles }: EdgeDecilesProps) {
           <Text size="xs" tone="muted">
             In-sample
           </Text>
-          <GuideHelp entry={{ kind: 'term', id: 'top_vs_bottom_decile' }} />
+          {termHelp('top_vs_bottom_decile')}
         </Stack>
       }
     >

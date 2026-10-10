@@ -7,7 +7,7 @@ import { DataTable, Panel, Stack, Text } from '@algotrade/ui';
 import { useMemo } from 'react';
 
 import { useEdgeCompare, type CompareRow } from '@/features/edge-compare';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 import { compareColumns } from '../model/columns';
 
@@ -28,7 +28,7 @@ export function EdgeCompare({ edgeId }: EdgeCompareProps) {
       loadingLabel="Loading comparison…"
       errorMessage="The comparison failed to load."
       onRetry={() => void found.refetch()}
-      actions={<GuideHelp entry={{ kind: 'term', id: 'compare_versions' }} />}
+      actions={termHelp('compare_versions')}
     >
       <Stack gap={2}>
         {compare?.reason && (

@@ -14,7 +14,7 @@ import {
   verdictTone,
   type Edge,
 } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 const screensOf = (e: Edge): string => {
   const screens =
@@ -47,7 +47,7 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
     {
       id: 'verdict',
       header: 'Verdict',
-      headerAction: <GuideHelp entry={{ kind: 'term', id: 'verdict' }} />,
+      headerAction: termHelp('verdict'),
       value: (e) => verdictLabel(e.verdict.verdict),
       essential: true,
       cell: ({ row }) => (
@@ -59,7 +59,7 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
     {
       id: 'result',
       header: 'Out-of-sample result',
-      headerAction: <GuideHelp entry={{ kind: 'term', id: 'out_of_sample' }} />,
+      headerAction: termHelp('out_of_sample'),
       value: (e) => e.verdict.result,
       grow: true,
       tone: 'secondary',
@@ -67,7 +67,7 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
     {
       id: 'trades',
       header: 'Trades',
-      headerAction: <GuideHelp entry={{ kind: 'term', id: 'trades' }} />,
+      headerAction: termHelp('trades'),
       value: (e) => e.verdict.trades ?? null,
       format: { kind: 'number' },
       align: 'end',
@@ -75,7 +75,7 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
     {
       id: 'status',
       header: 'Status',
-      headerAction: <GuideHelp entry={{ kind: 'term', id: 'edge_state' }} />,
+      headerAction: termHelp('edge_state'),
       value: stateOrStatus,
       tone: 'secondary',
       cell: ({ row }) => (

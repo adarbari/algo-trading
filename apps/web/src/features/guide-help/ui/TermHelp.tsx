@@ -1,6 +1,6 @@
 /**
  * A glossary term's help: the term, its one-sentence definition and the paragraph behind it.
- * The text is the term's (`config/site/guide/glossary.toml`) as the server links it; nothing is
+ * The text is the term's (`config/site/guide/glossary/<theme>.toml`) as the server links it; nothing is
  * written here, so any word of the app can carry an InfoButton by naming the term's id.
  */
 import { HelpLead, HelpSection, Text } from '@algotrade/ui';

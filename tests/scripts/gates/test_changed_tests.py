@@ -86,7 +86,7 @@ def test_what_the_guide_coverage_test_reads_maps_to_it() -> None:
     guide = changed_tests.GUIDE_FITNESS
     assert guide in covering("apps/api/schema.graphql")
     assert guide in changed_tests.covering_tests(
-        ["config/site/guide/glossary.toml"], {guide}.__contains__
+        ["config/site/guide/glossary/edges.toml"], {guide}.__contains__
     )
 
 
