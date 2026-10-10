@@ -127,7 +127,7 @@ describe('EdgeActions', () => {
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
         params: { path: { edge_id: 'earnings_drift' } },
-        body: { state: 'following', reason: '', reveal_oos: false },
+        body: { follow: true, status: null, reason: '', reveal_oos: false },
       });
     });
   });
@@ -144,7 +144,7 @@ describe('EdgeActions', () => {
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
         params: { path: { edge_id: 'momentum_12_1' } },
-        body: { state: 'rejected', reason: 'No edge.', reveal_oos: false },
+        body: { follow: false, status: null, reason: 'No edge.', reveal_oos: false },
       });
     });
   });
@@ -159,7 +159,7 @@ describe('EdgeActions', () => {
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
         params: { path: { edge_id: 'my_momentum' } },
-        body: { state: null, reason: '', reveal_oos: true },
+        body: { follow: null, status: null, reason: '', reveal_oos: true },
       });
     });
   });

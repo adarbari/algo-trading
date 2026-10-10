@@ -23,7 +23,7 @@ export interface MoveEdgeDialogProps {
 
 export function MoveEdgeDialog({ edge, move, open, onOpenChange }: MoveEdgeDialogProps) {
   const [reason, setReason] = useState('');
-  const mover = useMoveEdge(edge.id);
+  const mover = useMoveEdge(edge.id, edge.mine);
   const needsReason = move === 'reject' && reason.trim() === '';
   const close = () => {
     onOpenChange(false);

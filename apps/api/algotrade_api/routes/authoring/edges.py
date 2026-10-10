@@ -1,14 +1,14 @@
-"""``/edges/{id}``: copy an edge, save and delete the user's own, and move their state about one
-(follow, reject, retire, a new version's trial, show the out-of-sample result): ADR 0053
-amendment 2026-10-09, ADR 0029 writes into ``config/users/<id>/edges/``. Reading an edge is
-GraphQL (``Query.edge``); a run is ``POST /edges/{id}/evaluate``; publishing site-wide is an
-admin read (``Query.publishedEdgeDocument``), never a write to the site's config.
+"""``/edges/{id}``: copy an edge, save and delete the user's own, and move their status about one
+(follow a site edge, move the status of their own, show the out-of-sample result): ADR 0053
+amendments 2026-10-09 and 2026-10-10, ADR 0029 writes into ``config/users/<id>/edges/``.
+Reading an edge is GraphQL (``Query.edge``); a run is ``POST /edges/{id}/evaluate``;
+publishing site-wide is an admin read (``Query.publishedEdgeDocument``), never a write to the
+site's config.
 The write is for the caller; an admin names another user in the ``X-Act-For`` header (ADR 0040)."""
 
 from fastapi import APIRouter
 
-from algotrade.config.edges.document import Edge
-from algotrade.config.edges.loading import KIND, SITE
+from algotrade.config.edges.loading import USER_STATUSES
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring import edges
@@ -56,46 +56,30 @@ def delete(writer: Writer, user: User, edge_id: str) -> None:
 
 
 @router.put("/{edge_id}/state")
-def set_state(
+def state(
     writer: Writer, user: User, ctx: Context, store: Store, edge_id: str, body: StateBody
 ) -> EdgeState:
-    """Move the user's state about an edge (follow, reject, retire, replace) and/or show its
-    out-of-sample result. The server decides the permanent labels (a warning, never a block)."""
-    own = edge_id not in store.configs.names(SITE, KIND)
-    change = _change(body, own)
+    """Bookmark a site edge (``follow``) or move the status of the user's own (``status``), and/or
+    show an own edge's out-of-sample result. The server decides the permanent labels (a warning,
+    never a block); 400 for a ``status`` of a site edge, a ``follow`` of an own edge or both."""
+    if body.follow is not None and body.status is not None:
+        raise ConfigurationError("send follow (a site edge) or status (your own edge), not both")
+    if body.status is not None and body.status not in USER_STATUSES:
+        raise ConfigurationError(f"status {body.status!r}: expected one of {list(USER_STATUSES)}")
+    change = StatusChange(body.status, body.follow, body.reason, body.reveal_oos)
     # The verdict is the one the acted-for user sees (X-Act-For), not the caller's.
     theirs = open_stores(store.reader, store.configs, UserContext(user), store.cache)
-    verdict = versions.verdict_level(theirs, edge_id) if body.state == "following" else None
+    judged = body.follow is True or body.status == "live"
+    verdict = versions.verdict_level(theirs, edge_id) if judged else None
     edge = edges.set_status(writer, user, edge_id, change, today=ctx.session.date, verdict=verdict)
     return EdgeState(
         edge_id=edge_id,
-        state=_state(edge, own),
-        since=edge.audit.status_since if own else edge.follow.since,
+        status=edge.status,
+        followed=edge.followed,
+        followed_since=edge.follow.since,
+        status_since=edge.audit.status_since,
         reason=edge.audit.status_reason,
         replaces=edge.audit.replaces,
         labels=[*dict.fromkeys([*edge.follow.labels, *edge.audit.labels])],
         oos_revealed=edge.audit.oos_revealed,
     )
-
-
-# The old state words the browser still sends and reads (until the surfaces speak status, ADR 0053
-# amendment 2026-10-10): an own edge's status, or a site edge's bookmark.
-_STATUS_OF = {"researching": "researching", "trial": "candidate", "following": "live",
-              "rejected": "rejected", "retired": "retired"}  # fmt: skip
-
-
-def _change(body: StateBody, own: bool) -> StatusChange:
-    state = body.state
-    if state is not None and state not in _STATUS_OF:
-        raise ConfigurationError(f"state {state!r}: expected one of {list(_STATUS_OF)}")
-    if own:
-        status = None if state is None else _STATUS_OF[state]
-        return StatusChange(status, None, body.reason, body.reveal_oos)
-    follow = None if state is None else state in ("following", "trial")
-    return StatusChange(None, follow, body.reason, body.reveal_oos)
-
-
-def _state(edge: Edge, own: bool) -> str:
-    if not own:
-        return "following" if edge.followed else "researching"
-    return {v: k for k, v in _STATUS_OF.items()}.get(edge.status, "researching")
