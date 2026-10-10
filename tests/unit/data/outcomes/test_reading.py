@@ -71,3 +71,29 @@ def test_nothing_stored_is_missing_data_and_no_sessions_is_empty() -> None:
     with pytest.raises(MissingDataError):
         read_outcomes(reader, 20, [S1])
     assert read_outcomes(reader, 20, []).empty
+
+
+def test_with_as_of_only_the_wanted_partitions_are_read() -> None:
+    reader = _store()
+    read: list[date] = []
+    real = reader.table
+
+    def spy(table: str, day: date, *a: object, **k: object) -> pd.DataFrame | None:
+        read.append(day)
+        return real(table, day, *a, **k)  # type: ignore[arg-type]
+
+    reader.table = spy  # type: ignore[method-assign]
+    as_of = datetime(2026, 10, 6, tzinfo=UTC)
+    out = read_outcomes(reader, 20, [S1, S3], as_of=as_of)
+    assert read == [S1, S3]  # not S2, between them
+    assert list(out["session_date"]) == [S1, S1, S3]
+    assert read_outcomes(reader, 20, [S1, S3]).equals(out)  # the range read gives the same rows
+
+
+def test_with_as_of_the_error_keeps_the_span_semantics() -> None:
+    reader, as_of = _store(), datetime(2026, 10, 6, tzinfo=UTC)
+    assert read_outcomes(reader, 20, [S1, date(2026, 9, 5), S3], as_of=as_of).shape[0] == 3
+    with pytest.raises(MissingDataError):  # nothing stored in the span
+        read_outcomes(reader, 20, [date(2026, 9, 20), date(2026, 9, 22)], as_of=as_of)
+    none_wanted = [date(2026, 8, 30), date(2026, 9, 4)]  # partitions inside, none wanted
+    assert read_outcomes(reader, 20, none_wanted, as_of=as_of).empty

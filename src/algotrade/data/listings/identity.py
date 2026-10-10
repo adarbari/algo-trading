@@ -16,8 +16,11 @@ their identity fields come by one of two paths, the owner's rule (disclosed, nev
 ``status`` is ACTIVE for every name (it was listed on the session). Without a stored listing
 history the read raises ``MissingDataError`` (no silent fallback to today's names)."""
 
+import threading
+from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 
@@ -46,6 +49,40 @@ class HistoricalIdentity:
         chosen = set(ids)
         proxy = len(chosen & self.proxy_ids)
         return {TODAY_FLAG: len(chosen) - proxy, PROXY: proxy}
+
+
+_MEMO_SIZE = 8
+_lock = threading.Lock()  # the API's threads share the memo
+_memo: OrderedDict[
+    tuple[int, str | None, int, date, datetime | None],
+    tuple[StoreReader, HistoricalIdentity | None],
+] = OrderedDict()
+
+
+def memoised_identity(
+    reader: StoreReader,
+    session: date,
+    as_of: datetime | None,
+    compute: Callable[[], HistoricalIdentity | None],
+) -> HistoricalIdentity | None:
+    """``compute()`` once per (reader, ``visible_seq``, session, ``as_of``), a small LRU: the
+    harness asks for the same session's identity once per field read (16 times). ``visible_seq``
+    changes exactly when a commit publishes, so a publish makes every earlier entry unreachable.
+    The reader is kept in the entry so its ``id`` is never reused while the entry lives; a
+    reader with pending writes (``own_run``) is never memoised."""
+    if reader.own_run is not None:  # a run's pending writes do not move ``visible_seq``
+        return compute()
+    key = (id(reader), reader.own_run, reader.visible_seq(), session, as_of)  # read before
+    with _lock:
+        if key in _memo:
+            _memo.move_to_end(key)
+            return _memo[key][1]
+    found = compute()
+    with _lock:
+        _memo[key] = (reader, found)
+        while len(_memo) > _MEMO_SIZE:
+            _memo.popitem(last=False)
+    return found
 
 
 def historical_reference(

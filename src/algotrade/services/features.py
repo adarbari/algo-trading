@@ -24,7 +24,11 @@ from algotrade.config.env import config_dir
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, REFERENCE_TABLE, is_feature_field
 from algotrade.data import StoreReader
-from algotrade.data.listings.identity import HistoricalIdentity, historical_reference
+from algotrade.data.listings.identity import (
+    HistoricalIdentity,
+    historical_reference,
+    memoised_identity,
+)
 from algotrade.data.reference import InstrumentView, instrument_view, snapshot
 from algotrade.data.rollups import feature_rows, group_view
 from algotrade.features.expressions.feature_set import FeatureSet
@@ -141,11 +145,14 @@ def field_view(
 def _historical_identity(
     reader: StoreReader, session: date, as_of: datetime | None
 ) -> HistoricalIdentity | None:
-    snap = snapshot(reader, REFERENCE_TABLE, session)
-    if snap is None or not snap.pre_snapshot:
-        return None
-    today = reader.table(REFERENCE_TABLE, snap.snapshot_date, as_of)
-    return None if today is None else historical_reference(reader, session, today)
+    def compute() -> HistoricalIdentity | None:
+        snap = snapshot(reader, REFERENCE_TABLE, session)
+        if snap is None or not snap.pre_snapshot:
+            return None
+        today = reader.table(REFERENCE_TABLE, snap.snapshot_date, as_of)
+        return None if today is None else historical_reference(reader, session, today)
+
+    return memoised_identity(reader, session, as_of, compute)
 
 
 def entity_field_view(

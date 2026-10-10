@@ -1,10 +1,9 @@
 # Directory layout registry (ADR 0020): every directory that may hold code, tests, config or
-# docs, with what it holds. One folder = one kind of thing. Where a new kind of code goes:
-# the "Where does this go" table in CLAUDE.md (Directory layout). If nothing fits, add a new
-# folder for the new kind and declare it here; never park code in a neighbouring folder.
+# docs, with what it holds. One folder = one kind of thing. Where a new kind of code goes: the
+# "Where does this go" table in CLAUDE.md (Directory layout). If nothing fits, add a new folder
+# for the new kind and declare it here; never park code in a neighbouring folder.
 # Enforced by tests/architecture/test_layout.py (src/, libs/, apps/, module names) and
 # tests/architecture/test_layout_buckets.py (tests/, config/, docs/):
-#
 #   - every module under src/, libs/ and apps/ lives in a directory declared here (a new folder or a
 #     stray file fails: declare the folder here with its purpose, in the same PR);
 #   - at most `max_modules` modules (excluding __init__.py; in tests/ also conftest.py) per
@@ -24,13 +23,10 @@
 #     most `max_files` files each (`kind = "log"`: an append-only numbered log, not capped);
 #   - every apps/web folder is a `[[web_dir]]` in architecture/web_layout.toml (ADR 0025;
 #     enforced by tests/architecture/test_layout_web.py).
-#   path     a directory relative to the repo root; `*` matches one path segment
-#   purpose  one line: what belongs in it
+#   path     a directory relative to the repo root (`*` matches one path segment); purpose: one line, what belongs in it
 #   kind     optional: "vendor" or "task-domain" (rules above)
 #   contracts optional: import-linter contract names (pyproject.toml) enforcing the folder rule
-#   holds    [[test_dir]] only: "tests" (default), "folders" (no modules of its own) or "data"
-#            (recorded files, no Python)
-#
+#   holds    [[test_dir]] only: "tests" (default), "folders" (no modules of its own) or "data" (recorded files)
 # Adding a folder or moving a responsibility: .claude/skills/add-responsibility.
 
 doc = "docs/adr/0020-directory-layout.md"
@@ -280,7 +276,11 @@ purpose = "use case: evaluate every strategy on every golden dataset against the
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
-purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
+purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), what it reads once per session (reads/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/cross_section/reads"
+purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 0063): each screener's run, the regime label, the eligible names per universe, the implied vol and the scored outcomes, cached until a chunk of sessions is released (session.py), and the implied vol of names at a session (implied_at, also the paper record's)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reporting"
