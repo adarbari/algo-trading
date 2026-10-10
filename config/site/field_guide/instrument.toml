@@ -254,7 +254,7 @@ note = "feature.rs_improving is the same gate as a flag; pair with rollup.relati
 [[field]]
 name = "rollup.relative_strength@v1.ret_5d_pctile"
 theme = "instrument gates"
-reads = "Where the 5-session return ranks among the universe's stocks: the share of universe members (the stocks of the snapshot the session sees) whose return is strictly below the name's, among members with a known return. 0.9 means the name beat 90% of stocks this week, 0.1 only 10%. It is a rank, so it is comparable across market regimes; the best member reads just under 1."
+reads = "Where the 5-session return ranks among the universe's stocks: the share of universe members (the stocks of the snapshot the session sees) whose return is strictly below the name's, among members with a known return. 0.9 means the name beat 90% of stocks this week, 0.1 only 10%. It is a rank, so it is comparable across market regimes; the best member reads slightly under 1."
 caveats = [
   "A week is noisy: a top-decile week is as often a spike that mean-reverts as a start. Pair with rollup.relative_strength@v1.mom_pctile_63d gte 0.7 for a name that is strong over the quarter too.",
   "ETFs are ranked against stocks but never count as members, so an ETF's rank says how it would sit among stocks.",
@@ -276,7 +276,7 @@ name = "rollup.relative_strength@v1.mom_pctile_63d"
 theme = "instrument gates"
 reads = "Where the 63-session (a quarter) return ranks among the universe's stocks: the share of universe members whose return is strictly below the name's, among members with a known return. 0.9 is the top decile of the quarter, 0.5 the median stock, 0.1 the bottom decile. 'Top decile momentum' is this at or above 0.9."
 caveats = [
-  "Ties share the lower rank, and the best member reads just under 1 (n - 1 of n are below it): gte 0.9 is a top decile, not 'above 90% of everything'.",
+  "Ties share the lower rank, and the best member reads slightly under 1 (n - 1 of n are below it): gte 0.9 is a top decile, not 'above 90% of everything'.",
   "A rank hides magnitude: in a flat market the top decile may have gained 5%. Read rollup.price_stats@v2.ret_60d for the size.",
   "Top-decile quarterly winners are the most extended names: add feature.stretch_sma50_atr lte 4 to avoid chasing.",
   "Null with no universe snapshot on or before the session, fewer than 90% of its members with a bar on the session (min_coverage), fewer than 200 members with a known return (min_members), or a gap in the name's own 64 closes.",

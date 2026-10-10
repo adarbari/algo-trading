@@ -24,7 +24,7 @@ name = "rollup.momentum@v1.rsi_14"
 theme = "momentum and trend"
 reads = "Wilder's RSI over 14 sessions, 0 to 100: the share of recent movement that was up. 50 is balance; 70 and above means the last two weeks were mostly gains (overbought), 30 and below mostly losses (oversold). In a steady uptrend RSI lives between 40 and 80 and rarely visits 30; in a downtrend between 20 and 60 (Cardwell's ranges), so 'overbought' in a bull range is strength, not a top."
 caveats = [
-  "A pending takeover pins the price just under the offer: RSI prints 80+ on the announcement day and then stays high for weeks with no trend behind it. Check rollup.price_moves@v1.one_day_move (one big day) with feature.atr_pct near 0 since; see the 'pending takeover' situation.",
+  "A pending takeover pins the price slightly under the offer: RSI prints 80+ on the announcement day and then stays high for weeks with no trend behind it. Check rollup.price_moves@v1.one_day_move (one big day) with feature.atr_pct near 0 since; see the 'pending takeover' situation.",
   "In a strong trend RSI stays above 70 for weeks; 'overbought' alone is not a sell signal (Cardwell). Pair an overbought rule with feature.pct_vs_sma_20 or feature.dist_to_resistance before reading it as stretched.",
   "RSI is 100 when the 14-session run had no down close at all, which happens on thin, low-priced names that barely trade. Gate on rollup.price_stats@v2.adv_usd_20d and rollup.price_stats@v2.close first.",
   "Oversold in a downtrend keeps falling (a falling knife): an RSI below 30 is a bounce candidate only with feature.trend_state UPTREND or feature.pct_vs_sma_200 above 0.",
@@ -446,9 +446,9 @@ tolerance = 0.01
 [[field]]
 name = "feature.dist_to_support"
 theme = "momentum and trend"
-reads = "How far the nearest confirmed swing low below the close is, as a fraction of price: 0.03 is 3% above the last place buyers showed up. Under about 0.03 the name is at support (a stop goes just below it); above about 0.15 a stop at support is a wide one."
+reads = "How far the nearest confirmed swing low below the close is, as a fraction of price: 0.03 is 3% above the last place buyers showed up. Under about 0.03 the name is at support (a stop goes right below it); above about 0.15 a stop at support is a wide one."
 caveats = [
-  "Null at a one-year low (no swing low below): a 'near support' criterion then rejects the names that just broke support, which may be what you want.",
+  "Null at a one-year low (no swing low below): a 'near support' criterion then rejects the names that recently broke support, which may be what you want.",
   "A level more than a few ATRs away is not 'support' for a swing trade; feature.dist_to_support_atr under 2 is the usual working range.",
 ]
 sources = ["Practitioner convention; ATR-scaled stops (Turtle rules)"]

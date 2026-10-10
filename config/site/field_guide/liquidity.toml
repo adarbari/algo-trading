@@ -10,7 +10,7 @@ theme = "liquidity"
 reads = "Average dollars traded a day over 20 sessions (close times volume). The usual sizing rule is to hold no more than 1% to 2% of a day's volume, so the threshold follows from the position: a $50,000 position wants about $5M a day, $500,000 wants $50M. $5M is 'some volume', $50M is liquid, $100M and above is very liquid; under $1M a day is where spreads and slippage dominate any edge."
 caveats = [
   "An ETF's on-screen volume understates its liquidity: market makers create and redeem shares, so a fund with thin volume can still absorb a large order if its holdings are liquid. For funds (instrument.is_etf eq true) a low ADV is not disqualifying by itself.",
-  "One event day (earnings, an index inclusion) lifts a 20-day average for 20 sessions; a name just over a threshold may be thinner than it looks. Check rollup.momentum@v1.rel_volume history through rollup.price_moves@v1.one_day_move.",
+  "One event day (earnings, an index inclusion) lifts a 20-day average for 20 sessions; a name slightly over a threshold may be thinner than it looks. Check rollup.momentum@v1.rel_volume history through rollup.price_moves@v1.one_day_move.",
   "Dollar volume, not shares: a $2 stock trading 10M shares is $20M a day, the same as a $200 stock trading 100k shares, and the $2 one has a far wider spread. Pair with rollup.price_stats@v2.close.",
 ]
 sources = [
@@ -427,7 +427,7 @@ name = "rollup.skew_history@v1.skew_rank_252d"
 theme = "implied volatility"
 reads = "Skew rank, 0 to 1: where today's 30-day skew sits between the year's lowest and highest. Above 0.8 is a stretched put premium for the name (puts are as rich as they have been this year), below 0.2 the flattest. The year the rank needs is built from stored chains, which start on 2026-10-02: every name reads null until it has 60 sessions with a skew (about the end of 2026), and a full year around October 2027."
 caveats = [
-  "One spike sets the year's maximum and squashes later readings, as for IV rank; rollup.skew_history@v1.skew_percentile_252d is the robust cross-check.",
+  "One spike sets the year's maximum and squashes later readings, as for IV rank; rollup.skew_history@v1.skew_percentile_252d is the steadier cross-check (one extreme day moves it less).",
   "A short window is a short sample: PROVISIONAL (rollup.skew_history@v1.skew_rank_status) means under a year of skews, so a rank near 1 can be an ordinary day.",
   "Null while skew_rank_status is UNKNOWN, with no skew today, or when every skew in the window is equal.",
 ]
@@ -443,7 +443,7 @@ note = "with rollup.skew_history@v1.skew_rank_status in PROVISIONAL or FULL"
 [[field]]
 name = "rollup.skew_history@v1.skew_percentile_252d"
 theme = "implied volatility"
-reads = "The share of the last 252 sessions' skews below today's, 0 to 1. The robust companion of rollup.skew_history@v1.skew_rank_252d: one extreme day does not distort it."
+reads = "The share of the last 252 sessions' skews below today's, 0 to 1. The steadier companion of rollup.skew_history@v1.skew_rank_252d: one extreme day does not distort it."
 caveats = [
   "Null while the rank status is UNKNOWN (fewer than 60 sessions with a skew), with no skew today, or without an earlier skew.",
 ]

@@ -271,7 +271,7 @@ Sources: O'Neil, How to Make Money in Stocks: CAN SLIM 'C' pairs accelerating qu
 
 **When the reading lies**
 
-- Null when the EPS of the quarter a year earlier was 0 or negative: a growth rate from a loss or from nothing is meaningless, so a company that has just turned profitable is null, not infinite. A hard 'gte 0.25' drops every turnaround; read rollup.financials@v2.eps_diluted_qtr gt 0 for the first profitable quarter.
+- Null when the EPS of the quarter a year earlier was 0 or negative: a growth rate from a loss or from nothing is meaningless, so a company that has recently turned profitable is null, not infinite. A hard 'gte 0.25' drops every turnaround; read rollup.financials@v2.eps_diluted_qtr gt 0 for the first profitable quarter.
 - One quarter is noisy and one-offs (a tax gain, a write-down, an asset sale) land in a single quarter; confirm with feature.revenue_growth_qtr_yoy (real growth has sales behind it) and feature.eps_growth_yoy.
 - A small year-ago EPS gives huge percentages; a fourth quarter is derived (annual minus nine months) and, with share count changes, quarterly EPS is not exactly additive.
 - The newest quarter can be four months old (rollup.financials@v2.qtr_as_of); null with no derivable quarter, for a stale quarter, for funds and for foreign filers.
@@ -335,7 +335,7 @@ Sources: SEC EDGAR company facts (docs/data/vendors.md)
 
 ### `rollup.financials@v2.eps_diluted_qtr_year_ago`
 
-**How to read it.** Diluted EPS of the same quarter a year earlier, in dollars, split-adjusted to the session. The base of feature.eps_growth_qtr_yoy: positive means a growth rate exists; 0 or negative means it is null (a company that has just turned profitable has no growth rate, only a sign change).
+**How to read it.** Diluted EPS of the same quarter a year earlier, in dollars, split-adjusted to the session. The base of feature.eps_growth_qtr_yoy: positive means a growth rate exists; 0 or negative means it is null (a company that has recently turned profitable has no growth rate, only a sign change).
 
 **The criterion per intent**
 
