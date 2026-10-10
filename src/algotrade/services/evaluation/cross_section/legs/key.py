@@ -32,7 +32,12 @@ def universe_hash(universe: Selection) -> str:
 def expression_hash(features: FeatureSet) -> str:
     """Every expression feature's definition the catalogue resolves (site and the user's),
     by name: a changed formula, parameter or range changes it."""
-    return _digest({name: asdict(e.definition) for name, e in sorted(features.expressions.items())})
+    return _digest(
+        {
+            name: [e.definition.canonical(), e.definition.valid_range]  # no prose
+            for name, e in sorted(features.expressions.items())
+        }
+    )
 
 
 def leg_key(
@@ -43,9 +48,13 @@ def leg_key(
     offset: int,
     draws: int,
     expr_defs_hash: str,
+    top_k: int | None,
+    base: str,
+    picks: str,
 ) -> str:
-    """The key of a leg: ``universe`` is ``universe_hash``, ``expr_defs_hash`` is
-    ``expression_hash``."""
+    """The key of a leg (``top_k``, ``base`` and ``picks`` of the scope's edge cut its picks and
+    names and are not in the trial hash for ``main``): ``universe`` is ``universe_hash``,
+    ``expr_defs_hash`` is ``expression_hash``."""
     return _digest(
         {
             "trial": trial_hash,
@@ -54,6 +63,9 @@ def leg_key(
             "event_class": event_class,
             "offset": offset,
             "draws": draws,
+            "top_k": top_k,
+            "base": base,
+            "picks": picks,
             "expressions": expr_defs_hash,
             "versions": [HARNESS_VERSION, LEG_VERSION, SEED_VERSION],
         }

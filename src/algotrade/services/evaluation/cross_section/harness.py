@@ -698,6 +698,9 @@ class _RandomSpec:
                 scope.edge.outcome.start_offset_sessions,
                 self.draws,
                 self.expr_hash,
+                scope.edge.top_k,
+                scope.edge.base,
+                scope.edge.picks,
             )
         return found
 
