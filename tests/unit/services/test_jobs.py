@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.edges.document import job_name
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data import StoreReader
@@ -314,6 +315,7 @@ def test_edge_eval_audit_passes_on_stored_legs_and_fails_naming_missing_ones() -
     assert "momo" in (first.error or "") and "not stored" in (first.error or "")
     again = runner.wait(runner.submit("edge-eval", params, USER, force=True))
     assert again.status is JobStatus.COMPLETE, again.error  # the legs stored now agree
+    assert {r.stats["mode"] for r in w.results.runs_for(job_name("drift", "alice"))} == {"audit"}
     runner.shutdown()
 
 

@@ -19,29 +19,32 @@ trades whose outcome is stored
 outcome is not stored) and is not critical: a failed job is a warning naming the user, never a
 hold on the session or a later one.
 
-The ``edge-eval`` step (``edge_eval_jobs``) runs one ``edge-eval`` job per open edge (not rejected
-or blocked, with screeners or baselines) as the edge's owner over the stored outcome sessions
-(ADR 0063): ``mode="incremental"`` (reuse the stored legs) on a session, ``mode="audit"``
-(recompute every leg, compare, rewrite the ones that differ, FAIL naming them) on the first
-session of its ISO week. It needs ``outcomes`` and ``screens`` and is not critical: a job that is
-not COMPLETE fails the step, a warning naming the edge, never a hold on the session or a later one.
+The ``edge-eval`` step (``edge_eval_jobs``) runs one ``edge-eval`` job per open edge (not
+rejected or blocked, with screeners or baselines) as the edge's owner over the stored outcome
+sessions (ADR 0063), under the owner's evaluation claim: ``mode="incremental"`` (reuse the stored
+legs), or ``mode="audit"`` (recompute every leg, compare, rewrite the ones that differ, FAIL
+naming them) on the first night of the ISO week that runs the step (the edge has no audit run
+that week yet). It needs ``outcomes`` and ``screens`` and is not critical: a job that is not
+COMPLETE fails the step, a warning naming the edge, never a hold on the session or a later one.
 """
 
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from algotrade.config.edges.document import CLOSED
+from algotrade.config.edges.document import CLOSED, Edge, job_name
 from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.user import UserContext
-from algotrade.core.time.calendar import previous_session
 from algotrade.data import StoreReader
 from algotrade.services.configs import nightly_screeners
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.forward.results import paper_owners
 from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
+from algotrade.services.jobs.exclusive import EdgeEvalBusyError, claim_edge_eval
 from algotrade.storage.configs.store import ConfigStore
+from algotrade.storage.tables.interfaces import Backend
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
 
 type ScreenStep = Callable[[date], Outcome]
@@ -116,14 +119,25 @@ def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> S
     return run
 
 
-def audit_session(session: date) -> bool:
-    """The first session of its ISO week by the trading calendar: the night of the weekly audit
-    (ADR 0063 amendment 6; no weekly workflow exists to hold it)."""
-    return previous_session(session).isocalendar()[:2] != session.isocalendar()[:2]
+def audited_this_week(backend: Backend | None, edge: Edge, session: date) -> bool:
+    """The edge already has an audit run in the ISO week of ``session`` (ADR 0063 amendment 6):
+    the audit is due on the week's first night that runs the step, not on a fixed weekday, so a
+    catch-up night that skipped the Monday still audits on the Tuesday."""
+    if backend is None:
+        return False
+    week = session.isocalendar()[:2]
+    return any(
+        r.stats.get("mode") == "audit" and r.started_at.isocalendar()[:2] == week
+        for r in backend.runs.find(job_name(edge.id, edge.owner))
+    )
 
 
-def edge_eval_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> ScreenStep:
-    """The edge-eval step (a job per open edge, as its owner), submitting through ``jobs``."""
+def edge_eval_jobs(
+    jobs: JobRunner, configs: ConfigStore, reader: StoreReader, backend: Backend | None = None
+) -> ScreenStep:
+    """The edge-eval step (a job per open edge, as its owner), submitting through ``jobs`` under
+    the owner's evaluation claim when ``backend`` is given (an API run of theirs in flight makes
+    the edge ``busy``: a warning, the job not submitted)."""
 
     def run(session: date) -> Outcome:
         edges = [
@@ -135,9 +149,9 @@ def edge_eval_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -
         if not edges or not stored:
             reason = "no open edge to evaluate" if not edges else "no outcomes stored"
             return Outcome(StepStatus.SKIPPED, {"evaluations": []}, reason)
-        mode = "audit" if audit_session(session) else "incremental"
-        summaries, short = [], []
+        summaries, short, warnings = [], [], []
         for edge in edges:
+            mode = "incremental" if audited_this_week(backend, edge, session) else "audit"
             params = {
                 "edge": edge.id,
                 "start": stored[0].isoformat(),
@@ -145,24 +159,27 @@ def edge_eval_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -
                 "mode": mode,
                 "trigger": "nightly",
             }
-            job = jobs.run("edge-eval", params, UserContext(edge.owner), force=True)
+            summary: dict[str, Any] = {"edge": edge.id, "owner": edge.owner, "mode": mode}
+            try:
+                with claim_edge_eval(backend, edge.owner) if backend else nullcontext():
+                    job = jobs.run("edge-eval", params, UserContext(edge.owner), force=True)
+            except EdgeEvalBusyError as busy:
+                summaries.append({**summary, "status": "busy", "error": str(busy)})
+                warnings.append(
+                    {"name": "edge_eval_busy", "status": "WARN", "detail": f"{edge.id}: {busy}"}
+                )
+                continue
             summaries.append(
-                {"edge": edge.id, "owner": edge.owner, "mode": mode, "job_id": job.job_id}
-                | {"status": job.status.value}
+                {**summary, "job_id": job.job_id, "status": job.status.value}
                 | ({"error": job.error} if job.error else {})
-                | {
-                    k: job.result[k]
-                    for k in ("run_id", "legs_reused", "legs_computed")
-                    if k in job.result
-                }
+                | {k: job.result[k] for k in ("run_id", "legs") if k in job.result}
             )
             if job.status is not JobStatus.COMPLETE:
                 short.append(f"{edge.owner}/{edge.id} {job.status.value}")
-        result = {"evaluations": summaries, "mode": mode}
+        result = {"evaluations": summaries}
         if short:
-            return Outcome(
-                StepStatus.FAILED, result, f"edge evaluations not complete: {', '.join(short)}"
-            )
-        return Outcome(StepStatus.SUCCEEDED, result, None)
+            reason = f"edge evaluations not complete: {', '.join(short)}"
+            return Outcome(StepStatus.FAILED, result, reason, warnings)
+        return Outcome(StepStatus.SUCCEEDED, result, None, warnings)
 
     return run

@@ -57,6 +57,11 @@ class ResultWriter:
         return self._backend.runs.load(run_id)
 
     @property
+    def backend(self) -> Backend:
+        """The store itself, for what needs its locks (the edge-evaluation claim)."""
+        return self._backend
+
+    @property
     def runs_backend(self) -> RunStore:
         """The run-record store (job records live here too)."""
         return self._backend.runs

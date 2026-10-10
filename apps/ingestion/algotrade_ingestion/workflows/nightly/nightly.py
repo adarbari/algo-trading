@@ -673,7 +673,8 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
     workers = int(params["workers"]) if params.get("workers") else None
     resume = bool(params.get("resume", True))
     waive = dict(params.get("waive") or {})
-    evals = edge_eval_jobs(ctx.jobs, r["configs"], task_ctx.reader) if ctx.jobs else None
+    backend = getattr(task_ctx.writer, "backend", None)
+    evals = edge_eval_jobs(ctx.jobs, r["configs"], task_ctx.reader, backend) if ctx.jobs else None
     summary = run_nightly(task_ctx, plan, settings, screens, workers, resume, waive, signals, evals)
     notifier: Notifier = r.get("notifier") or default_notifier(settings)
     summary = report(summary, settings, notifier, task_ctx.reader)
