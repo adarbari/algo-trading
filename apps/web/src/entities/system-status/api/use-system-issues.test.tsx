@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
+import { useSessionNotice } from './use-session-notice';
 import { useSystemIssues } from './use-system-issues';
 
 vi.mock('@/shared/api', async (importOriginal) => {
@@ -93,5 +94,32 @@ describe('useSystemIssues', () => {
       expect(GQL).toHaveBeenCalled();
     });
     expect(result.current).toEqual([]);
+  });
+});
+
+describe('useSessionNotice', () => {
+  it('hands over the newer incomplete session from the same read, and drops the stale issue', async () => {
+    const newer = { date: '2026-10-09', state: 'FAILED_RETRYING', kind: 'SYSTEM' };
+    GQL.mockResolvedValue({ ...SCREENS, session: { date: '2026-10-01', newer } });
+    const { result } = renderHook(
+      () => ({ notice: useSessionNotice(false), issues: useSystemIssues(false) }),
+      {
+        wrapper,
+      },
+    );
+    await waitFor(() => {
+      expect(result.current.notice).toEqual({ served: '2026-10-01', newer });
+    });
+    expect(result.current.issues.map((i) => i.id)).toEqual(['screen:2026-10-01:a']);
+    expect(GQL).toHaveBeenCalledOnce(); // one request for the strip and the notice
+  });
+
+  it('is null when the served session is the newest', async () => {
+    GQL.mockImplementation((_doc, variables) => answer(variables));
+    const { result } = renderHook(() => useSessionNotice(false), { wrapper });
+    await waitFor(() => {
+      expect(GQL).toHaveBeenCalled();
+    });
+    expect(result.current).toBeNull();
   });
 });

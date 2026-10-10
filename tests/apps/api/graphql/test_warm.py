@@ -20,6 +20,7 @@ class _Reader:
 @dataclass
 class _Session:
     date: date
+    newer: object = None
 
 
 @dataclass
@@ -41,6 +42,20 @@ def test_it_warms_at_start_and_after_each_publish_or_new_session(
     session.date = date(2026, 10, 9)  # the next session
     assert warmer.warm_once()
     assert warmed == [(date(2026, 10, 8), 1), (date(2026, 10, 8), 2), (date(2026, 10, 9), 2)]
+
+
+def test_it_warms_when_a_session_becomes_complete_without_a_publish(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0062: the nightly's record flipping the served session saves no table."""
+    warmed: list[date] = []
+    monkeypatch.setattr(warm, "warm", lambda c: warmed.append(c.session.date))
+    session = _Session(date(2026, 10, 8), newer="2026-10-09 failing")
+    warmer = CacheWarmer(lambda: _Ctx(session, _Reader()))  # type: ignore[arg-type, return-value]
+    assert warmer.warm_once() and not warmer.warm_once()
+    session.date, session.newer = date(2026, 10, 9), None  # the retry completed 10-09
+    assert warmer.warm_once()
+    assert warmed == [date(2026, 10, 8), date(2026, 10, 9)]
 
 
 def test_a_failed_warm_is_logged_and_tried_again(

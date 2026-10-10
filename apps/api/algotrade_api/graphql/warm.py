@@ -48,7 +48,8 @@ def warm(ctx: ReadContext) -> None:
 
 
 class CacheWarmer:
-    """Calls ``warm`` on ``open_ctx()`` whenever its session or published state is new;
+    """Calls ``warm`` on ``open_ctx()`` whenever its session (or the newer one it discloses) or
+    published state is new;
     ``run`` polls until cancelled (the app's lifespan starts and cancels it)."""
 
     def __init__(self, open_ctx: Callable[[], ReadContext], every_s: float = WARM_EVERY_S):
@@ -60,7 +61,8 @@ class CacheWarmer:
         """Warm when the session or the published state moved since the last warm; whether it
         did. Blocking: the store's reads."""
         ctx = self._open_ctx()
-        state = (ctx.session.date, ctx.reader.visible_seq())
+        # the session moves with the nightly's run records too (ADR 0062), not only on a publish
+        state = (ctx.session.date, ctx.session.newer, ctx.reader.visible_seq())
         if state == self._warmed:
             return False
         warm(ctx)

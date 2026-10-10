@@ -1389,6 +1389,21 @@ type MarketRegime {
 }
 
 """
+The newest session after the one served whose nightly workflow is not complete (ADR 0062): its `date`, its `state`, and for a failure the public `kind` only (never the step or its cause: ADR 0056)
+"""
+type NewerSession {
+  date: Date!
+  state: NewerState!
+  kind: UnavailableKind
+}
+
+"""What a session newer than the one served is doing"""
+enum NewerState {
+  IN_PROGRESS
+  FAILED_RETRYING
+}
+
+"""
 One session's nightly run: `status` queued, running, complete, partial or failed; `steps` in workflow order; `problems` why it is partial or failed
 """
 type NightlyRun {
@@ -2279,7 +2294,7 @@ type SeriesPoint {
 }
 
 """
-The session a read serves: every value in the response is for `date` (ADR 0036). `unavailable` says what the nightly tables with no partition for it leave out; identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: one taken later).
+The session a read serves: every value in the response is for `date` (ADR 0036). `unavailable` says what the nightly tables with no partition for it leave out; identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: one taken later). A read with no date serves the latest session whose nightly workflow is complete (ADR 0062): `newer` is the later session still processing or failing (null: none, or a date was asked for), `complete` whether `date`'s workflow is complete (false on a store with none complete yet: the latest bars are served unconfirmed).
 """
 type Session {
   date: Date!
@@ -2289,6 +2304,8 @@ type Session {
   referenceSnapshot: Date
   preSnapshot: Boolean!
   unavailable: [Unavailable!]!
+  complete: Boolean!
+  newer: NewerSession
 }
 
 """A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""

@@ -28,7 +28,6 @@ from algotrade_api.graphql.limits import EXTENSIONS
 from algotrade_api.graphql.offload import Admission, OffLoop, only_inline
 from algotrade_api.graphql.response_cache import (
     CLOSED_SESSION_OPERATIONS,
-    RUN_OPERATIONS,
     ResponseCache,
     WriteEpoch,
     cacheable,
@@ -97,7 +96,7 @@ class _Router(GraphQLRouter[RequestContext, None]):
                 document,
                 variables,
                 name,
-                self._runs() if name in RUN_OPERATIONS else (0, 0),
+                self._runs(),
                 self._closed() if name in CLOSED_SESSION_OPERATIONS else None,
             )
             body = self._cache.get(key)

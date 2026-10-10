@@ -11,5 +11,5 @@ import { useStatusStrip } from './queries';
 
 export function useSystemIssues(admin: boolean): SystemIssue[] {
   const { data } = useStatusStrip(admin);
-  return systemIssues(data?.nightly, data?.screens, data?.completeness);
+  return systemIssues(data?.nightly, data?.screens, data?.completeness, data?.notice != null);
 }

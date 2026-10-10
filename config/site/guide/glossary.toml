@@ -14,14 +14,28 @@ id = "session"
 term = "Session"
 short = "The trading day a page is reading: every value on it is for exactly that day."
 body = """
-A page reads one session, by default the latest trading day with stored daily prices, and
-says which one it is. Every daily value on the page is the one stored for that day. A value
+A page reads one session, by default the latest trading day whose nightly update has fully
+completed, and says which one it is. Every daily value on the page is the one stored for that day. A value
 the app did not compute or pull for that day is shown as UNKNOWN with the reason; it is never
 filled in from an earlier day, so two numbers side by side are always about the same day. The
 list of instruments and their company details come from snapshots taken from time to time:
 the page uses the latest snapshot on or before the session and says which.
 """
-see_also = ["unknown", "not_run", "knowledge_time"]
+see_also = ["unknown", "not_run", "knowledge_time", "last_complete_session"]
+
+[[term]]
+id = "last_complete_session"
+term = "Last complete session"
+short = "The newest trading day whose nightly update has finished, which is what pages show by default."
+body = """
+Each night the app pulls prices and options, computes every field and runs every screen for
+the new trading day. Until all of that has finished, the day is incomplete: a page that read it
+would show gaps and screens that never ran. So pages keep showing the last complete session and
+say that a newer one is still processing, or that a step failed and is being retried. Once the
+update completes, pages switch to the new day by themselves. Asking for a date explicitly
+always shows that date, complete or not.
+"""
+see_also = ["session", "not_run", "run"]
 
 [[term]]
 id = "knowledge_time"

@@ -13,7 +13,7 @@ records or jobs: nightly runs, ingestion, screener runs and results, ideas, edge
 key (``response_key``) is the published state (``StoreReader.visible_seq()``), the writes the
 API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
 the routes that write: a config save changes the caller's next read without a publish), a hash
-of the operation document, its variables and the caller's role. A ``RUN_OPERATIONS`` key also
+of the operation document, its variables and the caller's role. Every key also
 holds the runs generation (``StoreReader.runs_generation()``: it moves on every saved run
 record, a job's too, which a publish does not cover: a failed job's record, an on-request run),
 read before the answer is computed like ``visible_seq`` (ADR 0022); an operation whose loader
@@ -196,14 +196,14 @@ def response_key(
     closed: date | None = None,
 ) -> str:
     """The hex digest identifying one cacheable answer. ``runs`` (the runs generation) is part
-    of a ``RUN_OPERATIONS`` key, ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one."""
+    of every key (the session a read with no date serves follows the nightly's run records,
+    ADR 0062), ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one."""
     who = (
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )
     text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
     parts = [str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text]
-    if name in RUN_OPERATIONS:
-        parts.append(f"runs:{runs[0]}:{runs[1]}")
+    parts.append(f"runs:{runs[0]}:{runs[1]}")
     if name in CLOSED_SESSION_OPERATIONS:
         parts.append(f"closed:{closed}")
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()

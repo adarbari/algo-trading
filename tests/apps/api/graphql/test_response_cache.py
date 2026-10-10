@@ -210,13 +210,17 @@ def test_a_run_operation_is_kept_until_a_run_record_is_saved(harness: Harness) -
     assert harness.opened > opened
 
 
-def test_a_static_operation_ignores_the_runs_generation(harness: Harness) -> None:
+def test_a_static_operation_is_read_again_when_a_run_record_is_saved(harness: Harness) -> None:
+    """The session a read with no date serves follows the nightly's run records (ADR 0062): a
+    record turning COMPLETE flips every page without a publish, so no operation outlives it."""
     client = harness.client()
     _post(client, SESSION)
     opened = harness.opened
+    _post(client, SESSION)
+    assert harness.opened == opened  # nothing saved: served from the cache
     harness.runs = (7, 101)
     _post(client, SESSION)
-    assert harness.opened == opened
+    assert harness.opened > opened
 
 
 def test_a_run_operation_is_still_keyed_on_publish_and_writes(harness: Harness) -> None:
@@ -273,9 +277,14 @@ def test_the_key_holds_the_variables_and_the_document() -> None:
     assert base != response_key(1, 0, who, "{ b }", {"x": 1, "y": 2}, None)
     assert base != response_key(2, 0, who, "{ a }", {"x": 1, "y": 2}, None)
     assert base != response_key(1, 1, who, "{ a }", {"x": 1, "y": 2}, None)
-    # the runs generation and the closed session count only for the operations that read them
+    # the runs generation is in every key: a read with no date serves the latest complete
+    # session, which a nightly record flips without a publish (ADR 0062)
+    assert base != response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2))
+    shared = response_key(1, 0, who, "{ a }", None, "MarketHistory", (1, 2))
+    assert shared != response_key(1, 0, who, "{ a }", None, "MarketHistory", (1, 3))
+    # the closed session counts only for the operations that read the clock
     assert base == response_key(
-        1, 0, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2), date(2026, 1, 1)
+        1, 0, who, "{ a }", {"x": 1, "y": 2}, None, (0, 0), date(2026, 1, 1)
     )
     run = response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 2))
     assert run != response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 3))

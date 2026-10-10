@@ -43,6 +43,11 @@ export type IndicatorStatus =
   | 'ON'
   | 'UNKNOWN';
 
+/** What a session newer than the one served is doing */
+export type NewerState =
+  | 'FAILED_RETRYING'
+  | 'IN_PROGRESS';
+
 /** Why a value is null when the null is the fact (EXPLAINED) */
 export type NullReason =
   | 'FEW_BARS'
@@ -446,7 +451,7 @@ export type StatusStripQueryVariables = Exact<{
 }>;
 
 
-export type StatusStripQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, problems: Array<string>, steps: Array<{ name: string, status: string, durationS: number | null, reason: string | null, error: string | null }> }>, completeness?: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null };
+export type StatusStripQuery = { session: { date: string, newer: { date: string, state: NewerState, kind: UnavailableKind | null } | null } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, problems: Array<string>, steps: Array<{ name: string, status: string, durationS: number | null, reason: string | null, error: string | null }> }>, completeness?: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2576,6 +2581,11 @@ export const StatusStripDocument = new TypedDocumentString(`
     query StatusStrip($admin: Boolean!) {
   session {
     date
+    newer {
+      date
+      state
+      kind
+    }
   }
   screeners {
     id

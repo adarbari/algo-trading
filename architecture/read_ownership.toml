@@ -98,7 +98,7 @@ detect = [{ call = "to_value" }, { call = "to_scalar" }, { call_regex = "^_(floa
 
 [[responsibility]]
 id = "session-resolution"
-description = "Which partition a read sees (ADR 0036): resolve one Session (requested, else the latest with bars) and read session-grain tables for exactly that date, UNKNOWN otherwise; snapshot tables through data.reference.snapshot with the snapshot date disclosed. services/read/session.py resolves (resolve_session, the table grains); services/read/context.py calls it once per request (open_context) and reads session partitions (partition); nothing else may (services/explore, which picked its own partition by six rules, the bug ADR 0036 fixes, was deleted in read-model PR 10b)"
+description = "Which partition a read sees (ADR 0036): resolve one Session (requested, else the latest whose nightly workflow is complete, ADR 0062, disclosing the newer incomplete one; none complete: the latest with bars) and read session-grain tables for exactly that date, UNKNOWN otherwise; snapshot tables through data.reference.snapshot with the snapshot date disclosed. services/read/session.py resolves (resolve_session, the table grains); services/read/context.py calls it once per request (open_context) and reads session partitions (partition); nothing else may (services/explore, which picked its own partition by six rules, the bug ADR 0036 fixes, was deleted in read-model PR 10b)"
 owner = [
     "src/algotrade/services/read/session.py",
     "src/algotrade/services/read/context.py",

@@ -5,7 +5,8 @@
  * the newest nightly run and the one-session completeness grid. It was four requests (screens,
  * nightly runs, completeness, and the viewer's) before; the viewer stays its own cached read. Not
  * `Query.ideas`: that ranks every screener's picks with their values (1.3 s of the API's
- * reads on every page, for what the strip never shows). Every viewer may read it; the nightly
+ * reads on every page, for what the strip never shows). The session's `newer` (the incomplete
+ * session left out, ADR 0062) feeds the session notice. Every viewer may read it; the nightly
  * run and the grid carry the same fields as the run and ingestion entities' own reads.
  */
 import { useQuery } from '@tanstack/react-query';
@@ -16,11 +17,17 @@ import type { Completeness } from '@/entities/ingestion';
 import type { NightlyRun } from '@/entities/run';
 
 import type { ScreenerStates } from '../model/issues';
+import type { SessionNotice } from '../model/notice';
 
 const StatusStrip = graphql(`
   query StatusStrip($admin: Boolean!) {
     session {
       date
+      newer {
+        date
+        state
+        kind
+      }
     }
     screeners {
       id
@@ -67,6 +74,8 @@ export interface StatusStripState {
   screens: ScreenerStates | null;
   nightly: NightlyRun | null;
   completeness: Completeness | null;
+  /** The newer incomplete session the pages leave out (null: none); ADR 0062. */
+  notice: SessionNotice | null;
 }
 
 /** What the strip draws from; `admin` adds the nightly run and the grid to the same request. */
@@ -86,6 +95,7 @@ export function useStatusStrip(admin: boolean) {
         : null,
       nightly: data.nightlyRuns?.[0] ?? null,
       completeness: data.completeness ?? null,
+      notice: data.session?.newer ? { served: data.session.date, newer: data.session.newer } : null,
     }),
   });
 }

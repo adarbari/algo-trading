@@ -85,15 +85,18 @@ function staleIssue(
   };
 }
 
-/** The open issues, failing ones first (each group keeps its order). */
+/** The open issues, failing ones first (each group keeps its order); ``noticed``: a session
+ * notice is showing, so the stale-session issue is left out. */
 export function systemIssues(
   nightly: NightlyRun | null | undefined,
   screens: ScreenerStates | null | undefined,
   completeness?: Completeness | null,
+  noticed = false,
 ): SystemIssue[] {
+  // a session notice already says the newer session is still processing or retrying
   const all = [
     ...(nightly ? [nightlyIssue(nightly)] : []),
-    staleIssue(screens, completeness),
+    noticed ? null : staleIssue(screens, completeness),
     ...(screens ? screenerIssues(screens) : []),
   ].filter((i): i is SystemIssue => i !== null);
   return [

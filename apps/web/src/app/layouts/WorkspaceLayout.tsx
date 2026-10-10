@@ -29,7 +29,7 @@ import { useEffect } from 'react';
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
 import { GuideSearchProvider } from '@/features/guide-search';
-import { SystemStatusStrip } from '@/widgets/status-strip';
+import { SessionNotice, SystemStatusStrip } from '@/widgets/status-strip';
 
 import {
   canEnter,
@@ -77,7 +77,14 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
         }}
       >
         <AppShell
-          strip={viewer ? <SystemStatusStrip admin={canEnter(viewer, 'admin')} /> : null}
+          strip={
+            viewer ? (
+              <>
+                <SessionNotice admin={canEnter(viewer, 'admin')} />
+                <SystemStatusStrip admin={canEnter(viewer, 'admin')} />
+              </>
+            ) : null
+          }
           topBar={
             <TopBar
               brand={<Mono weight="medium">algotrade</Mono>}

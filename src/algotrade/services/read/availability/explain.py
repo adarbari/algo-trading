@@ -21,7 +21,7 @@ from algotrade.services.read.availability.cause import (
     CauseLink,
 )
 from algotrade.services.read.context import ResultCache, Stores
-from algotrade.services.read.ops.runs import NIGHTLY
+from algotrade.services.read.session import NIGHTLY
 
 __all__ = ["explain", "failed_tables"]
 

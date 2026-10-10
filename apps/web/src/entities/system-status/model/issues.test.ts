@@ -50,6 +50,11 @@ describe('systemIssues', () => {
     expect(issue?.severity).toBe('warning');
   });
 
+  it('leaves the stale-session issue out while a session notice already says it', () => {
+    const old = { ...screens([]), session: '2026-10-01' };
+    expect(systemIssues(null, old, null, true)).toEqual([]);
+  });
+
   it('falls back to the calendar rule on the read session for everyone else', () => {
     const old = { ...screens([]), session: '2026-10-01' };
     expect(systemIssues(null, old).map((i) => i.id)).toEqual(['stale:2026-10-01']);

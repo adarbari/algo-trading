@@ -2,8 +2,12 @@
 none) into one ``Session``, and ``grain_of`` says how a table is read for it.
 
 Requested given: that date, even if nothing is stored for it (every value is then UNKNOWN).
-None: the latest ``bars/1d`` partition; no bars: the latest reference snapshot; an empty store:
-``NotFoundError``. Session-grain tables are then read for exactly ``Session.date``
+None: the latest session whose nightly workflow is complete (ADR 0062: its latest ``nightly``
+run record is COMPLETE, i.e. SUCCEEDED, a waived step included, and it has a ``bars/1d``
+partition); the newer sessions still processing or failing are disclosed (``Session.newer``),
+never mixed in. No session complete yet (an empty run history): the latest ``bars/1d``
+partition (flagged: ``complete`` is False); no bars: the latest reference snapshot; an empty
+store: ``NotFoundError``. Session-grain tables are then read for exactly ``Session.date``
 (``context.partition``); snapshot tables follow ADR 0007's one rule (``data.reference.snapshot``)
 and the ``Session`` discloses the reference snapshot used. This module is the only place the
 grain of a table decides anything (docs/api/read-model.md "Session resolution")."""
@@ -20,11 +24,13 @@ from algotrade.core.model.fields import COMPANY_TABLE, DESCRIPTION_TABLE, REFERE
 from algotrade.data import StoreReader
 from algotrade.data.funds.holdings import TABLE as HOLDINGS_TABLE
 from algotrade.data.reference import IBKR_CONTRACTS, UNIVERSE_TABLE, snapshot
-from algotrade.services.read.availability.cause import Unavailable
+from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import SCHEMA_VERSION
 
 BARS = "bars/1d"
+NIGHTLY = "nightly"  # the job name of the nightly workflow's per-session run records
 # The architecture registry at the repo root (the workspace installs this package editable).
 TABLES = Path(__file__).resolve().parents[4] / "architecture" / "tables.toml"
 
@@ -97,6 +103,24 @@ def expected_tables(tables: Path = TABLES) -> tuple[str, ...]:
 EXPECTED_TABLES = expected_tables()
 
 
+class NewerState(StrEnum):
+    """What a session newer than the one served is doing (ADR 0062)."""
+
+    IN_PROGRESS = "IN_PROGRESS"  # bars or a run record exist: running, or waiting for a source
+    FAILED_RETRYING = "FAILED_RETRYING"  # a critical step failed; the hourly nightly retries it
+
+
+@dataclass(frozen=True)
+class NewerSession:
+    """The newest session after the one served whose nightly workflow is not complete: its
+    ``date``, its ``state`` and, when a step failed, the public ``kind`` of the failure (never
+    the step, table or error: ADR 0056)."""
+
+    date: dt.date
+    state: NewerState
+    kind: UnavailableKind | None = None
+
+
 @dataclass(frozen=True)
 class Session:
     """The one session a read serves, and what is stored for it.
@@ -107,7 +131,9 @@ class Session:
     is read from (None: none stored) and ``pre_snapshot`` whether it is later than ``date``
     (survivorship, ADR 0007). ``present`` / ``missing``: the expected session-grain tables with
     and without a partition for ``date``; ``unavailable``: what the ``missing`` ones leave out,
-    in public words (ADR 0056)."""
+    in public words (ADR 0056). ``complete``: the nightly workflow of ``date`` is complete (False
+    for an explicit date that is not, and for the fallback of a store with no complete session);
+    ``newer``: the incomplete session after ``date`` a default read leaves out (ADR 0062)."""
 
     date: dt.date
     requested: dt.date | None
@@ -118,6 +144,8 @@ class Session:
     present: tuple[str, ...]
     missing: tuple[str, ...]
     unavailable: tuple[Unavailable, ...] = ()
+    complete: bool = False
+    newer: NewerSession | None = None
 
 
 def latest_session(reader: StoreReader) -> dt.date | None:
@@ -143,6 +171,44 @@ def store_info(reader: StoreReader) -> StoreInfo:
     return StoreInfo(latest_session(reader), tuple(reader.table_names()), str(SCHEMA_VERSION))
 
 
+def _nightly_by_session(reader: StoreReader) -> dict[dt.date, RunRecord]:
+    """Each session's latest ``nightly`` run record (by start time)."""
+    latest: dict[dt.date, RunRecord] = {}
+    for record in reader.runs(NIGHTLY):
+        held = latest.get(record.session_date)
+        if held is None or record.started_at > held.started_at:
+            latest[record.session_date] = record
+    return latest
+
+
+# A newer session's record in one of these states is still going (or has bars without its own
+# workflow having failed); any other state (FAILED, or PARTIAL before ADR 0039) is a failure.
+_GOING = (RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.WAITING, RunStatus.COMPLETE)
+
+
+def _newer(day: dt.date, record: RunRecord | None) -> NewerSession:
+    if record is not None and record.status not in _GOING:
+        return NewerSession(day, NewerState.FAILED_RETRYING, UnavailableKind.SYSTEM)
+    return NewerSession(day, NewerState.IN_PROGRESS)
+
+
+def last_complete(
+    reader: StoreReader,
+) -> tuple[dt.date | None, NewerSession | None]:
+    """The latest session whose nightly workflow is complete (its latest ``nightly`` record
+    COMPLETE: every critical step SUCCEEDED or was waived by hand; PARTIAL, FAILED, WAITING and
+    running are not) with a ``bars/1d`` partition, and the newest session after it that is not
+    (it has bars or a record). ``(None, None)``: no session is complete (ADR 0062)."""
+    records = _nightly_by_session(reader)
+    bar_days = set(reader.dates(BARS))
+    done = [d for d, r in records.items() if r.status is RunStatus.COMPLETE and d in bar_days]
+    if not done:
+        return None, None
+    day = max(done)
+    later = sorted(d for d in bar_days | set(records) if d > day)
+    return day, _newer(later[-1], records.get(later[-1])) if later else None
+
+
 def resolve_session(
     reader: StoreReader, requested: dt.date | None, expected: Sequence[str] = EXPECTED_TABLES
 ) -> Session:
@@ -151,10 +217,12 @@ def resolve_session(
     bars = snapshot(reader, BARS)
     latest_reference = snapshot(reader, REFERENCE_TABLE)
     latest = bars or latest_reference
+    complete_day, newer = last_complete(reader)
+    default = complete_day or (latest.snapshot_date if latest is not None else None)
     if requested is not None:
-        day = requested
-    elif latest is not None:
-        day = latest.snapshot_date
+        day, newer = requested, None
+    elif default is not None:
+        day = default
     else:
         raise NotFoundError("nothing stored: no bars/1d and no instruments/reference partition")
     reference = snapshot(reader, REFERENCE_TABLE, day)
@@ -163,11 +231,13 @@ def resolve_session(
     return Session(
         date=day,
         requested=requested,
-        is_latest=latest is not None and day == latest.snapshot_date,
+        is_latest=day == default,
         latest_with_bars=bars.snapshot_date if bars else None,
         reference_snapshot=reference.snapshot_date if reference else None,
         pre_snapshot=reference.pre_snapshot if reference else False,
         present=present,
         missing=missing,
         unavailable=unavailable_tables(missing, day),
+        complete=day == complete_day,
+        newer=newer,
     )

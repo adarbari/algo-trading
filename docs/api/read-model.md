@@ -159,7 +159,7 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 
 | Object | Identity | Typed fields | Backing tables | Loader module | Replaces |
 |---|---|---|---|---|---|
-| Session | `date` | `date, requested, isLatest, latestWithBars, referenceSnapshot, preSnapshot, present, missing, unavailable` | `bars/1d` (latest), partition lists | `read/session.py` | `explore/store.partition_for`, `latest_session`, preview's store half, ranking's `max(...)` |
+| Session | `date` | `date, requested, isLatest, latestWithBars, referenceSnapshot, preSnapshot, present, missing, unavailable, complete, newer{date, state, kind}` | `bars/1d`, `nightly` run records, partition lists | `read/session.py` | `explore/store.partition_for`, `latest_session`, preview's store half, ranking's `max(...)` |
 | Instrument | `instrumentId` | `symbol, name, securityType, assetClass, exchange, isEtf, description, referenceSnapshot` | `instruments/reference`, `company`, `description` | `read/instruments/identity.py` | `explore/instruments.resolve_key`, `description_of`; the symbol lookups in results, table, ranking, preview |
 | FeatureValue | (`instrumentId`, `name`, `session`) | `name, value: JSON?, unknown?, info` | `rollups/instrument/*`, expressions, reference columns | `read/instruments/features.py` (wraps `services.features.field_view`) | the features bag, `rollup_row` in chains, `VIEW_FIELDS`, `ticker_columns`, `ranking._earnings` |
 | FeatureInfo | `name` | `kind, source, dtype, format, description, nullMeaning, version, group, key, inputs, unit, range, categories, scope, owner, licence, guide` (the site field guide's entry on the catalogue read: `theme, reads, uses[{intent, op, value, mode, tolerance, onMiss, note}], caveats, sources`; ADR 0041 amended) | registry + user `FeatureSet` + `config/site/field_guide/` | `read/instruments/catalogue.py` (PR 4; `Query.catalogue` PR 9) | `explore/features.feature_catalogue` (deleted) |
@@ -250,8 +250,11 @@ today's `services/views.to_value`, moved; `views.py` imports it back so runs and
 
 One resolver, `services/read/session.py` (ownership `session-resolution`):
 `resolve_session(reader, requested) -> Session`. Requested given: that date, even if nothing is
-stored for it (everything UNKNOWN). None: the latest `bars/1d` partition; no bars: the latest
-reference snapshot; an empty store: `NotFoundError("nothing stored")`. Loaders read a
+stored for it (everything UNKNOWN). None: the latest session whose nightly workflow is complete
+(its latest `nightly` run record COMPLETE, with a `bars/1d` partition; ADR 0062), the newer
+incomplete session disclosed as `Session.newer`; none complete: the latest `bars/1d` partition
+(`complete` false); no bars: the latest reference snapshot; an empty store:
+`NotFoundError("nothing stored")`. Loaders read a
 session-grain table only through `partition(ctx, table) -> DataFrame | Unknown`, which is
 `ctx.reader.table(table, ctx.session.date)`: no `on`, no `snapshot()`, no `dates()` in a loader.
 
