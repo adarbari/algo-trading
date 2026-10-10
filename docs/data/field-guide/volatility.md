@@ -172,7 +172,7 @@ Sources: IV rank versus IV percentile, and the 50 / 30 convention: https://flash
 
 ### `feature.iv_percentile`
 
-**How to read it.** The share of the last 252 sessions whose IV30 was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. It answers the same question as feature.iv_rank but counts days instead of measuring the span, so one extreme day cannot squash it; it is the more robust of the two for premium selling.
+**How to read it.** The share of the last 252 sessions whose IV30 was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. It answers the same question as feature.iv_rank but counts days instead of measuring the span, so one extreme day cannot squash it; it is the steadier of the two for premium selling.
 
 **The criterion per intent**
 
@@ -190,7 +190,7 @@ Sources: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-whi
 
 ### `feature.iv_hv_spread`
 
-**How to read it.** IV30 minus HV30, in volatility points as a fraction: 0.05 means options price 5 points more movement than the stock delivered last month. Across markets implied volatility exceeds realised by about 3 to 4 points on average (the variance risk premium, Carr and Wu 2009), so a spread near 0.04 is just the normal insurance premium; 0.08 and above is a rich one, and a negative spread means the stock moved more than its options expected.
+**How to read it.** IV30 minus HV30, in volatility points as a fraction: 0.05 means options price 5 points more movement than the stock delivered last month. Across markets implied volatility exceeds realised by about 3 to 4 points on average (the variance risk premium, Carr and Wu 2009), so a spread near 0.04 is only the normal insurance premium; 0.08 and above is a rich one, and a negative spread means the stock moved more than its options expected.
 
 **The criterion per intent**
 
@@ -296,7 +296,7 @@ Sources: Carr and Wu (2009); docs/screeners/vrp-scanner.md
 **When the reading lies**
 
 - Null for the names IBKR has no history for (under 60 sessions of its IV, rollup.ibkr_iv@v1.rank_status_ibkr says): a hard criterion silently excludes them. Prefer feature.iv_rank for a gate; score this one.
-- Every caveat of feature.iv_rank applies: one spike squashes the year, a report ahead lifts it, a takeover collapses it. feature.iv_percentile is the robust cross-check.
+- Every caveat of feature.iv_rank applies: one spike squashes the year, a report ahead lifts it, a takeover collapses it. feature.iv_percentile is the steadier cross-check (one extreme day moves it less).
 
 Sources: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters; ADR 0028 (IBKR-derived, personal licence)
 
@@ -313,7 +313,7 @@ Sources: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-whi
 
 **When the reading lies**
 
-- Close-to-close, so one gap dominates it for 30 sessions: an earnings day of 15% alone puts hv30 near 0.45 (the 'earnings gap inside the window' situation); rollup.price_stats@v2.hv20_yz is the gap-robust alternative.
+- Close-to-close, so one gap dominates it for 30 sessions: an earnings day of 15% alone puts hv30 near 0.45 (the 'earnings gap inside the window' situation); rollup.price_stats@v2.hv20_yz is the alternative that gaps distort less.
 - Under 0.10 on a stock is a pinned takeover or a halted name, not calm; a tiny HV makes feature.iv_hv_ratio explode.
 - Null after any missing bar in the last 31 sessions.
 
@@ -332,7 +332,7 @@ Sources: Carr and Wu (2009) on the realised side of the premium; Yang and Zhang 
 
 **When the reading lies**
 
-- Still a 20-session window: a shock inside it raises the estimate, just less violently than close-to-close.
+- Still a 20-session window: a shock inside it raises the estimate, only less violently than close-to-close.
 - Bad intraday highs and lows (a bad print) distort a range estimator more than a close estimator; a reading far from rollup.price_stats@v2.hv20 is worth a look at the bars.
 
 Sources: Yang and Zhang (2000); https://flashalpha.com/articles/yang-zhang-vs-close-to-close-realized-volatility
@@ -385,7 +385,7 @@ Sources: Bollinger (2001), Bollinger on Bollinger Bands: BandWidth and the Squee
 
 **When the reading lies**
 
-- Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that just had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.
+- Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that recently had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.
 - A squeeze can last weeks and the release can go either way; do not read a low percentile as a buy. Confirm the direction with feature.breakout_20d or rollup.volume@v1.up_volume_share_20d once it moves.
 - A pending takeover pins the price, so the bands stay the tightest in the year until the deal closes. See the 'pending takeover' situation.
 - Null when fewer than 240 of the 252 sessions before today have a bandwidth (a young listing or a name with gaps), or today's is unknown.

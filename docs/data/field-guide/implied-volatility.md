@@ -149,7 +149,7 @@ Sources: Risk reversal: https://www.investopedia.com/terms/r/risk-reversal.asp
 
 **When the reading lies**
 
-- One spike sets the year's maximum and squashes later readings, as for IV rank; rollup.skew_history@v1.skew_percentile_252d is the robust cross-check.
+- One spike sets the year's maximum and squashes later readings, as for IV rank; rollup.skew_history@v1.skew_percentile_252d is the steadier cross-check (one extreme day moves it less).
 - A short window is a short sample: PROVISIONAL (rollup.skew_history@v1.skew_rank_status) means under a year of skews, so a rank near 1 can be an ordinary day.
 - Null while skew_rank_status is UNKNOWN, with no skew today, or when every skew in the window is equal.
 
@@ -157,7 +157,7 @@ Sources: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-whi
 
 ### `rollup.skew_history@v1.skew_percentile_252d`
 
-**How to read it.** The share of the last 252 sessions' skews below today's, 0 to 1. The robust companion of rollup.skew_history@v1.skew_rank_252d: one extreme day does not distort it.
+**How to read it.** The share of the last 252 sessions' skews below today's, 0 to 1. The steadier companion of rollup.skew_history@v1.skew_rank_252d: one extreme day does not distort it.
 
 **The criterion per intent**
 
@@ -490,7 +490,7 @@ Sources: ADR 0028
 
 ### `rollup.ibkr_iv@v1.iv_percentile_252d_ibkr`
 
-**How to read it.** The share of the last 252 sessions whose IBKR IV was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. The robust companion of rollup.ibkr_iv@v1.iv_rank_252d_ibkr (counts days instead of measuring the span, so one spike cannot squash it); feature.iv_percentile prefers this one where IBKR has it.
+**How to read it.** The share of the last 252 sessions whose IBKR IV was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. The steadier companion of rollup.ibkr_iv@v1.iv_rank_252d_ibkr (counts days instead of measuring the span, so one spike cannot squash it); feature.iv_percentile prefers this one where IBKR has it.
 
 **The criterion per intent**
 
@@ -550,14 +550,14 @@ Sources: ADR 0028
 
 **When the reading lies**
 
-- Every caveat of feature.iv_rank: one spike squashes the year, a report ahead lifts it, a takeover collapses it; rollup.iv_history@v2.iv_percentile_252d is the robust cross-check.
+- Every caveat of feature.iv_rank: one spike squashes the year, a report ahead lifts it, a takeover collapses it; rollup.iv_history@v2.iv_percentile_252d is the steadier cross-check (one extreme day moves it less).
 - Null under 60 sessions of our IV (rollup.iv_history@v2.rank_status UNKNOWN), when there is no IV today, or when every IV in the window is equal.
 
 Sources: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters
 
 ### `rollup.iv_history@v2.iv_percentile_252d`
 
-**How to read it.** The share of the last 252 sessions whose IV30 (ours) was below today's, 0 to 1. The robust companion of rollup.iv_history@v2.iv_rank_252d; feature.iv_percentile prefers IBKR's and falls back to this.
+**How to read it.** The share of the last 252 sessions whose IV30 (ours) was below today's, 0 to 1. The steadier companion of rollup.iv_history@v2.iv_rank_252d; feature.iv_percentile prefers IBKR's and falls back to this.
 
 **The criterion per intent**
 

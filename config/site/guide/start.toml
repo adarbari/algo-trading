@@ -24,9 +24,7 @@ links = [
 [[page.section]]
 title = "One day at a time"
 body = """
-The app works in sessions: trading days. Each night, after the market closes, it loads the
-day's prices and the other data it follows, checks them, computes the catalogue's fields for
-every instrument, and then runs the screens. A page reads one session, by
+The app works in sessions: trading days. Each night, after the market closes, it loads the day's prices and the other data it follows. It checks them, computes the catalogue's fields for every instrument, and then runs the screens. A page reads one session, by
 default the latest one with stored prices, and every daily number on it is for exactly that
 day.
 """
@@ -35,18 +33,14 @@ day.
 title = "What was known, and when"
 body = """
 Every stored fact remembers two times: the day it is about, and when the app learned it (its
-knowledge time). A correction from a data vendor is stored as a new fact with a later knowledge
-time, never written over the old one, and an announced event such as an earnings date only
-counts from the day it was known. That is how a backtest sees the past as it was, not with
+knowledge time). A correction from a data vendor is stored as a new fact with a later knowledge time, never written over the old one. An announced event such as an earnings date only counts from the day it was known. That is how a backtest sees the past as it was, not with
 today's hindsight.
 """
 
 [[page.section]]
 title = "UNKNOWN instead of a guess"
 body = """
-When a value was not computed or pulled for the session, the page says UNKNOWN and why
-(nothing stored that day, no row for this instrument, a stored empty value, a field that does
-not apply). It never shows yesterday's number instead, so everything side by side is about the
+When a value was not computed or pulled for the session, the page says UNKNOWN and why. The reason is one of: nothing stored that day, no row for this instrument, a stored empty value, a field that does not apply. It never shows yesterday's number instead, so everything side by side is about the
 same day. Screens treat missing data the same way: it never counts as a pass.
 """
 
@@ -54,9 +48,7 @@ same day. Screens treat missing data the same way: it never counts as a pass.
 title = "A screen that did not run"
 body = """
 A screen's results belong to the session it ran for. If a screen has no run for the session
-you are reading, it is NOT_RUN, which is not the same as a run that found nothing. If a
-critical step of the nightly load fails, the screens for that day wait rather than run on
-incomplete data, and show as NOT_RUN until the step succeeds or is waived by hand.
+you are reading, it is NOT_RUN, which is not the same as a run that found nothing. If a critical step of the nightly load fails, the screens for that day wait rather than run on incomplete data. They show as NOT_RUN until the step succeeds or is waived by hand.
 """
 
 # --------------------------------------------------------------------------------------- 2
@@ -74,16 +66,14 @@ links = [
   { kind = "term", id = "paused" },
   { kind = "term", id = "score" },
   { kind = "term", id = "gating_criterion" },
+  { kind = "term", id = "event_risk" },
 ]
 
 [[page.section]]
 title = "The decision"
 body = """
 Every instrument the screen looked at gets one decision. QUALIFIED: it met every hard and soft
-criterion. A near miss: it passed every hard criterion but missed a soft one by no more than
-that criterion's tolerance, and the row takes the near-miss decision the criterion names,
-WATCH by default, LIQUIDITY_RISK when the miss is about how much the name trades, EVENT_RISK
-for an event to stay away from. REJECT: it failed a hard criterion, had no value for one, or
+criterion. A near miss: it passed every hard criterion but missed a soft one by no more than that criterion's tolerance. The row takes the near-miss decision the criterion names. That is WATCH by default, LIQUIDITY_RISK when the miss is about how much the name trades, and EVENT_RISK for an event to stay away from. REJECT: it failed a hard criterion, had no value for one, or
 missed a soft one by more than its tolerance. PAUSED: it met the screen, but the regime gate
 held it back for the market's current weather.
 """
@@ -91,17 +81,14 @@ held it back for the market's current weather.
 [[page.section]]
 title = "The score and the order"
 body = """
-The score orders the list; it is not a probability. A row that meets every threshold scores
-100, and each miss takes points off: up to 10 for a near miss, 10 for a missed score criterion
-or a missing soft value, 100 for a hard miss. Rows sort by score, then by the screen's
+The score orders the list; it is not a probability. A row that meets every threshold scores 100, and each miss takes points off. A near miss takes up to 10. A missed score criterion or a missing soft value takes 10. A hard miss takes 100. Rows sort by score, then by the screen's
 tie-break field, then by instrument, so the order is the same every time.
 """
 
 [[page.section]]
 title = "The reasons"
 body = """
-A row lists why it got its decision: each criterion's value, whether it passed, missed
-narrowly, failed or had no value (no <field>), and how far it was from the threshold. Flags
+A row lists why it got its decision. For each criterion it gives the value, whether it passed, missed narrowly, failed or had no value (no <field>), and how far it was from the threshold. Flags
 mark something worth knowing (a leveraged fund, say) without changing the decision, and the
 screen's extra columns show values kept with the row.
 """
@@ -110,9 +97,7 @@ screen's extra columns show values kept with the row.
 title = "The run as a whole"
 body = """
 Each run reports how many rows passed, the count of each decision, and the narrow misses: the
-rows that missed only within tolerance. In the Builder, the funnel shows the gating criteria
-in order and how many rows each one removed, which tells you which rule does the work and
-which value is missing most often.
+rows that missed only within tolerance. In the Builder, the funnel shows the gating criteria in order and how many rows each one removed. This tells you which rule does the work and which value is missing most often.
 """
 
 # --------------------------------------------------------------------------------------- 3
@@ -144,9 +129,7 @@ from until you choose to rebase onto a newer one.
 [[page.section]]
 title = "Add and tune criteria"
 body = """
-A criterion is a field, a comparison, a threshold and a mode. The help button beside a
-criterion's field opens its Guide entry: how to read the number, the usual criterion for each
-intent (Use this sets the row to it) and when the number lies. Choose hard for a must, soft
+A criterion is a field, a comparison, a threshold and a mode. The help button beside a criterion's field opens its Guide entry. It explains how to read the number, the usual criterion for each intent (Use this sets the row to it) and when the number lies. Choose hard for a must, soft
 with a tolerance for a must that may miss by a little, and score for a preference that only
 orders the list. Who is screened at all (stocks or funds, listed, optionable) is written as
 hard criteria too, usually first, with the liquidity gate on
@@ -164,9 +147,7 @@ or a tolerance and preview again until the list says what you meant.
 [[page.section]]
 title = "Save and finalise"
 body = """
-Save draft keeps your work; a draft is never run. Finalize checks the screen (every field
-exists, every value fits its field), saves it as the next numbered version, which never
-changes, and puts it on the nightly: from then on it runs every night.
+Save draft keeps your work; a draft is never run. Finalize checks the screen (every field exists, every value fits its field) and saves it as the next numbered version, which never changes. It puts the screen on the nightly, so from then on it runs every night.
 """
 
 # --------------------------------------------------------------------------------------- 4
@@ -185,9 +166,7 @@ links = [
 title = "Write the sentence"
 body = """
 In the Builder's Describe it box, write what you want in your own words, such as optionable
-stocks over $5 with IV rank above 50%, and choose Draft it. A text model maps the sentence onto
-the field catalogue, using the app's phrasebook of trader vocabulary and the Guide's field
-entries (how to read each field and its usual criterion per intent). It sees the catalogue
+stocks over $5 with IV rank above 50%, and choose Draft it. A text model maps the sentence onto the field catalogue. It uses the app's phrasebook of trader vocabulary and the Guide's field entries (how to read each field and its usual criterion per intent). It sees the catalogue
 (each field's name, type, unit and description) and those texts, never market data, results
 or credentials.
 """
@@ -236,9 +215,7 @@ is market stress alone, Severe storm is both.
 title = "The indicator cards"
 body = """
 Each card asks one plain question, such as whether long-term interest rates are below
-short-term ones, and says whether its warning signal is on today. Slow cards move over
-weeks or months; fast cards move within days or a couple of weeks (pace says how fast a card
-moves, not what it measures: the financial conditions card is fast but still counts toward macro risk). Behind each card: why it matters, what on means, how
+short-term ones, and says whether its warning signal is on today. Slow cards move over weeks or months. Fast cards move within days or a couple of weeks. Pace says how fast a card moves, not what it measures: the financial conditions card is fast but still counts toward macro risk. Behind each card: why it matters, what on means, how
 far ahead it has warned before, its false alarms, and what it did before each past market fall.
 """
 
@@ -252,19 +229,14 @@ period with no stored value. Every chart on the page uses the same colors.
 [[page.section]]
 title = "The strips under a chart"
 body = """
-The scores chart has a regime strip, the weather word for each stretch of sessions (Not
-computed where it is unknown), and an evidence strip: Full evidence where at least 90% of a
-score's inputs, by weight, were known that day, Partial evidence where some were, No evidence
-where none were (a score with less than half its weight known is not computed). Each indicator
+The scores chart has a regime strip, which shows the weather word for each stretch of sessions (Not computed where it is unknown). It also has an evidence strip. Full evidence means at least 90% of a score's inputs, by weight, were known that day. Partial evidence means some were. No evidence means none were. A score with less than half its weight known is not computed. Each indicator
 chart has a signal strip: Signal on where its warning was on, No data where nothing is stored.
 """
 
 [[page.section]]
 title = "Shaded behind the lines"
 body = """
-The shading shows the past: each market fall from peak to trough, each recovery from the trough
-to a new high, and the economy's recessions as dated by the NBER, hatched so that overlapping
-spans stay readable. The falls are the reference episodes the indicators are judged on.
+The shading shows the past. It marks each market fall from peak to trough, each recovery from the trough to a new high, and the economy's recessions as dated by the NBER. The shading is hatched so that overlapping spans stay readable. The falls are the reference episodes the indicators are judged on.
 """
 
 # --------------------------------------------------------------------------------------- 6
@@ -275,6 +247,7 @@ title = "Reading recession signals"
 summary = "Slow signs warn months ahead but fire false alarms; fast signs confirm in days; the end is only known after the low."
 links = [
   { kind = "term", id = "regime" },
+  { kind = "term", id = "unknown" },
   { kind = "indicator", id = "curve_10y3m" },
   { kind = "indicator", id = "sahm" },
   { kind = "indicator", id = "hy_oas" },
@@ -290,17 +263,14 @@ Slow signs read the economy and move over weeks or months. An inverted yield cur
 preceded every recession since 1968 by 5 to 16 months (August 2006 before December 2007; June
 2019 before February 2020). Unemployment above its 12-month average turns about 3.5 months
 before a recession on average. The Sahm rule turns 1 to 8 months after the recession has begun
-and is published a month later. Fast signs read prices and move in days: the index through its
-200-day average (2 to 6 weeks after a peak), the VIX above the 3-month VIX, breadth collapsing,
-credit spreads gapping. The slow signs tell you how much to hold; the fast ones tell you the
+and is published a month later. Fast signs read prices and move in days. They are the index through its 200-day average (2 to 6 weeks after a peak), the VIX above the 3-month VIX, breadth collapsing, and credit spreads gapping. The slow signs tell you how much to hold; the fast ones tell you the
 fall has started.
 """
 
 [[page.section]]
 title = "Nobody knows it is a recession until later"
 body = """
-The NBER named the December 2007 start in December 2008 and the June 2009 end in September
-2010; it named the February 2020 start in June 2020 and the April 2020 end in July 2021. A
+The NBER named the December 2007 start in December 2008 and the June 2009 end in September 2010. It named the February 2020 start in June 2020 and the April 2020 end in July 2021. A
 recession is dated after the fact, so the page never waits for it: the label uses the signs
 themselves.
 """
@@ -308,9 +278,7 @@ themselves.
 [[page.section]]
 title = "The end is confirmed after the low"
 body = """
-Bottoms are only visible in hindsight. The index reclaims its 200-day average 2 to 3 months
-after the low (June 2009, late May 2020, January 2023), and the 50-day average crosses back
-above the 200-day later still (24 June 2009, 9 July 2020, 2 February 2023). Breadth thrusts
+Bottoms are only visible in hindsight. The index reclaims its 200-day average 2 to 3 months after the low (June 2009, late May 2020, January 2023). The 50-day average crosses back above the 200-day later still (24 June 2009, 9 July 2020, 2 February 2023). Breadth thrusts
 (March 2009, December 2018, April 2023) and credit spreads turning down from their peak come
 sooner. A rule that only turns off late misses the first 10 to 20% of every recovery.
 """
