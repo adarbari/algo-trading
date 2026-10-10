@@ -151,6 +151,8 @@ the skill with the fix.
     `capture-learning`. ADR and web-rule numbers are checked against origin/main
     (`make numbering`): take the next free number right before the push; `scripts/merge_main.sh`
     does the merge of main, regenerating generated files on conflict.
+    In the desktop app, bind the PR and turn on its Auto-fix monitor so CI failures wake you
+    (`docs/ci.md`, "Watching CI"); never poll or wait on CI.
     **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
     it `no-automerge`, to keep it open for review. **Never merge yourself**: no
