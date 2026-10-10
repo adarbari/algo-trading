@@ -73,7 +73,12 @@ from algotrade_ingestion.tasks.maintenance.quality import (
 from algotrade_ingestion.workflows.nightly.attempts import Attempts, earlier_attempts
 from algotrade_ingestion.workflows.nightly.notify import Notifier, default_notifier, report
 from algotrade_ingestion.workflows.nightly.records import job_name
-from algotrade_ingestion.workflows.nightly.screens import ScreenStep, screen_jobs, signal_jobs
+from algotrade_ingestion.workflows.nightly.screens import (
+    ScreenStep,
+    edge_eval_jobs,
+    screen_jobs,
+    signal_jobs,
+)
 from algotrade_ingestion.workflows.nightly.sessions import (
     NIGHTLY_RUN,
     Plan,
@@ -96,7 +101,12 @@ from algotrade_ingestion.workflows.nightly.timing import minutes_after_close
 
 SCREENS = "screens"  # not an ingestion task: one `screen` job per screener
 EDGE_SIGNALS = "edge-signals"  # not an ingestion task: one `edge-signals` job per user
-JOB_STEPS = {SCREENS: "screens", EDGE_SIGNALS: "signals"}  # the steps that submit jobs
+EDGE_EVAL = "edge-eval"  # not an ingestion task: one `edge-eval` job per open edge
+JOB_STEPS = {  # the steps that submit jobs
+    SCREENS: "screens",
+    EDGE_SIGNALS: "signals",
+    EDGE_EVAL: "edge evaluations",
+}
 PURGE = "purge-raw"
 LATEST_ONLY = "latest closed session only (the source serves the current snapshot)"
 MARKET_DATA = ("bars", "rates", "corporate-actions", "earnings", "chains")
@@ -223,6 +233,10 @@ NIGHTLY: tuple[Step, ...] = (
     # the same features); a trade whose outcome is not stored yet stays open. Optional: a
     # failure warns, never holds the session.
     Step(EDGE_SIGNALS, needs=(SCREENS,), critical=False, latest_only=True),
+    # The incremental evaluation of every open edge (ADR 0063; the week's first session an audit
+    # that recomputes every leg): one job per edge as its owner, after the screens and the
+    # outcomes it joins. Optional: a failed job warns, never holds the session.
+    Step(EDGE_EVAL, needs=("outcomes", SCREENS), critical=False, latest_only=True),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.
     Step("descriptions", latest_only=True, critical=False),
@@ -430,6 +444,7 @@ def run_step(
     settle_until: datetime | None = None,
     observe: bool = False,
     signal_step: ScreenStep | None = None,
+    eval_step: ScreenStep | None = None,
 ) -> StepResult:
     """One step, isolated: its precondition, the registry task (or the screen jobs), then
     its acceptance checks (``wait``: a pending failure is WAITING, not FAILED;
@@ -443,7 +458,7 @@ def run_step(
         if step.requires is not None and (why := step.requires(ctx, session)):
             return Outcome(StepStatus.NOT_RUN, reason=why)
         if step.name in JOB_STEPS:
-            job = screens if step.name == SCREENS else signal_step
+            job = {SCREENS: screens, EDGE_SIGNALS: signal_step, EDGE_EVAL: eval_step}[step.name]
             if job is None:
                 return Outcome(
                     StepStatus.SKIPPED, reason=f"no job runner to submit {JOB_STEPS[step.name]} to"
@@ -469,6 +484,7 @@ def run_session(
     waive: Mapping[str, str] | None = None,
     settings: NightlySettings | None = None,
     signal_step: ScreenStep | None = None,
+    eval_step: ScreenStep | None = None,
 ) -> dict[str, Any]:
     """Every ``NIGHTLY`` step for one session; saves the session's ``nightly`` run record.
     ``resume``: reuse the steps an earlier attempt of the session did; ``waive``: step ->
@@ -496,6 +512,7 @@ def run_session(
                     settle_until(step, session, settings) if wait else None,
                     latest,
                     signal_step,
+                    eval_step,
                 )
                 # a done step that ran although none of its inputs did is a refetch
                 refetch = (
@@ -546,6 +563,7 @@ def run_nightly(
     resume: bool = True,
     waive: Mapping[str, str] | None = None,
     signal_step: ScreenStep | None = None,
+    eval_step: ScreenStep | None = None,
 ) -> dict[str, Any]:
     """The planned sessions, oldest first, stopping at the first that FAILS (the later ones
     are ``held``); then ``FINALLY``. -> the run summary (status, per-session steps with
@@ -569,6 +587,7 @@ def run_nightly(
                 waive,
                 settings,
                 signal_step,
+                eval_step,
             )
         )
     ran = [date.fromisoformat(r["session"]) for r in runs]
@@ -654,7 +673,8 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
     workers = int(params["workers"]) if params.get("workers") else None
     resume = bool(params.get("resume", True))
     waive = dict(params.get("waive") or {})
-    summary = run_nightly(task_ctx, plan, settings, screens, workers, resume, waive, signals)
+    evals = edge_eval_jobs(ctx.jobs, r["configs"], task_ctx.reader) if ctx.jobs else None
+    summary = run_nightly(task_ctx, plan, settings, screens, workers, resume, waive, signals, evals)
     notifier: Notifier = r.get("notifier") or default_notifier(settings)
     summary = report(summary, settings, notifier, task_ctx.reader)
     return {**summary, "_partial": summary["status"] != Status.SUCCEEDED}

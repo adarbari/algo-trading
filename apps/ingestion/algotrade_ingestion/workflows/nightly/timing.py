@@ -41,6 +41,7 @@ UNITS: Mapping[str, str] = {
     "market-rollups": "rows",
     "screens": "screens",
     "edge-signals": "users",
+    "edge-eval": "edges",
     "quality": "checks",
 }
 RESULT_ITEMS: Mapping[str, str] = {

@@ -18,6 +18,13 @@ trades whose outcome is stored
 (``services/evaluation/forward``). It needs ``screens`` (settlement leaves a trade open when its
 outcome is not stored) and is not critical: a failed job is a warning naming the user, never a
 hold on the session or a later one.
+
+The ``edge-eval`` step (``edge_eval_jobs``) runs one ``edge-eval`` job per open edge (not rejected
+or blocked, with screeners or baselines) as the edge's owner over the stored outcome sessions
+(ADR 0063): ``mode="incremental"`` (reuse the stored legs) on a session, ``mode="audit"``
+(recompute every leg, compare, rewrite the ones that differ, FAIL naming them) on the first
+session of its ISO week. It needs ``outcomes`` and ``screens`` and is not critical: a job that is
+not COMPLETE fails the step, a warning naming the edge, never a hold on the session or a later one.
 """
 
 from collections.abc import Callable
@@ -25,8 +32,13 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from algotrade.config.edges.document import CLOSED
+from algotrade.config.edges.loading import load_all_edges
+from algotrade.config.user import UserContext
+from algotrade.core.time.calendar import previous_session
 from algotrade.data import StoreReader
 from algotrade.services.configs import nightly_screeners
+from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.forward.results import paper_owners
 from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
 from algotrade.storage.configs.store import ConfigStore
@@ -98,6 +110,58 @@ def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> S
         if short:
             return Outcome(
                 StepStatus.FAILED, result, f"edge signals not complete: {', '.join(short)}"
+            )
+        return Outcome(StepStatus.SUCCEEDED, result, None)
+
+    return run
+
+
+def audit_session(session: date) -> bool:
+    """The first session of its ISO week by the trading calendar: the night of the weekly audit
+    (ADR 0063 amendment 6; no weekly workflow exists to hold it)."""
+    return previous_session(session).isocalendar()[:2] != session.isocalendar()[:2]
+
+
+def edge_eval_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> ScreenStep:
+    """The edge-eval step (a job per open edge, as its owner), submitting through ``jobs``."""
+
+    def run(session: date) -> Outcome:
+        edges = [
+            e
+            for e in load_all_edges(configs)
+            if e.status not in CLOSED and (e.screeners or e.baselines)
+        ]
+        stored = stored_outcome_sessions(reader)
+        if not edges or not stored:
+            reason = "no open edge to evaluate" if not edges else "no outcomes stored"
+            return Outcome(StepStatus.SKIPPED, {"evaluations": []}, reason)
+        mode = "audit" if audit_session(session) else "incremental"
+        summaries, short = [], []
+        for edge in edges:
+            params = {
+                "edge": edge.id,
+                "start": stored[0].isoformat(),
+                "end": stored[-1].isoformat(),
+                "mode": mode,
+                "trigger": "nightly",
+            }
+            job = jobs.run("edge-eval", params, UserContext(edge.owner), force=True)
+            summaries.append(
+                {"edge": edge.id, "owner": edge.owner, "mode": mode, "job_id": job.job_id}
+                | {"status": job.status.value}
+                | ({"error": job.error} if job.error else {})
+                | {
+                    k: job.result[k]
+                    for k in ("run_id", "legs_reused", "legs_computed")
+                    if k in job.result
+                }
+            )
+            if job.status is not JobStatus.COMPLETE:
+                short.append(f"{edge.owner}/{edge.id} {job.status.value}")
+        result = {"evaluations": summaries, "mode": mode}
+        if short:
+            return Outcome(
+                StepStatus.FAILED, result, f"edge evaluations not complete: {', '.join(short)}"
             )
         return Outcome(StepStatus.SUCCEEDED, result, None)
 
