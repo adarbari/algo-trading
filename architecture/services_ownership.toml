@@ -28,6 +28,14 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pbo_cscv" }, { string = "results/edge_eval" }]
 
 [[responsibility]]
+id = "edge-leg-reuse"
+description = "What a screener's statistic at one session of an edge evaluation is a function of (ADR 0063): the leg key (trial, universe, implied-vol field, event class and offset, draws, the user's expression-feature definitions, the harness, leg and seed versions), which seeds the random-pick draws so a session draws the same names in every run; the storage and reuse of legs follow in later steps of the ADR"
+owner = ["src/algotrade/services/evaluation/cross_section/legs/*"]
+allowed = ["src/algotrade/services/evaluation/cross_section/harness.py"]  # the caller: its random draws are seeded by the key
+section = "docs/adr/0063-incremental-edge-evaluation.md#decision-proposed"
+detect = [{ call = "leg_key" }]
+
+[[responsibility]]
 id = "edge-paper-trading"
 description = "The forward paper record of the edges a user follows (ADR 0053 amendment 2026-10-09): for each edge a user follows (a bookmarked site edge) or owns as a candidate or live edge (interim rule, ADR 0053 amendment 2026-10-10: the owner changes it in PR 5), at each night's session when its schedule fires (the harness's own legs, cross_section/sessions.leg_blocks: a plain schedule's decision sessions counted from the bookmark's `since` or the status's `status_since`, an event schedule's event names read at D with S = D + 1), the harness's own picks (cross_section/picks: the screener's qualified names among the edge's eligible names, best first, top_k, only what was known at the session) as open paper trades with buy and sell sessions from the trading calendar; for every open trade whose sell session has come, the stored outcome read as of now and judged by the edge's own [outcome] (cross_section/hit) as won, lost or skipped with the reason (an implied-vol outcome, expires_otm or a vol ratio, reads the vol at the signal session through harness.implied_at; never a loss or a zero for a missing result; a trade whose edge's outcome changed since is skipped); one atomic run per user per night into results/edge_paper with the run record edge-paper:<user>; idempotent per night"
 owner = ["src/algotrade/services/evaluation/forward/*"]

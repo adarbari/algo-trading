@@ -84,6 +84,13 @@ def test_a_document_is_typed_and_a_missing_file_has_no_terms() -> None:
     assert beta.see_also == ()
     assert found.get("beta") is beta and found.get("gamma") is None
     assert load_guide_glossary(MemoryConfigStore({})) == GuideGlossary()
+    assert alpha.next == "" and alpha.reading == "Comes before beta."
+
+
+def test_next_is_served_as_the_body_s_last_sentence() -> None:
+    term = GuideGlossary.from_document({"term": [{**TERM, "next": " Retry  tonight. "}]}).terms[0]
+    assert term.next == "Retry tonight."
+    assert term.reading == "Comes before beta. Retry tonight."
 
 
 @pytest.mark.parametrize(
@@ -94,6 +101,7 @@ def test_a_document_is_typed_and_a_missing_file_has_no_terms() -> None:
         ([{**TERM, "id": "Alpha"}], "id: expected snake_case"),
         ([{**TERM, "short": " "}], "short: expected a non-empty string"),
         ([{**TERM, "colour": "red"}], "unknown keys"),
+        ([{**TERM, "next": " "}], "next: expected a non-empty string"),
         ([{**TERM, "see_also": ["alpha"]}], "does not refer to itself"),
         ([{**TERM, "see_also": ["b", "b"]}], "see_also ids listed more than once"),
         ([TERM, {**TERM, "term": "Other"}], "term ids listed more than once"),

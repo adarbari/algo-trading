@@ -143,7 +143,7 @@ note = "with feature.atr_pct gte 0.01 so pinned names are out"
 [[field]]
 name = "feature.iv_percentile"
 theme = "volatility"
-reads = "The share of the last 252 sessions whose IV30 was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. It answers the same question as feature.iv_rank but counts days instead of measuring the span, so one extreme day cannot squash it; it is the more robust of the two for premium selling."
+reads = "The share of the last 252 sessions whose IV30 was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. It answers the same question as feature.iv_rank but counts days instead of measuring the span, so one extreme day cannot squash it; it is the steadier of the two for premium selling."
 caveats = [
   "The earnings and takeover caveats of feature.iv_rank apply unchanged.",
   "A percentile near 1 after a long calm stretch can be a modest IV (every earlier day was lower, but not by much); read the level too (rollup.iv_history@v2.iv30).",
@@ -165,7 +165,7 @@ tolerance = 0.1
 [[field]]
 name = "feature.iv_hv_spread"
 theme = "volatility"
-reads = "IV30 minus HV30, in volatility points as a fraction: 0.05 means options price 5 points more movement than the stock delivered last month. Across markets implied volatility exceeds realised by about 3 to 4 points on average (the variance risk premium, Carr and Wu 2009), so a spread near 0.04 is just the normal insurance premium; 0.08 and above is a rich one, and a negative spread means the stock moved more than its options expected."
+reads = "IV30 minus HV30, in volatility points as a fraction: 0.05 means options price 5 points more movement than the stock delivered last month. Across markets implied volatility exceeds realised by about 3 to 4 points on average (the variance risk premium, Carr and Wu 2009), so a spread near 0.04 is only the normal insurance premium; 0.08 and above is a rich one, and a negative spread means the stock moved more than its options expected."
 caveats = [
   "A report inside 30 days inflates IV and the spread with it; the premium is the earnings move, not free. Check rollup.earnings@v1.days_to_earnings.",
   "A quiet month depresses HV30 and widens the spread; after a report drops out of the HV window the spread jumps with no change in IV. Check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.",
@@ -290,7 +290,7 @@ theme = "volatility"
 reads = "IV rank on IBKR's own implied-volatility history, 0 to 1: where today's IV sits between the year's low and high. The same reading as feature.iv_rank, which prefers this one where IBKR has it; use this field only when the screen must say 'IBKR's rank', as the VRP scanner does (it scores it, so a name IBKR has no history for loses points rather than the screen)."
 caveats = [
   "Null for the names IBKR has no history for (under 60 sessions of its IV, rollup.ibkr_iv@v1.rank_status_ibkr says): a hard criterion silently excludes them. Prefer feature.iv_rank for a gate; score this one.",
-  "Every caveat of feature.iv_rank applies: one spike squashes the year, a report ahead lifts it, a takeover collapses it. feature.iv_percentile is the robust cross-check.",
+  "Every caveat of feature.iv_rank applies: one spike squashes the year, a report ahead lifts it, a takeover collapses it. feature.iv_percentile is the steadier cross-check (one extreme day moves it less).",
 ]
 sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters; ADR 0028 (IBKR-derived, personal licence)"]
 [[field.use]]
@@ -308,7 +308,7 @@ name = "rollup.price_stats@v2.hv30"
 theme = "volatility"
 reads = "Realised (historical) volatility over 30 sessions, annualised, as a fraction: 0.25 is 25% a year. The denominator of the IV-over-HV premium (feature.iv_hv_spread, feature.iv_hv_ratio, the VRP scanner's versions): what the stock actually did against what its options price. A large-cap index runs 0.12 to 0.20, a typical single stock 0.25 to 0.40, a biotech or a meme name above 0.60."
 caveats = [
-  "Close-to-close, so one gap dominates it for 30 sessions: an earnings day of 15% alone puts hv30 near 0.45 (the 'earnings gap inside the window' situation); rollup.price_stats@v2.hv20_yz is the gap-robust alternative.",
+  "Close-to-close, so one gap dominates it for 30 sessions: an earnings day of 15% alone puts hv30 near 0.45 (the 'earnings gap inside the window' situation); rollup.price_stats@v2.hv20_yz is the alternative that gaps distort less.",
   "Under 0.10 on a stock is a pinned takeover or a halted name, not calm; a tiny HV makes feature.iv_hv_ratio explode.",
   "Null after any missing bar in the last 31 sessions.",
 ]
@@ -331,7 +331,7 @@ name = "rollup.price_stats@v2.hv20_yz"
 theme = "volatility"
 reads = "Yang-Zhang realised volatility over 20 sessions, annualised, as a fraction. It uses the open, high, low and close, weighing the overnight gap and the intraday range separately, so it is several times more efficient than close-to-close and does not let one gap day own the window. The better estimate for comparing realised volatility across names; the close-to-close hv20 and hv30 are what the stored IV/HV features use."
 caveats = [
-  "Still a 20-session window: a shock inside it raises the estimate, just less violently than close-to-close.",
+  "Still a 20-session window: a shock inside it raises the estimate, only less violently than close-to-close.",
   "Bad intraday highs and lows (a bad print) distort a range estimator more than a close estimator; a reading far from rollup.price_stats@v2.hv20 is worth a look at the bars.",
 ]
 sources = ["Yang and Zhang (2000); https://flashalpha.com/articles/yang-zhang-vs-close-to-close-realized-volatility"]
@@ -540,7 +540,7 @@ tolerance = 0
 [[field]]
 name = "rollup.ibkr_iv@v1.iv_percentile_252d_ibkr"
 theme = "implied volatility"
-reads = "The share of the last 252 sessions whose IBKR IV was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. The robust companion of rollup.ibkr_iv@v1.iv_rank_252d_ibkr (counts days instead of measuring the span, so one spike cannot squash it); feature.iv_percentile prefers this one where IBKR has it."
+reads = "The share of the last 252 sessions whose IBKR IV was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. The steadier companion of rollup.ibkr_iv@v1.iv_rank_252d_ibkr (counts days instead of measuring the span, so one spike cannot squash it); feature.iv_percentile prefers this one where IBKR has it."
 caveats = [
   "Null under 60 sessions of IBKR IV (rollup.ibkr_iv@v1.rank_status_ibkr UNKNOWN); PROVISIONAL below 252 sessions compares against a shorter year.",
   "A report in the next ten sessions lifts it like every IV measure.",
@@ -594,7 +594,7 @@ name = "rollup.iv_history@v2.iv_rank_252d"
 theme = "implied volatility"
 reads = "IV rank on our own IV30 history, 0 to 1: where today's IV30 sits between the year's low and high. feature.iv_rank prefers IBKR's rank and falls back to this one (feature.iv_rank_source says which); use this field only when the screen must say 'our history'."
 caveats = [
-  "Every caveat of feature.iv_rank: one spike squashes the year, a report ahead lifts it, a takeover collapses it; rollup.iv_history@v2.iv_percentile_252d is the robust cross-check.",
+  "Every caveat of feature.iv_rank: one spike squashes the year, a report ahead lifts it, a takeover collapses it; rollup.iv_history@v2.iv_percentile_252d is the steadier cross-check (one extreme day moves it less).",
   "Null under 60 sessions of our IV (rollup.iv_history@v2.rank_status UNKNOWN), when there is no IV today, or when every IV in the window is equal.",
 ]
 sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters"]
@@ -609,7 +609,7 @@ note = "prefer feature.iv_rank, which takes IBKR's where it exists"
 [[field]]
 name = "rollup.iv_history@v2.iv_percentile_252d"
 theme = "implied volatility"
-reads = "The share of the last 252 sessions whose IV30 (ours) was below today's, 0 to 1. The robust companion of rollup.iv_history@v2.iv_rank_252d; feature.iv_percentile prefers IBKR's and falls back to this."
+reads = "The share of the last 252 sessions whose IV30 (ours) was below today's, 0 to 1. The steadier companion of rollup.iv_history@v2.iv_rank_252d; feature.iv_percentile prefers IBKR's and falls back to this."
 caveats = [
   "A percentile near 1 after a long calm stretch can be a modest IV; read the level too.",
   "Null under 60 sessions of IV or without an earlier IV.",
@@ -728,7 +728,7 @@ name = "rollup.bands@v2.bb_width_pctile_252d"
 theme = "volatility"
 reads = "Where today's Bollinger bandwidth sits against the name's own last year, 0 to 1: the share of the 252 sessions before today whose bandwidth was narrower. 0.05 means the bands are tighter than on 95% of days in the year (Bollinger's Squeeze: the lowest bandwidth in six months), 0.50 an ordinary month, 0.95 one of the widest. A squeeze says a large move is likelier, not which way: it is a setup to pair with a direction (feature.trend_state, rollup.volume@v1.up_volume_share_20d), and feature.bb_squeeze is the same idea measured against the Keltner channel."
 caveats = [
-  "Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that just had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.",
+  "Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that recently had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.",
   "A squeeze can last weeks and the release can go either way; do not read a low percentile as a buy. Confirm the direction with feature.breakout_20d or rollup.volume@v1.up_volume_share_20d once it moves.",
   "A pending takeover pins the price, so the bands stay the tightest in the year until the deal closes. See the 'pending takeover' situation.",
   "Null when fewer than 240 of the 252 sessions before today have a bandwidth (a young listing or a name with gaps), or today's is unknown.",

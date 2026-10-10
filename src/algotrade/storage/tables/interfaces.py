@@ -48,6 +48,14 @@ class TableStore(Protocol):
         nothing else, so it is the cache-validity signal for readers (ADR 0022)."""
         ...
 
+    def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
+        """Per committed partition with ``start <= session_date <= end``, the highest commit
+        sequence of any run in its index (a replaced version included; an entry with no
+        sequence, from a direct write or before ADR 0022, counts 0). Pending writes are
+        ignored. A partition's value rises when a run commits or restates it and the date
+        is absent once it is purged: the stamp ADR 0063 compares to know a read is unchanged."""
+        ...
+
     def abort_run(self, run_id: str) -> int:
         """Drop the pending writes of ``run_id`` (and their files); -> partitions dropped."""
         ...

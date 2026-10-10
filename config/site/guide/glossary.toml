@@ -15,9 +15,7 @@ term = "Session"
 short = "The trading day a page is reading: every value on it is for exactly that day."
 body = """
 A page reads one session, by default the latest trading day whose nightly update has fully
-completed, and says which one it is. Every daily value on the page is the one stored for that day. A value
-the app did not compute or pull for that day is shown as UNKNOWN with the reason; it is never
-filled in from an earlier day, so two numbers side by side are always about the same day. The
+completed, and says which one it is. Every daily value on the page is the one stored for that day. A value the app did not compute or pull for that day is shown as UNKNOWN with the reason. It is never filled in from an earlier day. So two numbers side by side are always about the same day. The
 list of instruments and their company details come from snapshots taken from time to time:
 the page uses the latest snapshot on or before the session and says which.
 """
@@ -35,6 +33,7 @@ say that a newer one is still in progress, or that a step failed and the app is 
 update completes, pages switch to the new day by themselves. Asking for a date explicitly
 always shows that date, complete or not.
 """
+next = "Nothing is needed from you: pages move on by themselves, and a step that keeps failing is for the owner to fix."
 see_also = ["session", "not_run", "run"]
 
 [[term]]
@@ -43,9 +42,7 @@ term = "Knowledge time"
 short = "When the app stored a fact, as opposed to the day the fact is about."
 body = """
 Every stored row carries the market day it describes (its session date) and its knowledge
-time (knowledge_ts), the moment the app learned it. A vendor's correction is added as a new
-row with a later knowledge time, never written over the old one, so a backtest records which
-version of the data it read and can be repeated exactly. Dated events such as earnings
+time (knowledge_ts), the moment the app learned it. A vendor's correction is added as a new row with a later knowledge time. It is never written over the old one. So a backtest records which version of the data it read and can be repeated exactly. Dated events such as earnings
 announcements carry the day they became known (known_from), and a page for a session only
 uses the events known by that day.
 """
@@ -56,10 +53,7 @@ id = "unknown"
 term = "UNKNOWN"
 short = "A value that is not known for the session, always shown with the reason why."
 body = """
-The app shows UNKNOWN instead of guessing. The reason says which case it is: nothing of that
-kind was stored for the session, the instrument has no row that day, the value is stored
-empty (the field's null meaning says what empty means for it), the field does not apply to
-the instrument, or it is a personal-licence field you cannot read. UNKNOWN is about one value;
+The app shows UNKNOWN instead of guessing. The reason names one of five cases. Nothing of that kind was stored for the session. The instrument has no row that day. The value is stored empty, and the field's null meaning says what empty means for it. The field does not apply to the instrument. Or the field is a personal-licence one that you cannot read. UNKNOWN is about one value;
 NOT_RUN is about a whole screen. In a screen, missing data never passes: a hard criterion with
 no value rejects the row, a soft or score criterion with no value costs points.
 """
@@ -98,9 +92,7 @@ short = "Typed rules that pick which instruments a strategy or a backtest looks 
 body = """
 A selection is a list of rules (a field, a comparison and a value, combined with all, any and
 not) checked against the field catalogue. Missing data counts as unknown and is left out,
-never passed. Rule screens have no selection: who is screened (the security type, an ACTIVE
-listing, having options) is written as hard criteria like any other, so it shows in the funnel
-with the rest.
+never passed. Rule screens have no selection. Who is screened (the security type, an ACTIVE listing, having options) is written as hard criteria like any other. So it shows in the funnel with the rest.
 """
 see_also = ["criterion", "hard", "gating_criterion"]
 
@@ -109,11 +101,7 @@ id = "draft"
 term = "Draft"
 short = "A screen's working copy: you can edit, save and preview it, but it is never run."
 body = """
-The Builder keeps your edits to a screen as its draft (Save draft). A draft is never run;
-Finalize checks it (every field exists, every value fits its field) and turns it into the next
-numbered version, which cannot change and runs every night from then on. A screen drafted from
-a sentence (Describe it) is a draft too: the criteria the text model proposes load as unsaved
-edits, and nothing is saved or run until you save and finalise.
+The Builder keeps your edits to a screen as its draft (Save draft). A draft is never run. Finalize checks it (every field exists, every value fits its field) and turns it into the next numbered version. That version cannot change and runs every night from then on. A screen drafted from a sentence (Describe it) is a draft too. The criteria the text model proposes load as unsaved edits. Nothing is saved or run until you save and finalise.
 """
 see_also = ["preset", "run", "criterion"]
 
@@ -136,9 +124,7 @@ term = "Playbook"
 short = "The Guide's page for one site preset screen: the setup it looks for, what it checks and what it leaves to you."
 body = """
 There is one playbook per site preset, grouped by family (trend, breakouts, reversals, option
-income). It says what a hit looks like and what the screen does not check, lists each
-criterion in plain words with its field and rule, gives the caveats to read before acting on a
-hit and the situations that fool its fields, and links to related playbooks. Open in Builder
+income). It says what a hit looks like and what the screen does not check. It lists each criterion in plain words with its field and rule. It gives the caveats to read before acting on a hit and the situations that fool its fields. It also links to related playbooks. Open in Builder
 shows the preset in the Builder, where your first edit makes your own copy.
 """
 see_also = ["preset", "criterion"]
@@ -163,9 +149,7 @@ id = "op"
 term = "op"
 short = "The comparison a criterion makes, such as gte (greater than or equal to) or between."
 body = """
-The operators are eq (equals), ne (not equal), in and not_in (one of a list, or none of it),
-gt and gte (greater than; or equal to), lt and lte (less than; or equal to), between (within
-two bounds, both included), and is_null and not_null, which take no value. A tolerance works
+The comparison operators are eq (equals), ne (not equal), gt and gte (greater than; or equal to), and lt and lte (less than; or equal to). The list operators are in and not_in (one of a list, or none of it). The operator between means within two bounds, both included. The operators is_null and not_null take no value. A tolerance works
 only with the numeric comparisons gt, gte, lt, lte and between. A value that is absent, not a
 number, or of the wrong type for the comparison counts as missing, and missing never passes.
 """
@@ -181,7 +165,7 @@ one may miss by up to its tolerance and keep the row as a near miss. A score cri
 removes a row; it only moves it down the list. Hard and soft criteria are the gating ones, the
 steps of the screen's funnel.
 """
-see_also = ["hard", "soft", "score_mode", "gating_criterion"]
+see_also = ["hard", "soft", "score_mode", "gating_criterion", "near_miss"]
 
 [[term]]
 id = "hard"
@@ -199,12 +183,10 @@ id = "soft"
 term = "soft"
 short = "A criterion that may miss by a little: within its tolerance the row stays in as a near miss."
 body = """
-A soft criterion needs a tolerance. A value that passes is fine; one that misses by no more
-than the tolerance is a near miss and gives the row the decision its on_miss names (WATCH by
-default); one that misses by more is a REJECT. A row with no value for it stays in, loses the
+A soft criterion needs a tolerance. A value that passes is fine. One that misses by no more than the tolerance is a near miss, and gives the row the decision its on_miss names (WATCH by default). One that misses by more is a REJECT. A row with no value for it stays in, loses the
 full near-miss penalty of 10 points, and its reasons list no <field>.
 """
-see_also = ["tolerance", "on_miss", "near_miss", "mode"]
+see_also = ["tolerance", "on_miss", "near_miss", "mode", "watch", "reject"]
 
 [[term]]
 id = "score_mode"
@@ -212,8 +194,7 @@ term = "score (mode)"
 short = "A criterion that never removes a row: a miss only lowers the row's score."
 body = """
 Use score for a preference rather than a requirement: names that meet it rise, the others stay
-in lower down. Its tolerance is optional: a miss within it costs 0 to 10 points by how far it
-missed; a miss beyond it, or without one, or no value at all, costs 10.
+in lower down. Its tolerance is optional. A miss within it costs 0 to 10 points by how far it missed. A miss beyond it, a miss with no tolerance, or no value at all costs 10.
 """
 see_also = ["score", "mode", "tolerance"]
 
@@ -222,10 +203,7 @@ id = "tolerance"
 term = "tolerance"
 short = "How far a value may miss a soft or score criterion's threshold and still count as a near miss."
 body = """
-A tolerance is either a number in the field's own unit (a tolerance of 0.02 on a threshold of
-0.10 makes 0.08 to 0.10 a near miss) or relative, a share of the threshold: relative 0.2 on an
-average daily dollar volume of at least $50M (rollup.price_stats@v2.adv_usd_20d) makes $40M to
-$50M a near miss. It is required for soft, optional for score, not allowed for hard, and works
+A tolerance is either a number in the field's own unit or a share of the threshold (relative). A tolerance of 0.02 on a threshold of 0.10 makes 0.08 to 0.10 a near miss. A relative 0.2 on an average daily dollar volume of at least $50M (rollup.price_stats@v2.adv_usd_20d) makes $40M to $50M a near miss. It is required for soft, optional for score, not allowed for hard, and works
 only with numeric comparisons.
 """
 see_also = ["near_miss", "soft", "score_mode"]
@@ -240,7 +218,7 @@ decisions, EVENT_RISK above LIQUIDITY_RISK above WATCH, and every reason is list
 criteria have an on_miss: a hard miss is always a REJECT and a score miss changes only the
 score.
 """
-see_also = ["watch", "liquidity_risk", "event_risk", "near_miss"]
+see_also = ["watch", "liquidity_risk", "event_risk", "near_miss", "reject"]
 
 # ------------------------------------------------------------------------ reading a screen's result
 
@@ -251,9 +229,7 @@ short = "A value that missed a soft or score criterion's threshold by no more th
 body = """
 A near miss costs points by how close it came: 10 times the distance divided by the
 tolerance, so 0 to 10. On a soft criterion it also sets the row's decision through on_miss; on
-a score criterion it only lowers the score. Every run and preview lists its narrow misses: the
-rows that missed only within tolerance, with each criterion, the value, the threshold and the
-distance, which is where a threshold set a little too tight shows up.
+a score criterion it only lowers the score. Every run and preview lists its narrow misses: the rows that missed only within tolerance. Each shows the criterion, the value, the threshold and the distance. This is where a threshold set a little too tight shows up.
 """
 see_also = ["tolerance", "on_miss", "watch", "score"]
 
@@ -262,9 +238,7 @@ id = "gating_criterion"
 term = "Gating criterion"
 short = "A hard or soft criterion: one that can remove a row (a score criterion never does)."
 body = """
-The Builder's funnel shows the gating criteria in order: the universe at the top, then for
-each one how many rows enter it, pass, miss narrowly, fail and have no value, and how many are
-left for the next. A row with no value for a soft criterion stays in; for a hard one it is
+The Builder's funnel shows the gating criteria in order. It starts with the universe at the top. For each criterion it shows how many rows enter, pass, miss narrowly, fail and have no value, and how many are left for the next. A row with no value for a soft criterion stays in; for a hard one it is
 removed.
 """
 see_also = ["hard", "soft", "mode", "selection"]
@@ -278,15 +252,14 @@ A QUALIFIED row passed every gating criterion. Its score can still be below 100:
 criteria it missed, or a soft criterion with no value (listed among its reasons), cost
 points.
 """
-see_also = ["score", "watch", "reject"]
+see_also = ["score", "watch", "reject", "gating_criterion"]
 
 [[term]]
 id = "watch"
 term = "WATCH"
 short = "The default decision of a near miss: close enough to keep an eye on, not a pass."
 body = """
-A row is WATCH when it passed every hard criterion and nearly missed at least one soft
-criterion whose on_miss is WATCH, and no near miss gave it anything more severe. It is a name
+A row is WATCH when it passed every hard criterion and nearly missed at least one soft criterion whose on_miss is WATCH. No near miss gave it anything more severe. It is a name
 that may qualify on a later day if the value moves a little.
 """
 see_also = ["near_miss", "on_miss", "qualified"]
@@ -302,7 +275,7 @@ misses. Every site preset uses it on the average daily dollar volume
 WATCH and less than EVENT_RISK: the setup is there, but check the spread and the size you can
 trade.
 """
-see_also = ["on_miss", "near_miss", "event_risk"]
+see_also = ["on_miss", "near_miss", "event_risk", "watch"]
 
 [[term]]
 id = "event_risk"
@@ -314,7 +287,7 @@ example one asking for no earnings report within the next few days. It outranks 
 and WATCH when a row has several near misses. No site preset uses it today; your own screens
 can.
 """
-see_also = ["on_miss", "near_miss", "liquidity_risk"]
+see_also = ["on_miss", "near_miss", "liquidity_risk", "watch"]
 
 [[term]]
 id = "reject"
@@ -331,28 +304,26 @@ id = "paused"
 term = "PAUSED"
 short = "A pick the regime gate held back: it met the screen, but the market's regime is one the screen pauses in."
 body = """
-With the regime gate on, the [regime] settings (the site's defaults or your own config) list
-the regimes each screen pauses in, and on a session in one of them its QUALIFIED and WATCH rows become PAUSED, with the rule that paused them as the first
-reason. The VRP scanner, which sells option volatility, pauses in Storm and Severe storm. The
+With the regime gate on, the [regime] settings (the site's defaults or your own config) list the regimes each screen pauses in. On a session in one of them, its QUALIFIED and WATCH rows become PAUSED. The rule that paused them is the first reason. The VRP scanner, which sells option volatility, pauses in Storm and Severe storm. The
 gate fails closed: when the regime is UNKNOWN for the session, every QUALIFIED and WATCH row
 of a gated screen is paused. A paused pick stays visible with its reason (Ideas, Paused by regime), never silently
 dropped. The gate is off unless the site or your settings turn it on.
 """
-see_also = ["regime", "qualified", "watch"]
+see_also = ["regime", "qualified", "watch", "unknown"]
 
 [[term]]
 id = "regime"
 term = "Regime"
 short = "The market's weather for the session: Clear, Clouds building, Storm or Severe storm."
 body = """
-The regime comes from two scores from 0 to 100: macro risk, the warning signs in the
-economy (the financial conditions index is one, though it moves fast), and market stress, the fast ones in prices. Clear (CALM) is neither high, Clouds
+The regime comes from two scores from 0 to 100. Macro risk measures the warning signs in the economy (the financial conditions index is one, though it moves fast). Market stress measures the fast signs in prices. Clear (CALM) is neither high, Clouds
 building (CAUTION) macro risk only, Storm (STRESS) market stress only, Severe storm (CRISIS)
 both. It is UNKNOWN when either score cannot be computed, never Clear for lack of data. To
 avoid flickering, the label is the most severe one of the last five sessions, so a regime is
 left only after five sessions below it. It can size new positions and drive the regime gate,
 both off unless turned on.
 """
+next = "Read the label as the session's backdrop, and open the regime indicators in the Guide to see which signs drove it."
 see_also = ["paused", "unknown"]
 
 [[term]]
@@ -360,9 +331,7 @@ id = "score"
 term = "Score"
 short = "A row's number from 0 to 100 for sorting: 100 when every threshold is met, less a penalty for each miss."
 body = """
-A near miss costs 0 to 10 points by how close it came, a score criterion missed beyond its
-tolerance or a soft or score criterion with no value 10, and a hard miss or a soft miss beyond
-tolerance 100; the score stops at 0. It is for ordering the list, not a probability. Rows sort
+A near miss costs 0 to 10 points by how close it came. A score criterion missed beyond its tolerance costs 10, and so does a soft or score criterion with no value. A hard miss, or a soft miss beyond tolerance, costs 100. The score stops at 0. It is for ordering the list, not a probability. Rows sort
 by score, then by the screen's tie-break field, then by instrument.
 """
 see_also = ["near_miss", "score_mode", "qualified"]
@@ -378,7 +347,7 @@ term = "Not available: system error"
 short = "The value could not be shown because something in the app's own data pipeline did not deliver it."
 body = """
 A source was down, a nightly step did not finish, or a stored table is missing for the session.
-The value is not an empty value and not a zero: it is simply not there, and the app never fills
+The value is not an empty value and not a zero: it is not there, and the app never fills
 it from an earlier day. A screen that needs it treats it as missing data, so a hard criterion
 rejects the row and a soft or score criterion costs points. It normally clears on the next
 nightly run; the owner sees the exact cause.
@@ -439,9 +408,7 @@ id = "edge"
 term = "Edge"
 short = "A written reason why some stocks should do better than others, tested on the stored history."
 body = """
-An edge is a document: the idea in one sentence, who is forced or wrong so that the pattern
-exists, why it should last once known, how a trade would be held (how long, against what, at
-what cost) and the screens that implement it. The app runs each screen on every past session
+An edge is a document. It states the idea in one sentence and who is forced or wrong so that the pattern exists. It says why the pattern should last once known and how a trade would be held (how long, against what, at what cost). It lists the screens that implement it. The app runs each screen on every past session
 using only what was known then, and compares what its picks did next with every other eligible
 name. An edge earns trust only from those numbers, never from the idea alone.
 """
@@ -452,16 +419,17 @@ id = "edge_status"
 term = "Edge status"
 short = "Where an edge stands: researching, candidate, evidenced, live or retired; or rejected, blocked."
 body = """
-Every edge has one status, on one line of life: researching (the idea is written, nothing is
-claimed), candidate (being tested), evidenced (its picks beat the base rate and the baselines
-out of sample, on enough trades), live (evidenced and used to rank ideas), retired (it stopped
-working by its own retirement rule). Two statuses sit off the line: rejected (checked and
-dropped, with the reason kept so it is not filed again) and blocked (worth testing, but missing
-the data it needs). A site edge's status is the site's, the same for everybody; the status of
+Every edge has one status. Five follow one another in order. Researching: the idea is written
+and nothing is claimed. Candidate: it is being tested. Evidenced: its picks beat the base rate
+and the baselines out of sample, on enough trades. Live: it is evidenced and used to rank ideas.
+Retired: it stopped working by its own retirement rule. Two statuses sit off the line. Rejected:
+checked and dropped, with the reason kept so it is not filed again. Blocked: worth testing, but
+missing the data it needs. A site edge's status is the site's, the same for everybody; the status of
 your own edge is yours to move. Only an official result over the out-of-sample period can move a
 site edge to evidenced.
 """
-see_also = ["verdict", "edge_owner", "edge_state", "out_of_sample", "exploratory"]
+next = "Only the site's reviewers move a site edge; you move your own edge yourself (Moving your edge's status)."
+see_also = ["verdict", "edge_owner", "edge_state", "out_of_sample", "exploratory", "official_result", "base_rate"]
 
 [[term]]
 id = "edge_owner"
@@ -474,7 +442,7 @@ clone of a site edge or one you wrote from scratch. You set its status, you see 
 nobody else does, until an admin publishes it site-wide. You cannot change a site edge's status;
 clone it, or follow it.
 """
-see_also = ["edge_copy", "edge_status", "follow_edge"]
+see_also = ["edge_copy", "edge_status", "follow_edge", "official_result"]
 
 [[term]]
 id = "edge_run_rights"
@@ -515,6 +483,7 @@ replaces another edge of yours (a new version) retires the old one when it goes 
 your record, not an order: the app never trades. Some pages still show the older words: trial
 for a candidate, and following for a live edge or a site edge you bookmarked.
 """
+next = "The app records each move, and from candidate on it records the edge's paper trades every night."
 see_also = ["edge_status", "edge_owner", "forward_test"]
 
 [[term]]
@@ -522,9 +491,9 @@ id = "edge_copy"
 term = "Cloning an edge"
 short = "A clone is your own edge that extends another; you change only what you want."
 body = """
-Clone an edge to make one of your own: it extends the edge it was cloned from (its `extends`),
-so you write down only what differs (the screens, the picks, the holding periods, the universe)
-and everything else follows the original, which stays as it is. Your clone is researching to
+Clone an edge to make one of your own. It extends the edge it was cloned from (its `extends`),
+so you write down only what differs (the screens, the picks, the holding periods, the universe).
+Everything else follows the original, which stays as it is. Your clone is researching to
 begin with and has its own backtests. Its out-of-sample result stays hidden until you show it or
 make it live, so the fair test is not used up while you tune. An admin can publish a clone
 site-wide.
@@ -543,7 +512,7 @@ data, and the warning stays on the bookmark as a permanent label (Followed again
 Your own edge is not followed: you set its status instead. A bookmark is a record of your
 interest, not an order: the app never trades.
 """
-see_also = ["edge_owner", "edge_status", "verdict", "edge_labels", "paper_trading"]
+see_also = ["edge_owner", "edge_status", "verdict", "edge_labels", "paper_trading", "official_result"]
 
 [[term]]
 id = "edge_labels"
@@ -556,7 +525,8 @@ result is no longer a fair test. Replaced without a forward test: a new version 
 one before enough new sessions had passed. Split moved after viewing: the out-of-sample start
 was moved after the result was seen. Labels are never removed.
 """
-see_also = ["follow_edge", "edge_state", "out_of_sample", "show_out_of_sample"]
+next = "To avoid one, look at a clone's out-of-sample result only when you have finished tuning, and forward-test a new version before it replaces the old one."
+see_also = ["follow_edge", "edge_state", "out_of_sample", "show_out_of_sample", "forward_test"]
 
 [[term]]
 id = "show_out_of_sample"
@@ -582,7 +552,7 @@ whether a change helped on the period you tuned on. The out-of-sample columns ap
 show that result. A copy that beats its original in-sample but not out-of-sample was probably
 fitted to the past.
 """
-see_also = ["edge_copy", "show_out_of_sample", "win_rate"]
+see_also = ["edge_copy", "show_out_of_sample", "win_rate", "official_result"]
 
 [[term]]
 id = "edge_builder_idea"
@@ -602,9 +572,7 @@ id = "edge_quality_bar"
 term = "The quality bar"
 short = "Nine written answers every edge gives before its numbers are read."
 body = """
-Who is forced or wrong, why the pattern survives being known, how the outcome is measured, when
-the trigger becomes known, how a stranger could replicate it, the size to expect, capacity and
-costs, how it fails, and what else could explain the result. The seven under More in step 1 are
+Every edge answers nine questions. Who is forced or wrong? Why does the pattern survive being known? How is the outcome measured? When does the trigger become known? How could a stranger replicate it? What size should you expect? What are the capacity and costs? How does it fail? What else could explain the result? The seven under More in step 1 are
 those after the first two. An answer is a few sentences; an edge that cannot answer them is a
 backtest looking for a story.
 """
@@ -615,13 +583,11 @@ id = "edge_builder_screens"
 term = "Edge builder: screens"
 short = "The existing screens that decide which stocks qualify and in what order."
 body = """
-Step 2 of the six. A screen only decides which stocks qualify on a session and how they rank;
-everything after that (when the edge fires, how many it takes, how it is held) belongs to the
-edge. Choose one or more: each one is tested on its own as an implementation of the edge. The
+Step 2 of the six. A screen only decides which stocks qualify on a session and how they rank. Everything after that belongs to the edge: when it fires, how many picks it takes, how it is held. Choose one or more: each one is tested on its own as an implementation of the edge. The
 record beside a screen is its win rate against the base rate on the out-of-sample period, or No
 record yet. Edit in Screen Builder opens the screen and brings you back here with your draft kept.
 """
-see_also = ["edge", "base_rate", "edge_builder_picks"]
+see_also = ["edge", "base_rate", "edge_builder_picks", "win_rate"]
 
 [[term]]
 id = "edge_builder_picks"
@@ -643,7 +609,7 @@ body = """
 Step 4 of the six. Enter says how many sessions after the trigger the position opens (at least
 one, so nothing is bought on a price that was not known yet). Each holding period is measured and
 reported on its own. Costs are for a round trip in basis points (100 bps is 1%). A win is either
-a return above the benchmark after costs, or simply a rise after costs.
+a return above the benchmark after costs, or only a rise after costs.
 """
 see_also = ["edge_builder_picks", "win_rate", "edge_builder_compare"]
 
@@ -656,7 +622,7 @@ Step 5 of the six. The universe is the set of stocks a random pick could have be
 is the base rate the edge has to beat. The decoys are other screens run on the same sessions: if
 a plain one does as well, the idea is not what explains the result.
 """
-see_also = ["base_rate", "edge_builder_trade", "edge_builder_test"]
+see_also = ["base_rate", "edge_builder_trade", "edge_builder_test", "win_rate"]
 
 [[term]]
 id = "edge_builder_test"
@@ -690,15 +656,13 @@ body = """
 The verdict is judged by one fixed rule on the edge's official result, using its best screen and
 holding period (the page says which). Waiting on data: there is no official result, or it could
 not read what it needed. Not enough data: too few out-of-sample trades, or a figure the rule needs was
-not measured. Not working: the out-of-sample win rate is not above the base rate, or the top
-vs bottom decile, the deflated Sharpe ratio or the overfitting chance is poor, or it does not
-beat the plain baselines. Promising: it passes all of those with enough out-of-sample trades. Works: more
+not measured. Not working: the out-of-sample win rate is not above the base rate. It is also Not working when the top vs bottom decile, the deflated Sharpe ratio or the overfitting chance is poor, or when it does not beat the plain baselines. Promising: it passes all of those with enough out-of-sample trades. Works: more
 trades, stricter thresholds and an out-of-sample lift above nearly all of 1,000 backtests of
 random picks (95% by default; see Robustness). A result with no random-pick backtests stops at
 Promising. The reason line names the first test it fails;
 the details list every test with its value and its threshold.
 """
-see_also = ["win_rate", "trades", "out_of_sample", "official_result"]
+see_also = ["win_rate", "trades", "out_of_sample", "official_result", "base_rate", "top_vs_bottom_decile"]
 
 [[term]]
 id = "official_result"
@@ -717,9 +681,7 @@ id = "win_rate"
 term = "Win rate"
 short = "The share of an edge's picks whose outcome came true."
 body = """
-For each past session the app takes the screen's top picks and checks the edge's outcome for
-each one, for example "beat the S&P 500 over the next 20 trading days after costs" or "the
-short put expired worthless". The win rate is wins divided by picks. A window that has not
+For each past session the app takes the screen's top picks and checks the edge's outcome for each one. An outcome is, for example, "beat the S&P 500 over the next 20 trading days after costs" or "the short put expired worthless". The win rate is wins divided by picks. A window that has not
 closed yet is left out, never counted as a loss. On its own a win rate says little: compare it
 with the base rate.
 """
@@ -747,7 +709,7 @@ every eligible name; 0 means they did no better. The details also show the ratio
 divided by base rate). Lift on a handful of trades is noise: read it with the number of trades
 beside it, and prefer the out-of-sample lift to the whole history's.
 """
-see_also = ["base_rate", "trades", "out_of_sample"]
+see_also = ["base_rate", "trades", "out_of_sample", "win_rate"]
 
 [[term]]
 id = "trades"
@@ -755,9 +717,7 @@ term = "Trades"
 short = "How many non-overlapping test dates a number rests on: the real sample size."
 body = """
 Picks made on the same day share that day's market, so they are not independent: fifty picks
-on one session are one trade, not fifty. The app spaces test sessions at least one holding
-period apart (and pools overlapping events into one block) so that no two windows overlap, and
-shows the count beside every number. Fewer than about 40 cannot tell a real edge from luck;
+on one session are one trade, not fifty. The app spaces test sessions at least one holding period apart (and pools overlapping events into one block). That way no two windows overlap. It shows the count beside every number. Fewer than about 40 cannot tell a real edge from luck;
 the top vs bottom decile's t statistic says the same thing in another way.
 """
 see_also = ["lift", "top_vs_bottom_decile"]
@@ -772,9 +732,7 @@ On each test session every eligible name is ranked by the edge's own score (for 
 group minus the bottom group. A positive spread says the ranking itself carries information,
 beyond the few names a screen picks. Sessions where too few names have a score are left out of
 the deciles and counted. Its t statistic says how far the spread is from luck: 2 or more is
-promising, 3 or more strong. The bars show the average outcome of each group on the in-sample
-period, best-ranked first: a ranking that works falls from left to right, one that does not
-is flat or jagged. A bar is missing where the run stored none, never drawn as zero.
+promising, 3 or more strong. The bars show the average outcome of each group on the in-sample period, best-ranked first. A ranking that works falls from left to right. One that does not is flat or jagged. A bar is missing where the run stored none, never drawn as zero.
 """
 see_also = ["trades", "base_rate", "robustness"]
 
@@ -795,9 +753,7 @@ id = "in_sample"
 term = "In-sample"
 short = "The older history an edge was built and tuned on: it flatters the edge."
 body = """
-Everything before the out-of-sample start. Many versions were tried on it, so even a good
-in-sample result says little by itself; it is shown beside the out-of-sample result to see
-whether the edge held up or faded.
+Everything before the out-of-sample start. Many versions were tried on it, so even a good in-sample result says little by itself. It is shown beside the out-of-sample result, to see whether the edge held up or faded.
 """
 see_also = ["out_of_sample", "variants_tried"]
 
@@ -806,9 +762,7 @@ id = "exploratory"
 term = "Exploratory"
 short = "A backtest over an out-of-sample date you chose, not the site's."
 body = """
-You can run an edge's backtest with your own out-of-sample date to explore. Such numbers are
-labelled EXPLORATORY: they never feed the track record shown on screeners, the verdict or an
-edge's status, because a date chosen after seeing results is no longer a fair test. The site's
+You can run an edge's backtest with your own out-of-sample date to explore. Such numbers are labelled EXPLORATORY. They never feed the track record shown on screeners, the verdict or an edge's status. A date chosen after seeing results is no longer a fair test. The site's
 out-of-sample date is the one that counts.
 """
 see_also = ["out_of_sample", "official_result", "edge_status"]
@@ -818,10 +772,7 @@ id = "variants_tried"
 term = "Variants tried"
 short = "Every version of an edge that was ever tested, so luck from many tries is discounted."
 body = """
-Each variant, setting and holding period tried on an edge is counted. The more versions tried,
-the more likely the best one looks good by chance; the deflated Sharpe ratio uses the count to
-discount it, and the probability of backtest overfitting estimates how often the best version
-in one half of history fails in the other. A result shown without its count of variants tried
+Each variant, setting and holding period tried on an edge is counted. The more versions tried, the more likely the best one looks good by chance. The deflated Sharpe ratio uses the count to discount it. The probability of backtest overfitting estimates how often the best version in one half of history fails in the other. A result shown without its count of variants tried
 is not comparable.
 """
 see_also = ["out_of_sample", "trades"]
@@ -831,9 +782,7 @@ id = "robustness"
 term = "Robustness"
 short = "How the out-of-sample lift compares with backtests of random picks: the chance it is luck."
 body = """
-On each out-of-sample session the screen was measured, the harness draws as many names at random
-as the screen held (1,000 times, the same draws on every run of the same data) and measures each draw like the screen's
-picks. The histogram is those random lifts; the marker is the edge's. Beating 95% of the draws
+On each out-of-sample session the screen was measured, the harness draws as many names at random as the screen held. It does this 1,000 times, with the same draws on every run of the same data. It measures each draw like the screen's picks. The histogram is those random lifts; the marker is the edge's. Beating 95% of the draws
 is what Works asks for. The count of variants tried is beside it because trying more versions
 makes the best one look better than it is.
 """
@@ -887,9 +836,7 @@ id = "llm_bound_cost"
 term = "Bound cost"
 short = "The most a call could have cost, charged when the real cost is unknown."
 body = """
-When a paid provider answers without saying how many tokens it used, or an attempt fails (a
-timeout can still bill), the app charges the upper bound it reserved before the call: the
-prompt's length times the input price plus the longest answer allowed times the output price.
+Sometimes a paid provider answers without saying how many tokens it used, or an attempt fails (a timeout can still bill). Then the app charges the upper bound it reserved before the call. That bound is the prompt's length times the input price, plus the longest answer allowed times the output price.
 It errs on the high side on purpose, so an unknown never looks like free.
 """
 see_also = ["llm_cost_basis", "llm_budget"]
@@ -915,11 +862,7 @@ id = "llm_fallback"
 term = "Fallback"
 short = "A call answered by a later provider because an earlier one in the chain failed or was skipped."
 body = """
-The text model tries its providers in order. When the first is down, out of retries or skipped
-for the budget, the next one answers and the call is logged as a fallback, with the provider
-it fell back from. A high fallback rate means the first choice is unreliable or the budget is
-tight; a high failure rate means calls are being lost, and a failed attempt of a paid provider
-may still have been billed.
+The text model tries its providers in order. When the first is down, out of retries or skipped for the budget, the next one answers. The call is logged as a fallback, with the provider it fell back from. A high fallback rate means the first choice is unreliable or the budget is tight. A high failure rate means calls are being lost. A failed attempt of a paid provider may still have been billed.
 """
 see_also = ["llm_budget", "llm_cost_basis"]
 
@@ -928,8 +871,8 @@ id = "paper_trading"
 term = "Paper trading"
 short = "What an edge of yours would have bought and sold, recorded every night as it happens."
 body = """
-For an edge you follow, or your own candidate or live edge, each night the app takes the picks of its screen, using only what was
-known that night, and records them as paper trades: the name, the session to buy it and the
+For an edge you follow, or your own candidate or live edge, the app takes the picks of its
+screen each night, using only what was known that night. It records them as paper trades: the name, the session to buy it and the
 session to sell it after the edge's holding period. Nothing is ever ordered. A trade stays open
 until its window has closed and the result is stored, and is then won or lost by the same win
 rule as the backtest. A trade whose result could not be read is skipped with the reason; it is
@@ -945,8 +888,7 @@ short = "How the closed paper trades of a followed edge have done so far."
 body = """
 The live record counts the closed paper trades, the wins among them and the win rate, and sets
 it against what the backtest led you to expect (the usual range). Open and skipped trades are
-counted apart. With few closed trades the rate swings widely by chance, so the record is
-judged only once the site's minimum number of signal sessions have closed; before that it says it is too early.
+counted apart. With few closed trades the rate swings widely by chance. So the record is judged only once the site's minimum number of signal sessions have closed. Before that it says it is too early.
 On track means the live win rate is inside the usual range; below or above means it is outside,
 which is worth a look but proves nothing alone.
 """
@@ -957,12 +899,9 @@ id = "usual_range"
 term = "Usual range"
 short = "The spread of win rates the backtest's own win rate would give over the same number of trades."
 body = """
-If the backtest's win rate really held, the share of wins among a given number of trades would
-still vary from one run of trades to the next, by chance alone. The usual range is the middle
+Suppose the backtest's win rate really held. The share of wins among a given number of trades would still vary from one run of trades to the next, by chance alone. The usual range is the middle
 80% of that variation (the 10th to the 90th percentile of a binomial distribution of wins), so
-it narrows as more sessions close. The picks of one night are bets on the same market over the
-same window and move together, so the range counts signal sessions, not trades: ten picks on one
-night are one observation, not ten. The picture shows the whole spread, the live win rate and
+it narrows as more sessions close. The picks of one night are bets on the same market over the same window, and they move together. So the range counts signal sessions, not trades: ten picks on one night are one observation, not ten. The picture shows the whole spread, the live win rate and
 the two ends of the range. A live rate outside it is unusual if the backtest was right, but
 one in five honest records falls outside by chance.
 """
@@ -974,12 +913,13 @@ term = "Forward test"
 short = "A new version of an edge tried on live paper trades beside the edge it would replace."
 body = """
 A new version of an edge is a candidate first, tried on paper next to the version it would
-replace: both record the same nights' picks from the day it became a candidate. It can go live
-and retire the old one once the site's number of sessions have passed and its win rate is not behind. Replacing earlier is
-allowed but is recorded on the edge as replaced without a forward test, because the backtest of
-a version you have tuned looks better than it will do going forward.
+replace. Both record the same nights' picks from the day it became a candidate. It can go live
+and retire the old one once the site's number of sessions have passed and its win rate is not
+behind. Replacing earlier is allowed, but the edge then carries the label replaced without a
+forward test. The backtest of a version you have tuned looks better than it will do going
+forward.
 """
-see_also = ["paper_trading", "live_record", "official_result"]
+see_also = ["paper_trading", "live_record", "official_result", "win_rate"]
 
 [[term]]
 id = "edge_tonight"
@@ -988,9 +928,7 @@ short = "What the nightly run did for a followed edge on the session, so an empt
 body = """
 Signalled: the edge was due and its picks are listed as buys. No picks: it was due but its screen
 qualified no name. Not due: its schedule does not fire on this session (an edge held for 20
-sessions signals about once a month). Skipped: it was due but could not be signalled, and the
-reason says why (an input table was missing, the edge is not paper traded yet); it is never an
-empty record. Not run: the nightly has no finished run for the session. Missed counts due
+sessions signals about once a month). Skipped: it was due but could not be signalled, and the reason says why (an input table was missing, the edge is not paper traded yet). It is never an empty record. Not run: the nightly has no finished run for the session. Missed counts due
 sessions between nights that nobody signalled, kept so a gap is never silent.
 """
 see_also = ["paper_trading", "live_record"]

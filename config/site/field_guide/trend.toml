@@ -195,7 +195,7 @@ theme = "momentum and trend"
 reads = "The close over the close 120 sessions (about six months) earlier, minus one: 0.25 is up 25%. The six-month return is the classic intermediate momentum horizon (Jegadeesh and Titman's 6-month formation); above about 0.20 a name is a momentum leader in an ordinary year, below -0.20 a laggard. Compare with the market's six-month return (market.market_trend@v2.spx_ret_252d is the year) before reading it as stock-specific."
 caveats = [
   "A single gap (an earnings surprise, a takeover) can be the whole return: check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date before reading it as a trend.",
-  "Six months ago may sit just before or after a crash: the same stock reads +40% or -10% depending on the day. Read with rollup.price_stats@v2.ret_60d and rollup.trend_stats@v2.ret_252d.",
+  "Six months ago may sit right before or after a crash: the same stock reads +40% or -10% depending on the day. Read with rollup.price_stats@v2.ret_60d and rollup.trend_stats@v2.ret_252d.",
   "Null after a gap in the last 121 sessions or a shorter history (a listing under six months old).",
 ]
 sources = [
@@ -718,7 +718,7 @@ note = "with feature.stretch_sma20_atr lte 3 so the breakout is not already a cl
 [[field]]
 name = "feature.breakdown_20d"
 theme = "price levels"
-reads = "True when the close is below the lowest low of the previous 20 sessions on at least 1.5 times average volume: the mirror of feature.breakout_20d, the short-setup trigger and, for a long, the stop that just got hit. In an uptrend it marks the end of the leg; in a downtrend it is the next leg down."
+reads = "True when the close is below the lowest low of the previous 20 sessions on at least 1.5 times average volume: the mirror of feature.breakout_20d, the short-setup trigger and, for a long, the stop that was hit. In an uptrend it marks the end of the leg; in a downtrend it is the next leg down."
 caveats = [
   "A capitulation day is a breakdown on volume and often the low; pair with rollup.trend_stats@v2.close_range_pos (a close near the day's high after a breakdown is a reversal, not a breakdown).",
   "An ex-dividend day or an index event can print a volume breakdown on a flat chart; check rollup.dividends@v2.last_ex_date and rollup.trend_stats@v2.ret_1d.",
@@ -908,7 +908,7 @@ note = "the rule is feature.breakout_50d"
 [[field]]
 name = "rollup.trend_stats@v2.prior_low_20d"
 theme = "momentum and trend"
-reads = "The lowest daily low of the 20 sessions before today (today excluded), in dollars per share: the level a 20-session breakdown close has to break. feature.breakdown_20d is the rule (close below it on 1.5x volume); for a long it is the stop most swing systems place just under."
+reads = "The lowest daily low of the 20 sessions before today (today excluded), in dollars per share: the level a 20-session breakdown close has to break. feature.breakdown_20d is the rule (close below it on 1.5x volume); for a long it is the stop most swing systems place right under."
 caveats = [
   "Null after a gap in the 20 sessions before today or a shorter history.",
 ]
