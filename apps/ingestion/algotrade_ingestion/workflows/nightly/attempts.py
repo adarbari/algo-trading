@@ -27,6 +27,9 @@ class Attempts:
     # ``done[step]["run_id"]`` is the attempt that produced the result: a later attempt that
     # reused it stores that id as ``origin``, so the citation never drifts to the carrier.
     tried: frozenset[str] = frozenset()  # steps an earlier attempt ran and saw FAIL or WAIT
+    # Every task run any attempt of the session cites (``task_run`` of any step): a task run
+    # outside it was started by hand or by a killed attempt (``nightly._superseded``).
+    cited: frozenset[str] = frozenset()
 
 
 def _current(steps: dict[str, Any]) -> bool:
@@ -42,9 +45,13 @@ def earlier_attempts(reader: StoreReader, session: date) -> Attempts:
     tried, so a latest-only one (screens behind failed bars) is SKIPPED later, not expired."""
     done: dict[str, dict[str, Any]] = {}
     tried: set[str] = set()
+    cited: set[str] = set()
     for record in sorted(reader.runs(NIGHTLY_RUN, session), key=lambda r: r.started_at):
         steps = record.stats.get("steps")
-        if not isinstance(steps, dict) or not _current(steps):
+        if not isinstance(steps, dict):
+            continue
+        cited.update(str(s["task_run"]) for s in steps.values() if s.get("task_run"))
+        if not _current(steps):
             continue
         for name, step in steps.items():
             status = parse_status(str(step.get("status")))
@@ -54,4 +61,4 @@ def earlier_attempts(reader: StoreReader, session: date) -> Attempts:
             elif status in (StepStatus.FAILED, StepStatus.WAITING):  # NOT_RUN was never tried
                 done.pop(name, None)  # re-run on new input and failed: the latest verdict wins
                 tried.add(name)
-    return Attempts(done, frozenset(tried - set(done)))
+    return Attempts(done, frozenset(tried - set(done)), frozenset(cited))

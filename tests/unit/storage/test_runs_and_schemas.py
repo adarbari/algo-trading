@@ -3,7 +3,14 @@ from datetime import UTC, date, datetime
 import pytest
 
 from algotrade.core.model.errors import DataValidationError
-from algotrade.storage.runs import RunRecord, RunStatus, done_sessions, new_run_id, run_session
+from algotrade.storage.runs import (
+    RunRecord,
+    RunStatus,
+    done_sessions,
+    new_run_id,
+    published,
+    run_session,
+)
 from algotrade.storage.tables.schemas import (
     FORWARD_RETURNS,
     TableSpec,
@@ -167,3 +174,12 @@ def test_outcome_tables_are_fixed_merge_tables_keyed_by_horizon_and_benchmark() 
     validate_frame(
         FORWARD_RETURNS, stamped([{**row, "outcome_status": "COMPLETE"}], date(2026, 9, 1), "r")
     )
+
+
+def test_a_run_is_published_only_when_complete_or_partial() -> None:
+    now = datetime(2026, 10, 2, tzinfo=UTC)
+    flags = {
+        status: published(RunRecord("r", "job", date(2026, 10, 2), now, status))
+        for status in RunStatus
+    }
+    assert {s for s, ok in flags.items() if ok} == {RunStatus.COMPLETE, RunStatus.PARTIAL}

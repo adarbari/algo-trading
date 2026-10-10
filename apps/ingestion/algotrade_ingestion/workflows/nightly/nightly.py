@@ -42,6 +42,7 @@ from algotrade.config.site.settings import NightlySettings, SourcesSettings, loa
 from algotrade.core.time.calendar import close_time, last_closed_session, local_deadline
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
+from algotrade.storage.runs import published
 from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
@@ -277,9 +278,9 @@ def _carried(
     A done step runs again when one of its inputs (what it needs, or reruns after) ran in
     this attempt (``reran``: its input changed) or when it is a refetch (``_refetch``)."""
     if step.name in before.done:
-        if any(n in reran for n in step.inputs):
-            return None
         stored = before.done[step.name]
+        if any(n in reran for n in step.inputs) or _superseded(step, stored, ctx, session, before):
+            return None
         left, resumable = _refetch(step, stored, ctx, session, latest)
         if left and resumable:
             return None
@@ -291,6 +292,26 @@ def _carried(
         who = f"waived by {ctx.user} at {ctx.clock().isoformat(timespec='seconds')}"
         return _held(step, StepStatus.WAIVED, f"{who}: {waive[step.name]}")
     return None
+
+
+def _superseded(
+    step: Step, stored: Mapping[str, Any], ctx: TaskContext, session: date, before: Attempts
+) -> bool:
+    """Whether the step's own job published a run since its stored result that no attempt
+    cites: COMPLETE or PARTIAL, started after the stored ``task_run`` (after the carried
+    attempt for a result without one). A forced attempt killed after its task finished, or a
+    standalone ``run <task>``, leaves rows its dependents never saw; a FAILED or RUNNING run
+    published nothing and does not count. Own job only; one ``runs`` read per carried step."""
+    job = job_name(step.name)
+    if job is None:
+        return False
+    anchor = ctx.reader.run(str(stored.get("task_run") or stored["run_id"]))
+    if anchor is None:
+        return False
+    return any(
+        published(r) and r.started_at > anchor.started_at and r.run_id not in before.cited
+        for r in ctx.reader.runs(job, session)
+    )
 
 
 def _carried_reason(stored: Mapping[str, Any]) -> str:
@@ -472,7 +493,11 @@ def run_session(
                     signal_step,
                 )
                 # a done step that ran although none of its inputs did is a refetch
-                refetch = step.name in before.done and not any(n in reran for n in step.inputs)
+                refetch = (
+                    step.name in before.done
+                    and not any(n in reran for n in step.inputs)
+                    and not _superseded(step, before.done[step.name], ctx, session, before)
+                )
                 if refetch and result.status in BAD:
                     result = _refetch_failed(step, before.done[step.name], result)
                 elif result.status is StepStatus.SUCCEEDED:  # new data for what needs it
