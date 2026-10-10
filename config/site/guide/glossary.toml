@@ -451,9 +451,8 @@ short = "You run the edges that are yours; a site edge is run by an admin as the
 body = """
 Run starts a backtest of one edge and stores the result under the edge's owner. You can run only
 edges you own: your own edges, and your clones of a site edge. A site edge belongs to the site, so a
-trader cannot run it (clone it to test your own version), and an admin runs it with Run as site,
-which stores the result as the site's, the official one. Admins do not run a site edge as
-themselves. One backtest runs at a time for each owner: a second Run waits until the first has
+trader cannot run it. Clone it to test your own version. An admin runs it with Run as site, which
+stores the result as the site's, the official one. Admins do not run a site edge as themselves. One backtest runs at a time for each owner: a second Run waits until the first has
 finished.
 """
 see_also = ["edge_owner", "edge_copy", "run_trigger"]
@@ -463,11 +462,12 @@ id = "run_trigger"
 term = "Run trigger"
 short = "What started a backtest run: the nightly schedule, the Run button (ui) or the command line (cli)."
 body = """
-Every stored run says what started it. Nightly means the scheduled update ran it; ui means someone
-pressed Run (or Run as site) in the app; cli means it was started from the command line on the
+Every stored run says what started it. Nightly means the scheduled update ran it. Ui means someone
+pressed Run (or Run as site) in the app. Cli means it was started from the command line on the
 host. The trigger says nothing about how good the result is, only where it came from. A run stored
 before the trigger was recorded shows none, and the app does not guess one.
 """
+next = "Judge a run by its measures, not its trigger; press Run on an edge you own to start a fresh one."
 see_also = ["edge_run_rights", "edge_owner"]
 
 [[term]]
