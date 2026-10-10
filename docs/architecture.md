@@ -263,7 +263,7 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
   do the steps that need it. `--force` reruns every step. A step only
   held back (NOT_RUN) was never tried, so a latest-only one is SKIPPED on a later day, not
   expired. A critical latest-only step that failed and whose session is no
-  longer the latest FAILS as expired until waived: `algotrade-ingest nightly --date D --waive
+  longer the latest FAILS as expired until the owner waives it: `algotrade-ingest nightly --date D --waive
   chains --reason "..."` (the waiver, its user, time and reason are stored in the run record and
   kept on later attempts).
 - **Quiet when up to date** (`cli/main.py`): the scheduled form (no `--date`, no `--force`)
