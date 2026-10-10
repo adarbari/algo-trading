@@ -19,7 +19,7 @@ high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is
    `price.toml`, `swing.toml`; `options/`: `volatility.toml`, `vrp.toml`; `company/`:
    `fundamentals.toml`, `liquidity.toml`; `market/`: `regime.toml`; `scores/`: learned scorers,
    ED7; a theme name is unique across folders; a new theme is a new file, a new kind a new
-   folder declared in `architecture/layout.toml`; 12 files per folder):
+   folder declared in `architecture/layout*.toml`; 12 files per folder):
    `expr`, `dtype`, `unit`, `description`, `null_meaning`, and as needed `kind = "label"` +
    `categories`, `valid_range = [min, max]` (`inf` open; a flag, never a clip), `params = {...}`
    (thresholds as named constants), `version` (bump it when the formula changes). The language
@@ -70,7 +70,7 @@ Never read storage or `algotrade.data` inside a group (import-linter enforces it
 loader under `features/`, and never write a new task for a group. `make ownership` and
 `make dupes` must pass.
 
-0. **Where it goes:** a feature of an existing group goes in that group's module (a new stored column = a new group version, step 6); a new group in `features/rollups/<kind>/<name>.py` (`price/` daily bars, `options/` chains and implied vol, `corporate/` events and filings); a new input table's read in its owner in `src/algotrade/data/` plus an `INPUTS` entry in `data/feature_inputs.py`; pure maths in `quant/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
+0. **Where it goes:** a feature of an existing group goes in that group's module (a new stored column = a new group version, step 6); a new group in `features/rollups/<kind>/<name>.py` (`price/` daily bars, `options/` chains and implied vol, `corporate/` events and filings); a new input table's read in its owner in `src/algotrade/data/` plus an `INPUTS` entry in `data/feature_inputs.py`; pure maths in `quant/` (`grep -n purpose architecture/*layout*.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Declare its features** in `src/algotrade/features/rollups/<kind>/<name>.py`: `FEATURES = (
    Feature(name, dtype, unit, description, null_meaning, kind, valid_range=..., categories=...,
    inputs=...), ...)` (`features/framework/feature.py`): `dtype` one of `float32 | float | int |

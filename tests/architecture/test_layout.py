@@ -1,4 +1,4 @@
-"""Fitness tests for the directory layout (ADR 0020, ``architecture/layout.toml``).
+"""Fitness tests for the directory layout (ADR 0020, ``architecture/layout*.toml``).
 
 - every Python module under ``src/``, ``libs/`` and ``apps/`` lives in a declared directory;
 - no module (``src/``, ``libs/``, ``apps/``, ``tests/``, ``scripts/``) has a grab-bag name such
@@ -16,6 +16,7 @@
 
 import ast
 import fnmatch
+import importlib.util
 import tomllib
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
@@ -27,8 +28,14 @@ from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_sources.framework.registry import SESSION_SOURCES, SOURCES
 from tests.conftest import REPO_ROOT
 
-LAYOUT_FILE = "architecture/layout.toml"
-LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / LAYOUT_FILE).read_text())
+_SPEC = importlib.util.spec_from_file_location(
+    "layout_report", REPO_ROOT / "scripts" / "layout_report.py"
+)
+assert _SPEC and _SPEC.loader
+layout_report = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(layout_report)
+LAYOUT_FILE = "architecture/layout*.toml"  # split by kind, merged by read_layout
+LAYOUT: dict[str, Any] = layout_report.read_layout(REPO_ROOT)
 GUIDE = "CLAUDE.md 'Directory layout' (where does this go) and .claude/skills/add-responsibility"
 HINT = f"declare it in {LAYOUT_FILE} with a purpose; see {GUIDE}"
 DIRS: list[dict[str, Any]] = LAYOUT["dir"]

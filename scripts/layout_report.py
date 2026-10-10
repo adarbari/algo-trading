@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Early warning for the directory layout (ADR 0020, ``architecture/layout.toml``).
+"""Early warning for the directory layout (ADR 0020, ``architecture/layout*.toml``), and the
+one reader of that registry (``read_layout``: the files split by kind, merged).
 
 Lists directories under src/, libs/, apps/ and tests/ (Python) and apps/web (TypeScript, ADR
 0025) that hold ``warn_modules`` or more modules, so a split by kind is planned before the
@@ -13,14 +14,37 @@ import sys
 import tomllib
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-LAYOUT = tomllib.loads((ROOT / "architecture" / "layout.toml").read_text())
+LAYOUT_FILES = "architecture/layout*.toml"
 WEB = tomllib.loads((ROOT / "architecture" / "web_layout.toml").read_text())["web"]
 NOT_COUNTED = {"__init__.py", "conftest.py"}
 SKIPPED = {".venv", "node_modules", "__pycache__"}
 WEB_SUFFIXES = {".ts", ".tsx", ".js"}
 WEB_NOT_MODULES = ("index.ts", "*.test.*", "*.spec.*", "*.stories.*", "*.d.ts")
+
+
+def read_layout(root: Path) -> dict[str, Any]:
+    """Every architecture/layout*.toml merged: their entry lists (``[[dir]]``, ``[[test_dir]]``,
+    ...) concatenated in file order, any other key (the settings, ``[banned_module_names]``)
+    held by exactly one file."""
+    merged: dict[str, Any] = {}
+    owner: dict[str, str] = {}
+    files = sorted(root.glob(LAYOUT_FILES))
+    if not files:
+        raise ValueError(f"no layout registry: {LAYOUT_FILES}")
+    for path in files:
+        for key, value in tomllib.loads(path.read_text()).items():
+            entries = isinstance(value, list) and all(isinstance(v, dict) for v in value)
+            if entries and isinstance(merged.get(key, []), list):
+                merged.setdefault(key, []).extend(value)
+            elif key in merged:
+                raise ValueError(f"{key} is set in both {owner[key]} and {path.name}")
+            else:
+                merged[key] = value
+            owner.setdefault(key, path.name)
+    return merged
 
 
 def module_counts() -> Counter[str]:
@@ -40,7 +64,8 @@ def module_counts() -> Counter[str]:
 
 
 def main() -> int:
-    warn, limit = LAYOUT["warn_modules"], LAYOUT["max_modules"]
+    layout = read_layout(ROOT)
+    warn, limit = layout["warn_modules"], layout["max_modules"]
     near = sorted((d, n) for d, n in module_counts().items() if n >= warn)
     if not near:
         print(f"layout: no directory at {warn}+ modules (limit {limit})")

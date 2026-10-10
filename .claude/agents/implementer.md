@@ -12,7 +12,7 @@ Before writing:
 - Load the skill named in your brief (or the matching one from the CLAUDE.md "Workflows"
   table) and follow it step by step. Read the existing code you extend, not the whole area.
 - Confirm the owner in `architecture/*_ownership.toml` and the folder in
-  `architecture/layout.toml` with a grep. Extend the owner; never re-implement it.
+  `architecture/layout*.toml` with a grep. Extend the owner; never re-implement it.
 
 Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`), always: never
 create, switch or commit on a branch in the main checkout — the launchd API, nightly and auto-deploy run from it, and `deploy.sh` refuses while it is off `main` (2026-10-10: a branch left there blocked deploys for 8 h; #460-#463 never went live); never `--no-verify` / `SKIP=`. In any worktree (yours under
