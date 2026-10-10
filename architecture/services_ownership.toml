@@ -36,7 +36,7 @@ allowed = [
     "src/algotrade/services/jobs/handlers.py",  # the edge-eval job's audit mode publishes only the differing legs
     "src/algotrade/storage/tables/schemas.py",  # declares results/edge_legs's one schema
 ]
-section = "docs/adr/0063-incremental-edge-evaluation.md#decision-proposed"
+section = "docs/adr/0063-incremental-edge-evaluation.md#decision"
 detect = [{ call = "leg_key" }, { string = "results/edge_legs" }, { string = "edge_legs" }]
 
 [[responsibility]]
