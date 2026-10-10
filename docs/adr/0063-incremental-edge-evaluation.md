@@ -89,6 +89,17 @@ Under 60 s with no new storage method, but a restated feature or a rewritten out
 results only at the next weekly run (up to a week stale). The design above is the smallest exact
 one; the alternative is cheaper to build.
 
+## Consequences
+- A nightly run reads only the sessions whose window closed or whose inputs changed, plus the
+  stored legs; the full recompute stays the weekly audit and the path for a historical `as_of`,
+  a moved split or a new trial.
+- One more result table and one more storage Protocol method (`partition_seq`, every backend,
+  contract-tested); the recording reader is a second place that must see every read a session
+  makes (a read outside it is a staleness bug, caught by the weekly audit).
+- Random-pick rows before `SEED_VERSION` 3 are not comparable draw for draw with later ones; the
+  verdict reads only the latest run.
+- Until this is accepted, the hot-spot fixes of the same PR are what the nightly gets.
+
 ## Acceptance
 - Contract test: for the golden `cross_section` store, incremental after a full run at the same
   `as_of` gives identical `edge_eval` rows; a full run at `as_of` then an incremental at
