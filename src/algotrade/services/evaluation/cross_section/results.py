@@ -172,6 +172,32 @@ def report_containment(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
     ]
 
 
+def iv_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per variant and horizon whose outcome reads an implied vol, the measured sessions, those
+    at which its ``iv_field`` had a value for some eligible name, and the picks excluded for no
+    implied vol; only where the field fell short (a field stored only after the range would
+    otherwise read as a silent row of zeros)."""
+    out = []
+    for r in evaluation.results:
+        if r.iv_source is None:
+            continue
+        measured = [s for s in r.stats if not s.excluded_coverage]
+        stored = sum(s.implied_stored for s in measured)
+        dropped = sum(s.no_implied_vol for s in measured)
+        if stored < len(measured) or dropped:
+            out.append(
+                {
+                    "variant": f"{r.edge_variant}/{r.variant}",
+                    "horizon": r.horizon,
+                    "field": r.iv_source,
+                    "sessions": len(measured),
+                    "stored": stored,
+                    "picks": dropped,
+                }
+            )
+    return out
+
+
 def survivorship(evaluation: EdgeEvaluation) -> dict[int, tuple[int, int]]:
     """Per horizon, how many of the evaluated sessions read a universe snapshot taken after
     them (``(n, m)``: the survivorship caveat beside every number over them)."""

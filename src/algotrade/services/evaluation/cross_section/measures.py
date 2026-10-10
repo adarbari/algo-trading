@@ -60,6 +60,8 @@ class SessionStat:
     no_entry_bar: int = 0  # names eligible at D with no outcome row at S (over the base names)
     pick_reference: tuple[float, ...] = ()  # expires_otm: risk-neutral chance of a hit, per pick
     pick_touches: int = 0  # expires_otm: counted picks whose strike was touched intraday
+    no_implied_vol: int = 0  # picks excluded for a missing or invalid implied vol at D
+    implied_stored: bool = False  # the outcome's iv_field has a value for some eligible name at D
 
     @property
     def eligible(self) -> int:
@@ -105,6 +107,8 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         no_entry_bar=sum(leg.no_entry_bar for leg in legs),
         pick_reference=tuple(v for leg in legs for v in leg.pick_reference),
         pick_touches=sum(leg.pick_touches for leg in legs),
+        no_implied_vol=sum(leg.no_implied_vol for leg in legs),
+        implied_stored=any(leg.implied_stored for leg in legs),
     )
 
 

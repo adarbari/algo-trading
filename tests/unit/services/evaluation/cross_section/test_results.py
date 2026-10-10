@@ -13,15 +13,18 @@ from algotrade.core.model.errors import DataValidationError
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
+    iv_coverage,
     records,
     survivorship,
     write_edge_eval,
 )
 from algotrade.storage.backends.run_selection import merge_rows
 from algotrade.storage.tables.schemas import EDGE_EVAL
+from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
+    IDS,
     PRICE,
     World,
     build_world,
@@ -181,3 +184,45 @@ def test_rows_written_before_the_split_columns_keep_the_null_key_beside_a_dated_
     assert set(merged["run_id"]) == {"r0", "r1"}
     assert merged[merged["run_id"] == "r0"]["split_from"].isna().all()
     assert (merged[merged["run_id"] == "r1"]["split_from"] == date(2026, 4, 1)).all()
+
+
+IBKR, OURS = "rollup.ibkr_iv@v1.iv30_ibkr", "rollup.iv30@v1.iv30"
+OTM = {
+    "kind": "expires_otm", "horizon_sessions": [2], "benchmark": "none", "structure": "put",
+    "strike_delta": 0.30, "iv_field": IBKR, "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def iv_world(ours_from: date | None) -> World:
+    """IBKR's IV on every session; ours (``iv30@v1``) only from ``ours_from`` (None: never)."""
+    w = build_world()
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:
+        rows = [{"instrument_id": iid, "iv30_ibkr": 0.4} for iid in IDS]
+        w.writer.write_table(
+            "rollups/instrument/ibkr_iv@v1", day, f"ib-{day}", stamped(rows, day, f"ib-{day}")
+        )
+        if ours_from is not None and day >= ours_from:
+            ours = [{"instrument_id": iid, "iv30": 0.4} for iid in IDS]
+            w.writer.write_table(
+                "rollups/instrument/iv30@v1", day, f"iv-{day}", stamped(ours, day, f"iv-{day}")
+            )
+    return w
+
+
+def test_a_variant_whose_iv_field_has_no_rows_in_range_is_stated_not_a_silent_zero() -> None:
+    variants = [{"id": "ours", "outcome": {"iv_field": OURS}}]
+    ev = evaluate(iv_world(None), outcome=OTM, variants=variants)
+    main, ours = ev.results
+    assert ours.measures[0].picks == 0 and main.measures[0].picks > 0  # the silent zero
+    (gap,) = iv_coverage(ev)  # the edge's own field is stored throughout: no line for it
+    assert (gap["variant"], gap["horizon"], gap["field"]) == ("ours/momo", 2, OURS)
+    assert gap["stored"] == 0 and gap["sessions"] == ours.measures[0].sessions > 0
+    assert gap["picks"] == main.measures[0].picks  # every pick the field would have measured
+
+
+def test_an_iv_field_stored_part_of_the_range_counts_the_sessions_that_have_it() -> None:
+    variants = [{"id": "ours", "outcome": {"iv_field": OURS}}]
+    (gap,) = iv_coverage(evaluate(iv_world(DAYS[4]), outcome=OTM, variants=variants))
+    assert 0 < gap["stored"] < gap["sessions"] and gap["picks"] > 0
+    assert iv_coverage(evaluate(iv_world(DAYS[0]), outcome=OTM, variants=variants)) == []
+    assert iv_coverage(evaluate(iv_world(None))) == []  # an outcome that reads no implied vol
