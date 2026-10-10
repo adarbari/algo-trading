@@ -11,7 +11,10 @@ are joined to the closed outcomes of the partition at S, read as of the run's ``
 reads outcomes** (``read_outcomes``; the picks never see one: a fitness test checks both). A
 window not closed has no outcome row and is excluded, never a miss; a name eligible at D with
 no outcome row at S has no entry bar (``no_entry_bar``); a block with no closed window at all
-is counted in ``unclosed_sessions``.
+is counted in ``unclosed_sessions``. A pick with no implied vol at D (an outcome that reads one)
+is excluded and counted per session (``no_implied_vol``) beside whether the ``iv_field`` had a
+value for any eligible name then (``implied_stored``): a field stored only after the range
+reads as a stated gap, never a silent zero.
 
 An edge's ``[[variants]]`` are evaluated like the edge itself under their own id
 (``edge_variant``, "main" for the edge). The deflated Sharpe ratio counts every distinct
@@ -62,6 +65,8 @@ from algotrade.services.evaluation.cross_section.historical import (
 )
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
+    INVALID_IMPLIED_VOL,
+    NO_IMPLIED_VOL,
     UNMEASURED,
     apply_outcome,
     needs_implied_vol,
@@ -411,6 +416,12 @@ def _stat(
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     have = set(res.index)
     got = [i for i in picks if i in counted.index]
+    no_iv = set(res.index[res["excluded"].isin((NO_IMPLIED_VOL, INVALID_IMPLIED_VOL))])
+    implied = (
+        session.implied(scope.key, scope.iv_field, eligible, day)  # cached by ``_outcomes``
+        if needs_implied_vol(edge)
+        else {}
+    )
     ranked = (
         []
         if thin
@@ -441,6 +452,8 @@ def _stat(
         no_entry_bar=len(ids - have),
         pick_reference=tuple(float(v) for v in counted.loc[got, "reference"].dropna()),
         pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
+        no_implied_vol=sum(1 for i in picks if i in no_iv),
+        implied_stored=any(v is not None for v in implied.values()),
     )
 
 

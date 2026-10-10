@@ -1,6 +1,7 @@
 """An edge evaluation as text (``algotrade-backtest evaluate-edges``): the survivorship line,
-the unclosed sessions, then one table row per variant, horizon and slice with the number of
-independent sessions beside the numbers. Pure: it renders the job's result dict."""
+the unclosed sessions, the implied-vol field's gaps, then one table row per variant, horizon
+and slice with the number of independent sessions beside the numbers. Pure: it renders the
+job's result dict."""
 
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -57,6 +58,12 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
         lines.append(
             f"LOST: {lost['variant']} h={lost['horizon']} lost {lost['sessions']} sessions: "
             f"no data in {lost['table']} (counted as unmeasured, not a miss)"
+        )
+    for iv in result.get("iv_coverage", []):
+        lines.append(
+            f"IV FIELD: {iv['variant']} h={iv['horizon']} reads {iv['field']}, which has a value "
+            f"at {iv['stored']} of {iv['sessions']} measured sessions; {iv['picks']} picks "
+            "excluded for no implied vol (not misses)"
         )
     for c in result.get("report_containment", []):
         share = c["contained"] / c["windows"] if c["windows"] else None

@@ -55,3 +55,18 @@ def test_an_exploratory_run_is_labelled_in_the_header_and_each_slice() -> None:
     text = render_edge_report(result)
     assert "EXPLORATORY: test split from 2026-06-01" in text
     assert "split=split (EXPLORATORY)" in text
+
+
+def test_an_iv_field_with_no_value_in_range_is_a_line_beside_the_zeros() -> None:
+    gap = {
+        "variant": "our_iv30/vrp_rich", "horizon": 15, "field": "rollup.iv30@v1.iv30",
+        "sessions": 31, "stored": 0, "picks": 155,
+    }  # fmt: skip
+    result = {
+        "edge": "e", "run_id": "r", "trials": 1, "survivorship": {}, "unclosed_sessions": {},
+        "universe_snapshot": None, "rows": [], "iv_coverage": [gap],
+    }  # fmt: skip
+    assert (
+        "IV FIELD: our_iv30/vrp_rich h=15 reads rollup.iv30@v1.iv30, which has a value at 0 of "
+        "31 measured sessions; 155 picks excluded for no implied vol (not misses)"
+    ) in render_edge_report(result).splitlines()
