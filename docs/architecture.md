@@ -406,7 +406,7 @@ Extra contracts:
 
 ### Directory layout (ADR 0020)
 
-One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
+One folder holds one kind of thing. `architecture/layout*.toml` declares every directory under
 `src/`, `libs/`, `apps/`, `tests/`, `config/` and `docs/` with a one-line purpose and the import-linter contracts that enforce its
 rule; `tests/architecture/test_layout.py` fails on a module in an undeclared directory, on a
 directory with more than 10 modules (no exceptions), on a contract name that does not exist,

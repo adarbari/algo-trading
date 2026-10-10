@@ -24,7 +24,7 @@ running it belongs to the job runner (`services/jobs`, kind `screen`; nightly su
 `screen` jobs). Shared filters live in one helper, not copies: `make dupes` must pass.
 Owners are listed in `architecture/*_ownership.toml`.
 
-0. **Where it goes:** `strategies/screeners/` (rule screens: `strategies/screeners/rules/`); running it is `services/screening/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
+0. **Where it goes:** `strategies/screeners/` (rule screens: `strategies/screeners/rules/`); running it is `services/screening/` (`grep -n purpose architecture/*layout*.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Location:** `src/algotrade/strategies/screeners/<name>.py`. Implement the screener
    interface (`strategies/screeners/base.py`): `screen(view: FeatureView) -> ranked rows`;
    `FeatureView` is `core/views/feature_view.py`, built by `services/views.py`. Each row carries

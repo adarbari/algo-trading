@@ -6,7 +6,9 @@ description: Add a new responsibility (a kind of work some module must own) or m
 # Add or move a responsibility
 
 Read first: ADR 0019 (`docs/adr/0019-ownership-and-boundaries.md`),
-`architecture/*_ownership.toml` and `architecture/layout.toml` (ADR 0020, directory layout).
+`architecture/*_ownership.toml` and `architecture/layout*.toml` (ADR 0020, directory layout; split
+by kind: `layout.toml` the settings and `src/`, `layout_apps.toml` `apps/`, `libs/` and `[[shared]]`,
+`layout_tests.toml` `tests/`, `layout_docs_config.toml` `config/` and `docs/`).
 
 **The ownership ratchet is at zero**: `make ownership` fails on any
 hit outside an owner, `architecture/known_violations.toml` must stay empty, and no
@@ -30,22 +32,23 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    (`string_prefix`). Run `make ownership`; it must report no new hits. If a rule hits
    legitimate code, narrow the rule or add the module to `allowed` with a comment saying
    why. Never add the hit to `known_violations.toml`.
-3. **Where does the code go?** Look the kind up in `architecture/layout.toml`
-   (`grep -n purpose`; (every directory under
+3. **Where does the code go?** Look the kind up in `architecture/layout*.toml`
+   (`grep -n purpose architecture/*layout*.toml`; (every directory under
    `src/`, `apps/`, `tests/`, `config/`, `docs/`, with its purpose; one kind of thing per
    folder). Put the module in the folder whose purpose fits, named for what it does (never
    `utils` / `helpers` / `common` / `misc` / `shared`: `[banned_module_names]`). Run
    `make layout`: a folder at 8+ of 10 modules is due a split by kind; plan it in this PR
    rather than adding the 11th (there are no `[[exception]]` entries). **A new kind gets a
    new folder, end to end, in the same PR:**
-   - a `[[dir]]` entry in `architecture/layout.toml` with a one-line `purpose` (and `kind`
-     if it is a vendor or task domain);
+   - a `[[dir]]` entry in `architecture/layout.toml` (`src/`) or `layout_apps.toml` (`apps/`,
+     `libs/`) with a one-line `purpose` (and `kind` if it is a vendor or task domain);
    - an `__init__.py` whose docstring says what the folder holds;
    - if a boundary guards it (purity, independence, who may import it), an import-linter
      contract in `pyproject.toml`, named in the entry's `contracts`;
    - the mirrored test folder (`tests/unit/<path>/`, `tests/libs/sources/<path>/` or `tests/apps/<app>/<path>/`, with an
      `__init__.py`); a new non-mirrored test bucket (helpers, a contract suite) is a
-     `[[test_dir]]`; a new config or docs folder a `[[config_dir]]` / `[[docs_dir]]`;
+     `[[test_dir]]` (`layout_tests.toml`); a new config or docs folder a `[[config_dir]]` /
+     `[[docs_dir]]` (`layout_docs_config.toml`);
    - an addendum to ADR 0020 (`docs/adr/0020-directory-layout.md`) when the top-level structure
      changes (a new top-level library package, app folder or test suite).
    Splitting a folder: move modules into kind subfolders, update imports and
@@ -65,4 +68,3 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    must drive code (`tests/architecture/test_ownership.py`). Environment variables are read
    only in `src/algotrade/config/env.py`. A new table column is declared with its type in
    `src/algotrade/storage/tables/schemas.py`.
-8. Run `make changed`, then push: CI is the full gate.

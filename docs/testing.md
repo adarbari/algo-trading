@@ -13,7 +13,7 @@
 
 ## Test layout
 
-Tests follow the directory layout (ADR 0020, `architecture/layout.toml`, checked by
+Tests follow the directory layout (ADR 0020, `architecture/layout*.toml`, checked by
 `tests/architecture/test_layout_buckets.py`):
 
 - **Mirror the source.** A test for `src/algotrade/<path>/x.py` lives in `tests/unit/<path>/`;
