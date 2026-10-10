@@ -192,6 +192,10 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 # ------------------------------------------------------------------ baselines (shrink only)
 
 [baseline]
+# The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
+max_enums = 36
+max_sections = 6
+max_panels = 77
 enums = [
   "graphql:Adjustment",
   "graphql:AheadEvent.kind",

@@ -147,7 +147,7 @@ def web_sources(root: Path) -> list[Path]:
 
 def uncovered_titled(text: str, tags: tuple[str, ...]) -> int:
     """Titled containers of ``tags`` in one source whose ``actions`` carry no help button."""
-    context = "useHelp" in text
+    context = bool(re.search(r"import\s*\{[^}]*\buseHelp\b[^}]*\}\s*from", text))
     return sum(
         1
         for _, attrs in jsx_tags(text, tags)
@@ -229,6 +229,16 @@ def sources() -> dict[str, tuple[str, ...] | None]:
     return schema_sources((REPO_ROOT / "apps/api/schema.graphql").read_text())
 
 
+def assert_pinned(coverage: dict[str, Any], name: str, size: int) -> None:
+    """A baseline only shrinks: its size equals the pin ``max_<name>``, which a PR only lowers
+    (adding to a baseline fails here; raising the pin shows in review)."""
+    pin = coverage["baseline"][f"max_{name}"]
+    assert size <= pin, f"{COVERAGE_FILE}: [baseline] {name} grew to {size} (pin {pin}); {FIX}"
+    assert size == pin, (
+        f"{COVERAGE_FILE}: [baseline] {name} shrank to {size}: set max_{name} = {size}"
+    )
+
+
 def unresolved(refs: list[str], entries: set[str]) -> list[str]:
     return [r for r in refs if r not in entries]
 
@@ -247,6 +257,7 @@ def test_every_enum_and_status_field_is_declared_or_baselined(
     assert not gone, f"{COVERAGE_FILE}: declared or baselined but not in the schema: {gone}"
     covered = sorted(baseline & declared)
     assert not covered, f"{COVERAGE_FILE}: covered now, remove from [baseline] enums: {covered}"
+    assert_pinned(coverage, "enums", len(baseline))
 
 
 def test_each_declared_enum_is_exempt_with_a_reason_or_maps_every_value(
@@ -256,8 +267,8 @@ def test_each_declared_enum_is_exempt_with_a_reason_or_maps_every_value(
     for entry in coverage["enum"]:
         source = entry["source"]
         if "exempt" in entry:
-            if not str(entry["exempt"]).strip() or "values" in entry:
-                problems.append(f"{source}: `exempt` takes a reason and no `values`")
+            if not str(entry["exempt"]).strip() or {"values", "values_from", "names"} & set(entry):
+                problems.append(f"{source}: `exempt` takes a reason and no `values` / `names`")
             continue
         values = entry.get("values", {})
         if "values_from" in entry:
@@ -293,12 +304,17 @@ def test_a_term_shared_by_several_values_names_each_of_them(coverage: dict[str, 
     problems = []
     for entry in coverage["enum"]:
         names: dict[str, str] = entry.get("names", {})
+        if stray := sorted(set(names) - set(entry.get("values", {}))):
+            problems.append(f"{entry['source']}: `names` for values it does not map: {stray}")
         shared: dict[str, list[str]] = {}
         for value, ref in entry.get("values", {}).items():
             shared.setdefault(ref, []).append(value)
         for ref, values in shared.items():
             kind, _, term_id = ref.partition(":")
-            if len(values) < 2 or kind != "term" or term_id not in glossary:
+            if len(values) < 2 or (term_id not in glossary and kind == "term"):
+                continue  # one value, or a term the resolve check already fails
+            if kind != "term":
+                problems.append(f"{entry['source']}: {values} share {ref}; only a term is shared")
                 continue
             words = re.findall(r"[a-z]+", glossary[term_id])
             problems += [
@@ -328,6 +344,7 @@ def test_every_section_has_a_start_page_or_is_exempt(
     assert not gone, f"{COVERAGE_FILE}: not a section of workspaces.ts any more: {gone}"
     covered = sorted(baseline & declared)
     assert not covered, f"{COVERAGE_FILE}: covered now, remove from [baseline] sections: {covered}"
+    assert_pinned(coverage, "sections", len(baseline))
     for s in coverage["section"]:
         if "exempt" in s:
             assert str(s["exempt"]).strip() and "start" not in s, f"{s['path']}: reason or start"
@@ -345,6 +362,8 @@ def test_every_top_level_route_belongs_to_a_section(coverage: dict[str, Any]) ->
         "(add the section, or list it under non_sections with its reason)"
     )
     assert not set(coverage["non_sections"]) & workspace, "non_sections lists a section"
+    unseen = sorted(workspace - routes)
+    assert not unseen, f"route_paths found no route for sections {unseen}: fix the scanner"
 
 
 # 3. titled containers
@@ -386,6 +405,7 @@ def test_titled_containers_carry_help_against_the_baseline(coverage: dict[str, A
         if counts.get(f, 0) < n
     ]
     assert not under, f"{COVERAGE_FILE}: lower [baseline.panels]:\n" + "\n".join(under)
+    assert_pinned(coverage, "panels", sum(baseline.values()))
 
 
 # 4. references
