@@ -24,6 +24,6 @@ the domain rules on top:
 functions; they never import ``algotrade.storage.tables.readers`` (import-linter contract R1).
 """
 
-from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.readers import ReadRecord, RecordingReader, StoreReader, dates_digest
 
-__all__ = ["StoreReader"]
+__all__ = ["ReadRecord", "RecordingReader", "StoreReader", "dates_digest"]

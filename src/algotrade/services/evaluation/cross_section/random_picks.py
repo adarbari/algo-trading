@@ -3,10 +3,12 @@ information would have scored, the yardstick an edge's out-of-sample result is p
 
 At each decision session of the out-of-sample slice ``draws`` times ``top_k`` names are taken
 uniformly from the pickable names that have a counted outcome, from the outcomes the harness
-already holds (no new read). The generator of a session is seeded by (run hash, edge variant,
-holding period, session), the names sorted by id first: the same run draws the same names
-whatever the order the sessions or the names arrive in, and a session's draws do not change when
-another session is added. A draw's row is the pooled picks of its sessions: ``hit_rate`` against
+already holds (no new read). The generator of a session is seeded by (leg key, edge variant,
+holding period, session), the names sorted by id first: the leg key (``legs/key.py``) names what
+the leg is a function of and not the range or the ``as_of``, so a run draws the same names for a
+session whatever the order the sessions or the names arrive in, and a session's draws do not
+change when another session is added or the run's start, end or ``as_of`` move (ADR 0063).
+A draw's row is the pooled picks of its sessions: ``hit_rate`` against
 the session's own ``base_rate`` (every counted name), ``lift`` and ``mean_excess_picks``, the same
 measures as a screener's, so the read model can place the screener's lift among them
 (``quant.edge_statistics.percentile_of``). A draw does not read a screen, so a session a screener
@@ -28,7 +30,7 @@ from algotrade.services.evaluation.cross_section.measures import SliceMeasure
 RANDOM = "random"  # the role and the variant of a random-pick row
 DRAW = "draw"  # its slice kind; the slice value is the draw's number
 DEFAULT_DRAWS = 1000
-SEED_VERSION = 2  # the seed scheme: in the run hash, so a change of scheme is a new run
+SEED_VERSION = 3  # the seed scheme: in the run hash and the leg key, so a change is a new run
 
 
 @dataclass(frozen=True)
@@ -44,9 +46,9 @@ class RandomStat:
     base_hits: int  # of those, the hits
 
 
-def generator(run_hash: str, edge_variant: str, horizon: int, session: date) -> np.random.Generator:
+def generator(leg_key: str, edge_variant: str, horizon: int, session: date) -> np.random.Generator:
     """The session's generator, a function of its four arguments only."""
-    digest = hashlib.sha256(f"{run_hash}|{edge_variant}".encode()).digest()
+    digest = hashlib.sha256(f"{leg_key}|{edge_variant}".encode()).digest()
     entropy = [int.from_bytes(digest[:8], "big"), int.from_bytes(digest[8:16], "big")]
     return np.random.default_rng(np.random.SeedSequence([*entropy, horizon, session.toordinal()]))
 

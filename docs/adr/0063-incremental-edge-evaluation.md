@@ -118,3 +118,27 @@ one; the alternative is cheaper to build.
    This ADR proposes `results/` so the publish is atomic with the rows.
 3. Seed change (6): acceptable that the draws of runs before SEED_VERSION 3 are not comparable
    with later ones (the verdict reads only the latest run)?
+
+## Amendment (2026-10-10, implementation plan; architect)
+1. **Outcomes by the read, not the compute instant.** A leg records `outcomes_as_of` (the `as_of` its
+   outcome read used) and the outcome partition's commit `seq`; rule 3(c) compares the stored rows'
+   `knowledge_ts` against `outcomes_as_of` and the partition `seq` against the recorded one (a
+   commit landing after its rows' `knowledge_ts` would slip past a timestamp check alone).
+2. **Absent reads are recorded.** A read that found nothing is logged like any other: a partition
+   that appears later invalidates the session.
+3. **`dates()` reads are checked up to D only** (a digest of the partitions at or before D):
+   sound under the point-in-time rule, and later partitions never invalidate D.
+4. **Event edges.** An event schedule (`read_events_for`) counts a name once per window, so it
+   depends on every earlier session and is read over the whole range on every run; the 60 s
+   target holds for plain-schedule edges (`vrp_short_premium` is one), not event edges.
+5. **Who writes.** `results/edge_legs` is written by the `edge-eval` job, which the nightly
+   submits through `JobRunner` (the `edge-signals` precedent), never by an ingestion task.
+6. **No weekly workflow exists yet** (ADR 0039 WF4): the audit is the nightly step's run on the
+   week's first session (`mode = audit`: compute full, compare, fail naming the legs, publish
+   only the legs that differ).
+7. **Pruning by tombstone.** A leg of a trial the edge no longer has gets a tombstone row; date
+   partitions shared with other edges are never rewritten (a concurrent run's write could be lost).
+8. **Files per partition.** Each run adds a file to every date partition it touches; a later
+   compaction or history-copy step is expected.
+9. **Code changes.** A change to a screener's or the harness's Python code that changes a leg
+   bumps `LEG_VERSION`; a missed bump is caught only by the weekly audit.

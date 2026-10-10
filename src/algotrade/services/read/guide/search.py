@@ -216,7 +216,7 @@ def guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
         for s in guide.situations
     )  # fmt: skip
     terms = tuple(
-        GuideEntryText("term", t.id, t.term, (t.id,), (t.term,), (), (t.short, t.body), t.short)
+        GuideEntryText("term", t.id, t.term, (t.id,), (t.term,), (), (t.short, t.reading), t.short)
         for t in load_guide_glossary(ctx.configs).terms
     )
     return (*pages, *indicators, *episodes, *playbooks, *fields, *situations, *terms)
