@@ -14,9 +14,8 @@ import { useQuery } from '@tanstack/react-query';
 import { gql, graphql, queryKeys } from '@/shared/api';
 
 import type { Completeness } from '@/entities/ingestion';
-import type { NightlyRun } from '@/entities/run';
 
-import type { ScreenerStates } from '../model/issues';
+import type { NightlyStatus, ScreenerStates } from '../model/issues';
 import type { SessionNotice } from '../model/notice';
 
 const StatusStrip = graphql(`
@@ -26,7 +25,6 @@ const StatusStrip = graphql(`
       newer {
         date
         state
-        kind
       }
     }
     screeners {
@@ -41,16 +39,10 @@ const StatusStrip = graphql(`
       runId
       session
       status
-      startedAt
-      finishedAt
-      durationS
       problems
       steps {
         name
         status
-        durationS
-        reason
-        error
       }
     }
     completeness(sessions: 1) @include(if: $admin) {
@@ -72,7 +64,7 @@ const StatusStrip = graphql(`
 
 export interface StatusStripState {
   screens: ScreenerStates | null;
-  nightly: NightlyRun | null;
+  nightly: NightlyStatus | null;
   completeness: Completeness | null;
   /** The newer incomplete session the pages leave out (null: none); ADR 0062. */
   notice: SessionNotice | null;
@@ -95,7 +87,7 @@ export function useStatusStrip(admin: boolean) {
         : null,
       nightly: data.nightlyRuns?.[0] ?? null,
       completeness: data.completeness ?? null,
-      notice: data.session?.newer ? { served: data.session.date, newer: data.session.newer } : null,
+      notice: data.session?.newer ? data.session : null,
     }),
   });
 }

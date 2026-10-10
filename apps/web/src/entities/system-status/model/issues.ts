@@ -17,6 +17,11 @@ export interface SystemIssue {
   links: readonly { label: string; href: string }[];
 }
 
+/** The part of the newest nightly run the strip reads (the query asks for no more). */
+export type NightlyStatus = Pick<NightlyRun, 'runId' | 'session' | 'status' | 'problems'> & {
+  steps: readonly Pick<NightlyRun['steps'][number], 'name' | 'status'>[];
+};
+
 export interface ScreenerState {
   screener: { id: string; name: string };
   notRun: { kindText: string } | null;
@@ -32,7 +37,7 @@ export const NAMED_SCREENERS = 3;
 
 const STEP_FAILED = new Set(['FAILED', 'ERROR']);
 
-function nightlyIssue(run: NightlyRun): SystemIssue | null {
+function nightlyIssue(run: NightlyStatus): SystemIssue | null {
   const status = run.status.toUpperCase();
   if (status !== 'FAILED' && status !== 'PARTIAL') return null;
   const failed = run.steps.filter((s) => STEP_FAILED.has(s.status.toUpperCase()));
@@ -85,18 +90,15 @@ function staleIssue(
   };
 }
 
-/** The open issues, failing ones first (each group keeps its order); ``noticed``: a session
- * notice is showing, so the stale-session issue is left out. */
+/** The open issues, failing ones first (each group keeps its order). */
 export function systemIssues(
-  nightly: NightlyRun | null | undefined,
+  nightly: NightlyStatus | null | undefined,
   screens: ScreenerStates | null | undefined,
   completeness?: Completeness | null,
-  noticed = false,
 ): SystemIssue[] {
-  // a session notice already says the newer session is still processing or retrying
   const all = [
     ...(nightly ? [nightlyIssue(nightly)] : []),
-    noticed ? null : staleIssue(screens, completeness),
+    staleIssue(screens, completeness),
     ...(screens ? screenerIssues(screens) : []),
   ].filter((i): i is SystemIssue => i !== null);
   return [
