@@ -77,6 +77,12 @@ from algotrade.services.evaluation.cross_section.hit import (
     apply_outcome,
     needs_implied_vol,
 )
+from algotrade.services.evaluation.cross_section.legs.key import (
+    HARNESS_VERSION,
+    expression_hash,
+    leg_key,
+    universe_hash,
+)
 from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     Slice,
@@ -108,7 +114,6 @@ from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
 
-HARNESS_VERSION = 2  # 2: the run hash is an allowlist of ``RUN_INPUTS``, not the whole Edge
 # What an edge contributes to a run's identity (``run_hash``); every other field of ``Edge`` is
 # ``BOOKKEEPING`` (the user's or the server's state, prose, the site's decisions): changing one
 # never changes what a run measures, so it never makes a new run (nor reseeds the random draws).
@@ -534,7 +539,11 @@ def evaluate_edge(
         for horizon in scope.edge.outcome.horizon_sessions
     ]
     hashed = run_hash(edge, variants, start, end, as_of, iv_field, split, random_draws)
-    spec = None if split is None else _RandomSpec(split, random_draws, hashed)
+    spec = (
+        None
+        if split is None
+        else _RandomSpec(split, random_draws, expression_hash(catalogue(configs, user.user_id)))
+    )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec)
     results: list[VariantResult] = []
     randoms: list[RandomPicks] = []
@@ -669,11 +678,28 @@ class _Measured:
 @dataclass(frozen=True)
 class _RandomSpec:
     """What the random-pick backtest needs: the first out-of-sample session, the draws per
-    session and the run hash that seeds them."""
+    session and the hash of the user's expression-feature definitions, which with the trial
+    seed the draws through the leg key (``legs/key.py``); the run's range and ``as_of`` do not."""
 
     split: date
     draws: int
-    run_hash: str
+    expr_hash: str
+    keys: dict[tuple[str, str], str] = field(default_factory=dict)  # (scope, variant) -> leg key
+
+    def key_for(self, scope: "_Scope", variant: "Variant") -> str:
+        """The leg key of one scope's screener: what its legs (and draws) are a function of."""
+        found = self.keys.get((scope.key, variant.id))
+        if found is None:
+            found = self.keys[scope.key, variant.id] = leg_key(
+                _trial_hash(scope, variant),
+                universe_hash(scope.universe),
+                scope.iv_field,
+                scope.edge.event_class,
+                scope.edge.outcome.start_offset_sessions,
+                self.draws,
+                self.expr_hash,
+            )
+        return found
 
 
 def _measure(
@@ -806,7 +832,9 @@ def _measure_random(
         names.pickable,
         len(stat.pick_values),
         spec.draws,
-        generator(spec.run_hash, f"{p.scope.key}|{variant.id}", p.horizon, leg.decision),
+        generator(
+            spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}", p.horizon, leg.decision
+        ),
     )
     if found is not None:
         out.randoms.setdefault((p.key, variant.id), {})[leg.decision] = found

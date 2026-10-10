@@ -1,0 +1,60 @@
+"""The leg key (ADR 0063): the identity of everything a screener's statistic at one session (a
+leg) is a function of besides the session itself, so a leg computed by one run is the leg any run
+with the same key would compute, and the random draws of a session can be seeded by it.
+
+A key is a sha256 of a canonical JSON of the trial, the universe, the implied-vol field, the event
+class and offset, the draws per session, the definitions of every expression feature the user's
+catalogue resolves, and the three scheme versions. A change to a screener's or the harness's
+Python that changes a leg bumps ``LEG_VERSION`` (ADR 0063 amendment 9)."""
+
+import hashlib
+import json
+from dataclasses import asdict
+from typing import Any
+
+from algotrade.config.strategy.schema import Selection
+from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.services.evaluation.cross_section.random_picks import SEED_VERSION
+
+LEG_VERSION = 1  # bump when a change to code (not config) changes what a leg holds
+HARNESS_VERSION = 2  # 2: the run hash is an allowlist of ``RUN_INPUTS``, not the whole Edge
+
+
+def _digest(payload: Any) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def universe_hash(universe: Selection) -> str:
+    """The canonical form of a selection: its name, rule tree, cap and order."""
+    return _digest(asdict(universe))
+
+
+def expression_hash(features: FeatureSet) -> str:
+    """Every expression feature's definition the catalogue resolves (site and the user's),
+    by name: a changed formula, parameter or range changes it."""
+    return _digest({name: asdict(e.definition) for name, e in sorted(features.expressions.items())})
+
+
+def leg_key(
+    trial_hash: str,
+    universe: str,
+    iv_field: str,
+    event_class: str | None,
+    offset: int,
+    draws: int,
+    expr_defs_hash: str,
+) -> str:
+    """The key of a leg: ``universe`` is ``universe_hash``, ``expr_defs_hash`` is
+    ``expression_hash``."""
+    return _digest(
+        {
+            "trial": trial_hash,
+            "universe": universe,
+            "iv_field": iv_field,
+            "event_class": event_class,
+            "offset": offset,
+            "draws": draws,
+            "expressions": expr_defs_hash,
+            "versions": [HARNESS_VERSION, LEG_VERSION, SEED_VERSION],
+        }
+    )
