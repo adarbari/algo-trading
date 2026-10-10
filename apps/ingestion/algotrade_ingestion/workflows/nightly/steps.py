@@ -92,7 +92,8 @@ class Step:
 
     @property
     def inputs(self) -> tuple[str, ...]:
-        """Every step whose success in this attempt makes a done step run again."""
+        """Every step whose success in this attempt makes a done step run again. (A done step
+        also runs again when its own job published a run no attempt cites since: ``nightly``.)"""
         return (*self.needs, *self.reruns_after)
 
 
