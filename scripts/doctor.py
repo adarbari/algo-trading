@@ -16,6 +16,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 REPO = Path(__file__).resolve().parents[1]
@@ -331,14 +332,21 @@ def history_stale() -> str | None:
     from algotrade.config.env import config_dir, data_url  # noqa: PLC0415 (venv may lack it)
     from algotrade.config.site.settings import load_nightly  # noqa: PLC0415
     from algotrade.services.read.context import open_read_stores  # noqa: PLC0415
-    from algotrade.services.read.session import default_session  # noqa: PLC0415
 
     reader, configs = open_read_stores(data_url(), config_dir())
     settings = load_nightly(configs).history_copy
+    return stale_history(reader, settings.instrument_tables) if settings.enabled else None
+
+
+def stale_history(reader: Any, tables: tuple[str, ...]) -> str | None:
+    """Of ``tables``, the first whose copy misses the default session: the latest COMPLETE one
+    (``default_session``, ADR 0062), never a newer incomplete session's partition."""
+    from algotrade.services.read.session import default_session  # noqa: PLC0415
+
     session = default_session(reader)
-    if not settings.enabled or session is None:
+    if session is None:
         return None
-    for table in settings.instrument_tables:
+    for table in tables:
         if session in reader.dates(table) and not reader.history_current(table, session):
             return f"{table} has no history copy holding session {session}"
     return None

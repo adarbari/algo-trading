@@ -4,9 +4,13 @@ import importlib.util
 import json
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
+
+from algotrade.storage.runs import RunStatus
+from tests.unit.services.read.test_session import nightly, store, write_bar
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "doctor.py"
 _spec = importlib.util.spec_from_file_location("doctor", SCRIPT)
@@ -132,6 +136,31 @@ def test_a_missing_or_stale_history_copy_warns_with_the_command_to_run(tmp_path:
     )
     assert stale.level == doctor.WARN and "algotrade-ingest history-copy" in stale.fix
     assert "nightly" in stale.fix and "bars/1d" in stale.detail
+
+
+def test_the_history_copy_is_expected_for_the_latest_complete_session_only() -> None:
+    writer, reader = store()
+    done, newer = date(2026, 10, 8), date(2026, 10, 9)
+    for day in (done, newer):
+        write_bar(writer, day)
+    nightly(reader, done, RunStatus.COMPLETE)
+    nightly(reader, newer, RunStatus.FAILED)  # a newer session whose nightly never completed
+
+    class Copy:
+        """The copy holds ``held`` only (the memory backend itself keeps none)."""
+
+        def __init__(self, held: date) -> None:
+            self.held = held
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(reader, name)
+
+        def history_current(self, table: str, day: date) -> bool:
+            return day == self.held
+
+    assert doctor.stale_history(Copy(done), ("bars/1d",)) is None
+    stale = doctor.stale_history(Copy(date(2026, 10, 7)), ("bars/1d",))
+    assert stale is not None and "2026-10-08" in stale
 
 
 def test_an_unreadable_store_leaves_the_history_copy_unchecked(tmp_path: Path) -> None:

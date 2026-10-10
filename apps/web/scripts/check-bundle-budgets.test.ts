@@ -169,7 +169,9 @@ describe('table', () => {
   it('marks a size over its budget', () => {
     const sizes = measure(manifest, gzipSize, LAZY);
     const text = table(sizes, { ...budgets, entry_gzip_bytes: 10 });
-    expect(text).toMatch(/entry chunk \(JS \+ CSS\) \| 0.0 kB \(\d+ B\) \| 0.0 kB \(10 B\) \| OVER/);
+    expect(text).toMatch(
+      /entry chunk \(JS \+ CSS\) \| 0.0 kB \(\d+ B\) \| 0.0 kB \(10 B\) \| OVER/,
+    );
     expect(text).toMatch(/src\/pages\/b\/index.ts \| 0.0 kB \(\d+ B\) \| 0.0 kB \(\d+ B\) \| ok/);
   });
 });
