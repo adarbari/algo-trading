@@ -3,7 +3,8 @@ gets one row per (edge variant, variant, horizon, slice) of the run's range, pub
 atomically (pending, then committed); the run record ``edge-eval:<edge>`` keeps the trial log
 (the "all" row of each variant and horizon, the count the next run's deflated Sharpe ratio is
 taken over), the run hash, the split and whether the run was
-exploratory, and how much was excluded."""
+exploratory, how much was excluded, and who ran it: ``owner``, ``trigger`` (nightly, ui or cli)
+and the ``job_id`` of the job that wrote it (ADR 0059 amendment 2026-10-10)."""
 
 from dataclasses import asdict
 from datetime import datetime
@@ -12,6 +13,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.edges.document import MAIN, job_name
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
@@ -23,6 +25,7 @@ from algotrade.storage.tables.result_writer import ResultWriter
 
 RESULT = "edge_eval"
 SOURCE = "edge-eval"
+TRIGGERS = ("nightly", "ui", "cli")  # what can start a run; stored in its stats, shown as-is
 MEASURE_COLUMNS = (
     "sessions", "picks", "hits", "hit_rate", "eligible", "base_hits", "base_rate", "lift",
     "mean_excess_picks", "bh_mean", "top_decile_mean", "decile_spread", "decile_t",
@@ -214,13 +217,28 @@ def historical_identity(evaluation: EdgeEvaluation) -> dict[str, Any] | None:
     return None if evaluation.historical is None else evaluation.historical.as_dict()
 
 
-def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datetime) -> RunRecord:
+def write_edge_eval(
+    writer: ResultWriter,
+    evaluation: EdgeEvaluation,
+    now: datetime,
+    *,
+    owner: str | None = None,
+    trigger: str = "cli",
+    job_id: str | None = None,
+) -> RunRecord:
     """Save ``evaluation``: its rows (both visible or neither) and its run record, whose stats
-    hold the trial log. Returns the finished record."""
+    hold the trial log and who ran it (``owner``: the edge's, default the rows' user; ``trigger``:
+    ``nightly`` | ``ui`` | ``cli``; ``job_id``: the job that wrote it, none for a direct call).
+    Returns the finished record."""
+    if trigger not in TRIGGERS:
+        raise ConfigurationError(f"unknown run trigger {trigger!r}; known: {list(TRIGGERS)}")
     record = start_run(job_name(evaluation.edge_id, evaluation.user_id), evaluation.end, now)
     frame = edge_eval_frame(evaluation, record.run_id, now)
     stats = {
         "edge": evaluation.edge_id,
+        "owner": evaluation.user_id if owner is None else owner,
+        "trigger": trigger,
+        "job_id": job_id,
         "run_hash": evaluation.run_hash,
         "split_from": evaluation.split_from.isoformat() if evaluation.split_from else None,
         "exploratory": evaluation.exploratory,

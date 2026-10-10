@@ -357,7 +357,7 @@ type EdgeRow {
 }
 
 """
-A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one), `lostInputs` what the run could not read (a screener's missing table and the sessions lost); `oosHidden`: the run is a copy's whose out-of-sample result is withheld until the user shows it, so `rows` serves the in-sample rows only
+A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one), `lostInputs` what the run could not read (a screener's missing table and the sessions lost); `oosHidden`: the run is a copy's whose out-of-sample result is withheld until the user shows it, so `rows` serves the in-sample rows only; `legacyOwner`: a site run recorded under an older owner (`local`), read as the site's; `trigger`: what started the run (`nightly`, `ui` or `cli`), null for a run from before it was recorded
 """
 type EdgeRun {
   runId: String!
@@ -374,6 +374,8 @@ type EdgeRun {
   afterSession: Boolean!
   lostInputs: [String!]!
   oosHidden: Boolean!
+  legacyOwner: String
+  trigger: String
 
   """
   The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none

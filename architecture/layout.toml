@@ -327,7 +327,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/services/jobs"
-purpose = "long-running work as jobs: runner, models, handlers, exclusive runs"
+purpose = "long-running work as jobs: runner, models, handlers, exclusive runs and claims"
 contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
 
 [[dir]]

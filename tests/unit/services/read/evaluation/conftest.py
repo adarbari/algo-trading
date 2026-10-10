@@ -68,6 +68,7 @@ def write_run(
     exploratory: bool | None = None,
     finished_minutes: int | None = None,
     extra: list[dict[str, Any]] | None = None,
+    trigger: str | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T."""
@@ -87,6 +88,8 @@ def write_run(
         "range": [START.isoformat(), END.isoformat()], "as_of": "2026-10-01T00:00:00+00:00",
         "trials_counted": 1,
     }  # fmt: skip
+    if trigger is not None:  # runs from before the trigger was recorded have none
+        stats["trigger"] = trigger
     record = RunRecord(run_id, f"edge-eval:drift:{owner}", END, at)
     with writer.publishing(run_id, done):
         writer.write_result("edge_eval", END, run_id, frame, pending=True)

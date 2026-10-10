@@ -132,7 +132,7 @@ detect = [{ string = "usage/llm_calls" }, { call = "UsageWriter" }, { call = "Us
 
 [[responsibility]]
 id = "on-request-edge-evaluations"
-description = "The API's on-request edge evaluations (ADR 0059): the CLI's `edge-eval` job for the caller, or an admin's site run, on its own single-worker runner (one queued or running evaluation per user; a stale RUNNING record is recovered first); writes only results/edge_eval rows and run records under the run's own run id, never market or feature data"
+description = "The API's on-request edge evaluations (ADR 0059): the CLI's `edge-eval` job for the edge's owner only (a user their own edges, an admin a site edge as the site; anyone else is refused), recorded with trigger `ui`, on its own single-worker runner (one queued or running evaluation per owner across processes, the check and submit under `Backend.lock` `edge-eval:<owner>`; a stale RUNNING record is recovered first); writes only results/edge_eval rows and run records under the run's own run id, never market or feature data"
 owner = ["src/algotrade/services/ondemand/*"]
 section = "docs/adr/0059-edge-evaluations-on-request.md#decision"
 detect = [{ call = "OnDemandEdges" }]
