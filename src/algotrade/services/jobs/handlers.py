@@ -161,8 +161,9 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
 
 
 def edge_signals_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
-    """params: ``session`` (ISO date: tonight's). The user's followed edges' picks at it and the
-    open paper trades their outcomes close, published atomically into ``results/edge_paper``."""
+    """params: ``session`` (ISO date: tonight's); the job's user is the RECORD owner (``site`` or
+    a user). The picks at it of the owner's evidenced or live edges and the open paper trades its
+    rows hold whose outcomes close, published atomically into ``results/edge_paper``."""
     night, record = run_night(
         ctx.resources["reader"],
         ctx.resources["writer"],

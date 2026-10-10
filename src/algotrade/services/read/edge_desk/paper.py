@@ -15,7 +15,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from algotrade.data.paper import LOOKBACK_DAYS, read_paper
+from algotrade.data.paper import LOOKBACK_DAYS, read_stored
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.values import to_scalar
@@ -82,7 +82,7 @@ def load_trades(ctx: ReadContext, names: Mapping[str, str]) -> tuple[PaperTrade,
     user no longer has is left out) signalled in the window up to ``ctx.session``, oldest signal
     first."""
     day = ctx.session.date
-    frame = read_paper(ctx.reader, ctx.user.user_id, day - timedelta(days=LOOKBACK_DAYS), day)
+    frame = read_stored(ctx.reader, ctx.user.user_id, day - timedelta(days=LOOKBACK_DAYS), day)
     records = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
     return tuple(_trade(r, day, names) for r in records if str(r["edge_id"]) in names)
 

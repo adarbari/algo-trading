@@ -8,18 +8,21 @@ from datetime import UTC, date, datetime, timedelta
 import pandas as pd
 
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.user import UserContext
+from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.time.calendar import next_session
-from algotrade.data.paper import job_name, read_paper
+from algotrade.data.paper import job_name, read_paper, read_stored
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
-from algotrade.services.evaluation.forward.results import MISSED, paper_users, run_night
+from algotrade.services.evaluation.forward.results import MISSED, paper_owners, run_night
+from algotrade.services.evaluation.forward.settle import outcome_hash
 from algotrade.services.evaluation.forward.signals import advance
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.schemas import EDGE_PAPER
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
     IDS,
     build_world,
+    edge_document,
     outcome_row,
 )
 from tests.unit.services.evaluation.cross_section.test_harness import (
@@ -34,6 +37,7 @@ from tests.unit.services.evaluation.forward.conftest import (
     desk,
     event_changes,
     event_world,
+    site_desk,
 )
 
 BUY = next_session(DAYS[0])  # the first signal's entry session
@@ -45,7 +49,7 @@ def night(d: Desk, day: date, now: datetime = NOW):  # type: ignore[no-untyped-d
 
 
 def book(d: Desk, until: date = DAYS[-1], as_of: datetime | None = None) -> pd.DataFrame:
-    return read_paper(d.world.reader, "u1", DAYS[0], until, as_of)
+    return read_stored(d.world.reader, "u1", DAYS[0], until, as_of)
 
 
 def test_a_night_stores_the_signals_open_with_buy_and_sell_sessions(following: Desk) -> None:
@@ -145,7 +149,7 @@ def test_a_trade_is_not_judged_by_an_outcome_the_user_edited_after_the_signal() 
         "start_offset_sessions": 1, "cost_bps": 5.0,
     })  # fmt: skip
     run_night(d.world.reader, d.world.results, edited.configs, USER, SELL, NOW)
-    status = read_paper(d.world.reader, "u1", DAYS[0], DAYS[-1])
+    status = read_stored(d.world.reader, "u1", DAYS[0], DAYS[-1])
     rows = status[status["signal_session"] == DAYS[0]]
     assert set(rows["status"]) == {"skipped"}
     assert set(rows["reason"]) == {"the edge's outcome changed after the signal"}
@@ -167,20 +171,27 @@ def test_the_night_publishes_one_run_and_a_failed_write_leaves_nothing(following
     assert book(following).empty  # pending rows were aborted, never visible
 
 
-def test_only_users_with_a_followed_edge_or_open_trades_are_signalled_for(
+def test_the_nightly_works_for_the_site_and_users_with_a_recording_edge_or_open_trades(
     following: Desk,
 ) -> None:
-    store = _with_users(following.configs, ["u1", "u2", "u3"])
+    docs = {**following.configs._docs, ("u2", "edges", "beta"): {"follow": {"since": "2026-09-01"}}}
+    docs[("site", "edges", "beta")] = {
+        **edge_document(id="beta", status="evidenced"),
+        "evidence": {"run_id": "r1", "split_from": "2026-01-02"},
+    }  # a site edge u2 follows, beside u1's own live edge
+    store = _with_users(MemoryConfigStore(docs), ["u1", "u2", "u3"])
     reader = following.world.reader
-    assert paper_users(reader, store, DAYS[0]) == [USER]
-    # u3 follows nothing any more but still has an open trade: it settles
+    assert paper_owners(reader, store, DAYS[0]) == [UserContext(SITE_USER), USER]
+    # u3 owns nothing recording but still has an open trade: it settles
     following.world.writer.write_table(
         "results/edge_paper",
         DAYS[0],
         "p3",
         stamped([trade_row("u3")], DAYS[0], "p3", NOW, "edge-signals"),
     )
-    assert paper_users(reader, store, DAYS[0]) == [USER, UserContext("u3")]
+    assert paper_owners(reader, store, DAYS[0]) == [
+        UserContext(SITE_USER), USER, UserContext("u3")
+    ]  # fmt: skip
 
 
 def trade_row(user: str) -> dict:  # type: ignore[type-arg]
@@ -320,3 +331,98 @@ def test_an_event_night_is_idempotent() -> None:
     again = night(d, DAYS[1])[0]
     assert first.signalled == {"drift": 3} and again.signalled == {} and again.rows == 0
     pd.testing.assert_frame_equal(book(d), before)
+
+
+# ---- paper trades follow the edge's owner, never a follower (ADR 0053 amendment 2026-10-10) ----
+
+
+SITE = UserContext(SITE_USER)
+
+
+def site_night(d: Desk, day: date, user: UserContext = SITE, now: datetime = NOW):  # type: ignore[no-untyped-def]
+    return run_night(d.world.reader, d.world.results, d.configs, user, day, now)
+
+
+def shared(d: Desk, until: date = DAYS[-1]) -> pd.DataFrame:
+    """What every follower of the site's ``drift`` reads: the site's record of it."""
+    return read_paper(d.world.reader, {"drift": SITE_USER}, DAYS[0], until)
+
+
+def test_a_follower_of_a_site_edge_gets_no_trades_from_the_nightly() -> None:
+    d = site_desk()
+    for follower in ("u1", "u2"):
+        result, record = site_night(d, DAYS[0], UserContext(follower))
+        assert result.signalled == {} and result.rows == 0 and result.tonight == {}
+        assert record.job == job_name(follower)
+    assert read_stored(d.world.reader, "u1", DAYS[0], DAYS[-1]).empty
+    assert shared(d).empty  # nothing duplicated, nothing recorded until the site's own night
+    result, _ = site_night(d, DAYS[0])
+    assert result.signalled == {"drift": 5}
+    assert set(shared(d)["user_id"]) == {SITE_USER} and len(shared(d)) == 5
+
+
+def test_a_site_edge_records_while_evidenced_or_live_and_a_retired_one_only_settles() -> None:
+    for status, rows in (("candidate", 0), ("researching", 0), ("rejected", 0), ("evidenced", 5),
+                         ("live", 5)):  # fmt: skip
+        d = site_desk(status=status, followers=())
+        result, record = site_night(d, DAYS[0])
+        assert (result.rows, record.stats["tonight"] != {}) == (rows, bool(rows)), status
+    d = site_desk(followers=())
+    site_night(d, DAYS[0])
+    retired = site_desk(d.world, followers=(), status="retired")
+    result, _ = site_night(retired, SELL)  # DAYS[2] was due, but a retired edge takes no pick
+    assert result.settled == {"drift": 5} and result.signalled == {} and result.rows == 5
+    assert set(shared(retired)["status"]) == {"won"} and len(shared(retired)) == 5
+
+
+def test_a_record_starts_the_first_night_the_job_sees_the_status_and_is_never_backfilled() -> None:
+    d = site_desk(followers=())
+    _, first = site_night(d, DAYS[3])  # the edge was evidenced long before: nothing before this
+    assert first.stats["tonight"]["drift"]["state"] == "signalled" and first.stats["missed"] == []
+    assert set(shared(d)["signal_session"]) == {DAYS[3]}
+    _, later = site_night(d, DAYS[5])  # DAYS[3] + one horizon is due and was run
+    assert set(shared(d)["signal_session"]) == {DAYS[3], DAYS[5]}
+    assert later.stats["missed"] == []
+    _, gap = site_night(d, advance(DAYS[5], 5))  # a gap after the record began is filled
+    assert [m["session"] for m in gap.stats["missed"]] == [
+        advance(DAYS[3], 2 * k).isoformat() for k in (2, 3)
+    ]
+
+
+def test_a_followers_own_universe_and_screen_do_not_change_the_site_record() -> None:
+    plain = site_desk(followers=())
+    site_night(plain, DAYS[0])
+    own = site_desk(followers=("u1",))
+    docs = dict(own.configs._docs)
+    docs[("u1", "selections", "active")] = {"id": "active", "where": {"price": {"lt": 1}}}
+    docs[("u1", "strategies", "momo")] = docs[("site", "strategies", "momo")]
+    mine = Desk(own.world, MemoryConfigStore(docs))
+    site_night(mine, DAYS[0])
+    pd.testing.assert_frame_equal(
+        shared(mine).drop(columns=["knowledge_ts", "config_hash"]),
+        shared(plain).drop(columns=["knowledge_ts", "config_hash"]),
+    )
+
+
+def test_a_followers_old_rows_settle_but_stay_out_of_the_shared_record() -> None:
+    d = site_desk(followers=("u1",))
+    (edge,) = [e for e in load_edges(d.configs, "u1") if e.id == "drift"]
+    old = [
+        {**trade_row("u1"), "edge_id": "drift", "instrument_id": f"EQ:N{i:02d}",
+         "outcome_hash": outcome_hash(edge), "screener": "momo", "rank": r, "config_hash": "x"}
+        for r, i in enumerate((19, 18, 17, 16, 15), start=1)
+    ]  # fmt: skip
+    d.world.writer.write_table(
+        "results/edge_paper",
+        DAYS[0],
+        "p1",
+        stamped(old, DAYS[0], "p1", NOW - timedelta(days=1), "edge-signals"),
+    )
+    reader = d.world.reader
+    site_owner = UserContext(SITE_USER)  # the site edge itself is evidenced: it records
+    assert paper_owners(reader, d.configs, SELL) == [site_owner, UserContext("u1")]  # u1: open
+    result, _ = site_night(d, SELL, UserContext("u1"))
+    assert result.settled == {"drift": 5} and result.signalled == {}
+    assert set(read_stored(reader, "u1", DAYS[0], DAYS[-1])["status"]) == {"won"}
+    assert shared(d).empty  # the shared record is the site's own rows only
+    assert paper_owners(reader, d.configs, SELL) == [site_owner]  # none left open: u1's job stops

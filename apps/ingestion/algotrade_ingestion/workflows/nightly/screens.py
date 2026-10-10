@@ -1,5 +1,6 @@
 """The nightly's job steps: ``screens`` (one ``screen`` job per screener, ADR 0033) and
-``edge-signals`` (one job per user who follows an edge, ADR 0053 amendment 2026-10-09).
+``edge-signals`` (one job per record owner: ``site`` and each user with an edge recording or
+open paper trades, ADR 0053 amendment 2026-10-10).
 
 Screens run through the job runner (``services/jobs``), never inline (ADR 0019, R5): each
 screener (every site preset as ``site``, then each user's finalised ones) becomes a ``screen``
@@ -11,8 +12,9 @@ down, or a required one whose coalesce fallback is present, e.g. ``iv30@v1`` bef
 stored) is a WARN check on the step, never its failure (ADR 0055, coverage of coalescing
 expressions).
 
-The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the user's tonight picks of
-the edges they follow and settles the open paper trades whose outcome is stored
+The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the owner's tonight picks of
+its evidenced or live edges (a follower's bookmark trades nothing) and settles the open paper
+trades whose outcome is stored
 (``services/evaluation/forward``). It needs ``screens`` (settlement leaves a trade open when its
 outcome is not stored) and is not critical: a failed job is a warning naming the user, never a
 hold on the session or a later one.
@@ -25,7 +27,7 @@ from typing import Any
 
 from algotrade.data import StoreReader
 from algotrade.services.configs import nightly_screeners
-from algotrade.services.evaluation.forward.results import paper_users
+from algotrade.services.evaluation.forward.results import paper_owners
 from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
 from algotrade.storage.configs.store import ConfigStore
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
@@ -79,11 +81,11 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
 
 
 def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> ScreenStep:
-    """The edge-signals step, submitting through ``jobs`` (run in the nightly's own thread)."""
+    """The edge-signals step (a job per record owner), submitting through ``jobs``."""
 
     def run(session: date) -> Outcome:
         summaries, short = [], []
-        for user in paper_users(reader, configs, session):
+        for user in paper_owners(reader, configs, session):
             job = jobs.run("edge-signals", {"session": session.isoformat()}, user, force=True)
             summaries.append(
                 {"user": user.user_id, "job_id": job.job_id, "status": job.status.value}

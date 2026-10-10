@@ -91,12 +91,12 @@ class SignalJobs:
         )
 
 
-def test_edge_signals_submit_one_job_per_user_who_follows_an_edge(
+def test_edge_signals_submit_one_job_per_record_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         screens_module,
-        "paper_users",
+        "paper_owners",
         lambda reader, store, session: [UserContext("alice"), UserContext("bob")],
     )
     jobs = SignalJobs()
@@ -113,7 +113,7 @@ def test_a_failed_edge_signals_job_fails_the_step_naming_the_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        screens_module, "paper_users", lambda reader, store, session: [UserContext("alice")]
+        screens_module, "paper_owners", lambda reader, store, session: [UserContext("alice")]
     )
     step = screens_module.signal_jobs(SignalJobs(("alice",)), MemoryConfigStore({}), None)(D)  # type: ignore[arg-type]
     assert (

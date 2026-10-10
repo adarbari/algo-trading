@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 
 import pandas as pd
 
-from algotrade.data.paper import PAPER_COLUMNS, read_paper
+from algotrade.data.paper import PAPER_COLUMNS, read_paper, read_stored
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import EDGE_PAPER
@@ -38,8 +38,8 @@ def _store() -> StoreReader:
     return StoreReader(backend)
 
 
-def test_one_users_rows_in_the_window_sorted_by_signal_session() -> None:
-    out = read_paper(_store(), "u1", D1, D2)
+def test_one_owners_stored_rows_in_the_window_sorted_by_signal_session() -> None:
+    out = read_stored(_store(), "u1", D1, D2)
     assert list(out.columns) == list(PAPER_COLUMNS)
     assert list(zip(out["signal_session"], out["instrument_id"], strict=True)) == [
         (D1, "EQ:A"), (D2, "EQ:A"),
@@ -47,17 +47,33 @@ def test_one_users_rows_in_the_window_sorted_by_signal_session() -> None:
 
 
 def test_the_window_bounds_the_signal_sessions() -> None:
-    assert list(read_paper(_store(), "u1", D2, D2)["signal_session"]) == [D2]
+    assert list(read_stored(_store(), "u1", D2, D2)["signal_session"]) == [D2]
 
 
 def test_a_later_run_settles_the_row_and_as_of_keeps_the_earlier_book() -> None:
     store = _store()
-    assert list(read_paper(store, "u1", D1, D1)["status"]) == ["won"]
+    assert list(read_stored(store, "u1", D1, D1)["status"]) == ["won"]
     early = datetime(2026, 9, 2, tzinfo=UTC)
-    assert list(read_paper(store, "u1", D1, D1, early)["status"]) == ["open"]
+    assert list(read_stored(store, "u1", D1, D1, early)["status"]) == ["open"]
 
 
 def test_nothing_stored_is_an_empty_frame_with_the_columns() -> None:
-    out = read_paper(StoreReader(MemoryBackend()), "u1", D1, D2)
+    out = read_stored(StoreReader(MemoryBackend()), "u1", D1, D2)
     assert out.empty and list(out.columns) == list(PAPER_COLUMNS)
     assert isinstance(out, pd.DataFrame)
+
+
+def test_read_paper_keeps_only_the_rows_of_each_edges_record_owner() -> None:
+    """A follower's old row of a site edge is not part of the shared record."""
+    backend = MemoryBackend()
+    rows = [_row("site", "EQ:A", D1), _row("u1", "EQ:A", D1), _row("u1", "EQ:Z", D1)]
+    rows[2]["edge_id"] = "mine"
+    writer = StoreWriter(backend)
+    writer.write_table(EDGE_PAPER.name, D1, "r1", stamped(rows, D1, "r1", source="edge-signals"))
+    store = StoreReader(backend)
+    shared = read_paper(store, {"drift": "site", "mine": "u1"}, D1, D2)
+    assert sorted(zip(shared["user_id"], shared["edge_id"], strict=True)) == [
+        ("site", "drift"), ("u1", "mine"),
+    ]  # fmt: skip
+    assert read_paper(store, {}, D1, D2).empty
+    assert len(read_stored(store, "u1", D1, D2)) == 2  # the owner's own nightly settles both
