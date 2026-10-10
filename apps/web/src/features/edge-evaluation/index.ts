@@ -5,4 +5,5 @@
  * time per user: the API's refusal is shown as the message.
  */
 export { useRunEvaluation } from './api/hooks';
+export { evaluationMessage, isActive } from './model/evaluation';
 export { RunEvaluation, type RunEvaluationProps } from './ui/RunEvaluation';

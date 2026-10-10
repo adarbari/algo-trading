@@ -36,15 +36,15 @@ beforeEach(() => {
 });
 
 function setup(id: string, over: Record<string, unknown> = {}) {
-  const onCloned = vi.fn();
+  const onEdit = vi.fn();
   const view = render(
     <ToastProvider>
       <TestQueryProvider>
-        <EdgeActions edge={{ ...byId(id), ...over }} onCloned={onCloned} />
+        <EdgeActions edge={{ ...byId(id), ...over }} onEdit={onEdit} />
       </TestQueryProvider>
     </ToastProvider>,
   );
-  return { onCloned, ...view };
+  return { onEdit, ...view };
 }
 
 const buttons = () => screen.getAllByRole('button').map((b) => b.textContent);
@@ -52,10 +52,17 @@ const buttons = () => screen.getAllByRole('button').map((b) => b.textContent);
 describe('EdgeActions', () => {
   it('offers the moves of each state, and Show out-of-sample only for a hidden copy', () => {
     const { unmount } = setup('momentum_12_1');
-    expect(buttons()).toEqual(['Clone', 'Follow', 'Reject']);
+    expect(buttons()).toEqual(['Clone', 'Follow', 'Reject']); // a site edge: nothing to Edit
     unmount();
     const copy = setup('my_momentum', { state: 'following' });
-    expect(buttons()).toEqual(['Clone', 'Retire', 'Back to researching', 'Show out-of-sample']);
+    expect(buttons()).toEqual([
+      'Clone',
+      'New version',
+      'Edit',
+      'Retire',
+      'Back to researching',
+      'Show out-of-sample',
+    ]);
     copy.unmount();
     setup('momentum_12_1', { state: 'rejected' });
     expect(buttons()).toEqual(['Clone', 'Back to researching']);
@@ -63,7 +70,7 @@ describe('EdgeActions', () => {
 
   it('clones under a name and opens the copy', async () => {
     POST.mockResolvedValue(ok({ edge_id: 'mine', document: {} }));
-    const { onCloned, baseElement } = setup('momentum_12_1');
+    const { onEdit, baseElement } = setup('momentum_12_1');
     await userEvent.click(screen.getByRole('button', { name: 'Clone' }));
     const name = await screen.findByRole('textbox', { name: 'Name of your copy' });
     expect(name).toHaveValue('my-momentum_12_1');
@@ -72,12 +79,35 @@ describe('EdgeActions', () => {
     await userEvent.type(name, 'mine');
     await userEvent.click(screen.getByRole('button', { name: 'Clone' }));
     await waitFor(() => {
-      expect(onCloned).toHaveBeenCalledWith('mine');
+      expect(onEdit).toHaveBeenCalledWith('mine');
     });
     expect(POST).toHaveBeenCalledWith('/edges/{edge_id}/copy', {
       params: { path: { edge_id: 'momentum_12_1' } },
       body: { new_id: 'mine', as_version: false },
     });
+  });
+
+  it('makes a new version as a trial and opens it', async () => {
+    POST.mockResolvedValue(ok({ edge_id: 'mine-v2', document: {} }));
+    const { onEdit } = setup('my_momentum', { state: 'following' });
+    await userEvent.click(screen.getByRole('button', { name: 'New version' }));
+    expect(await screen.findByRole('textbox', { name: 'Name of the new version' })).toHaveValue(
+      'my_momentum-v2',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Create version' }));
+    await waitFor(() => {
+      expect(onEdit).toHaveBeenCalledWith('my_momentum-v2');
+    });
+    expect(POST).toHaveBeenCalledWith('/edges/{edge_id}/copy', {
+      params: { path: { edge_id: 'my_momentum' } },
+      body: { new_id: 'my_momentum-v2', as_version: true },
+    });
+  });
+
+  it('opens the builder on an edge of the users own', async () => {
+    const { onEdit } = setup('my_momentum');
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith('my_momentum');
   });
 
   it('refuses an invalid copy name', async () => {

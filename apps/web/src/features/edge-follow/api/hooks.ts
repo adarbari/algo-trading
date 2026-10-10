@@ -1,6 +1,6 @@
 /**
- * The writes of a user's edges (ADR 0053 amendment, `/edges/{id}`): copy an edge (a new edge of
- * theirs that extends it), move their state about one (follow, reject, retire, reopen) and show a
+ * The writes of a user's edges (ADR 0053 amendment, `/edges/{id}`): copy an edge, or make a new
+ * version of it (a new edge of theirs that extends it), move their state about one (follow, reject, retire, reopen) and show a
  * copy's out-of-sample result, and the admin's read of one edge as the TOML to land in the site's
  * config. Each write reads the edges again.
  */
@@ -16,14 +16,15 @@ const PublishedEdge = new TypedDocumentString<
   { id: string }
 >('query PublishedEdge($id: String!) { publishedEdgeDocument(id: $id) }');
 
-export function useCopyEdge(id: string) {
+/** Copy `id` under a new name; `asVersion`: the copy is a trial that would replace it. */
+export function useCopyEdge(id: string, asVersion = false) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (newId: string) =>
       unwrap(
         api.POST('/edges/{edge_id}/copy', {
           params: { path: { edge_id: id } },
-          body: { new_id: newId, as_version: false },
+          body: { new_id: newId, as_version: asVersion },
         }),
       ),
     onSuccess: () => refreshEdges(client),

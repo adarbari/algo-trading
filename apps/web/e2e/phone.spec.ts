@@ -258,6 +258,23 @@ test('Edges: a tapped edge opens its page', async ({ page }) => {
   );
 });
 
+test('Edge builder: the six steps fit a phone, the steps scroll sideways and a step opens from the nav', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/edges/new');
+  const nav = page.getByRole('navigation', { name: 'Edge builder steps' });
+  await expect(nav.getByRole('link', { name: '4 · Trade' })).toBeAttached();
+  await nav.getByRole('link', { name: '4 · Trade' }).tap();
+  await expect(page.getByRole('heading', { name: '4 · Trade' })).toBeInViewport();
+  const width = page.viewportSize()?.width ?? 0;
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    width,
+  );
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) => {
   await mockAdminApi(page, {
     harnessRuns: [
