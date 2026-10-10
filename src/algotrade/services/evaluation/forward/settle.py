@@ -8,7 +8,11 @@ never a loss). The edge's outcome is judged by the definition it had at the sign
 whose edge's ``[outcome]`` changed since (``outcome_hash``) is skipped with that reason. A name
 with no outcome row although its window's partition is stored has no entry bar (skipped); a
 window with no outcome at all ``GRACE_SESSIONS`` after its sell session is skipped too, with
-the reason: a missing result is never a loss and never a zero."""
+the reason: a missing result is never a loss and never a zero. An outcome that reads the implied
+vol (``expires_otm``: the strike is set from it) reads it at the signal session D, as the harness
+does (``harness.implied_at``, ``harness.iv_field_of``); a name whose vol
+is missing or invalid there is skipped with that reason, never a loss. ``excess_return`` of a
+settled trade is set only when the outcome's value is a return (not an ``expires_otm`` cushion)."""
 
 import hashlib
 import json
@@ -21,11 +25,15 @@ from algotrade.config.edges.document import Edge
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.services.evaluation.cross_section.harness import BENCHMARK
+from algotrade.services.evaluation.cross_section.harness import BENCHMARK, implied_at, iv_field_of
 from algotrade.services.evaluation.cross_section.hit import (
+    INVALID_IMPLIED_VOL,
     MISSING_DRAWDOWN,
     MISSING_VALUE,
+    NO_IMPLIED_VOL,
     apply_outcome,
+    is_return,
+    needs_implied_vol,
 )
 from algotrade.services.evaluation.forward.signals import advance
 
@@ -35,6 +43,8 @@ OPEN, WON, LOST, SKIPPED = "open", "won", "lost", "skipped"
 REASONS = {
     MISSING_VALUE: "the result could not be computed (no benchmark return)",
     MISSING_DRAWDOWN: "the worst drawdown of the window could not be computed",
+    NO_IMPLIED_VOL: "no implied vol was stored for the name at the signal session",
+    INVALID_IMPLIED_VOL: "the implied vol stored at the signal session was not usable",
 }
 
 
@@ -90,7 +100,15 @@ def settle_group(
             [_skipped(i, "no outcome stored for its window") for i in names] if late else []
         )
     mine = stored[stored["instrument_id"].isin(names)]
-    result = apply_outcome(edge, mine).set_index("instrument_id") if len(mine) else None
+    try:
+        implied = (
+            implied_at(reader, iv_field_of(edge), names, first["signal_session"])
+            if needs_implied_vol(edge)
+            else None
+        )
+    except MissingDataError:
+        return out + [_skipped(i, "no implied vol stored at the signal session") for i in names]
+    result = apply_outcome(edge, mine, implied).set_index("instrument_id") if len(mine) else None
     for name in names:
         if result is None or name not in result.index:
             out.append(_skipped(name, "no entry bar at the buy session"))
@@ -104,7 +122,7 @@ def settle_group(
                 name,
                 WON if row["hit"] else LOST,
                 "",
-                float(str(row["value"])),
+                float(str(row["value"])) if is_return(edge) else None,
                 bool(row["delisted"]),
             )
         )

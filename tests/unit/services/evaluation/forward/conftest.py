@@ -3,7 +3,7 @@
 session."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -12,9 +12,11 @@ from algotrade.config.user import UserContext
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
+    IDS,
     World,
     build_world,
     edge_document,
+    with_listing_history,
 )
 
 USER = UserContext("u1")
@@ -40,3 +42,21 @@ def desk(world: World | None = None, **changes: Any) -> Desk:
 @pytest.fixture
 def following() -> Desk:
     return desk()
+
+
+def event_world(days_with: dict[date, list[int]]) -> World:
+    """The world where names ``i`` have the earnings reaction on a decision session. The listing
+    history is stored: an event schedule reads back before the first session (the dedupe)."""
+    w = with_listing_history(build_world(), DAYS[0] - timedelta(days=3))
+    for day, names in days_with.items():
+        w.write_reactions(day, {IDS[i]: 0 for i in names})
+    return w
+
+
+def event_changes(horizon: int = 2) -> dict[str, Any]:
+    """The edge document keys of an ``on_event:earnings_reaction`` edge over every name it finds."""
+    outcome = {
+        "kind": "excess_return", "horizon_sessions": [horizon], "benchmark": "SPY",
+        "start_offset_sessions": 1,
+    }  # fmt: skip
+    return {"schedule": "on_event:earnings_reaction", "top_k": "all", "outcome": outcome}

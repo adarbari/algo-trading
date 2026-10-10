@@ -16,11 +16,23 @@ S = anchor + offset and D = S - 1, so S = D + 1.
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
 
+from algotrade.config.edges.document import Edge
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.engines.selection.schedule import rebalance_sessions
+from algotrade.services.evaluation.cross_section.events import EventSchedule
+
+
+@dataclass(frozen=True)
+class Leg:
+    """One decision session D and its entry session S: the screen and the names are read at D,
+    the outcome rows of the partition at S."""
+
+    decision: date
+    entry: date
 
 
 def decision_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> list[date]:
@@ -89,3 +101,21 @@ def _spaced(candidates: Sequence[date], sessions: Sequence[date], horizon: int) 
         if not kept or position[day] - position[kept[-1]] >= horizon:
             kept.append(day)
     return kept
+
+
+def leg_blocks(
+    edge: Edge, events: EventSchedule | None, days: Sequence[date], horizon: int
+) -> list[list[Leg]]:
+    """The blocks of decision legs a horizon's windows are measured in: one leg per decision
+    session of a plain schedule (S = D + the offset), a block of the event days within one
+    horizon of its first for an event schedule (S = D + 1: the offset places D, not S). The
+    harness and the paper record both build their legs here: a paper trade is the backtest's leg."""
+    if events is None:
+        offset = edge.outcome.start_offset_sessions
+        return [[Leg(d, entry_session(d, offset))] for d in decision_sessions(
+            edge.schedule, days, horizon
+        )]  # fmt: skip
+    return [
+        [Leg(d, entry_session(d, 1)) for d in block]
+        for block in event_blocks(sorted(events.names), days, horizon)
+    ]
