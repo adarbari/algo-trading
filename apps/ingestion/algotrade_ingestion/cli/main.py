@@ -18,7 +18,8 @@
                               [--waive STEP --reason TEXT]
                               (no --date: catch up; a quiet no-op when up to date; a failed
                               session resumes; --force reruns every step; --waive accepts a
-                              step that cannot succeed, e.g. chains past their day: ADR 0039)
+                              step that cannot succeed, e.g. chains past their day: ADR 0039;
+                              the owner only, never a session or agent: hook guard_waive)
     algotrade-ingest report   [--date D] [--out report.html] [--send] [--max-examples N]
                               (the nightly summary email for a past session; read-only)
     algotrade-ingest arrivals [--sessions N]
@@ -185,7 +186,8 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
                 action="append",
                 default=[],
                 metavar="STEP",
-                help="with --date and --reason: accept STEP for that session without it "
+                help="OWNER ONLY (your own terminal; a hook blocks sessions and agents). "
+                "With --date and --reason: accept STEP for that session without it "
                 "succeeding (recorded in the run record); repeatable",
             )
             s.add_argument("--reason", help="why the --waive steps are accepted")

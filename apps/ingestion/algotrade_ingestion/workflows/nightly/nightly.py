@@ -18,7 +18,7 @@ step also re-runs when an optional input it does not need succeeds in a later at
 latest-only step (universe files, SEC,
 Cboe chains: sources that serve only the current snapshot) runs only for the last closed
 session; one that failed and whose session is no longer the latest FAILS as expired until it
-is waived by hand (``algotrade-ingest nightly --date D --waive STEP --reason ...``).
+is waived by the owner only (``algotrade-ingest nightly --date D --waive STEP --reason ...``).
 
 A step whose source has not published the latest session yet is WAITING, not FAILED, until its
 deadline (``[schedule] data_deadline``, ADR 0043; ``waits``): the session is WAITING, holds
@@ -344,7 +344,8 @@ def _not_latest(step: Step, before: Attempts, session: date) -> StepResult:
     if step.critical and step.name in before.tried:
         why = (
             "expired: the source serves only the current snapshot and this session is no "
-            "longer the latest; accept the gap with `algotrade-ingest nightly --date "
+            "longer the latest; only the owner can accept the gap, from their own terminal: "
+            "`algotrade-ingest nightly --date "
             f"{session.isoformat()} --waive {step.name} --reason ...`"
         )
         return _held(step, StepStatus.FAILED, why)
