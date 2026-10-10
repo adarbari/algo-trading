@@ -48,7 +48,7 @@ export function TestStep({ draft, onChange, trials, ready, saving, onSave }: Tes
             label={`${String(trials)} variants tried`}
             summary="on this edge so far"
           />
-          {help('edge_variants_tried')}
+          {help('variants_tried')}
         </Stack>
       )}
       <Stack direction="row" gap={2} wrap>

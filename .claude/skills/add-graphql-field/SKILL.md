@@ -113,6 +113,12 @@ copy (`docs/api/read-model.md` "Performance rules", ADR 0037 amendment).
 
 Verify: `make web-check` (or `cd apps/web && npm run check`).
 
+**Guide entry** (ADR 0051): a new `enum`, or a `String` field named like a status, state,
+kind, label, trigger or verdict, is declared in `architecture/guide_coverage.toml` with each
+value's Guide entry (`values_from` the Python tuple that lists them), or exempt with a reason
+(free text, admin-only); write a missing glossary term first (`.claude/skills/add-guide-content`).
+`tests/architecture/guide/` fails a new one undeclared.
+
 ## Step 7: finish
 
 `docs/api/read-model.md`: the object row if a field was added to it. If this PR retires a REST

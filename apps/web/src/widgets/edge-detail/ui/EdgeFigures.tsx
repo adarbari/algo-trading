@@ -7,9 +7,7 @@ import { OddsLine, Stack, StatStrip, Text, type StatItem } from '@algotrade/ui';
 import type { ReactNode } from 'react';
 
 import type { EdgeVerdict } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
-
-const term = (id: string) => <GuideHelp entry={{ kind: 'term', id }} />;
+import { termHelp } from '@/features/guide-help';
 
 function Labelled({ text, help }: { text: string; help: string }): ReactNode {
   return (
@@ -17,7 +15,7 @@ function Labelled({ text, help }: { text: string; help: string }): ReactNode {
       <Text size="xs" tone="muted">
         {text}
       </Text>
-      {term(help)}
+      {termHelp(help)}
     </Stack>
   );
 }

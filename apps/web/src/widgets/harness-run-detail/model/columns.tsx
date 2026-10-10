@@ -5,9 +5,7 @@
 import { Mono, StatusBadge, type DataTableColumn } from '@algotrade/ui';
 
 import { rowLabel, type HarnessLostInput, type HarnessRow } from '@/entities/harness-run';
-import { GuideHelp } from '@/features/guide-help';
-
-const term = (id: string) => <GuideHelp entry={{ kind: 'term', id }} />;
+import { termHelp } from '@/features/guide-help';
 const COUNT = { kind: 'number' } as const;
 const RATE = { kind: 'percent', digits: 1 } as const;
 const FIGURE = { kind: 'number', digits: 2 } as const;
@@ -54,7 +52,7 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     {
       id: 'trials',
       header: 'Variants tried',
-      headerAction: term('variants_tried'),
+      headerAction: termHelp('variants_tried'),
       value: (r) => r.trials ?? null,
       format: COUNT,
       align: 'end',
@@ -62,7 +60,7 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     {
       id: 'hitRate',
       header: 'Win rate',
-      headerAction: term('win_rate'),
+      headerAction: termHelp('win_rate'),
       value: (r) => r.hitRate ?? null,
       format: RATE,
       align: 'end',
@@ -70,7 +68,7 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     {
       id: 'baseRate',
       header: 'Base rate',
-      headerAction: term('base_rate'),
+      headerAction: termHelp('base_rate'),
       value: (r) => r.baseRate ?? null,
       format: RATE,
       align: 'end',
@@ -78,7 +76,7 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     {
       id: 'lift',
       header: 'Lift',
-      headerAction: term('lift'),
+      headerAction: termHelp('lift'),
       value: (r) => r.lift ?? null,
       format: FIGURE,
       align: 'end',
@@ -86,7 +84,7 @@ export function rowColumns(): DataTableColumn<HarnessRow>[] {
     {
       id: 'decile',
       header: 'Top vs bottom decile',
-      headerAction: term('top_vs_bottom_decile'),
+      headerAction: termHelp('top_vs_bottom_decile'),
       value: (r) => r.decileSpread ?? null,
       format: { kind: 'percent', digits: 2 },
       align: 'end',

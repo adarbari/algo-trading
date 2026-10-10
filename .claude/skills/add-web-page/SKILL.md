@@ -53,3 +53,8 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
 9. **Test:** unit tests next to each module; extend `e2e/smoke.spec.ts` (or add an e2e spec)
    for the route. Run `make changed`, then push: CI is the full gate. Every lint message names its rule
    and the fix.
+10. **Guide entry** (ADR 0051, `.claude/skills/add-guide-content`): a new section gets a Start
+   here page (`config/site/guide/start.toml`) declared as its `[[section]]` in
+   `architecture/guide_coverage.toml`; every titled `Panel` / `Section` passes `actions` with its help button
+   (`GuideHelp` or `termHelp`); every new word the page shows (a status, a verdict, a control)
+   is a glossary term. `tests/architecture/guide/` fails until they are; its baselines only shrink.

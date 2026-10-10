@@ -56,6 +56,15 @@ def changed_files(base: str) -> list[str]:
     return sorted(set(committed) | set(untracked))
 
 
+# What the Guide coverage test reads (architecture/guide_coverage.toml is under architecture/).
+GUIDE_SOURCES = ("apps/web/src/", "apps/api/schema.graphql", "config/site/guide/")
+GUIDE_FITNESS = "tests/architecture/guide"
+FITNESS_BY_PREFIX = (
+    (("apps/web/", "architecture/web_"), WEB_FITNESS),
+    (GUIDE_SOURCES, GUIDE_FITNESS),
+)
+
+
 def _on_disk(path: str) -> bool:
     return (REPO / path).exists()
 
@@ -70,8 +79,7 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
             paths.update(p for p in SITE_CONFIG_TESTS if present(p))
         if name.startswith(CATALOGUE_SOURCES):
             paths.update(p for p in CATALOGUE_TESTS if present(p))
-        if name.startswith("apps/web/") or name.startswith("architecture/web_"):
-            paths.add(WEB_FITNESS)
+        paths.update(test for prefixes, test in FITNESS_BY_PREFIX if name.startswith(prefixes))
         if not name.endswith(".py"):
             continue
         if name.startswith("tests/"):

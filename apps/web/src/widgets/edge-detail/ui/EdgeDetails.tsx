@@ -18,11 +18,9 @@ import {
 } from '@algotrade/ui';
 
 import { verdictLabel, type Edge, type VerdictCriterion } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 import { criterionColumns } from '../model/columns';
-
-const term = (id: string) => <GuideHelp entry={{ kind: 'term', id }} />;
 
 const BY_LEVEL: DataTableGroupBy<VerdictCriterion> = {
   getGroup: (c) => c.level,
@@ -56,13 +54,13 @@ function Backtests({ edge }: { edge: Edge }) {
             {run.runId === edge.canonicalRun?.runId && (
               <>
                 <StatusBadge tone="info">Official result</StatusBadge>
-                {term('official_result')}
+                {termHelp('official_result')}
               </>
             )}
             {run.exploratory && (
               <>
                 <StatusBadge tone="warning">EXPLORATORY</StatusBadge>
-                {term('exploratory')}
+                {termHelp('exploratory')}
               </>
             )}
             {run.trialsCounted != null && (
@@ -103,7 +101,7 @@ export function EdgeDetails({ edge }: EdgeDetailsProps) {
         <Stack gap={2}>
           <Stack direction="row" gap={1} align="center">
             <Heading level={3}>Backtests</Heading>
-            {term('variants_tried')}
+            {termHelp('variants_tried')}
           </Stack>
           <Backtests edge={edge} />
         </Stack>
