@@ -1,0 +1,149 @@
+# Directory layout registry (ADR 0020), continued: the config/ and docs/ folders
+# ([[config_dir]], [[docs_dir]]).
+# The rules, the field meanings and the shared settings are in architecture/layout.toml; the
+# readers merge every architecture/layout*.toml (scripts/layout_report.py read_layout).
+
+# --------------------------------------------------------------------------- config (config/)
+# Every config/site/*.toml is loaded by the one settings loader (config/site/settings.py;
+# tests/architecture/test_layout_buckets.py) and every key in it is read by code
+# (tests/architecture/test_ownership.py::test_every_site_setting_key_is_read_by_code).
+
+[[config_dir]]
+path = "config"
+purpose = "configuration by layer: site/ (L3, reviewed via PR) and users/ (L4, local); no files of its own"
+
+[[config_dir]]
+path = "config/site"
+purpose = "L3 site settings: one <name>.toml per settings group, each loaded by config/site/settings.py"
+
+[[config_dir]]
+path = "config/site/field_guide"
+purpose = "L3 field guide, one <theme>.toml per theme plus situations.toml: how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+
+[[config_dir]]
+path = "config/site/features"
+purpose = "L3 expression features, one <theme>.toml per theme in the subfolder of its kind (loaded by config/site/settings.py load_features through the config store, one level of subfolders; a theme name is unique across them; ADR 0023 step 3); the 12-file cap applies per subfolder; scores/ (ED7: edge_scores.toml, written by fit-edge-scorer, ADR 0053) is added with its first file"
+
+[[config_dir]]
+path = "config/site/features/technical"
+purpose = "expression features of the chart: bands.toml (bands, channels, z-scores, regression trend), price.toml (price statistics, relative strength), swing.toml (swing levels, candles, momentum), volume.toml (volume dry-ups, accumulation)"
+
+[[config_dir]]
+path = "config/site/features/options"
+purpose = "expression features of options and volatility: earnings.toml (events against expiries), positioning.toml (skew, flow, term structure), volatility.toml (IV against HV, IV rank), vrp.toml (the VRP scanner), wings.toml (the covered-call wing)"
+
+[[config_dir]]
+path = "config/site/features/company"
+purpose = "expression features of the company and its tradability: fundamentals.toml (ratios over fundamentals and dividends), liquidity.toml (the liquidity class)"
+
+[[config_dir]]
+path = "config/site/features/market"
+purpose = "expression features of the market entity: regime.toml (the context signals of the market regime, ADR 0047)"
+
+[[config_dir]]
+path = "config/site/edges"
+purpose = "edge documents, one <id>.toml per edge: thesis, mechanism, persistence, outcome, schedule, universe, the screeners that implement it, status and the quality-bar answers (typed by src/algotrade/config/edges; ADR 0053); rendered to docs/edges.md by make features-doc"
+
+[[config_dir]]
+path = "config/site/studies"
+purpose = "research-study settings, one <name>.toml per study: winners.toml, the ED6 winners study's outcome window, grid, winner and control definitions, discovery thresholds and gate (typed by src/algotrade/config/edges/winners.py; ADR 0053 amendment 2026-10-09)"
+
+[[config_dir]]
+path = "config/site/events"
+purpose = "event-sensitivity track settings: the scope list of names the event study runs for and the registry of macro releases it calendars (ADR 0050)"
+
+[[config_dir]]
+path = "config/site/guide"
+purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), glossary.toml (the app's words and the rule grammar, [[term]]), start.toml (the numbered Start here pages, [[page]]); the playbook prose in playbooks/"
+
+[[config_dir]]
+path = "config/site/guide/playbooks"
+purpose = "the Guide's playbook prose (ADR 0051), one subfolder per playbook family of config/site/guide/sections.toml (the 12-file cap per folder), one <id>.toml per site rule-screen preset in its family's folder: summary, what a hit looks like, what it does not check, the caveats before acting, related playbooks, sources and what each criterion asks (loaded by config/site/guide/playbooks.py, one level of subfolders; fitness tests: one per preset, in its family's folder, asks match the latest version)"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/trend"
+purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/breakouts"
+purpose = "the Guide's playbooks of the breakout family (range breakout, breakout, failed breakout): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/reversals"
+purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/income"
+purpose = "the Guide's playbooks of the option income family (VRP scanner): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/events"
+purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/regime"
+purpose = "regime track reference data: the crash episodes, the NBER recession chronology and the plain-language indicator cards (ADR 0047)"
+
+[[config_dir]]
+path = "config/site/presets"
+purpose = "site presets by kind (no files of its own)"
+
+[[config_dir]]
+path = "config/site/presets/selections"
+purpose = "named selection presets (typed Selection documents) strategies and screeners reuse"
+
+[[config_dir]]
+path = "config/site/presets/strategies"
+purpose = "strategy and screener presets: kind, impl, params, selection, schedule"
+
+[[config_dir]]
+path = "config/site/presets/screeners"
+purpose = "rule-screen presets (ADR 0029): one folder per preset id, no files of its own"
+
+[[config_dir]]
+path = "config/site/presets/screeners/*"
+purpose = "one rule-screen preset's immutable versions v<N>.toml (sha256-locked in architecture/preset_versions.toml)"
+
+[[config_dir]]
+path = "config/site/overrides"
+purpose = "curated CSV overrides read by the settings loader (e.g. leveraged_etfs.csv)"
+
+[[config_dir]]
+path = "config/users"
+purpose = "L4 user configs, one folder per user (git-ignored local state: not checked)"
+local = true
+
+# --------------------------------------------------------------------------- docs (docs/)
+
+[[docs_dir]]
+path = "docs"
+purpose = "cross-cutting docs: architecture, roadmap, configuration, testing, hosting, trading pitfalls"
+
+[[docs_dir]]
+path = "docs/api"
+purpose = "the API's read contract: the read model, GraphQL conventions, what stays REST, the read-model migration plan"
+
+[[docs_dir]]
+path = "docs/adr"
+purpose = "architecture decision records: numbered, append-only (never moved or renumbered)"
+kind = "log"
+
+[[docs_dir]]
+path = "docs/data"
+purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue and field guide (both generated), options positioning, swing levels"
+
+[[docs_dir]]
+path = "docs/data/field-guide"
+purpose = "the field guide, one generated page per theme (make features-doc from config/site/field_guide/; the index is docs/data/field-guide.md)"
+
+[[docs_dir]]
+path = "docs/screeners"
+purpose = "one page per screener, and the screener index"
+
+[[docs_dir]]
+path = "docs/perf"
+purpose = "measured performance baselines (generated by scripts/perf/, e.g. the per-API latency table)"
+
+[[docs_dir]]
+path = "docs/ui"
+purpose = "the web UI: frontend architecture (layers, rules) and the design system"

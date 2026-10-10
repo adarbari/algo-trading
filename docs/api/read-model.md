@@ -7,7 +7,7 @@ values). Skills: `.claude/skills/add-domain-object`, `.claude/skills/add-graphql
 
 **What exists now (the track is complete: read-model PRs 1-10b).** The decisions, this spec, the packages
 `src/algotrade/services/read/{,instruments,screens,ops}` and
-`apps/api/algotrade_api/graphql/{,types}` (declared in `architecture/layout.toml`, guarded by
+`apps/api/algotrade_api/graphql/{,types}` (declared in `architecture/layout*.toml`, guarded by
 two import-linter contracts), the ownership entries, the REST GET allow-list
 (`architecture/rest_allowlist.toml`) and the web derivation list
 (`architecture/web_forbidden_derivations.toml`), and the `strawberry-graphql[fastapi]`

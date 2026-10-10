@@ -18,8 +18,12 @@ CASES = [
         for p in sorted(ARCH.glob("*_ownership.toml"))
         if p.name != "web_ownership.toml"
     ),
-    ("layout.toml", "dir"),
-    ("tests_layout.toml", "test_dir"),
+    *(
+        (p.name, table)
+        for p in sorted(ARCH.glob("layout*.toml"))
+        for table in ("dir", "test_dir")
+        if table in tomllib.loads(p.read_text())
+    ),
     ("web_layout.toml", "web_dir"),
 ]
 

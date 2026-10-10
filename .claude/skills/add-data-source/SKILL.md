@@ -24,11 +24,11 @@ names, request keys, response fields) inside `sources/vendors/<vendor>/`; never 
 `src/algotrade/config/site/settings.py`. Look these up in `architecture/*_ownership.toml`; `make ownership`
 must pass with `architecture/known_violations.toml` still empty.
 
-0. **Where it goes:** `libs/sources/algotrade_sources/vendors/<vendor>/` (new folder, covered by the `vendors/*` entry) (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
+0. **Where it goes:** `libs/sources/algotrade_sources/vendors/<vendor>/` (new folder, covered by the `vendors/*` entry) (`grep -n purpose architecture/*layout*.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Location:** a new folder `libs/sources/algotrade_sources/vendors/<vendor>/`
    with an `__init__.py` docstring naming the vendor, and one module per dataset it serves
    (e.g. `bars.py`); shared auth / paging goes in `client.py` (see `vendors/massive/`). The
-   folder is covered by the `libs/sources/algotrade_sources/vendors/*` entry in `architecture/layout.toml`
+   folder is covered by the `libs/sources/algotrade_sources/vendors/*` entry in `architecture/layout*.toml`
    (`tests/architecture/test_layout.py`): it must register at least one source (step 5), only
    `sources/framework/registry.py` may import it, and vendors never import each other (an
    import-linter independence contract: add the new folder to it in `pyproject.toml`).

@@ -58,7 +58,7 @@ Non-obvious: the expression language is `features/expressions/`, definitions are
 (consumers never import `storage.tables.readers`).
 
 ## Directory layout (ADR 0020; enforced by `tests/architecture/test_layout*.py`, `make layout`)
-One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
+One folder holds one kind of thing. `architecture/layout*.toml` (split by kind) declares every dir under
 `src/`, `libs/`, `apps/`, `tests/`, `config/` and `docs/` with its purpose and rules; a new folder (or
 a file in an undeclared one) fails CI until it is declared there in the same PR. At most 10
 modules per code or test folder and 12 files per config / docs folder (split by kind; no
@@ -70,7 +70,7 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/libs/sources/<path>
 `apps/ingestion/algotrade_ingestion/<path>`); shared test builders live in `tests/helpers/`
 (vendor payloads in `tests/helpers/payloads/`), recorded data in `tests/fixtures/`.
 
-**Where does this go?** `grep -n purpose architecture/*layout.toml` (every folder, with its
+**Where does this go?** `grep -n purpose architecture/*layout*.toml` (every folder, with its
 purpose). The non-obvious cases:
 
 | Kind of code | Folder |
@@ -84,7 +84,7 @@ purpose). The non-obvious cases:
 | A REST write, job, live or file endpoint | `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`); a Builder dry run (preview POST) in `src/algotrade/services/preview/` |
 | Web: component / page / feature | see Web UI below and `docs/ui/architecture.md` |
 
-**If nothing fits, add a new folder for the new kind**: declare it in `architecture/layout.toml`
+**If nothing fits, add a new folder for the new kind**: declare it in its kind's `architecture/layout*.toml`
 with a purpose (+ `contracts` if an import-linter rule guards it), give it an `__init__.py`
 docstring, and mirror it in tests. Never park code in a neighbouring folder
 (`.claude/skills/add-responsibility`). A folder at its cap: split it by kind first.
