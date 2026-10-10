@@ -195,7 +195,7 @@ the skill with the fix.
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
-runs its own `npm ci`); `source` that file; `--remove` cleans up one, `--prune-merged` removes the worktrees of merged PRs
+runs its own `npm ci`); `source` that file; **The main checkout stays on `main`**: every session and agent branch lives in a `scripts/worktree.sh` worktree; never `git checkout -b` / `switch` there (auto-deploy refuses off main; hook `scripts/ops/guard_main_checkout.py`). `--remove` cleans up one, `--prune-merged` removes the worktrees of merged PRs
 (leftovers filled the disk 2026-10-06; `make doctor` warns). Never symlink `node_modules`
 to main's: `make check`'s `npm ci` through the link empties main's. **Never `uv sync` /
 `make install` in a worktree** (agent worktrees too): through the `.venv` link it points the

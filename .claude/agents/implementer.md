@@ -14,8 +14,8 @@ Before writing:
 - Confirm the owner in `architecture/*_ownership.toml` and the folder in
   `architecture/layout.toml` with a grep. Extend the owner; never re-implement it.
 
-Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`) when the
-main checkout is busy; never `--no-verify` / `SKIP=`. In any worktree (yours under
+Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`), always: never
+create, switch or commit on a branch in the main checkout — the launchd API, nightly and auto-deploy run from it, and `deploy.sh` refuses while it is off `main` (2026-10-10: a branch left there blocked deploys for 8 h; #460-#463 never went live); never `--no-verify` / `SKIP=`. In any worktree (yours under
 `.claude/worktrees/` too) never run `uv sync`, `uv run` or `make install`: `.venv` is the
 main checkout's, and syncing it points the owner's nightly and API at your branch. Run code
 through `source worktree.env` (its `PYTHONPATH`; `scripts/worktree.sh` already links `.venv`); a dependency change is `uv lock` plus the PR, installed in the main

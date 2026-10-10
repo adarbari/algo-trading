@@ -392,6 +392,16 @@ def check_worktrees(p: Probes) -> Result:
     )
 
 
+def _last_blocked(main: Path) -> str:
+    """The last BLOCKED line of the deploy log, as ``; last: <line>`` (empty when none)."""
+    try:
+        lines = (main / "var" / "logs" / "deploy.log").read_text().splitlines()
+    except OSError:
+        return ""
+    blocked = [x for x in lines if "BLOCKED" in x]
+    return f"; last: {blocked[-1]}" if blocked else ""
+
+
 def check_main_checkout(p: Probes) -> list[Result]:
     """The main checkout is what the API and the nightly run: it belongs on ``main`` at
     ``origin/main`` (`scripts/ops/deploy.sh` moves it), and its committed site config is clean
@@ -407,7 +417,9 @@ def check_main_checkout(p: Probes) -> list[Result]:
             Result(
                 WARN,
                 "main checkout",
-                f"on {branch or 'an unknown branch'}, not main (the API and the nightly run it)",
+                f"on {branch or 'an unknown branch'}, not main (the API and the nightly run it; "
+                "deploy.sh refuses while it is off main, so auto-deploy is blocked)"
+                + _last_blocked(main),
                 f"cd {main} && git switch main",
             )
         )
