@@ -17,6 +17,7 @@ from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.workflows.nightly import nightly as nightly_module
 from algotrade_ingestion.workflows.nightly.nightly import (
+    EDGE_EVAL,
     EDGE_SIGNALS,
     FINALLY,
     NIGHTLY,
@@ -49,7 +50,7 @@ def others_fake(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every nightly task but the IBKR ones is a fake that completes; no acceptance checks."""
     monkeypatch.setattr(nightly_module, "NIGHTLY", tuple(replace(s, accept=()) for s in NIGHTLY))
     for step in (*NIGHTLY, *FINALLY):
-        if step.name not in (SCREENS, EDGE_SIGNALS, *IBKR_STEPS):
+        if step.name not in (SCREENS, EDGE_SIGNALS, EDGE_EVAL, *IBKR_STEPS):
             spec = registry.TASKS[step.name]
             fake = replace(spec, run=_complete(step.name), sources=(), skip=None)
             monkeypatch.setitem(registry.TASKS, step.name, fake)

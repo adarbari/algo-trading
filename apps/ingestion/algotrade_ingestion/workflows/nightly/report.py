@@ -185,6 +185,8 @@ def _counts(name: str, result: Any) -> tuple[tuple[str, Any], ...]:
         return (("screens", len(result.get("screens", []))),)
     if name == "edge-signals":
         return (("users", len(result.get("signals", []))),)
+    if name == "edge-eval":
+        return (("edges", len(result.get("evaluations", []))),)
     rollups = [v for k, v in result.items() if "@" in k and isinstance(v, Mapping)]
     if rollups:
         return (("rollups", len(rollups)), ("rows", sum(int(v.get("rows", 0)) for v in rollups)))

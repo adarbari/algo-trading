@@ -2,17 +2,21 @@
 without an optional source's table is a warning on the step, never its failure (ADR 0055)."""
 
 from collections.abc import Mapping
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from algotrade.config.edges.document import job_name
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.jobs import JobRecord, JobStatus
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.locks import held
+from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly import screens as screens_module
-from algotrade_ingestion.workflows.nightly.nightly import EDGE_SIGNALS, NIGHTLY
+from algotrade_ingestion.workflows.nightly.nightly import EDGE_EVAL, EDGE_SIGNALS, NIGHTLY
 from algotrade_ingestion.workflows.nightly.steps import StepStatus
 
 D = date(2026, 10, 2)
@@ -125,3 +129,110 @@ def test_a_failed_edge_signals_job_fails_the_step_naming_the_user(
 def test_the_edge_signals_step_is_optional_and_waits_for_screens_only() -> None:
     step = next(s for s in NIGHTLY if s.name == EDGE_SIGNALS)
     assert not step.critical and step.needs == ("screens",) and step.latest_only
+
+
+MONDAY, TUESDAY, WEDNESDAY = date(2026, 10, 5), date(2026, 10, 6), date(2026, 10, 7)
+STORED = [date(2026, 8, 3), date(2026, 9, 30)]
+
+
+def _edges(monkeypatch: pytest.MonkeyPatch, *edges: tuple[str, str, str, bool]) -> None:
+    """Edges as (id, owner, status, has screeners) and stored outcomes from August."""
+    docs = [
+        SimpleNamespace(id=i, owner=o, status=st, screeners=("momo",) if has else (), baselines=())
+        for i, o, st, has in edges
+    ]
+    monkeypatch.setattr(screens_module, "load_all_edges", lambda configs: docs)
+    monkeypatch.setattr(screens_module, "stored_outcome_sessions", lambda reader: STORED)
+
+
+def _audited(backend: MemoryBackend, edge: str, owner: str, day: date, mode: str = "audit") -> None:
+    """An evaluation run of the edge started on ``day`` in ``mode``."""
+    start = datetime(day.year, day.month, day.day, 22, tzinfo=UTC)
+    run = RunRecord("r-" + edge + day.isoformat(), job_name(edge, owner), STORED[-1], start)
+    backend.runs.save(run.finish(start, stats={"mode": mode}))
+
+
+def _eval_step(jobs: SignalJobs, session: date, backend: MemoryBackend | None = None) -> Any:
+    step = screens_module.edge_eval_jobs(jobs, MemoryConfigStore({}), None, backend)  # type: ignore[arg-type]
+    return step(session)
+
+
+def test_edge_eval_audits_until_the_week_has_an_audit_then_is_incremental(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _edges(monkeypatch, ("drift", "site", "evidenced", True), ("mine", "alice", "live", True))
+    backend = MemoryBackend()
+    _audited(backend, "drift", "site", MONDAY)  # only the site edge was audited this week
+    _audited(backend, "mine", "alice", MONDAY - timedelta(days=3))  # last week's does not count
+    jobs = SignalJobs()
+    assert _eval_step(jobs, WEDNESDAY, backend).status is StepStatus.SUCCEEDED
+    assert [(k, u, p["edge"], p["mode"], f) for k, u, p, f in jobs.asked] == [
+        ("edge-eval", "site", "drift", "incremental", True),
+        ("edge-eval", "alice", "mine", "audit", True),
+    ]
+    params = jobs.asked[0][2]
+    assert (params["start"], params["end"], params["trigger"]) == (
+        "2026-08-03", "2026-09-30", "nightly"
+    )  # fmt: skip
+
+
+def test_a_catch_up_night_over_monday_and_tuesday_audits_on_tuesday(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The step is latest-only: Monday's night did not run it, so Tuesday's is the week's audit,
+    and once an audit is on record the next night is incremental."""
+    _edges(monkeypatch, ("drift", "site", "evidenced", True))
+    backend = MemoryBackend()
+    tuesday, wednesday = SignalJobs(), SignalJobs()
+    _eval_step(tuesday, TUESDAY, backend)
+    _audited(backend, "drift", "site", TUESDAY)  # what the audit job recorded
+    _eval_step(wednesday, WEDNESDAY, backend)
+    assert tuesday.asked[0][2]["mode"] == "audit"
+    assert wednesday.asked[0][2]["mode"] == "incremental"
+
+
+def test_edge_eval_skips_closed_edges_and_edges_without_screeners(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _edges(
+        monkeypatch,
+        ("open", "site", "researching", True),
+        ("done", "site", "rejected", True),
+        ("stuck", "site", "blocked", True),
+        ("empty", "site", "researching", False),
+    )
+    jobs = SignalJobs()
+    _eval_step(jobs, WEDNESDAY)
+    assert [p["edge"] for _, _, p, _ in jobs.asked] == ["open"]
+
+
+def test_edge_eval_with_nothing_to_evaluate_is_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    _edges(monkeypatch, ("done", "site", "rejected", True))
+    assert _eval_step(SignalJobs(), WEDNESDAY).status is StepStatus.SKIPPED
+
+
+def test_a_failed_edge_eval_job_fails_the_step_without_holding_the_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _edges(monkeypatch, ("drift", "site", "evidenced", True), ("mine", "alice", "live", True))
+    step = _eval_step(SignalJobs(("alice",)), MONDAY)
+    assert step.status is StepStatus.FAILED
+    assert step.reason == "edge evaluations not complete: alice/mine failed"
+    assert [e["status"] for e in step.result["evaluations"]] == ["complete", "failed"]  # all ran
+    declared = next(s for s in NIGHTLY if s.name == EDGE_EVAL)
+    assert not declared.critical and declared.latest_only
+    assert declared.needs == ("outcomes", "screens")
+
+
+def test_an_owner_with_an_evaluation_in_flight_is_a_busy_warning_not_a_crash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _edges(monkeypatch, ("drift", "site", "evidenced", True), ("mine", "alice", "live", True))
+    backend, jobs = MemoryBackend(), SignalJobs()
+    with held(backend.lock("edge-eval:alice")):  # another process is claiming alice's slot
+        step = _eval_step(jobs, WEDNESDAY, backend)
+    assert step.status is StepStatus.SUCCEEDED
+    assert [p["edge"] for _, _, p, _ in jobs.asked] == ["drift"]  # alice's was not submitted
+    assert [e["status"] for e in step.result["evaluations"]] == ["complete", "busy"]
+    (warning,) = step.checks
+    assert warning["name"] == "edge_eval_busy" and warning["detail"].startswith("mine:")

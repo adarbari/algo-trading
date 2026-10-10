@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.edges.document import job_name
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data import StoreReader
@@ -289,6 +290,32 @@ def test_edge_eval_handler_is_incremental_by_default_and_full_on_request() -> No
     assert second.result["mode"] == "incremental"
     bad = run(as_of=later[2], mode="sometimes")
     assert bad.status is JobStatus.FAILED and "unknown edge-eval mode" in (bad.error or "")
+    runner.shutdown()
+
+
+def test_edge_eval_audit_passes_on_stored_legs_and_fails_naming_missing_ones() -> None:
+    w = build_world()
+    configs = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "momo"): screen(),
+            ("site", "edges", "drift"): edge_document(),
+        }
+    )
+    runner = LocalJobRunner(
+        MemoryRuns(),
+        LIBRARY_HANDLERS,
+        {"reader": w.reader, "writer": w.results, "configs": configs},
+    )
+    params = {"edge": "drift", "start": DAYS[0].isoformat(), "end": DAYS[-1].isoformat()}
+    params |= {"as_of": AS_OF.isoformat(), "mode": "audit"}
+    first = runner.wait(runner.submit("edge-eval", params, USER))
+    # nothing stored yet: every leg differs, is published, and the job fails naming them
+    assert first.status is JobStatus.FAILED
+    assert "momo" in (first.error or "") and "not stored" in (first.error or "")
+    again = runner.wait(runner.submit("edge-eval", params, USER, force=True))
+    assert again.status is JobStatus.COMPLETE, again.error  # the legs stored now agree
+    assert {r.stats["mode"] for r in w.results.runs_for(job_name("drift", "alice"))} == {"audit"}
     runner.shutdown()
 
 
