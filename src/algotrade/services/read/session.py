@@ -2,8 +2,9 @@
 none) into one ``Session``, and ``grain_of`` says how a table is read for it.
 
 Requested given: that date, even if nothing is stored for it (every value is then UNKNOWN).
-None: the latest session whose nightly workflow is complete (ADR 0062: its latest ``nightly``
-run record is COMPLETE, i.e. SUCCEEDED, a waived step included, and it has a ``bars/1d``
+None: the latest session whose nightly workflow is complete (ADR 0062: a ``nightly``
+run record is done by ``storage.runs.done_sessions``, the rule the ingestion planner uses:
+COMPLETE, a waived step included, or PARTIAL from before ADR 0039; and it has a ``bars/1d``
 partition); the newer sessions still processing or failing are disclosed (``Session.newer``),
 never mixed in. No session complete yet (an empty run history): the latest ``bars/1d``
 partition (flagged: ``complete`` is False); no bars: the latest reference snapshot; an empty
@@ -26,7 +27,7 @@ from algotrade.data.funds.holdings import TABLE as HOLDINGS_TABLE
 from algotrade.data.reference import IBKR_CONTRACTS, UNIVERSE_TABLE, snapshot
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
-from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus, done_sessions
 from algotrade.storage.tables.schemas import SCHEMA_VERSION
 
 BARS = "bars/1d"
@@ -181,32 +182,47 @@ def _nightly_by_session(reader: StoreReader) -> dict[dt.date, RunRecord]:
     return latest
 
 
-# A newer session's record in one of these states is still going (or has bars without its own
-# workflow having failed); any other state (FAILED, or PARTIAL before ADR 0039) is a failure.
-_GOING = (RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.WAITING, RunStatus.COMPLETE)
-
-
 def _newer(day: dt.date, record: RunRecord | None) -> NewerSession:
-    if record is not None and record.status not in _GOING:
+    if record is not None and record.status is RunStatus.FAILED:
         return NewerSession(day, NewerState.FAILED_RETRYING, UnavailableKind.SYSTEM)
     return NewerSession(day, NewerState.IN_PROGRESS)
 
 
-def last_complete(
-    reader: StoreReader,
-) -> tuple[dt.date | None, NewerSession | None]:
-    """The latest session whose nightly workflow is complete (its latest ``nightly`` record
-    COMPLETE: every critical step SUCCEEDED or was waived by hand; PARTIAL, FAILED, WAITING and
-    running are not) with a ``bars/1d`` partition, and the newest session after it that is not
-    (it has bars or a record). ``(None, None)``: no session is complete (ADR 0062)."""
-    records = _nightly_by_session(reader)
+@dataclass(frozen=True)
+class Completeness:
+    """What the nightly's run records say about the sessions with bars: ``complete`` (the done
+    ones, by ``storage.runs.done_sessions``), ``last`` the latest of them (None: none) and
+    ``newer`` the newest session after it that is not (it has bars or a record)."""
+
+    complete: frozenset[dt.date]
+    last: dt.date | None
+    newer: NewerSession | None
+
+
+def completeness(reader: StoreReader) -> Completeness:
+    """The sessions whose nightly workflow is complete (ADR 0062): done by the one rule the
+    ingestion planner uses (any record COMPLETE, a waived step included, or PARTIAL from before
+    ADR 0039) and with a ``bars/1d`` partition; FAILED, WAITING and running ones are not."""
+    records = reader.runs(NIGHTLY)
     bar_days = set(reader.dates(BARS))
-    done = [d for d, r in records.items() if r.status is RunStatus.COMPLETE and d in bar_days]
+    done = frozenset(done_sessions(records) & bar_days)
     if not done:
-        return None, None
-    day = max(done)
-    later = sorted(d for d in bar_days | set(records) if d > day)
-    return day, _newer(later[-1], records.get(later[-1])) if later else None
+        return Completeness(done, None, None)
+    last = max(done)
+    latest: dict[dt.date, RunRecord] = {}
+    for record in records:
+        held = latest.get(record.session_date)
+        if held is None or record.started_at > held.started_at:
+            latest[record.session_date] = record
+    later = sorted(d for d in bar_days | set(latest) if d > last)
+    return Completeness(done, last, _newer(later[-1], latest.get(later[-1])) if later else None)
+
+
+def default_session(reader: StoreReader) -> dt.date | None:
+    """The session a read or an on-request run with no date serves: the latest complete one
+    (ADR 0062); none complete: the latest ``bars/1d`` partition, else the latest reference
+    snapshot; None on an empty store. The one default, beside ``resolve_session``."""
+    return completeness(reader).last or latest_session(reader)
 
 
 def resolve_session(
@@ -215,10 +231,9 @@ def resolve_session(
     """The session a read for ``requested`` serves (see the module docstring). ``expected``:
     the session-grain tables checked for ``present`` / ``missing`` (tests pass their own)."""
     bars = snapshot(reader, BARS)
-    latest_reference = snapshot(reader, REFERENCE_TABLE)
-    latest = bars or latest_reference
-    complete_day, newer = last_complete(reader)
-    default = complete_day or (latest.snapshot_date if latest is not None else None)
+    found = completeness(reader)
+    default = found.last or latest_session(reader)
+    newer = found.newer
     if requested is not None:
         day, newer = requested, None
     elif default is not None:
@@ -238,6 +253,6 @@ def resolve_session(
         present=present,
         missing=missing,
         unavailable=unavailable_tables(missing, day),
-        complete=day == complete_day,
+        complete=day in found.complete,
         newer=newer,
     )

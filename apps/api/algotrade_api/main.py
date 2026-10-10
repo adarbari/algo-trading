@@ -50,6 +50,7 @@ from algotrade.services.read.context import (
     limit_threads,
     open_context,
     open_stores,
+    served_session,
 )
 from algotrade.services.text_model.model import TextModel
 from algotrade_api import __version__
@@ -58,7 +59,7 @@ from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.graphql.offload import OverloadedError
-from algotrade_api.graphql.response_cache import CountWrites, WriteEpoch
+from algotrade_api.graphql.response_cache import CountWrites, WriteEpoch, served_token
 from algotrade_api.graphql.schema import graphql_router, sdl
 from algotrade_api.graphql.warm import CacheWarmer
 from algotrade_api.live import no_live, open_live
@@ -245,6 +246,7 @@ def create_app(
             app.state.store.reader.visible_seq,
             epoch,
             runs=app.state.store.reader.runs_generation,
+            served=_served(app.state.store, cache),
         ),
         dependencies=caller,
     )
@@ -266,6 +268,19 @@ def _reads(
     published state, and on the user where the result is the user's; room for the session,
     the descriptions, the universe and a few table orders)."""
     return partial(open_context, store.reader, store.configs, cache=cache)
+
+
+def _served(store: ReadStore, cache: ResultCache) -> Callable[[], str]:
+    """The response cache's token of the session a read with no date serves (ADR 0062); an
+    empty store has none."""
+
+    def token() -> str:
+        try:
+            return served_token(served_session(store.reader, cache))
+        except NotFoundError:
+            return "empty"
+
+    return token
 
 
 def _stores(store: ReadStore, cache: ResultCache) -> Callable[[UserContext], StoreContext]:

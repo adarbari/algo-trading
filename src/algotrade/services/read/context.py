@@ -57,6 +57,7 @@ __all__ = [
     "partition_on",
     "previous_session",
     "run_partition",
+    "served_session",
     "snapshot_on",
     "stored_dates",
 ]
@@ -283,6 +284,13 @@ def _session(reader: StoreReader, requested: date | None, cache: ResultCache) ->
     key = ("session", requested, reader.own_run, reader.visible_seq(), reader.runs_generation())
     session: Session = cache.get_or_compute(key, lambda: resolve_session(reader, requested))
     return session
+
+
+def served_session(reader: StoreReader, cache: ResultCache) -> Session:
+    """The session a read with no date serves now (resolved once per publish and saved run
+    record, shared with ``open_context``); ``NotFoundError`` on an empty store. For the API's
+    response cache key (ADR 0062)."""
+    return _session(reader, None, cache)
 
 
 def previous_session(ctx: ReadContext, table: str) -> date | None:

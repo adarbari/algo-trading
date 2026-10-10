@@ -8,6 +8,7 @@ the job runner (``services/jobs``) build on the same record.
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
@@ -66,6 +67,14 @@ class RunRecord:
             items=data["items"],
             stats=data["stats"],
         )
+
+
+def done_sessions(records: Iterable[RunRecord]) -> set[date]:
+    """The sessions ``records`` finished: any record COMPLETE (SUCCEEDED, waived steps included)
+    or PARTIAL (written before ADR 0039) counts; FAILED, WAITING and unfinished ones do not. The
+    one rule of "a session is done": the nightly planner (``last_finished_session``) and the
+    read side's last complete session (ADR 0062) both use it."""
+    return {r.session_date for r in records if r.status in (RunStatus.COMPLETE, RunStatus.PARTIAL)}
 
 
 def new_run_id(job: str, session_date: date, now: datetime) -> str:

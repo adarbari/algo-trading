@@ -15,13 +15,15 @@ completed, reads serve the last complete session and say so; failed steps are re
 nightly already retries hourly), never waived to unblock.
 
 ## Decision
-1. **The default session is the latest session whose nightly workflow is complete.** A session
-   is complete when its latest `nightly` run record (by start time) is `COMPLETE` (SUCCEEDED:
-   every critical step SUCCEEDED or was waived by hand; an optional step's failure does not
-   count) and it has a `bars/1d` partition. PARTIAL (records written before 0039), FAILED,
-   WAITING and RUNNING are not complete. The check reads run records through the store reader,
-   in `services/read/session.py` (`last_complete`); the read side never imports the ingestion
-   app.
+1. **The default session is the latest session whose nightly workflow is complete**, by the
+   one rule the ingestion planner already uses (`sessions.last_done` -> `run.last_finished_session`):
+   a session is done when **any** of its `nightly` run records is COMPLETE (SUCCEEDED; a step
+   waived by hand counts, as 0039 says) or PARTIAL (records written before 0039). FAILED, WAITING
+   and unfinished records are not done. The rule is written once, `storage.runs.done_sessions`
+   (owner `run-records`); the planner and `services/read/session.py` (`completeness`) both call
+   it, so they cannot disagree, and the planner's behaviour is unchanged. The session also needs
+   a `bars/1d` partition. The read side reads the records through the store reader; it never
+   imports the ingestion app.
 2. **Still exactly one session per read.** Nothing mixes partitions: the newer, incomplete
    session is not read at all.
 3. **An explicitly requested date is unchanged** (ADR 0036): served as asked, no notice.
@@ -37,10 +39,12 @@ nightly already retries hourly), never waived to unblock.
    model, not an error.
 6. **The caches follow the run records.** A workflow turning COMPLETE saves a run record, not a
    table, so no publish moves. The resolved session is kept per publish and runs generation,
-   every GraphQL response key holds the runs generation, and the cache warmer warms again when
+   every GraphQL response key holds the resolved default session (date, newer date, state,
+   public kind), the run operations also the runs generation, and the cache warmer warms again when
    the served session or `newer` changes: pages flip to the new session without a restart.
-7. Writes are out of scope as in 0036: an on-request screen run still targets the latest
-   session with data (`latest_session`, ADR 0033).
+7. **One default.** `session.default_session(reader)` (the latest complete session, else the
+   latest bars) is used by `resolve_session` and by the on-request screen run (ADR 0033), so a
+   run with no date never targets the incomplete day while pages show the previous one.
 
 ## Consequences
 - A failing night no longer blanks the pages: they show the previous whole session and a notice
@@ -48,7 +52,7 @@ nightly already retries hourly), never waived to unblock.
 - A session completes only when every critical step has: chains (2 to 4 h) now gate what users
   see, so the new session appears later than its bars did.
 - `Session.is_latest` now means "the date a read with no date serves".
-- Every response is re-read once after any saved run record (a job's too), because the key
-  holds the runs generation for all operations, not only the run ones.
-- A partially failed or waived session counts as complete once the owner waives its steps:
-  waiving is the owner's explicit acceptance, as in 0039.
+- A job's or checkpoint's run record changes no session, so it evicts only the run operations;
+  a nightly completing a session changes every key at once.
+- A waived session counts as complete: waiving is the owner's explicit acceptance, as in 0039.
+- Old PARTIAL sessions count as done, as they do for the planner (no retry of them).

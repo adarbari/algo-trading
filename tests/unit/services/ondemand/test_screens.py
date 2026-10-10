@@ -2,7 +2,7 @@
 without waiting for ingestion, for the right owner (ADR 0033)."""
 
 import time
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -12,8 +12,10 @@ from algotrade.services.ondemand.status import JobView, read_job
 from algotrade.services.read.context import NotFoundError
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.locks import held
-from algotrade.storage.runs import RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.ondemand_store import DAY, SCREEN, SNAPSHOT, seeded_backend, site_configs
+from tests.helpers.rollup_store import write_rows
 
 
 def wait(runner: OnDemandScreens, request: RunRequest, timeout: float = 10.0) -> JobView:
@@ -54,6 +56,23 @@ def test_the_latest_session_with_data_is_the_default(runner: OnDemandScreens) ->
     request = runner.request("big_liquid", SITE)
     assert request.session == SNAPSHOT  # the newest stored reference snapshot
     assert wait(runner, request).state in ("partial", "complete")  # no features that day
+
+
+def test_an_on_request_run_takes_the_default_session_not_the_incomplete_newest_one() -> None:
+    """Pages show the last complete session (ADR 0062): a run with no date must not target the
+    newer day whose nightly failed."""
+    backend = seeded_backend()
+    complete, newest = DAY - timedelta(days=1), DAY
+    bar = {"instrument_id": "EQ:AAA", "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0}
+    for day, status in ((complete, RunStatus.COMPLETE), (newest, RunStatus.FAILED)):
+        write_rows(StoreWriter(backend), "bars/1d", day, [{**bar, "ts": day, "volume": 1.0}])
+        started = datetime(day.year, day.month, day.day, tzinfo=UTC)
+        backend.runs.save(RunRecord(f"nightly-{day}", "nightly", day, started, status))
+    ondemand = OnDemandScreens(backend, site_configs())
+    try:
+        assert ondemand.request("big_liquid", SITE).session == complete
+    finally:
+        ondemand.close()
 
 
 def test_a_site_preset_runs_as_the_site_and_an_own_screen_as_its_user() -> None:

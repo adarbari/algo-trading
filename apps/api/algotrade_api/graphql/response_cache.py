@@ -13,13 +13,16 @@ records or jobs: nightly runs, ingestion, screener runs and results, ideas, edge
 key (``response_key``) is the published state (``StoreReader.visible_seq()``), the writes the
 API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
 the routes that write: a config save changes the caller's next read without a publish), a hash
-of the operation document, its variables and the caller's role. Every key also
+of the operation document, its variables and the caller's role. A ``RUN_OPERATIONS`` key also
 holds the runs generation (``StoreReader.runs_generation()``: it moves on every saved run
 record, a job's too, which a publish does not cover: a failed job's record, an on-request run),
 read before the answer is computed like ``visible_seq`` (ADR 0022); an operation whose loader
 reads the clock (``CLOSED_SESSION_OPERATIONS``: the ingestion grid's "last closed session")
-also holds that session. A ``SHARED_OPERATIONS`` entry does not hold the user id; every other
-cached one does. The role is always in the key (ADR 0056: an admin's answer carries causes a
+also holds that session. Every other key holds the session a read with no date serves
+(``served_token``: its date and the newer incomplete session's, ADR 0062) instead: a nightly
+workflow completing flips the pages without a publish, while a job's checkpoint record, which
+changes no session, evicts nothing. A ``SHARED_OPERATIONS`` entry does not hold the user id; every
+other cached one does. The role is always in the key (ADR 0056: an admin's answer carries causes a
 trader must never read). ``ResponseCache`` is an LRU bounded by bytes (``MAX_BYTES``, a
 constant) and by age (``TTL_S``: a write made outside this process, such as a CLI config edit,
 is seen within it). Only queries (the schema has no mutation), only answers without
@@ -194,19 +197,31 @@ def response_key(
     name: str | None,
     runs: tuple[int, int] = (0, 0),
     closed: date | None = None,
+    served: str = "",
 ) -> str:
     """The hex digest identifying one cacheable answer. ``runs`` (the runs generation) is part
-    of every key (the session a read with no date serves follows the nightly's run records,
-    ADR 0062), ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one."""
+    of a ``RUN_OPERATIONS`` key, ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one, ``served``
+    (``served_token``: the default session) of every key (ADR 0062)."""
     who = (
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )
     text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
     parts = [str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text]
-    parts.append(f"runs:{runs[0]}:{runs[1]}")
+    parts.append(f"session:{served}")
+    if name in RUN_OPERATIONS:
+        parts.append(f"runs:{runs[0]}:{runs[1]}")
     if name in CLOSED_SESSION_OPERATIONS:
         parts.append(f"closed:{closed}")
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
+
+
+def served_token(session: Any) -> str:
+    """What of the default ``Session`` an answer can depend on: its date and the newer
+    incomplete session's date, state and public kind (ADR 0062)."""
+    newer = session.newer
+    if newer is None:
+        return str(session.date)
+    return f"{session.date}:{newer.date}:{newer.state}:{newer.kind}"
 
 
 class ResponseCache:

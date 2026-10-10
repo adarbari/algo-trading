@@ -14,6 +14,7 @@ import re
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -32,10 +33,11 @@ from algotrade_api.graphql.response_cache import (
     ResponseCache,
     WriteEpoch,
     response_key,
+    served_token,
 )
 from algotrade_api.graphql.schema import _accepts_gzip, graphql_router
 from algotrade_api.main import create_app
-from tests.helpers.api_store import as_user
+from tests.helpers.api_store import END, as_user
 
 SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
 VIEWER = "query Day { viewer { id role } }"
@@ -54,6 +56,7 @@ class Harness:
         self.seq = 1
         self.runs = (7, 100)  # the runs generation
         self.closed = date(2026, 10, 8)  # the last closed session
+        self.served = "2026-10-08"  # the default session's token (ADR 0062)
         self.wired: Any = None  # the runs generation main.py passes
         self.opened = 0
         self.cache = ResponseCache()
@@ -70,9 +73,15 @@ class Harness:
             return counting
 
         def router(
-            opener: Any, debug: bool, stores: Any, seq: Any, epoch: WriteEpoch, runs: Any
+            opener: Any,
+            debug: bool,
+            stores: Any,
+            seq: Any,
+            epoch: WriteEpoch,
+            runs: Any,
+            served: Any,
         ) -> Any:
-            self.wired = runs
+            self.wired, self.wired_served = runs, served
             return graphql_router(
                 opener,
                 debug,
@@ -83,6 +92,7 @@ class Harness:
                 self.admission,
                 lambda: self.runs,
                 lambda: self.closed,
+                lambda: self.served,
             )
 
         monkeypatch.setattr(main, "_reads", reads)
@@ -210,17 +220,40 @@ def test_a_run_operation_is_kept_until_a_run_record_is_saved(harness: Harness) -
     assert harness.opened > opened
 
 
-def test_a_static_operation_is_read_again_when_a_run_record_is_saved(harness: Harness) -> None:
-    """The session a read with no date serves follows the nightly's run records (ADR 0062): a
-    record turning COMPLETE flips every page without a publish, so no operation outlives it."""
+def test_a_job_record_does_not_evict_a_shared_operation_but_a_session_completing_does(
+    harness: Harness,
+) -> None:
+    """A checkpoint or job record saves no session (the runs generation moves, the served token
+    does not): nothing is evicted. A nightly turning a session COMPLETE changes the default
+    session's token (ADR 0062): every operation is read again, without a publish."""
     client = harness.client()
     _post(client, SESSION)
     opened = harness.opened
+    harness.runs = (7, 101)  # a non-nightly record was saved
     _post(client, SESSION)
-    assert harness.opened == opened  # nothing saved: served from the cache
-    harness.runs = (7, 101)
+    assert harness.opened == opened
+    harness.served = "2026-10-09"  # the nightly completed the next session
     _post(client, SESSION)
     assert harness.opened > opened
+
+
+def test_the_app_wires_the_real_default_session_token(harness: Harness) -> None:
+    harness.client()
+    assert harness.wired_served() == str(END)  # the golden store has no nightly records
+
+
+def test_the_served_token_holds_the_newer_session_too() -> None:
+    day, newer = date(2026, 10, 8), date(2026, 10, 9)
+    plain = served_token(SimpleNamespace(date=day, newer=None))
+    failing = served_token(
+        SimpleNamespace(
+            date=day, newer=SimpleNamespace(date=newer, state="FAILED_RETRYING", kind="SYSTEM")
+        )
+    )
+    going = served_token(
+        SimpleNamespace(date=day, newer=SimpleNamespace(date=newer, state="IN_PROGRESS", kind=None))
+    )
+    assert len({plain, failing, going}) == 3
 
 
 def test_a_run_operation_is_still_keyed_on_publish_and_writes(harness: Harness) -> None:
@@ -277,12 +310,12 @@ def test_the_key_holds_the_variables_and_the_document() -> None:
     assert base != response_key(1, 0, who, "{ b }", {"x": 1, "y": 2}, None)
     assert base != response_key(2, 0, who, "{ a }", {"x": 1, "y": 2}, None)
     assert base != response_key(1, 1, who, "{ a }", {"x": 1, "y": 2}, None)
-    # the runs generation is in every key: a read with no date serves the latest complete
-    # session, which a nightly record flips without a publish (ADR 0062)
-    assert base != response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2))
+    # the runs generation counts only for the run operations, the closed session only for the
+    # operations that read the clock; every key holds the default session (ADR 0062)
+    assert base == response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2))
+    assert base != response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, None, served="2026-10-09")
     shared = response_key(1, 0, who, "{ a }", None, "MarketHistory", (1, 2))
-    assert shared != response_key(1, 0, who, "{ a }", None, "MarketHistory", (1, 3))
-    # the closed session counts only for the operations that read the clock
+    assert shared == response_key(1, 0, who, "{ a }", None, "MarketHistory", (1, 3))
     assert base == response_key(
         1, 0, who, "{ a }", {"x": 1, "y": 2}, None, (0, 0), date(2026, 1, 1)
     )

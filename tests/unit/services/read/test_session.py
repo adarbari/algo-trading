@@ -17,6 +17,7 @@ from algotrade.services.read.session import (
     NewerState,
     NotFoundError,
     Session,
+    default_session,
     expected_tables,
     grain_of,
     latest_session,
@@ -231,7 +232,7 @@ def test_a_session_still_running_or_without_a_record_is_in_progress() -> None:
     assert (found.date, found.newer) == (D1, NewerSession(D3, NewerState.IN_PROGRESS))
 
 
-def test_the_latest_record_of_a_session_decides_and_a_retry_that_succeeds_flips_it() -> None:
+def test_a_retry_that_succeeds_flips_it() -> None:
     writer, reader = store()
     for day in (D1, D2):
         write_bar(writer, day)
@@ -243,12 +244,12 @@ def test_the_latest_record_of_a_session_decides_and_a_retry_that_succeeds_flips_
     assert (flipped.date, flipped.newer) == (D2, None)
 
 
-def test_a_complete_record_without_bars_is_not_complete_and_partial_is_not_done() -> None:
+def test_a_complete_record_without_bars_is_not_complete() -> None:
     writer, reader = store()
     write_bar(writer, D1)
     nightly(reader, D1, RunStatus.COMPLETE)
     nightly(reader, D2, RunStatus.COMPLETE)  # no bars/1d for D2
-    nightly(reader, D3, RunStatus.PARTIAL)
+    nightly(reader, D3, RunStatus.FAILED)
     write_bar(writer, D3)
     found = resolve_session(reader, None, EXPECTED)
     failing = NewerSession(D3, NewerState.FAILED_RETRYING, UnavailableKind.SYSTEM)
@@ -262,3 +263,38 @@ def test_no_complete_session_keeps_the_latest_bars_and_flags_it() -> None:
     nightly(reader, D2, RunStatus.FAILED)
     found = resolve_session(reader, None, EXPECTED)
     assert (found.date, found.is_latest, found.complete, found.newer) == (D2, True, False, None)
+
+
+def test_a_partial_record_counts_as_done_as_the_ingestion_planner_does() -> None:
+    """One rule (``storage.runs.done_sessions``): PARTIAL, written before ADR 0039, is done, and
+    any done record counts even when a later attempt of the session is not."""
+    writer, reader = store()
+    for day in (D1, D2, D3):
+        write_bar(writer, day)
+    nightly(reader, D1, RunStatus.PARTIAL)
+    nightly(reader, D2, RunStatus.COMPLETE, hour=6)
+    nightly(reader, D2, RunStatus.FAILED, hour=9)  # a later rerun failing does not undo it
+    nightly(reader, D3, RunStatus.WAITING)
+    found = resolve_session(reader, None, EXPECTED)
+    assert (found.date, found.complete) == (D2, True)
+    assert resolve_session(reader, D1, EXPECTED).complete is True
+
+
+def test_an_explicit_older_complete_session_is_complete() -> None:
+    writer, reader = store()
+    for day in (D1, D2, D3):
+        write_bar(writer, day)
+        nightly(reader, day, RunStatus.COMPLETE if day != D3 else RunStatus.FAILED)
+    assert resolve_session(reader, D1, EXPECTED).complete is True  # not the default, still done
+    assert resolve_session(reader, D3, EXPECTED).complete is False
+
+
+def test_the_default_session_is_one_function_for_reads_and_runs() -> None:
+    writer, reader = store()
+    assert default_session(reader) is None
+    for day in (D1, D2):
+        write_bar(writer, day)
+    assert default_session(reader) == D2  # no run records: the latest bars
+    nightly(reader, D1, RunStatus.COMPLETE)
+    nightly(reader, D2, RunStatus.FAILED)
+    assert default_session(reader) == D1 == resolve_session(reader, None, EXPECTED).date

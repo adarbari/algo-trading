@@ -251,7 +251,8 @@ today's `services/views.to_value`, moved; `views.py` imports it back so runs and
 One resolver, `services/read/session.py` (ownership `session-resolution`):
 `resolve_session(reader, requested) -> Session`. Requested given: that date, even if nothing is
 stored for it (everything UNKNOWN). None: the latest session whose nightly workflow is complete
-(its latest `nightly` run record COMPLETE, with a `bars/1d` partition; ADR 0062), the newer
+(a `nightly` run record COMPLETE or PARTIAL, the planner's rule `storage.runs.done_sessions`, with a
+`bars/1d` partition; ADR 0062), the newer
 incomplete session disclosed as `Session.newer`; none complete: the latest `bars/1d` partition
 (`complete` false); no bars: the latest reference snapshot; an empty store:
 `NotFoundError("nothing stored")`. Loaders read a
