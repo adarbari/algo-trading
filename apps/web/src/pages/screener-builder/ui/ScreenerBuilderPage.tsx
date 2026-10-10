@@ -26,6 +26,8 @@ export interface ScreenerBuilderPageProps {
   onDeleted: () => void;
   /** Open the Regime page (the gate line's link). */
   onOpenRegime: () => void;
+  /** Opened from an edge's builder: save and go back to it. */
+  onReturn?: (() => void) | undefined;
 }
 
 export function ScreenerBuilderPage({
@@ -33,11 +35,12 @@ export function ScreenerBuilderPage({
   onOpenTicker,
   onDeleted,
   onOpenRegime,
+  onReturn,
 }: ScreenerBuilderPageProps) {
   return (
     <ScreenerBuilderProvider id={id} key={id}>
       <Stack gap={3}>
-        <DraftBar onDeleted={onDeleted} />
+        <DraftBar onDeleted={onDeleted} onReturn={onReturn} />
         <PreviewDiff />
         <RegimeGateLine screenerId={id} onOpenRegime={onOpenRegime} />
         <DescribeScreen />

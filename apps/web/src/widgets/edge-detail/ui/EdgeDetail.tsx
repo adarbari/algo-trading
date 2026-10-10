@@ -53,11 +53,11 @@ export interface EdgeDetailProps {
   id: string;
   /** Back to the edges list. */
   onBack: () => void;
-  /** Open another edge's page (a clone was made). */
-  onOpen: (id: string) => void;
+  /** Open the builder on one of the user's edges (a copy was made, or Edit). */
+  onEdit: (id: string) => void;
 }
 
-export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
+export function EdgeDetail({ id, onBack, onEdit }: EdgeDetailProps) {
   const edges = useEdges();
   const edge = edges.data?.find((e) => e.id === id);
   if (edges.isPending) return <Panel title="Edge" state="loading" loadingLabel="Loading edge…" />;
@@ -115,7 +115,7 @@ export function EdgeDetail({ id, onBack, onOpen }: EdgeDetailProps) {
           <Stack gap={2} align="end">
             <RunEvaluation edgeId={edge.id} />
             <Stack direction="row" gap={1} align="center">
-              <EdgeActions edge={edge} onCloned={onOpen} />
+              <EdgeActions edge={edge} onEdit={onEdit} />
               <GuideHelp entry={{ kind: 'term', id: 'follow_edge' }} />
               {edge.oosHidden && <GuideHelp entry={{ kind: 'term', id: 'show_out_of_sample' }} />}
             </Stack>

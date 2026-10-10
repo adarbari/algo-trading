@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EdgesPage } from './EdgesPage';
@@ -12,16 +13,26 @@ vi.mock('@/widgets/edge-detail', async () => {
   return { EdgeDetail: ({ id }: { id: string }) => <Text>{`detail ${id}`}</Text> };
 });
 
+const onBuild = vi.fn();
+
 describe('EdgesPage', () => {
   it('shows its heading and the list when no edge is chosen', () => {
-    render(<EdgesPage onSelect={vi.fn()} onClear={vi.fn()} />);
+    render(<EdgesPage onSelect={vi.fn()} onBuild={onBuild} onClear={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Edges' })).toBeInTheDocument();
     expect(screen.getByText('list')).toBeInTheDocument();
     expect(screen.queryByText(/^detail/)).not.toBeInTheDocument();
   });
 
+  it('opens the builder on a new edge', async () => {
+    render(<EdgesPage onSelect={vi.fn()} onBuild={onBuild} onClear={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'New edge' }));
+    expect(onBuild).toHaveBeenCalledWith(null);
+  });
+
   it('shows the chosen edge in place of the list', () => {
-    render(<EdgesPage selected="momentum_12_1" onSelect={vi.fn()} onClear={vi.fn()} />);
+    render(
+      <EdgesPage selected="momentum_12_1" onSelect={vi.fn()} onBuild={vi.fn()} onClear={vi.fn()} />,
+    );
     expect(screen.getByText('detail momentum_12_1')).toBeInTheDocument();
     expect(screen.queryByText('list')).not.toBeInTheDocument();
   });

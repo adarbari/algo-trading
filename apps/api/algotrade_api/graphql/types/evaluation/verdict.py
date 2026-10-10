@@ -5,6 +5,7 @@ the edge is defined): every number and sentence is the read model's, none is der
 from typing import Self
 
 import strawberry
+from strawberry.scalars import JSON
 
 from algotrade.services.read.evaluation import edges, robustness
 from algotrade.services.read.evaluation import verdict as read
@@ -18,6 +19,47 @@ class EdgeSource:
     @classmethod
     def of(cls, d: edges.EdgeSource) -> Self:
         return cls(title=d.title, url=d.url)
+
+
+@strawberry.type(description="One quality-bar answer: `key` names the question, `text` the answer")
+class EdgeAnswer:
+    key: str
+    text: str
+
+    @classmethod
+    def of(cls, d: edges.EdgeAnswer) -> Self:
+        return cls(key=d.key, text=d.text)
+
+
+@strawberry.type(
+    description="What the builder edits, as the layered document resolves: `topK` (null: every "
+    "qualified name), `universe` (a preset's name; empty: an inline selection), the outcome's "
+    "`kind`, `benchmark`, `startOffsetSessions` and `costBps`, the `qualityBar` answers, and "
+    "`own`: the user's own document as JSON (empty for a site edge), which a save extends "
+    "because a save replaces the whole document"
+)
+class EdgeSettings:
+    top_k: int | None
+    universe: str
+    kind: str
+    benchmark: str
+    start_offset_sessions: int
+    cost_bps: float | None
+    quality_bar: list[EdgeAnswer]
+    own: JSON
+
+    @classmethod
+    def of(cls, d: edges.EdgeSettings) -> Self:
+        return cls(
+            top_k=d.top_k,
+            universe=d.universe,
+            kind=d.kind,
+            benchmark=d.benchmark,
+            start_offset_sessions=d.start_offset_sessions,
+            cost_bps=d.cost_bps,
+            quality_bar=[EdgeAnswer.of(a) for a in d.quality_bar],
+            own=JSON(dict(d.own)),
+        )
 
 
 @strawberry.type(

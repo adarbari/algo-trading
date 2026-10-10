@@ -20,14 +20,14 @@ const MoveEdgeDialog = lazyPage(() => import('./MoveEdgeDialog'), 'MoveEdgeDialo
 
 export interface EdgeActionsProps {
   edge: Edge;
-  /** A copy was made: open it. */
-  onCloned: (id: string) => void;
+  /** A copy or a new version was made, or Edit was chosen: open it in the builder. */
+  onEdit: (id: string) => void;
 }
 
-export function EdgeActions({ edge, onCloned }: EdgeActionsProps) {
+export function EdgeActions({ edge, onEdit }: EdgeActionsProps) {
   const viewer = useViewer();
   const toast = useToast();
-  const [cloning, setCloning] = useState(false);
+  const [cloning, setCloning] = useState<'clone' | 'version' | null>(null);
   const [move, setMove] = useState<Move | null>(null);
   const [publishing, setPublishing] = useState(false);
   const moves: Move[] = [
@@ -57,11 +57,33 @@ export function EdgeActions({ edge, onCloned }: EdgeActionsProps) {
           size="sm"
           variant="secondary"
           onClick={() => {
-            setCloning(true);
+            setCloning('clone');
           }}
         >
           Clone
         </Button>
+        {edge.state === 'following' && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setCloning('version');
+            }}
+          >
+            New version
+          </Button>
+        )}
+        {edge.mine && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              onEdit(edge.id);
+            }}
+          >
+            Edit
+          </Button>
+        )}
         {moves.map((m) => (
           <Button
             key={m}
@@ -84,11 +106,14 @@ export function EdgeActions({ edge, onCloned }: EdgeActionsProps) {
         {cloning && (
           <CloneEdgeDialog
             edgeId={edge.id}
+            asVersion={cloning === 'version'}
             open
-            onOpenChange={setCloning}
+            onOpenChange={(open) => {
+              if (!open) setCloning(null);
+            }}
             onCloned={(id) => {
-              setCloning(false);
-              onCloned(id);
+              setCloning(null);
+              onEdit(id);
             }}
           />
         )}

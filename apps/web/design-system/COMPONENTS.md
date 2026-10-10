@@ -1350,6 +1350,30 @@ Source: `design-system/components/Tabs`
 | `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
 | `size` | `'sm' \| 'md'` | no | Text size: `md` (default) or `sm` (dense toolbars). |
 
+### TextArea
+
+TextArea: a multi-line text box for a few sentences (a thesis, an answer, a note), in the same box as Input and the same label, description and invalid wiring inside a Field. It grows with what is typed up to `maxRows`, then scrolls; `rows` sets the height it starts at.
+
+Source: `design-system/components/TextArea`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `(Pick<AriaAttributes, 'aria-label' \| 'aria-describedby'>)` | `inherited` | no |  |
+| `value` | `string \| undefined` | no | The text (controlled). |
+| `defaultValue` | `string \| undefined` | no | The initial text (uncontrolled). |
+| `onValueChange` | `((value: string) => void) \| undefined` | no | Called with the new text on every edit. |
+| `placeholder` | `string \| undefined` | no |  |
+| `rows` | `number` | no | Lines shown before the user types more (default 3). |
+| `invalid` | `boolean` | no | Shows the invalid state (a Field with an error sets this). |
+| `disabled` | `boolean` | no |  |
+| `readOnly` | `boolean` | no |  |
+| `required` | `boolean` | no |  |
+| `name` | `string` | no |  |
+| `id` | `string` | no |  |
+| `spellCheck` | `boolean` | no |  |
+| `onBlur` | `FocusEventHandler<HTMLTextAreaElement> \| undefined` | no |  |
+| `ref` | `Ref<HTMLTextAreaElement>` | no |  |
+
 ### TextLink
 
 TextLink: a link inside the app (a field's page, a section of this page, Explore): accent text, an optional leading icon and a trailing key hint; `current` marks the page the link points at. In-app paths go through the app's router link (`LinkProvider`); anchors ("#reads") and URLs are plain anchors. A link to another site is an ExternalLink.

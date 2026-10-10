@@ -234,6 +234,7 @@ type Edge {
   mine: Boolean!
   extends: String
   replaces: String
+  settings: EdgeSettings
 
   """
   The latest committed site run whose split is `frozenFrom`; null: none (see `canonicalNotRun`). An exploratory or older split is never shown here
@@ -257,6 +258,12 @@ type Edge {
   The user's own edge against the edge it extends and its baselines, in-sample only while `oosHidden`; null for a site edge
   """
   compare: EdgeCompare
+}
+
+"""One quality-bar answer: `key` names the question, `text` the answer"""
+type EdgeAnswer {
+  key: String!
+  text: String!
 }
 
 """
@@ -368,6 +375,20 @@ type EdgeRun {
   The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none
   """
   rows: [EdgeRow!]!
+}
+
+"""
+What the builder edits, as the layered document resolves: `topK` (null: every qualified name), `universe` (a preset's name; empty: an inline selection), the outcome's `kind`, `benchmark`, `startOffsetSessions` and `costBps`, the `qualityBar` answers, and `own`: the user's own document as JSON (empty for a site edge), which a save extends because a save replaces the whole document
+"""
+type EdgeSettings {
+  topK: Int
+  universe: String!
+  kind: String!
+  benchmark: String!
+  startOffsetSessions: Int!
+  costBps: Float
+  qualityBar: [EdgeAnswer!]!
+  own: JSON!
 }
 
 """A source the edge rests on; `url` is empty when it has none"""

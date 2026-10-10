@@ -1,6 +1,8 @@
 /**
- * Trader > Edges: the edges list, or the chosen edge's page. The chosen edge lives in the
- * URL (`/edges?edge=momentum_12_1`) so it can be shared and a phone's sheet can be dismissed.
+ * Trader > Edges: the edges list, or the chosen edge's page (`/edges?edge=momentum_12_1`, so it
+ * can be shared and a phone's sheet can be dismissed), and the builder: a new edge
+ * (`/edges/new`) or one of the user's own (`/edges/$id/edit`, a copy, a new version or an edge of
+ * theirs). The builder loads lazily.
  */
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
@@ -9,6 +11,7 @@ import type { EdgeView } from '@/entities/edge';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const EdgesPage = lazyPage(() => import('@/pages/trader-edges'), 'EdgesPage');
+const BuilderRoute = lazyPage(() => import('./edge-builder-route'), 'BuilderRoute');
 
 // The views a link may name (`all` is the bare list); a type import only keeps the entity out of
 // the entry chunk.
@@ -28,7 +31,7 @@ export function validateEdgesSearch(search: Record<string, unknown>): EdgesSearc
   };
 }
 
-function EdgesRoute() {
+function EdgesIndex() {
   const { edge, view } = validateEdgesSearch(useSearch({ strict: false }));
   const navigate = useNavigate();
   return (
@@ -39,6 +42,9 @@ function EdgesRoute() {
         void navigate({ to: '/edges', search: next === 'all' ? {} : { view: next }, replace: true })
       }
       onSelect={(id) => void navigate({ to: '/edges', search: { edge: id }, replace: true })}
+      onBuild={(id) =>
+        void navigate(id ? { to: '/edges/$id/edit', params: { id } } : { to: '/edges/new' })
+      }
       onClear={() => void navigate({ to: '/edges', search: {}, replace: true })}
     />
   );
@@ -48,5 +54,15 @@ export const edgesRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'edges',
   validateSearch: validateEdgesSearch,
-  component: EdgesRoute,
+  component: EdgesIndex,
 });
+
+// The builder: siblings of the list, so `/edges` itself stays one route.
+export const edgesBuilderRoutes = [
+  createRoute({ getParentRoute: () => traderRoute, path: 'edges/new', component: BuilderRoute }),
+  createRoute({
+    getParentRoute: () => traderRoute,
+    path: 'edges/$id/edit',
+    component: BuilderRoute,
+  }),
+];

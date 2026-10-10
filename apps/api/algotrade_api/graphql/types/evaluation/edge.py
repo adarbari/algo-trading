@@ -14,7 +14,12 @@ from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, runs, versions
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.evaluation.compare import EdgeCompare
-from algotrade_api.graphql.types.evaluation.verdict import EdgeDefinition, EdgeSource, EdgeVerdict
+from algotrade_api.graphql.types.evaluation.verdict import (
+    EdgeDefinition,
+    EdgeSettings,
+    EdgeSource,
+    EdgeVerdict,
+)
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
 
@@ -194,6 +199,7 @@ class Edge:
     mine: bool
     extends: str | None
     replaces: str | None
+    settings: EdgeSettings | None
     edge: strawberry.Private[edges.Edge]
     ctx: strawberry.Private[Stores]
     cache: strawberry.Private[dict[str, Any]]
@@ -226,6 +232,7 @@ class Edge:
             mine=d.mine,
             extends=d.extends,
             replaces=d.replaces,
+            settings=EdgeSettings.of(d.settings) if d.settings else None,
             edge=d,
             ctx=ctx,
             cache={},
