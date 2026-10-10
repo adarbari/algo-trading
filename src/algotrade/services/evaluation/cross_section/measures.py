@@ -10,23 +10,27 @@ a ``below`` one. Every count is explicit; nothing is dropped silently by a stati
 """
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import partial
+from typing import Protocol
 
 import numpy as np
 
 from algotrade.quant.edge_statistics import (
     Moments,
     decile_spread,
+    deflated_sharpe,
     effect_vs_moments,
     lift,
     merge_moments,
+    pbo_cscv,
     sharpe,
     spread_summary,
 )
 
 BUCKETS = 10
+PBO_SPLITS = 16
 
 
 @dataclass(frozen=True)
@@ -283,3 +287,60 @@ def _before(day: date, stat: SessionStat) -> bool:
 
 def _since(day: date, stat: SessionStat) -> bool:
     return stat.session >= day
+
+
+class Scored(Protocol):
+    """What the trial statistics read of one variant's result at one horizon (the harness's
+    ``VariantResult``)."""
+
+    @property
+    def horizon(self) -> int: ...
+    @property
+    def stats(self) -> tuple["SessionStat", ...]: ...
+    @property
+    def measures(self) -> tuple["SliceMeasure", ...]: ...
+
+
+def deflate[R: Scored](results: list[R], trials: int) -> list[R]:
+    """The deflated Sharpe ratio, the trial count and PBO on each variant's "all" rows. The
+    Sharpe variance across trials is taken within a horizon (windows of other lengths are not
+    the same kind of trial)."""
+    by_horizon: dict[int, list[R]] = {}
+    for r in results:
+        by_horizon.setdefault(r.horizon, []).append(r)
+    variance, overfit = {}, {}
+    for horizon, peers in by_horizon.items():
+        sharpes = [p.measures[0].sharpe for p in peers if p.measures[0].sharpe is not None]
+        variance[horizon] = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
+        overfit[horizon] = pbo(peers)
+    out = []
+    for r in results:
+        means = [m for m in (s.pick_mean for s in r.stats) if m is not None]
+        dsr = deflated_sharpe(means, trials, variance[r.horizon]) if means else None
+        deflated = replace(
+            r.measures[0], deflated_sharpe=dsr, trials=trials, pbo=overfit[r.horizon]
+        )
+        out.append(replace(r, measures=(deflated, *r.measures[1:])))  # type: ignore[type-var]
+    return out
+
+
+def pbo(peers: Sequence[Scored]) -> float | None:
+    """PBO over the sessions every variant held something at: a session where one held nothing
+    is left out, never filled in."""
+    if len(peers) < 2:
+        return None
+    days = sorted({s.session for p in peers for s in p.stats})
+    means = [_means(p) for p in peers]
+    matrix = np.array([[m.get(d, float("nan")) for m in means] for d in days], dtype=np.float64)
+    matrix = matrix.reshape(len(days), len(peers))
+    return pbo_cscv(matrix[~np.isnan(matrix).any(axis=1)], PBO_SPLITS)
+
+
+def _means(result: Scored) -> dict[date, float]:
+    """A variant's pick mean per session it held something at (the first stat of a session
+    with a mean wins)."""
+    means: dict[date, float] = {}
+    for s in result.stats:
+        if s.pick_mean is not None:
+            means.setdefault(s.session, s.pick_mean)
+    return means

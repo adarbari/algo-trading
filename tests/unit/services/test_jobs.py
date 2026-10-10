@@ -258,6 +258,40 @@ def test_edge_eval_handler_runs_the_harness_and_reports_rows() -> None:
     runner.shutdown()
 
 
+def test_edge_eval_handler_is_incremental_by_default_and_full_on_request() -> None:
+    w = build_world()
+    configs = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "momo"): screen(),
+            ("site", "edges", "drift"): edge_document(),
+        }
+    )
+    runner = LocalJobRunner(
+        MemoryRuns(),
+        LIBRARY_HANDLERS,
+        {"reader": w.reader, "writer": w.results, "configs": configs},
+    )
+    params = {"edge": "drift", "start": DAYS[0].isoformat(), "end": DAYS[-1].isoformat()}
+
+    def run(**extra: str) -> JobRecord:
+        return runner.wait(runner.submit("edge-eval", {**params, **extra}, USER))
+
+    later = [(datetime.now(UTC) + timedelta(days=n)).isoformat() for n in (1, 2, 3)]
+    first = run()  # as of now
+    second, forced = run(as_of=later[0]), run(as_of=later[1], mode="full")  # the next nights
+    assert [j.status for j in (first, second, forced)] == [JobStatus.COMPLETE] * 3
+    assert (first.result["mode"], first.result["legs"]["computed"]) == ("incremental", 4)
+    assert (second.result["legs"]["reused"], second.result["legs"]["computed"]) == (4, 0)
+    assert (forced.result["mode"], forced.result["legs"]["reused"]) == ("full", 0)
+    record = w.results.load_run(forced.result["run_id"])
+    assert record is not None and record.stats["mode"] == "full"
+    assert second.result["mode"] == "incremental"
+    bad = run(as_of=later[2], mode="sometimes")
+    assert bad.status is JobStatus.FAILED and "unknown edge-eval mode" in (bad.error or "")
+    runner.shutdown()
+
+
 def test_edge_signals_handler_signals_the_followed_edge_and_reports_the_night() -> None:
     d = desk()
     runner = LocalJobRunner(

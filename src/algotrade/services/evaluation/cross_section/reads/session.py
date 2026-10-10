@@ -85,6 +85,13 @@ class SessionReads:
             self._identity.of("screened", day),
         )
 
+    def adopt(self, reads: DayReads, snapshots: Iterable[date]) -> None:
+        """Take over a session a run did not compute (its legs were reused): what it read counts
+        in the run's historical caveat and universe snapshots as if it had."""
+        for kind, counts in (("eligible", reads.eligible), ("screened", reads.screened)):
+            self._identity.note(kind, reads.day, counts)
+        self._snapshots.update(snapshots)
+
     def attributed_days(self) -> list[date]:
         return self._reader.attributed_days()
 

@@ -287,7 +287,7 @@ purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (s
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/legs"
-purpose = "the reuse of a screener's per-session statistics between edge evaluations (ADR 0063): the leg key, what a leg is a function of besides its session (key.py), a leg, a session's reads log and its outcome read as stored rows (rows.py) and their write and read-back in results/edge_legs (store.py); the reuse is added by a later step of the ADR"
+purpose = "the reuse of a screener's per-session statistics between edge evaluations (ADR 0063): the leg key, what a leg is a function of besides its session (key.py), a leg, a session's reads log and its outcome read as stored rows (rows.py) and their write and read-back in results/edge_legs (store.py), and which stored legs a run reuses and which it retires (reuse.py)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reads"

@@ -32,13 +32,12 @@ EXPLORATORY: its rows carry its split in their key and the flag, and the split j
 import hashlib
 import json
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from functools import partial
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import (
@@ -58,13 +57,14 @@ from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
     OUTCOME_FIELDS,
     missing_outcomes,
+    outcome_known,
     outcome_seqs,
     read_stored,
     select_outcomes,
     stored_sessions,
 )
 from algotrade.engines.screening.runner import RunCoverage
-from algotrade.quant.edge_statistics import deflated_sharpe, moments, pbo_cscv
+from algotrade.quant.edge_statistics import moments
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.historical import (
@@ -84,18 +84,30 @@ from algotrade.services.evaluation.cross_section.legs.key import (
     leg_key,
     universe_hash,
 )
+from algotrade.services.evaluation.cross_section.legs.reuse import (
+    FULL,
+    LegId,
+    Need,
+    Reuse,
+    lost_error,
+    plan_reuse,
+    tombstones,
+)
 from algotrade.services.evaluation.cross_section.legs.rows import (
     LegRecord,
     OutcomeRead,
+    StoredLegs,
     decode_leg,
     encode_leg,
     encode_outcome,
     encode_reads,
 )
+from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     SliceMeasure,
     decile_means,
+    deflate,
     edge_slices,
     pool_stats,
     slice_measures,
@@ -136,7 +148,6 @@ BOOKKEEPING = (
     "rejection_reason", "evidence", "promoted", "compared", "extends", "follow", "audit", "owner",
 )  # fmt: skip
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
-PBO_SPLITS = 16
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
 # A session is measured only when at least this share of the eligible names carries the edge's
 # score; the rest are counted as ``unscored`` and never ranked (recent listings lack a year of
@@ -209,6 +220,12 @@ class EdgeEvaluation:
     # The run's legs, the reads of its sessions and its outcome reads as ``results/edge_legs``
     # rows (``legs/rows.py``): what ``write_edge_eval`` stores with the run (ADR 0063).
     leg_rows: tuple[Mapping[str, Any], ...] = field(default=(), repr=False, compare=False)
+    # How the run got its legs (ADR 0063): ``full`` or ``incremental``, the stored legs it
+    # reused, the ones it computed and the stored ones it recomputed, by reason.
+    mode: str = FULL
+    legs_reused: int = 0
+    legs_computed: int = 0
+    legs_invalidated: Mapping[str, int] = field(default_factory=dict)
 
 
 def run_hash(
@@ -425,49 +442,6 @@ def _prior_trials(
     return found
 
 
-def _deflate(results: list[VariantResult], trials: int) -> list[VariantResult]:
-    """The deflated Sharpe ratio, the trial count and PBO on each variant's "all" rows. The
-    Sharpe variance across trials is taken within a horizon (windows of other lengths are not
-    the same kind of trial)."""
-    by_horizon: dict[int, list[VariantResult]] = {}
-    for r in results:
-        by_horizon.setdefault(r.horizon, []).append(r)
-    variance, pbo = {}, {}
-    for horizon, peers in by_horizon.items():
-        sharpes = [p.measures[0].sharpe for p in peers if p.measures[0].sharpe is not None]
-        variance[horizon] = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
-        pbo[horizon] = _pbo(peers)
-    out = []
-    for r in results:
-        means = [m for m in (s.pick_mean for s in r.stats) if m is not None]
-        dsr = deflated_sharpe(means, trials, variance[r.horizon]) if means else None
-        deflated = replace(r.measures[0], deflated_sharpe=dsr, trials=trials, pbo=pbo[r.horizon])
-        out.append(replace(r, measures=(deflated, *r.measures[1:])))
-    return out
-
-
-def _pbo(peers: Sequence[VariantResult]) -> float | None:
-    """PBO over the sessions every variant held something at: a session where one held nothing
-    is left out, never filled in."""
-    if len(peers) < 2:
-        return None
-    days = sorted({s.session for p in peers for s in p.stats})
-    means = [_means(p) for p in peers]
-    matrix = np.array([[m.get(d, float("nan")) for m in means] for d in days], dtype=np.float64)
-    matrix = matrix.reshape(len(days), len(peers))
-    return pbo_cscv(matrix[~np.isnan(matrix).any(axis=1)], PBO_SPLITS)
-
-
-def _means(result: VariantResult) -> dict[date, float]:
-    """A variant's pick mean per session it held something at (the first stat of a session
-    with a mean wins)."""
-    means: dict[date, float] = {}
-    for s in result.stats:
-        if s.pick_mean is not None:
-            means.setdefault(s.session, s.pick_mean)
-    return means
-
-
 def stored_outcome_sessions(reader: StoreReader) -> list[date]:
     """The start sessions with stored outcomes, ascending: the range an evaluation covers by
     default (empty: none stored). The one place outside the harness that asks, so the outcomes
@@ -487,12 +461,14 @@ def evaluate_edge(
     iv_field: str = IMPLIED_VOL_FIELD,
     split_from: date | None = None,
     random_draws: int = DEFAULT_DRAWS,
+    full: bool = False,
 ) -> EdgeEvaluation:
     """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
     horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
     one implied-vol field of the run (an outcome that reads one; its source and licence are
     recorded); ``split_from``: the run's own split over the edge's;
-    ``random_draws``: random picks drawn per out-of-sample session (``random_picks.py``). Raises
+    ``random_draws``: random picks drawn per out-of-sample session (``random_picks.py``);
+    ``full``: compute every leg, reusing none of the stored ones (``legs/reuse.py``). Raises
     ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon."""
     variants = _variants(configs, user, edge)
@@ -525,7 +501,14 @@ def evaluate_edge(
         user.user_id,
         edge.id,
     )
-    stats = _measure(reader, session, plans, variants, schedules, as_of, spec)
+    stored = read_legs(reader, user.user_id, edge.id, start, end)
+    earnings = any(p.scope.edge.event_class == "earnings_expected" for p in plans)  # a diagnostic
+    needs = _needs(plans, variants, schedules, spec)
+    stamps = partial(_outcome_stamps, reader, as_of)
+    reuse = plan_reuse(
+        reader, stored, needs, as_of, stamps, "requested" if full or earnings else None
+    )
+    stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results: list[VariantResult] = []
     randoms: list[RandomPicks] = []
     reports = None  # the real report dates, read once and only for an earnings_expected edge
@@ -618,7 +601,7 @@ def evaluate_edge(
         end=end,
         as_of=as_of,
         snapshot=snapshot,
-        results=tuple(_deflate(results, trials)),
+        results=tuple(deflate(results, trials)),
         trials=trials,
         start_sessions=starts,
         unclosed_sessions=unclosed,
@@ -627,21 +610,68 @@ def evaluate_edge(
         exploratory=exploratory,
         historical=session.caveat(),
         random_picks=tuple(randoms),
-        leg_rows=_leg_rows(stats, session, user.user_id, edge.id),
+        leg_rows=_leg_rows(stats, session, user.user_id, edge.id, stored, reuse, needs),
+        mode=reuse.mode,
+        legs_reused=len(reuse.reused),
+        legs_computed=len(stats.rows),
+        legs_invalidated=dict(reuse.invalidated),
     )
 
 
 def _leg_rows(
-    stats: "_Measured", session: SessionReads, user_id: str, edge_id: str
+    stats: "_Measured",
+    session: SessionReads,
+    user_id: str,
+    edge_id: str,
+    stored: StoredLegs,
+    reuse: Reuse,
+    needs: Sequence[Need],
 ) -> tuple[Mapping[str, Any], ...]:
-    """The legs measured, the reads log of each decision session that has one and the outcome
-    reads, as ``results/edge_legs`` rows."""
+    """The legs measured, the reads log of each decision session that has one, the outcome reads
+    and the tombstones of the stored legs not carried, as ``results/edge_legs`` rows (a session
+    reused whole is not rewritten)."""
     held = {row["session_date"] for row in stats.rows}
     reads = [
         encode_reads(session.day_reads(d), user_id, edge_id) for d in session.attributed_days()
     ]
     outcomes = [encode_outcome(o, user_id, edge_id) for o in stats.outcome_reads.values()]
-    return (*stats.rows, *(r for r in reads if r["session_date"] in held), *outcomes)
+    gone = tombstones(stored, reuse, stats.rows, needs, held, user_id, edge_id)
+    return (*stats.rows, *(r for r in reads if r["session_date"] in held), *outcomes, *gone)
+
+
+def _outcome_stamps(
+    reader: StoreReader, as_of: datetime, entries: Collection[date]
+) -> tuple[dict[tuple[date, int], datetime], dict[date, int]]:
+    """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
+    ``knowledge_ts`` known by ``as_of`` and per S the commit sequence (the harness is the one
+    reader of outcomes)."""
+    return outcome_known(reader, entries, as_of), outcome_seqs(reader, entries)
+
+
+def _drawing(spec: "_RandomSpec", variant: Variant, block: Sequence[Leg]) -> bool:
+    """Whether the screener's legs in ``block`` carry random draws: out of sample only."""
+    return spec.split is not None and variant.role == "screener" and block[0].decision >= spec.split
+
+
+def _needs(
+    plans: Sequence["_Plan"],
+    variants: Sequence[Variant],
+    schedules: Mapping[str, EventSchedule],
+    spec: "_RandomSpec",
+) -> list[Need]:
+    """Every leg of the run (``legs/reuse.py`` keeps those whose window has closed)."""
+    found = []
+    for p in plans:
+        events = schedules.get(p.scope.key)
+        for variant in variants:
+            key = spec.key_for(p.scope, variant)
+            for block in p.blocks:
+                drawing = _drawing(spec, variant, block)
+                for leg in block:
+                    names = None if events is None else tuple(sorted(events.names[leg.decision]))
+                    id_: LegId = (key, p.scope.key, variant.id, p.horizon, leg.decision)
+                    found.append(Need(id_, leg.entry, drawing, names))
+    return found
 
 
 @dataclass(frozen=True)
@@ -714,18 +744,21 @@ def _measure(
     schedules: Mapping[str, EventSchedule],
     as_of: datetime,
     spec: _RandomSpec,
+    reuse: Reuse,
 ) -> _Measured:
     """One statistic per (plan, variant, leg), over chunks of ``CHUNK_SESSIONS`` decision
     sessions: each chunk reads the outcomes of its entry sessions, screens its sessions and
     keeps only the statistics, so peak memory does not grow with the range. Every leg is
     stored as a row (``legs/rows.py``) and measured from that row's decoded form, so a run that
-    computes a leg and one that reads it hold the same numbers."""
+    computes a leg and one that reads it hold the same numbers. Only the sessions of ``reuse``
+    are computed; its stored legs are taken as they are (``legs/reuse.py``)."""
     out = _Measured({}, {}, {}, {}, {})
-    days = sorted({leg.decision for p in plans for b in p.blocks for leg in b})
-    entries = {leg.entry for p in plans for b in p.blocks for leg in b}
-    out.seqs = outcome_seqs(reader, entries)  # before any outcome row is read
+    todo = reuse.days
+    legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
+    days = sorted({leg.decision for leg in legs})
+    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs})  # before any outcome row is read
     failed: dict[int, MissingDataError] = {}
-    out.closed.update({p.horizon: set() for p in plans})
+    out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):
         chunk = set(days[at : at + CHUNK_SESSIONS])
         closed = _read_closed(reader, plans, chunk, as_of, out, failed)
@@ -739,12 +772,15 @@ def _measure(
                 events = schedules.get(p.scope.key)
                 _measure_plan(p, variant, session, events, chunk, closed, out, spec, as_of)
         session.release()
+    reuse.adopt(out.legs, out.lost, out.randoms, {p.key for p in plans})
+    for reads in reuse.reads.values():
+        session.adopt(reads, reuse.snapshots())
     for horizon, missing in failed.items():
         if not out.closed[horizon]:  # nothing stored for any session of the range
             raise missing
     for (_, variant_id), lost in out.lost.items():  # a variant measured nowhere is a failure
         if lost and len(lost) == len(out.legs[_, variant_id]):
-            raise session.errors[variant_id]
+            raise lost_error(lost)
     return out
 
 
@@ -809,11 +845,7 @@ def _measure_plan(
                 continue
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
-            drawing = (
-                spec.split is not None
-                and variant.role == "screener"
-                and block[0].decision >= spec.split
-            )
+            drawing = _drawing(spec, variant, block)
             with session.attribute(leg.decision):
                 stat = _stat(p.scope, session, variant, leg, p.horizon, rows, names)
                 drawn = (

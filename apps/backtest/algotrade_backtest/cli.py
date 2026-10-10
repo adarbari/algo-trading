@@ -102,6 +102,12 @@ def build_parser() -> argparse.ArgumentParser:
         "edge's frozen_from); another split than the site edge's is exploratory",
     )
     ee.add_argument(
+        "--full",
+        action="store_true",
+        help="compute every leg instead of reusing the stored ones that are still valid "
+        "(ADR 0063; the default is incremental)",
+    )
+    ee.add_argument(
         "--extra-baseline",
         action="append",
         default=[],

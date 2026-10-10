@@ -115,7 +115,9 @@ class StoreReader:
 @dataclass(frozen=True)
 class ReadRecord:
     """One read an attributed day made. ``kind`` ``rows``: partitions ``start..end`` of
-    ``table`` were read (found or not: a read that found nothing is recorded too); ``dates``:
+    ``table`` were read (found or not: a read that found nothing is recorded too; ``digest``, when
+    the read could tell, the hash of the partition dates it returned, so a partition purged since
+    is noticed); ``dates``:
     the partition dates of ``table`` the caller used were listed, ``digest`` their hash
     (``dates_digest``), ``start`` the earliest of them; ``end`` is the day, or the latest date
     listed when that is after it (a read of the future: never reusable)."""
@@ -204,9 +206,11 @@ class RecordingReader(StoreReader):
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        if self._open():
-            self._log(ReadRecord(table, session_date, session_date, "rows"))
-        return super().table(table, session_date, as_of, instruments)
+        recording = self._open()
+        frame = super().table(table, session_date, as_of, instruments)
+        if recording:
+            self._log_rows(table, session_date, session_date)
+        return frame
 
     def table_range(
         self,
@@ -217,9 +221,17 @@ class RecordingReader(StoreReader):
         instruments: Sequence[str] | None = None,
         columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        if self._open():
-            self._log(ReadRecord(table, start, end, "rows"))
-        return super().table_range(table, start, end, as_of, instruments, columns)
+        recording = self._open()
+        frame = super().table_range(table, start, end, as_of, instruments, columns)
+        if recording:
+            self._log_rows(table, start, end)
+        return frame
+
+    def _log_rows(self, table: str, start: date, end: date) -> None:
+        """Log a ``rows`` read with the committed partition dates the store lists in the range
+        (not what the read returned: a filtered read cannot tell an empty partition from none)."""
+        listed = sorted(StoreReader.partition_seq(self, table, start, end))
+        self._log(ReadRecord(table, start, end, "rows", dates_digest(listed)))
 
     def _log_dates(self, table: str, seen: list[date]) -> None:
         """Log the listing the caller used. A date after the day is a read of the future: the

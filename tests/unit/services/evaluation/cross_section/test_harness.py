@@ -20,11 +20,11 @@ from algotrade.services.evaluation.cross_section.harness import (
     BOOKKEEPING,
     RUN_INPUTS,
     EdgeEvaluation,
-    _pbo,
     _prior_trials,
     evaluate_edge,
     run_hash,
 )
+from algotrade.services.evaluation.cross_section.measures import pbo
 from algotrade.services.evaluation.cross_section.picks import screen_variant
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
 from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
@@ -313,10 +313,10 @@ def test_the_probability_of_overfitting_leaves_out_sessions_a_variant_held_nothi
         w.reader, w.results, w.configs, USER, edge(baselines=["other"]), days[0], days[-1], AS_OF
     )
     peers = list(ev.results)
-    assert _pbo(peers) is not None
+    assert pbo(peers) is not None
     held = tuple(dataclasses.replace(s, pick_values=()) for s in peers[1].stats)
     nothing = [peers[0], dataclasses.replace(peers[1], stats=held)]
-    assert _pbo(nothing) is None  # no session where both held something: no guess at zero
+    assert pbo(nothing) is None  # no session where both held something: no guess at zero
 
 
 def test_session_without_scores_is_excluded_not_ranked() -> None:
