@@ -1,0 +1,279 @@
+# Directory layout registry (ADR 0020), continued: the app and vendor-source folders (apps/, libs/)
+# and the [[shared]] task helpers.
+# The rules, the field meanings and the shared settings are in architecture/layout.toml; the
+# readers merge every architecture/layout*.toml (scripts/layout_report.py read_layout).
+
+# --------------------------------------------------------------------------- backtest app
+
+[[dir]]
+path = "apps/backtest/algotrade_backtest"
+purpose = "the backtest app: algotrade-backtest CLI and its command bodies"
+
+# --------------------------------------------------------------------------- vendor sources (libs/sources)
+# ADR 0027: vendor adapters are a shared workspace package, `algotrade_sources`. Ingestion uses
+# it for batch pulls; the API may use it later for live, read-only reads; backtests never.
+
+[[dir]]
+path = "libs/sources/algotrade_sources"
+purpose = "vendor sources: framework, vendors and fixtures (no modules of its own)"
+contracts = [
+    "Vendor sources are leaf adapters: they see only core, quant and config.env (ADR 0027)",
+    "The shared library never imports vendor sources (ADR 0027)",
+    "Backtests can never reach vendors (ADR 0008, ADR 0027)",
+]
+
+[[dir]]
+path = "libs/sources/algotrade_sources/fixtures"
+purpose = "the golden synthetic fixture source (generators, catalogue, CSV files)"
+
+[[dir]]
+path = "libs/sources/algotrade_sources/framework"
+purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry, a session source served on its own thread (session_thread)"
+contracts = ["Layout: only the source registry imports vendor folders"]
+
+[[dir]]
+path = "libs/sources/algotrade_sources/llm"
+purpose = "the text-model adapters (ADR 0041): the OpenAI-compatible chat-completions client over the framework's POST transport, which any provider answers by base_url alone, and the Claude Code headless client (the owner's own login, owner-only); built by the registry, injected into the API"
+
+[[dir]]
+path = "libs/sources/algotrade_sources/vendors"
+purpose = "one folder per data vendor (no modules of its own)"
+
+[[dir]]
+path = "libs/sources/algotrade_sources/vendors/*"
+purpose = "one vendor: fetch + normalise only; registered in framework/registry.py"
+kind = "vendor"
+contracts = ["Layout: vendors never import each other (one folder per vendor)"]
+
+# --------------------------------------------------------------------------- api app (ADR 0024)
+
+[[dir]]
+path = "apps/api/algotrade_api"
+purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the role-scoped REST responses (redact, ADR 0056), the text model behind screener drafts and regime explanations (text_model, ADR 0041), the built web app on the API's origin (web, ADR 0044), the ASGI app and the algotrade-api CLI"
+contracts = [
+    "API: routes reach the library only through services.read, services.preview, services.drafting, services.explaining, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)",
+    "Apps never import each other (ADR 0004)",
+]
+
+[[dir]]
+path = "apps/api/algotrade_api/auth"
+purpose = "who is calling (ADR 0040): the Authenticator protocol, Supabase token verification (JWKS key cache, claims, email -> registry user) and the loopback-only ALGOTRADE_AUTH=off mode; the one reader of the Authorization header"
+contracts = ["API: routes reach the library only through services.read, services.preview, services.drafting, services.explaining, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql"
+purpose = "the GraphQL read layer (ADR 0037): Strawberry schema at POST /graphql, scalars, errors, request context, dataloaders, the event-loop offload and admission control (offload.py), the response cache (response_cache.py); thin types over services.read in types/"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types"
+purpose = "GraphQL object types, one module per domain read object, split by area (instruments/, events/, screens/, ops/); here only the Query root, Session and the shared Unavailable / Cause (availability.py, ADR 0056): fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/evaluation"
+purpose = "GraphQL types over the edge evaluation (mirrors services/read/evaluation): Edge, EdgeRun, EdgeRow, TrackRecord"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/events"
+purpose = "GraphQL types about events (mirrors services/read/events): Event, InstrumentEvents (ahead, filings, expiry ladder, fund reference, gaps) and EventCalendar"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/guide"
+purpose = "GraphQL types of the Guide (mirrors services/read/guide, ADR 0051): GuideIndex, GuideField with its playbook uses and situations, GuidePlaybookDetail, GuideSituationDetail and GuideProse (prose split at catalogue names)"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/instruments"
+purpose = "GraphQL types at instrument grain (mirrors services/read/instruments): Instrument, FeatureValue / FeatureInfo / Unknown and the instrument's detail objects (its events: types/events)"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/market"
+purpose = "GraphQL types at market grain (mirrors services/read/market and services/read/regime): Market (values and the history of its stored fields) and MarketRegime with its scores, indicator cards, sizing rule, label bands, episodes and recessions"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/ops"
+purpose = "GraphQL types over run records and the configs they run (mirrors services/read/ops): Backtest, BacktestDetail, Config"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/screens"
+purpose = "GraphQL types over stored screen results (mirrors services/read/screens): Screener, ScreenerRun, ScreenResult, Ideas, TableView"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/users"
+purpose = "GraphQL types about users (mirrors services/read/users): Viewer"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/ops"
+purpose = "operating the API on a host: the launchd agents (the API kept serving, the auto-deploy poll) and the deploy cycle (ADR 0044, ADR 0057)"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes"
+purpose = "one FastAPI router per area (REST: writes, job polling, health, live quotes, preview POSTs): parse parameters, call one library function, map it to a schema"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/authoring"
+purpose = "the routes that write (ADR 0029): user rule screens and user features, each calling one services.authoring use case"
+contracts = ["Config writes go only through services.authoring (ADR 0029)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/drafting"
+purpose = "the drafting route (ADR 0041): a sentence to a draft rule screen through the app's text model; a POST body, never a write; calls the one services.drafting use case"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/edges"
+purpose = "the edges area's routes that stay REST (ADR 0059): run an edge evaluation on request and poll its job; its reads are GraphQL (Query.edges)"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/preview"
+purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.preview dry run"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/regime"
+purpose = "the regime route (ADR 0041, amended): the market regime in plain words through the app's text model; a POST body whose only write is the explanation cache; calls the one services.explaining use case"
+
+[[dir]]
+path = "apps/api/algotrade_api/routes/screens"
+purpose = "the screens area's routes that stay REST (ADR 0033, 0037): run a screener on request and poll its job; its reads are GraphQL (Query.screener)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas"
+purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/authoring"
+purpose = "request bodies and responses of the config-writing routes (ADR 0029)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/drafting"
+purpose = "request body and response of the drafting route (ADR 0041)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/preview"
+purpose = "request bodies and responses of the dry-run routes (screen preview, formula check)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/regime"
+purpose = "request body and response of the regime explanation route (ADR 0041, amended)"
+
+# --------------------------------------------------------------------------- ingestion app
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion"
+purpose = "the ingestion app package root (only __main__)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/cli"
+purpose = "algotrade-ingest: argument parsing (main) and command bodies (commands)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/ops"
+purpose = "operating the app on a host: scheduling the nightly run, the deploy hold (ADR 0057)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks"
+purpose = "ingestion tasks by domain (no modules of its own)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/derived"
+purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060)"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/events"
+purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows)"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/framework"
+purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the task registry and refresh scheduling (slot days for incremental tasks)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/listings"
+purpose = "listing tasks (edges ED6): the vendor listing history, the S&P 500 membership history and the winners-study sample with its coverage report"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/macro"
+purpose = "macro-series tasks: the macro task (FRED / ALFRED and published economic series and index levels into macro/series, with vintages) and the rows it adds to what is stored"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/maintenance"
+purpose = "maintenance tasks: quality checks, bad-bar flags, raw purge, id migration, golden load"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/market"
+purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/profile"
+purpose = "profile tasks: descriptive text about what an instrument is (stock descriptions from Massive, ETF investment objectives from SEC prospectuses)"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/reference"
+purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/verification"
+purpose = "verification tasks: compare stored values with an independent live source (IBKR, read-only), the sample and the graded checks"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows"
+purpose = "workflows: ordered, isolated runs of registry tasks (no modules of its own)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows/nightly"
+purpose = "the nightly workflow: sessions, steps, screens, the summary report and notifications"
+
+# --------------------------------------------------------------------------- shared helpers
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/reference/classify.py"
+reason = "the name rules of the security type: the universe build applies them, and `reference_classification` (ADR 0045) re-applies them to measure disagreement with the vendor"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/bar_quality.py"
+reason = "the bad-bar detector and its flag plan (ADR 0061): `bars-history` judges the bars it adds and publishes the flags with them"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py"
+reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-ids reuse it"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
+reason = "the option-chain coverage (`select_underlyings`: every active optionable instrument) is the coverage IBKR contract resolution enriches (ADR 0028), and `prioritise` is the one fetch order (priority symbols, S&P 500, liquidity) the descriptions task follows too (ADR 0034)"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/history_copy.py"
+reason = "its acceptance check (`check_history_copy`, WARN per skipped table) is declared by the nightly workflow on the `history-copy` step, like the quality checks (ADR 0060)"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py"
+reason = "the data-quality checks are the nightly steps' acceptance checks (ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/market/tiers.py"
+reason = "the one core / rest tier rule (ADR 0043): the chain fetch order, the chain acceptance check and the coverage check (tasks/maintenance/coverage.py) all grade by it"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"
+reason = "the coverage check is the rollups step's acceptance check (ADR 0043): the workflow declares which check accepts which step and runs it right after the step"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
+reason = "`check_outcomes` is the outcomes step's acceptance check (ADR 0053 amendment, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
+# The web app's folders (the [web] settings and every [[web_dir]], ADR 0025) are in architecture/web_layout.toml.

@@ -129,7 +129,7 @@ market regime.
 ## Where the columns live
 
 `features/rollups/price/` is at its module cap, so the new kinds get their own folders (`relative/` holds the groups that compare an instrument with the market, its sector and the universe) (one
-folder per kind of thing; `architecture/layout.toml`):
+folder per kind of thing; `architecture/layout*.toml`):
 
 | Group | Folder | Columns | Status |
 |---|---|---|---|

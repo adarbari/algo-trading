@@ -16,7 +16,7 @@
 <!-- Paste the warning list from `make layout` (folders at 8+ of 10 modules) if this PR adds
      modules to any of them, and say whether a split is planned. -->
 - [ ] Placed per the "Where does this go?" table (CLAUDE.md); nothing parked in a neighbouring folder
-- [ ] New folders declared in `architecture/layout.toml` with a purpose (+ `__init__.py` docstring, contracts if a boundary guards them)
+- [ ] New folders declared in `architecture/layout*.toml` with a purpose (+ `__init__.py` docstring, contracts if a boundary guards them)
 - [ ] No directory over 10 modules; folders in the `make layout` warning band considered (split planned or not needed)
 - [ ] Tests mirror the source folders; no grab-bag module names (`utils`, `helpers`, `common`, ...)
 
