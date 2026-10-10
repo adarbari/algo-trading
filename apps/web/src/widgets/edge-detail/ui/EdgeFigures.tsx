@@ -9,7 +9,8 @@ import type { ReactNode } from 'react';
 import type { EdgeVerdict } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
 
-function Labelled({ text, help }: { text: string; help: string }): ReactNode {
+/** A figure's label with its Guide help (shared by the strip and the details' figures). */
+export function Labelled({ text, help }: { text: string; help: string }): ReactNode {
   return (
     <Stack direction="row" gap={1} align="center">
       <Text size="xs" tone="muted">

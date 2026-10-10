@@ -54,7 +54,11 @@ purpose = "event-sensitivity track settings: the scope list of names the event s
 
 [[config_dir]]
 path = "config/site/guide"
-purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), glossary.toml (the app's words and the rule grammar, [[term]]), start.toml (the numbered Start here pages, [[page]]); the playbook prose in playbooks/"
+purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), start.toml (the numbered Start here pages, [[page]]); the glossary in glossary/ and the playbook prose in playbooks/"
+
+[[config_dir]]
+path = "config/site/guide/glossary"
+purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-line aim per file; the day, the rule grammar, a screen's result, why a value is not available, edges, the evidence behind a verdict, the text model's cost): the app's own words, [[term]] each (loaded by config/site/guide/glossary.py in file-name order; fitness tests: ids and terms unique across the files)"
 
 [[config_dir]]
 path = "config/site/guide/playbooks"

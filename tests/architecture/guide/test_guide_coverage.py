@@ -325,7 +325,7 @@ def test_a_term_shared_by_several_values_names_each_of_them(coverage: dict[str, 
             ]
     assert not problems, (
         f"{COVERAGE_FILE}: a shared term must name each value it explains (or give the value "
-        "its own [[term]] in config/site/guide/glossary.toml):\n" + "\n".join(problems)
+        "its own [[term]] in config/site/guide/glossary/<theme>.toml):\n" + "\n".join(problems)
     )
 
 

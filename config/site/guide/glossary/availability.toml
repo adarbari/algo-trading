@@ -1,0 +1,91 @@
+# L3 site setting: the Guide glossary, why a value is not available (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+# ------------------------------------------------------------- why a value is not available (ADR 0056)
+# One term per public kind (`UnavailableKind`, src/algotrade/services/read/availability/cause.py;
+# the fitness test tests/unit/services/read/availability/test_cause.py keeps every kind mapped).
+# A trader reads the kind and the feature names; the chain behind it is for admins.
+
+[[term]]
+id = "unavailable_system"
+term = "Not available: system error"
+short = "The value could not be shown because something in the app's own data pipeline did not deliver it."
+body = """
+A source was down, a nightly step did not finish, or a stored table is missing for the session.
+The value is not an empty value and not a zero: it is not there, and the app never fills
+it from an earlier day. A screen that needs it treats it as missing data, so a hard criterion
+rejects the row and a soft or score criterion costs points. It normally clears on the next
+nightly run; the owner sees the exact cause.
+"""
+see_also = ["unknown", "session", "unavailable_not_stored"]
+
+[[term]]
+id = "unavailable_not_stored"
+term = "Not available for this instrument"
+short = "Nothing is stored for this instrument for the session, and nothing went wrong: the data does not exist for it."
+body = """
+The instrument has no row in the data behind the field for that day, or the field is stored
+empty. A stock with no listed options has no option chain, a recent listing has no history,
+a company that has not reported has no report date. No failure stands behind it, so waiting
+does not change it. A screen treats it as missing data, like any other UNKNOWN value.
+"""
+see_also = ["unknown", "unavailable_not_applicable", "unavailable_system"]
+
+[[term]]
+id = "unavailable_not_applicable"
+term = "Does not apply to this instrument"
+short = "The field is not defined for this kind of instrument, so there is no value to show."
+body = """
+Some fields describe only some instruments: earnings dates exist for operating companies, not
+for funds; a fund's holdings exist only for funds. The app shows the field as not applicable
+and, where the data says so, the precise reason (a new listing, a blank-check company). It is a
+fact about the instrument, not a gap in the data.
+"""
+see_also = ["unknown", "unavailable_not_stored"]
+
+[[term]]
+id = "unavailable_illiquid"
+term = "Not available: too thinly traded"
+short = "An option value is left out because the instrument's options are too thinly quoted to trust."
+body = """
+Option values such as implied volatility are computed from near-the-money quotes. When the
+quotes are missing or their spread is too wide, the app shows no value rather than a number
+built from noise. It is the market's state on the day, not an error, and it can change by the
+next session.
+"""
+see_also = ["unknown", "liquidity_risk"]
+
+[[term]]
+id = "unavailable_licence"
+term = "Not available under your data licence"
+short = "The field comes from a personal-licence source that only its owner may read."
+body = """
+Some data (from the owner's brokerage connection) is licensed for personal use. Another user
+sees the field as unavailable, and a formula over it inherits the same licence. It is a rule
+of the data, not a fault.
+"""
+see_also = ["unknown"]
+
+[[term]]
+id = "chain_coverage"
+term = "Option chain coverage"
+short = "The share of optionable stocks and funds whose option chain was fetched fresh for the session."
+body = """
+Each night the app asks Cboe for the option chain of every optionable name. A chain counts as
+covered when it came back for that session; the figure is covered names over all optionable
+names. The rest are "stale" (Cboe served an older chain, common for thin, illiquid names), have
+no chain, or failed to fetch. A screen treats a name without a fresh chain as missing data.
+It never qualifies on option criteria.
+
+Read it against its own history, not against 100%. Cboe's free delayed feed chronically leaves
+several hundred names stale, so a steady 80% is normal here and a fall of five points or more
+is a problem. A name is chronic when it was stale in at least three of the last five sessions.
+Chronic names are mostly in the rest tier and will not clear by waiting.
+
+The nightly report and the Admin Ingestion page both show it. The report warns when coverage
+falls more than five points under its five-session median, or when the chronic count rises by
+more than fifty. It is a warning only: the chain acceptance checks and what they hold back are
+unchanged. The share can mislead when the optionable list itself changes, so check the counts.
+"""
+see_also = ["unavailable_system", "session"]

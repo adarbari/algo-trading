@@ -1,6 +1,6 @@
 /**
  * The Guide's Start here pages, glossary and search for the end-to-end tests (a mock of what the
- * server reads from `start.toml` and `glossary.toml` and ranks in `Query.guideSearch`): the index
+ * server reads from `start.toml` and `glossary/*.toml` and ranks in `Query.guideSearch`): the index
  * entries, `Query.guideStartPage(id)`, `Query.guideTerm(id)` and a search that matches the words
  * of a query in the titles and prose of those entries, the fields and the playbook, grouped by
  * kind. The ranking is the server's job (its own tests); here only the grouping is checked.
