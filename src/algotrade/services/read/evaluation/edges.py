@@ -11,6 +11,7 @@ from datetime import date
 from typing import Any
 
 from algotrade.config.edges import document, loading
+from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
 from algotrade.services.read.context import Stores
 
@@ -75,9 +76,11 @@ class Edge:
     """An edge document. ``frozen_from``: the first session of its frozen period (None: it has
     none, so no run is canonical); ``variants``: the ids of its ``[[variants]]``, ``main``
     first; ``schedule``: ``every_session``, ``month_end`` or ``on_event:<class>``. The user's
-    own state about it (``[follow]``, ADR 0053 amendment 2026-10-09): ``state`` (researching,
-    following, rejected, retired, trial), ``since``, ``state_reason``, the permanent ``labels``
-    the server decided, ``oos_revealed``; ``mine``: the document is the user's (a copy or a new
+    own state about it (ADR 0053 amendment 2026-10-10): ``status`` is the one status (the user's
+    on an own edge, with ``status_since`` and ``status_reason`` from its ``[audit]``); ``followed``
+    and ``followed_since``: a site edge the user bookmarked; the permanent ``labels`` the server
+    decided (the bookmark's and the audit's), ``oos_revealed``; ``mine``: the document is the
+    user's (a copy or a new
     edge, not a site edge), ``extends`` the edge it is a copy of, ``replaces`` the edge a trial
     would replace. ``oos_hidden``: a copy whose out-of-sample result is withheld until shown."""
 
@@ -97,9 +100,10 @@ class Edge:
     rejection_reason: str
     sources: tuple[EdgeSource, ...]
     definition: EdgeDefinition
-    state: str = "researching"
-    since: date | None = None
-    state_reason: str = ""
+    followed: bool = False
+    followed_since: date | None = None
+    status_since: date | None = None
+    status_reason: str = ""
     labels: tuple[str, ...] = ()
     oos_revealed: bool = False
     mine: bool = False
@@ -107,6 +111,24 @@ class Edge:
     replaces: str | None = None
     oos_hidden: bool = False
     settings: EdgeSettings | None = None
+    # Interim, until the surfaces speak status (ADR 0053 amendment 2026-10-10): the old state
+    # words the GraphQL type still serves, derived (``following`` when bookmarked, else
+    # ``researching``; ``since`` the bookmark's; ``state_reason`` the status's).
+    state: str = "researching"
+    since: date | None = None
+    state_reason: str = ""
+
+    # Interim, until the paper rule is rewritten: what the desk still trades.
+
+    @property
+    def paper_traded(self) -> bool:
+        """The edge trades on paper: a followed site edge, or an own candidate or live edge."""
+        return self.followed or (self.mine and self.status in ("candidate", "live"))
+
+    @property
+    def paper_since(self) -> date | None:
+        """The session its paper trading counts from."""
+        return self.followed_since if self.followed else self.status_since
 
 
 def _picks(e: document.Edge) -> str:
@@ -173,7 +195,7 @@ def _settings(e: document.Edge, own: Mapping[str, Any] | None) -> EdgeSettings:
         start_offset_sessions=e.outcome.start_offset_sessions,
         cost_bps=e.outcome.cost_bps,
         quality_bar=tuple(EdgeAnswer(k, e.quality_bar.get(k, "")) for k in document.QUALITY_BAR),
-        own={k: _json(v) for k, v in (own or {}).items() if k != FOLLOW},
+        own={k: _json(v) for k, v in (own or {}).items() if k not in (FOLLOW, AUDIT, "status")},
     )
 
 
@@ -195,15 +217,19 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         rejection_reason=e.rejection_reason,
         sources=tuple(EdgeSource(x.title, x.url) for x in e.sources),
         definition=EdgeDefinition(_picks(e), _trade(e.outcome), _compare(e), _test(e)),
-        state=e.follow.state,
+        state="following" if e.followed else "researching",
         since=e.follow.since,
-        state_reason=e.follow.reason,
-        labels=e.follow.labels,
-        oos_revealed=e.follow.oos_revealed,
+        state_reason=e.audit.status_reason,
+        followed=e.followed,
+        followed_since=e.follow.since,
+        status_since=e.audit.status_since,
+        status_reason=e.audit.status_reason,
+        labels=tuple(dict.fromkeys([*e.follow.labels, *e.audit.labels])),
+        oos_revealed=e.audit.oos_revealed,
         mine=mine,
         extends=e.extends,
-        replaces=e.follow.replaces,
-        oos_hidden=mine and not e.follow.oos_revealed,
+        replaces=e.audit.replaces,
+        oos_hidden=mine and not e.audit.oos_revealed,
         settings=_settings(e, own if mine else None),
     )
 

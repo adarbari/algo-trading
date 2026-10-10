@@ -42,10 +42,11 @@ failure_modes = "f"
 decoys = "g"
 """
 QUERY = """query E($id: String!) {
-  edge(id: $id) { id state since stateReason labels oosRevealed oosHidden mine extends replaces
-                  frozenFrom screeners compare { oosHidden reason rows { kind } } }
+  edge(id: $id) { id status followed followedSince statusSince statusReason labels oosRevealed
+                  oosHidden mine extends replaces frozenFrom screeners
+                  compare { oosHidden reason rows { kind } } }
 }"""
-LIST = "{ edges { id mine state } }"
+LIST = "{ edges { id mine status followed } }"
 
 
 @pytest.fixture
@@ -75,7 +76,8 @@ def test_copy_save_and_read_back(client: TestClient, root: Path) -> None:
     saved = c.put("/edges/mine", json={"document": {"extends": "drift", "top_k": 2}})
     assert saved.status_code == 200 and saved.json()["document"]["top_k"] == 2
     mine = read(c, QUERY, id="mine")
-    assert (mine["mine"], mine["extends"], mine["state"]) == (True, "drift", "researching")
+    assert (mine["mine"], mine["extends"], mine["status"]) == (True, "drift", "researching")
+    assert (mine["followed"], mine["followedSince"]) == (False, None)
     assert mine["oosHidden"] and mine["compare"]["reason"] == "You have not run this edge yet"
     assert [(e["id"], e["mine"]) for e in read(c, LIST)] == [("drift", False), ("mine", True)]
     assert read(c, QUERY, id="drift")["compare"] is None  # a site edge is not compared
@@ -99,30 +101,45 @@ def test_state_follow_reject_and_the_reveal(client: TestClient) -> None:
     shown = c.put("/edges/mine/state", json={"reveal_oos": True})
     assert shown.json()["oos_revealed"] and shown.json()["labels"] == ["oos_viewed_during_tuning"]
     assert not read(c, QUERY, id="mine")["oosHidden"]
-    refused = c.put("/edges/mine/state", json={"state": "retired"})
+    refused = c.put("/edges/mine/state", json={"status": "retired"})
     assert refused.status_code == 400 and "cannot go from" in refused.json()["detail"]
-    assert c.put("/edges/mine/state", json={"state": "rejected"}).status_code == 400  # a reason
-    rejected = c.put("/edges/mine/state", json={"state": "rejected", "reason": "No edge."})
-    assert (rejected.json()["state"], rejected.json()["reason"]) == ("rejected", "No edge.")
-    followed = c.put("/edges/drift/state", json={"state": "following"})  # a site edge, no copy
-    assert followed.status_code == 200 and followed.json()["state"] == "following"
-    assert read(c, QUERY, id="drift")["state"] == "following"
-    assert [(e["id"], e["state"]) for e in read(c, LIST)] == [
-        ("drift", "following"),
-        ("mine", "rejected"),
-    ]
+    assert c.put("/edges/mine/state", json={"status": "rejected"}).status_code == 400  # a reason
+    rejected = c.put("/edges/mine/state", json={"status": "rejected", "reason": "No edge."})
+    assert (rejected.json()["status"], rejected.json()["reason"]) == ("rejected", "No edge.")
+    mine = read(c, QUERY, id="mine")
+    assert (mine["status"], mine["statusReason"]) == ("rejected", "No edge.")
+    assert mine["statusSince"]
+    # following is a bookmark of a site edge: it never changes the site's status
+    followed = c.put("/edges/drift/state", json={"follow": True})
+    assert followed.status_code == 200 and followed.json()["followed"] is True
+    drift = read(c, QUERY, id="drift")
+    assert (drift["followed"], drift["status"]) == (True, "candidate") and drift["followedSince"]
+    assert [(e["id"], e["followed"]) for e in read(c, LIST)] == [("drift", True), ("mine", False)]
+    unfollowed = c.put("/edges/drift/state", json={"follow": False})
+    assert unfollowed.json()["followed"] is False
+    assert read(c, QUERY, id="drift")["followed"] is False  # the bookmark is gone
 
 
-def test_a_new_version_is_a_trial_and_replacing_retires_the_old_one(client: TestClient) -> None:
+def test_follow_is_for_site_edges_and_status_for_own_edges(client: TestClient) -> None:
     c = client
-    assert c.put("/edges/drift/state", json={"state": "following"}).status_code == 200
+    assert c.post("/edges/drift/copy", json={"new_id": "mine"}).status_code == 201
+    assert c.put("/edges/drift/state", json={"status": "live"}).status_code == 400
+    assert c.put("/edges/mine/state", json={"follow": True}).status_code == 400
+    both = c.put("/edges/mine/state", json={"follow": True, "status": "candidate"})
+    assert both.status_code == 400
+    unknown = c.put("/edges/mine/state", json={"status": "following"})
+    assert unknown.status_code == 400 and "status" in unknown.json()["detail"]
+
+
+def test_a_new_version_is_a_candidate_and_going_live_retires_the_old_one(
+    client: TestClient,
+) -> None:
+    c = client
     made = c.post("/edges/drift/copy", json={"new_id": "drift_v2", "as_version": True})
-    assert made.json()["document"]["follow"]["state"] == "trial"
-    v2 = read(c, QUERY, id="drift_v2")
-    assert (v2["state"], v2["replaces"]) == ("trial", "drift")
-    done = c.put("/edges/drift_v2/state", json={"state": "following"}).json()
-    assert done["labels"] == ["replaced_without_forward_test"]  # no forward sessions have passed
-    assert read(c, QUERY, id="drift")["state"] == "retired"
+    assert made.json()["document"]["status"] == "candidate"
+    assert read(c, QUERY, id="drift_v2")["replaces"] == "drift"
+    done = c.put("/edges/drift_v2/state", json={"status": "live"}).json()
+    assert (done["status"], done["labels"]) == ("live", ["replaced_without_forward_test"])
 
 
 def test_delete_archives_the_edge_and_the_id_is_not_reused(client: TestClient, root: Path) -> None:
@@ -152,7 +169,9 @@ def test_an_admin_writes_for_another_user_and_a_trader_only_for_themself(
         client.post("/edges/drift/copy", json={"new_id": "mine"}, headers=ALICE).status_code == 201
     )
     assert (root / "users" / "alice" / "edges" / "mine.toml").is_file()
-    assert read(client, LIST) == [{"id": "drift", "mine": False, "state": "researching"}]
+    assert read(client, LIST) == [
+        {"id": "drift", "mine": False, "status": "candidate", "followed": False}
+    ]
     other = trader_client.post(
         "/edges/drift/copy", json={"new_id": "x"}, headers={"X-Act-For": "alice"}
     )
@@ -184,7 +203,7 @@ def test_following_is_judged_against_the_acted_for_users_verdict_not_the_callers
         return "not_working"
 
     monkeypatch.setattr(versions, "verdict_level", verdict_level)
-    done = client.put("/edges/drift/state", json={"state": "following"}, headers=ALICE)
+    done = client.put("/edges/drift/state", json={"follow": True}, headers=ALICE)
     assert done.status_code == 200
     assert seen_users == ["alice"]  # the admin is "local"; the verdict is alice's view
     assert done.json()["labels"] == ["followed_against_verdict"]

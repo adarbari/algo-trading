@@ -127,14 +127,30 @@ describe('EdgeActions', () => {
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
         params: { path: { edge_id: 'earnings_drift' } },
-        body: { state: 'following', reason: '', reveal_oos: false },
+        body: { follow: true, status: null, reason: '', reveal_oos: false },
       });
     });
   });
 
-  it('needs a reason to reject', async () => {
+  it('rejects a site edge without asking why: it only removes the bookmark', async () => {
     PUT.mockResolvedValue(ok({ edge_id: 'momentum_12_1', state: 'rejected' }));
     setup('momentum_12_1');
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    const confirm = screen.getAllByRole('button', { name: 'Reject' }).at(-1) as HTMLElement;
+    expect(screen.queryByRole('textbox', { name: 'Why' })).not.toBeInTheDocument();
+    expect(confirm).toBeEnabled();
+    await userEvent.click(confirm);
+    await waitFor(() => {
+      expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
+        params: { path: { edge_id: 'momentum_12_1' } },
+        body: { follow: false, status: null, reason: '', reveal_oos: false },
+      });
+    });
+  });
+
+  it("needs a reason to reject one of the user's own edges", async () => {
+    PUT.mockResolvedValue(ok({ edge_id: 'my_momentum', state: 'rejected' }));
+    setup('my_momentum');
     await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
     await screen.findByRole('textbox', { name: 'Why' });
     const confirm = () => screen.getAllByRole('button', { name: 'Reject' }).at(-1) as HTMLElement;
@@ -143,8 +159,8 @@ describe('EdgeActions', () => {
     await userEvent.click(confirm());
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
-        params: { path: { edge_id: 'momentum_12_1' } },
-        body: { state: 'rejected', reason: 'No edge.', reveal_oos: false },
+        params: { path: { edge_id: 'my_momentum' } },
+        body: { follow: null, status: 'rejected', reason: 'No edge.', reveal_oos: false },
       });
     });
   });
@@ -159,7 +175,7 @@ describe('EdgeActions', () => {
     await waitFor(() => {
       expect(PUT).toHaveBeenCalledWith('/edges/{edge_id}/state', {
         params: { path: { edge_id: 'my_momentum' } },
-        body: { state: null, reason: '', reveal_oos: true },
+        body: { follow: null, status: null, reason: '', reveal_oos: true },
       });
     });
   });

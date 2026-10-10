@@ -20,7 +20,7 @@ class CopyEdgeBody(BaseModel):
 class SaveEdgeBody(BaseModel):
     document: dict[str, Any] = Field(
         description="the edge's TOML keys as JSON: `extends` and the settings it changes "
-        "(a `[follow]` table in it is ignored: the state has its own call)"
+        "(its status, `[follow]` and `[audit]` are ignored: the status has its own call)"
     )
 
 
@@ -30,9 +30,14 @@ class EdgeDocument(Schema):
 
 
 class StateBody(BaseModel):
-    state: str | None = Field(
+    follow: bool | None = Field(
         default=None,
-        description="researching | following | rejected | retired | trial; none keeps it",
+        description="a site edge: true bookmarks it, false removes the bookmark; none keeps it",
+    )
+    status: str | None = Field(
+        default=None,
+        description="the user's own edge: researching | candidate | live | retired | rejected; "
+        "none keeps it",
     )
     reason: str = Field(default="", description="why: a rejection needs one, a retirement may")
     reveal_oos: bool = Field(
@@ -42,8 +47,10 @@ class StateBody(BaseModel):
 
 class EdgeState(Schema):
     edge_id: str
-    state: str
-    since: date | None
+    status: str
+    followed: bool
+    followed_since: date | None
+    status_since: date | None
     reason: str
     replaces: str | None
     labels: list[str]

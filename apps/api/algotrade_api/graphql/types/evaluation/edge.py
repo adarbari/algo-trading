@@ -167,11 +167,14 @@ class EdgeEvidence:
 
 @strawberry.type(
     description="An edge document (ADR 0053): status, thesis, the screeners and baselines that "
-    "implement it, its `frozenFrom` (null: no frozen period) and the run it cites; the user's "
-    "own `state` about it (researching, following, rejected, retired, trial) with its `since`, "
-    "`stateReason`, the permanent `labels` the server decided and `oosRevealed`; `mine`: the "
-    "document is the user's own (a copy or a new edge), `extends` the edge it is a copy of, "
-    "`replaces` the edge a trial would replace, `oosHidden` its out-of-sample result is withheld"
+    "implement it, its `frozenFrom` (null: no frozen period) and the run it cites; `status` is "
+    "the one status (a site edge's the site's, the user's own edge's theirs, with `statusSince` "
+    "and `statusReason` for a rejection or retirement); `followed` / `followedSince`: the user "
+    "bookmarked a site edge; the permanent `labels` the server decided and `oosRevealed`; "
+    "`mine`: the document is the user's own (a copy or a new edge), `extends` the edge it is a "
+    "copy of, `replaces` the edge a candidate would replace, `oosHidden` its out-of-sample "
+    "result is withheld; `state`, `since` and `stateReason` are deprecated (the old state "
+    "words, derived) until the web speaks status"
 )
 class Edge:
     id: str
@@ -190,9 +193,15 @@ class Edge:
     rejection_reason: str
     sources: list[EdgeSource]
     definition: EdgeDefinition
-    state: str
-    since: dt.date | None
-    state_reason: str
+    followed: bool
+    followed_since: dt.date | None
+    status_since: dt.date | None
+    status_reason: str
+    state: str = strawberry.field(
+        deprecation_reason="Use status and followed: researching, or following when bookmarked"
+    )
+    since: dt.date | None = strawberry.field(deprecation_reason="Use followedSince or statusSince")
+    state_reason: str = strawberry.field(deprecation_reason="Use statusReason")
     labels: list[str]
     oos_revealed: bool
     oos_hidden: bool
@@ -223,6 +232,10 @@ class Edge:
             rejection_reason=d.rejection_reason,
             sources=[EdgeSource.of(x) for x in d.sources],
             definition=EdgeDefinition.of(d.definition),
+            followed=d.followed,
+            followed_since=d.followed_since,
+            status_since=d.status_since,
+            status_reason=d.status_reason,
             state=d.state,
             since=d.since,
             state_reason=d.state_reason,
