@@ -1,13 +1,15 @@
-"""The paper trades a user's followed edges made, as ``ctx.session`` knew them (ADR 0053 amendment
-2026-10-09, ADR 0036's one session).
+"""The paper trades of the edges a user sees, as ``ctx.session`` knew them (ADR 0053 amendment
+2026-10-10, ADR 0036's one session).
 
-The trades are the stored record of ``results/edge_paper`` (``data.paper``: written by the nightly
-``edge-signals`` job, never derived here: re-deriving history from today's edge documents would
-rewrite the record when the user edits an edge). Point in time by business dates, not by when a
-row was written: a trade signalled after the session is not read, and one whose sell session is
-after the session is OPEN whatever a later night recorded (its result was not known yet). A
-trade that is open, settled or skipped is shown as the record says for the session; a number
-not known (an open trade's return) is None, never zero."""
+Paper trades follow the edge's OWNER: a site edge has ONE record, the ``site``'s, which every
+follower and every other reader sees alike; a user's own edge has the user's, which no one else
+reads (``record_owner``). The trades are the stored record of ``results/edge_paper``
+(``data.paper``: written by the nightly ``edge-signals`` job, never derived here: re-deriving
+history from today's edge documents would rewrite the record when the user edits an edge). Point
+in time by business dates, not by when a row was written: a trade signalled after the session is
+not read, and one whose sell session is after the session is OPEN whatever a later night recorded
+(its result was not known yet). A trade that is open, settled or skipped is shown as the record
+says for the session; a number not known (an open trade's return) is None, never zero."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -15,8 +17,10 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from algotrade.data.paper import LOOKBACK_DAYS, read_stored
+from algotrade.config.user import SITE_USER
+from algotrade.data.paper import LOOKBACK_DAYS, read_paper
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.evaluation.edges import Edge
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.values import to_scalar
 
@@ -77,14 +81,21 @@ def _trade(row: dict[str, object], session: date, names: Mapping[str, str]) -> P
     )
 
 
-def load_trades(ctx: ReadContext, names: Mapping[str, str]) -> tuple[PaperTrade, ...]:
-    """Every paper trade of the user's edges (``names``: edge id -> name; a trade of an edge the
-    user no longer has is left out) signalled in the window up to ``ctx.session``, oldest signal
-    first."""
+def record_owner(edge: Edge, user_id: str) -> str:
+    """Whose record holds the edge's paper trades: ``site`` for a site edge, else the user's."""
+    return user_id if edge.mine else SITE_USER
+
+
+def load_trades(ctx: ReadContext, edges: Mapping[str, Edge]) -> tuple[PaperTrade, ...]:
+    """Every paper trade of ``edges`` (by id; a trade of an edge the user does not see is left out,
+    and so is a follower's old row of a site edge: only the record owner's rows count) signalled
+    in the window up to ``ctx.session``, oldest signal first."""
     day = ctx.session.date
-    frame = read_stored(ctx.reader, ctx.user.user_id, day - timedelta(days=LOOKBACK_DAYS), day)
+    owners = {i: record_owner(e, ctx.user.user_id) for i, e in edges.items()}
+    frame = read_paper(ctx.reader, owners, day - timedelta(days=LOOKBACK_DAYS), day)
+    names = {i: e.name for i, e in edges.items()}
     records = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
-    return tuple(_trade(r, day, names) for r in records if str(r["edge_id"]) in names)
+    return tuple(_trade(r, day, names) for r in records)
 
 
 def with_instruments(ctx: ReadContext, trades: tuple[PaperTrade, ...]) -> tuple[PaperTrade, ...]:

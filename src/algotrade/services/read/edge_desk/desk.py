@@ -1,10 +1,12 @@
-"""The Ideas signals of the edges a user follows (ADR 0053 amendment 2026-10-09) for one session:
-what to buy (the paper trades the nightly signalled for the session), what to sell next session
-(the open trades whose window closes then) and how each followed edge is doing (its live record).
+"""The Ideas signals of the edges a user follows or owns (ADR 0053 amendment 2026-10-10) for one
+session: what to buy (the paper trades the nightly signalled for the session), what to sell next
+session (the open trades whose window closes then) and how each edge is doing (its live record).
 
-A buy or a sell is the stored paper record, never derived here (``paper.py``); a followed edge
-with no trade yet says so. D4: a sell shows ahead or behind only once settled (an open trade has
-no mark), which is why the list carries no return."""
+A buy or a sell is the stored paper record of the edge's OWNER (``paper.py``: the site's for a
+site edge the user follows, so every follower reads the same trades; the user's for their own
+edge), never derived here, and only of the edges on this desk; an edge with no trade yet says
+so. D4: a sell shows ahead or behind only once settled (an open trade has no mark), which is why
+the list carries no return."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -15,7 +17,13 @@ from algotrade.core.time.calendar import next_session
 from algotrade.data.paper import job_name
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.live import LiveRecord, live_record
-from algotrade.services.read.edge_desk.paper import OPEN, PaperTrade, load_trades, with_instruments
+from algotrade.services.read.edge_desk.paper import (
+    OPEN,
+    PaperTrade,
+    load_trades,
+    record_owner,
+    with_instruments,
+)
 from algotrade.services.read.evaluation.edges import Edge, load_edges
 from algotrade.storage.runs import RunStatus
 
@@ -24,13 +32,13 @@ SIGNALLED, NO_PICKS, NOT_DUE, SKIPPED, NOT_RUN = (
 )  # fmt: skip
 
 
-def _night(ctx: ReadContext) -> dict[str, Any] | None:
-    """The stats of the user's committed ``edge-paper`` run for exactly the session (None: the
-    nightly did not run it)."""
+def _night(ctx: ReadContext, owner: str) -> dict[str, Any] | None:
+    """The stats of the record owner's committed ``edge-paper`` run for exactly the session (None:
+    the nightly did not run it)."""
     day = ctx.session.date
     found = [
         r
-        for r in ctx.reader.runs(job_name(ctx.user.user_id))
+        for r in ctx.reader.runs(job_name(owner))
         if r.session_date == day and r.status is RunStatus.COMPLETE
     ]
     return max(found, key=lambda r: r.finished_at or r.started_at).stats if found else None
@@ -96,18 +104,21 @@ def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
     nxt = next_session(day)
     if not followed:
         return EdgeDesk(day, nxt, (), (), ())
-    trades = load_trades(ctx, {i: e.name for i, e in edges.items()})
+    on_desk = {e.id for e in followed}
+    trades = tuple(t for t in load_trades(ctx, edges) if t.edge_id in on_desk)
     settings = load_verdict(ctx.configs)
     buys = with_instruments(ctx, tuple(t for t in trades if t.signal_session == day))
     sells = with_instruments(
         ctx, tuple(t for t in trades if t.status == OPEN and t.sell_session == nxt)
     )
-    night = _night(ctx)
+    me = ctx.user.user_id
+    nights = {o: _night(ctx, o) for o in {record_owner(e, me) for e in followed}}
     records = tuple(
         FollowedEdge(
             e.id, e.name, _state(e), e.paper_since,
             live_record(ctx, e, [t for t in trades if t.edge_id == e.id], settings),
-            *_tonight(night, e.id), _missed(night, e.id),
+            *_tonight(nights[record_owner(e, me)], e.id),
+            _missed(nights[record_owner(e, me)], e.id),
         )
         for e in followed
     )  # fmt: skip

@@ -263,7 +263,7 @@ def load_edge_paper(ctx: ReadContext, edge_id: str) -> EdgePaper | None:
     edge = edges.get(edge_id)
     if edge is None:
         return None
-    trades = load_trades(ctx, {i: e.name for i, e in edges.items()})
+    trades = load_trades(ctx, edges)
     settings = load_verdict(ctx.configs)
     own = [t for t in trades if t.edge_id == edge.id]
     ordered = sorted(own, key=lambda t: (t.signal_session, -t.rank), reverse=True)

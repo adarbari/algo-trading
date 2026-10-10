@@ -130,7 +130,7 @@ TRIAL = {("me", "edges", "drift2"): {
 
 
 def two_edges(backend: MemoryBackend, v2_wins: int, v1_wins: int, day: date = SESSION):  # type: ignore[no-untyped-def]
-    v2 = [t | {"edge_id": "drift2"} for t in closed_trades(v2_wins, 10 - v2_wins)]
+    v2 = [t | {"edge_id": "drift2", "user_id": "me"} for t in closed_trades(v2_wins, 10 - v2_wins)]
     v1 = closed_trades(v1_wins, 10 - v1_wins)
     store(backend, v1 + v2)
     found = load_edge_paper(context(backend, day=day, extra=TRIAL), "drift2")

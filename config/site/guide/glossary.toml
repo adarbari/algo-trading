@@ -507,11 +507,12 @@ see_also = ["edge", "edge_owner", "show_out_of_sample", "compare_versions"]
 [[term]]
 id = "follow_edge"
 term = "Following an edge"
-short = "Following is a bookmark of a site edge: it keeps the edge in your list and on paper."
+short = "Following is a bookmark of a site edge: it keeps the edge in your list and shows you its paper trades."
 body = """
-Follow a site edge to keep it in your list and have the app record its paper trades for you.
-Following changes nothing about the edge: its status and its official result stay the site's, and
-unfollowing removes the bookmark. The app warns when the verdict is Not working or Not enough
+Follow a site edge to keep it in your list and see its paper trades on Ideas. The trades are the
+site's, one record for every follower: following records nothing of its own and creates no
+trades, and unfollowing hides them again. Following changes nothing about the edge: its status
+and its official result stay the site's, and unfollowing removes the bookmark. The app warns when the verdict is Not working or Not enough
 data, and the warning stays on the bookmark as a permanent label (Followed against the verdict).
 Your own edge is not followed: you set its status instead. A bookmark is a record of your
 interest, not an order: the app never trades.
@@ -901,9 +902,15 @@ id = "paper_trading"
 term = "Paper trading"
 short = "What an edge of yours would have bought and sold, recorded every night as it happens."
 body = """
-For an edge you follow, or your own candidate or live edge, each night the app takes the picks of its screen, using only what was
-known that night, and records them as paper trades: the name, the session to buy it and the
-session to sell it after the edge's holding period. Nothing is ever ordered. A trade stays open
+Paper trades are recorded by an edge's owner, never by a follower. An edge records while it is
+evidenced or live: a site edge once, for the site, which every follower of it then reads, and an
+edge of your own, for you alone, once you make it live. A candidate or researching edge records
+nothing, and a retired or rejected one takes no new picks, though trades still open settle.
+Following is only a bookmark and creates no paper trades. Each night the app takes the picks of
+the recording edge's screen, using only what was known that night (with the owner's presets, never
+a follower's), and records them as paper trades: the name, the session to buy it and the
+session to sell it after the edge's holding period. A record begins the first night the app sees
+the edge recording, never earlier. Nothing is ever ordered. A trade stays open
 until its window has closed and the result is stored, and is then won or lost by the same win
 rule as the backtest. A trade whose result could not be read is skipped with the reason; it is
 never counted as a loss. The record is kept as written: editing the edge later does not change
@@ -947,7 +954,8 @@ term = "Forward test"
 short = "A new version of an edge tried on live paper trades beside the edge it would replace."
 body = """
 A new version of an edge is a candidate first, tried on paper next to the version it would
-replace: both record the same nights' picks from the day it became a candidate. It can go live
+replace over the same nights' picks. A candidate records no paper trades itself (only an evidenced
+or live edge does, see Paper trading), so there is nothing to compare until it is live. It can go live
 and retire the old one once the site's number of sessions have passed and its win rate is not behind. Replacing earlier is
 allowed but is recorded on the edge as replaced without a forward test, because the backtest of
 a version you have tuned looks better than it will do going forward.

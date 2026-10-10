@@ -670,17 +670,18 @@ WINNERS_STUDY = _fixed(
     runs="merge",
     key=("row_kind", "feature", "block", "run_id"),
 )  # fmt: skip
-# The forward paper record (ADR 0053 amendment 2026-10-09): one row per (user, edge, signal
-# session, name) the nightly ``edge-signals`` job made when it was tonight's pick of a followed
-# edge, written by ``services/evaluation/forward/results.py``. Partition ``session_date`` =
-# ``signal_session`` (the decision session D), so a later run settles a trade by rewriting its
-# row in its own partition: runs merge, the latest known row wins per key and ``as_of`` reads the
-# book as it was. ``status`` is ``open`` (window not closed), ``won`` / ``lost`` (the edge's own
-# hit; ``excess_return`` the outcome's measure) or ``skipped`` with ``reason`` (never a loss,
-# never a zero); ``delisted`` marks a name measured to its last bar; ``outcome_hash``
-# fingerprints the edge's [outcome] at the signal, so a trade is never judged by a definition the
-# user edited afterwards. ``buy_session`` is the entry session S, ``sell_session`` the window's
-# close, both from the trading calendar.
+# The forward paper record (ADR 0053 amendment 2026-10-10): one row per (user, edge, signal
+# session, name) the nightly ``edge-signals`` job made when it was tonight's pick of an evidenced
+# or live edge; ``user_id`` is the RECORD owner (``site`` for a site edge, else the user whose
+# edge it is), never a follower. Written by ``services/evaluation/forward/results.py``. Partition
+# ``session_date`` = ``signal_session`` (the decision session D), so a later run settles a trade
+# by rewriting its row in its own partition: runs merge, the latest known row wins per key and
+# ``as_of`` reads the book as it was. ``status`` is ``open`` (window not closed), ``won`` /
+# ``lost`` (the edge's own hit; ``excess_return`` the outcome's measure) or ``skipped`` with
+# ``reason`` (never a loss, never a zero); ``delisted`` marks a name measured to its last bar;
+# ``outcome_hash`` fingerprints the edge's [outcome] at the signal, so a trade is never judged by
+# a definition the user edited afterwards. ``buy_session`` is the entry session S,
+# ``sell_session`` the window's close, both from the trading calendar.
 EDGE_PAPER = _fixed(
     "results/edge_paper",
     "results",

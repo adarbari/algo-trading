@@ -5,12 +5,20 @@ from datetime import date
 
 import pytest
 
+from algotrade.config.edges.document import QUALITY_BAR
+from algotrade.config.user import UserContext
+from algotrade.data import StoreReader
 from algotrade.data.paper import job_name
+from algotrade.services.read.context import ReadContext, open_stores
 from algotrade.services.read.edge_desk.desk import load_edge_desk
+from algotrade.services.read.edge_desk.live import load_edge_paper
+from algotrade.services.read.session import Session
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.unit.services.read.edge_desk.conftest import (
+    FOLLOW,
     FOLLOWED,
     KNOWN,
     NEXT,
@@ -20,6 +28,7 @@ from tests.unit.services.read.edge_desk.conftest import (
     store,
     trade,
 )
+from tests.unit.services.read.evaluation.conftest import DOCS
 
 
 def test_the_desk_lists_tonights_buys_and_tomorrows_sells_best_first(
@@ -71,9 +80,15 @@ def test_every_followed_edge_carries_its_record_and_since(backend: MemoryBackend
     assert (edge.record.closed, edge.record.wins) == (20, 12)
 
 
-def _night(backend: MemoryBackend, day: date, stats: dict, finish: bool = True) -> None:  # type: ignore[type-arg]
-    """The run record a nightly ``edge-signals`` job leaves for ``me`` on ``day``."""
-    record = RunRecord(f"edge-paper-{day}", job_name("me"), day, KNOWN)
+def _night(
+    backend: MemoryBackend,
+    day: date,
+    stats: dict,  # type: ignore[type-arg]
+    finish: bool = True,
+    owner: str = "site",
+) -> None:
+    """The run record a nightly ``edge-signals`` job leaves for the record owner on ``day``."""
+    record = RunRecord(f"edge-paper-{day}", job_name(owner), day, KNOWN)
     ResultWriter(backend).save_run(record.finish(KNOWN, complete=finish, stats=stats))
 
 
@@ -115,3 +130,58 @@ def test_the_sessions_the_nightly_missed_are_served_per_edge(backend: MemoryBack
     _night(backend, SESSION, {"tonight": {"drift": {"state": "signalled"}}, "missed": missed})
     (edge,) = load_edge_desk(context(backend)).followed
     assert edge.missed == (date(2026, 10, 1),)
+
+
+OWN_LIVE = {
+    "id": "mine", "name": "Mine", "thesis": "Names keep rising.", "mechanism": "m",
+    "persistence": "p", "schedule": "every_session", "universe": "active", "top_k": 5,
+    "screeners": ["momo"], "status": "live", "audit": {"status_since": FOLLOWED},
+    "sources": [{"title": "A"}], "quality_bar": dict.fromkeys(QUALITY_BAR, "An answer."),
+    "outcome": {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+                "start_offset_sessions": 1},
+}  # fmt: skip
+
+
+def _as(backend: MemoryBackend, user: str, own: dict | None = None) -> ReadContext:  # type: ignore[type-arg]
+    """The read context of ``user``, who follows the site edge ``drift`` (and has ``own`` docs)."""
+    docs = {**DOCS, (user, "edges", "drift"): {"follow": FOLLOW}, **(own or {})}
+    stores = open_stores(StoreReader(backend), MemoryConfigStore(docs), UserContext(user))
+    session = Session(SESSION, None, True, None, None, False, (), ())
+    return ReadContext(
+        stores.reader, stores.configs, stores.user, session, stores.features, stores.cache
+    )
+
+
+def test_two_followers_of_a_site_edge_see_the_same_site_trades_and_night(
+    backend: MemoryBackend,
+) -> None:
+    store(backend, [trade("EQ:A", SESSION, rank=1), trade("EQ:B", SESSION, rank=2)])
+    _night(backend, SESSION, {"tonight": {"drift": {"state": "signalled", "reason": ""}}})
+    seen = [load_edge_desk(_as(backend, user)) for user in ("me", "you")]
+    assert [[t.instrument_id for t in d.buys] for d in seen] == [["EQ:A", "EQ:B"]] * 2
+    assert [d.followed[0].tonight for d in seen] == ["signalled", "signalled"]
+    assert seen[0].followed[0].record == seen[1].followed[0].record
+
+
+def test_a_followers_old_rows_of_a_site_edge_are_left_out_of_the_shared_record(
+    backend: MemoryBackend,
+) -> None:
+    store(backend, [trade("EQ:A", SESSION), trade("EQ:OLD", SESSION, user="me")])
+    desk = load_edge_desk(context(backend))
+    assert [t.instrument_id for t in desk.buys] == ["EQ:A"]
+    paper = load_edge_paper(context(backend), "drift")
+    assert paper is not None and [t.instrument_id for t in paper.trades] == ["EQ:A"]
+
+
+def test_a_site_edge_nobody_follows_is_not_on_the_desk_and_an_own_edge_is_private(
+    backend: MemoryBackend,
+) -> None:
+    mine = {("me", "edges", "mine"): OWN_LIVE}
+    store(backend, [trade("EQ:S", SESSION), trade("EQ:M", SESSION, edge="mine", user="me")])
+    own_only = context(backend, follow=None, extra=mine)
+    desk = load_edge_desk(own_only)
+    assert [t.instrument_id for t in desk.buys] == ["EQ:M"]  # the site's trades are not shown
+    assert [e.edge_id for e in desk.followed] == ["mine"]
+    other = _as(backend, "you")  # follows drift; mine is no edge of theirs
+    assert [t.instrument_id for t in load_edge_desk(other).buys] == ["EQ:S"]
+    assert load_edge_paper(other, "mine") is None

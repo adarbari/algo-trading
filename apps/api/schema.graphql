@@ -1805,7 +1805,7 @@ type Query {
   edgeProblems: [EdgeProblem!]!
 
   """
-  The Ideas signals of the edges the user follows for the session: what to buy (the paper trades signalled on it), what to sell next session and each followed edge's live record. Null: nothing stored
+  The Ideas signals of the edges the user follows or owns for the session: what to buy (the paper trades signalled on it), what to sell next session and each edge's live record. Paper trades follow the edge's owner: a followed site edge shows the one site record every follower sees, an own edge the user's own. Null: nothing stored
   """
   edgeDesk(
     """
@@ -1815,7 +1815,7 @@ type Query {
   ): EdgeDesk
 
   """
-  The paper record of the edge `id` as the session knew it: the live record against the backtest's usual range, the trades and, for a trial, the forward test; null: no such edge or nothing stored
+  The paper record of the edge `id` as the session knew it, the owner's: the site's for a site edge (the same for every follower), the user's for their own edge. The live record against the backtest's usual range, the trades and, for a trial, the forward test; null: no such edge or nothing stored
   """
   edgePaper(
     id: String!

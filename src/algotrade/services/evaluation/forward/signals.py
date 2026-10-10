@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.loading import RECORDING
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import (
@@ -50,7 +51,6 @@ from algotrade.services.evaluation.cross_section.picks import eligible, screen_v
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.storage.configs.store import ConfigStore
 
-RECORDING = ("evidenced", "live")  # the statuses an edge takes new paper picks in
 # Sessions an event schedule reads back to dedupe names. The dedupe is a chain (a name counted
 # at X blocks the next DEDUPE_SESSIONS), so the bound is exact unless one name matches three or
 # more times within this many sessions (a moved report date): then the first match may lie
