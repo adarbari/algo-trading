@@ -45,6 +45,7 @@ class LegRecord:
     event_ids: tuple[str, ...] | None = None  # sorted; None: no event schedule
     lost_table: str | None = None  # the table the screener had no data in at D
     snapshot: date | None = None  # the universe snapshot the screen read
+    outcome_seq: int | None = None  # the outcome partition's commit sequence at the read
     known: datetime | None = None  # the row's ``knowledge_ts``, set when read from the store
 
     @property
@@ -150,6 +151,7 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         entry_session=record.entry,
         outcomes_as_of=record.outcomes_as_of,
         screen_snapshot=record.snapshot,
+        outcome_seq=record.outcome_seq,
         lost_table=record.lost_table,
         event_ids=None if record.event_ids is None else list(record.event_ids),
         regime=s.regime,
@@ -245,6 +247,7 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         event_ids=None if _null(events) else tuple(str(i) for i in events),
         lost_table=_opt(row.get("lost_table")),
         snapshot=_opt_day(row.get("screen_snapshot")),
+        outcome_seq=_int(row.get("outcome_seq")),
         known=None if _null(row.get("knowledge_ts")) else _moment(row["knowledge_ts"]),
     )
 

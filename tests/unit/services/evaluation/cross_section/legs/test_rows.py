@@ -67,14 +67,14 @@ def leg(**changes: Any) -> LegRecord:
     base = LegRecord(
         key="k" * 64, trial_hash="t" * 64, edge_variant="main", variant="momo", horizon=2,
         entry=S, stat=stat(), outcomes_as_of=AS_OF, random=draws(),
-        event_ids=("EQ:A", "EQ:B"), lost_table=None, snapshot=date(2026, 8, 28),
+        event_ids=("EQ:A", "EQ:B"), lost_table=None, snapshot=date(2026, 8, 28), outcome_seq=7,
     )  # fmt: skip
     return replace(base, **changes)
 
 
 def assert_same(a: LegRecord, b: LegRecord) -> None:
-    assert (a.stat, a.key, a.trial_hash, a.entry, a.snapshot) == (
-        b.stat, b.key, b.trial_hash, b.entry, b.snapshot
+    assert (a.stat, a.key, a.trial_hash, a.entry, a.snapshot, a.outcome_seq) == (
+        b.stat, b.key, b.trial_hash, b.entry, b.snapshot, b.outcome_seq
     )  # fmt: skip
     assert (a.edge_variant, a.variant, a.horizon, a.event_ids, a.lost_table) == (
         b.edge_variant, b.variant, b.horizon, b.event_ids, b.lost_table

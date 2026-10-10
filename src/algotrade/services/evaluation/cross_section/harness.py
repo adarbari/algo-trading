@@ -834,6 +834,7 @@ def _measure_plan(
                 event_ids=None if names is None else tuple(sorted(names)),
                 lost_table=session.lost.get((variant.id, leg.decision)),
                 snapshot=session.snapshot_of(variant, leg.decision),
+                outcome_seq=out.seqs.get(leg.entry),
             )
             row = encode_leg(record, spec.user_id, spec.edge_id)
             out.rows.append(row)

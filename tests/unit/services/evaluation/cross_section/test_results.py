@@ -10,8 +10,13 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import DataValidationError
+from algotrade.data import dates_digest
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
-from algotrade.services.evaluation.cross_section.legs.rows import decode_leg, encode_leg
+from algotrade.services.evaluation.cross_section.legs.rows import (
+    decode_leg,
+    decode_reads,
+    encode_leg,
+)
 from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
@@ -298,3 +303,24 @@ def test_the_evaluations_own_leg_rows_decode_to_the_statistics_it_measured(world
     legs = [decode_leg(r) for r in ev.leg_rows if r["row_kind"] == "leg"]
     assert [leg.stat for leg in legs] == list(ev.results[0].stats)
     assert all(encode_leg(leg, "site", "drift")["leg_key"] == leg.key for leg in legs)
+
+
+def test_a_snapshot_after_a_session_never_ends_its_reads_log_past_it() -> None:
+    """The snapshot read lists only the partitions up to D: a later snapshot cannot change what
+    D read (ADR 0063); before the first snapshot the earliest one is logged as that one
+    partition, so a later snapshot never invalidates D and an earlier one does."""
+    w = with_listing_history(build_world(snapshot=DAYS[3]), DAYS[3])  # first snapshot Sept 4
+    reads = {
+        r.day: r
+        for r in (decode_reads(x) for x in evaluate(w).leg_rows if x["row_kind"] == "reads")
+    }
+    assert len(reads) == 4
+    for day, found in reads.items():
+        for rec in found.reads:
+            if rec.table not in ("universe", "instruments/reference"):
+                continue
+            if day >= DAYS[3]:  # a snapshot on or before D: nothing is listed past D
+                assert rec.end <= day, (day, rec)
+            elif rec.start > day and rec.kind == "dates":  # before the first: only the earliest
+                assert (rec.start, rec.end) == (DAYS[3], DAYS[3])
+                assert rec.digest == dates_digest([DAYS[3]])
