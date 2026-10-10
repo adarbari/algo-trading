@@ -19,7 +19,7 @@ from algotrade.storage.backends.arrow import ROW_GROUP_SIZE, TABLE_KEY, VERSION_
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.interfaces import Backend
-from algotrade.storage.tables.schemas import SCHEMA_VERSION, spec_for
+from algotrade.storage.tables.schemas import KNOWN, SCHEMA_VERSION, Column, TableSpec, spec_for
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
 
@@ -210,3 +210,44 @@ def test_unstorable_frames_fail_and_unknown_tables_pass_through(backend: Backend
         backend.tables.write("catalog/demo", D1, "r", mixed)
     backend.tables.write("scratch", D1, "r", stamped([{"instrument_id": "EQ:A"}], D1, "r"))
     assert backend.tables.names() == ["scratch"]
+
+
+LISTS = "test/lists"
+
+
+def test_list_columns_round_trip_on_every_backend(
+    backend: Backend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``float64[]``, ``float32[]``, ``string[]`` and ``date[]`` (ADR 0063): stored as Arrow
+    lists of the scalar type, empty and null lists kept, other element types cast."""
+    columns = (
+        Column("instrument_id", "string", False),
+        Column("f64", "float64[]"),
+        Column("f32", "float32[]"),
+        Column("ids", "string[]"),
+        Column("days", "date[]"),
+        Column("session_date", "date", False),
+        Column("knowledge_ts", "timestamp_utc", False),
+        Column("source", "string", False),
+        Column("run_id", "string", False),
+    )
+    spec = TableSpec(LISTS, "test", ("instrument_id",), columns=columns)
+    monkeypatch.setitem(KNOWN, LISTS, spec)
+    rows = [
+        {"instrument_id": "a", "f64": [0.1, 0.2], "f32": [0.5, 1.5], "ids": ["x", "y"],
+         "days": [D1, D2]},
+        {"instrument_id": "b", "f64": [], "f32": np.array([2.0]), "ids": [], "days": []},
+        {"instrument_id": "c", "f64": None, "f32": None, "ids": None, "days": None},
+    ]  # fmt: skip
+    StoreWriter(backend).write_table(LISTS, D1, "r1", stamped(rows, D1, "r1"))
+    got = backend.tables.read(LISTS, D1)
+    assert got is not None
+    by_id = {r["instrument_id"]: r for r in got.to_dict("records")}
+    assert list(by_id["a"]["f64"]) == [0.1, 0.2] and list(by_id["a"]["ids"]) == ["x", "y"]
+    assert list(by_id["a"]["days"]) == [D1, D2]
+    assert list(by_id["a"]["f32"]) == [0.5, 1.5]
+    assert list(by_id["b"]["f32"]) == [2.0] and len(by_id["b"]["ids"]) == 0
+    assert by_id["c"]["f64"] is None or len(by_id["c"]["f64"]) == 0 or pd.isna(by_id["c"]["f64"])
+    with pytest.raises(DataValidationError):
+        bad = stamped([{"instrument_id": "d", "f64": ["not a number"]}], D2, "r1")
+        StoreWriter(backend).write_table(LISTS, D2, "r1", bad)
