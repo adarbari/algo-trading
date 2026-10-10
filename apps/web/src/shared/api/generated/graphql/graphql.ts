@@ -451,7 +451,7 @@ export type StatusStripQueryVariables = Exact<{
 }>;
 
 
-export type StatusStripQuery = { session: { date: string, newer: { date: string, state: NewerState } | null } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, problems: Array<string>, steps: Array<{ name: string, status: string }> }>, completeness?: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null };
+export type StatusStripQuery = { session: { date: string, newer: { date: string, state: NewerState } | null } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, problems: Array<string>, steps: Array<{ name: string, status: string }> }>, completeness?: { sessions: Array<string>, lastClosed: string } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2606,17 +2606,7 @@ export const StatusStripDocument = new TypedDocumentString(`
   }
   completeness(sessions: 1) @include(if: $admin) {
     sessions
-    datasets
     lastClosed
-    cells {
-      dataset
-      session
-      status
-      present
-      expected
-      basis
-      runIds
-    }
   }
 }
     `) as unknown as TypedDocumentString<StatusStripQuery, StatusStripQueryVariables>;

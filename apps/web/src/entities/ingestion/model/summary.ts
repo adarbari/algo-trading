@@ -39,7 +39,9 @@ export function completenessSummary(completeness: Completeness): CompletenessSum
 }
 
 /** The latest stored session when the exchange has closed a later one (else null). */
-export function staleSince(completeness: Completeness): string | null {
+export function staleSince(
+  completeness: Pick<Completeness, 'sessions' | 'lastClosed'>,
+): string | null {
   const latest = completeness.sessions.at(-1);
   return latest !== undefined && latest < completeness.lastClosed ? latest : null;
 }

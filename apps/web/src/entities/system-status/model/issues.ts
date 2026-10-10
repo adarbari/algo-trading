@@ -22,6 +22,9 @@ export type NightlyStatus = Pick<NightlyRun, 'runId' | 'session' | 'status' | 'p
   steps: readonly Pick<NightlyRun['steps'][number], 'name' | 'status'>[];
 };
 
+/** The part of the completeness grid the strip reads (the query asks for no more). */
+export type CompletenessStatus = Pick<Completeness, 'sessions' | 'lastClosed'>;
+
 export interface ScreenerState {
   screener: { id: string; name: string };
   notRun: { kindText: string } | null;
@@ -75,7 +78,7 @@ function screenerIssues(states: ScreenerStates): SystemIssue[] {
 
 function staleIssue(
   screens: ScreenerStates | null | undefined,
-  completeness: Completeness | null | undefined,
+  completeness: CompletenessStatus | null | undefined,
 ): SystemIssue | null {
   // An admin's completeness grid says exactly which session the exchange closed without us;
   // everyone else gets the calendar rule on the session the pages read.
@@ -94,7 +97,7 @@ function staleIssue(
 export function systemIssues(
   nightly: NightlyStatus | null | undefined,
   screens: ScreenerStates | null | undefined,
-  completeness?: Completeness | null,
+  completeness?: CompletenessStatus | null,
 ): SystemIssue[] {
   const all = [
     ...(nightly ? [nightlyIssue(nightly)] : []),

@@ -13,9 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
-import type { Completeness } from '@/entities/ingestion';
-
-import type { NightlyStatus, ScreenerStates } from '../model/issues';
+import type { CompletenessStatus, NightlyStatus, ScreenerStates } from '../model/issues';
 import type { SessionNotice } from '../model/notice';
 
 const StatusStrip = graphql(`
@@ -47,17 +45,7 @@ const StatusStrip = graphql(`
     }
     completeness(sessions: 1) @include(if: $admin) {
       sessions
-      datasets
       lastClosed
-      cells {
-        dataset
-        session
-        status
-        present
-        expected
-        basis
-        runIds
-      }
     }
   }
 `);
@@ -65,7 +53,7 @@ const StatusStrip = graphql(`
 export interface StatusStripState {
   screens: ScreenerStates | null;
   nightly: NightlyStatus | null;
-  completeness: Completeness | null;
+  completeness: CompletenessStatus | null;
   /** The newer incomplete session the pages leave out (null: none); ADR 0062. */
   notice: SessionNotice | null;
 }
