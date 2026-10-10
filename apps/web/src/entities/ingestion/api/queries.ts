@@ -89,7 +89,6 @@ const ChainCoverage = graphql(`
       }
       chronic
       chronicNames
-      medianShare
       previousChronic
       drift
     }

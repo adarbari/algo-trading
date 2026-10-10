@@ -915,17 +915,17 @@ body = """
 Each night the app asks Cboe for the option chain of every optionable name. A chain counts as
 covered when it came back for that session; the figure is covered names over all optionable
 names. The rest are "stale" (Cboe served an older chain, common for thin, illiquid names), have
-no chain, or failed to fetch. A screen treats a name without a fresh chain as missing data, so
-it never qualifies on option criteria.
+no chain, or failed to fetch. A screen treats a name without a fresh chain as missing data.
+It never qualifies on option criteria.
 
 Read it against its own history, not against 100%. Cboe's free delayed feed chronically leaves
 several hundred names stale, so a steady 80% is normal here and a fall of five points or more
-is a problem. A name is chronic when it was stale in at least three of the last five sessions;
-chronic names are mostly in the rest tier and will not clear by waiting.
+is a problem. A name is chronic when it was stale in at least three of the last five sessions.
+Chronic names are mostly in the rest tier and will not clear by waiting.
 
-The nightly report and the Admin Ingestion page both show it; the report warns when coverage
-falls more than five points under its five-session median or the chronic count rises by more
-than fifty. It is a warning only: the chain acceptance checks and what they hold back are
+The nightly report and the Admin Ingestion page both show it. The report warns when coverage
+falls more than five points under its five-session median, or when the chronic count rises by
+more than fifty. It is a warning only: the chain acceptance checks and what they hold back are
 unchanged. The share can mislead when the optionable list itself changes, so check the counts.
 """
 see_also = ["unavailable_system", "session"]

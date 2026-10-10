@@ -28,7 +28,6 @@ const COVERAGE = {
   ],
   chronic: 622,
   chronicNames: ['AAA', 'BBB'],
-  medianShare: 0.9,
   previousChronic: 500,
   drift: ['chain coverage 80.5% is 9.5 points below its median of the sessions before (90.0%)'],
 };

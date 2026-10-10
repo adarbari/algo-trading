@@ -268,7 +268,7 @@ export type IngestionCellQuery = { ingestionCell: { job: string, cell: { dataset
 export type ChainCoverageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ChainCoverageQuery = { chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, medianShare: number | null, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null };
+export type ChainCoverageQuery = { chainCoverage: { session: string, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null };
 
 export type InstrumentFactsQueryVariables = Exact<{
   key: string;
@@ -1626,8 +1626,6 @@ export const ChainCoverageDocument = new TypedDocumentString(`
     query ChainCoverage {
   chainCoverage {
     session
-    total
-    ok
     share
     statuses {
       code
@@ -1641,7 +1639,6 @@ export const ChainCoverageDocument = new TypedDocumentString(`
     }
     chronic
     chronicNames
-    medianShare
     previousChronic
     drift
   }
