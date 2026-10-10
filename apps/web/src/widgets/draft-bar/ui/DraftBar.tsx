@@ -23,7 +23,7 @@ export interface DraftBarProps {
   /** The screener was deleted: leave its pages. Without it there is no Delete. */
   onDeleted?: () => void;
   /** Opened from an edge: "Save and return to edge" saves the draft and goes back. */
-  onReturn?: () => void;
+  onReturn?: (() => void) | undefined;
 }
 
 export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps) {

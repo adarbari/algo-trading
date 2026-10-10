@@ -20,12 +20,11 @@ vi.mock('@/features/edge-builder', async () => {
     HelpProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     EdgeBuilder: (props: {
       id: string | null;
-      addScreen?: string;
       onSaved: (id: string, run: boolean) => void;
       onOpenScreen: (id: string | null) => void;
     }) => (
       <>
-        <Text>{`builder ${props.id ?? 'new'} ${props.addScreen ?? ''}`}</Text>
+        <Text>{`builder ${props.id ?? 'new'}`}</Text>
         <Button
           onClick={() => {
             props.onSaved('mine', false);
@@ -68,14 +67,14 @@ function setup(id: string | null = 'mine') {
     onCancel: vi.fn(),
     onOpenEdge: vi.fn(),
   };
-  render(<EdgeBuilderPage id={id} addScreen="momo" {...props} />);
+  render(<EdgeBuilderPage id={id} {...props} />);
   return props;
 }
 
 describe('EdgeBuilderPage', () => {
-  it('shows the builder, passing the screen to add, and tells which edge opens the Screen Builder', async () => {
+  it('shows the builder and tells which edge opens the Screen Builder', async () => {
     const { onOpenScreen } = setup('mine');
-    expect(screen.getByText('builder mine momo')).toBeInTheDocument();
+    expect(screen.getByText('builder mine')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'edit screen' }));
     expect(onOpenScreen).toHaveBeenCalledWith('momo', 'mine');
   });

@@ -5,9 +5,7 @@
  * they then return to it.
  * Tickers open in Explore.
  */
-import { createRoute, useNavigate } from '@tanstack/react-router';
-
-import { backToEdge, validateReturnSearch } from './return-to-edge';
+import { createRoute, useNavigate, useRouter, useSearch } from '@tanstack/react-router';
 
 import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
@@ -42,19 +40,15 @@ function ScreenersIndex() {
 }
 
 function NewScreener() {
-  const { returnTo } = newRoute.useSearch();
   const navigate = useNavigate();
   return (
     <NewScreenerPage
-      onCancel={() => {
-        if (returnTo) backToEdge(navigate, returnTo);
-        else void navigate({ to: '/screeners' });
-      }}
+      onCancel={() => void navigate({ to: '/screeners' })}
       onCreated={(id) =>
         void navigate({
           to: '/screeners/$id/edit',
           params: { id },
-          search: returnTo ? { returnTo } : {},
+          search: (prev) => prev,
         })
       }
     />
@@ -81,18 +75,20 @@ function ScreenerResultsRoute() {
 
 function EditScreener() {
   const { id } = editRoute.useParams();
-  const { returnTo } = editRoute.useSearch();
+  const search: Record<string, unknown> = useSearch({ strict: false });
+  const returnTo = search['returnTo'];
   const navigate = useNavigate();
+  const router = useRouter();
   return (
     <ScreenerBuilderPage
       id={id}
-      {...(returnTo
-        ? {
-            onReturn: () => {
-              backToEdge(navigate, returnTo, id);
-            },
-          }
-        : {})}
+      onReturn={
+        returnTo
+          ? () => {
+              router.history.back();
+            }
+          : undefined
+      }
       onDeleted={() => void navigate({ to: '/screeners' })}
       onOpenTicker={(symbol) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })
@@ -110,7 +106,6 @@ const indexRoute = createRoute({
 const newRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: 'new',
-  validateSearch: validateReturnSearch,
   component: NewScreener,
 });
 const resultsRoute = createRoute({
@@ -121,7 +116,6 @@ const resultsRoute = createRoute({
 const editRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: '$id/edit',
-  validateSearch: validateReturnSearch,
   component: EditScreener,
 });
 

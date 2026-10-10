@@ -20,6 +20,7 @@ import {
 import { useState, type ReactNode } from 'react';
 
 import { useEdges, type Edge } from '@/entities/edge';
+import { useScreeners } from '@/entities/screen';
 import { errorDetail } from '@/shared/api';
 
 import { useSaveEdge } from '../api/hooks';
@@ -49,8 +50,6 @@ import { TradeStep } from './TradeStep';
 export interface EdgeBuilderProps {
   /** The edge to build or change (the user's own); null: a new edge. */
   id: string | null;
-  /** A screen to add to the edge (the one just made in the Screen Builder). */
-  addScreen?: string | undefined;
   /** Saved: open it, and run the backtest when asked. */
   onSaved: (id: string, run: boolean) => void;
   onCancel: () => void;
@@ -89,18 +88,25 @@ interface BuilderProps extends Omit<EdgeBuilderProps, 'id'> {
   served: EdgeSettings | null;
 }
 
-function Builder({ id, edge, served, addScreen, onSaved, onCancel, onOpenScreen }: BuilderProps) {
+function Builder({ id, edge, served, onSaved, onCancel, onOpenScreen }: BuilderProps) {
   const key = id ?? NEW_KEY;
   const mode = modeOf(edge);
   const [initial] = useState<EdgeDraft>(() =>
     edge && served ? draftOf(edge, served) : blankDraft(),
   );
-  const [draft, setDraft] = useState<EdgeDraft>(() => {
-    const kept = unstash(key) ?? initial;
-    return addScreen && !kept.screeners.includes(addScreen)
-      ? { ...kept, screeners: [...kept.screeners, addScreen] }
-      : kept;
-  });
+  const [left] = useState(() => unstash(key));
+  const [merged, setMerged] = useState(false);
+  const [draft, setDraft] = useState<EdgeDraft>(() => left?.draft ?? initial);
+  const screeners = useScreeners();
+  const ids = (screeners.data ?? []).map((s) => s.configId);
+  // Back from the Screen Builder: the screens made there since the user left join the draft.
+  if (left && !merged && screeners.data && !screeners.isFetching) {
+    setMerged(true);
+    const added = ids.filter((s) => !left.known.includes(s));
+    if (added.length > 0) {
+      setDraft((d) => ({ ...d, screeners: [...new Set([...d.screeners, ...added])] }));
+    }
+  }
   const save = useSaveEdge();
   const help = useHelp();
   const blocked = incomplete(draft, mode);
@@ -182,7 +188,7 @@ function Builder({ id, edge, served, addScreen, onSaved, onCancel, onOpenScreen 
           draft={draft}
           onChange={change}
           onOpenScreen={(screen) => {
-            stash(key, draft);
+            stash(key, draft, ids);
             onOpenScreen(screen);
           }}
         />,

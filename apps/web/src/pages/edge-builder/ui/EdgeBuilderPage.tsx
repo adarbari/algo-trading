@@ -13,8 +13,6 @@ import { GuideHelp } from '@/features/guide-help';
 export interface EdgeBuilderPageProps {
   /** The edge to build or change; null: a new one. */
   id: string | null;
-  /** A screen to add to the edge (back from the Screen Builder). */
-  addScreen?: string | undefined;
   /** Open the Screen Builder on a screen (null: a new one). */
   onOpenScreen: (id: string | null, from: string | null) => void;
   /** Leave the builder without saving. */
@@ -25,20 +23,13 @@ export interface EdgeBuilderPageProps {
 
 const help = (term: string) => <GuideHelp entry={{ kind: 'term', id: term }} />;
 
-export function EdgeBuilderPage({
-  id,
-  addScreen,
-  onOpenScreen,
-  onCancel,
-  onOpenEdge,
-}: EdgeBuilderPageProps) {
+export function EdgeBuilderPage({ id, onOpenScreen, onCancel, onOpenEdge }: EdgeBuilderPageProps) {
   const [running, setRunning] = useState<string | null>(null);
   if (running !== null) return <Running edgeId={running} onOpenEdge={onOpenEdge} />;
   return (
     <HelpProvider value={help}>
       <EdgeBuilder
         id={id}
-        addScreen={addScreen}
         onCancel={onCancel}
         onOpenScreen={(screen) => {
           onOpenScreen(screen, id);

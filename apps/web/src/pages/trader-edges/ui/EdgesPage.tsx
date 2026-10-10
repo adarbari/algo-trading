@@ -14,10 +14,8 @@ export interface EdgesPageProps {
   /** The chosen edge (from the URL), or null for the list. */
   selected?: string | null;
   onSelect: (id: string) => void;
-  /** Open the builder on one of the user's edges. */
-  onEdit: (id: string) => void;
-  /** Open the builder on a new edge. */
-  onNew: () => void;
+  /** Open the builder on one of the user's edges (null: a new edge). */
+  onBuild: (id: string | null) => void;
   /** Back to the list: the route clears the choice. */
   onClear: () => void;
   /** The list's view (from the URL) and its change. */
@@ -28,13 +26,12 @@ export interface EdgesPageProps {
 export function EdgesPage({
   selected = null,
   onSelect,
-  onEdit,
-  onNew,
+  onBuild,
   onClear,
   view,
   onViewChange,
 }: EdgesPageProps) {
-  if (selected !== null) return <EdgeDetail id={selected} onBack={onClear} onEdit={onEdit} />;
+  if (selected !== null) return <EdgeDetail id={selected} onBack={onClear} onEdit={onBuild} />;
   return (
     <Stack gap={3}>
       <Stack direction="row" gap={3} align="center" justify="between" wrap>
@@ -44,7 +41,12 @@ export function EdgesPage({
             Strategy ideas, each backtested for an edge
           </Text>
         </Stack>
-        <Button variant="primary" onClick={onNew}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            onBuild(null);
+          }}
+        >
           New edge
         </Button>
       </Stack>

@@ -168,20 +168,29 @@ describe('EdgeBuilder', () => {
     expect(screen.getAllByText('Needs an answer')).toHaveLength(1);
   });
 
-  it('keeps the draft while the user edits a screen, and adds the screen made there', async () => {
+  it('keeps the draft while the user edits a screen, and adds a screen made meanwhile', async () => {
     const { props, unmount } = setup();
     await userEvent.type(screen.getByRole('textbox', { name: /^Thesis/ }), ' more');
     await userEvent.click(
       screen.getByRole('button', { name: 'Edit size_small in Screen Builder' }),
     );
     expect(props.onOpenScreen).toHaveBeenCalledWith('size_small');
-    expect(unstash('my_momentum')?.thesis).toContain(' more');
+    expect(unstash('my_momentum')?.draft.thesis).toContain(' more');
     unmount();
-    setup({ addScreen: 'size_small' });
+    // The screen made while away (not in the list when the user left) joins the draft.
+    hooks.useScreeners.mockReturnValue(
+      fakeQuery([
+        { configId: 'momentum_12_1', scope: 'site', selection: 'liquid' },
+        { configId: 'size_small', scope: 'site', selection: 'small' },
+        { configId: 'brand_new', scope: 'user', selection: 'small' },
+      ]),
+    );
+    setup();
     expect(screen.getByRole<HTMLInputElement>('textbox', { name: /^Thesis/ }).value).toContain(
       ' more',
     );
-    expect(screens().getByRole('checkbox', { name: /^size_small/ })).toBeChecked();
+    expect(await screens().findByRole('checkbox', { name: /^brand_new/ })).toBeChecked();
+    expect(screens().getByRole('checkbox', { name: /^size_small/ })).not.toBeChecked();
     expect(screens().getByRole('checkbox', { name: /^momentum_12_1/ })).toBeChecked();
   });
 
