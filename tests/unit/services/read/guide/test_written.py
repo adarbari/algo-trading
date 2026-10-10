@@ -15,7 +15,8 @@ GLOSSARY = {
     "term": [
         {"id": "near_miss", "term": "Near miss", "short": "Close.",
          "body": f"Within tolerance; see {ADV}.", "see_also": ["tolerance", "gone"]},
-        {"id": "tolerance", "term": "tolerance", "short": "How far.", "body": "A band."},
+        {"id": "tolerance", "term": "tolerance", "short": "How far.", "body": "A band.",
+         "next": "Widen it."},
     ]
 }  # fmt: skip
 START = {
@@ -49,6 +50,8 @@ def test_a_term_page() -> None:
     assert term.body.fields == (ADV,)
     assert term.see_also == (GuideTermEntry("tolerance", "tolerance", "How far."),)  # no "gone"
     assert load_guide_term(stores(WRITTEN), "Near miss") is None
+    tolerance = load_guide_term(stores(WRITTEN), "tolerance")
+    assert tolerance is not None and tolerance.body.text == "A band. Widen it."  # next last
 
 
 def test_a_start_page() -> None:

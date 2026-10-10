@@ -39,9 +39,9 @@ id = "win_rate"
 term = "Win rate"
 short = "The share of an edge's picks whose outcome came true."
 body = """
-For each past session the app takes the screen's top picks and checks the edge's outcome for
-each one, for example "beat the S&P 500 over the next 20 trading days after costs" or "the
-short put expired worthless". The win rate is wins divided by picks. A window that has not
+For each past session the app takes the screen's top picks and checks the edge's outcome for each
+one. An outcome is, for example, "beat the S&P 500 over the next 20 trading days after costs" or
+"the short put expired worthless". The win rate is wins divided by picks. A window that has not
 closed yet is left out, never counted as a loss. On its own a win rate says little: compare it
 with the base rate. Example: a win rate of 77% reads well, but vrp_short_premium's base rate is
 69% and the 77% rests on 3 trades. Don't read a win rate as profit: it counts outcomes, not
@@ -73,7 +73,7 @@ divided by base rate). Lift on a handful of trades is noise: read it with the nu
 beside it, and prefer the out-of-sample lift to the whole history's. Example: vrp_short_premium
 shows +8 pts (a ratio of 1.11) on 3 trades, which is noise, and about 0 in-sample.
 """
-see_also = ["base_rate", "trades", "out_of_sample"]
+see_also = ["base_rate", "trades", "out_of_sample", "win_rate"]
 
 [[term]]
 id = "trades"
@@ -126,8 +126,8 @@ term = "In-sample"
 short = "The older history an edge was built and tuned on: it flatters the edge."
 body = """
 Everything before the out-of-sample start. Many versions were tried on it, so even a good
-in-sample result says little by itself; it is shown beside the out-of-sample result to see
-whether the edge held up or faded. Example: vrp_short_premium's in-sample lift is about 0, so its
+in-sample result says little by itself. It is shown beside the out-of-sample result to see whether
+the edge held up or faded. Example: vrp_short_premium's in-sample lift is about 0, so its
 out-of-sample gain is not a faded edge but a thin sample.
 """
 see_also = ["out_of_sample", "variants_tried"]
@@ -137,9 +137,7 @@ id = "exploratory"
 term = "Exploratory"
 short = "A backtest over an out-of-sample date you chose, not the site's."
 body = """
-You can run an edge's backtest with your own out-of-sample date to explore. Such numbers are
-labelled EXPLORATORY: they never feed the track record shown on screeners, the verdict or an
-edge's status, because a date chosen after seeing results is no longer a fair test. The site's
+You can run an edge's backtest with your own out-of-sample date to explore. Such numbers are labelled EXPLORATORY. They never feed the track record shown on screeners, the verdict or an edge's status. A date chosen after seeing results is no longer a fair test. The site's
 out-of-sample date is the one that counts.
 """
 see_also = ["out_of_sample", "official_result", "edge_status"]
@@ -156,7 +154,7 @@ half of history fails in the other. A result shown without its count of variants
 is not comparable. Example: vrp_short_premium tried 126 variants, which takes its deflated Sharpe
 from a Sharpe ratio of 1.74 down to 0.00.
 """
-see_also = ["out_of_sample", "trades", "deflated_sharpe", "overfitting_probability"]
+see_also = ["out_of_sample", "trades", "deflated_sharpe", "overfitting_probability", "sharpe_ratio"]
 
 [[term]]
 id = "robustness"
@@ -194,13 +192,13 @@ body = """
 Shown when the official result passes both levels. It needs at least 100 trades, 40 of them
 out-of-sample, a top vs bottom decile t of 3 or more and a deflated Sharpe of 0.95 or more. It
 needs an overfitting probability of 0.2 or less and a decile spread above every baseline. Its
-out-of-sample lift must beat 95% of 1,000 random-pick backtests. A result with no random-pick backtests cannot reach it. Works
-is not a promise: it says the past out-of-sample evidence is strong, not that the pattern lasts or
-that a trade will profit. Don't size a position from the badge. Next, read why it should last and
-the year by year table for one year carrying the whole result. A newer official result can change
-the verdict.
+out-of-sample lift must beat 95% of 1,000 random-pick backtests. A result with no random-pick
+backtests cannot reach it. Works is not a promise: it says the past out-of-sample evidence is
+strong, not that the pattern lasts or that a trade will profit. Don't size a position from the
+badge. A newer official result can change the verdict.
 """
-see_also = ["verdict", "verdict_criteria", "edge_persistence", "year_by_year", "robustness"]
+next = "Next, read why it should last and check the year by year table for one year carrying the whole result."
+see_also = ["verdict", "verdict_criteria", "edge_persistence", "year_by_year", "robustness", "official_result", "top_vs_bottom_decile", "deflated_sharpe", "overfitting_probability"]
 
 [[term]]
 id = "verdict_promising"
@@ -210,28 +208,29 @@ body = """
 Shown when all seven Promising tests pass. They are at least 40 out-of-sample trades, a win rate
 above the base rate and a decile t of 2 or more. They also need an overfitting probability of 0.5
 or less, a deflated Sharpe of 0.8 or more and a lift above every baseline. The seventh is an
-out-of-sample lift that keeps at least half of the in-sample lift. The reason line names the first Works test still missed. It is not a
-trading signal and not a smaller Works. The out-of-sample sample is still short, and more sessions
-can lift it or sink it. Next, watch whether the missed Works test moves as sessions pass. Don't
-run the edge again on another date to push it over: that is exploratory and never counts.
+out-of-sample lift that keeps at least half of the in-sample lift. The reason line names the first
+Works test still missed. It is not a trading signal and not a smaller Works. The out-of-sample
+sample is still short, and more sessions can lift it or sink it. Don't run the edge again on
+another date to push it over: that is exploratory and never counts.
 """
-see_also = ["verdict", "verdict_criteria", "verdict_works", "exploratory", "out_of_sample"]
+next = "Next, watch whether the missed Works test moves as new sessions pass."
+see_also = ["verdict", "verdict_criteria", "verdict_works", "exploratory", "out_of_sample", "win_rate", "base_rate", "deflated_sharpe", "overfitting_probability"]
 
 [[term]]
 id = "verdict_not_working"
 term = "Verdict: Not working"
 short = "With enough out-of-sample trades, a test fails clearly: the picks did no better than chance or the plain baselines."
 body = """
-Shown only when there are at least 40 out-of-sample trades, so the numbers can speak. A test
-fails clearly. The win rate is not above the base rate, or the decile t is below 1, or the
-deflated Sharpe is below 0.5. Or the overfitting probability is above 0.5, the lift is below the
-median baseline, or another Promising test fails outright. The reason line names it. It says this data
+Shown only when there are at least 40 out-of-sample trades, so the numbers can speak. A test fails
+clearly. The win rate is not above the base rate, or the decile t is below 1, or the deflated
+Sharpe is below 0.5. Or the overfitting probability is above 0.5, the lift is below the median
+baseline, or another Promising test fails outright. The reason line names it. It says this data
 does not support the idea, not that the idea is wrong for ever: a different screen or holding
-period is a new test. Next, read the reason, then reject the edge with the reason kept or clone it
-and change one thing. Don't follow an edge while it reads Not working: the app labels that choice
+period is a new test. Don't follow an edge while it reads Not working: the app labels that choice
 for good.
 """
-see_also = ["verdict", "verdict_criteria", "edge_state", "edge_labels", "follow_edge"]
+next = "Next, read the reason, then reject the edge with the reason kept, or clone it and change one thing."
+see_also = ["verdict", "verdict_criteria", "edge_state", "edge_labels", "follow_edge", "win_rate", "base_rate", "deflated_sharpe", "overfitting_probability"]
 
 [[term]]
 id = "verdict_not_enough_data"
@@ -242,11 +241,11 @@ Shown when there are fewer than 40 out-of-sample trades (the reason says how man
 test has no value yet, such as the overfitting probability. It is the usual verdict of a young
 edge, or one whose data starts late. It is not a mild Not working and not a mild Promising: no
 judgement is possible. Example: vrp_short_premium shows a win rate of 77% against 69% on 3
-out-of-sample trades, and the verdict stays Not enough data. Next, it clears as sessions pass or
-the missing figure is stored; nothing you do speeds it up. Don't read the win rate and lift
+out-of-sample trades, and the verdict stays Not enough data. Don't read the win rate and lift
 beside this badge as a result.
 """
-see_also = ["verdict", "trades", "verdict_criteria", "out_of_sample", "overfitting_probability"]
+next = "It clears by itself as sessions pass or the missing figure is stored; nothing you do speeds it up."
+see_also = ["verdict", "trades", "verdict_criteria", "out_of_sample", "overfitting_probability", "win_rate"]
 
 [[term]]
 id = "verdict_waiting_on_data"
@@ -255,11 +254,11 @@ short = "There is no official result yet, or the run could not read an input it 
 body = """
 Shown when the edge has no official result, because nobody has run it at its out-of-sample start,
 or when the run lost inputs for its best variant. The reason line says which, and Backtests lists
-what the run could not read. It is not bad news about the idea: nothing has been judged. Next, a
-backtest at the edge's out-of-sample start creates the official result: Run backtest for your
-own edge, Run as site for an admin. If an input was lost, the reason names it, and a run made
-after the data is stored can read it. Don't read an edge in this state as failed.
+what the run could not read. It is not bad news about the idea: nothing has been judged. If an
+input was lost, the reason names it, and a run made after the data is stored can read it. Don't
+read an edge in this state as failed.
 """
+next = "A backtest at the edge's out-of-sample start creates the official result: Run backtest for your own edge, Run as site for an admin."
 see_also = ["verdict", "official_result", "edge_backtests", "run_backtest"]
 
 [[term]]
@@ -268,15 +267,16 @@ term = "What the verdict tests"
 short = "The table of every test behind the verdict: its value, what it needs, and pass, fail or not measured."
 body = """
 Open Details to see it. The tests come in two groups: the seven Promising tests, then the six
-Works tests. Each row shows the test, its Value for this edge, what is Needed and the Result.
-Not measured means the run did not store the figure, which is different from a fail; it keeps
-the verdict at Not enough data. All Promising tests passing means at least Promising, and all
-Works tests as well means Works. Example: vrp_short_premium fails three tests: trades (3 against at least 40), the decile t
-(-1.66 against 2) and the deflated Sharpe (0.00 against 0.8). It passes the win rate, baselines
-and keeps-its-size tests, and does not measure the overfitting probability.
-A pass means a threshold was crossed, not that the edge is proven.
+Works tests. Each row shows the test, its Value for this edge, what is Needed and the Result. Not
+measured means the run did not store the figure, which is different from a fail; it keeps the
+verdict at Not enough data. All Promising tests passing means at least Promising, and all Works
+tests as well means Works. Example: vrp_short_premium fails three tests: trades (3 against at
+least 40), the decile t (-1.66 against 2) and the deflated Sharpe (0.00 against 0.8). It passes
+the win rate, baselines and keeps-its-size tests, and does not measure the overfitting
+probability. A pass means a threshold was crossed, not that the edge is proven.
 """
-see_also = ["verdict", "sharpe_ratio", "deflated_sharpe", "overfitting_probability", "baselines"]
+next = "Next, read the first failing row: it is the reason line under the verdict badge."
+see_also = ["verdict", "sharpe_ratio", "deflated_sharpe", "overfitting_probability", "baselines", "win_rate"]
 
 [[term]]
 id = "sharpe_ratio"
@@ -348,7 +348,7 @@ different from a result of zero. Example: vrp_short_premium has no trades from 2
 the data it needs starts around 2024. In 2024 it won 80% against 70% on 2 trades. In 2025 it won
 70% against 71% on 8, and in 2026 73% against 71% on 5. Don't read a year with 2 trades as a result.
 """
-see_also = ["trades", "in_sample", "out_of_sample", "win_rate"]
+see_also = ["trades", "in_sample", "out_of_sample", "win_rate", "base_rate", "top_vs_bottom_decile"]
 
 [[term]]
 id = "edge_backtests"

@@ -13,7 +13,7 @@ term = "Not available: system error"
 short = "The value could not be shown because something in the app's own data pipeline did not deliver it."
 body = """
 A source was down, a nightly step did not finish, or a stored table is missing for the session.
-The value is not an empty value and not a zero: it is simply not there, and the app never fills
+The value is not an empty value and not a zero: it is not there, and the app never fills
 it from an earlier day. A screen that needs it treats it as missing data, so a hard criterion
 rejects the row and a soft or score criterion costs points. It normally clears on the next
 nightly run; the owner sees the exact cause.

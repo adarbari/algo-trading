@@ -52,7 +52,9 @@ an item, then delete its baseline line.
    The bar (customer-praised trading sites and Stripe's docs; `docs/ui/guide-quality.md`):
    - `short` is one sentence of at most 25 words; body sentences at most 30, active voice.
    - Each status / state value has its own entry saying when it is shown, what it is not, and
-     what happens next (what the app does, what the reader can do), Stripe's lifecycle style.
+     what happens next (what the app does, what the reader can do), Stripe's lifecycle style:
+     a term a value maps to in `architecture/guide_coverage.toml` has a `next` (one sentence,
+     shown as the body's last).
    - One worked example (a rule line, a value read low to high) and when it misleads, ending
      with what to check instead; a statistic says the sample size below which it is noise.
    - A term with its own entry used in a body is in `see_also`; no marketing or filler words
@@ -67,15 +69,20 @@ an item, then delete its baseline line.
 6. **Checks**: `.venv/bin/python -m pytest tests/architecture/guide -q` (coverage),
    `.venv/bin/python -m pytest tests/architecture/test_layout_web.py -q -k prose`
    (explanatory prose in `apps/web/src` against the shrink-only baseline), the field-guide
-   tests in `tests/architecture/test_features.py`, then `make changed` and push (CI is the full gate). A false finding of the
-   prose test (a long label, say) is shortened, never added to the baseline.
+   tests in `tests/architecture/test_features.py`, the style checks
+   `.venv/bin/python -m pytest tests/unit/config/site/guide/test_style.py -q` (lengths, banned
+   words, orphan jargon, `next` on state terms, at most 7 Start sections; long sentences that
+   shipped before it are the shrink-only `architecture/guide_style_baseline.toml`: split a new
+   one, lower the count when you fix one, never add a line), then `make changed` and push (CI
+   is the full gate). A false finding of the prose test (a long label, say) is shortened, never
+   added to the baseline; a banned word is rewritten, never the pattern widened.
 
 ## Before you ship (beyond the bar in step 3)
 
 The principles: `docs/ui/guide.md` section 7; the full checklist: `docs/ui/guide-quality.md`
 section 3. Also yes to each of these, or fix it:
 
-1. One kind of entry (Start page, term or field), not a mix; a Start page has at most 7 sections.
+1. One kind of entry (Start page, term or field), not a mix.
 2. Every concept with its own entry is linked, never restated.
 3. The worked example uses real values from a real run and the threshold they cross.
 4. One explicit "Don't ..." where misuse is plausible.

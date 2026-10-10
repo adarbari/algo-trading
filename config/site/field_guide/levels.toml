@@ -176,7 +176,7 @@ name = "rollup.momentum@v1.prior_high_20d"
 theme = "price levels"
 reads = "The highest daily high of the 20 sessions before today, today excluded, in dollars: the level a breakout close has to clear. feature.breakout_20d is the close above it with volume at 1.5 times normal; this field is the level itself, to show next to the close."
 caveats = [
-  "A level set by one spike high (a halt, a news candle) is easy to clear on a quiet day: the volume condition of feature.breakout_20d is there for that reason.",
+  "A level set by one spike high (a halt, a news candle) is cleared even on a quiet day: the volume condition of feature.breakout_20d is there for that reason.",
   "Null after a gap among those 20 sessions.",
 ]
 sources = ["Donchian channels (the Turtle rules); Raschke and Connors on failed breakouts"]
@@ -218,9 +218,9 @@ mode = "hard"
 [[field]]
 name = "rollup.swing_levels@v1.swing_low"
 theme = "price levels"
-reads = "Support: the low of the most recent confirmed swing low below the close, in dollars (a bar whose low is strictly below the five lows before it and at most the five after, confirmed five sessions later). Where buyers last showed up below the current price; the usual place for a stop just under it. feature.dist_to_support is the distance as a fraction and feature.dist_to_support_atr in ATRs."
+reads = "Support: the low of the most recent confirmed swing low below the close, in dollars (a bar whose low is strictly below the five lows before it and at most the five after, confirmed five sessions later). Where buyers last showed up below the current price; the usual place for a stop right under it. feature.dist_to_support is the distance as a fraction and feature.dist_to_support_atr in ATRs."
 caveats = [
-  "Null at a one-year low (nothing below the close): the name just broke every support, which a screen should read as what it is.",
+  "Null at a one-year low (nothing below the close): the name recently broke every support, which a screen should read as what it is.",
   "Confirmed five sessions late; a level more than a few ATRs below is not support for a swing trade.",
 ]
 sources = ["docs/data/swing.md; the Turtle rules for ATR-scaled stops"]
@@ -233,7 +233,7 @@ note = "threshold feature.dist_to_support instead"
 [[field]]
 name = "rollup.swing_levels@v1.swing_low_date"
 theme = "price levels"
-reads = "The session of the swing low that is the current support. A recent low is a level the market has just defended; an old one is a memory. A date to show with the level."
+reads = "The session of the swing low that is the current support. A recent low is a level the market has recently defended; an old one is a memory. A date to show with the level."
 caveats = [
   "Null when there is no confirmed swing low below the close.",
 ]
@@ -286,7 +286,7 @@ tolerance = 0.5
 [[field]]
 name = "feature.dist_to_support_atr"
 theme = "price levels"
-reads = "The distance to support in ATRs: how many typical daily ranges sit between the close and the last swing low below it. Under 1 the close is at support (a stop just below it is tight); 2 to 3 is the usual working distance for a swing entry; above 5 a stop at support is a wide one."
+reads = "The distance to support in ATRs: how many typical daily ranges sit between the close and the last swing low below it. Under 1 the close is at support (a stop right below it is tight); 2 to 3 is the usual working distance for a swing entry; above 5 a stop at support is a wide one."
 caveats = [
   "Null at a one-year low (no support below) and when the ATR is 0.",
   "Support in a downtrend breaks: pair with feature.trend_state eq UPTREND.",
@@ -311,7 +311,7 @@ name = "rollup.retest@v1.breakout_level"
 theme = "price levels"
 reads = "The level the latest breakout cleared, in dollars: the highest high of the 20 sessions before the breakout session (the prior_high_20d of that day), within the last 60 sessions. Broken resistance is the textbook place for new support: a pullback that holds near it is the retest. rollup.retest@v1.retest_state says where the close stands against it."
 caveats = [
-  "A level set by one spike high (a halt, a news candle) is easy to clear and weak support afterwards; check rollup.retest@v1.sessions_since_breakout and the volume on the day (rollup.momentum@v1.rel_volume).",
+  "A level set by one spike high (a halt, a news candle) is cleared even on a quiet day and is weak support afterwards. Check rollup.retest@v1.sessions_since_breakout and the volume on the day (rollup.momentum@v1.rel_volume).",
   "Null when no session of the last 60 closed above its prior 20-session high (retest_state NONE); a hard 'not_null' drops every name that has not broken out lately.",
   "The close alone defines the breakout here, with no volume condition (unlike feature.breakout_20d).",
 ]
@@ -384,7 +384,7 @@ note = "threshold feature.dist_to_gap_below instead"
 [[field]]
 name = "rollup.gaps@v1.gap_below_date"
 theme = "price levels"
-reads = "The session of the up gap behind rollup.gaps@v1.gap_below. A recent gap is a level the market has just jumped over; an old one is a memory."
+reads = "The session of the up gap behind rollup.gaps@v1.gap_below. A recent gap is a level the market has recently jumped over; an old one is a memory."
 caveats = [
   "Null when rollup.gaps@v1.gap_below is null.",
 ]
@@ -406,7 +406,7 @@ name = "rollup.bands@v2.ema_20"
 theme = "price levels"
 reads = "The 20-session exponential moving average of the close, in dollars per share: the midline of the Keltner channel and the fastest of the common averages (it weights the latest close 2 / 21, so it turns a few sessions before rollup.price_stats@v2.sma_20). Compare with the close: above it the short-term trend is up, below it down; the gap between the two in percent or ATRs is what to threshold (feature.pct_vs_sma_20 and feature.stretch_sma20_atr do that for the SMA, which sits within a fraction of a percent of the EMA on all but the fastest moves)."
 caveats = [
-  "The EMA is seeded with the mean of the first 20 bars of the consecutive run ending today; after a gap in the bars the run restarts, so a name that just resumed trading has an EMA over few bars. Check rollup.price_history@v1.bar_status and rollup.price_stats@v2.history_days.",
+  "The EMA is seeded with the mean of the first 20 bars of the consecutive run ending today; after a gap in the bars the run restarts, so a name that recently resumed trading has an EMA over few bars. Check rollup.price_history@v1.bar_status and rollup.price_stats@v2.history_days.",
   "Null with fewer than 20 consecutive bars ending on the session (a gap among the last 20, or a new listing).",
 ]
 sources = [
@@ -531,7 +531,7 @@ tolerance = 30
 [[field]]
 name = "rollup.pivot_strength@v1.support_age"
 theme = "price levels"
-reads = "Sessions since the swing low that is the current support (5 to 246). A recent low is a floor the market has just defended; an old one is a memory."
+reads = "Sessions since the swing low that is the current support (5 to 246). A recent low is a floor the market has recently defended; an old one is a memory."
 caveats = [
   "At least 5 by construction; the age of the pivot, not of its last test (rollup.pivot_strength@v1.support_touches).",
   "Null when there is no support below the close.",
@@ -609,7 +609,7 @@ mode = "hard"
 [[field]]
 name = "feature.dist_to_gap_above"
 theme = "price levels"
-reads = "How far above the close the nearest unfilled down gap begins, as a fraction of the close: 0.03 is 3% above. Close to 0 the close is just under a gap zone where supply sat when price dropped through; 0.10 or more is out of play for a swing trade. The zone is rollup.gaps@v1.gap_above (its lower edge)."
+reads = "How far above the close the nearest unfilled down gap begins, as a fraction of the close: 0.03 is 3% above. Close to 0 the close is right under a gap zone where supply sat when price dropped through; 0.10 or more is out of play for a swing trade. The zone is rollup.gaps@v1.gap_above (its lower edge)."
 caveats = [
   "Null when no unfilled down gap lies wholly above the close (all filled, or the close is inside one): that is a clean overhead, not a zero distance.",
   "A gap from an earnings reaction (rollup.gaps@v1.gap_above_date near rollup.earnings@v1.last_earnings_date) is a weaker level than one on no news.",
@@ -633,7 +633,7 @@ note = "soft, so a name with a clean overhead (null) is listed rather than rejec
 [[field]]
 name = "feature.dist_to_gap_below"
 theme = "price levels"
-reads = "How far below the close the nearest unfilled up gap begins, as a fraction of the close: 0.03 is 3% below. Close to 0 the close is just above a gap zone, where a pullback meets the old gap; the zone is rollup.gaps@v1.gap_below (its upper edge). A gap that far below has not been tested since it formed."
+reads = "How far below the close the nearest unfilled up gap begins, as a fraction of the close: 0.03 is 3% below. Close to 0 the close is right above a gap zone, where a pullback meets the old gap; the zone is rollup.gaps@v1.gap_below (its upper edge). A gap that far below has not been tested since it formed."
 caveats = [
   "Null when no unfilled up gap lies wholly below the close (all filled, or the close is inside one).",
   "A breakaway gap on news may never fill; check rollup.gaps@v1.gap_below_date and rollup.earnings@v1.last_earnings_date.",

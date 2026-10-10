@@ -7,9 +7,7 @@ id = "edge"
 term = "Edge"
 short = "A written reason why some stocks should do better than others, tested on the stored history."
 body = """
-An edge is a document: the idea in one sentence, who is forced or wrong so that the pattern
-exists, why it should last once known, how a trade would be held (how long, against what, at
-what cost) and the screens that implement it. The app runs each screen on every past session
+An edge is a document. It states the idea in one sentence and who is forced or wrong so that the pattern exists. It says why the pattern should last once known and how a trade would be held (how long, against what, at what cost). It lists the screens that implement it. The app runs each screen on every past session
 using only what was known then, and compares what its picks did next with every other eligible
 name. An edge earns trust only from those numbers, never from the idea alone.
 """
@@ -20,16 +18,17 @@ id = "edge_status"
 term = "Edge status"
 short = "Where an edge stands: researching, candidate, evidenced, live or retired; or rejected, blocked."
 body = """
-Every edge has one status, on one line of life: researching (the idea is written, nothing is
-claimed), candidate (being tested), evidenced (its picks beat the base rate and the baselines
-out of sample, on enough trades), live (evidenced and used to rank ideas), retired (it stopped
-working by its own retirement rule). Two statuses sit off the line: rejected (checked and
-dropped, with the reason kept so it is not filed again) and blocked (worth testing, but missing
-the data it needs). A site edge's status is the site's, the same for everybody; the status of
+Every edge has one status. Five follow one another in order. Researching: the idea is written
+and nothing is claimed. Candidate: it is being tested. Evidenced: its picks beat the base rate
+and the baselines out of sample, on enough trades. Live: it is evidenced and used to rank ideas.
+Retired: it stopped working by its own retirement rule. Two statuses sit off the line. Rejected:
+checked and dropped, with the reason kept so it is not filed again. Blocked: worth testing, but
+missing the data it needs. A site edge's status is the site's, the same for everybody; the status of
 your own edge is yours to move. Only an official result over the out-of-sample period can move a
 site edge to evidenced.
 """
-see_also = ["verdict", "edge_owner", "edge_state", "out_of_sample", "exploratory"]
+next = "Only the site's reviewers move a site edge; you move your own edge yourself (Moving your edge's status)."
+see_also = ["verdict", "edge_owner", "edge_state", "out_of_sample", "exploratory", "official_result", "base_rate"]
 
 [[term]]
 id = "edge_owner"
@@ -42,7 +41,7 @@ clone of a site edge or one you wrote from scratch. You set its status, you see 
 nobody else does, until an admin publishes it site-wide. You cannot change a site edge's status;
 clone it, or follow it.
 """
-see_also = ["edge_copy", "edge_status", "follow_edge"]
+see_also = ["edge_copy", "edge_status", "follow_edge", "official_result"]
 
 [[term]]
 id = "edge_state"
@@ -57,6 +56,7 @@ replaces another edge of yours (a new version) retires the old one when it goes 
 your record, not an order: the app never trades. Some pages still show the older words: trial
 for a candidate, and following for a live edge or a site edge you bookmarked.
 """
+next = "The app records each move, and from candidate on it records the edge's paper trades every night."
 see_also = ["edge_status", "edge_owner", "forward_test"]
 
 [[term]]
@@ -64,9 +64,9 @@ id = "edge_copy"
 term = "Cloning an edge"
 short = "A clone is your own edge that extends another; you change only what you want."
 body = """
-Clone an edge to make one of your own: it extends the edge it was cloned from (its `extends`),
-so you write down only what differs (the screens, the picks, the holding periods, the universe)
-and everything else follows the original, which stays as it is. Your clone is researching to
+Clone an edge to make one of your own. It extends the edge it was cloned from (its `extends`),
+so you write down only what differs (the screens, the picks, the holding periods, the universe).
+Everything else follows the original, which stays as it is. Your clone is researching to
 begin with and has its own backtests. Its out-of-sample result stays hidden until you show it or
 make it live, so the fair test is not used up while you tune. An admin can publish a clone
 site-wide.
@@ -85,7 +85,8 @@ data, and the warning stays on the bookmark as a permanent label (Followed again
 Your own edge is not followed: you set its status instead. A bookmark is a record of your
 interest, not an order: the app never trades.
 """
-see_also = ["edge_owner", "edge_status", "verdict", "edge_labels", "paper_trading"]
+next = "Unfollow at any time to remove the bookmark; to change the edge itself, clone it."
+see_also = ["edge_owner", "edge_status", "verdict", "edge_labels", "paper_trading", "official_result"]
 
 [[term]]
 id = "edge_labels"
@@ -98,7 +99,8 @@ result is no longer a fair test. Replaced without a forward test: a new version 
 one before enough new sessions had passed. Split moved after viewing: the out-of-sample start
 was moved after the result was seen. Labels are never removed.
 """
-see_also = ["follow_edge", "edge_state", "out_of_sample", "show_out_of_sample"]
+next = "To avoid one, look at a clone's out-of-sample result only when you have finished tuning, and forward-test a new version before it replaces the old one."
+see_also = ["follow_edge", "edge_state", "out_of_sample", "show_out_of_sample", "forward_test"]
 
 [[term]]
 id = "show_out_of_sample"
@@ -124,7 +126,7 @@ whether a change helped on the period you tuned on. The out-of-sample columns ap
 show that result. A copy that beats its original in-sample but not out-of-sample was probably
 fitted to the past.
 """
-see_also = ["edge_copy", "show_out_of_sample", "win_rate"]
+see_also = ["edge_copy", "show_out_of_sample", "win_rate", "official_result"]
 
 [[term]]
 id = "edge_builder_idea"
@@ -137,16 +139,14 @@ being known. List where the idea comes from: a paper with its link, or author, t
 Everything else the edge does is tested; this part is the reason to believe the test is more than
 luck, so write it before you look at a result.
 """
-see_also = ["edge", "edge_quality_bar", "edge_builder_screens"]
+see_also = ["edge", "edge_quality_bar", "edge_builder_screens", "edge_persistence"]
 
 [[term]]
 id = "edge_quality_bar"
 term = "The quality bar"
 short = "Nine written answers every edge gives before its numbers are read."
 body = """
-Who is forced or wrong, why the pattern survives being known, how the outcome is measured, when
-the trigger becomes known, how a stranger could replicate it, the size to expect, capacity and
-costs, how it fails, and what else could explain the result. The seven under More in step 1 are
+Every edge answers nine questions. Who is forced or wrong? Why does the pattern survive being known? How is the outcome measured? When does the trigger become known? How could a stranger replicate it? What size should you expect? What are the capacity and costs? How does it fail? What else could explain the result? The seven under More in step 1 are
 those after the first two. An answer is a few sentences; an edge that cannot answer them is a
 backtest looking for a story.
 """
@@ -157,13 +157,11 @@ id = "edge_builder_screens"
 term = "Edge builder: screens"
 short = "The existing screens that decide which stocks qualify and in what order."
 body = """
-Step 2 of the six. A screen only decides which stocks qualify on a session and how they rank;
-everything after that (when the edge fires, how many it takes, how it is held) belongs to the
-edge. Choose one or more: each one is tested on its own as an implementation of the edge. The
+Step 2 of the six. A screen only decides which stocks qualify on a session and how they rank. Everything after that belongs to the edge: when it fires, how many picks it takes, how it is held. Choose one or more: each one is tested on its own as an implementation of the edge. The
 record beside a screen is its win rate against the base rate on the out-of-sample period, or No
 record yet. Edit in Screen Builder opens the screen and brings you back here with your draft kept.
 """
-see_also = ["edge", "base_rate", "edge_builder_picks"]
+see_also = ["edge", "base_rate", "edge_builder_picks", "win_rate"]
 
 [[term]]
 id = "edge_builder_picks"
@@ -185,7 +183,7 @@ body = """
 Step 4 of the six. Enter says how many sessions after the trigger the position opens (at least
 one, so nothing is bought on a price that was not known yet). Each holding period is measured and
 reported on its own. Costs are for a round trip in basis points (100 bps is 1%). A win is either
-a return above the benchmark after costs, or simply a rise after costs.
+a return above the benchmark after costs, or only a rise after costs.
 """
 see_also = ["edge_builder_picks", "win_rate", "edge_builder_compare"]
 
@@ -198,7 +196,7 @@ Step 5 of the six. The universe is the set of stocks a random pick could have be
 is the base rate the edge has to beat. The decoys are other screens run on the same sessions: if
 a plain one does as well, the idea is not what explains the result.
 """
-see_also = ["base_rate", "edge_builder_trade", "edge_builder_test"]
+see_also = ["base_rate", "edge_builder_trade", "edge_builder_test", "win_rate"]
 
 [[term]]
 id = "edge_builder_test"
@@ -211,7 +209,7 @@ change the edge. Moving the date after seeing a result is recorded as a permanen
 edge. Save and run backtest saves the whole edge and starts the backtest; you can leave and the
 result lands on the edge's page.
 """
-see_also = ["out_of_sample", "variants_tried", "show_out_of_sample"]
+see_also = ["out_of_sample", "variants_tried", "show_out_of_sample", "run_backtest"]
 
 [[term]]
 id = "edge_builder_running"
@@ -303,8 +301,8 @@ id = "paper_trading"
 term = "Paper trading"
 short = "What an edge of yours would have bought and sold, recorded every night as it happens."
 body = """
-For an edge you follow, or your own candidate or live edge, each night the app takes the picks of its screen, using only what was
-known that night, and records them as paper trades: the name, the session to buy it and the
+For an edge you follow, or your own candidate or live edge, the app takes the picks of its
+screen each night, using only what was known that night. It records them as paper trades: the name, the session to buy it and the
 session to sell it after the edge's holding period. Nothing is ever ordered. A trade stays open
 until its window has closed and the result is stored, and is then won or lost by the same win
 rule as the backtest. A trade whose result could not be read is skipped with the reason; it is
@@ -320,8 +318,7 @@ short = "How the closed paper trades of a followed edge have done so far."
 body = """
 The live record counts the closed paper trades, the wins among them and the win rate, and sets
 it against what the backtest led you to expect (the usual range). Open and skipped trades are
-counted apart. With few closed trades the rate swings widely by chance, so the record is
-judged only once the site's minimum number of signal sessions have closed; before that it says it is too early.
+counted apart. With few closed trades the rate swings widely by chance. So the record is judged only once the site's minimum number of signal sessions have closed. Before that it says it is too early.
 On track means the live win rate is inside the usual range; below or above means it is outside,
 which is worth a look but proves nothing alone.
 """
@@ -332,12 +329,9 @@ id = "usual_range"
 term = "Usual range"
 short = "The spread of win rates the backtest's own win rate would give over the same number of trades."
 body = """
-If the backtest's win rate really held, the share of wins among a given number of trades would
-still vary from one run of trades to the next, by chance alone. The usual range is the middle
+Suppose the backtest's win rate really held. The share of wins among a given number of trades would still vary from one run of trades to the next, by chance alone. The usual range is the middle
 80% of that variation (the 10th to the 90th percentile of a binomial distribution of wins), so
-it narrows as more sessions close. The picks of one night are bets on the same market over the
-same window and move together, so the range counts signal sessions, not trades: ten picks on one
-night are one observation, not ten. The picture shows the whole spread, the live win rate and
+it narrows as more sessions close. The picks of one night are bets on the same market over the same window, and they move together. So the range counts signal sessions, not trades: ten picks on one night are one observation, not ten. The picture shows the whole spread, the live win rate and
 the two ends of the range. A live rate outside it is unusual if the backtest was right, but
 one in five honest records falls outside by chance.
 """
@@ -349,12 +343,13 @@ term = "Forward test"
 short = "A new version of an edge tried on live paper trades beside the edge it would replace."
 body = """
 A new version of an edge is a candidate first, tried on paper next to the version it would
-replace: both record the same nights' picks from the day it became a candidate. It can go live
-and retire the old one once the site's number of sessions have passed and its win rate is not behind. Replacing earlier is
-allowed but is recorded on the edge as replaced without a forward test, because the backtest of
-a version you have tuned looks better than it will do going forward.
+replace. Both record the same nights' picks from the day it became a candidate. It can go live and
+retire the old one once the site's number of sessions have passed and its win rate is not behind.
+Replacing earlier is allowed, but the edge then carries the label replaced without a forward test.
+The backtest of a version you have tuned looks better than it will do going forward.
 """
-see_also = ["paper_trading", "live_record", "official_result"]
+next = "The app records both versions' paper trades each night until the site's number of sessions has passed."
+see_also = ["paper_trading", "live_record", "official_result", "win_rate"]
 
 [[term]]
 id = "edge_tonight"
@@ -363,9 +358,7 @@ short = "What the nightly run did for a followed edge on the session, so an empt
 body = """
 Signalled: the edge was due and its picks are listed as buys. No picks: it was due but its screen
 qualified no name. Not due: its schedule does not fire on this session (an edge held for 20
-sessions signals about once a month). Skipped: it was due but could not be signalled, and the
-reason says why (an input table was missing, the edge is not paper traded yet); it is never an
-empty record. Not run: the nightly has no finished run for the session. Missed counts due
+sessions signals about once a month). Skipped: it was due but could not be signalled, and the reason says why (an input table was missing, the edge is not paper traded yet). It is never an empty record. Not run: the nightly has no finished run for the session. Missed counts due
 sessions between nights that nobody signalled, kept so a gap is never silent.
 """
 see_also = ["paper_trading", "live_record"]

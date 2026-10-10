@@ -197,7 +197,7 @@ Sources: Donchian channels (the Turtle rules)
 
 **When the reading lies**
 
-- A level set by one spike high (a halt, a news candle) is easy to clear on a quiet day: the volume condition of feature.breakout_20d is there for that reason.
+- A level set by one spike high (a halt, a news candle) is cleared even on a quiet day: the volume condition of feature.breakout_20d is there for that reason.
 - Null after a gap among those 20 sessions.
 
 Sources: Donchian channels (the Turtle rules); Raschke and Connors on failed breakouts
@@ -238,7 +238,7 @@ Sources: docs/data/swing.md
 
 ### `rollup.swing_levels@v1.swing_low`
 
-**How to read it.** Support: the low of the most recent confirmed swing low below the close, in dollars (a bar whose low is strictly below the five lows before it and at most the five after, confirmed five sessions later). Where buyers last showed up below the current price; the usual place for a stop just under it. feature.dist_to_support is the distance as a fraction and feature.dist_to_support_atr in ATRs.
+**How to read it.** Support: the low of the most recent confirmed swing low below the close, in dollars (a bar whose low is strictly below the five lows before it and at most the five after, confirmed five sessions later). Where buyers last showed up below the current price; the usual place for a stop right under it. feature.dist_to_support is the distance as a fraction and feature.dist_to_support_atr in ATRs.
 
 **The criterion per intent**
 
@@ -248,14 +248,14 @@ Sources: docs/data/swing.md
 
 **When the reading lies**
 
-- Null at a one-year low (nothing below the close): the name just broke every support, which a screen should read as what it is.
+- Null at a one-year low (nothing below the close): the name recently broke every support, which a screen should read as what it is.
 - Confirmed five sessions late; a level more than a few ATRs below is not support for a swing trade.
 
 Sources: docs/data/swing.md; the Turtle rules for ATR-scaled stops
 
 ### `rollup.swing_levels@v1.swing_low_date`
 
-**How to read it.** The session of the swing low that is the current support. A recent low is a level the market has just defended; an old one is a memory. A date to show with the level.
+**How to read it.** The session of the swing low that is the current support. A recent low is a level the market has recently defended; an old one is a memory. A date to show with the level.
 
 **The criterion per intent**
 
@@ -306,7 +306,7 @@ Sources: The Turtle rules (ATR-scaled distances); docs/data/swing.md
 
 ### `feature.dist_to_support_atr`
 
-**How to read it.** The distance to support in ATRs: how many typical daily ranges sit between the close and the last swing low below it. Under 1 the close is at support (a stop just below it is tight); 2 to 3 is the usual working distance for a swing entry; above 5 a stop at support is a wide one.
+**How to read it.** The distance to support in ATRs: how many typical daily ranges sit between the close and the last swing low below it. Under 1 the close is at support (a stop right below it is tight); 2 to 3 is the usual working distance for a swing entry; above 5 a stop at support is a wide one.
 
 **The criterion per intent**
 
@@ -334,7 +334,7 @@ Sources: The Turtle rules (a 2 ATR stop); docs/data/swing.md
 
 **When the reading lies**
 
-- A level set by one spike high (a halt, a news candle) is easy to clear and weak support afterwards; check rollup.retest@v1.sessions_since_breakout and the volume on the day (rollup.momentum@v1.rel_volume).
+- A level set by one spike high (a halt, a news candle) is cleared even on a quiet day and is weak support afterwards. Check rollup.retest@v1.sessions_since_breakout and the volume on the day (rollup.momentum@v1.rel_volume).
 - Null when no session of the last 60 closed above its prior 20-session high (retest_state NONE); a hard 'not_null' drops every name that has not broken out lately.
 - The close alone defines the breakout here, with no volume condition (unlike feature.breakout_20d).
 
@@ -411,7 +411,7 @@ Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Tren
 
 ### `rollup.gaps@v1.gap_below_date`
 
-**How to read it.** The session of the up gap behind rollup.gaps@v1.gap_below. A recent gap is a level the market has just jumped over; an old one is a memory.
+**How to read it.** The session of the up gap behind rollup.gaps@v1.gap_below. A recent gap is a level the market has recently jumped over; an old one is a memory.
 
 **The criterion per intent**
 
@@ -437,7 +437,7 @@ Sources: docs/data/swing.md
 
 **When the reading lies**
 
-- The EMA is seeded with the mean of the first 20 bars of the consecutive run ending today; after a gap in the bars the run restarts, so a name that just resumed trading has an EMA over few bars. Check rollup.price_history@v1.bar_status and rollup.price_stats@v2.history_days.
+- The EMA is seeded with the mean of the first 20 bars of the consecutive run ending today; after a gap in the bars the run restarts, so a name that recently resumed trading has an EMA over few bars. Check rollup.price_history@v1.bar_status and rollup.price_stats@v2.history_days.
 - Null with fewer than 20 consecutive bars ending on the session (a gap among the last 20, or a new listing).
 
 Sources: Moving average (exponential), Wikipedia: https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average; Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel
@@ -550,7 +550,7 @@ Sources: docs/data/swing.md
 
 ### `rollup.pivot_strength@v1.support_age`
 
-**How to read it.** Sessions since the swing low that is the current support (5 to 246). A recent low is a floor the market has just defended; an old one is a memory.
+**How to read it.** Sessions since the swing low that is the current support (5 to 246). A recent low is a floor the market has recently defended; an old one is a memory.
 
 **The criterion per intent**
 
@@ -622,7 +622,7 @@ Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Tren
 
 ### `feature.dist_to_gap_above`
 
-**How to read it.** How far above the close the nearest unfilled down gap begins, as a fraction of the close: 0.03 is 3% above. Close to 0 the close is just under a gap zone where supply sat when price dropped through; 0.10 or more is out of play for a swing trade. The zone is rollup.gaps@v1.gap_above (its lower edge).
+**How to read it.** How far above the close the nearest unfilled down gap begins, as a fraction of the close: 0.03 is 3% above. Close to 0 the close is right under a gap zone where supply sat when price dropped through; 0.10 or more is out of play for a swing trade. The zone is rollup.gaps@v1.gap_above (its lower edge).
 
 **The criterion per intent**
 
@@ -640,7 +640,7 @@ Sources: docs/data/swing.md; Murphy, Technical Analysis of the Financial Markets
 
 ### `feature.dist_to_gap_below`
 
-**How to read it.** How far below the close the nearest unfilled up gap begins, as a fraction of the close: 0.03 is 3% below. Close to 0 the close is just above a gap zone, where a pullback meets the old gap; the zone is rollup.gaps@v1.gap_below (its upper edge). A gap that far below has not been tested since it formed.
+**How to read it.** How far below the close the nearest unfilled up gap begins, as a fraction of the close: 0.03 is 3% below. Close to 0 the close is right above a gap zone, where a pullback meets the old gap; the zone is rollup.gaps@v1.gap_below (its upper edge). A gap that far below has not been tested since it formed.
 
 **The criterion per intent**
 
@@ -951,7 +951,7 @@ Sources: Faith (2007), Way of the Turtle: System 2 (55-day breakout)
 
 ### `feature.breakdown_20d`
 
-**How to read it.** True when the close is below the lowest low of the previous 20 sessions on at least 1.5 times average volume: the mirror of feature.breakout_20d, the short-setup trigger and, for a long, the stop that just got hit. In an uptrend it marks the end of the leg; in a downtrend it is the next leg down.
+**How to read it.** True when the close is below the lowest low of the previous 20 sessions on at least 1.5 times average volume: the mirror of feature.breakout_20d, the short-setup trigger and, for a long, the stop that was hit. In an uptrend it marks the end of the leg; in a downtrend it is the next leg down.
 
 **The criterion per intent**
 

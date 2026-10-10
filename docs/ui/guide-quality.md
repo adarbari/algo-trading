@@ -83,22 +83,22 @@ review sites (StockBrokers.com, NerdWallet, Bankrate, Finder), Trustpilot and a 
 11. **One idea per section**: a Start page section is one paragraph under a question-shaped or verb-shaped title; a page has at most 7 sections and ends with `links` to read next.
 12. **Honest about risk**: a playbook or Start page that leads to a trade says what the screen does not check and the loss case, before the hit case.
 
-### (b) Fitness tests over the TOML (proposed; per-value terms ship as `tests/architecture/guide/`, the style checks are a follow-up)
+### (b) Fitness tests over the TOML (per-value terms: `tests/architecture/guide/`; style: `tests/unit/config/site/guide/test_style.py`, long sentences shipped before it in the shrink-only `architecture/guide_style_baseline.toml`)
 
 | Check | Rule | Status |
 |---|---|---|
 | `short` is one sentence | one terminal `.`/`?`, no `;` | exists (glossary) |
-| `short` <= 25 words; every sentence in `body` / `reads` / `caveats` <= 30 words | word count split on `. ` | new (bullets 2, 9) |
+| `short` <= 25 words; every sentence in `body` / `reads` / `caveats` <= 30 words | word count, a sentence ends at `.`/`!`/`?` before a capital; `short` and Start `summary` <= 25; glossary `body` / `next`, Start sections, field `reads` / `caveats`, situation `signs` / `do` <= 30 | exists (`test_style.py`; field-guide and situation sentences baselined) |
 | Every public status value has its own term | every `UnknownCode` served as a public kind, every `NewerState`, every screener `status` and ingestion step state maps to a `[[term]]` id (today: 5 `unavailable_*` terms, `not_run`, `paused`; assert the full enum) | new (bullet 3) |
-| State terms carry "next" | a term whose id is in the state set has a `next` key (one sentence) or its `body` contains a sentence starting "Then" / "Next" / "The app"; schema key preferred | new (bullet 4) |
+| State terms carry "next" | a term whose id is in the state set has a `next` key (one sentence) (the state set: every `term:` a value maps to in `architecture/guide_coverage.toml`) | exists (`next` in the glossary schema, served as the body's last sentence; `test_style.py`) |
 | Field has example + caveat + source | each `[[field]]` has >= 1 `use`, >= 1 `caveats`, >= 1 `sources` | partly (use validated); new for counts |
 | Caveat ends with a check | each caveat's last sentence names a catalogue field, a `situation` or "see" | new (bullet 6) |
-| Banned words | the list in bullet 8 fails on `short`, `body`, `reads`, `summary`, section `body` (case-insensitive, whole word) | new |
-| No orphan jargon | every glossary `term` string that appears in another entry's body is in that entry's `see_also` (or a Start page's `links`) | new (bullet 7) |
+| Banned words | the list in bullet 8 fails on every text above (case-insensitive, whole word); "leverage" only as a verb, advice as "should buy/sell/trade", "buy now" or a sentence starting Buy / Sell ("buy" describing a rule is not advice) | exists (`test_style.py`) |
+| No orphan jargon | every glossary `term` string that appears in another entry's body is in that entry's `see_also` (or a Start page's `links`); a term is spotted when it is a code (`NOT_RUN`, `on_miss`, as written) or a phrase of two or more words (any case); single plain words ("Run", "Edge") read as English and are skipped | exists (`test_style.py`) |
 | Version named is current | a `name@vN` in prose is the catalogue's latest version (playbooks already check `asks` vs latest) | extend |
-| Reviewed date | each `[[term]]` / `[[page]]` / `[[field]]` has `reviewed = YYYY-MM-DD`; a fitness test lists entries older than 180 days as a warning, and fails when a feature version bumped after the date | new (bullet 10) |
-| Section caps | a Start page has <= 7 sections, each body one paragraph (no blank line) | new (bullet 11) |
-| Readability | a Flesch-Kincaid grade estimate (syllable heuristic in the test, no dependency) <= 10 on `short` and `summary` | new, advisory first |
+| Reviewed date | each `[[term]]` / `[[page]]` / `[[field]]` has `reviewed = YYYY-MM-DD`; a fitness test lists entries older than 180 days as a warning, and fails when a feature version bumped after the date | not built (optional, advisory) |
+| Section caps | a Start page has <= 7 sections, each body one paragraph (no blank line) | 7-section cap exists (`test_style.py`); one paragraph not checked (the loader collapses whitespace) |
+| Readability | a Flesch-Kincaid grade estimate (syllable heuristic in the test, no dependency) <= 10 on `short` and `summary` | not built (optional, advisory) |
 
 Keep these in the existing test modules (layout cap: `tests/unit/config/site/guide/` holds 4 modules; a `test_style.py` shared by the three kinds fits).
 

@@ -2,15 +2,19 @@
 ``docs/ui/guide.md`` section 3, "Glossary"): the app's own words and the rule grammar, one
 ``[[term]]`` each: ``id`` (its page's key), ``term`` (as the app writes it: ``NOT_RUN``,
 ``on_miss``, ``Near miss``), ``short`` (one sentence: the help button's hover and the drawer's
-first line), ``body`` (a short paragraph; catalogue names in it are linked) and ``see_also``
-(other term ids, in reading order).
+first line), ``body`` (a short paragraph; catalogue names in it are linked), ``next`` (optional,
+one sentence: what the app does next or what the reader can do, for a state or status term;
+served as the body's last sentence, ``reading``) and ``see_also`` (other term ids, in reading
+order).
 
 The loader reads every theme file in file-name order and checks shape only: known keys,
 snake_case ids, non-empty text, no id or term twice across the files (terms compared without
 case), no ``see_also`` naming the term itself or another twice, no
 secrets. That every
 ``see_also`` id is a term, every catalogue name in the prose exists, ``short`` is one sentence
-and every term the spec lists is written are fitness tests over the shipped file."""
+and every term the spec lists is written are fitness tests over the shipped files; the writing style
+(lengths, banned words, orphan jargon, ``next`` on state terms) is
+``tests/unit/config/site/guide/test_style.py``."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -21,7 +25,7 @@ from algotrade.config.site.guide.start import entry_id
 from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "guide_glossary"  # the config store's kind: site/guide/glossary/<theme>.toml
-TERM_KEYS = ("id", "term", "short", "body", "see_also")
+TERM_KEYS = ("id", "term", "short", "body", "next", "see_also")
 
 
 class Documents(Protocol):
@@ -41,6 +45,12 @@ class GlossaryTerm:
     short: str
     body: str
     see_also: tuple[str, ...] = ()
+    next: str = ""
+
+    @property
+    def reading(self) -> str:
+        """What the drawer shows under the short line: ``body`` then ``next``."""
+        return f"{self.body} {self.next}" if self.next else self.body
 
     @classmethod
     def from_table(cls, t: Table) -> "GlossaryTerm":
@@ -50,7 +60,8 @@ class GlossaryTerm:
         if term_id in see_also:
             raise ConfigurationError(f"{t.where} see_also: a term does not refer to itself")
         unique(t.where, "see_also ids", see_also)
-        return cls(term_id, t.line("term"), t.line("short"), t.line("body"), see_also)
+        next_ = t.line("next") if t.raw("next") is not None else ""
+        return cls(term_id, t.line("term"), t.line("short"), t.line("body"), see_also, next_)
 
 
 @dataclass(frozen=True)
