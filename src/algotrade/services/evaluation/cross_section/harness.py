@@ -369,7 +369,7 @@ def effective_split(run: date | None, edge: Edge) -> tuple[date | None, bool]:
     when it is not the site edge's (a copy whose split moved), or the user moved the split of
     an edge whose out-of-sample result they had seen (a permanent label)."""
     split = run or edge.frozen_from
-    moved = "split_moved_after_viewing" in edge.follow.labels
+    moved = "split_moved_after_viewing" in edge.audit.labels
     return split, split != edge.site_frozen_from or moved
 
 

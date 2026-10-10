@@ -7,9 +7,12 @@ The write is for the caller; an admin names another user in the ``X-Act-For`` he
 
 from fastapi import APIRouter
 
+from algotrade.config.edges.document import Edge
+from algotrade.config.edges.loading import KIND, SITE
 from algotrade.config.user import UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring import edges
-from algotrade.services.authoring.edges import StateChange
+from algotrade.services.authoring.edges import StatusChange
 from algotrade.services.read.context import open_stores
 from algotrade.services.read.evaluation import versions
 from algotrade_api.deps import Context, Store, User, Writer
@@ -58,17 +61,41 @@ def set_state(
 ) -> EdgeState:
     """Move the user's state about an edge (follow, reject, retire, replace) and/or show its
     out-of-sample result. The server decides the permanent labels (a warning, never a block)."""
-    change = StateChange(body.state, body.reason, body.reveal_oos)
+    own = edge_id not in store.configs.names(SITE, KIND)
+    change = _change(body, own)
     # The verdict is the one the acted-for user sees (X-Act-For), not the caller's.
     theirs = open_stores(store.reader, store.configs, UserContext(user), store.cache)
     verdict = versions.verdict_level(theirs, edge_id) if body.state == "following" else None
-    follow = edges.set_state(writer, user, edge_id, change, today=ctx.session.date, verdict=verdict)
+    edge = edges.set_status(writer, user, edge_id, change, today=ctx.session.date, verdict=verdict)
     return EdgeState(
         edge_id=edge_id,
-        state=follow.state,
-        since=follow.since,
-        reason=follow.reason,
-        replaces=follow.replaces,
-        labels=list(follow.labels),
-        oos_revealed=follow.oos_revealed,
+        state=_state(edge, own),
+        since=edge.audit.status_since if own else edge.follow.since,
+        reason=edge.audit.status_reason,
+        replaces=edge.audit.replaces,
+        labels=[*dict.fromkeys([*edge.follow.labels, *edge.audit.labels])],
+        oos_revealed=edge.audit.oos_revealed,
     )
+
+
+# The old state words the browser still sends and reads (until the surfaces speak status, ADR 0053
+# amendment 2026-10-10): an own edge's status, or a site edge's bookmark.
+_STATUS_OF = {"researching": "researching", "trial": "candidate", "following": "live",
+              "rejected": "rejected", "retired": "retired"}  # fmt: skip
+
+
+def _change(body: StateBody, own: bool) -> StatusChange:
+    state = body.state
+    if state is not None and state not in _STATUS_OF:
+        raise ConfigurationError(f"state {state!r}: expected one of {list(_STATUS_OF)}")
+    if own:
+        status = None if state is None else _STATUS_OF[state]
+        return StatusChange(status, None, body.reason, body.reveal_oos)
+    follow = None if state is None else state in ("following", "trial")
+    return StatusChange(None, follow, body.reason, body.reveal_oos)
+
+
+def _state(edge: Edge, own: bool) -> str:
+    if not own:
+        return "following" if edge.followed else "researching"
+    return {v: k for k, v in _STATUS_OF.items()}.get(edge.status, "researching")

@@ -33,7 +33,7 @@ and the key.
     top_k             an integer >= 1, or ``"all"`` (every qualified name)
     screeners         the screener presets that implement it (empty while a candidate waits)
     baselines         screener presets run on the same sessions (quality bar 9)
-    status            candidate | evidenced | live | retired | rejected | blocked
+    status            researching | candidate | evidenced | live | retired | rejected | blocked
     frozen_from       optional date: the harness reports sessions from it on their own as the
                       frozen period (fixed once chosen, never rolling; none: no frozen slice)
     [evidence]        run_id and split_from of the run an evidenced or live edge rests on; its
@@ -52,7 +52,8 @@ and the key.
                       committed numbers the same way (``test_edge_promotion.py``)
     extends           a user's copy: the id of the edge (a site edge, or the user's own) whose
                       document it is layered over (``loading.py``); the copy's own keys win
-    [follow]          the user's own state about the edge (``follow.py``)
+    [follow]          a user's bookmark of a site edge (``follow.py``)
+    [audit]           the server's bookkeeping of a user's own edge (``follow.py``)
     [scorer]          optional: ``features``, the selection fields (``rollup.<group>@v<n>.<column>``
                       or ``feature.<name>``) a learned scorer is fitted on (ED7)
 
@@ -65,14 +66,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
-from algotrade.config.edges.follow import Follow, parse_follow
+from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 
 MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion need this many
-STATUSES = ("candidate", "evidenced", "live", "retired", "rejected", "blocked")
+STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
 OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm")
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
@@ -116,7 +117,7 @@ KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
-    "extends", "follow",
+    "extends", "follow", "audit",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -220,13 +221,19 @@ class Edge:
     promoted: str | None = None  # the screener that implements the edge for use (ED7c)
     compared: tuple[Compared, ...] = ()  # the numbers the promotion rests on
     extends: str | None = None  # a user's copy: the edge it is layered over
-    follow: Follow = field(default_factory=Follow)  # the user's own state about the edge
+    follow: Follow = field(default_factory=Follow)  # the user's bookmark of a site edge
+    audit: Audit = field(default_factory=Audit)  # the server's bookkeeping of an own edge
     # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
     # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
     site_frozen_from: date | None = None
     # Whose edge it is: ``site`` or a user id, set by the loader from where the document lives
     # (``loading.py``), never a key of the document (a document cannot claim an owner).
     owner: str = "site"
+
+    @property
+    def followed(self) -> bool:
+        """The user bookmarked this (site) edge."""
+        return self.follow.since is not None
 
     @property
     def event_class(self) -> str | None:
@@ -305,6 +312,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         compared=_compared(t),
         extends=_extends(t, edge_id),
         follow=parse_follow(doc, where),
+        audit=parse_audit(doc, where),
         site_frozen_from=_frozen_from(t),
     )
     if edge.promoted is not None and edge.promoted not in edge.screeners:

@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from algotrade.config.edges.follow import Follow
+from algotrade.config.edges.follow import Audit
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
@@ -711,8 +711,8 @@ def test_a_copy_that_kept_the_site_split_is_not_exploratory_until_a_split_moved_
     world: World,
 ) -> None:
     assert not _split_run(world).exploratory
-    follow = Follow(labels=("split_moved_after_viewing",))
-    assert _split_run(world, changes={"follow": follow}).exploratory
+    audit = Audit(labels=("split_moved_after_viewing",))
+    assert _split_run(world, changes={"audit": audit}).exploratory
 
 
 def test_the_run_split_beats_the_edges(world: World) -> None:
@@ -887,9 +887,10 @@ def test_random_picks_need_an_out_of_sample_slice_and_are_drawn_only_there() -> 
     assert len(found.draws) == 1000  # DEFAULT_DRAWS
     first = found.draws[0]
     assert (first.slice_kind, first.sessions, first.picks, first.eligible) == ("draw", 2, 10, 40)
-    # Names earn (i - 9.5)%: the screener's top five always hit (lift 2.0); random fives do not.
+    # Names earn (i - 9.5)%: the screener's top five always hit (lift 2.0, the ceiling); a random
+    # five rarely is the top five (1 in 252 a session), so the draws centre on 1.0.
     lifts = [d.lift for d in found.draws if d.lift is not None]
-    assert max(lifts) < 2.0
+    assert max(lifts) <= 2.0
     assert sum(lifts) / len(lifts) == pytest.approx(1.0, abs=0.05)
 
 

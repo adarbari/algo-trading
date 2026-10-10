@@ -71,11 +71,11 @@ def test_a_copy_extends_a_site_edge_under_its_own_id_and_adds_new_edges() -> Non
     assert copy.screeners == ("mine",)  # the user's own screen counts for the user
     assert copy.outcome.horizon_sessions == (20,)  # tables merge, lists replace
     assert copy.outcome.kind == "excess_return"  # the extended document's key stays
-    assert copy.status == "candidate"  # never the site's status, evidence or rejection
+    assert copy.status == "researching"  # never the site's status, evidence or rejection
     assert copy.evidence is None
     assert copy.frozen_from == by_id["drift"].frozen_from  # inherited
     assert copy.site_frozen_from == by_id["drift"].frozen_from
-    assert by_id["idea"].status == "candidate"  # a new edge is a candidate too
+    assert by_id["idea"].status == "researching"  # a new edge is researching too
     assert by_id["drift"].screeners == ()  # the site edge is untouched
     assert [e.id for e in load_edges(configs)] == ["drift"]  # the site user sees site edges only
 
@@ -100,24 +100,89 @@ def test_a_version_extends_the_users_own_copy_and_the_root_is_the_site_edge() ->
     assert by_id["v2"].site_frozen_from == by_id["drift"].frozen_from
 
 
-def test_a_follow_only_file_of_a_site_id_is_the_users_state_about_that_edge() -> None:
-    follow = {"follow": {"state": "following", "since": "2026-05-04", "labels": []}}
+def test_a_follow_only_file_of_a_site_id_is_the_users_bookmark_of_that_edge() -> None:
+    follow = {"follow": {"since": "2026-05-04", "labels": ["followed_against_verdict"]}}
     configs = store(site__drift=document(), alice__drift=follow)
     by_id = {e.id: e for e in load_edges(configs, "alice")}
-    assert by_id["drift"].follow.state == "following"
+    assert by_id["drift"].followed
     assert str(by_id["drift"].follow.since) == "2026-05-04"
+    assert by_id["drift"].follow.labels == ("followed_against_verdict",)
     assert by_id["drift"].status == "candidate"  # the site's document, as is
-    assert load_edges(store(site__drift=document()), "alice")[0].follow.state == "researching"
+    assert not load_edges(store(site__drift=document()), "alice")[0].followed
+
+
+@pytest.mark.parametrize(
+    ("state", "followed"),
+    [("following", True), ("trial", True), ("researching", True), ("rejected", False),
+     ("retired", False)],
+)  # fmt: skip
+def test_an_old_follow_state_of_a_site_edge_reads_as_a_bookmark_or_none(
+    state: str, followed: bool
+) -> None:
+    old = {
+        "follow": {"state": state, "since": "2026-05-04", "labels": ["oos_viewed_during_tuning"]}
+    }
+    edge_ = load_edges(store(site__drift=document(), alice__drift=old), "alice")[0]
+    assert edge_.followed is followed
+    assert edge_.follow.labels == ()  # the other labels are the own edge's audit
+
+
+@pytest.mark.parametrize(
+    ("state", "status"),
+    [("researching", "researching"), ("trial", "candidate"), ("following", "live"),
+     ("rejected", "rejected"), ("retired", "retired")],
+)  # fmt: skip
+def test_an_old_follow_table_of_an_own_edge_reads_as_its_status_and_audit(
+    state: str, status: str
+) -> None:
+    old = {"extends": "drift", "follow": {
+        "state": state, "since": "2026-05-04", "reason": "why", "replaces": "drift",
+        "labels": ["oos_viewed_during_tuning"], "oos_revealed": True,
+    }}  # fmt: skip
+    mine = {e.id: e for e in load_edges(store(site__drift=document(), alice__mine=old), "alice")}[
+        "mine"
+    ]
+    assert mine.status == status
+    assert str(mine.audit.status_since) == "2026-05-04"
+    assert (mine.audit.status_reason, mine.audit.replaces) == ("why", "drift")
+    assert (mine.audit.labels, mine.audit.oos_revealed) == (("oos_viewed_during_tuning",), True)
+    assert not mine.followed
+    assert mine.rejection_reason == ("why" if status in ("rejected", "retired") else "")
+
+
+def test_an_own_edge_keeps_its_own_status_and_audit_and_a_copy_does_not_inherit_them() -> None:
+    audit = {"status_since": "2026-06-01", "labels": ["followed_against_verdict"]}
+    mine = {"extends": "drift", "status": "live", "audit": audit}
+    configs = store(
+        site__drift=document(status="evidenced"), alice__mine=mine, alice__next={"extends": "mine"}
+    )
+    by_id = {e.id: e for e in load_edges(configs, "alice")}
+    assert (by_id["mine"].status, str(by_id["mine"].audit.status_since)) == ("live", "2026-06-01")
+    assert by_id["mine"].audit.labels == ("followed_against_verdict",)
+    assert (by_id["next"].status, by_id["next"].audit.labels) == ("researching", ())
+
+
+def test_a_follow_table_in_an_own_edge_is_refused_unless_it_is_the_old_shape() -> None:
+    bookmark = {"extends": "drift", "follow": {"since": "2026-05-04"}}
+    configs = store(site__drift=document(), alice__mine=bookmark, alice__fine={"extends": "drift"})
+    assert [e.id for e in load_edges(configs, "alice")] == ["drift", "fine"]
+    assert "an own edge has a status" in edge_problems(configs, "alice")["mine"]
+
+
+def test_a_rejected_own_edge_carries_its_reason_from_the_audit() -> None:
+    mine = {"extends": "drift", "status": "rejected", "audit": {"status_reason": "No edge."}}
+    by_id = {e.id: e for e in load_edges(store(site__drift=document(), alice__mine=mine), "alice")}
+    assert (by_id["mine"].status, by_id["mine"].rejection_reason) == ("rejected", "No edge.")
 
 
 def test_follow_is_never_inherited_by_a_copy() -> None:
     configs = store(
         site__drift=document(),
-        alice__drift={"follow": {"state": "following"}},
+        alice__drift={"follow": {"since": "2026-05-04"}},
         alice__mine={"extends": "drift"},
     )
     by_id = {e.id: e for e in load_edges(configs, "alice")}
-    assert (by_id["drift"].follow.state, by_id["mine"].follow.state) == ("following", "researching")
+    assert (by_id["drift"].followed, by_id["mine"].followed) == (True, False)
 
 
 @pytest.mark.parametrize(
@@ -127,6 +192,8 @@ def test_follow_is_never_inherited_by_a_copy() -> None:
         ({"extends": "drift"}, r"holds only \[follow\].*ignored \['extends'\]"),
         ({"follow": {"state": "bogus"}}, "state"),
         ({"follow": {"labels": ["nope"]}}, r"unknown \['nope'\]"),
+        ({"follow": {"labels": ["oos_viewed_during_tuning"]}}, "unknown"),
+        ({"follow": {"since": "soon"}}, "expected a date"),
     ],
 )
 def test_a_site_edges_own_file_is_only_state_and_a_fault_in_it_is_a_problem_not_a_failed_load(
@@ -140,7 +207,8 @@ def test_a_site_edges_own_file_is_only_state_and_a_fault_in_it_is_a_problem_not_
 @pytest.mark.parametrize(
     ("user_doc", "message"),
     [
-        ({"extends": "drift", "status": "live"}, "status: a user's edge is a 'candidate'"),
+        ({"extends": "drift", "status": "evidenced"}, "a user's edge is one of"),
+        ({"extends": "drift", "audit": {"labels": ["nope"]}}, r"unknown \['nope'\]"),
         (
             {"extends": "drift", "evidence": {"run_id": "r", "split_from": "2026-04-01"}},
             r"\['evidence'\] are the site's to set",
@@ -165,16 +233,16 @@ def test_extends_cycles_between_two_copies_are_isolated() -> None:
     assert set(edge_problems(configs, "alice")) == {"a", "b"}
 
 
-def test_a_new_edge_is_only_a_candidate() -> None:
+def test_a_new_edge_is_never_the_sites_evidenced_or_blocked() -> None:
     configs = store(alice__idea=document(id="idea", status="evidenced"))
     assert load_edges(configs, "alice") == ()
-    assert "a user's edge is a 'candidate'" in edge_problems(configs, "alice")["idea"]
+    assert "a user's edge is one of" in edge_problems(configs, "alice")["idea"]
 
 
 def test_the_site_publishing_a_users_copy_by_its_id_keeps_all_their_edges() -> None:
     """The publish path: the site gets an edge under the copy's id; the user's file of that id
     becomes their state about it, and their other edges still load."""
-    mine = {"extends": "drift", "top_k": 3, "follow": {"state": "following"}}
+    mine = {"extends": "drift", "top_k": 3, "follow": {"state": "following", "since": "2026-05-04"}}
     before = store(site__drift=document(), alice__mine=mine, alice__other={"extends": "mine"})
     assert [e.id for e in load_edges(before, "alice")] == ["drift", "mine", "other"]
     after = store(
@@ -185,7 +253,7 @@ def test_the_site_publishing_a_users_copy_by_its_id_keeps_all_their_edges() -> N
     )
     by_id = {e.id: e for e in load_edges(after, "alice")}
     assert set(by_id) == {"drift", "mine", "other"}
-    assert by_id["mine"].follow.state == "following" and by_id["mine"].extends is None
+    assert by_id["mine"].followed and by_id["mine"].extends is None
     assert by_id["other"].extends == "mine"
     assert "the site now has an edge 'mine'" in edge_problems(after, "alice")["mine"]
 
@@ -240,7 +308,7 @@ def test_every_shipped_inline_universe_names_catalogue_fields() -> None:
 
 
 def test_an_edge_is_owned_by_where_its_document_lives() -> None:
-    follow = {"follow": {"state": "following", "since": "2026-05-04", "labels": []}}
+    follow = {"follow": {"since": "2026-05-04"}}
     over = {"extends": "drift", "screeners": ["mine"]}
     configs = store(
         site__drift=document(), alice__drift=follow, alice__mine_v2=over,
@@ -255,7 +323,7 @@ def test_an_edge_is_owned_by_where_its_document_lives() -> None:
 def test_load_all_edges_is_the_site_edges_and_every_users_own_once() -> None:
     configs = store(
         site__drift=document(),
-        alice__drift={"follow": {"state": "following", "since": "2026-05-04", "labels": []}},
+        alice__drift={"follow": {"since": "2026-05-04"}},
         alice__idea=document(id="idea", status=None),
         bob__idea=document(id="idea", status=None),
     )

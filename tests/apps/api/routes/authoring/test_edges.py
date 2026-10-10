@@ -107,22 +107,28 @@ def test_state_follow_reject_and_the_reveal(client: TestClient) -> None:
     followed = c.put("/edges/drift/state", json={"state": "following"})  # a site edge, no copy
     assert followed.status_code == 200 and followed.json()["state"] == "following"
     assert read(c, QUERY, id="drift")["state"] == "following"
+    # the read still serves the old words, derived: only a bookmark reads as following (Brief B)
     assert [(e["id"], e["state"]) for e in read(c, LIST)] == [
         ("drift", "following"),
-        ("mine", "rejected"),
+        ("mine", "researching"),
     ]
+    assert (
+        c.put("/edges/drift/state", json={"state": "researching"}).json()["state"] == "researching"
+    )
+    assert read(c, QUERY, id="drift")["state"] == "researching"  # the bookmark is gone
 
 
-def test_a_new_version_is_a_trial_and_replacing_retires_the_old_one(client: TestClient) -> None:
+def test_a_new_version_is_a_candidate_and_replacing_unfollows_the_old_one(
+    client: TestClient,
+) -> None:
     c = client
     assert c.put("/edges/drift/state", json={"state": "following"}).status_code == 200
     made = c.post("/edges/drift/copy", json={"new_id": "drift_v2", "as_version": True})
-    assert made.json()["document"]["follow"]["state"] == "trial"
-    v2 = read(c, QUERY, id="drift_v2")
-    assert (v2["state"], v2["replaces"]) == ("trial", "drift")
+    assert made.json()["document"]["status"] == "candidate"
+    assert read(c, QUERY, id="drift_v2")["replaces"] == "drift"
     done = c.put("/edges/drift_v2/state", json={"state": "following"}).json()
-    assert done["labels"] == ["replaced_without_forward_test"]  # no forward sessions have passed
-    assert read(c, QUERY, id="drift")["state"] == "retired"
+    assert (done["state"], done["labels"]) == ("following", ["replaced_without_forward_test"])
+    assert read(c, QUERY, id="drift")["state"] == "researching"  # no longer bookmarked
 
 
 def test_delete_archives_the_edge_and_the_id_is_not_reused(client: TestClient, root: Path) -> None:
