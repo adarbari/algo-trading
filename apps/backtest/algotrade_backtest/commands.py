@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from algotrade.analytics.report import markdown_table
 from algotrade.config.edges.document import CLOSED
-from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.env import config_dir, data_url
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_macro
@@ -227,9 +227,11 @@ def cmd_regime_scorecard(args: argparse.Namespace) -> int:
 
 
 def cmd_evaluate_edges(args: argparse.Namespace) -> int:
-    """The edge harness (ADR 0053) through the jobs runner: every open edge that has screeners
-    or baselines (or the one ``--edge``) over ``--from``..``--to`` (default: the stored outcome
-    sessions), outcomes known as of ``--as-of`` (default now), the test slice from
+    """The edge harness (ADR 0053) through the jobs runner, each edge as its OWNER (the site, or
+    the user whose ``config/users/<id>/edges/`` holds it; no ``--user``): every open edge that
+    has screeners or baselines, the site's and every user's own (or the one ``--edge``) over
+    ``--from``..``--to`` (default: the stored outcome sessions), outcomes known as of
+    ``--as-of`` (default now), the test slice from
     ``--split-from`` (else each edge's ``frozen_from``; another split than the site edge's is
     exploratory). Rows land in ``results/edge_eval``;
     a report with the survivorship line is printed (and written to ``--report``).
@@ -239,9 +241,13 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
         raise ConfigurationError("--update-baseline needs --baseline FILE")
     backend = open_backend(data_url(args.data_url))
     reader = StoreReader(backend)
+    if args.user:
+        raise ConfigurationError(
+            "evaluate-edges takes no --user: each edge is run as its owner, from where its "
+            "document lives (config/site/edges = site, config/users/<id>/edges = that user)"
+        )
     configs = open_config_store(config_dir(args.config_dir))
-    user = _user(args)
-    edges = [e for e in load_edges(configs, user.user_id) if args.edge in (None, e.id)]
+    edges = [e for e in load_all_edges(configs) if args.edge in (None, e.id)]
     if args.edge is None:
         edges = [e for e in edges if e.status not in CLOSED and (e.screeners or e.baselines)]
     if not edges:
@@ -262,9 +268,10 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
             "extra_baselines": list(args.extra_baseline),
             "split_from": args.split_from.isoformat() if args.split_from else None,
         }  # fmt: skip
-        job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-eval", params, user)
+        owner = UserContext(edge.owner)
+        job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-eval", params, owner)
         if job.status is JobStatus.FAILED:
-            print(f"error: {edge.id}: {job.error}", file=sys.stderr)
+            print(f"error: {edge.id} ({edge.owner}): {job.error}", file=sys.stderr)
             failed = True
             continue
         reports.append(render_edge_report(job.result))

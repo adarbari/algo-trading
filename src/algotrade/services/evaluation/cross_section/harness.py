@@ -41,11 +41,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from algotrade.config.edges.document import MAIN, Edge, job_name
+from algotrade.config.edges.document import LEGACY_SITE_OWNERS, MAIN, Edge, job_name
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
-from algotrade.config.user import UserContext
+from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.core.time.calendar import sessions_between
@@ -503,9 +503,12 @@ def _prior_trials(
     writer: ResultWriter, edge_id: str, user_id: str
 ) -> set[tuple[str, str, str, int]]:
     """(edge variant, variant, config hash, horizon) of earlier runs; a trial logged before
-    edge variants existed is the edge's own ("main")."""
+    edge variants existed is the edge's own ("main"). The site's log includes the runs recorded
+    under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them."""
     found: set[tuple[str, str, str, int]] = set()
-    for record in writer.runs_for(job_name(edge_id, user_id)):
+    owners = (user_id, *(LEGACY_SITE_OWNERS if user_id == SITE_USER else ()))
+    records = [r for owner in owners for r in writer.runs_for(job_name(edge_id, owner))]
+    for record in records:
         for t in record.stats.get("trials", []):
             found.add(
                 (t.get("edge_variant") or MAIN, t["variant"], t["config_hash"], int(t["horizon"]))

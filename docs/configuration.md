@@ -314,7 +314,11 @@ only a `[follow]` table (the user's state about it: `config/edges/follow.py`). A
 shadows a site edge. A run whose split is not the site edge's `frozen_from` is exploratory: its
 rows carry it in their key (`results/edge_eval.split_from`) and `exploratory`, and it never moves
 an edge's status or the track-record chip. `algotrade-backtest evaluate-edges --split-from D` sets
-a split for one run. Written only through `services/authoring/edges.py`.
+a split for one run. An edge is evaluated under its OWNER, derived from where its document lives
+(`config/site/edges/` is `site`, `config/users/<id>/edges/` that user; `Edge.owner`, never a
+key): `evaluate-edges` takes no `--user` and runs the site's edges and every user's own. Runs
+once recorded under `edge-eval:<edge>:local` (the old CLI fallback; `LEGACY_SITE_OWNERS`) are read
+as the site's, disclosed as `legacy_owner`, and count in the site's trial log. Written only through `services/authoring/edges.py`.
 
 ## Expression features
 

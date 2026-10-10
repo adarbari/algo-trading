@@ -224,6 +224,11 @@ def test_evaluate_edges_needs_stored_outcomes_and_a_known_edge(cli: Cli) -> None
     assert unknown.returncode == 2 and "no edge to evaluate" in unknown.stderr
 
 
+def test_evaluate_edges_has_no_user_the_owner_is_the_edge_documents(cli: Cli) -> None:
+    proc = cli("--user", "alice", "evaluate-edges")
+    assert proc.returncode == 2 and "owner" in proc.stderr
+
+
 def test_evaluate_edges_takes_a_split_flag_that_is_a_date(cli: Cli) -> None:
     proc = cli("evaluate-edges", "--split-from", "2026-06-01")  # parsed, then the empty store
     assert proc.returncode == 2 and "no outcomes stored" in proc.stderr

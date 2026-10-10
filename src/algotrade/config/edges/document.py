@@ -224,6 +224,9 @@ class Edge:
     # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
     # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
     site_frozen_from: date | None = None
+    # Whose edge it is: ``site`` or a user id, set by the loader from where the document lives
+    # (``loading.py``), never a key of the document (a document cannot claim an owner).
+    owner: str = "site"
 
     @property
     def event_class(self) -> str | None:
@@ -240,8 +243,14 @@ class Edge:
         )
 
 
+# Owners an evaluation run was once recorded under for what are now site edges: the backtest CLI
+# fell back to the user ``local`` before an edge's owner came from its document. Their records
+# are read as the site's (disclosed as ``legacy_owner``), never rewritten.
+LEGACY_SITE_OWNERS = ("local",)
+
+
 def job_name(edge_id: str, user_id: str) -> str:
-    """The run-record ``job`` whose records hold one user's trial log of an edge (ADR 0015):
+    """The run-record ``job`` whose records hold one owner's trial log of an edge (ADR 0015):
     written by the harness, read by the read model."""
     return f"edge-eval:{edge_id}:{user_id}"
 

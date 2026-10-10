@@ -135,3 +135,16 @@ def test_latest_is_by_commit_time_not_start_time(backend: MemoryBackend) -> None
     assert edge is not None
     run = load_canonical_run(ctx, edge).run
     assert run is not None and run.run_id == "long"
+
+
+def test_a_legacy_local_run_is_the_sites_and_says_so(backend: MemoryBackend) -> None:
+    write_run(backend, "old-local", FROZEN, 0.5, owner="local")
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None and run.run_id == "old-local"
+    assert (run.owner, run.legacy_owner) == ("site", "local")
+    write_run(backend, "new-site", FROZEN, 0.6, minutes=5)
+    assert load_canonical_run(ctx, edge).run.run_id == "new-site"  # type: ignore[union-attr]
+    assert load_canonical_run(ctx, edge).run.legacy_owner is None  # type: ignore[union-attr]

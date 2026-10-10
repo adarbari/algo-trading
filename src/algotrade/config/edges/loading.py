@@ -16,7 +16,9 @@ screen), a universe given by name a selection preset that exists, and, given the
 catalogue, an inline universe only catalogue fields. ``Edge.site_frozen_from`` is the
 ``frozen_from`` of the root of the copy chain, so a copy whose split differs is exploratory.
 
-The ``site`` user reads the site documents only.
+The ``site`` user reads the site documents only. ``Edge.owner`` is where the document lives:
+``site`` for a site document (a user's follow-only file over it included), the user for a copy or
+a new edge; ``load_all_edges`` is every site edge and every user's own, for the evaluation CLI.
 """
 
 from collections.abc import Mapping
@@ -51,6 +53,12 @@ class Documents(Protocol):
     def names(self, scope: str, kind: str) -> list[str]: ...
 
 
+class UserDocuments(Documents, Protocol):
+    """``Documents`` that can also list the users with files (``ConfigStore``)."""
+
+    def users(self) -> list[str]: ...
+
+
 def load_edges(
     configs: Documents, user: str = SITE_USER, catalog: FieldCatalog | None = None
 ) -> tuple[Edge, ...]:
@@ -62,6 +70,16 @@ def load_edges(
     left out, or for a site id kept as the site's with only its ``[follow]`` read, and
     ``edge_problems`` says why. A fault in a site document still raises."""
     return _load(configs, user, catalog)[0]
+
+
+def load_all_edges(configs: UserDocuments) -> tuple[Edge, ...]:
+    """The site's edges, then each user's own (copies and new edges; a site edge once), by
+    owner: what ``evaluate-edges`` runs, each under its owner. Users come from the store's
+    ``users()``; a user whose file is faulty contributes what loads."""
+    found = list(load_edges(configs))
+    for user in configs.users():
+        found.extend(e for e in load_edges(configs, user) if e.owner == user)
+    return tuple(found)
 
 
 def edge_problems(
@@ -93,9 +111,11 @@ def _load(
             continue
         parsed[name] = edge
     edges = []
-    for name, edge in parsed.items():
+    for name, parsed_edge in parsed.items():
         root = layered[name][2]
         parent = parsed.get(root) if root is not None else None
+        owner = SITE if layered[name][1].startswith(f"{_folder(SITE)}/") else user
+        edge = replace(parsed_edge, owner=owner)
         edges.append(edge if parent is None else replace(edge, site_frozen_from=parent.frozen_from))
     return tuple(edges), problems
 

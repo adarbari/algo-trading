@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from algotrade.config.edges.document import job_name
+from algotrade.config.edges.document import LEGACY_SITE_OWNERS, job_name
 from algotrade.config.user import SITE_USER
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext, Stores, run_partition
@@ -40,7 +40,9 @@ class EdgeRun:
     numbers were not knowable on that session; ``lost_inputs``: what the run could not read, as
     "<variant>: <table> (<n> sessions)" (a screener missing a table on those decision sessions);
     ``oos_hidden``: the run is a copy's whose out-of-sample result is withheld until the user shows
-    it (ADR 0053 amendment 2026-10-09): its rows are served in-sample only (``load_run_rows``)."""
+    it (ADR 0053 amendment 2026-10-09): its rows are served in-sample only (``load_run_rows``);
+    ``legacy_owner``: a site run recorded under an older owner (``LEGACY_SITE_OWNERS``, the
+    ``local`` fallback), read as the site's and never rewritten."""
 
     run_id: str
     edge_id: str
@@ -56,6 +58,7 @@ class EdgeRun:
     after_session: bool = False
     lost_inputs: tuple[str, ...] = ()
     oos_hidden: bool = False
+    legacy_owner: str | None = None
 
 
 @dataclass(frozen=True)
@@ -110,7 +113,9 @@ def _day(value: Any) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
-def _run(ctx: Stores, record: RunRecord, edge: Edge, owner: str) -> EdgeRun:
+def _run(
+    ctx: Stores, record: RunRecord, edge: Edge, owner: str, legacy_owner: str | None = None
+) -> EdgeRun:
     stats = record.stats
     frozen_from = edge.frozen_from
     committed = record.finished_at or record.started_at
@@ -132,6 +137,7 @@ def _run(ctx: Stores, record: RunRecord, edge: Edge, owner: str) -> EdgeRun:
         after_session=session is not None and committed.date() > session,
         lost_inputs=_lost(stats),
         oos_hidden=edge.oos_hidden and owner != SITE_USER,
+        legacy_owner=legacy_owner,
     )
 
 
@@ -144,10 +150,20 @@ def _lost(stats: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
-    records = ctx.reader.runs(job_name(edge.id, owner))
-    done = [r for r in records if r.status is RunStatus.COMPLETE]
-    ordered = sorted(done, key=lambda r: r.finished_at or r.started_at, reverse=True)
-    return [_run(ctx, r, edge, owner) for r in ordered]
+    """The committed runs of ``owner``, newest first; the site's include the records of
+    ``LEGACY_SITE_OWNERS`` (built as the site's, the old owner disclosed)."""
+    sources = [
+        (owner, None),
+        *((legacy, legacy) for legacy in LEGACY_SITE_OWNERS if owner == SITE_USER),
+    ]
+    found = [
+        (r, legacy)
+        for who, legacy in sources
+        for r in ctx.reader.runs(job_name(edge.id, who))
+        if r.status is RunStatus.COMPLETE
+    ]
+    ordered = sorted(found, key=lambda f: f[0].finished_at or f[0].started_at, reverse=True)
+    return [_run(ctx, r, edge, owner, legacy) for r, legacy in ordered]
 
 
 def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:
