@@ -32,7 +32,7 @@
       "dom_nodes": 192
     },
     "/regime": {
-      "first_load_js_gzip_bytes": 302200,
+      "first_load_js_gzip_bytes": 302300,
       "requests": 83,
       "dom_nodes": 1593
     },
@@ -47,7 +47,7 @@
       "dom_nodes": 634
     },
     "/explore?focus=AAPL&tab=chart": {
-      "first_load_js_gzip_bytes": 304500,
+      "first_load_js_gzip_bytes": 304630,
       "requests": 62,
       "dom_nodes": 218
     }
@@ -55,7 +55,7 @@
   "reasons": {
     "bundle.routes.src/pages/admin-llm-usage/index.ts": "2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk; then 2026-10-10 #461 ED8 E8 the six-step edge builder: its lazy page shares Checkbox, SectionNav, NumberInput and ScreenerRecord with the pages that used them, so they leave those page chunks as shared chunks (each gzipped on its own)",
     "e2e./explore?focus=AAPL&tab=chart.dom_nodes": "2026-10-10 #461 ED8 E8 the six-step edge builder reuses Checkbox, SectionNav, NumberInput and ScreenerRecord, so they leave the page chunk that inlined them and load as shared chunks: one more small request and its modulepreload link (measured)",
-    "e2e./explore?focus=AAPL&tab=chart.first_load_js_gzip_bytes": "2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",
+    "e2e./explore?focus=AAPL&tab=chart.first_load_js_gzip_bytes": "2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom); then 2026-10-10 #461 ED8 E8: the builder's shared Checkbox / SectionNav / NumberInput / ScreenerRecord chunks and the lazy Screen Builder routes (measured by CI: 304590 B)",
     "e2e./ideas.requests": "2026-10-10 #461 ED8 E8 the six-step edge builder reuses Checkbox, SectionNav, NumberInput and ScreenerRecord, so they leave the page chunk that inlined them and load as shared chunks: one more small request and its modulepreload link (measured)",
     "e2e./admin/ingestion.requests": "2026-10-10 #461 ED8 E8 the six-step edge builder reuses Checkbox, SectionNav, NumberInput and ScreenerRecord, so they leave the page chunk that inlined them and load as shared chunks: one more small request and its modulepreload link (measured)",
     "e2e./ideas.first_load_js_gzip_bytes": "2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",
