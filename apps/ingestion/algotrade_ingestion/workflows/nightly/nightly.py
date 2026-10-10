@@ -480,6 +480,10 @@ def run_session(
         for step in NIGHTLY:
             held = _not_run(step, ctx, session, latest, done, before, waive or {}, reran)
             if held is None:
+                # decided before the run: this attempt's own task run must not count
+                stale = step.name in before.done and _superseded(
+                    step, before.done[step.name], ctx, session, before
+                )
                 wait = waits(step, ctx, session, latest, settings)
                 result = run_step(
                     step,
@@ -496,7 +500,7 @@ def run_session(
                 refetch = (
                     step.name in before.done
                     and not any(n in reran for n in step.inputs)
-                    and not _superseded(step, before.done[step.name], ctx, session, before)
+                    and not stale
                 )
                 if refetch and result.status in BAD:
                     result = _refetch_failed(step, before.done[step.name], result)

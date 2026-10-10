@@ -650,6 +650,26 @@ def test_failed_refetch_run_does_not_force_rerun(fake: Callable[..., Calls]) -> 
     assert calls.sessions("rollups") == [D] and calls.sessions("history-copy") == [D]
 
 
+def test_a_partial_refetch_that_fails_acceptance_keeps_the_earlier_chains(
+    fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the refetch's own task run (PARTIAL, uncited) is not a superseding run: the earlier
+    # success is kept, not recorded FAILED (which would hold the workflow back)
+    monkeypatch.setattr(nightly_module, "job_name", lambda step: f"fake-{step}")
+    gate: list[Check] = []
+    calls, screens = fake(checks={"chains": gate}, items=STALE), Screens()
+    writer = store()
+    run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    _chains_staging(writer)
+    calls.partial = ("chains",)
+    gate.append(Check("chains_fresh", "FAIL", "still stale"))
+    later = AFTER_CLOSE + timedelta(hours=1)  # the refetch starts after the stored run
+    second = run_nightly(task_ctx(writer, clock=lambda: later), Plan([D]), screens=screens)
+    chains = steps_of(second)["chains"]
+    assert calls.sessions("chains") == [D, D] and chains["status"] == "SUCCEEDED"
+    assert "refetch failed" in chains["reason"]
+
+
 def test_a_reused_step_cites_the_attempt_that_produced_it(fake: Callable[..., Calls]) -> None:
     calls = fake(fail=("bars",))
     writer = store()
