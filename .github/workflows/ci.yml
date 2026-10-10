@@ -159,7 +159,7 @@ jobs:
           key: venv-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('uv.lock') }}
       - if: needs.changes.outputs.python == 'true'
         run: uv sync --all-packages --locked
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         if: needs.changes.outputs.python == 'true'
         with: { pattern: "coverage-py${{ matrix.python }}-*", merge-multiple: true }
       - name: Coverage gate 90% over the shards
@@ -327,7 +327,7 @@ jobs:
         run: |
           locked=$(node -p "require('@playwright/test/package.json').version")
           test "$PLAYWRIGHT_IMAGE" = "mcr.microsoft.com/playwright:v$locked-noble" || { echo "bump PLAYWRIGHT_IMAGE and the container images to v$locked-noble"; exit 1; }
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with: { name: storybook-static, path: apps/web/storybook-static }
       - name: Screenshots + axe (light and dark) over every design-system story
         run: npm run visual -- --fully-parallel --shard=${{ matrix.shard }}/4 # one story per worker, not one file per worker
