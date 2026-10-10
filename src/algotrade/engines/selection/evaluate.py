@@ -65,9 +65,10 @@ def _audit(selection: Selection, view: FeatureView) -> tuple[RuleAudit, ...]:
                 return evaluate_group(child, row)
             return evaluate_rule(child, row.get(child.field))
 
-        results = [truth(i) for i in view]
+        results = [truth(i) for i in view]  # once per name: the counts and the funnel share it
+        truths = dict(zip(view, results, strict=True))
         if funnel:
-            remaining = [i for i in remaining if truth(i) is True]
+            remaining = [i for i in remaining if truths[i] is True]
         label = child.describe() if isinstance(child, Rule) else f"<{child.kind} group>"
         audits.append(
             RuleAudit(

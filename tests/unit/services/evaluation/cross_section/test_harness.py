@@ -21,6 +21,7 @@ from algotrade.services.evaluation.cross_section.harness import (
     evaluate_edge,
 )
 from algotrade.services.evaluation.cross_section.picks import screen_variant
+from algotrade.services.evaluation.cross_section.reads import session as session_reads
 from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
@@ -750,14 +751,14 @@ def test_an_event_edge_screens_each_session_once_per_screener_whatever_its_varia
     )
     alone = run(w, plain)
     calls: list[tuple[str, date]] = []
-    real = harness.screen_variant
+    real = session_reads.screen_variant
 
     def counting(reader: Any, config: Any, day: date) -> Any:
         calls.append((config.config.id, day))
         return real(reader, config, day)
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(harness, "screen_variant", counting)
+        mp.setattr(session_reads, "screen_variant", counting)
         both = run(w, varied)
     assert len(calls) == len(set(calls)) and {d for _, d in calls} == set(EVENTS)
     assert {c for c, _ in calls} == {"momo", "momo2"}
@@ -785,14 +786,14 @@ def test_the_result_is_the_same_whatever_the_chunk_of_sessions_held_in_memory(
 def test_a_screener_with_no_data_for_a_session_loses_it_counted_and_the_run_continues(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real = harness.screen_variant
+    real = session_reads.screen_variant
 
     def missing_on_third(reader: Any, config: Any, day: date) -> Any:
         if day == DAYS[2]:
             raise MissingDataError("rollups/instrument/option_liquidity@v1", "no rows", "ingest")
         return real(reader, config, day)
 
-    monkeypatch.setattr(harness, "screen_variant", missing_on_third)
+    monkeypatch.setattr(session_reads, "screen_variant", missing_on_third)
     ev = run(build_world())
     (r,) = ev.results
     m = r.measures[0]
@@ -819,7 +820,7 @@ def test_a_missing_wiring_dataset_fails_the_run_it_is_not_a_lost_session(
     def broken(reader: Any, config: Any, day: date) -> Any:
         raise MissingDataError(dataset, "not loaded for this run", "wire it")
 
-    monkeypatch.setattr(harness, "screen_variant", broken)
+    monkeypatch.setattr(session_reads, "screen_variant", broken)
     with pytest.raises(MissingDataError, match=dataset):
         run(build_world())
 
@@ -830,7 +831,7 @@ def test_a_variant_that_loses_every_session_fails_the_run(
     def never(reader: Any, config: Any, day: date) -> Any:
         raise MissingDataError("rollups/instrument/option_liquidity@v1", "no rows", "ingest")
 
-    monkeypatch.setattr(harness, "screen_variant", never)
+    monkeypatch.setattr(session_reads, "screen_variant", never)
     with pytest.raises(MissingDataError, match="option_liquidity"):
         run(build_world())  # zero measured sessions is never a SUCCEEDED run
 
@@ -839,7 +840,7 @@ def test_other_exceptions_from_a_screen_still_propagate(monkeypatch: pytest.Monk
     def broken(reader: Any, config: Any, day: date) -> Any:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(harness, "screen_variant", broken)
+    monkeypatch.setattr(session_reads, "screen_variant", broken)
     with pytest.raises(RuntimeError, match="boom"):
         run(build_world())
 
@@ -941,12 +942,12 @@ def test_every_qualified_name_sizes_the_draws_when_top_k_is_all() -> None:
 def test_a_screener_that_held_nothing_keeps_the_sessions_base_in_its_draws(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real = harness.screen_variant
+    real = session_reads.screen_variant
 
     def none_qualify(*a: Any, **k: Any) -> Any:
         return dataclasses.replace(real(*a, **k), qualified=())
 
-    monkeypatch.setattr(harness, "screen_variant", none_qualify)
+    monkeypatch.setattr(session_reads, "screen_variant", none_qualify)
     ev = run(build_world(), edge(frozen_from="2026-09-04"))
     (found,) = ev.random_picks
     first = found.draws[0]

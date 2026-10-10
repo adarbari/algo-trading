@@ -10,7 +10,7 @@ with no outcome row although its window's partition is stored has no entry bar (
 window with no outcome at all ``GRACE_SESSIONS`` after its sell session is skipped too, with
 the reason: a missing result is never a loss and never a zero. An outcome that reads the implied
 vol (``expires_otm``: the strike is set from it) reads it at the signal session D, as the harness
-does (``harness.implied_at``, ``harness.iv_field_of``); a name whose vol
+does (``reads.session.implied_at``, ``harness.iv_field_of``); a name whose vol
 is missing or invalid there is skipped with that reason, never a loss. ``excess_return`` of a
 settled trade is set only when the outcome's value is a return (not an ``expires_otm`` cushion)."""
 
@@ -25,7 +25,7 @@ from algotrade.config.edges.document import Edge
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.services.evaluation.cross_section.harness import BENCHMARK, implied_at, iv_field_of
+from algotrade.services.evaluation.cross_section.harness import BENCHMARK, iv_field_of
 from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
     MISSING_DRAWDOWN,
@@ -35,6 +35,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     is_return,
     needs_implied_vol,
 )
+from algotrade.services.evaluation.cross_section.reads.session import implied_at
 from algotrade.services.evaluation.forward.signals import advance
 
 GRACE_SESSIONS = 5  # sessions after a window's close an outcome may still be stored

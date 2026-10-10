@@ -32,7 +32,7 @@ EXPLORATORY: its rows carry its split in their key and the flag, and the split j
 import hashlib
 import json
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from functools import partial
@@ -53,21 +53,21 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
-from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.core.time.calendar import sessions_between
-from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
-from algotrade.data.listings.membership import TABLE as MEMBERSHIP_TABLE
-from algotrade.data.listings.universe import TABLE as LISTING_TABLE
-from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes, stored_sessions
-from algotrade.data.reference import UNIVERSE_TABLE
+from algotrade.data.outcomes import (
+    OUTCOME_FIELDS,
+    missing_outcomes,
+    read_stored,
+    select_outcomes,
+    stored_sessions,
+)
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.quant.edge_statistics import deflated_sharpe, moments, pbo_cscv
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.historical import (
     HistoricalCaveat,
-    IdentityTally,
 )
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
@@ -85,11 +85,6 @@ from algotrade.services.evaluation.cross_section.measures import (
     pool_stats,
     slice_measures,
 )
-from algotrade.services.evaluation.cross_section.picks import (
-    RankedRun,
-    SelectionReads,
-    screen_variant,
-)
 from algotrade.services.evaluation.cross_section.random_picks import (
     DEFAULT_DRAWS,
     SEED_VERSION,
@@ -99,6 +94,7 @@ from algotrade.services.evaluation.cross_section.random_picks import (
     random_measures,
     random_stat,
 )
+from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.reporting.report_containment import (
     ReportContainment,
     containment,
@@ -109,15 +105,12 @@ from algotrade.services.evaluation.cross_section.sessions import (
     leg_blocks,
 )
 from algotrade.services.features import catalogue
-from algotrade.services.screening.regime import session_market
-from algotrade.services.selection import fields_view
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
 
 HARNESS_VERSION = 1
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
 PBO_SPLITS = 16
-UNKNOWN = "UNKNOWN"
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
 # A session is measured only when at least this share of the eligible names carries the edge's
 # score; the rest are counted as ``unscored`` and never ranked (recent listings lack a year of
@@ -128,15 +121,6 @@ MIN_SCORE_COVERAGE = 0.8
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 SELECTIONS = "selections"
-# Not an input table a screener lacks for a session but the run's own wiring (market features
-# not loaded, no universe or reference snapshot): always an error, never a lost session.
-WIRING_DATASETS = (
-    MARKET_FEATURES,
-    UNIVERSE_TABLE,
-    REFERENCE_TABLE,
-    LISTING_TABLE,
-    MEMBERSHIP_TABLE,
-)
 CHUNK_SESSIONS = 20  # decision sessions screened and measured before the frames are dropped
 OUTCOME_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS)  # kept per entry session
 
@@ -244,97 +228,6 @@ def edge_universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Select
     raise ConfigurationError(f"edge {edge.id}: unknown selection {edge.universe!r}")
 
 
-class _Session:
-    """What is read once per decision session, whatever the horizon or the edge variant: each
-    screener's run and the regime label; per edge variant (``key``) the eligible names and, when
-    the measure needs it, the implied vol (the scope's one ``iv_field``) at D. ``release``
-    drops all of it (after a chunk of sessions): only the universe snapshot dates and the
-    sessions a screener could not be run on (``lost``: its missing table) are kept."""
-
-    def __init__(self, reader: StoreReader, label_field: str):
-        self._reader, self._label_field = reader, label_field
-        self._selections = SelectionReads(reader)
-        self._runs: dict[tuple[str, date], RankedRun | None] = {}
-        self._eligible: dict[tuple[str, date], frozenset[str]] = {}
-        self._labels: dict[date, str] = {}
-        self._implied: dict[tuple[str, date], dict[str, float | None]] = {}
-        self._snapshots: set[date] = set()
-        self._identity = IdentityTally()
-        self.errors: dict[str, MissingDataError] = {}  # variant -> its first lost session's error
-        self.lost: dict[tuple[str, date], str] = {}  # (variant, D) -> the table it had no data in
-
-    def run(self, variant: Variant, day: date) -> RankedRun | None:
-        """The screener's run at ``day``; None when an input table has no data for it (the
-        session is lost to this screener, counted, never a miss)."""
-        if (variant.id, day) not in self._runs:
-            self._runs[variant.id, day] = self._screen(variant, day)
-        return self._runs[variant.id, day]
-
-    def _screen(self, variant: Variant, day: date) -> RankedRun | None:
-        try:
-            found = screen_variant(self._reader, variant.config, day)
-        except MissingDataError as error:
-            if error.dataset in WIRING_DATASETS:  # not an input the screener lacks: a broken run
-                raise
-            self.lost[variant.id, day] = error.dataset
-            self.errors.setdefault(variant.id, error)
-            return None
-        self._snapshots.add(found.snapshot)
-        self._identity.note("screened", day, found.identity)
-        return found
-
-    def eligible(self, key: str, universe: Selection, day: date) -> frozenset[str]:
-        if (key, day) not in self._eligible:
-            found = self._selections.eligible(universe, day)
-            self._identity.note("eligible", day, found.identity)
-            self._eligible[key, day] = found.ids
-        return self._eligible[key, day]
-
-    def caveat(self) -> HistoricalCaveat | None:
-        """What the sessions read before the first reference snapshot covered (None: none)."""
-        return self._identity.caveat()
-
-    def snapshots(self) -> list[date]:
-        """The universe snapshot dates the screens read."""
-        return sorted(self._snapshots)
-
-    def release(self) -> None:
-        """Forget what was read for the sessions done (memory stays flat in the sessions)."""
-        self._runs.clear()
-        self._eligible.clear()
-        self._labels.clear()
-        self._implied.clear()
-
-    def label(self, day: date) -> str:
-        if day not in self._labels:
-            name = self._label_field
-            value = session_market(self._reader, [name], day).get(name)
-            self._labels[day] = UNKNOWN if value is None else str(value)
-        return self._labels[day]
-
-    def implied(
-        self, key: str, field_name: str, ids: frozenset[str], day: date
-    ) -> dict[str, float | None]:
-        if (key, day) not in self._implied:
-            self._implied[key, day] = implied_at(self._reader, field_name, ids, day)
-        return self._implied[key, day]
-
-
-def implied_at(
-    reader: StoreReader, field_name: str, ids: Iterable[str], day: date
-) -> dict[str, float | None]:
-    """The implied vol ``field_name`` of ``ids`` read at the decision session ``day`` (None: not
-    stored): what an ``expires_otm`` strike or a vol ratio is measured from, for the harness and
-    the paper record alike."""
-    wanted = sorted(ids)
-    view, _ = fields_view(reader, (field_name,), day, wanted, historical=True)
-    values = {i: view.get(i, field_name) for i in wanted}
-    return {
-        i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
-        for i, v in values.items()
-    }
-
-
 @dataclass(frozen=True)
 class _Scope:
     """One evaluation of the edge: ``main`` or one of its ``[[variants]]``."""
@@ -371,28 +264,36 @@ def names_for(edge: Edge, eligible: frozenset[str], event_names: frozenset[str] 
 
 def _outcomes(
     scope: _Scope,
-    session: _Session,
-    day: date,
+    session: SessionReads,
+    leg: Leg,
+    horizon: int,
     rows: pd.DataFrame,
     eligible: frozenset[str],
     ids: frozenset[str],
 ) -> pd.DataFrame:
     """The stored outcomes of ``ids`` scored by the edge's outcome (``apply_outcome``), indexed
-    by instrument; ``excluded`` is non-empty for a name that does not count."""
-    inside = rows[rows["instrument_id"].isin(ids)]
-    implied = (
-        session.implied(scope.key, scope.iv_field, eligible, day)
-        if needs_implied_vol(scope.edge)
-        else None
-    )
-    return apply_outcome(scope.edge, inside, implied).set_index("instrument_id")
+    by instrument; ``excluded`` is non-empty for a name that does not count. It depends only on
+    the scope, the horizon and D (``rows`` are that horizon's at the entry), so it is kept."""
+    day = leg.decision
+
+    def score() -> pd.DataFrame:
+        inside = rows[rows["instrument_id"].isin(ids)]
+        implied = (
+            session.implied(scope.iv_field, eligible, day)
+            if needs_implied_vol(scope.edge)
+            else None
+        )
+        return apply_outcome(scope.edge, inside, implied).set_index("instrument_id")
+
+    return session.outcomes(scope.key, horizon, day, score)
 
 
 def _stat(
     scope: _Scope,
-    session: _Session,
+    session: SessionReads,
     variant: Variant,
     leg: Leg,
+    horizon: int,
     rows: pd.DataFrame,
     event_names: frozenset[str] | None,
 ) -> SessionStat:
@@ -401,7 +302,7 @@ def _stat(
     (an event schedule): the picks are the qualified names within them, and the base is them
     (``base = "event"``) or every eligible name."""
     edge, day = scope.edge, leg.decision
-    run, eligible = session.run(variant, day), session.eligible(scope.key, scope.universe, day)
+    run, eligible = session.run(variant, day), session.eligible(scope.universe, day)
     if (
         run is None or run.coverage not in MEASURED_COVERAGE
     ):  # read incomplete data: not measured, counted
@@ -410,7 +311,7 @@ def _stat(
     pickable, ids = names.pickable, names.ids
     scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
-    res = _outcomes(scope, session, day, rows, eligible, ids)
+    res = _outcomes(scope, session, leg, horizon, rows, eligible, ids)
     counted = res[res["excluded"] == ""]
     in_universe = [i for i in run.qualified if i in eligible]
     chosen = [i for i in in_universe if i in pickable]
@@ -424,7 +325,7 @@ def _stat(
     got = [i for i in picks if i in counted.index]
     no_iv = set(res.index[res["excluded"].isin((NO_IMPLIED_VOL, INVALID_IMPLIED_VOL))])
     implied = (
-        session.implied(scope.key, scope.iv_field, eligible, day)  # cached by ``_outcomes``
+        session.implied(scope.iv_field, eligible, day)  # cached by ``_outcomes``
         if needs_implied_vol(edge)
         else {}
     )
@@ -555,17 +456,20 @@ def _pbo(peers: Sequence[VariantResult]) -> float | None:
     if len(peers) < 2:
         return None
     days = sorted({s.session for p in peers for s in p.stats})
-    matrix = np.array([[_mean_on(p, d) for p in peers] for d in days], dtype=np.float64)
+    means = [_means(p) for p in peers]
+    matrix = np.array([[m.get(d, float("nan")) for m in means] for d in days], dtype=np.float64)
     matrix = matrix.reshape(len(days), len(peers))
     return pbo_cscv(matrix[~np.isnan(matrix).any(axis=1)], PBO_SPLITS)
 
 
-def _mean_on(result: VariantResult, day: date) -> float:
-    """A variant's pick mean at ``day``; NaN when it held nothing then."""
+def _means(result: VariantResult) -> dict[date, float]:
+    """A variant's pick mean per session it held something at (the first stat of a session
+    with a mean wins)."""
+    means: dict[date, float] = {}
     for s in result.stats:
-        if s.session == day and s.pick_mean is not None:
-            return s.pick_mean
-    return float("nan")
+        if s.pick_mean is not None:
+            means.setdefault(s.session, s.pick_mean)
+    return means
 
 
 def stored_outcome_sessions(reader: StoreReader) -> list[date]:
@@ -598,7 +502,7 @@ def evaluate_edge(
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
-    session = _Session(reader, label)
+    session = SessionReads(reader, label)
     days = sessions_between(start, end)
     scopes = _scopes(configs, user, edge, iv_field)
     licences: dict[str, str | None] = {}
@@ -762,7 +666,7 @@ class _RandomSpec:
 
 def _measure(
     reader: StoreReader,
-    session: _Session,
+    session: SessionReads,
     plans: Sequence[_Plan],
     variants: Sequence[Variant],
     schedules: Mapping[str, EventSchedule],
@@ -782,7 +686,7 @@ def _measure(
         for day in sorted(chunk):  # lockstep over the scopes: one selection read per session
             for p in plans:
                 if any(leg.decision == day for b in p.blocks for leg in b):
-                    session.eligible(p.scope.key, p.scope.universe, day)
+                    session.eligible(p.scope.universe, day)
         for p in plans:
             for variant in variants:
                 events = schedules.get(p.scope.key)
@@ -807,19 +711,27 @@ def _read_closed(
 ) -> dict[int, dict[date, pd.DataFrame]]:
     """The outcome rows of the chunk's entry sessions by horizon and entry session."""
     closed: dict[int, dict[date, pd.DataFrame]] = {}
-    for horizon in sorted({p.horizon for p in plans}):
-        closed[horizon] = {}
-        entries = sorted(
-            {leg.entry for p in plans if p.horizon == horizon for b in p.blocks for leg in b
+    wanted = {
+        h: sorted(
+            {leg.entry for p in plans if p.horizon == h for b in p.blocks for leg in b
              if leg.decision in chunk}
-        )  # fmt: skip
-        if not entries:
+        )
+        for h in sorted({p.horizon for p in plans})
+    }  # fmt: skip
+    entries = sorted({d for days in wanted.values() for d in days})
+    stored = read_stored(reader, entries, as_of) if entries else None  # once for the horizons
+    have: set[date] = set()  # the entry sessions with a partition visible at ``as_of``
+    if stored is not None:  # plain strings: the ``isin`` over arrow strings is the slow path
+        stored = stored.assign(instrument_id=stored["instrument_id"].astype(object))
+        have = {_day(v) for v in stored["session_date"].unique()}
+    for horizon, days in wanted.items():
+        closed[horizon] = {}
+        if not days:
             continue
-        try:
-            frame = read_outcomes(reader, horizon, entries, BENCHMARK, as_of=as_of)
-        except MissingDataError as missing:
-            failed.setdefault(horizon, missing)
+        if stored is None or not any(days[0] <= d <= days[-1] for d in have):
+            failed.setdefault(horizon, missing_outcomes(days))  # nothing stored in its span
             continue
+        frame = select_outcomes(stored, horizon, days, BENCHMARK, as_of)
         kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
         out.closed[horizon] |= set(closed[horizon])
@@ -831,7 +743,7 @@ def _read_closed(
 def _measure_plan(
     p: _Plan,
     variant: Variant,
-    session: _Session,
+    session: SessionReads,
     events: EventSchedule | None,
     chunk: set[date],
     closed: Mapping[int, Mapping[date, pd.DataFrame]],
@@ -848,7 +760,9 @@ def _measure_plan(
                 continue
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
-            stat = mine[leg.decision] = _stat(p.scope, session, variant, leg, rows, names)
+            stat = mine[leg.decision] = _stat(
+                p.scope, session, variant, leg, p.horizon, rows, names
+            )
             if spec is not None and variant.role == "screener" and block[0].decision >= spec.split:
                 _measure_random(p, variant, leg, stat, session, names, rows, out, spec)
             if (variant.id, leg.decision) in session.lost:
@@ -860,7 +774,7 @@ def _measure_random(
     variant: Variant,
     leg: Leg,
     stat: SessionStat,
-    session: _Session,
+    session: SessionReads,
     event_names: frozenset[str] | None,
     rows: pd.DataFrame,
     out: _Measured,
@@ -871,9 +785,9 @@ def _measure_random(
     sample size, sessions and base as the screener's own result (``random_picks.py``)."""
     if stat.excluded_coverage:
         return
-    eligible = session.eligible(p.scope.key, p.scope.universe, leg.decision)
+    eligible = session.eligible(p.scope.universe, leg.decision)
     names = names_for(p.scope.edge, eligible, event_names)
-    res = _outcomes(p.scope, session, leg.decision, rows, eligible, names.ids)
+    res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
     found = random_stat(
         leg.decision,
         res[res["excluded"] == ""],
@@ -934,7 +848,7 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
 
 
 def _events(
-    reader: StoreReader, session: _Session, scopes: Sequence[_Scope], days: Sequence[date]
+    reader: StoreReader, session: SessionReads, scopes: Sequence[_Scope], days: Sequence[date]
 ) -> dict[str, EventSchedule]:
     """The event names by decision session of each scope with an event schedule (by scope key;
     the others are absent). Scopes with the same event class and offset share one read of the
@@ -952,7 +866,7 @@ def _events(
                 cls,
                 offset,
                 days,
-                {m.key: partial(session.eligible, m.key, m.universe) for m in members},
+                {m.key: partial(session.eligible, m.universe) for m in members},
             )
         )
     return found
