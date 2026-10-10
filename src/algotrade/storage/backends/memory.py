@@ -233,7 +233,7 @@ class MemoryTables:
     def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
         with self._index_lock:
             return {
-                d: max_seq(entries)
+                d: max_seq(entries, self._seq)
                 for (t, d), entries in self._partitions.items()
                 if t == table and start <= d <= end
             }

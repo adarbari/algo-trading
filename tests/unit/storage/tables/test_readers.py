@@ -40,12 +40,12 @@ def test_reads_are_logged_per_attributed_day_found_or_not() -> None:
     assert reader.reads(D1) == () and reader.attributed_days() == [D2]
 
 
-def test_dates_and_latest_date_log_the_dates_up_to_the_day_with_a_digest() -> None:
+def test_dates_and_latest_date_log_the_listing_the_caller_used() -> None:
     backend = MemoryBackend()
-    publish(backend, "r1", A, D1, D2, D3)
+    publish(backend, "r1", A, D1, D2)
     reader = RecordingReader(backend)
     with reader.attribute(D2):
-        assert reader.dates(A) == [D1, D2, D3]  # the read sees all; the log only up to D
+        assert reader.dates(A) == [D1, D2]
         assert reader.latest_date(A, D2) == D2
         assert reader.dates(B) == []
     digest = dates_digest([D1, D2])
@@ -53,12 +53,20 @@ def test_dates_and_latest_date_log_the_dates_up_to_the_day_with_a_digest() -> No
         ReadRecord(A, D1, D2, "dates", digest),
         ReadRecord(B, D2, D2, "dates", dates_digest([])),
     )
-    # a later partition does not change the digest; an earlier one does
-    publish(backend, "r2", A, D3 + timedelta(1))
-    again = RecordingReader(backend)
-    with again.attribute(D2):
-        again.dates(A)
-    assert again.reads(D2)[0].digest == digest
+
+
+def test_a_listing_that_includes_later_dates_is_recorded_as_a_read_of_them() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1, D2, D3)
+    reader = RecordingReader(backend)
+    with reader.attribute(D2):
+        assert reader.dates(A) == [D1, D2, D3]
+        assert reader.latest_date(A) == D3  # no bound: the future was used
+        assert reader.latest_date(A, D2) == D2  # bounded at the day: only up to it
+    assert reader.reads(D2) == (
+        ReadRecord(A, D1, D3, "dates", dates_digest([D1, D2, D3])),
+        ReadRecord(A, D1, D2, "dates", dates_digest([D1, D2])),
+    )
 
 
 def test_reads_outside_a_block_are_not_logged_and_blocks_do_not_nest() -> None:

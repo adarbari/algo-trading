@@ -95,3 +95,28 @@ def test_a_direct_write_without_a_sequence_counts_zero(backend: Backend) -> None
     assert backend.tables.partition_seq(TABLE, D1, D3) == {D1: 0}
     later = publish(backend, "r1", D1)  # a commit on top of it
     assert backend.tables.partition_seq(TABLE, D1, D3) == {D1: later}
+
+
+def test_an_indexed_commit_that_is_not_published_is_not_stamped(
+    backend: Backend, tmp_path: Path
+) -> None:
+    """A commit in flight (or crashed before publishing) has indexed its entry but not yet
+    raised ``visible_seq``: no read could see it, so the stamp must not name it."""
+    first = publish(backend, "r1", D1)
+    publish(backend, "r2", D1, D2)
+    if isinstance(backend, LocalBackend):
+        (backend.tables.commits.base / "seq").write_text(str(first))  # roll the publish back
+    else:
+        assert isinstance(backend, MemoryBackend)
+        backend.tables._seq = first  # type: ignore[attr-defined]
+    assert backend.tables.visible_seq() == first
+    assert backend.tables.partition_seq(TABLE, D1, D3) == {D1: first, D2: 0}  # r2's entries unseen
+
+
+def test_an_empty_frame_commit_lists_the_partition_with_stamp_zero_on_any_backend(
+    backend: Backend,
+) -> None:
+    empty = frame(D1, "r1").iloc[0:0]
+    backend.tables.write(TABLE, D1, "r1", empty, pending=True)
+    backend.tables.commit_run("r1", AT)
+    assert backend.tables.partition_seq(TABLE, D1, D3) == {D1: 0}  # listed by dates() too, no entry

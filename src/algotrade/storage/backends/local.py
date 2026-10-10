@@ -296,10 +296,11 @@ class LocalTables:
     def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
         base = self.root / table
         out: dict[date, int] = {}
+        published = self.commits.published()  # before the indexes: a later commit is not seen
         for day in sorted(base.glob("date=*")) if base.exists() else []:
             when = date.fromisoformat(day.name.removeprefix("date="))
             if start <= when <= end and (day / INDEX).exists():
-                out[when] = max_seq(read_index(day))
+                out[when] = max_seq(read_index(day), published)
         return out
 
     def names(self, own_run: str | None = None) -> list[str]:

@@ -107,8 +107,9 @@ class StoreReader:
 class ReadRecord:
     """One read an attributed day made. ``kind`` ``rows``: partitions ``start..end`` of
     ``table`` were read (found or not: a read that found nothing is recorded too); ``dates``:
-    the partition dates of ``table`` up to ``end`` were listed, ``digest`` their hash
-    (``dates_digest``), ``start`` the earliest of them (``end`` when there were none)."""
+    the partition dates of ``table`` the caller used were listed, ``digest`` their hash
+    (``dates_digest``), ``start`` the earliest of them; ``end`` is the day, or the latest date
+    listed when that is after it (a read of the future: never reusable)."""
 
     table: str
     start: date
@@ -211,11 +212,25 @@ class RecordingReader(StoreReader):
             self._log(ReadRecord(table, start, end, "rows"))
         return super().table_range(table, start, end, as_of, instruments, columns)
 
-    def dates(self, table: str) -> list[date]:
+    def _log_dates(self, table: str, seen: list[date]) -> None:
+        """Log the listing the caller used. A date after the day is a read of the future: the
+        record then ends there, and its digest covers it, so it never stays valid."""
         day = self._attr.day
+        assert day is not None
+        first, last = (seen[0], max(seen[-1], day)) if seen else (day, day)
+        self._log(ReadRecord(table, first, last, "dates", dates_digest(seen)))
+
+    def dates(self, table: str) -> list[date]:
         recording = self._open()  # before the read: the sequence it will be stamped with
         found = super().dates(table)
-        if day is not None and recording:
-            upto = [d for d in found if d <= day]
-            self._log(ReadRecord(table, upto[0] if upto else day, day, "dates", dates_digest(upto)))
+        if recording:
+            self._log_dates(table, found)
         return found
+
+    def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
+        recording = self._open()
+        found = StoreReader.dates(self, table)  # not self.dates: logged here, once
+        seen = [d for d in found if on_or_before is None or d <= on_or_before]
+        if recording:
+            self._log_dates(table, seen)
+        return seen[-1] if seen else None
