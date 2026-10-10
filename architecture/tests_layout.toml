@@ -1,0 +1,134 @@
+# Test directory registry (ADR 0020), split from architecture/layout.toml (its line cap):
+# every [[test_mirror]] root and every [[test_dir]] bucket under tests/. Enforced by
+# tests/architecture/test_layout_buckets.py; the shared settings (max_modules, banned module
+# names) and the source directories the mirrors name are in architecture/layout.toml.
+
+# --------------------------------------------------------------------------- tests (tests/)
+# Test modules mirror their source: a directory under `tests` is the source directory at the
+# same relative path under `source` (it must exist and be declared above). Anything else in
+# tests/ is a declared bucket below.
+
+[[test_mirror]]
+tests = "tests/unit"
+source = "src/algotrade"
+
+[[test_mirror]]
+tests = "tests/libs/sources"
+source = "libs/sources/algotrade_sources"
+
+[[test_mirror]]
+tests = "tests/apps/ingestion"
+source = "apps/ingestion/algotrade_ingestion"
+
+[[test_mirror]]
+tests = "tests/apps/api"
+source = "apps/api/algotrade_api"
+
+[[test_dir]]
+path = "tests"
+purpose = "the test root: conftest.py (shared pytest fixtures) only"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/apps"
+purpose = "app tests: one folder per app, mirroring the app package ([[test_mirror]])"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/architecture"
+purpose = "fitness tests: layout, ownership, structure, docs, registries"
+
+[[test_dir]]
+path = "tests/architecture/api"
+purpose = "fitness tests for the API surface and the read model"
+
+[[test_dir]]
+path = "tests/architecture/data"
+purpose = "fitness tests over the data layer's boundaries: which modules may import a quarantined reader (algotrade.data.outcomes, ADR 0053)"
+
+[[test_dir]]
+path = "tests/architecture/guide"
+purpose = "fitness tests over the Guide's coverage (ADR 0051): enum values, sections, titled containers and web references covered by Guide entries, per architecture/guide_coverage.toml"
+
+[[test_dir]]
+path = "tests/architecture/pipeline"
+purpose = "fitness tests over the delivery pipeline: the CI workflow's shape, the flaky-spec quarantine list, the local gates that keep a measured speed-up (docs/ci.md Pipeline)"
+
+[[test_dir]]
+path = "tests/contract"
+purpose = "contract suites every implementation of a protocol must pass, one folder per protocol"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/contract/storage"
+purpose = "the storage contract: every table backend passes it"
+
+[[test_dir]]
+path = "tests/e2e"
+purpose = "the CLIs end to end against the committed golden datasets and baseline"
+
+[[test_dir]]
+path = "tests/fixtures"
+purpose = "recorded data files used by tests (no Python)"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/reconciliation"
+purpose = "recorded cross-source comparisons, one folder per source and session (both sides' recorded values)"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/reconciliation/*"
+purpose = "one recorded comparison: the other source's values, our raw inputs, a README with provenance"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/sources"
+purpose = "recorded vendor responses (real format, trimmed), one folder per vendor"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/sources/*"
+purpose = "one vendor's recorded responses"
+holds = "data"
+
+[[test_dir]]
+path = "tests/helpers"
+purpose = "test builders and fakes shared across suites, one module per thing built (stored frames, ingest fakes, rollup stores, domain objects)"
+
+[[test_dir]]
+path = "tests/helpers/payloads"
+purpose = "synthetic payloads in a vendor's wire format, one module per vendor or feed"
+
+[[test_dir]]
+path = "tests/integration"
+purpose = "a real store and engine across every golden dataset"
+
+[[test_dir]]
+path = "tests/libs"
+purpose = "workspace library tests (libs/): one folder per package, mirroring it ([[test_mirror]])"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/property"
+purpose = "Hypothesis invariants across every registered strategy and screener"
+
+[[test_dir]]
+path = "tests/reconciliation"
+purpose = "cross-source reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values (marker reconciliation)"
+
+[[test_dir]]
+path = "tests/scripts"
+purpose = "tests for the machine and store maintenance scripts in scripts/ (doctor, status, worktree, export_catalogue, check_rest_allowlist, session_friction)"
+
+[[test_dir]]
+path = "tests/scripts/gates"
+purpose = "tests for the delivery-pipeline scripts in scripts/ (changed_tests, changed_web, check_numbering, merge_main) and the Makefile's gates (split from tests/scripts, at its module cap)"
+
+[[test_dir]]
+path = "tests/scripts/ops"
+purpose = "tests for the operator scripts in scripts/ops/ (deploy, check_lock, guard_main_checkout, guard_waive)"
+
+[[test_dir]]
+path = "tests/scripts/perf"
+purpose = "tests for the manual API load test in scripts/perf/ (load.py: percentiles, page-mix parsing, report; api_latency.py: inventory, page totals, table)"

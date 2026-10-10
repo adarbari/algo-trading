@@ -24,7 +24,8 @@ Tests follow the directory layout (ADR 0020, `architecture/layout.toml`, checked
   a vendor's wire format in `tests/helpers/payloads/<vendor>.py`. Never name a module
   `helpers.py` or `utils.py`.
 - **Recorded data** (real format, trimmed) lives in `tests/fixtures/sources/<vendor>/`.
-- **Anything else** is a declared `[[test_dir]]` bucket with a purpose; `tests/` itself
+- **Anything else** is a declared `[[test_dir]]` bucket with a purpose
+  (`architecture/tests_layout.toml`); `tests/` itself
   holds only `conftest.py`.
 - At most 10 modules per test folder (`__init__.py`, `conftest.py` excluded): split by kind,
   mirroring the source. `make layout` lists folders at 8+.

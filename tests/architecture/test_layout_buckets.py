@@ -26,8 +26,19 @@ LAYOUT_FILE = "architecture/layout.toml"
 LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / LAYOUT_FILE).read_text())
 GUIDE = "CLAUDE.md 'Directory layout' (where does this go) and .claude/skills/add-responsibility"
 SOURCE_DIRS = [d["path"] for d in LAYOUT["dir"]]
-MIRRORS: list[dict[str, str]] = LAYOUT["test_mirror"]
-TEST_DIRS: list[dict[str, Any]] = LAYOUT["test_dir"]
+TESTS_LAYOUT_FILE = "architecture/tests_layout.toml"  # [[test_mirror]] and [[test_dir]]
+TESTS_LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / TESTS_LAYOUT_FILE).read_text())
+MIRRORS: list[dict[str, str]] = TESTS_LAYOUT["test_mirror"]
+TEST_DIRS: list[dict[str, Any]] = TESTS_LAYOUT["test_dir"]
+DECLS: dict[str, list[dict[str, Any]]] = {
+    "test_dir": TEST_DIRS, "config_dir": LAYOUT["config_dir"], "docs_dir": LAYOUT["docs_dir"]
+}  # fmt: skip
+
+
+def _file_of(table: str) -> str:
+    return TESTS_LAYOUT_FILE if table == "test_dir" else LAYOUT_FILE
+
+
 SETTINGS_LOADER = "src/algotrade/config/site/settings.py"
 SKIPPED = {"__pycache__", "node_modules"}
 
@@ -79,7 +90,7 @@ def test_bucket_declarations_are_well_formed_and_not_stale() -> None:
     for mirror in MIRRORS:
         assert mirror["source"] in SOURCE_DIRS, f"[[test_mirror]] {mirror}: undeclared source"
     for table in ("test_dir", "config_dir", "docs_dir"):
-        decls = LAYOUT[table]
+        decls = DECLS[table]
         paths = [d["path"] for d in decls]
         assert len(paths) == len(set(paths)), f"duplicate [[{table}]] paths"
         for decl in decls:
@@ -88,7 +99,7 @@ def test_bucket_declarations_are_well_formed_and_not_stale() -> None:
             assert decl.get("kind") in (None, "log"), decl
             exists = any(_matches(_rel(d), decl["path"]) for d in _walk(decl["path"].split("/")[0]))
             assert exists or decl.get("local"), (
-                f"[[{table}]] {decl['path']} does not exist: remove it from {LAYOUT_FILE}"
+                f"[[{table}]] {decl['path']} does not exist: remove it from {_file_of(table)}"
             )
 
 
@@ -161,7 +172,7 @@ def test_test_buckets_hold_what_they_declare() -> None:
 
 @pytest.mark.parametrize("table", ["config_dir", "docs_dir"])
 def test_config_and_docs_folders_are_declared_and_small(table: str) -> None:
-    decls: list[dict[str, Any]] = LAYOUT[table]
+    decls: list[dict[str, Any]] = DECLS[table]
     top = decls[0]["path"].split("/")[0]
     local = {d["path"] for d in decls if d.get("local")}
     limit = LAYOUT["max_files"]
@@ -175,11 +186,11 @@ def test_config_and_docs_folders_are_declared_and_small(table: str) -> None:
             over[directory] = n
     assert not undeclared, (
         f"undeclared {top}/ folders {undeclared}: declare each as a [[{table}]] in "
-        f"{LAYOUT_FILE} with a purpose; see {GUIDE}"
+        f"{_file_of(table)} with a purpose; see {GUIDE}"
     )
     assert not over, (
         f"{top}/ folders with more than {limit} files {over}: split by kind into subfolders "
-        f"declared as [[{table}]] in {LAYOUT_FILE}; see {GUIDE}"
+        f"declared as [[{table}]] in {_file_of(table)}; see {GUIDE}"
     )
 
 

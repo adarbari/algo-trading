@@ -19,7 +19,7 @@ CASES = [
         if p.name != "web_ownership.toml"
     ),
     ("layout.toml", "dir"),
-    ("layout.toml", "test_dir"),
+    ("tests_layout.toml", "test_dir"),
     ("web_layout.toml", "web_dir"),
 ]
 

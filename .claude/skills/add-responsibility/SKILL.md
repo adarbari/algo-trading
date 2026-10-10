@@ -45,7 +45,7 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
      contract in `pyproject.toml`, named in the entry's `contracts`;
    - the mirrored test folder (`tests/unit/<path>/`, `tests/libs/sources/<path>/` or `tests/apps/<app>/<path>/`, with an
      `__init__.py`); a new non-mirrored test bucket (helpers, a contract suite) is a
-     `[[test_dir]]`; a new config or docs folder a `[[config_dir]]` / `[[docs_dir]]`;
+     `[[test_dir]]` (in `architecture/tests_layout.toml`); a new config or docs folder a `[[config_dir]]` / `[[docs_dir]]`;
    - an addendum to ADR 0020 (`docs/adr/0020-directory-layout.md`) when the top-level structure
      changes (a new top-level library package, app folder or test suite).
    Splitting a folder: move modules into kind subfolders, update imports and

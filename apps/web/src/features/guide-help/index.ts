@@ -6,6 +6,7 @@
  */
 export { GuideHelp, type GuideHelpProps } from './ui/GuideHelp';
 export { helped } from './ui/helped';
+export { termHelp } from './ui/term-help-button';
 export { GuideHelpProvider, type GuideNavigate } from './model/navigation';
 export { guidePath, type GuideEntry } from './model/entry';
 export { useGuideHelp } from './api/hooks';
