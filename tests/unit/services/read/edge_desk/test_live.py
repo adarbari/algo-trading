@@ -204,3 +204,13 @@ def test_the_band_is_taken_over_signal_sessions_not_trades() -> None:
     assert record.closed == 5 * sessions and (record.low, record.high) == win_rate_band(
         0.6, sessions
     )
+
+
+def test_a_trial_that_records_no_paper_trades_says_so_never_that_it_can_replace(
+    backend: MemoryBackend,
+) -> None:
+    store(backend, closed_trades(7, 3))  # the replaced edge's record; the candidate has none
+    found = load_edge_paper(context(backend, extra=TRIAL), "drift2")
+    assert found is not None and found.forward is not None
+    assert not found.forward.can_replace
+    assert found.forward.headline == "No paper trades: a candidate is not recorded."

@@ -163,12 +163,16 @@ def _nights(writer: ResultWriter, user: UserContext, session: date) -> list[RunR
 
 
 def _since(nights: list[RunRecord]) -> dict[str, date]:
-    """Where each edge's record started: the first night whose run listed it as recording."""
-    first: dict[str, date] = {}
+    """Where each edge's record started: the first night of its latest UNBROKEN run of complete
+    nights that listed it as recording (a night without it ends the run, so an edge that recorded,
+    stopped and records again, or whose old rows are another era's, starts afresh)."""
+    start: dict[str, date] = {}
     for night in nights:
-        for edge_id in night.stats.get("tonight", {}):
-            first.setdefault(edge_id, night.session_date)
-    return first
+        listed = night.stats.get("tonight", {})
+        start = {e: d for e, d in start.items() if e in listed}
+        for edge_id in listed:
+            start.setdefault(edge_id, night.session_date)
+    return start
 
 
 def _missed(

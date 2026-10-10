@@ -244,7 +244,9 @@ def _forward(
         and mine.win_rate < theirs.win_rate
     )
     can = sessions >= settings.forward_sessions and mine.closed > 0 and not behind
-    if sessions < settings.forward_sessions:
+    if mine.closed == 0 and not mine.open and not mine.skipped:
+        words = "No paper trades: a candidate is not recorded."
+    elif sessions < settings.forward_sessions:
         words = (
             f"{sessions} of {settings.forward_sessions} sessions of the forward test have passed."
         )

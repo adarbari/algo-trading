@@ -426,3 +426,12 @@ def test_a_followers_old_rows_settle_but_stay_out_of_the_shared_record() -> None
     assert set(read_stored(reader, "u1", DAYS[0], DAYS[-1])["status"]) == {"won"}
     assert shared(d).empty  # the shared record is the site's own rows only
     assert paper_owners(reader, d.configs, SELL) == [site_owner]  # none left open: u1's job stops
+
+
+def test_a_record_that_was_broken_starts_afresh_when_the_edge_records_again() -> None:
+    d = site_desk(followers=())
+    site_night(d, DAYS[0])  # evidenced: a record begins at DAYS[0] (due every second session)
+    candidate = site_desk(d.world, followers=(), status="candidate")
+    site_night(candidate, DAYS[1])  # a complete night that does not list the edge breaks the run
+    _, again = site_night(d, DAYS[3])  # DAYS[0]'s cadence says not due; a fresh start is due
+    assert again.stats["tonight"]["drift"]["state"] == "signalled"

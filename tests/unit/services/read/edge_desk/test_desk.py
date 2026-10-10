@@ -119,7 +119,7 @@ def test_no_run_for_the_session_is_not_run_never_nothing_due(backend: MemoryBack
     _night(backend, SESSION, {"tonight": {}}, finish=False)
     assert _tonight(backend) == ("not_run", "")  # an unfinished run says nothing
     _night(backend, SESSION, {"tonight": {"other": {"state": "signalled"}}})
-    assert _tonight(backend) == ("not_run", "")  # a run that never looked at this edge
+    assert _tonight(backend) == ("not_recording", "")  # a run that never listed this edge
 
 
 def test_the_sessions_the_nightly_missed_are_served_per_edge(backend: MemoryBackend) -> None:
@@ -185,3 +185,11 @@ def test_a_site_edge_nobody_follows_is_not_on_the_desk_and_an_own_edge_is_privat
     other = _as(backend, "you")  # follows drift; mine is no edge of theirs
     assert [t.instrument_id for t in load_edge_desk(other).buys] == ["EQ:S"]
     assert load_edge_paper(other, "mine") is None
+
+
+def test_a_followed_edge_the_site_does_not_record_is_not_recording_not_not_run(
+    backend: MemoryBackend,
+) -> None:
+    _night(backend, SESSION, {"tonight": {}})  # the site's night ran; the edge was not recording
+    assert _tonight(backend) == ("not_recording", "")
+    assert _tonight(MemoryBackend()) == ("not_run", "")  # no night at all

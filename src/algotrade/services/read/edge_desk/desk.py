@@ -24,11 +24,11 @@ from algotrade.services.read.edge_desk.paper import (
     record_owner,
     with_instruments,
 )
-from algotrade.services.read.evaluation.edges import Edge, load_edges
+from algotrade.services.read.evaluation.edges import load_edges
 from algotrade.storage.runs import RunStatus
 
-SIGNALLED, NO_PICKS, NOT_DUE, SKIPPED, NOT_RUN = (
-    "signalled", "no_picks", "not_due", "skipped", "not_run",
+SIGNALLED, NO_PICKS, NOT_DUE, SKIPPED, NOT_RUN, NOT_RECORDING = (
+    "signalled", "no_picks", "not_due", "skipped", "not_run", "not_recording",
 )  # fmt: skip
 
 
@@ -45,9 +45,11 @@ def _night(ctx: ReadContext, owner: str) -> dict[str, Any] | None:
 
 
 def _tonight(night: dict[str, Any] | None, edge_id: str) -> tuple[str, str]:
-    said = (night or {}).get("tonight", {}).get(edge_id)
-    if not isinstance(said, dict):
+    if night is None:
         return NOT_RUN, ""
+    said = night.get("tonight", {}).get(edge_id)
+    if not isinstance(said, dict):
+        return NOT_RECORDING, ""  # the night ran, but the edge was not evidenced or live
     return str(said.get("state", NOT_RUN)), str(said.get("reason", ""))
 
 
@@ -61,11 +63,12 @@ def _missed(night: dict[str, Any] | None, edge_id: str) -> tuple[date, ...]:
 
 @dataclass(frozen=True)
 class FollowedEdge:
-    """A followed edge (``state`` following or trial since ``since``) and its live record.
+    """A followed edge (``state`` following, since ``since``) and its live record.
     ``tonight`` is what the nightly did for it on the session, so an empty buy list says why:
     ``signalled``, ``no_picks`` (due, the screen qualified none), ``not_due`` (its schedule does
     not fire), ``skipped`` (due but could not be signalled: ``tonight_reason`` says why) or
-    ``not_run`` (no nightly run for the session). ``missed``: due sessions since the previous
+    ``not_recording`` (the owner's night ran, but the edge is not evidenced or live) or ``not_run``
+    (no nightly run for the session). ``missed``: due sessions since the previous
     night that nobody signalled."""
 
     edge_id: str
@@ -91,11 +94,6 @@ class EdgeDesk:
     followed: tuple[FollowedEdge, ...]
 
 
-def _state(edge: Edge) -> str:
-    """``trial`` for an own candidate (a new version on trial), else ``following``."""
-    return "trial" if edge.mine and edge.status == "candidate" else "following"
-
-
 def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
     """The desk for ``ctx.session``."""
     day = ctx.session.date
@@ -115,7 +113,7 @@ def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
     nights = {o: _night(ctx, o) for o in {record_owner(e, me) for e in followed}}
     records = tuple(
         FollowedEdge(
-            e.id, e.name, _state(e), e.paper_since,
+            e.id, e.name, "following", e.paper_since,
             live_record(ctx, e, [t for t in trades if t.edge_id == e.id], settings),
             *_tonight(nights[record_owner(e, me)], e.id),
             _missed(nights[record_owner(e, me)], e.id),
