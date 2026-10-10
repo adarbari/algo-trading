@@ -1,12 +1,16 @@
-"""Random-pick draws: deterministic by (run hash, edge variant, holding period, session), the same
-whatever order the names arrive in, and measured like a screener's picks."""
+"""Random-pick draws: deterministic by (leg key, edge variant, holding period, session), the same
+whatever order the names arrive in or range the run has, and measured like a screener's picks."""
 
-from datetime import date
+from datetime import date, timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from algotrade.config.user import UserContext
+from algotrade.services.evaluation.cross_section import harness
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.random_picks import (
     DRAW,
     RandomStat,
@@ -15,8 +19,10 @@ from algotrade.services.evaluation.cross_section.random_picks import (
     random_measures,
     random_stat,
 )
+from tests.unit.services.evaluation.cross_section.conftest import AS_OF, DAYS, build_world, edge
 
 DAY = date(2026, 9, 1)
+USER = UserContext("site")
 IDS = [f"EQ:{i:02d}" for i in range(20)]
 
 
@@ -94,3 +100,31 @@ def test_an_event_block_is_one_session_with_the_legs_added() -> None:
     assert block.session == DAY and block.picks == 10 and block.eligible == 40
     np.testing.assert_allclose(block.value_sums, one.value_sums + two.value_sums)
     assert pool_random([one]) is one
+
+
+def test_a_sessions_random_draws_do_not_change_with_the_range_or_the_as_of(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0063: the draws are seeded by the leg key, not the run hash, so moving the start, the
+    end or the ``as_of`` leaves the names drawn at a session as they were."""
+    drawn: dict[date, list[Any]] = {}
+    real = harness.random_stat
+
+    def record(day: date, *args: Any, **kwargs: Any) -> Any:
+        found = real(day, *args, **kwargs)
+        if found is not None:
+            drawn.setdefault(day, []).append((found.value_sums.tolist(), found.hit_sums.tolist()))
+        return found
+
+    monkeypatch.setattr(harness, "random_stat", record)
+    e = edge(frozen_from="2026-09-04")
+    w = build_world()
+    evaluate_edge(w.reader, w.results, w.configs, USER, e, DAYS[0], DAYS[-1], AS_OF)
+    full = {day: draws[0] for day, draws in drawn.items()}
+    assert len(full) >= 2
+    drawn.clear()
+    later = AS_OF + timedelta(days=1)
+    w = build_world()
+    evaluate_edge(w.reader, w.results, w.configs, USER, e, DAYS[2], DAYS[-1], later)
+    assert drawn and set(drawn) <= set(full)
+    assert all(draws[0] == full[day] for day, draws in drawn.items())
