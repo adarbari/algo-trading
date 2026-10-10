@@ -24,6 +24,7 @@ from algotrade.storage.backends.run_selection import (
     RunEntry,
     committed,
     concat_frames,
+    max_seq,
     merge_rows,
     pinned_read,
     run_mode,
@@ -228,6 +229,14 @@ class MemoryTables:
         with self._index_lock:
             keys = set(self._partitions) | set(self._pending.get(own_run or "", {}))
         return sorted(d for (t, d) in keys if t == table)
+
+    def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
+        with self._index_lock:
+            return {
+                d: max_seq(entries, self._seq)
+                for (t, d), entries in self._partitions.items()
+                if t == table and start <= d <= end
+            }
 
     def names(self, own_run: str | None = None) -> list[str]:
         with self._index_lock:

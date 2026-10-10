@@ -160,7 +160,10 @@ def _write(
             stamp.config_hash,
         )
         frame["regime"], frame["size_multiplier"] = stamp.regime, stamp.size_multiplier
-        writer.write_result(config.config.impl, stamp.session_date, stamp.run_id, frame)
+        with writer.publishing(stamp.run_id, stamp.knowledge_ts):  # a stamped partition (ADR 0063)
+            writer.write_result(
+                config.config.impl, stamp.session_date, stamp.run_id, frame, pending=True
+            )
         return
     with writer.publishing(stamp.run_id, stamp.knowledge_ts):  # both tables or neither
         for name, frame in rule_frames(rules, stamp).items():

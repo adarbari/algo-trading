@@ -33,6 +33,10 @@ ARROW_TYPES: dict[str, pa.DataType] = {
     "bool": pa.bool_(),
     "date": pa.date32(),
     "timestamp_utc": pa.timestamp("us", tz="UTC"),
+    "float64[]": pa.list_(pa.float64()),
+    "float32[]": pa.list_(pa.float32()),
+    "string[]": pa.list_(pa.large_string()),
+    "date[]": pa.list_(pa.date32()),
 }
 TABLE_KEY = b"algotrade.table"
 VERSION_KEY = b"algotrade.schema_version"
