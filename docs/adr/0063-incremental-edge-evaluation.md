@@ -142,3 +142,16 @@ one; the alternative is cheaper to build.
    compaction or history-copy step is expected.
 9. **Code changes.** A change to a screener's or the harness's Python code that changes a leg
    bumps `LEG_VERSION`; a missed bump is caught only by the weekly audit.
+10. **Reuse as built (PR 4).** `legs/reuse.py` decides per leg; the first reason that fails is
+    counted in the run record (`entry`, `events`, `inputs`, `outcomes`, `draws`, and `session` for
+    a leg that was fine but shares its session with one that was not). A `rows` read records the
+    partition dates it returned (`digest`; none for a read filtered by instruments or `as_of`, which
+    cannot tell an empty partition from none), so a purged partition is noticed beside a committed
+    one. An event edge's names (read over the whole range on every run) are compared with the
+    leg's stored `event_ids`. `results/edge_legs` gains a `tombstone` column: a leg row whose
+    latest version says the key has no leg. Legs are retired when their key is not the edge's any
+    more, and, at a session whose reads log the run rewrote, when the run did not compute them
+    again; legs at other sessions are left alone (a run over another range or a shifted schedule
+    grid never deletes what it does not rewrite). An `earnings_expected` edge is always FULL: its
+    report-containment diagnostic reads the names with an entry bar of every window. `--full` and
+    the job's `mode = "full"` skip reuse; `make evaluate` (the golden gate) passes `--full`.

@@ -36,6 +36,31 @@ def outcome_seqs(reader: StoreReader, sessions: Iterable[date]) -> dict[date, in
     return {d: s for d, s in found.items() if d in set(wanted)}
 
 
+def outcome_known(
+    reader: StoreReader, sessions: Iterable[date], as_of: datetime, benchmark: str = "SPY"
+) -> dict[tuple[date, int], datetime]:
+    """Per (start session, horizon) of ``sessions`` with a ``benchmark`` row known by ``as_of``,
+    the latest ``knowledge_ts`` among those rows: which windows are closed, and when the newest
+    row of each became known (a columns-only read of each wanted partition, not of the range
+    between them; ADR 0063)."""
+    latest: dict[tuple[date, int], datetime] = {}
+    for day in sorted(set(sessions)):
+        frame = reader.table_range(
+            FORWARD_RETURNS, day, day, as_of, columns=("horizon_sessions", "benchmark")
+        )
+        if frame is None:
+            continue
+        known = pd.to_datetime(frame["knowledge_ts"], utc=True)
+        keep = (frame["benchmark"] == benchmark) & (known <= pd.Timestamp(as_of))
+        for horizon, stamp in zip(
+            frame.loc[keep, "horizon_sessions"], known[keep].dt.to_pydatetime(), strict=True
+        ):
+            key = (day, int(horizon))
+            if key not in latest or stamp > latest[key]:
+                latest[key] = stamp
+    return latest
+
+
 def missing_outcomes(sessions: Sequence[date]) -> MissingDataError:
     """The error of start ``sessions`` none of which has a stored outcome."""
     wanted = sorted(set(sessions))

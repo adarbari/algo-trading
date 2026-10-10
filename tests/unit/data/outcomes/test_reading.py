@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.outcomes import OUTCOME_FIELDS, outcome_seqs, read_outcomes
+from algotrade.data.outcomes import OUTCOME_FIELDS, outcome_known, outcome_seqs, read_outcomes
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
@@ -106,3 +106,15 @@ def test_outcome_seqs_are_the_wanted_committed_partitions_commit_sequences() -> 
     assert set(outcome_seqs(reader, [S2])) == {S2}
     assert outcome_seqs(reader, []) == {}
     assert outcome_seqs(reader, [date(2020, 1, 1)]) == {}  # no such partition
+
+
+def test_outcome_known_is_the_latest_known_row_of_each_closed_window_by_as_of() -> None:
+    reader = _store()
+    early, late = datetime(2026, 10, 1, 22, tzinfo=UTC), datetime(2026, 10, 5, 22, tzinfo=UTC)
+    now = datetime(2026, 10, 9, tzinfo=UTC)
+    assert outcome_known(reader, [S1, S2, S3], now) == {  # the benchmark SPY only, QQQ's row aside
+        (S1, 20): late, (S1, 6): early, (S2, 20): early, (S3, 20): early,
+    }  # fmt: skip
+    assert outcome_known(reader, [S1, S2, S3], datetime(2026, 10, 3, tzinfo=UTC))[S1, 20] == early
+    assert outcome_known(reader, [S1, S3], datetime(2026, 9, 1, tzinfo=UTC)) == {}
+    assert outcome_known(reader, [S2], now) == {(S2, 20): early}

@@ -4,7 +4,9 @@ atomically (pending, then committed); the run record ``edge-eval:<edge>`` keeps 
 (the "all" row of each variant and horizon, the count the next run's deflated Sharpe ratio is
 taken over), the run hash, the split and whether the run was
 exploratory, how much was excluded, and who ran it: ``owner``, ``trigger`` (nightly, ui or cli)
-and the ``job_id`` of the job that wrote it (ADR 0059 amendment 2026-10-10)."""
+and the ``job_id`` of the job that wrote it (ADR 0059 amendment 2026-10-10); its ``mode``
+(``full`` | ``incremental``) and how many legs it reused, computed and recomputed, by reason
+(ADR 0063)."""
 
 from dataclasses import asdict
 from datetime import datetime
@@ -253,6 +255,10 @@ def write_edge_eval(
         "event_unknown": dict(evaluation.event_unknown),
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
         "historical_identity": historical_identity(evaluation),
+        "mode": evaluation.mode,  # full | incremental (ADR 0063): how the run got its legs
+        "legs_reused": evaluation.legs_reused,
+        "legs_computed": evaluation.legs_computed,
+        "legs_invalidated": dict(evaluation.legs_invalidated),  # stored legs recomputed, by reason
     }
     # The record goes in before the commit: a crash between the two leaves a trial counted
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
