@@ -20,6 +20,7 @@ from algotrade.storage.tables.schemas import KNOWN_FROM, spec_for
 from algotrade_ingestion.cli import main as cli
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.nightly import (
+    EDGE_EVAL,
     EDGE_SIGNALS,
     FINALLY,
     NIGHTLY,
@@ -97,7 +98,9 @@ def test_every_declared_source_can_be_built() -> None:
 
 def test_nightly_is_an_ordered_list_of_registry_tasks() -> None:
     names = [s.name for s in (*NIGHTLY, *FINALLY)]
-    assert [n for n in names if n not in (SCREENS, EDGE_SIGNALS) and n not in TASKS] == []
+    assert [
+        n for n in names if n not in (SCREENS, EDGE_SIGNALS, EDGE_EVAL) and n not in TASKS
+    ] == []
     assert len(set(names)) == len(names)
     assert [s.name for s in FINALLY] == ["purge-raw"]
     for step in NIGHTLY:  # a step needs only steps declared before it (ADR 0039)

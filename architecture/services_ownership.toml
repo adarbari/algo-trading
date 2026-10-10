@@ -29,10 +29,11 @@ detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pb
 
 [[responsibility]]
 id = "edge-leg-reuse"
-description = "What a screener's statistic at one session of an edge evaluation is a function of (ADR 0063): the leg key (trial, universe, implied-vol field, event class and offset, draws, the user's expression-feature definitions, the harness, leg and seed versions), which seeds the random-pick draws so a session draws the same names in every run; the legs stored in results/edge_legs (a leg, the reads log of a session and its outcome read as rows, encoded and decoded losslessly but for the draws as float32, written with the run's rows and read back with one range read); the reuse follows in a later step of the ADR"
+description = "What a screener's statistic at one session of an edge evaluation is a function of (ADR 0063): the leg key (trial, universe, implied-vol field, event class and offset, draws, the user's expression-feature definitions, the harness, leg and seed versions), which seeds the random-pick draws so a session draws the same names in every run; the legs stored in results/edge_legs (a leg, the reads log of a session and its outcome read as rows, encoded and decoded losslessly but for the draws as float32, written with the run's rows and read back with one range read); the weekly audit's comparison (legs/audit.py: a full run's legs against the stored ones, the differing legs by key); the reuse follows in a later step of the ADR"
 owner = ["src/algotrade/services/evaluation/cross_section/legs/*"]
 allowed = [
     "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: its random draws are seeded by the key
+    "src/algotrade/services/jobs/handlers.py",  # the edge-eval job's audit mode publishes only the differing legs
     "src/algotrade/storage/tables/schemas.py",  # declares results/edge_legs's one schema
 ]
 section = "docs/adr/0063-incremental-edge-evaluation.md#decision-proposed"
