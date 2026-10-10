@@ -164,7 +164,8 @@ class EdgePaper:
     description="An edge the user follows (or tries as a new version) and its record. `tonight` "
     "is what the nightly did for it on the session, so an empty buy list says why: signalled, "
     "no_picks (due, the screen qualified none), not_due, skipped (due but could not be "
-    "signalled: `tonightReason`) or not_run (no nightly run for the session); `missed` the due "
+    "signalled: `tonightReason`), not_recording (the nightly ran but the edge is not "
+    "evidenced or live) or not_run (no nightly run for the session); `missed` the due "
     "sessions since the previous night that nobody signalled"
 )
 class FollowedEdge:

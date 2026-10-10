@@ -1,6 +1,6 @@
 """A store for the paper-record tests: the harness's small world (20 names, the rule screen
-``momo``, two-session outcomes) and a user ``u1`` who follows the edge ``drift`` from the first
-session."""
+``momo``, two-session outcomes), a user ``u1`` with their own live edge ``drift`` (``desk``) or the
+site's edge ``drift`` that ``u1`` and ``u2`` follow (``site_desk``)."""
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -37,6 +37,24 @@ def desk(world: World | None = None, **changes: Any) -> Desk:
     status = changes.pop("status", "live")
     doc = edge_document(status=status, audit=changes.pop("audit", audit), **changes)
     docs = {**w.configs._docs, ("u1", "edges", "drift"): doc}
+    return Desk(w, MemoryConfigStore(docs))
+
+
+def site_desk(
+    world: World | None = None, followers: tuple[str, ...] = ("u1", "u2"), **changes: Any
+) -> Desk:
+    """The world with the SITE's edge ``drift`` (status ``evidenced`` unless changed) and each of
+    ``followers`` bookmarking it from the first session."""
+    w = world or build_world()
+    status = changes.pop("status", "evidenced")
+    doc = edge_document(status=status, **changes)
+    if status == "rejected":
+        doc["rejection_reason"] = "no edge"
+    if status in ("evidenced", "live", "retired"):
+        doc["evidence"] = {"run_id": "r1", "split_from": "2026-01-02"}
+    docs = {**w.configs._docs, ("site", "edges", "drift"): doc}
+    for user in followers:
+        docs[(user, "edges", "drift")] = {"follow": {"since": DAYS[0].isoformat()}}
     return Desk(w, MemoryConfigStore(docs))
 
 

@@ -1,12 +1,17 @@
-"""One night of the forward paper record: tonight's signals of every edge a user follows, the
-open trades their outcomes close, both published atomically into ``results/edge_paper`` with one
-run record ``edge-paper:<user>`` (ADR 0053 amendment 2026-10-09, ADR 0015).
+"""One night of the forward paper record of one RECORD OWNER: tonight's signals of every edge
+the owner has recording (``site`` for the site's edges, else a user's own), the open trades their
+outcomes close, both published atomically into ``results/edge_paper`` with one run record
+``edge-paper:<owner>`` (ADR 0053 amendment 2026-10-10, ADR 0015). A follower of a site edge
+trades nothing: its job only settles the open rows it wrote while followers traded, until none is
+left (readers leave those rows out of the shared record, ``data.paper.read_paper``).
 
 Rows land in the partition of their signal session, so a settled trade replaces its own open row
 (runs merge per key; ``as_of`` still gives the book as an earlier night saw it). The night is
 idempotent: an edge that already has rows for the session is not signalled again, and a settled
-trade is not open any more, so a re-run writes the same rows. A due signal that could not be made
-is listed in the run record's ``skipped`` with its reason (never as an empty record)."""
+trade is not open any more, so a re-run writes the same rows. An edge's record starts on the first
+night this job sees it recording (``_since``), never backfilled to when its status changed; a due
+signal that could not be made is listed in the run record's ``skipped`` with its reason (never as
+an empty record), and a session between two nights that nobody signalled in ``missed``."""
 
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -17,16 +22,15 @@ import pandas as pd
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.user import UserContext
+from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.data.paper import LOOKBACK_DAYS, job_name, read_paper
+from algotrade.data.paper import LOOKBACK_DAYS, job_name, read_stored
 from algotrade.services.evaluation.forward.settle import OPEN, outcome_hash, settle_group
 from algotrade.services.evaluation.forward.signals import (
     edge_signals,
     legs_between,
-    paper_state,
     paper_traded,
 )
 from algotrade.storage.configs.store import ConfigStore
@@ -40,21 +44,22 @@ SIGNALLED, NO_PICKS, NOT_DUE, SKIPPED_TONIGHT = "signalled", "no_picks", "not_du
 MISSED = "the nightly did not run edge-signals for this session"
 
 
-def paper_users(reader: StoreReader, configs: ConfigStore, session: date) -> list[UserContext]:
-    """The users the nightly works for: those with an edge they follow, try or have retired, and
-    those who still have open paper trades (their trades settle even after the edge is gone)."""
+def paper_owners(reader: StoreReader, configs: ConfigStore, session: date) -> list[UserContext]:
+    """The record owners the nightly works for, ``site`` first: those with an edge of their own
+    recording (evidenced or live), and those who still have open paper trades (they settle after
+    the edge stopped recording or is gone; a follower's old rows of a site edge count)."""
     since = session - timedelta(days=LOOKBACK_DAYS)
-    users = []
-    for owner in configs.users():
-        state = any(paper_state(e) for e in load_edges(configs, owner))
-        if state or (read_paper(reader, owner, since, session)["status"] == OPEN).any():
-            users.append(UserContext(owner))
-    return users
+    owners = []
+    for owner in dict.fromkeys([SITE_USER, *configs.users()]):
+        recording = any(e.owner == owner and paper_traded(e) for e in load_edges(configs, owner))
+        if recording or (read_stored(reader, owner, since, session)["status"] == OPEN).any():
+            owners.append(UserContext(owner))
+    return owners
 
 
 @dataclass(frozen=True)
 class PaperNight:
-    """What one night wrote for one user, by edge id."""
+    """What one night wrote for one record owner, by edge id."""
 
     session: date
     signalled: dict[str, int] = field(default_factory=dict)
@@ -105,6 +110,7 @@ def _signals(
     book: pd.DataFrame,
     session: date,
     user_id: str,
+    since: dict[str, date],
 ) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, str]], dict[str, dict[str, str]]]:
     tonight: dict[str, dict[str, str]] = {}
     rows: list[dict[str, Any]] = []
@@ -116,7 +122,7 @@ def _signals(
             tonight[edge.id] = {"state": SIGNALLED, "reason": ""}
             continue
         try:
-            found = edge_signals(reader, configs, user, edge, session)
+            found = edge_signals(reader, configs, user, edge, since.get(edge.id, session), session)
         except ConfigurationError as error:
             skipped.append({"edge": edge.id, "reason": str(error)})
             tonight[edge.id] = {"state": SKIPPED_TONIGHT, "reason": str(error)}
@@ -146,30 +152,52 @@ def _signals(
     return rows, made, skipped, tonight
 
 
+def _nights(writer: ResultWriter, user: UserContext, session: date) -> list[RunRecord]:
+    """The owner's complete nights up to ``session``, oldest first."""
+    found = [
+        r
+        for r in writer.runs_for(job_name(user.user_id))
+        if r.session_date <= session and r.status is RunStatus.COMPLETE
+    ]
+    return sorted(found, key=lambda r: r.session_date)
+
+
+def _since(nights: list[RunRecord]) -> dict[str, date]:
+    """Where each edge's record started: the first night of its latest UNBROKEN run of complete
+    nights that listed it as recording (a night without it ends the run, so an edge that recorded,
+    stopped and records again, or whose old rows are another era's, starts afresh)."""
+    start: dict[str, date] = {}
+    for night in nights:
+        listed = night.stats.get("tonight", {})
+        start = {e: d for e, d in start.items() if e in listed}
+        for edge_id in listed:
+            start.setdefault(edge_id, night.session_date)
+    return start
+
+
 def _missed(
     reader: StoreReader,
-    writer: ResultWriter,
     configs: ConfigStore,
     user: UserContext,
-    edges: dict[str, Edge],
+    edges: list[Edge],
+    nights: list[RunRecord],
+    since: dict[str, date],
     session: date,
 ) -> list[dict[str, str]]:
-    """The due sessions between this user's previous night and ``session`` that no night
-    signalled (the step is latest-only: a catch-up skips sessions): recorded, never a silent gap."""
-    done = [
-        r.session_date
-        for r in writer.runs_for(job_name(user.user_id))
-        if r.session_date < session and r.status is RunStatus.COMPLETE
-    ]
-    if not done:
+    """The due sessions between the previous night and ``session`` that no night signalled (the
+    step is latest-only: a catch-up skips sessions) for the edges that night had recording:
+    recorded, never a silent gap, and never before the record began."""
+    before = [n for n in nights if n.session_date < session]
+    if not before:
         return []
-    between = sessions_between(max(done), session)[1:-1]
+    last = max(before, key=lambda n: n.session_date)
+    between = sessions_between(last.session_date, session)[1:-1]
     missed: list[dict[str, str]] = []
-    for e in edges.values():
-        if not between or not paper_traded(e):
+    for e in edges:
+        if not between or e.id not in last.stats.get("tonight", {}):
             continue
         try:
-            legs, _ = legs_between(reader, configs, user, e, between[0], between[-1])
+            legs, _ = legs_between(reader, configs, user, e, since[e.id], between[0], between[-1])
         except (MissingDataError, ConfigurationError) as error:
             missed.append({"edge": e.id, "session": between[0].isoformat(), "reason": str(error)})
             continue
@@ -197,18 +225,21 @@ def run_night(
     session: date,
     now: datetime,
 ) -> tuple[PaperNight, RunRecord]:
-    """Settle ``user``'s open trades and make tonight's signals at ``session``; publish both."""
+    """Settle the open trades ``user`` (a record owner: ``site`` or a user) wrote and make tonight's
+    signals of the edges it owns that are recording, at ``session``; publish both."""
     user_id = user.user_id
     edges = {e.id: e for e in load_edges(configs, user_id)}
-    book = read_paper(reader, user_id, session - timedelta(days=LOOKBACK_DAYS), session, now)
+    book = read_stored(reader, user_id, session - timedelta(days=LOOKBACK_DAYS), session, now)
     settled, settled_n = _settlements(reader, edges, book, session, now)
+    recording = [e for e in edges.values() if e.owner == user_id and paper_traded(e)]
+    nights = _nights(writer, user, session)
+    since = _since(nights)
     signals, signalled, skipped, tonight = _signals(
-        reader, configs, user, [e for e in edges.values() if paper_traded(e)], book, session,
-        user_id,
-    )  # fmt: skip
+        reader, configs, user, recording, book, session, user_id, since
+    )
     rows = [*settled, *signals]
     record = start_run(job_name(user_id), session, now)
-    missed = _missed(reader, writer, configs, user, edges, session)
+    missed = _missed(reader, configs, user, recording, nights, since, session)
     night = PaperNight(session, signalled, settled_n, skipped, len(rows), tonight, missed)
     stats = {
         "signalled": night.signalled, "settled": night.settled, "skipped": night.skipped,
