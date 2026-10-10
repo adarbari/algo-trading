@@ -21,6 +21,7 @@ export const FAIL = 'FAIL';
 const FIELDS = new Set([
   'completeness',
   'ingestionCell',
+  'chainCoverage',
   'quality',
   'verification',
   'nightlyRuns',
