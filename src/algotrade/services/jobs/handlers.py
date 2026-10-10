@@ -123,8 +123,10 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
 
 def _edge_eval_mode(params: Mapping[str, Any]) -> str:
     mode = params.get("mode") or "incremental"
-    if mode not in ("incremental", "full"):
-        raise ConfigurationError(f"unknown edge-eval mode {mode!r}; known: incremental, full")
+    if mode not in ("incremental", "full", "audit"):
+        raise ConfigurationError(
+            f"unknown edge-eval mode {mode!r}; known: incremental, full, audit"
+        )
     return str(mode)
 
 
@@ -137,7 +139,9 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     real edge document's), ``random_draws`` (random picks per out-of-sample session; default
     1,000), ``trigger`` (``nightly`` | ``ui`` | ``cli``, recorded in the run's stats; default
     ``cli``), ``mode`` (``incremental``, the default: reuse the stored legs still valid, or
-    ``full``: compute every leg; ADR 0063). The harness's rows land in ``results/edge_eval``."""
+    ``full``: compute every leg, or ``audit``: a full run publishing only the legs that differ from
+    the stored ones, then failing naming them; ADR 0063). The harness's rows land in
+    ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -157,11 +161,11 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
         split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
         random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
-        full=_edge_eval_mode(params) == "full",
+        full=_edge_eval_mode(params) != "incremental",  # an audit recomputes every leg
     )
-    # ``mode`` ``audit`` (the nightly's run on a week's first session, ADR 0063): this run is the
-    # full recompute (PR4: pass its full-mode flag to ``evaluate_edge`` above); only the legs that
-    # differ from the stored ones are published, and the job then FAILS naming them.
+    # ``mode`` ``audit`` (the nightly's run on a week's first session, ADR 0063): the run above is
+    # the full recompute; only the legs that differ from the stored ones are published, and the
+    # job then FAILS naming them.
     differing: list[LegDifference] = []
     if params.get("mode") == "audit":
         evaluation, differing = _audited(ctx.resources["reader"], evaluation)
