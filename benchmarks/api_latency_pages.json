@@ -1,0 +1,1178 @@
+{
+ "pages": {
+  "/ideas": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "SessionDate",
+    "variables": {},
+    "query": "\n    query SessionDate {\n  session {\n    date\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "IdeasPage",
+    "variables": {
+     "limit": 200,
+     "names": [
+      "rollup.earnings@v1.next_earnings_date",
+      "rollup.earnings@v1.last_earnings_date",
+      "rollup.earnings@v1.days_to_earnings",
+      "rollup.nearest_expiry@v1.dte",
+      "feature.earnings_before_expiry",
+      "feature.vrp_iv30",
+      "rollup.price_stats@v2.close",
+      "rollup.trend_stats@v2.ret_1d",
+      "rollup.relative_strength@v1.sector_etf"
+     ]
+    },
+    "query": "\n    query IdeasPage($limit: Int!, $names: [FeatureName!]!) {\n  ideas(limit: $limit) {\n    session\n    priority\n    total\n    pausedTotal\n    paused {\n      instrumentId\n      instrument {\n        symbol\n      }\n      result {\n        configId\n        score\n        reasons\n        regime\n      }\n    }\n    screeners {\n      screener {\n        id\n        name\n        owner\n        version\n      }\n      run {\n        runId\n        configVersion\n        paused\n      }\n      notRun {\n        code\n        reason\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      picked\n      top {\n        instrumentId\n        score\n        instrument {\n          symbol\n        }\n      }\n    }\n    items {\n      rank\n      instrumentId\n      regime\n      sizeMultiplier\n      instrument {\n        symbol\n        name\n        features(names: $names) {\n          name\n          value\n          unknown {\n            code\n            kind\n            guideTerm\n            kindText\n            cause {\n              links {\n                level\n                subject\n                status\n                message\n                runId\n              }\n            }\n          }\n          info {\n            format\n            unit\n            dtype\n            nullMeaning\n          }\n        }\n      }\n      picks {\n        configId\n        decision\n        score\n        reasons\n        flags\n        criteria {\n          id\n          outcome\n          value\n        }\n        columns {\n          name\n          value\n        }\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "EdgeDesk",
+    "variables": {},
+    "query": "query EdgeDesk { edgeDesk { session sellSession buys { edgeId edgeName instrumentId instrument { symbol } rank buySession sellSession } sells { edgeId edgeName instrumentId instrument { symbol } rank buySession sellSession }\n    followed { edgeId name state tonight tonightReason missed\n      record { state closed open winRate } } } }"
+   }
+  ],
+  "/screeners": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerConfigs",
+    "variables": {},
+    "query": "\n    query ScreenerConfigs {\n  configs(kind: \"screener\") {\n    configId\n    scope\n    kind\n    impl\n    selection\n    hash\n    error\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "SessionDate",
+    "variables": {},
+    "query": "\n    query SessionDate {\n  session {\n    date\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerConfigs",
+    "variables": {},
+    "query": "\n    query ScreenerConfigs {\n  configs(kind: \"screener\") {\n    configId\n    scope\n    kind\n    impl\n    selection\n    hash\n    error\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "MyScreens",
+    "variables": {},
+    "query": "\n    query MyScreens {\n  myScreens {\n    screenerId\n    status\n    latest\n    hasDraft\n    presetId\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerRuns",
+    "variables": {},
+    "query": "\n    query ScreenerRuns {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    criteria {\n      id\n      field\n      mode\n      op\n      value\n    }\n    notRun {\n      kindText\n    }\n    pickHistory {\n      session\n      picked\n    }\n    latestRun {\n      runId\n      session\n      picked\n      paused\n      decisions {\n        decision\n        count\n      }\n      changes {\n        change\n        count\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerTrackRecords",
+    "variables": {},
+    "query": "\n    query ScreenerTrackRecords {\n  edges {\n    id\n    status\n  }\n  screeners {\n    id\n    trackRecords {\n      screenerId\n      edgeId\n      edgeName\n      runLabel\n      afterSession\n      notRun {\n        code\n        reason\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      horizons {\n        horizonSessions\n        hitRate\n        baseRate\n        liftPts\n        sessions\n        picks\n      }\n    }\n  }\n}\n    "
+   }
+  ],
+  "/screeners/vrp_scanner": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "TableView",
+    "variables": {
+     "scope": "screener:vrp_scanner",
+     "name": null
+    },
+    "query": "\n    query TableView($scope: String!, $name: String) {\n  view(scope: $scope, name: $name) {\n    scope\n    name\n    saved\n    columns\n    narrowColumns\n    sort\n    decisions\n    names\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerResults",
+    "variables": {
+     "id": "vrp_scanner",
+     "decisions": [
+      "QUALIFIED",
+      "WATCH",
+      "LIQUIDITY_RISK",
+      "EVENT_RISK",
+      "PAUSED"
+     ],
+     "change": null,
+     "q": null,
+     "sort": null,
+     "columns": [],
+     "page": 1,
+     "size": 100
+    },
+    "query": "\n    query ScreenerResults($id: String!, $decisions: [String!], $change: String, $q: String, $sort: String, $columns: [FeatureName!], $page: Int, $size: Int) {\n  session {\n    date\n    unavailable {\n      kind\n      features\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n  }\n  screener(id: $id) {\n    id\n    name\n    criteria {\n      id\n      field\n      mode\n    }\n    displayColumns {\n      name\n      field\n    }\n    notRun {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    latestRun {\n      runId\n      session\n      previousSession\n      status\n      coverage\n      unavailable {\n        kind\n        features\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      regime\n      paused\n      decisions {\n        decision\n        count\n      }\n      changes {\n        change\n        count\n      }\n      results(\n        decisions: $decisions\n        change: $change\n        q: $q\n        sort: $sort\n        columns: $columns\n        page: $page\n        size: $size\n      ) {\n        sort\n        total\n        page\n        size\n        unavailable {\n          kind\n          features\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        columns {\n          name\n          description\n          format\n          unit\n          dtype\n          nullMeaning\n          licence\n          scope\n        }\n        rows\n        unknown\n        reasons\n        kinds\n        kindTexts {\n          kind\n          text\n        }\n        results {\n          instrumentId\n          rank\n          decision\n          score\n          reasons\n          flags\n          change\n          previousDecision\n          instrument {\n            instrumentId\n            symbol\n            name\n          }\n          criteria {\n            id\n            field\n            mode\n            outcome\n            value\n            distance\n          }\n          columns {\n            name\n            value\n          }\n        }\n      }\n    }\n  }\n}\n    "
+   }
+  ],
+  "/screeners/new": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerConfigs",
+    "variables": {},
+    "query": "\n    query ScreenerConfigs {\n  configs(kind: \"screener\") {\n    configId\n    scope\n    kind\n    impl\n    selection\n    hash\n    error\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "MyScreens",
+    "variables": {},
+    "query": "\n    query MyScreens {\n  myScreens {\n    screenerId\n    status\n    latest\n    hasDraft\n    presetId\n  }\n}\n    "
+   }
+  ],
+  "/edges": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "EdgesPage",
+    "variables": {},
+    "query": "\n    query EdgesPage {\n  edgeProblems {\n    edgeId\n    reason\n  }\n  edges {\n    id\n    name\n    status\n    state\n    labels\n    oosHidden\n    mine\n    extends\n    thesis\n    mechanism\n    persistence\n    horizons\n    screeners\n    baselines\n    rejectionReason\n    sources {\n      title\n      url\n    }\n    definition {\n      picks\n      trade\n      compare\n      test\n    }\n    verdict {\n      verdict\n      rationale\n      headline\n      result\n      basis\n      trades\n      oosTrades\n      winRate\n      baseRate\n      liftPts\n      lift\n      decileSpread\n      decileT\n      sharpe\n      deflatedSharpe\n      pbo\n      trials\n      deciles\n      robustness {\n        lift\n        draws\n        beats\n        summary\n        bins {\n          start\n          end\n          count\n        }\n      }\n      criteria {\n        id\n        label\n        value\n        threshold\n        status\n        level\n      }\n      years {\n        year\n        period\n        winRate\n        baseRate\n        liftPts\n        decileSpread\n        trades\n      }\n    }\n    canonicalRun {\n      runId\n      knowledgeTs\n    }\n    runs {\n      runId\n      owner\n      rangeFrom\n      rangeTo\n      splitFrom\n      exploratory\n      knowledgeTs\n      trialsCounted\n      lostInputs\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "SessionDate",
+    "variables": {},
+    "query": "\n    query SessionDate {\n  session {\n    date\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "EdgesPage",
+    "variables": {},
+    "query": "\n    query EdgesPage {\n  edgeProblems {\n    edgeId\n    reason\n  }\n  edges {\n    id\n    name\n    status\n    state\n    labels\n    oosHidden\n    mine\n    extends\n    thesis\n    mechanism\n    persistence\n    horizons\n    screeners\n    baselines\n    rejectionReason\n    sources {\n      title\n      url\n    }\n    definition {\n      picks\n      trade\n      compare\n      test\n    }\n    verdict {\n      verdict\n      rationale\n      headline\n      result\n      basis\n      trades\n      oosTrades\n      winRate\n      baseRate\n      liftPts\n      lift\n      decileSpread\n      decileT\n      sharpe\n      deflatedSharpe\n      pbo\n      trials\n      deciles\n      robustness {\n        lift\n        draws\n        beats\n        summary\n        bins {\n          start\n          end\n          count\n        }\n      }\n      criteria {\n        id\n        label\n        value\n        threshold\n        status\n        level\n      }\n      years {\n        year\n        period\n        winRate\n        baseRate\n        liftPts\n        decileSpread\n        trades\n      }\n    }\n    canonicalRun {\n      runId\n      knowledgeTs\n    }\n    runs {\n      runId\n      owner\n      rangeFrom\n      rangeTo\n      splitFrom\n      exploratory\n      knowledgeTs\n      trialsCounted\n      lostInputs\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideEntries",
+    "variables": {
+     "refs": [
+      {
+       "kind": "TERM",
+       "id": "verdict"
+      },
+      {
+       "kind": "TERM",
+       "id": "out_of_sample"
+      },
+      {
+       "kind": "TERM",
+       "id": "trades"
+      },
+      {
+       "kind": "TERM",
+       "id": "edge_state"
+      }
+     ]
+    },
+    "query": "\n    query GuideEntries($refs: [GuideRef!]!) {\n  guideEntries(refs: $refs) {\n    indicators {\n      key\n      plainName\n      technicalName\n      pace\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      whyItMatters {\n        segments {\n          text\n          field\n        }\n      }\n      whatOnMeans {\n        segments {\n          text\n          field\n        }\n      }\n      leadTime {\n        segments {\n          text\n          field\n        }\n      }\n      trackRecord {\n        segments {\n          text\n          field\n        }\n      }\n      before {\n        label\n        episode\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      how {\n        text\n        url\n      }\n      feature\n      sources {\n        title\n        url\n      }\n    }\n    episodes {\n      episode {\n        key\n        name\n        kind\n        peak\n        trough\n        recovered\n        spxDrawdown\n        nasdaqDrawdown\n        recession\n        nberStart\n        nberEnd\n        knownFrom\n      }\n      cause {\n        segments {\n          text\n          field\n        }\n      }\n      notes {\n        segments {\n          text\n          field\n        }\n      }\n      indicators {\n        key\n        plainName\n        label\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n    }\n    terms {\n      entry {\n        id\n        term\n        short\n      }\n      body {\n        segments {\n          text\n          field\n        }\n      }\n      seeAlso {\n        id\n        term\n        short\n      }\n    }\n    startPages {\n      entry {\n        id\n        order\n        title\n        summary\n      }\n      sections {\n        title\n        body {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      links {\n        kind\n        id\n        title\n      }\n    }\n  }\n}\n    "
+   }
+  ],
+  "/explore": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   }
+  ],
+  "/explore?sel=AAPL": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "InstrumentFacts",
+    "variables": {
+     "key": "AAPL",
+     "names": [
+      "instrument.sector",
+      "instrument.industry",
+      "instrument.website",
+      "instrument.in_sp500",
+      "instrument.optionable",
+      "instrument.leverage",
+      "instrument.is_inverse",
+      "instrument.is_leveraged",
+      "instrument.tracks",
+      "rollup.earnings@v1.next_earnings_date",
+      "rollup.earnings@v1.last_earnings_date",
+      "rollup.earnings@v1.days_to_earnings",
+      "rollup.earnings@v1.earnings_time",
+      "rollup.price_stats@v2.close",
+      "feature.market_cap",
+      "feature.pe_ratio",
+      "rollup.financials@v2.revenue_ttm",
+      "rollup.fundamentals@v3.shares_outstanding",
+      "feature.revenue_growth_yoy",
+      "rollup.financials@v2.net_income_ttm",
+      "rollup.financials@v2.eps_diluted_ttm",
+      "rollup.price_stats@v2.adv_usd_20d",
+      "rollup.price_stats@v2.high_52w",
+      "rollup.price_stats@v2.low_52w",
+      "feature.pct_from_high_52w",
+      "rollup.price_stats@v2.hv30",
+      "feature.div_yield",
+      "rollup.dividends@v2.div_ttm",
+      "rollup.dividends@v2.last_ex_date",
+      "rollup.iv30@v1.iv30",
+      "feature.iv_rank",
+      "feature.iv_hv_ratio",
+      "rollup.episode_behaviour@v1.beta_252d",
+      "rollup.episode_behaviour@v1.dd_tariffs_2025",
+      "rollup.episode_behaviour@v1.recovery_sessions_tariffs_2025",
+      "rollup.episode_behaviour@v1.dd_hikes_2022",
+      "rollup.episode_behaviour@v1.recovery_sessions_hikes_2022",
+      "rollup.episode_behaviour@v1.dd_covid_2020",
+      "rollup.episode_behaviour@v1.recovery_sessions_covid_2020"
+     ]
+    },
+    "query": "\n    query InstrumentFacts($key: String!, $names: [FeatureName!]!) {\n  session {\n    date\n    isLatest\n    unavailable {\n      kind\n      features\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    referenceSnapshot\n    preSnapshot\n  }\n  instrument(key: $key) {\n    instrumentId\n    symbol\n    name\n    securityType\n    exchange\n    isEtf\n    description\n    referenceSnapshot\n    features(names: $names) {\n      name\n      value\n      unknown {\n        code\n        reason\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      info {\n        format\n        unit\n        dtype\n        nullMeaning\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "InstrumentEvents",
+    "variables": {
+     "key": "AAPL"
+    },
+    "query": "\n    query InstrumentEvents($key: String!) {\n  instrument(key: $key) {\n    instrumentId\n    events {\n      table\n      kind\n      date\n      ts\n      values\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "RegimeEpisodes",
+    "variables": {},
+    "query": "\n    query RegimeEpisodes {\n  regime {\n    episodes {\n      key\n      name\n      kind\n      peak\n      trough\n      recovered\n      spxDrawdown\n      nasdaqDrawdown\n      recession\n      nberStart\n      nberEnd\n      cause\n      notes\n      knownFrom\n    }\n    recessions {\n      start\n      end\n      announcedStart\n      announcedEnd\n    }\n  }\n}\n    "
+   }
+  ],
+  "/regime": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "SessionDate",
+    "variables": {},
+    "query": "\n    query SessionDate {\n  session {\n    date\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "RegimeEpisodes",
+    "variables": {},
+    "query": "\n    query RegimeEpisodes {\n  regime {\n    episodes {\n      key\n      name\n      kind\n      peak\n      trough\n      recovered\n      spxDrawdown\n      nasdaqDrawdown\n      recession\n      nberStart\n      nberEnd\n      cause\n      notes\n      knownFrom\n    }\n    recessions {\n      start\n      end\n      announcedStart\n      announcedEnd\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "RegimeSignals",
+    "variables": {},
+    "query": "\n    query RegimeSignals {\n  regime {\n    episodes {\n      key\n      signals {\n        gate {\n          indicator\n          kind\n          state\n          flaggedDay\n          clearedDay\n          flaggedDayFromTrough\n          firstKnownDay\n          neverFired\n          unknownReason {\n            code\n            kind\n            guideTerm\n            kindText\n            cause {\n              links {\n                level\n                subject\n                status\n                message\n                runId\n              }\n            }\n          }\n        }\n        indicators {\n          indicator\n          kind\n          state\n          flaggedDay\n          clearedDay\n          flaggedDayFromTrough\n          firstKnownDay\n          neverFired\n          unknownReason {\n            code\n            kind\n            guideTerm\n            kindText\n            cause {\n              links {\n                level\n                subject\n                status\n                message\n                runId\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideEntries",
+    "variables": {
+     "refs": [
+      {
+       "kind": "START",
+       "id": "reading_recession_signals"
+      }
+     ]
+    },
+    "query": "\n    query GuideEntries($refs: [GuideRef!]!) {\n  guideEntries(refs: $refs) {\n    indicators {\n      key\n      plainName\n      technicalName\n      pace\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      whyItMatters {\n        segments {\n          text\n          field\n        }\n      }\n      whatOnMeans {\n        segments {\n          text\n          field\n        }\n      }\n      leadTime {\n        segments {\n          text\n          field\n        }\n      }\n      trackRecord {\n        segments {\n          text\n          field\n        }\n      }\n      before {\n        label\n        episode\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      how {\n        text\n        url\n      }\n      feature\n      sources {\n        title\n        url\n      }\n    }\n    episodes {\n      episode {\n        key\n        name\n        kind\n        peak\n        trough\n        recovered\n        spxDrawdown\n        nasdaqDrawdown\n        recession\n        nberStart\n        nberEnd\n        knownFrom\n      }\n      cause {\n        segments {\n          text\n          field\n        }\n      }\n      notes {\n        segments {\n          text\n          field\n        }\n      }\n      indicators {\n        key\n        plainName\n        label\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n    }\n    terms {\n      entry {\n        id\n        term\n        short\n      }\n      body {\n        segments {\n          text\n          field\n        }\n      }\n      seeAlso {\n        id\n        term\n        short\n      }\n    }\n    startPages {\n      entry {\n        id\n        order\n        title\n        summary\n      }\n      sections {\n        title\n        body {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      links {\n        kind\n        id\n        title\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "MarketHistory",
+    "variables": {
+     "names": [
+      "market.regime@v3.macro_risk",
+      "market.regime@v3.market_stress",
+      "market.regime@v3.label",
+      "market.regime@v3.market_coverage"
+     ],
+     "start": "1971-01-01",
+     "end": "2026-10-09",
+     "points": 600
+    },
+    "query": "\n    query MarketHistory($names: [String!]!, $start: Date!, $end: Date!, $points: Int!) {\n  market {\n    history(names: $names, start: $start, end: $end, points: $points) {\n      name\n      bucketSessions\n      points {\n        session\n        value\n      }\n      segments {\n        start\n        end\n        value\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideEntries",
+    "variables": {
+     "refs": [
+      {
+       "kind": "TERM",
+       "id": "unavailable_system"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "curve_10y3m"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "hy_oas"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "unrate_trend"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "sahm"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "nfci"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "spx_trend_200d"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "vix_term"
+      },
+      {
+       "kind": "INDICATOR",
+       "id": "breadth_200d"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "tariffs_2025"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "hikes_2022"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "covid_2020"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "qt_2018"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "downgrade_2011"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "gfc_2007"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "dotcom_2000"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "ltcm_1998"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "gulf_1990"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "crash_1987"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "volcker_1980"
+      },
+      {
+       "kind": "EPISODE",
+       "id": "oil_1973"
+      }
+     ]
+    },
+    "query": "\n    query GuideEntries($refs: [GuideRef!]!) {\n  guideEntries(refs: $refs) {\n    indicators {\n      key\n      plainName\n      technicalName\n      pace\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      whyItMatters {\n        segments {\n          text\n          field\n        }\n      }\n      whatOnMeans {\n        segments {\n          text\n          field\n        }\n      }\n      leadTime {\n        segments {\n          text\n          field\n        }\n      }\n      trackRecord {\n        segments {\n          text\n          field\n        }\n      }\n      before {\n        label\n        episode\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      how {\n        text\n        url\n      }\n      feature\n      sources {\n        title\n        url\n      }\n    }\n    episodes {\n      episode {\n        key\n        name\n        kind\n        peak\n        trough\n        recovered\n        spxDrawdown\n        nasdaqDrawdown\n        recession\n        nberStart\n        nberEnd\n        knownFrom\n      }\n      cause {\n        segments {\n          text\n          field\n        }\n      }\n      notes {\n        segments {\n          text\n          field\n        }\n      }\n      indicators {\n        key\n        plainName\n        label\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n    }\n    terms {\n      entry {\n        id\n        term\n        short\n      }\n      body {\n        segments {\n          text\n          field\n        }\n      }\n      seeAlso {\n        id\n        term\n        short\n      }\n    }\n    startPages {\n      entry {\n        id\n        order\n        title\n        summary\n      }\n      sections {\n        title\n        body {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      links {\n        kind\n        id\n        title\n      }\n    }\n  }\n}\n    "
+   }
+  ],
+  "/calendar": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "EventCalendar",
+    "variables": {
+     "instrumentIds": [],
+     "scope": true
+    },
+    "query": "\n    query EventCalendar($instrumentIds: [String!]!, $scope: Boolean!) {\n  eventCalendar(instrumentIds: $instrumentIds, scope: $scope) {\n    session\n    end\n    names {\n      instrumentId\n      symbol\n    }\n    days {\n      date\n      isSession\n      events {\n        instrumentId\n        symbol\n        event {\n          date\n          time\n          kind\n          label\n          name\n          subjectId\n          source\n          knownFrom\n          expiry\n        }\n      }\n    }\n    gaps {\n      instrumentId\n      part\n      unknown {\n        code\n        reason\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n    }\n    missing\n    unresolved\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerConfigs",
+    "variables": {},
+    "query": "\n    query ScreenerConfigs {\n  configs(kind: \"screener\") {\n    configId\n    scope\n    kind\n    impl\n    selection\n    hash\n    error\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "SessionDate",
+    "variables": {},
+    "query": "\n    query SessionDate {\n  session {\n    date\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "ScreenerConfigs",
+    "variables": {},
+    "query": "\n    query ScreenerConfigs {\n  configs(kind: \"screener\") {\n    configId\n    scope\n    kind\n    impl\n    selection\n    hash\n    error\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "EventCalendar",
+    "variables": {
+     "instrumentIds": [],
+     "scope": true
+    },
+    "query": "\n    query EventCalendar($instrumentIds: [String!]!, $scope: Boolean!) {\n  eventCalendar(instrumentIds: $instrumentIds, scope: $scope) {\n    session\n    end\n    names {\n      instrumentId\n      symbol\n    }\n    days {\n      date\n      isSession\n      events {\n        instrumentId\n        symbol\n        event {\n          date\n          time\n          kind\n          label\n          name\n          subjectId\n          source\n          knownFrom\n          expiry\n        }\n      }\n    }\n    gaps {\n      instrumentId\n      part\n      unknown {\n        code\n        reason\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n    }\n    missing\n    unresolved\n  }\n}\n    "
+   }
+  ],
+  "/admin/ingestion": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "IngestionCompleteness",
+    "variables": {
+     "sessions": 10
+    },
+    "query": "\n    query IngestionCompleteness($sessions: Int!) {\n  completeness(sessions: $sessions) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "QualityChecks",
+    "variables": {},
+    "query": "\n    query QualityChecks {\n  quality {\n    session\n    runId\n    status\n    finishedAt\n    checks {\n      name\n      status\n      detail\n    }\n    unknown {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "NightlyRuns",
+    "variables": {
+     "limit": 10
+    },
+    "query": "\n    query NightlyRuns($limit: Int!) {\n  nightlyRuns(limit: $limit) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FigiReview",
+    "variables": {},
+    "query": "\n    query FigiReview {\n  figiReview {\n    session\n    source\n    items\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "LeverageReview",
+    "variables": {},
+    "query": "\n    query LeverageReview {\n  leverageReview {\n    session\n    source\n    items\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Verification",
+    "variables": {},
+    "query": "\n    query Verification {\n  verification {\n    session\n    runIds\n    instruments\n    counts\n    byCheck {\n      check\n      counts\n    }\n    failing\n    unknown {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "IngestionCell",
+    "variables": {
+     "dataset": "rollups/instrument/option_liquidity@v1",
+     "date": "2026-10-09"
+    },
+    "query": "\n    query IngestionCell($dataset: String!, $date: Date!) {\n  ingestionCell(dataset: $dataset, date: $date) {\n    job\n    cell {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n    groups {\n      reason\n      count\n      examples\n      statuses\n    }\n    runs {\n      runId\n      job\n      session\n      status\n      startedAt\n      finishedAt\n      durationS\n      itemsTotal\n      itemsByStatus\n      stats\n      failures {\n        reason\n        count\n        examples\n        statuses\n      }\n    }\n  }\n}\n    "
+   }
+  ],
+  "/admin/llm-usage": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "LlmUsage",
+    "variables": {
+     "recent": 50
+    },
+    "query": "\n    query LlmUsage($recent: Int!) {\n  llmUsage(recent: $recent) {\n    today\n    recorded\n    budget {\n      dailyUsd\n      monthlyUsd\n      over\n      reportedCallUsd\n      error\n    }\n    windows {\n      key\n      start\n      end\n      cap {\n        kind\n        limitUsd\n        usedShare\n      }\n      tally {\n        calls\n        inputTokens\n        outputTokens\n        callsWithoutTokens\n        spentUsd\n        billedUsd\n        reportedUsd\n        boundUsd\n        freeCalls\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n        }\n      }\n    }\n    breakdowns {\n      by\n      rows {\n        key\n        provider\n        costShare\n        tally {\n          calls\n          inputTokens\n          outputTokens\n          callsWithoutTokens\n          spentUsd\n          billedUsd\n          reportedUsd\n          boundUsd\n        }\n      }\n    }\n    daily {\n      day\n      tally {\n        calls\n        inputTokens\n        outputTokens\n        spentUsd\n        reportedUsd\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n        }\n      }\n    }\n    reliability {\n      attempts\n      ok\n      fellBack\n      failed\n      skippedBudget\n      fallbackRate\n      failureRate\n    }\n    recent {\n      ts\n      provider\n      model\n      useCase\n      user\n      inputTokens\n      outputTokens\n      latencyS\n      costUsd\n      costBasis\n      outcome\n      fellBackFrom\n      runId\n      unknownFields\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideEntries",
+    "variables": {
+     "refs": [
+      {
+       "kind": "TERM",
+       "id": "llm_cost_basis"
+      },
+      {
+       "kind": "TERM",
+       "id": "llm_budget"
+      },
+      {
+       "kind": "TERM",
+       "id": "llm_fallback"
+      }
+     ]
+    },
+    "query": "\n    query GuideEntries($refs: [GuideRef!]!) {\n  guideEntries(refs: $refs) {\n    indicators {\n      key\n      plainName\n      technicalName\n      pace\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      whyItMatters {\n        segments {\n          text\n          field\n        }\n      }\n      whatOnMeans {\n        segments {\n          text\n          field\n        }\n      }\n      leadTime {\n        segments {\n          text\n          field\n        }\n      }\n      trackRecord {\n        segments {\n          text\n          field\n        }\n      }\n      before {\n        label\n        episode\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      how {\n        text\n        url\n      }\n      feature\n      sources {\n        title\n        url\n      }\n    }\n    episodes {\n      episode {\n        key\n        name\n        kind\n        peak\n        trough\n        recovered\n        spxDrawdown\n        nasdaqDrawdown\n        recession\n        nberStart\n        nberEnd\n        knownFrom\n      }\n      cause {\n        segments {\n          text\n          field\n        }\n      }\n      notes {\n        segments {\n          text\n          field\n        }\n      }\n      indicators {\n        key\n        plainName\n        label\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n    }\n    terms {\n      entry {\n        id\n        term\n        short\n      }\n      body {\n        segments {\n          text\n          field\n        }\n      }\n      seeAlso {\n        id\n        term\n        short\n      }\n    }\n    startPages {\n      entry {\n        id\n        order\n        title\n        summary\n      }\n      sections {\n        title\n        body {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      links {\n        kind\n        id\n        title\n      }\n    }\n  }\n}\n    "
+   }
+  ],
+  "/admin/harness-runs": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "HarnessRuns",
+    "variables": {
+     "limit": 100
+    },
+    "query": "\n    query HarnessRuns($limit: Int!) {\n  harnessRuns(limit: $limit) {\n    runId\n    edgeId\n    user\n    status\n    startedAt\n    finishedAt\n    rangeFrom\n    rangeTo\n    splitFrom\n    exploratory\n    variants\n    horizons\n    sessions\n    unclosed\n    excludedCoverage\n    scoreCoverage\n    noEntryBar\n    trials\n    knowledgeTs\n    asOf\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideEntries",
+    "variables": {
+     "refs": [
+      {
+       "kind": "TERM",
+       "id": "out_of_sample"
+      },
+      {
+       "kind": "TERM",
+       "id": "harness_exclusions"
+      },
+      {
+       "kind": "TERM",
+       "id": "variants_tried"
+      },
+      {
+       "kind": "TERM",
+       "id": "knowledge_time"
+      }
+     ]
+    },
+    "query": "\n    query GuideEntries($refs: [GuideRef!]!) {\n  guideEntries(refs: $refs) {\n    indicators {\n      key\n      plainName\n      technicalName\n      pace\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      whyItMatters {\n        segments {\n          text\n          field\n        }\n      }\n      whatOnMeans {\n        segments {\n          text\n          field\n        }\n      }\n      leadTime {\n        segments {\n          text\n          field\n        }\n      }\n      trackRecord {\n        segments {\n          text\n          field\n        }\n      }\n      before {\n        label\n        episode\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      how {\n        text\n        url\n      }\n      feature\n      sources {\n        title\n        url\n      }\n    }\n    episodes {\n      episode {\n        key\n        name\n        kind\n        peak\n        trough\n        recovered\n        spxDrawdown\n        nasdaqDrawdown\n        recession\n        nberStart\n        nberEnd\n        knownFrom\n      }\n      cause {\n        segments {\n          text\n          field\n        }\n      }\n      notes {\n        segments {\n          text\n          field\n        }\n      }\n      indicators {\n        key\n        plainName\n        label\n        line {\n          segments {\n            text\n            field\n          }\n        }\n      }\n    }\n    terms {\n      entry {\n        id\n        term\n        short\n      }\n      body {\n        segments {\n          text\n          field\n        }\n      }\n      seeAlso {\n        id\n        term\n        short\n      }\n    }\n    startPages {\n      entry {\n        id\n        order\n        title\n        summary\n      }\n      sections {\n        title\n        body {\n          segments {\n            text\n            field\n          }\n        }\n      }\n      links {\n        kind\n        id\n        title\n      }\n    }\n  }\n}\n    "
+   }
+  ],
+  "/admin/screener-runs": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   }
+  ],
+  "/admin/users": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   }
+  ],
+  "/guide": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideIndex",
+    "variables": {},
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   }
+  ],
+  "/guide/start": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideIndex",
+    "variables": {},
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   }
+  ],
+  "/guide/glossary": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideIndex",
+    "variables": {},
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   }
+  ],
+  "/guide/fields": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideIndex",
+    "variables": {},
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   }
+  ],
+  "/guide/playbooks": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideIndex",
+    "variables": {},
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "trend_continuation"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "pullback"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "momentum_12_1"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "size_small"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "range_breakout"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "breakout"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "failed_breakout"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "support_reversal"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "oversold_reversal"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "exhaustion"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "vrp_scanner"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "vrp_iv_hv"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "pead_small_cap"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "eap_all"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuidePlaybook",
+    "variables": {
+     "id": "eap_volume"
+    },
+    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+   }
+  ],
+  "/guide/situations": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideIndex",
+    "variables": {},
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   }
+  ],
+  "/guide/regime": [
+   {
+    "kind": "graphql",
+    "op": "Viewer",
+    "variables": {},
+    "query": "\n    query Viewer {\n  viewer {\n    id\n    name\n    role\n    workspaces\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "Regime",
+    "variables": {},
+    "query": "\n    query Regime {\n  regime {\n    session\n    label\n    headline\n    unknownReason {\n      code\n      kind\n      guideTerm\n      kindText\n      cause {\n        links {\n          level\n          subject\n          status\n          message\n          runId\n        }\n      }\n    }\n    scores {\n      macroRisk {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      marketStress {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n      fragility {\n        value\n        unknown {\n          code\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        feature\n        coverageFeature\n        threshold\n      }\n    }\n    sizing {\n      label\n      multiplier\n      enabled\n      unknownMultiplier\n      multipliers {\n        label\n        multiplier\n      }\n      screeners {\n        screenerId\n        name\n        enabled\n        pauseIn\n      }\n    }\n    indicators {\n      key\n      pace\n      plainName\n      technicalName\n      oneLiner\n      whyItMatters\n      whatOnMeans\n      before {\n        episode\n        line\n      }\n      leadTime\n      falseAlarms\n      links {\n        title\n        url\n      }\n      value\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n      format\n      status\n      changed\n      feature\n      verdictFeature\n      range {\n        min\n        max\n      }\n      threshold\n      direction\n      how {\n        text\n        url\n      }\n      sources {\n        label\n        series\n        cadence\n        releaseLagDays\n        url\n        licence\n        terms\n        lastObservation\n        vintageDate\n        vintageKind\n        firstVintage\n        active\n      }\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "StatusStrip",
+    "variables": {
+     "admin": true
+    },
+    "query": "\n    query StatusStrip($admin: Boolean!) {\n  session {\n    date\n  }\n  screeners {\n    id\n    name\n    notRun {\n      code\n      kindText\n    }\n  }\n  nightlyRuns(limit: 1) @include(if: $admin) {\n    runId\n    session\n    status\n    startedAt\n    finishedAt\n    durationS\n    problems\n    steps {\n      name\n      status\n      durationS\n      reason\n      error\n    }\n  }\n  completeness(sessions: 1) @include(if: $admin) {\n    sessions\n    datasets\n    lastClosed\n    cells {\n      dataset\n      session\n      status\n      present\n      expected\n      basis\n      runIds\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "GuideIndex",
+    "variables": {},
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+   },
+   {
+    "kind": "graphql",
+    "op": "FeatureCatalogue",
+    "variables": {},
+    "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
+   }
+  ]
+ }
+}
