@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.edges.document import CLOSED
-from algotrade.config.edges.loading import edge_problems, load_edges
+from algotrade.config.edges.loading import edge_problems, load_all_edges, load_edges
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import field_catalog
@@ -237,3 +237,40 @@ def test_every_open_shipped_edge_answers_the_whole_quality_bar() -> None:
 def test_every_shipped_inline_universe_names_catalogue_fields() -> None:
     edges = load_edges(SHIPPED, catalog=field_catalog(SHIPPED))
     assert any(isinstance(e.universe, Selection) for e in edges)
+
+
+def test_an_edge_is_owned_by_where_its_document_lives() -> None:
+    follow = {"follow": {"state": "following", "since": "2026-05-04", "labels": []}}
+    over = {"extends": "drift", "screeners": ["mine"]}
+    configs = store(
+        site__drift=document(), alice__drift=follow, alice__mine_v2=over,
+        alice__idea=document(id="idea", status=None),
+    )  # fmt: skip
+    by_id = {e.id: e for e in load_edges(configs, "alice")}
+    assert by_id["drift"].owner == "site"  # a follow-only file over a site edge stays the site's
+    assert by_id["mine_v2"].owner == "alice" and by_id["idea"].owner == "alice"
+    assert {e.owner for e in load_edges(configs)} == {"site"}
+
+
+def test_load_all_edges_is_the_site_edges_and_every_users_own_once() -> None:
+    configs = store(
+        site__drift=document(),
+        alice__drift={"follow": {"state": "following", "since": "2026-05-04", "labels": []}},
+        alice__idea=document(id="idea", status=None),
+        bob__idea=document(id="idea", status=None),
+    )
+    found = sorted((e.id, e.owner) for e in load_all_edges(configs))
+    assert found == [("drift", "site"), ("idea", "alice"), ("idea", "bob")]
+
+
+def test_load_all_edges_skips_a_users_folder_named_site() -> None:
+    class WithSiteFolder(MemoryConfigStore):
+        def users(self) -> list[str]:
+            return ["site"]
+
+    base = store(site__drift=document(), site__idea=document(id="idea"))
+    configs = WithSiteFolder(base._docs)
+    assert [(e.id, e.owner) for e in load_all_edges(configs)] == [
+        ("drift", "site"),
+        ("idea", "site"),
+    ]

@@ -12,6 +12,7 @@ algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [-
                                     [--split-from D]
                                   [--report edges.md] [--baseline benchmarks/baseline.json
                                   [--update-baseline]]
+    (no --user: each edge is run as its owner, from where its document lives)
 algotrade-backtest study-winners                           (the ED6 winners study, one run)
 algotrade-backtest draft-edges --run ID [--out-dir DIR]    (a candidate edge draft, if it passed)
 """
@@ -79,9 +80,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rg.add_argument("--report", type=Path, help="also write the text here")
     ee = sub.add_parser(
-        "evaluate-edges", help="the edge harness: each edge's screeners against the stored outcomes"
+        "evaluate-edges",
+        help="the edge harness: each edge's screeners against the stored outcomes, as its owner",
     )
-    ee.add_argument("--edge", help="one edge id (default: every open edge with screeners)")
+    ee.add_argument(
+        "--edge", help="one edge id (default: every open edge with screeners, site and users')"
+    )
     ee.add_argument("--from", dest="start", type=date.fromisoformat, help="first session")
     ee.add_argument("--to", dest="end", type=date.fromisoformat, help="last session")
     ee.add_argument(

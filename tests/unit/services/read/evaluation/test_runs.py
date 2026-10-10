@@ -135,3 +135,46 @@ def test_latest_is_by_commit_time_not_start_time(backend: MemoryBackend) -> None
     assert edge is not None
     run = load_canonical_run(ctx, edge).run
     assert run is not None and run.run_id == "long"
+
+
+def test_a_legacy_local_run_is_the_sites_and_says_so(backend: MemoryBackend) -> None:
+    write_run(backend, "old-local", FROZEN, 0.5, owner="local")
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None and run.run_id == "old-local"
+    assert (run.owner, run.legacy_owner) == ("site", "local")
+    write_run(backend, "new-site", FROZEN, 0.6, minutes=5)
+    assert load_canonical_run(ctx, edge).run.run_id == "new-site"  # type: ignore[union-attr]
+    assert load_canonical_run(ctx, edge).run.legacy_owner is None  # type: ignore[union-attr]
+
+
+def test_a_local_run_after_the_cutoff_is_the_users_not_the_sites(backend: MemoryBackend) -> None:
+    write_run(backend, "later-local", FROZEN, 0.5, owner="local", finished_minutes=60 * 24 * 30)
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    assert load_canonical_run(ctx, edge).run is None  # not the site's
+    assert load_edge_runs(ctx, edge) == ()  # the viewer is "me"
+
+
+def test_viewer_local_sees_each_legacy_run_once_as_the_sites(backend: MemoryBackend) -> None:
+    write_run(backend, "old-local", FROZEN, 0.5, owner="local")
+    write_run(
+        backend, "new-local", FROZEN, 0.6, owner="local", minutes=5, finished_minutes=60 * 24 * 30
+    )
+    ctx = stores(backend, "local")
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    assert [(r.run_id, r.owner) for r in load_edge_runs(ctx, edge)] == [
+        ("new-local", "local"), ("old-local", "site"),
+    ]  # fmt: skip
+
+
+def test_a_legacy_run_at_another_split_is_not_canonical(backend: MemoryBackend) -> None:
+    write_run(backend, "explore", date(2026, 3, 1), 0.5, owner="local")
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    assert load_canonical_run(ctx, edge).run is None

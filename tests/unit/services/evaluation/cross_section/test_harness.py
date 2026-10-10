@@ -620,6 +620,7 @@ def test_each_variant_is_evaluated_under_its_own_key_and_is_a_trial() -> None:
 def test_a_trial_logged_before_edge_variants_is_the_edges_own() -> None:
     class Record:
         stats: ClassVar = {"trials": [{"variant": "momo", "config_hash": "h", "horizon": 2}]}
+        finished_at = started_at = datetime(2026, 10, 5, tzinfo=UTC)
 
     class Writer:
         def runs_for(self, job: str) -> list[Record]:
