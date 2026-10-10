@@ -59,7 +59,7 @@ def load_guide_term(ctx: Stores, term_id: str) -> GuideTerm | None:
     others = (glossary.get(other) for other in term.see_also)
     return GuideTerm(
         entry=_term_entry(term),
-        body=link_prose(term.body, catalog_of(ctx.features).fields),
+        body=link_prose(term.reading, catalog_of(ctx.features).fields),
         see_also=tuple(_term_entry(t) for t in others if t is not None),
     )
 

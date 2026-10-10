@@ -30,7 +30,13 @@ from algotrade.core.views.series import FIELDS
 SCHEMA_VERSION = 1
 COMMON = ("session_date", "knowledge_ts", "source", "run_id")
 # Abstract column types; storage backends map them to physical types (Arrow, DuckDB later).
-COLUMN_TYPES = frozenset({"string", "float64", "float32", "int64", "bool", "date", "timestamp_utc"})
+# ``<scalar>[]`` is a list column of that scalar (ADR 0063's per-session arrays); null or empty.
+COLUMN_TYPES = frozenset(
+    {
+        "string", "float64", "float32", "int64", "bool", "date", "timestamp_utc",
+        "float64[]", "float32[]", "string[]", "date[]",
+    }
+)  # fmt: skip
 # How a partition's runs combine on read: "snapshot" (each run is the whole partition; the
 # latest known at as_of wins) or "merge" (each run is a window; the union, latest per key).
 RUN_MODES = frozenset({"snapshot", "merge"})

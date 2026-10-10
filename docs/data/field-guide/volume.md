@@ -154,7 +154,7 @@ Sources: O'Neil, How to Make Money in Stocks: volume drying up near the lows of 
 
 ### `feature.volume_climax`
 
-**How to read it.** True when the session's volume is 3 or more standard deviations above the 20 sessions before it (rollup.volume@v1.volume_z_20d at least 3): an event-sized day. False is everything from a quiet day to a busy one (a z-score under 3; 1 to 2 is a busy but ordinary day); null when the z-score is unknown. After a long decline a climax with a close off the lows can mark capitulation; after a long rise, exhaustion. Most climaxes are simply news, and a typical name has a few a year (earnings alone gives four).
+**How to read it.** True when the session's volume is 3 or more standard deviations above the 20 sessions before it (rollup.volume@v1.volume_z_20d at least 3): an event-sized day. False is everything from a quiet day to a busy one (a z-score under 3; 1 to 2 is a busy but ordinary day); null when the z-score is unknown. After a long decline a climax with a close off the lows can mark capitulation; after a long rise, exhaustion. Most climaxes are news, and a typical name has a few a year (earnings alone gives four).
 
 **The criterion per intent**
 
@@ -261,7 +261,7 @@ Sources: Turnover ratio (share turnover), Investopedia: https://www.investopedia
 
 ### `rollup.volume_profile@v1.volume_near_close_share`
 
-**How to read it.** The share of the last year's volume that traded in price bins within one ATR of today's close: how much the market has already transacted around here. 0.05 is a thinly traded level (price moves through it easily); 0.15 to 0.25 is a well-traded zone where the name has spent weeks (a level that holds); above 0.30 the close sits in the year's main value area. It is the daily-bar profile's answer to 'is this price a level or a gap'.
+**How to read it.** The share of the last year's volume that traded in price bins within one ATR of today's close: how much the market has already transacted around here. 0.05 is a thinly traded level (price moves through it with little resistance); 0.15 to 0.25 is a well-traded zone where the name has spent weeks (a level that holds); above 0.30 the close sits in the year's main value area. It is the daily-bar profile's answer to 'is this price a level or a gap'.
 
 **The criterion per intent**
 
@@ -400,7 +400,7 @@ Sources: Dalton (2007), Markets in Profile: high-volume nodes
 
 ### `rollup.volume_profile@v1.lvn_above`
 
-**How to read it.** The nearest low-volume node above the close: the closest bin above with at most half the average bin volume, in dollars per share. A price the market rejected quickly, so a move into it tends to continue through it (thin air): the breakout screens like a close just under a low-volume node with a high-volume node further up as the target.
+**How to read it.** The nearest low-volume node above the close: the closest bin above with at most half the average bin volume, in dollars per share. A price the market rejected quickly, so a move into it tends to continue through it (thin air): the breakout screens like a close right under a low-volume node with a high-volume node further up as the target.
 
 **The criterion per intent**
 

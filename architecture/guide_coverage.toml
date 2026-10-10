@@ -69,21 +69,21 @@ exempt = "a display hint for the column (percent, date, ...), never shown as a w
 [[enum]]
 source = "graphql:Edge.status"
 values_from = "python:algotrade.config.edges.document:STATUSES"
-values = { candidate = "term:edge_status", evidenced = "term:edge_status", live = "term:edge_status", retired = "term:edge_status", rejected = "term:edge_status", blocked = "term:edge_status" }
+values = { researching = "term:edge_status", candidate = "term:edge_status", evidenced = "term:edge_status", live = "term:edge_status", retired = "term:edge_status", rejected = "term:edge_status", blocked = "term:edge_status" }
 
 [[enum]]
 source = "graphql:Edge.state"
-values_from = "python:algotrade.config.edges.follow:STATES"
+values_from = "python:algotrade.config.edges.follow:LEGACY"
 values = { researching = "term:edge_state", following = "term:edge_state", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:edge_state" }
 
 [[enum]]
 source = "graphql:FollowedEdge.state"
-values_from = "python:algotrade.config.edges.follow:STATES"
+values_from = "python:algotrade.config.edges.follow:LEGACY"
 values = { researching = "term:edge_state", following = "term:edge_state", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:edge_state" }
 
 [[enum]]
 source = "graphql:Edge.labels"
-values_from = "python:algotrade.config.edges.follow:LABELS"
+values_from = "python:algotrade.config.edges.follow:AUDIT_LABELS"
 values = { followed_against_verdict = "term:edge_labels", oos_viewed_during_tuning = "term:edge_labels", replaced_without_forward_test = "term:edge_labels", split_moved_after_viewing = "term:edge_labels" }
 names = { oos_viewed_during_tuning = "out-of-sample seen while tuning" }  # the label as the app shows it
 
@@ -118,6 +118,10 @@ exempt = "a catalogue field name; the field's own help explains it"
 [[enum]]
 source = "graphql:Edge.stateReason"
 exempt = "free text the user wrote"
+
+[[enum]]
+source = "graphql:Edge.statusReason"
+exempt = "free text the user wrote (why an edge was rejected or retired)"
 
 [[enum]]
 source = "graphql:AheadEvent.label"

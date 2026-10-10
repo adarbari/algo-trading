@@ -5,7 +5,10 @@ bars, adjustments, events and chains are ``algotrade.data``. Consumers get this 
 ``algotrade.data`` and pass it to the functions there.
 """
 
-from collections.abc import Collection, Sequence
+import hashlib
+from collections.abc import Collection, Iterator, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import date, datetime
 
 import pandas as pd
@@ -62,6 +65,10 @@ class StoreReader:
         """The latest committed publish sequence: changes exactly when a commit publishes."""
         return self._backend.tables.visible_seq()
 
+    def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
+        """Per committed partition in the range, its highest commit sequence (ADR 0063)."""
+        return self._backend.tables.partition_seq(table, start, end)
+
     def runs_generation(self) -> tuple[int, int]:
         """Changes exactly when a run record (a job's too) is saved: the key of a cache over the
         run records, read before them like ``visible_seq`` (ADR 0022)."""
@@ -94,3 +101,136 @@ class StoreReader:
     def run(self, run_id: str) -> RunRecord | None:
         """One run record by id (``None`` when there is none)."""
         return self._backend.runs.load(run_id)
+
+
+@dataclass(frozen=True)
+class ReadRecord:
+    """One read an attributed day made. ``kind`` ``rows``: partitions ``start..end`` of
+    ``table`` were read (found or not: a read that found nothing is recorded too); ``dates``:
+    the partition dates of ``table`` the caller used were listed, ``digest`` their hash
+    (``dates_digest``), ``start`` the earliest of them; ``end`` is the day, or the latest date
+    listed when that is after it (a read of the future: never reusable)."""
+
+    table: str
+    start: date
+    end: date
+    kind: str
+    digest: str | None = None
+
+
+def dates_digest(days: Sequence[date]) -> str:
+    """The hash of a list of partition dates: what a ``dates`` read is compared by."""
+    return hashlib.sha256(",".join(d.isoformat() for d in days).encode()).hexdigest()[:16]
+
+
+@dataclass
+class _Attribution:
+    """What the readers of one family (a ``RecordingReader`` and its ``including`` copies)
+    share: the day being attributed, each day's reads and the sequence at its first read."""
+
+    day: date | None = None
+    reads: dict[date, dict[ReadRecord, None]] = field(default_factory=dict)  # ordered, deduped
+    seq: dict[date, int] = field(default_factory=dict)
+
+
+class RecordingReader(StoreReader):
+    """A ``StoreReader`` that logs, per attributed day, which partitions it read (ADR 0063).
+
+    Inside ``attribute(day)`` every ``table`` / ``require`` / ``table_range`` / ``dates`` /
+    ``latest_date`` read is logged against ``day``, including one that found nothing, and the
+    first read of a day also stamps ``inputs_seq(day)`` with ``visible_seq()`` taken before the
+    read. A reader whose day's logged reads still match (``partition_seq`` per ``rows`` read,
+    ``dates_digest`` per ``dates`` read) can reuse what that day computed. Reads outside any
+    ``attribute`` block belong to the run, not to a day, and are not logged. One attributed
+    day at a time: attribution is not thread-safe."""
+
+    def __init__(
+        self, backend: Backend, own_run: str | None = None, _shared: _Attribution | None = None
+    ) -> None:
+        super().__init__(backend, own_run)
+        self._attr = _shared if _shared is not None else _Attribution()
+
+    def including(self, run_id: str) -> "RecordingReader":
+        return RecordingReader(self._backend, run_id, self._attr)
+
+    @contextmanager
+    def attribute(self, day: date) -> Iterator[None]:
+        """Log the reads made inside the block against ``day`` (blocks do not nest)."""
+        if self._attr.day is not None:
+            raise RuntimeError(f"already attributing {self._attr.day}: attribute() does not nest")
+        self._attr.day = day
+        try:
+            yield
+        finally:
+            self._attr.day = None
+
+    def reads(self, day: date) -> tuple[ReadRecord, ...]:
+        """The reads attributed to ``day``, first to last, each distinct read once."""
+        return tuple(self._attr.reads.get(day, {}))
+
+    def inputs_seq(self, day: date) -> int | None:
+        """``visible_seq()`` at ``day``'s first read; ``None`` when it read nothing."""
+        return self._attr.seq.get(day)
+
+    def attributed_days(self) -> list[date]:
+        return sorted(self._attr.reads)
+
+    def _log(self, record: ReadRecord) -> None:
+        self._attr.reads[self._attr.day][record] = None  # type: ignore[index]
+
+    def _open(self) -> bool:
+        """Start logging a read: stamps the day's first, before the read it precedes."""
+        day = self._attr.day
+        if day is None:
+            return False
+        if day not in self._attr.reads:
+            self._attr.reads[day] = {}
+            self._attr.seq[day] = self.visible_seq()
+        return True
+
+    def table(
+        self,
+        table: str,
+        session_date: date,
+        as_of: datetime | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        if self._open():
+            self._log(ReadRecord(table, session_date, session_date, "rows"))
+        return super().table(table, session_date, as_of, instruments)
+
+    def table_range(
+        self,
+        table: str,
+        start: date,
+        end: date,
+        as_of: datetime | None = None,
+        instruments: Sequence[str] | None = None,
+        columns: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        if self._open():
+            self._log(ReadRecord(table, start, end, "rows"))
+        return super().table_range(table, start, end, as_of, instruments, columns)
+
+    def _log_dates(self, table: str, seen: list[date]) -> None:
+        """Log the listing the caller used. A date after the day is a read of the future: the
+        record then ends there, and its digest covers it, so it never stays valid."""
+        day = self._attr.day
+        assert day is not None
+        first, last = (seen[0], max(seen[-1], day)) if seen else (day, day)
+        self._log(ReadRecord(table, first, last, "dates", dates_digest(seen)))
+
+    def dates(self, table: str) -> list[date]:
+        recording = self._open()  # before the read: the sequence it will be stamped with
+        found = super().dates(table)
+        if recording:
+            self._log_dates(table, found)
+        return found
+
+    def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
+        recording = self._open()
+        found = StoreReader.dates(self, table)  # not self.dates: logged here, once
+        seen = [d for d in found if on_or_before is None or d <= on_or_before]
+        if recording:
+            self._log_dates(table, seen)
+        return seen[-1] if seen else None
