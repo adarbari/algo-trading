@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_to
 from algotrade.data import StoreReader
 from algotrade.services.selection import fields_view
@@ -27,6 +27,15 @@ from algotrade.services.selection import fields_view
 DEDUPE_SESSIONS = 40  # one report per name in this many sessions
 NO_EVENT_ROW = "no_event_row"  # eligible at D, but the event field has no value for the name
 NOT_KNOWN_AT_D = "event_not_known_at_decision"  # the field's event date is after D
+
+
+class EventDayMissingError(MissingDataError):
+    """An event field has no data for a decision session: ``day`` says which (a lookback day
+    of the paper record is not tonight)."""
+
+    def __init__(self, error: MissingDataError, day: date) -> None:
+        super().__init__(error.dataset, str(error), "see the first error")
+        self.day = day
 
 
 @dataclass(frozen=True)
@@ -114,7 +123,10 @@ def read_events_for(
     unknown: dict[str, dict[date, Mapping[str, int]]] = {k: {} for k in eligible_of}
     last: dict[str, dict[str, date]] = {k: {} for k in eligible_of}  # name -> latest counted D
     for day in decisions:
-        view, _ = fields_view(reader, (spec.count, spec.date), day, historical=True)
+        try:
+            view, _ = fields_view(reader, (spec.count, spec.date), day, historical=True)
+        except MissingDataError as error:
+            raise EventDayMissingError(error, day) from error
         reads = {i: _read(view.get(i, spec.count), view.get(i, spec.date)) for i in view}
         if not any(count == target for count, _ in reads.values()):
             continue
