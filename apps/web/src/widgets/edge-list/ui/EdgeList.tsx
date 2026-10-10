@@ -18,7 +18,7 @@ import {
   type Edge,
   type EdgeView,
 } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
+import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { edgeColumns } from '../model/columns';
 
@@ -57,7 +57,7 @@ export function EdgeList({ onSelect, view = 'all', onViewChange }: EdgeListProps
           key={p.edgeId}
           tone="warning"
           title={`Left out: ${p.edgeId}`}
-          actions={<GuideHelp entry={{ kind: 'term', id: 'edge_left_out' }} />}
+          actions={termHelp('edge_left_out')}
         >
           {p.reason}
         </Banner>
@@ -73,17 +73,12 @@ export function EdgeList({ onSelect, view = 'all', onViewChange }: EdgeListProps
             onViewChange?.(v);
           }}
         />
-        <GuideHelp entry={{ kind: 'term', id: 'edge_views' }} />
+        {termHelp('edge_views')}
       </Stack>
       <Panel
         title="Edges"
         flush
-        actions={
-          <Stack direction="row" gap={1} align="center">
-            <GuideHelp entry={{ kind: 'term', id: 'edge' }} />
-            <GuideHelp entry={{ kind: 'start', id: 'read_an_edge_page' }} />
-          </Stack>
-        }
+        actions={<GuideHelp entry={{ kind: 'start', id: 'read_an_edge_page' }} />}
         state={state}
         loadingLabel="Loading edges…"
         emptyMessage="No edge is declared."

@@ -26,7 +26,7 @@ import {
   type ForwardTest,
   type PaperRecord,
 } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 import { tradeColumns } from '../model/columns';
 
@@ -63,11 +63,7 @@ export function EdgeLive({ edgeId }: EdgeLiveProps) {
     <Stack gap={4}>
       {paper.forward && (
         <Stack gap={2}>
-          <Banner
-            tone="info"
-            title="Forward test"
-            actions={<GuideHelp entry={{ kind: 'term', id: 'forward_test' }} />}
-          >
+          <Banner tone="info" title="Forward test" actions={termHelp('forward_test')}>
             {paper.forward.headline}
           </Banner>
           <StatStrip label="Forward test figures" items={forwardItems(paper.forward)} />
@@ -77,8 +73,8 @@ export function EdgeLive({ edgeId }: EdgeLiveProps) {
         title="Live record"
         actions={
           <Stack direction="row" gap={1} align="center">
-            <GuideHelp entry={{ kind: 'term', id: 'live_record' }} />
-            <GuideHelp entry={{ kind: 'term', id: 'usual_range' }} />
+            {termHelp('live_record')}
+            {termHelp('usual_range')}
           </Stack>
         }
       >
@@ -99,11 +95,7 @@ export function EdgeLive({ edgeId }: EdgeLiveProps) {
           )}
         </Stack>
       </Panel>
-      <Panel
-        title="Paper trades"
-        flush
-        actions={<GuideHelp entry={{ kind: 'term', id: 'paper_trading' }} />}
-      >
+      <Panel title="Paper trades" flush actions={termHelp('paper_trading')}>
         <DataTable
           label="Paper trades"
           columns={tradeColumns}

@@ -12,7 +12,10 @@ vi.mock('@/entities/edge', async (importOriginal) => ({
 }));
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
+  return {
+    GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text>,
+    termHelp: (id: string) => <Text>{`help ${id}`}</Text>,
+  };
 });
 
 stubElementSize();

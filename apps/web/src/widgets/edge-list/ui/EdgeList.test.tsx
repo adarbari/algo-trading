@@ -15,7 +15,10 @@ vi.mock('@/entities/edge', async (importOriginal) => ({
 }));
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
+  return {
+    GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text>,
+    termHelp: (id: string) => <Text>{`help ${id}`}</Text>,
+  };
 });
 
 stubElementSize();
@@ -43,7 +46,7 @@ describe('EdgeList', () => {
     const waiting = within(table).getByRole('row', { name: /S&P 500 index changes/ });
     expect(within(waiting).getByText('no screen yet · site edge')).toBeInTheDocument();
     expect(within(waiting).getByText('Rejected')).toBeInTheDocument();
-    for (const id of ['verdict', 'edge_state', 'trades', 'out_of_sample', 'edge', 'edge_views']) {
+    for (const id of ['verdict', 'edge_state', 'trades', 'out_of_sample', 'read_an_edge_page', 'edge_views']) {
       expect(screen.getByText(`help ${id}`)).toBeInTheDocument();
     }
     await expectNoA11yViolations(container);

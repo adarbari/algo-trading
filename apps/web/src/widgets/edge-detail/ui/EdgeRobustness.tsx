@@ -7,7 +7,7 @@
 import { Distribution, Panel, Stack, Text } from '@algotrade/ui';
 
 import type { EdgeVerdict } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 export interface EdgeRobustnessProps {
   robustness: EdgeVerdict['robustness'];
@@ -19,7 +19,7 @@ export function EdgeRobustness({ robustness }: EdgeRobustnessProps) {
       title="Robustness"
       state={robustness ? 'ready' : 'empty'}
       emptyMessage="No random-pick backtests for this result."
-      actions={<GuideHelp entry={{ kind: 'term', id: 'robustness' }} />}
+      actions={termHelp('robustness')}
     >
       {robustness && (
         <Stack gap={2}>

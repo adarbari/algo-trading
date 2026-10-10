@@ -22,6 +22,8 @@ import { termHelp } from '@/features/guide-help';
 
 import { criterionColumns } from '../model/columns';
 
+import { Labelled } from './EdgeFigures';
+
 const BY_LEVEL: DataTableGroupBy<VerdictCriterion> = {
   getGroup: (c) => c.level,
   order: ['promising', 'works'],
@@ -29,15 +31,6 @@ const BY_LEVEL: DataTableGroupBy<VerdictCriterion> = {
 };
 
 const NUMBER = { kind: 'number', digits: 2 } as const;
-
-function Labelled({ text, help }: { text: string; help: string }) {
-  return (
-    <Stack direction="row" gap={1} align="center">
-      <Text size="sm">{text}</Text>
-      {termHelp(help)}
-    </Stack>
-  );
-}
 
 function figures(edge: Edge): KeyValueItem[] {
   const v = edge.verdict;

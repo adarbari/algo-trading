@@ -31,7 +31,7 @@ import {
 } from '@/entities/edge';
 import { EdgeActions } from '@/features/edge-follow';
 import { RunEvaluation } from '@/features/edge-evaluation';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 import { lazyPage } from '@/shared/lib/lazy';
 
 import { EdgeDefinition } from './EdgeDefinition';
@@ -86,20 +86,20 @@ export function EdgeDetail({ id, onBack, onEdit }: EdgeDetailProps) {
             <Heading level={1}>{edge.name}</Heading>
             <Stack direction="row" gap={2} align="center" wrap>
               <StatusBadge tone={verdictTone(v.verdict)}>{verdictLabel(v.verdict)}</StatusBadge>
-              <GuideHelp entry={{ kind: 'term', id: 'verdict' }} />
+              {termHelp('verdict')}
               <Text size="sm" tone="secondary">
                 {`${edge.mine ? `Your edge · extends ${edge.extends ?? 'nothing'}` : 'Site edge'} · ${statusLabel(edge.status)}`}
               </Text>
-              <GuideHelp entry={{ kind: 'term', id: 'edge_copy' }} />
-              <GuideHelp entry={{ kind: 'term', id: 'edge_status' }} />
+              {termHelp('edge_copy')}
+              {termHelp('edge_status')}
               <StatusBadge tone={stateTone(edge.state)}>{stateLabel(edge.state)}</StatusBadge>
-              <GuideHelp entry={{ kind: 'term', id: 'edge_state' }} />
+              {termHelp('edge_state')}
               {edge.canonicalRun && (
                 <>
                   <Text size="sm" tone="secondary">
                     {`Last backtest ${formatValue(edge.canonicalRun.knowledgeTs, { kind: 'date', style: 'day' }).text} (official result)`}
                   </Text>
-                  <GuideHelp entry={{ kind: 'term', id: 'official_result' }} />
+                  {termHelp('official_result')}
                 </>
               )}
             </Stack>
@@ -108,19 +108,19 @@ export function EdgeDetail({ id, onBack, onEdit }: EdgeDetailProps) {
                 {edge.labels.map((label) => (
                   <Chip key={label} label={labelText(label)} />
                 ))}
-                <GuideHelp entry={{ kind: 'term', id: 'edge_labels' }} />
+                {termHelp('edge_labels')}
               </Stack>
             )}
           </Stack>
           <Stack gap={2} align="end">
             <Stack direction="row" gap={1} align="center">
               <RunEvaluation edgeId={edge.id} />
-              <GuideHelp entry={{ kind: 'term', id: 'run_backtest' }} />
+              {termHelp('run_backtest')}
             </Stack>
             <Stack direction="row" gap={1} align="center">
               <EdgeActions edge={edge} onEdit={onEdit} />
-              <GuideHelp entry={{ kind: 'term', id: 'follow_edge' }} />
-              {edge.oosHidden && <GuideHelp entry={{ kind: 'term', id: 'show_out_of_sample' }} />}
+              {termHelp('follow_edge')}
+              {edge.oosHidden && termHelp('show_out_of_sample')}
             </Stack>
           </Stack>
         </Stack>

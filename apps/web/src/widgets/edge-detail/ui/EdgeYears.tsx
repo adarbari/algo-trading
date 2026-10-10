@@ -7,7 +7,7 @@ import { DataTable, Panel, SegmentedControl, Stack, type SegmentedOption } from 
 import { useMemo, useState } from 'react';
 
 import type { VerdictYear } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 import { yearColumns } from '../model/columns';
 
@@ -34,7 +34,7 @@ export function EdgeYears({ years }: EdgeYearsProps) {
       flush
       actions={
         <Stack direction="row" gap={1} align="center">
-          <GuideHelp entry={{ kind: 'term', id: 'year_by_year' }} />
+          {termHelp('year_by_year')}
           <SegmentedControl
             aria-label="Period shown"
             size="sm"
