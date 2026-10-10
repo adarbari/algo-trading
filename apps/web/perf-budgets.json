@@ -2,9 +2,7 @@
   "bundle": {
     "entry_gzip_bytes": 24800,
     "entry_closure_gzip_bytes": 203800,
-    "lazy_only": [
-      "design-system/components/Chart/engine.ts"
-    ],
+    "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
       "src/pages/admin-harness-runs/index.ts": 32000,
       "src/pages/admin-ingestion/index.ts": 48480,
