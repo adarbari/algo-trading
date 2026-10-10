@@ -16,6 +16,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 REPO = Path(__file__).resolve().parents[1]
@@ -75,6 +76,7 @@ class Probes:
     launch_agents: Path = Path.home() / "Library" / "LaunchAgents"
     free_bytes: Callable[[Path], int] = lambda path: shutil.disk_usage(path).free
     api_build: Callable[[], tuple[str, ...] | None] = field(default=_api_build)
+    history_stale: Callable[[], str | None] = field(default=lambda: None)  # see history_stale()
 
 
 @dataclass(frozen=True)
@@ -323,6 +325,51 @@ def llm_error(main: Path) -> str | None:
     return None
 
 
+def history_stale() -> str | None:
+    """The first instrument table whose history copy (ADR 0060) misses the default session
+    (the latest complete one, as every read serves it), or ``None`` (current, off, or no store).
+    Read through the store's reader; a path is never built here."""
+    from algotrade.config.env import config_dir, data_url  # noqa: PLC0415 (venv may lack it)
+    from algotrade.config.site.settings import load_nightly  # noqa: PLC0415
+    from algotrade.services.read.context import open_read_stores  # noqa: PLC0415
+
+    reader, configs = open_read_stores(data_url(), config_dir())
+    settings = load_nightly(configs).history_copy
+    return stale_history(reader, settings.instrument_tables) if settings.enabled else None
+
+
+def stale_history(reader: Any, tables: tuple[str, ...]) -> str | None:
+    """Of ``tables``, the first whose copy misses the default session: the latest COMPLETE one
+    (``default_session``, ADR 0062), never a newer incomplete session's partition."""
+    from algotrade.services.read.session import default_session  # noqa: PLC0415
+
+    session = default_session(reader)
+    if session is None:
+        return None
+    for table in tables:
+        if session in reader.dates(table) and not reader.history_current(table, session):
+            return f"{table} has no history copy holding session {session}"
+    return None
+
+
+def check_history_copy(p: Probes) -> Result:
+    """Without a current history copy long reads (Explore charts, regime history) fall back to
+    thousands of partitions: RegimeSignals took 31.9 s cold against 44 ms uncached while the
+    copy was unbuilt (2026-10-10). A warning: the API still answers, slowly."""
+    try:
+        stale = p.history_stale()
+    except Exception as exc:  # no store / no venv: store and library checks say so
+        return Result(INFO, "history copy", f"not checked ({type(exc).__name__})")
+    if stale is None:
+        return Result(OK, "history copy", "current for the served session (ADR 0060)")
+    return Result(
+        WARN,
+        "history copy",
+        f"{stale}: long reads are slow until it is built",
+        "run `algotrade-ingest history-copy` (the nightly's history-copy step does it each night)",
+    )
+
+
 # The launchd agents (``algotrade-ingest schedule``, ``algotrade-api schedule``): label -> the
 # command that rewrites it. Each must run the main checkout's code from the main checkout.
 AGENTS = {
@@ -483,6 +530,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_env(p),
         check_ibkr(p),
         check_store(p),
+        check_history_copy(p),
         check_web_dist(p),
         check_api_build(p),
         check_llm(p),
@@ -523,6 +571,7 @@ def main() -> int:
             required=REQUIRED_KEYS,
             web_dist=web_dist,
             llm_error=llm_error,
+            history_stale=history_stale,
         )
         extra = []
     text, code = render(run_checks(probes) + extra)

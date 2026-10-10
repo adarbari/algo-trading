@@ -172,8 +172,10 @@ without a settings change) builds the production bundle and runs two gates; ever
 - **Bundle** (`apps/web/scripts/check-bundle-budgets.ts`, `npm run perf:bundle`): from
   `dist/.vite/manifest.json`, the gzip size of the entry chunk (JS + CSS, 45 kB), of the entry plus
   everything it imports statically (every first visit), and of what each lazy page adds beyond that;
-  and the chart engine must not be in the entry's static imports. A size table is printed and added
-  to the job summary.
+  and the chart engine must not be in the entry's static imports. A size table (kB and exact bytes next to each
+  budget) is printed and added to the job summary. Run locally with the Supabase `VITE_*` variables
+  unset, the script rebuilds with the placeholder values CI uses (unset hides ~22 kB of auth-js:
+  a branch once passed locally and failed CI by 17 B).
 - **Phone** (`apps/web/e2e/perf.spec.ts`, `npm run perf:e2e`, config `playwright.perf.config.ts`):
   per main route (Ideas, Screeners, Explore with a ticker, Regime, Screener results, Admin
   ingestion), with the API mocked as in the e2e suite, the gzip bytes of scripts transferred, the

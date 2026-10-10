@@ -189,6 +189,9 @@ class MemoryTables:
     def history_size(self, table: str) -> int:
         return 0
 
+    def history_current(self, table: str, day: date) -> bool:
+        return True  # no copy to be stale
+
     def free_bytes(self) -> int:
         return 1 << 62  # memory: no volume to fill
 

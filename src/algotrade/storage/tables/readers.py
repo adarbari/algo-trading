@@ -67,6 +67,11 @@ class StoreReader:
         run records, read before them like ``visible_seq`` (ADR 0022)."""
         return self._backend.runs.generation()
 
+    def history_current(self, table: str, day: date) -> bool:
+        """Whether the table's history copy (ADR 0060) holds ``day`` as it is now: how an
+        operator learns the nightly's ``history-copy`` step is behind (``make doctor``)."""
+        return self._backend.tables.history_current(table, day)
+
     def table_names(self) -> list[str]:
         return self._backend.tables.names(self.own_run)
 

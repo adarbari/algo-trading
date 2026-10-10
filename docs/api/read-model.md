@@ -317,12 +317,20 @@ hundreds of concurrent requests, no hacks, and no UX trade-off that costs the cu
 1. **Measure first.** Time each GraphQL operation per page, then run `make load` (`scripts/perf/load.py`,
    by hand on an idle machine; scenarios `realistic` and `stress`). Pass criterion (`CRITERIA`): 300
    realistic users, page p95 <= 2.5 s, errors after retries <= 0.5 %, RSS <= 2 GB, `/health` p99 < 250 ms.
-   A perf PR states the before and after numbers in its description.
+   A perf PR states the before and after numbers in its description. Measure with
+   `make api-latency` (cold / warm / no-cache per operation; `ARGS="--only Op ..."` writes
+   nothing); before and after in the PR. **Cold much greater than no-cache means warm-up or
+   missing data, not the resolver**: check `graphql/warm.py` and the nightly derived steps (the
+   history copy) before changing code (2026-10-10: RegimeSignals 31.9 s cold vs 44 ms no-cache was
+   an unbuilt history copy; `make doctor` now warns of one).
 2. **A per-publish cache key never holds a request window.** Read the whole series and slice (the
    regime page's 16 episodes each re-read 14,000 partitions: 150 s). Keys read `visible_seq` (and
    `runs_generation` for a read that depends on run records, the closed session where the clock
    matters) BEFORE computing (ADR 0022, ADR 0037 amendment 2026-10-09). Compute through
-   `ResultCache.get_or_compute` (single-flight), never get-then-set.
+   `ResultCache.get_or_compute` (single-flight), never get-then-set. Only an operation in
+   `RUN_OPERATIONS` (run records) keys on `runs_generation`; a shared operation keys on the
+   served-session token (`served_token`, ADR 0062), so a job save never evicts shared responses
+   (#463's test).
 3. **Never scan every run record** (`LocalRuns.find` opens each file): a run id names its job and
    session, so read that one record.
 4. **A page with many small reads batches them** (Guide entries: `Query.guideEntries`; one

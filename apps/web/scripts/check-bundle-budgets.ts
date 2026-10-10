@@ -6,6 +6,9 @@
  * `tsx scripts/check-bundle-budgets.ts` checks; `... update` shrinks the budgets to the current
  * sizes + 1 % (never raises one; a new page gets its first budget). Prints a size table, also
  * into the GitHub job summary. Budgets: perf-budgets.json (scripts/perf-budgets.ts).
+ * Locally, with the Supabase `VITE_*` variables unset, it first rebuilds with CI's placeholder
+ * values: an unset build tree-shakes ~22 kB of auth-js away, so a branch passed here and failed CI
+ * by 17 B (2026-10-10). In CI (`CI` set) the workflow's own build is measured as it is.
  */
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -139,7 +142,7 @@ export function updated(sizes: Sizes, budgets: Budgets): Budgets {
   };
 }
 
-const kb = (bytes: number): string => `${(bytes / 1000).toFixed(1)} kB`;
+const kb = (bytes: number): string => `${(bytes / 1000).toFixed(1)} kB (${String(bytes)} B)`;
 
 /** The size table (Markdown, so the job summary renders it and the terminal reads it). */
 export function table(sizes: Sizes, budgets: Budgets['bundle']): string {
@@ -183,7 +186,26 @@ function risesAgainstBase(head: Budgets): string[] {
 
 const DIST = new URL('../dist/', import.meta.url);
 
+/** The Supabase values of CI's production build (the e2e's placeholders: .github/workflows/ci.yml). */
+export const PLACEHOLDER_ENV = {
+  VITE_SUPABASE_URL: 'http://127.0.0.1:54321',
+  VITE_SUPABASE_ANON_KEY: 'e2e-anon-key',
+} as const;
+
+/** The environment to build with locally: the placeholders for each Supabase variable that is
+ * unset; `null` when nothing is missing or this is CI (whose build step sets them itself). */
+export function buildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv | null {
+  if (env['CI'] !== undefined) return null;
+  const missing = Object.entries(PLACEHOLDER_ENV).filter(([name]) => !env[name]);
+  return missing.length === 0 ? null : { ...env, ...Object.fromEntries(missing) };
+}
+
 function main(): number {
+  const env = buildEnv(process.env);
+  if (env !== null) {
+    console.log('VITE_SUPABASE_* unset: building with the placeholder values CI uses');
+    execFileSync('npx', ['vite', 'build'], { env, stdio: 'inherit' });
+  }
   const manifestFile = new URL('.vite/manifest.json', DIST);
   if (!existsSync(manifestFile)) {
     console.error(

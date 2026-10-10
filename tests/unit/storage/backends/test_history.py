@@ -170,6 +170,17 @@ def test_a_new_partition_in_a_year_makes_that_year_fall_back(tmp_path: Path) -> 
     assert got is not None and new in set(got["session_date"])
 
 
+def test_history_current_says_whether_the_copy_holds_a_day_as_it_is(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    day, new = _days(30)[-1], _days(30)[-1] + timedelta(days=1)
+    assert not backend.tables.history_current(TABLE, day)  # no copy yet
+    backend.tables.build_history(TABLE, [2026])
+    assert backend.tables.history_current(TABLE, day)
+    backend.tables.write(TABLE, new, "r9", stamped(_rows(99), new, "r9", LATER))
+    assert not backend.tables.history_current(TABLE, new)  # committed after the build
+    assert MemoryBackend().tables.history_current(TABLE, day)  # no copy to be stale
+
+
 def test_a_restated_partition_makes_its_year_fall_back(tmp_path: Path) -> None:
     backend = _store(tmp_path / "data")
     backend.tables.build_history(TABLE, [2025, 2026])

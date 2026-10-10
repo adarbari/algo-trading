@@ -103,6 +103,11 @@ class TableStore(Protocol):
         """Bytes the table's history copy takes (0 when it has none)."""
         ...
 
+    def history_current(self, table: str, day: date) -> bool:
+        """Whether the history copy holds ``day``'s partition as it is now (False: no copy, or
+        one built before the partition's last commit; the memory backend has none: True)."""
+        ...
+
     def free_bytes(self) -> int:
         """Bytes free on the volume the store is on (the history build's disk floor)."""
         ...
