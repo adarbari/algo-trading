@@ -13,6 +13,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.edges.document import MAIN, job_name
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
@@ -24,6 +25,7 @@ from algotrade.storage.tables.result_writer import ResultWriter
 
 RESULT = "edge_eval"
 SOURCE = "edge-eval"
+TRIGGERS = ("nightly", "ui", "cli")  # what can start a run; stored in its stats, shown as-is
 MEASURE_COLUMNS = (
     "sessions", "picks", "hits", "hit_rate", "eligible", "base_hits", "base_rate", "lift",
     "mean_excess_picks", "bh_mean", "top_decile_mean", "decile_spread", "decile_t",
@@ -228,6 +230,8 @@ def write_edge_eval(
     hold the trial log and who ran it (``owner``: the edge's, default the rows' user; ``trigger``:
     ``nightly`` | ``ui`` | ``cli``; ``job_id``: the job that wrote it, none for a direct call).
     Returns the finished record."""
+    if trigger not in TRIGGERS:
+        raise ConfigurationError(f"unknown run trigger {trigger!r}; known: {list(TRIGGERS)}")
     record = start_run(job_name(evaluation.edge_id, evaluation.user_id), evaluation.end, now)
     frame = edge_eval_frame(evaluation, record.run_id, now)
     stats = {
