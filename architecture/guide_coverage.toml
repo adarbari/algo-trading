@@ -135,6 +135,10 @@ source = "graphql:Edge.stateReason"
 exempt = "free text the user wrote"
 
 [[enum]]
+source = "graphql:Edge.statusReason"
+exempt = "free text the user wrote (why an edge was rejected or retired)"
+
+[[enum]]
 source = "graphql:AheadEvent.label"
 exempt = "free text: a short label for the event, composed from its data"
 

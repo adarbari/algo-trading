@@ -54,7 +54,8 @@ intend to act on it, and retire it when it stops working or you stop acting on i
 have checked and dropped: a reason is needed and is kept so it is not filed again. From any status
 you can go back to researching, and a rejected or retired edge can be reopened. A candidate that
 replaces another edge of yours (a new version) retires the old one when it goes live. A move is
-your record, not an order: the app never trades.
+your record, not an order: the app never trades. Some pages still show the older words: trial
+for a candidate, and following for a live edge or a site edge you bookmarked.
 """
 see_also = ["edge_status", "edge_owner", "forward_test"]
 
