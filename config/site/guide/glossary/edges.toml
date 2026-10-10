@@ -1,4 +1,4 @@
-# L3 site setting: the Guide glossary, edges: the idea, its state and the builder (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
+# L3 site setting: the Guide glossary, edges: the idea, its status, the builder and paper trading (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
 # each: id, term, short (one sentence), body, see_also. Typed by
 # src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
 
@@ -13,76 +13,96 @@ what cost) and the screens that implement it. The app runs each screen on every 
 using only what was known then, and compares what its picks did next with every other eligible
 name. An edge earns trust only from those numbers, never from the idea alone.
 """
-see_also = ["verdict", "edge_status", "edge_state", "edge_copy", "base_rate", "out_of_sample"]
+see_also = ["verdict", "edge_status", "edge_owner", "edge_copy", "base_rate", "out_of_sample"]
 
 [[term]]
 id = "edge_status"
 term = "Edge status"
-short = "Where an edge stands: candidate, evidenced, live, retired, rejected or blocked."
+short = "Where an edge stands: researching, candidate, evidenced, live or retired; or rejected, blocked."
 body = """
-Candidate: written and being tested; no claim yet. Evidenced: its picks beat the base rate and
-the baselines out of sample, on enough trades. Live: evidenced and used to rank ideas. Retired:
-it stopped working by its own retirement rule. Rejected: checked and dropped, with the reason
-kept so it is not filed again. Blocked: worth testing but missing the data it needs. Only an
-official result over the out-of-sample period can move an edge to evidenced.
+Every edge has one status, on one line of life: researching (the idea is written, nothing is
+claimed), candidate (being tested), evidenced (its picks beat the base rate and the baselines
+out of sample, on enough trades), live (evidenced and used to rank ideas), retired (it stopped
+working by its own retirement rule). Two statuses sit off the line: rejected (checked and
+dropped, with the reason kept so it is not filed again) and blocked (worth testing, but missing
+the data it needs). A site edge's status is the site's, the same for everybody; the status of
+your own edge is yours to move. Only an official result over the out-of-sample period can move a
+site edge to evidenced.
 """
-see_also = ["verdict", "edge", "out_of_sample", "exploratory"]
+see_also = ["verdict", "edge_owner", "edge_state", "out_of_sample", "exploratory"]
+
+[[term]]
+id = "edge_owner"
+term = "Edge owner"
+short = "Whose edge it is: the site's, shared by everybody, or yours."
+body = """
+A site edge is reviewed and shared: its document, its status and its official result are the same
+for every user, and only the site's reviewers change them. Your edge is a document of your own: a
+clone of a site edge or one you wrote from scratch. You set its status, you see its backtests and
+nobody else does, until an admin publishes it site-wide. You cannot change a site edge's status;
+clone it, or follow it.
+"""
+see_also = ["edge_copy", "edge_status", "follow_edge"]
 
 [[term]]
 id = "edge_state"
-term = "Your state about an edge"
-short = "What you have decided about an edge: researching, following, rejected, retired or trial."
+term = "Moving your edge's status"
+short = "You move your own edge along its status line; a site edge's status is not yours to move."
 body = """
-Researching is where every edge starts. Follow an edge when you intend to act on it; you can
-retire it later, or go back to researching. Reject one you have checked and dropped, with the
-reason kept so it is not filed again. Trial is a new version of an edge you follow, tested beside
-the old one before it replaces it. The state is yours: it does not change the site's edge or what
-other users see. The site's own status (candidate, evidenced, live) is separate.
+A clone starts as researching. Make it a candidate when you start testing it, live when you
+intend to act on it, and retire it when it stops working or you stop acting on it. Reject one you
+have checked and dropped: a reason is needed and is kept so it is not filed again. From any status
+you can go back to researching, and a rejected or retired edge can be reopened. A candidate that
+replaces another edge of yours (a new version) retires the old one when it goes live. A move is
+your record, not an order: the app never trades.
 """
-see_also = ["follow_edge", "edge_status", "edge_copy"]
+see_also = ["edge_status", "edge_owner", "forward_test"]
 
 [[term]]
 id = "edge_copy"
-term = "Site edge and your edge"
-short = "A site edge is the shared document; your edge is your own copy of one, or one you wrote."
+term = "Cloning an edge"
+short = "A clone is your own edge that extends another; you change only what you want."
 body = """
-A site edge is reviewed and shared: its official result is the one everybody sees. Clone one
-to make your own copy: it extends the site edge, so you change only what you want (the screens,
-the picks, the holding periods, the universe) and the original stays as it is. Your copy has its
-own backtests. Its out-of-sample result stays hidden until you show it or follow it, so the fair
-test is not used up while you tune. An admin can publish a copy site-wide.
+Clone an edge to make one of your own: it extends the edge it was cloned from (its `extends`),
+so you write down only what differs (the screens, the picks, the holding periods, the universe)
+and everything else follows the original, which stays as it is. Your clone is researching to
+begin with and has its own backtests. Its out-of-sample result stays hidden until you show it or
+make it live, so the fair test is not used up while you tune. An admin can publish a clone
+site-wide.
 """
-see_also = ["edge", "show_out_of_sample", "compare_versions"]
+see_also = ["edge", "edge_owner", "show_out_of_sample", "compare_versions"]
 
 [[term]]
 id = "follow_edge"
 term = "Following an edge"
-short = "Following says you intend to act on the edge; the app warns when the evidence is thin."
+short = "Following is a bookmark of a site edge: it keeps the edge in your list and on paper."
 body = """
-You can follow any edge, but the app warns when its verdict is Not working or Not enough data,
-and the warning stays on the edge as a permanent label (Followed against the verdict). Following
-a copy shows its out-of-sample result. Retire an edge you follow when it stops working or you
-stop acting on it. Following is a record of your decision, not an order: the app never trades.
+Follow a site edge to keep it in your list and have the app record its paper trades for you.
+Following changes nothing about the edge: its status and its official result stay the site's, and
+unfollowing removes the bookmark. The app warns when the verdict is Not working or Not enough
+data, and the warning stays on the bookmark as a permanent label (Followed against the verdict).
+Your own edge is not followed: you set its status instead. A bookmark is a record of your
+interest, not an order: the app never trades.
 """
-see_also = ["edge_state", "verdict", "show_out_of_sample", "edge_labels"]
+see_also = ["edge_owner", "edge_status", "verdict", "edge_labels", "paper_trading"]
 
 [[term]]
 id = "edge_labels"
 term = "Edge labels"
 short = "Permanent warnings the app puts on an edge when a choice weakens its evidence."
 body = """
-Followed against the verdict: you followed it while its verdict was Not working. Out-of-sample
+Followed against the verdict: you followed it, or made your own edge live, while its verdict was Not working. Out-of-sample
 seen while tuning: you looked at a copy's out-of-sample result and kept changing it, so that
 result is no longer a fair test. Replaced without a forward test: a new version replaced the old
 one before enough new sessions had passed. Split moved after viewing: the out-of-sample start
 was moved after the result was seen. Labels are never removed.
 """
-see_also = ["follow_edge", "out_of_sample", "show_out_of_sample"]
+see_also = ["follow_edge", "edge_state", "out_of_sample", "show_out_of_sample"]
 
 [[term]]
 id = "show_out_of_sample"
 term = "Show out-of-sample"
-short = "Reveals a copy's out-of-sample result; once seen it cannot be hidden again."
+short = "Reveals a clone's out-of-sample result; once seen it cannot be hidden again."
 body = """
 The out-of-sample period is the fair test: data the edge was not tuned on. While you are still
 changing a copy the app keeps that result hidden and judges the copy on the in-sample period
@@ -274,3 +294,77 @@ you follow stays listed with only its bookmark read. Correct the file the reason
 admin to. Nothing in your other edges is lost.
 """
 see_also = ["edge_copy", "edge_views", "edge"]
+
+# ---------------------------------------------------------------- paper trading and the live record
+
+[[term]]
+id = "paper_trading"
+term = "Paper trading"
+short = "What an edge of yours would have bought and sold, recorded every night as it happens."
+body = """
+For an edge you follow, or your own candidate or live edge, each night the app takes the picks of its screen, using only what was
+known that night, and records them as paper trades: the name, the session to buy it and the
+session to sell it after the edge's holding period. Nothing is ever ordered. A trade stays open
+until its window has closed and the result is stored, and is then won or lost by the same win
+rule as the backtest. A trade whose result could not be read is skipped with the reason; it is
+never counted as a loss. The record is kept as written: editing the edge later does not change
+the trades already made.
+"""
+see_also = ["live_record", "usual_range", "forward_test", "win_rate"]
+
+[[term]]
+id = "live_record"
+term = "Live record"
+short = "How the closed paper trades of a followed edge have done so far."
+body = """
+The live record counts the closed paper trades, the wins among them and the win rate, and sets
+it against what the backtest led you to expect (the usual range). Open and skipped trades are
+counted apart. With few closed trades the rate swings widely by chance, so the record is
+judged only once the site's minimum number of signal sessions have closed; before that it says it is too early.
+On track means the live win rate is inside the usual range; below or above means it is outside,
+which is worth a look but proves nothing alone.
+"""
+see_also = ["paper_trading", "usual_range", "win_rate"]
+
+[[term]]
+id = "usual_range"
+term = "Usual range"
+short = "The spread of win rates the backtest's own win rate would give over the same number of trades."
+body = """
+If the backtest's win rate really held, the share of wins among a given number of trades would
+still vary from one run of trades to the next, by chance alone. The usual range is the middle
+80% of that variation (the 10th to the 90th percentile of a binomial distribution of wins), so
+it narrows as more sessions close. The picks of one night are bets on the same market over the
+same window and move together, so the range counts signal sessions, not trades: ten picks on one
+night are one observation, not ten. The picture shows the whole spread, the live win rate and
+the two ends of the range. A live rate outside it is unusual if the backtest was right, but
+one in five honest records falls outside by chance.
+"""
+see_also = ["live_record", "win_rate", "paper_trading"]
+
+[[term]]
+id = "forward_test"
+term = "Forward test"
+short = "A new version of an edge tried on live paper trades beside the edge it would replace."
+body = """
+A new version of an edge is a candidate first, tried on paper next to the version it would
+replace: both record the same nights' picks from the day it became a candidate. It can go live
+and retire the old one once the site's number of sessions have passed and its win rate is not behind. Replacing earlier is
+allowed but is recorded on the edge as replaced without a forward test, because the backtest of
+a version you have tuned looks better than it will do going forward.
+"""
+see_also = ["paper_trading", "live_record", "official_result"]
+
+[[term]]
+id = "edge_tonight"
+term = "Tonight's signal"
+short = "What the nightly run did for a followed edge on the session, so an empty buy list says why."
+body = """
+Signalled: the edge was due and its picks are listed as buys. No picks: it was due but its screen
+qualified no name. Not due: its schedule does not fire on this session (an edge held for 20
+sessions signals about once a month). Skipped: it was due but could not be signalled, and the
+reason says why (an input table was missing, the edge is not paper traded yet); it is never an
+empty record. Not run: the nightly has no finished run for the session. Missed counts due
+sessions between nights that nobody signalled, kept so a gap is never silent.
+"""
+see_also = ["paper_trading", "live_record"]

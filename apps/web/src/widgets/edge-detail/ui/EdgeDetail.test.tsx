@@ -30,7 +30,10 @@ vi.mock('@/features/edge-follow', async () => {
 vi.mock('@/features/edge-compare', () => ({ useEdgeCompare: hooks.useEdgeCompare }));
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
+  return {
+    GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text>,
+    termHelp: (id: string) => <Text>{`help ${id}`}</Text>,
+  };
 });
 
 stubElementSize();

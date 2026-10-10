@@ -36,6 +36,11 @@ NOT_ENOUGH: Final = "not_enough_data"
 WAITING: Final = "waiting_on_data"
 ORDER: Final = (WAITING, NOT_ENOUGH, NOT_WORKING, PROMISING, WORKS)  # worst to best
 PASS, FAIL, NOT_MEASURED = "pass", "fail", "not_measured"
+CRITERION_STATUSES: Final = (
+    PASS,
+    FAIL,
+    NOT_MEASURED,
+)  # a criterion's status, each explained in the Guide
 IN_SAMPLE, OUT_OF_SAMPLE, BOTH = "in_sample", "out_of_sample", "both"
 
 

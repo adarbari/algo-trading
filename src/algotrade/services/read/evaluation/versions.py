@@ -271,9 +271,10 @@ def load_compare(ctx: Stores, edge: Edge) -> EdgeCompare | None:
 def load_published_document(ctx: Stores, edge_id: str) -> str | None:
     """The layered document of the edge ``edge_id`` as the user sees it, as TOML (None: they
     see no such edge): ``extends`` resolved (a copy is one whole document), the user's
-    ``[follow]`` and ``extends`` left out. What an admin lands in ``config/site/edges/<id>.toml``
+    ``[follow]``, ``[audit]`` and ``extends`` left out (the status stays the user's: the admin
+    sets the site's). What an admin lands in ``config/site/edges/<id>.toml``
     by pull request: the site's config changes only by PR, so publishing is a read."""
     if load_edge(ctx, edge_id) is None:
         return None
     merged = loading.layered_documents(ctx.configs, ctx.user.user_id)[edge_id]
-    return toml_text({k: v for k, v in merged.items() if k not in ("follow", "extends")})
+    return toml_text({k: v for k, v in merged.items() if k not in ("follow", "audit", "extends")})

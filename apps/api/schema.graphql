@@ -206,7 +206,7 @@ type DecisionCount {
 }
 
 """
-An edge document (ADR 0053): status, thesis, the screeners and baselines that implement it, its `frozenFrom` (null: no frozen period) and the run it cites; the user's own `state` about it (researching, following, rejected, retired, trial) with its `since`, `stateReason`, the permanent `labels` the server decided and `oosRevealed`; `mine`: the document is the user's own (a copy or a new edge), `extends` the edge it is a copy of, `replaces` the edge a trial would replace, `oosHidden` its out-of-sample result is withheld
+An edge document (ADR 0053): status, thesis, the screeners and baselines that implement it, its `frozenFrom` (null: no frozen period) and the run it cites; `status` is the one status (a site edge's the site's, the user's own edge's theirs, with `statusSince` and `statusReason` for a rejection or retirement); `followed` / `followedSince`: the user bookmarked a site edge; the permanent `labels` the server decided and `oosRevealed`; `mine`: the document is the user's own (a copy or a new edge), `extends` the edge it is a copy of, `replaces` the edge a candidate would replace, `oosHidden` its out-of-sample result is withheld; `state`, `since` and `stateReason` are deprecated (the old state words, derived) until the web speaks status
 """
 type Edge {
   id: String!
@@ -225,9 +225,13 @@ type Edge {
   rejectionReason: String!
   sources: [EdgeSource!]!
   definition: EdgeDefinition!
-  state: String!
-  since: Date
-  stateReason: String!
+  followed: Boolean!
+  followedSince: Date
+  statusSince: Date
+  statusReason: String!
+  state: String! @deprecated(reason: "Use status and followed: researching, or following when bookmarked")
+  since: Date @deprecated(reason: "Use followedSince or statusSince")
+  stateReason: String! @deprecated(reason: "Use statusReason")
   labels: [String!]!
   oosRevealed: Boolean!
   oosHidden: Boolean!

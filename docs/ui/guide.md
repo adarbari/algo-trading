@@ -190,6 +190,16 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
 - **Coverage**: fitness tests that every Guide reference in the web code and in config resolves,
   that every site preset has a playbook, every regime card and episode a page, and (existing)
   every phrased or site-screened field a field-guide entry.
+- **New functionality** (owner 2026-10-10): `tests/architecture/guide/test_guide_coverage.py`
+  over the declared mapping `architecture/guide_coverage.toml`: (1) every GraphQL `enum`, and
+  every `String` field named like a status, state, kind, label, trigger or verdict, maps each
+  value to its own Guide entry (`values_from` the Python tuple listing them) or is exempt with a
+  reason; a new enum, field or value fails until declared; (2) every workspace section in
+  `src/app/workspaces/workspaces.ts` has a Start here page, and every top-level route belongs to
+  a section or a declared non-section; (3) every titled container (each design-system component
+  with `title` and `actions`) passes its help button in `actions`; (4) every `{ kind, id }` the
+  web names (`GuideHelp`, the exported term helper, the Edge Builder's `help`) resolves. The
+  gaps of 2026-10-10 are shrink-only baselines in the same file.
 - **Sources**: Guide-only sources live under `config/site/guide/`: `sections.toml` (the
   section order, the theme groups, the playbook families), one
   `config/site/guide/playbooks/<family>/<id>.toml` per site preset (the playbook prose above, GD4),
@@ -204,6 +214,9 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   words from `widgets/regime-legend` and `features/indicator-history`.
   Field, situation and regime entries stay where they are (`config/site/field_guide/`,
   `config/site/regime/`).
+- **Quality bar**: `docs/ui/guide-quality.md` (research note 2026-10-10: what customers of
+  trading sites praise and what Stripe does; the writing checklist, the proposed style tests,
+  the review questions).
 - **Process**: `.claude/skills/add-guide-content` (where each kind lives, its owner, how to put
   the button on a page); CLAUDE.md names it in the workflow table.
 
@@ -252,7 +265,8 @@ How an entry is written, so the Guide reads like the best product docs (research
 [Markdoc post](https://stripe.dev/blog/markdoc), Slab on
 [Stripe's writing culture](https://slab.com/blog/stripe-writing-culture), the
 [Linear docs](https://linear.app/docs), the
-[Twilio glossary](https://www.twilio.com/docs/glossary)). The principles are ours, in our words.
+[Twilio glossary](https://www.twilio.com/docs/glossary)). The principles are ours, in our words. They are the why behind the checklist in
+`docs/ui/guide-quality.md` section 3 (the what to check), which this section does not repeat.
 
 1. **One kind per entry, by what the reader came to do.** A task or reading order is a Start
    here page (verb title); a concept is a term; a measured value is a field. Never one entry

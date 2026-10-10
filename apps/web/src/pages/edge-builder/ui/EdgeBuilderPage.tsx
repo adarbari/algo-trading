@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { errorDetail } from '@/shared/api';
 import { EdgeBuilder, HelpProvider } from '@/features/edge-builder';
 import { evaluationMessage, useRunEvaluation } from '@/features/edge-evaluation';
-import { GuideHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
 export interface EdgeBuilderPageProps {
   /** The edge to build or change; null: a new one. */
@@ -21,13 +21,11 @@ export interface EdgeBuilderPageProps {
   onOpenEdge: (id: string) => void;
 }
 
-const help = (term: string) => <GuideHelp entry={{ kind: 'term', id: term }} />;
-
 export function EdgeBuilderPage({ id, onOpenScreen, onCancel, onOpenEdge }: EdgeBuilderPageProps) {
   const [running, setRunning] = useState<string | null>(null);
   if (running !== null) return <Running edgeId={running} onOpenEdge={onOpenEdge} />;
   return (
-    <HelpProvider value={help}>
+    <HelpProvider value={termHelp}>
       <EdgeBuilder
         id={id}
         onCancel={onCancel}
@@ -61,7 +59,7 @@ function Running({ edgeId, onOpenEdge }: { edgeId: string; onOpenEdge: (id: stri
           {runner.running ? 'Backtest running' : 'Backtest finished'}
         </StatusBadge>
       </Stack>
-      <Panel title="Backtest" actions={help('edge_builder_running')}>
+      <Panel title="Backtest" actions={termHelp('edge_builder_running')}>
         <Stack gap={2}>
           {runner.error && (
             <Banner tone="negative" title="The backtest did not start">

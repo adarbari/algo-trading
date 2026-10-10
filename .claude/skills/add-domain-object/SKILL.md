@@ -99,7 +99,9 @@ if the grain has one. Run `.venv/bin/python -m pytest tests/unit/services/read -
 
 Follow `.claude/skills/add-graphql-field` step 4: `apps/api/algotrade_api/graphql/types/<area>/<object>.py`
 with `@strawberry.type`, fields copied from the dataclass, one `of()` classmethod, resolvers that
-call one loader. Then the snapshot (`.venv/bin/python scripts/export_graphql_schema.py`) and
+call one loader. A status / state / kind / label / verdict the object carries (an enum or a
+string from a fixed tuple) gets its Guide entries in `architecture/guide_coverage.toml`
+(`add-graphql-field`, "Guide entry"). Then the snapshot (`.venv/bin/python scripts/export_graphql_schema.py`) and
 `make changed`, then push: CI is the full gate.
 
 ## Worked example: Holdings (an ETF's top holdings)

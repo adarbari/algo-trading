@@ -2,12 +2,14 @@
 fails closed with the file and the key; rejected and blocked documents need their reason and
 may leave the quality bar unanswered."""
 
+from dataclasses import fields
 from datetime import date
 from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import QUALITY_BAR, Edge, parse_edge
+from algotrade.config.edges.document import QUALITY_BAR, STATUSES, Edge, parse_edge
+from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from tests.unit.services.evaluation.cross_section.conftest import edge
@@ -393,3 +395,15 @@ def test_the_numbers_a_promotion_rests_on_are_parsed_and_checked() -> None:
     with pytest.raises(ConfigurationError, match="decile_sessions"):
         bad = {k: v for k, v in row.items() if k != "decile_sessions"}
         edge(screeners=["momo", "mod"], implementation={"promoted": "mod", "compared": [bad]})
+
+
+def test_edge_lifecycle_has_one_vocabulary() -> None:
+    """An edge has one status (ADR 0053 amendment 2026-10-10); following is a bookmark, not a
+    second lifecycle: no lifecycle word is spoken by two vocabularies."""
+    assert {f.name for f in fields(Follow)} == {"since", "labels"}
+    assert STATUSES == (
+        "researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked",
+    )  # fmt: skip
+    assert set(BOOKMARK_LABELS) <= set(AUDIT_LABELS)
+    assert not set(STATUSES) & set(AUDIT_LABELS)
+    assert not {"following", "trial", "followed"} & set(STATUSES)

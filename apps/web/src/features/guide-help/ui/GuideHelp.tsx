@@ -43,3 +43,11 @@ export function GuideHelp({ entry, onUse, useDisabled = false }: GuideHelpProps)
       return <StartHelp id={entry.id} />;
   }
 }
+
+/**
+ * The one helper that renders a glossary term's help button beside what it explains:
+ * `termHelp('win_rate')`. Every file that needs one calls this instead of building its own
+ * (ADR 0051; tests/architecture/guide/ recognises exactly this name). It lives here, not in
+ * its own module, so it rides in GuideHelp's chunk instead of a shared chunk per page.
+ */
+export const termHelp = (id: string) => <GuideHelp entry={{ kind: 'term', id }} />;

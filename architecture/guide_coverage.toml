@@ -1,0 +1,311 @@
+# What a reader meets in the app is explained in the Guide (ADR 0051; docs/ui/guide.md;
+# `.claude/skills/add-guide-content`). This file declares how each user-facing enum value,
+# section, titled container and Guide reference is covered; the fitness test
+# tests/architecture/guide/test_guide_coverage.py reads it (and apps/api/schema.graphql, the
+# web code and the shipped Guide entries) and fails when something new is not covered.
+#
+# A Guide reference is `<kind>:<id>` of an entry in `guide_entries` (term, start, indicator,
+# episode, playbook, situation, field). The checks:
+#
+#   [[enum]]   every GraphQL enum and every String field named like a status / state / kind /
+#              trigger / label / verdict (`source = "graphql:Enum"` or `"graphql:Type.field"`)
+#              is either
+#                values = { VALUE = "term:id", ... }   each value mapped to the entry that
+#                  explains it (equal to the enum's values, or, for a String field,
+#                  to `values_from = "python:<module>:<NAME>"`, a tuple / set of str or an Enum);
+#                  a term shared by several values names each one (its words, or the
+#                  label the app shows from `names = { VALUE = "words" }`), as Stripe's
+#                  lifecycle tables do; or
+#                exempt = "<reason>"   free text, a Guide-internal kind, admin-only, covered
+#                  elsewhere. Never map a value to a generic term only to pass.
+#   [[section]] every section of apps/web/src/app/workspaces/workspaces.ts maps to its Start
+#              here page (`start = "start:<id>"`) or is `exempt` with a reason; a top-level
+#              route that is no section is listed under `non_sections`.
+#   [panels]   `tags` = every design-system component with a `title` and an `actions` prop
+#              (kept equal by the test); each titled one in apps/web/src carries a help button
+#              (`actions={termHelp('<term>')}` or a GuideHelp).
+#   [[dynamic_ref]] a help id built in a template literal, with the ids it can take.
+#
+# [baseline] is today's gap, a shrink-only ratchet: a new item that is not covered fails
+# (write the Guide entry and map it; never add to the baseline); an item that becomes covered
+# fails until its line is removed. `enums` are sources, `sections` are paths, `panels` are the
+# uncovered titled containers per file.
+
+non_sections = []
+
+[panels]
+tags = ["Banner", "Panel", "StatusStrip"]
+
+# ------------------------------------------------------------------ enums and status fields
+
+[[enum]]
+source = "graphql:RegimeLabel"
+values = { CALM = "term:regime", CAUTION = "term:regime", STRESS = "term:regime", CRISIS = "term:regime", UNKNOWN = "term:regime" }
+
+[[enum]]
+source = "graphql:NewerState"
+values = { IN_PROGRESS = "term:last_complete_session", FAILED_RETRYING = "term:last_complete_session" }
+
+[[enum]]
+source = "graphql:UnavailableKind"
+exempt = "covered by GUIDE_TERMS (one glossary term per kind), kept complete by tests/unit/services/read/availability/test_cause.py"
+
+[[enum]]
+source = "graphql:UnknownCode"
+exempt = "the stored code behind UnavailableKind; a reader sees the public kind and its term (ADR 0056), the code is for admins and clients"
+
+[[enum]]
+source = "graphql:CauseLevel"
+exempt = "admin-only cause chain (ADR 0056), shown to admins as a table, not a concept"
+
+[[enum]]
+source = "graphql:GuideEntryKind"
+exempt = "Guide-internal: the kinds of the Guide's own entries"
+
+[[enum]]
+source = "graphql:FeatureFormat"
+exempt = "a display hint for the column (percent, date, ...), never shown as a word"
+
+[[enum]]
+source = "graphql:Edge.status"
+values_from = "python:algotrade.config.edges.document:STATUSES"
+values = { researching = "term:edge_status", candidate = "term:edge_status", evidenced = "term:edge_status", live = "term:edge_status", retired = "term:edge_status", rejected = "term:edge_status", blocked = "term:edge_status" }
+
+[[enum]]
+source = "graphql:Edge.state"
+values_from = "python:algotrade.config.edges.follow:LEGACY"
+values = { researching = "term:edge_state", following = "term:follow_edge", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:forward_test" }
+
+[[enum]]
+source = "graphql:FollowedEdge.state"
+values_from = "python:algotrade.config.edges.follow:LEGACY"
+values = { researching = "term:edge_state", following = "term:follow_edge", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:forward_test" }
+
+[[enum]]
+source = "graphql:Edge.labels"
+values_from = "python:algotrade.config.edges.follow:AUDIT_LABELS"
+values = { followed_against_verdict = "term:edge_labels", oos_viewed_during_tuning = "term:edge_labels", replaced_without_forward_test = "term:edge_labels", split_moved_after_viewing = "term:edge_labels" }
+names = { oos_viewed_during_tuning = "out-of-sample seen while tuning" }  # the label as the app shows it
+
+[[enum]]
+source = "graphql:CauseLink.status"
+exempt = "admin-only cause chain (ADR 0056): the state recorded for a step, table or feature"
+
+[[enum]]
+source = "graphql:GuideLink.kind"
+exempt = "Guide-internal: the kind of the entry a link names"
+
+[[enum]]
+source = "graphql:GuideSearchGroup.kind"
+exempt = "Guide-internal: the kind a search result group holds"
+
+[[enum]]
+source = "graphql:GuideSearchHit.kind"
+exempt = "Guide-internal: the kind of the entry a search hit opens"
+
+[[enum]]
+source = "graphql:Unavailable.kindText"
+exempt = "the public UnavailableKind in generic words; covered with it (GUIDE_TERMS)"
+
+[[enum]]
+source = "graphql:Unknown.kindText"
+exempt = "the public UnavailableKind in generic words; covered with it (GUIDE_TERMS)"
+
+[[enum]]
+source = "graphql:RegimeIndicator.verdictFeature"
+exempt = "a catalogue field name; the field's own help explains it"
+
+[[enum]]
+source = "graphql:EdgeVerdict.verdict"
+values_from = "python:algotrade.services.read.evaluation.verdict:ORDER"
+values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data" }
+
+[[enum]]
+source = "graphql:VerdictCriterion.status"
+values_from = "python:algotrade.services.read.evaluation.verdict:CRITERION_STATUSES"
+values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_measured = "term:verdict_criteria" }
+names = { not_measured = "not measured" }
+
+[[enum]]
+source = "graphql:Edge.statusReason"
+exempt = "free text the user wrote (the reason for a rejection or retirement)"
+
+[[enum]]
+source = "graphql:Edge.stateReason"
+exempt = "free text the user wrote"
+
+[[enum]]
+source = "graphql:AheadEvent.label"
+exempt = "free text: a short label for the event, composed from its data"
+
+[[enum]]
+source = "graphql:CompareRow.label"
+exempt = "free text: the name of the compared row"
+
+[[enum]]
+source = "graphql:Filing.label"
+exempt = "free text: the filing's title as filed"
+
+[[enum]]
+source = "graphql:VerdictCriterion.label"
+exempt = "free text: the criterion's name, explained in the verdict's own term"
+
+[[enum]]
+source = "graphql:GuideEpisodeIndicator.label"
+exempt = "free text: the indicator's name, taken from its Guide entry"
+
+[[enum]]
+source = "graphql:GuideIndicatorBefore.label"
+exempt = "free text: the indicator's name, taken from its Guide entry"
+
+[[enum]]
+source = "graphql:IndicatorSource.label"
+exempt = "free text: the data source's name"
+
+[[enum]]
+source = "graphql:MarketRegime.plainLabel"
+exempt = "free text: the regime label in plain words, the Guide's regime term explains it"
+
+[[enum]]
+source = "graphql:TrackRecord.runLabel"
+exempt = "free text: the run's name"
+
+# ------------------------------------------------------------------ sections
+
+[[section]]
+path = "/ideas"
+start = "start:read_a_result"
+
+[[section]]
+path = "/screeners"
+start = "start:build_a_screen"
+
+[[section]]
+path = "/edges"
+start = "start:read_an_edge_page"
+
+[[section]]
+path = "/regime"
+start = "start:read_the_regime_page"
+
+[[section]]
+path = "/backtests"
+exempt = "placeholder page, not built yet"
+
+[[section]]
+path = "/admin/screener-runs"
+exempt = "placeholder page, not built yet"
+
+[[section]]
+path = "/admin/users"
+exempt = "placeholder page, not built yet"
+
+# ------------------------------------------------------------------ dynamic references
+
+[[dynamic_ref]]
+file = "src/features/edge-builder/ui/EdgeBuilder.tsx"
+template = "edge_builder_${step}"
+kind = "term"
+ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_builder_trade", "edge_builder_compare", "edge_builder_test"]
+
+# ------------------------------------------------------------------ baselines (shrink only)
+
+[baseline]
+# The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
+max_enums = 34
+max_sections = 5
+max_panels = 71
+enums = [
+  "graphql:Adjustment",
+  "graphql:AheadEvent.kind",
+  "graphql:Backtest.status",
+  "graphql:CompareRow.kind",
+  "graphql:Config.kind",
+  "graphql:EdgeRow.sliceKind",
+  "graphql:EdgeRun.status",
+  "graphql:EdgeSettings.kind",
+  "graphql:Episode.kind",
+  "graphql:Event.kind",
+  "graphql:FailureGroup.statuses",
+  "graphql:FeatureInfo.kind",
+  "graphql:FundReference.kind",
+  "graphql:FundReference.status",
+  "graphql:HarnessRun.status",
+  "graphql:IndicatorSource.vintageKind",
+  "graphql:IndicatorStatus",
+  "graphql:IngestionCell.status",
+  "graphql:LiveRecord.state",
+  "graphql:NightlyRun.status",
+  "graphql:NullReason",
+  "graphql:OptionChain.status",
+  "graphql:PaperTrade.status",
+  "graphql:QualityCheck.status",
+  "graphql:QualityReport.status",
+  "graphql:RiskDirection",
+  "graphql:RunDetail.status",
+  "graphql:RunItem.status",
+  "graphql:RunStep.status",
+  "graphql:ScreenListing.status",
+  "graphql:ScreenerRun.status",
+  "graphql:SignalKind",
+  "graphql:SignalState",
+  "graphql:UsageCap.kind",
+]
+sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/calendar", "/explore"]
+
+[baseline.panels]
+"src/entities/llm-usage/ui/UsagePanel.tsx" = 1
+"src/features/edge-builder/ui/EdgeBuilder.tsx" = 1
+"src/features/edge-builder/ui/TradeStep.tsx" = 1
+"src/features/edge-follow/ui/MoveEdgeDialog.tsx" = 1
+"src/features/formula-feature/ui/FormulaFeatureDialog.tsx" = 1
+"src/features/screener-describe/ui/DescribeForm.tsx" = 1
+"src/features/screener-finalise/ui/RebaseBanner.tsx" = 1
+"src/pages/edge-builder/ui/EdgeBuilderPage.tsx" = 1
+"src/pages/screener-builder/ui/NewScreenerPage.tsx" = 1
+"src/widgets/compare-panel/ui/ComparePanel.tsx" = 1
+"src/widgets/completeness-panel/ui/CompletenessPanel.tsx" = 1
+"src/widgets/criteria-table/ui/CriteriaTable.tsx" = 2
+"src/widgets/describe-screen/ui/DescribeScreen.tsx" = 1
+"src/widgets/draft-bar/ui/DraftBar.tsx" = 2
+"src/widgets/drilldown-panel/ui/DrilldownPanel.tsx" = 1
+"src/widgets/edge-detail/ui/EdgeDetail.tsx" = 5
+"src/widgets/edge-signals/ui/EdgeSignals.tsx" = 2
+"src/widgets/event-calendar-panel/ui/EventCalendarPanel.tsx" = 3
+"src/widgets/event-study-panel/ui/EventStudyPanel.tsx" = 3
+"src/widgets/events-panel/ui/EventsPanel.tsx" = 1
+"src/widgets/feature-table/ui/TableFrame.tsx" = 2
+"src/widgets/features-panel/ui/FeatureDistribution.tsx" = 1
+"src/widgets/features-panel/ui/FeaturesPanel.tsx" = 1
+"src/widgets/guide-field/ui/CaveatsPanel.tsx" = 1
+"src/widgets/guide-field/ui/ComputedPanel.tsx" = 1
+"src/widgets/guide-field/ui/CriteriaPanel.tsx" = 1
+"src/widgets/guide-field/ui/RelatedPanel.tsx" = 1
+"src/widgets/guide-field/ui/SeriesPanel.tsx" = 1
+"src/widgets/guide-field/ui/UniversePanel.tsx" = 1
+"src/widgets/guide-playbook/ui/GuidePlaybook.tsx" = 1
+"src/widgets/harness-run-detail/ui/HarnessRunDetail.tsx" = 1
+"src/widgets/harness-run-list/ui/HarnessRunList.tsx" = 1
+"src/widgets/holdings-panel/ui/HoldingsPanel.tsx" = 1
+"src/widgets/options-panel/ui/OptionsPanel.tsx" = 2
+"src/widgets/overview-panel/ui/OverviewPanel.tsx" = 1
+"src/widgets/pick-detail/ui/PickDetail.tsx" = 1
+"src/widgets/preview-diff/ui/PreviewDiff.tsx" = 1
+"src/widgets/price-chart-panel/ui/PriceChartPanel.tsx" = 1
+"src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx" = 1
+"src/widgets/recent-runs-panel/ui/RecentRunsPanel.tsx" = 1
+"src/widgets/regime-cycles/ui/RegimeCycles.tsx" = 2
+"src/widgets/regime-episodes/ui/RegimeEpisodes.tsx" = 1
+"src/widgets/regime-header/ui/RegimeHeader.tsx" = 1
+"src/widgets/regime-indicators/ui/RegimeIndicators.tsx" = 2
+"src/widgets/regime-legend/ui/RegimeLegend.tsx" = 1
+"src/widgets/regime-sizing/ui/RegimeSizing.tsx" = 1
+"src/widgets/review-items-panel/ui/ReviewItemsPanel.tsx" = 1
+"src/widgets/screen-funnel/ui/ScreenFunnel.tsx" = 1
+"src/widgets/screen-summary/ui/ScreenSummary.tsx" = 2
+"src/widgets/screener-hits-panel/ui/ScreenerHitsPanel.tsx" = 1
+"src/widgets/screener-hits-panel/ui/WhyIdeaPanel.tsx" = 1
+"src/widgets/screener-list/ui/ScreenerList.tsx" = 1
+"src/widgets/top-ideas/ui/TopIdeas.tsx" = 1
+"src/widgets/usage-budget-panel/ui/UsageBudgetPanel.tsx" = 1
+"src/widgets/verification-panel/ui/VerificationPanel.tsx" = 1

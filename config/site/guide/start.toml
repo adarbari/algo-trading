@@ -340,7 +340,7 @@ end stayed unknown.
 id = "read_an_edge_page"
 order = 7
 title = "Read an edge page"
-summary = "Walk down an edge page, from the verdict to the actions, with one real example: why a win rate 8 points above the base rate on 3 trades is noise."
+summary = "Walk down an edge page, from the verdict to its definition, with one real example: why a win rate 8 points above the base rate on 3 trades is noise."
 links = [
   { kind = "term", id = "verdict" },
   { kind = "term", id = "verdict_criteria" },
@@ -353,6 +353,7 @@ links = [
   { kind = "term", id = "robustness" },
   { kind = "term", id = "sharpe_ratio" },
   { kind = "term", id = "deflated_sharpe" },
+  { kind = "term", id = "run_backtest" },
   { kind = "start", id = "edge_life" },
 ]
 
@@ -432,17 +433,8 @@ Read the example as a chain. A lift of +8 points on 3 trades is noise. The in-sa
 about zero. The deciles are flat and their t is negative, so the ranking carries no information.
 The deflated Sharpe of 0.00 says the Sharpe of 1.74 is what the best of 126 tries shows by luck.
 It beats 91% of random backtests, not 95%. Together they say the evidence is too thin to trust.
-More out-of-sample sessions settle it, not a different date.
-"""
-
-[[page.section]]
-title = "The actions"
-body = """
-Run backtest tests the edge now under your own split, and admins also see Run as site. Clone makes
-your own edge from this one, and Follow keeps a site edge in your list. Edit and the status moves
-appear on your own edges. An edge you run on a date of your own is exploratory and never changes
-the verdict. Don't change an edge and rerun until the numbers look good: that is how a lucky
-result is made.
+More out-of-sample sessions settle it, not a different date. Don't change an edge and
+rerun it until the numbers look good: that is how a lucky result is made.
 """
 
 # --------------------------------------------------------------------------------------- 8
@@ -469,7 +461,9 @@ Every edge has one status on one line: researching, candidate, evidenced, live, 
 Rejected and blocked sit off the line. A site edge's status is the site's, the same for everyone.
 The status of your own edge is yours to move. The verdict is different: the app computes it from
 the official result by a fixed rule. A status is a decision and a verdict is a measurement, so
-they can disagree, and the page shows both.
+they can disagree, and the page shows both. On your own edge every move can be undone; labels
+such as Followed against the verdict cannot, so a hasty choice stays on the record. Don't move an
+edge to live to see what happens: the move is your record of a decision.
 """
 
 [[page.section]]
@@ -522,28 +516,11 @@ retires the old one when it goes live. Paper trades show how it does going forwa
 """
 
 [[page.section]]
-title = "Retired"
+title = "Retired, rejected, blocked"
 body = """
-A retired edge stopped working by its own retirement rule, or you stopped acting on it. It keeps
-its record, so you can still read why. Reopening it sends it back to researching. Retiring is the way to stop acting on an edge without deleting what
-you learned.
-"""
-
-[[page.section]]
-title = "Rejected and blocked"
-body = """
-Rejected means checked and dropped. The reason is kept, so the same idea is not filed again, and
-the Rejected view lists these edges. Reopening a rejected edge sends it back to researching.
-Blocked means worth testing but missing the data it needs; only the site sets it and clears it. Neither is a verdict: Waiting on data describes a result, blocked
-describes the edge.
-"""
-
-[[page.section]]
-title = "What you can undo"
-body = """
-On your own edge every move can be undone by going back to researching, and a rejected or retired
-edge can be reopened. Labels cannot be undone: Followed against the verdict and the others stay on
-the edge for good, so the record of a hasty choice is not erased. A site edge's status changes only
-by a reviewed change to the site's files. Don't move an edge to live to see what happens: the move
-is your record of a decision.
+Retired: the edge stopped working by its own retirement rule, or you stopped acting on it; it
+keeps its record, so you can still read why. Rejected: checked and dropped, with the reason kept
+so the same idea is not filed again; the Rejected view lists these edges. Reopening either sends
+your own edge back to researching. Blocked: worth testing but missing the data it needs; only
+the site sets and clears it. Blocked describes the edge, while Waiting on data describes a result.
 """

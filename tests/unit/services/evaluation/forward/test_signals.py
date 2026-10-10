@@ -7,8 +7,14 @@ from datetime import date
 from algotrade.config.edges.loading import load_edges
 from algotrade.core.time.calendar import next_session
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
-from algotrade.services.evaluation.forward.signals import edge_signals, legs_between, paper_traded
-from tests.unit.services.evaluation.cross_section.conftest import DAYS, build_world
+from algotrade.services.evaluation.forward.signals import (
+    edge_signals,
+    legs_between,
+    paper_since,
+    paper_traded,
+)
+from algotrade.storage.configs.files import MemoryConfigStore
+from tests.unit.services.evaluation.cross_section.conftest import DAYS, build_world, edge_document
 from tests.unit.services.evaluation.cross_section.test_harness import (
     EVENTS,
     OTM_OUTCOME,
@@ -48,16 +54,59 @@ def test_the_schedule_spaces_signals_a_horizon_apart_from_since(following: Desk)
 
 
 def test_a_session_before_the_state_began_does_not_signal() -> None:
-    d = desk(follow={"state": "following", "since": DAYS[3].isoformat()})
+    d = desk(audit={"status_since": DAYS[3].isoformat()})
     assert signals(d, DAYS[2]).signals == ()
     assert len(signals(d, DAYS[3]).signals) == 5
 
 
-def test_only_following_and_trial_edges_are_paper_traded() -> None:
-    for state, expected in (("following", True), ("trial", True), ("retired", False)):
-        d = desk(follow={"state": state, "since": DAYS[0].isoformat()})
+def test_only_candidate_and_live_own_edges_and_followed_site_edges_are_paper_traded() -> None:
+    for status, expected in (("live", True), ("candidate", True), ("retired", False),
+                             ("researching", False), ("rejected", False)):  # fmt: skip
+        d = desk(status=status)
         (edge,) = load_edges(d.configs, "u1")
         assert paper_traded(edge) is expected
+        assert paper_since(edge) == DAYS[0]  # from the status's session
+
+
+def test_a_followed_site_edge_is_paper_traded_from_the_bookmarks_session() -> None:
+    world = build_world()
+    site = edge_document(status="evidenced")
+    site["evidence"] = {"run_id": "r1", "split_from": "2026-01-02"}
+    docs = {
+        **world.configs._docs,
+        ("site", "edges", "drift"): site,
+        ("u1", "edges", "drift"): {"follow": {"since": DAYS[1].isoformat()}},
+    }
+    (edge,) = load_edges(MemoryConfigStore(docs), "u1")
+    assert (paper_traded(edge), paper_since(edge)) == (True, DAYS[1])
+    (unfollowed,) = load_edges(MemoryConfigStore({**docs, ("u1", "edges", "drift"): {}}), "u1")
+    assert not paper_traded(unfollowed)
+
+
+def test_an_old_researching_or_trial_file_of_a_site_edge_is_unfollowed_and_does_not_trade() -> None:
+    site = edge_document(status="evidenced")
+    site["evidence"] = {"run_id": "r1", "split_from": "2026-01-02"}
+    for state in ("researching", "trial", "retired"):
+        old = {"follow": {"state": state, "since": DAYS[0].isoformat()}}
+        docs = {**build_world().configs._docs, ("site", "edges", "drift"): site}
+        (edge,) = load_edges(MemoryConfigStore({**docs, ("u1", "edges", "drift"): old}), "u1")
+        assert not paper_traded(edge)
+
+
+def test_an_edge_still_in_the_old_follow_shape_trades_as_before_the_migration() -> None:
+    """trial -> candidate and following -> live: the same edges trade, from the same session."""
+    for state in ("following", "trial"):
+        d = desk()
+        docs = dict(d.configs._docs)
+        doc = {
+            k: v for k, v in docs[("u1", "edges", "drift")].items() if k not in ("audit", "status")
+        }
+        docs[("u1", "edges", "drift")] = {
+            **doc,
+            "follow": {"state": state, "since": DAYS[0].isoformat()},
+        }
+        (edge,) = load_edges(MemoryConfigStore(docs), "u1")
+        assert (paper_traded(edge), paper_since(edge)) == (True, DAYS[0])
 
 
 def test_picks_read_nothing_after_the_signal_session(following: Desk) -> None:
@@ -84,7 +133,7 @@ def test_an_event_schedule_signals_the_event_names_at_the_session_they_fire() ->
 
 def test_an_event_schedule_does_not_signal_before_the_state_began() -> None:
     w = event_world({DAYS[0]: [10], DAYS[1]: [12]})
-    d = desk(w, follow={"state": "following", "since": DAYS[1].isoformat()}, **event_changes(2))
+    d = desk(w, audit={"status_since": DAYS[1].isoformat()}, **event_changes(2))
     assert signals(d, DAYS[0]).signals == ()
     assert [s.instrument_id for s in signals(d, DAYS[1]).signals] == ["EQ:N12"]
 

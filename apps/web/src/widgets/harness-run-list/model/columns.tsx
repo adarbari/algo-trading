@@ -6,9 +6,7 @@
 import { Mono, StatusBadge, type DataTableColumn } from '@algotrade/ui';
 
 import { rangeText, stamp, statusTone, type HarnessRun } from '@/entities/harness-run';
-import { GuideHelp } from '@/features/guide-help';
-
-const term = (id: string) => <GuideHelp entry={{ kind: 'term', id }} />;
+import { termHelp } from '@/features/guide-help';
 const COUNT = { kind: 'number' } as const;
 
 export function runColumns(): DataTableColumn<HarnessRun>[] {
@@ -61,7 +59,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'split',
       header: 'Split from',
-      headerAction: term('out_of_sample'),
+      headerAction: termHelp('out_of_sample'),
       value: (r) => r.splitFrom ?? null,
       cell: ({ row }) => (
         <>
@@ -82,7 +80,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'unclosed',
       header: 'Unclosed',
-      headerAction: term('harness_exclusions'),
+      headerAction: termHelp('harness_exclusions'),
       value: (r) => r.unclosed ?? null,
       format: COUNT,
       align: 'end',
@@ -90,7 +88,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'coverage',
       header: 'Coverage',
-      headerAction: term('harness_exclusions'),
+      headerAction: termHelp('harness_exclusions'),
       value: (r) => r.excludedCoverage ?? null,
       format: COUNT,
       align: 'end',
@@ -98,7 +96,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'score',
       header: 'Score coverage',
-      headerAction: term('harness_exclusions'),
+      headerAction: termHelp('harness_exclusions'),
       value: (r) => r.scoreCoverage ?? null,
       format: { kind: 'percent', digits: 0 },
       align: 'end',
@@ -106,7 +104,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'noEntry',
       header: 'No entry bar',
-      headerAction: term('harness_exclusions'),
+      headerAction: termHelp('harness_exclusions'),
       value: (r) => r.noEntryBar ?? null,
       format: COUNT,
       align: 'end',
@@ -114,7 +112,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'trials',
       header: 'Variants tried',
-      headerAction: term('variants_tried'),
+      headerAction: termHelp('variants_tried'),
       value: (r) => r.trials ?? null,
       format: COUNT,
       align: 'end',
@@ -122,7 +120,7 @@ export function runColumns(): DataTableColumn<HarnessRun>[] {
     {
       id: 'knowledge',
       header: 'Knowledge ts',
-      headerAction: term('knowledge_time'),
+      headerAction: termHelp('knowledge_time'),
       value: (r) => r.knowledgeTs,
       cell: ({ row }) => <Mono size="sm">{stamp(row.knowledgeTs)}</Mono>,
     },

@@ -26,6 +26,7 @@
 - [ ] No HTML elements, `className` / `style`, CSS, colours or px outside `design-system/`; only `src/shared/api` talks HTTP
 - [ ] New / changed design-system component: stories (Default, Loading, Empty, Error, Dense), test with axe, screenshots updated (`npm run visual:update`) and reviewed; `COMPONENTS.md` regenerated
 - [ ] API changes: `npm run api:generate` run and the generated schema committed
+- [ ] Guide (ADR 0051): every new user-visible word (enum value, status, verdict, control), section and titled panel has its Guide entry, declared in `architecture/guide_coverage.toml` (each value its own entry, not one generic term); baselines only shrink
 - [ ] `make web-check` passes
 
 ## Checklist
