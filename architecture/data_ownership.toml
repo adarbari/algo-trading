@@ -138,6 +138,14 @@ section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-
 detect = [{ call = "raw.put" }]
 
 [[responsibility]]
+id = "partition-stamps"
+description = "The commit-sequence stamp of each committed partition in a range (TableStore.partition_seq: the highest sequence of any run in its index, 0 for a direct write, pending ignored) and the per-day log of the reads a computation made (RecordingReader, with the sequence at its first read): what lets a reader tell the partitions it read have not changed (ADR 0063)"
+owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/readers.py"]
+allowed = ["src/algotrade/storage/tables/interfaces.py"]  # declares partition_seq on TableStore
+section = "docs/adr/0022-atomic-run-publication.md#decision"
+detect = [{ call = "partition_seq" }, { call = "RecordingReader" }]
+
+[[responsibility]]
 id = "run-publish"
 description = "Atomic publication of a run's table writes (ADR 0022): pending writes, one commit for every table at once (or abort), commit sequence for readers, crash recovery; driven by IngestRun for ingestion and ResultWriter.publishing for services"
 owner = [

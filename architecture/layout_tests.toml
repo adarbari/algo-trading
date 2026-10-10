@@ -44,7 +44,7 @@ purpose = "fitness tests for the API surface and the read model"
 
 [[test_dir]]
 path = "tests/architecture/data"
-purpose = "fitness tests over the data layer's boundaries: which modules may import a quarantined reader (algotrade.data.outcomes, ADR 0053)"
+purpose = "fitness tests over the data layer's boundaries: which modules may import a quarantined reader (algotrade.data.outcomes, ADR 0053); that production table writes are pending (partition stamps, ADR 0063)"
 
 [[test_dir]]
 path = "tests/architecture/guide"

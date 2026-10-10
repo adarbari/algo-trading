@@ -66,6 +66,7 @@ from algotrade.storage.backends.local_index import (
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
+    max_seq,
     merge_rows,
     pinned_read,
     run_mode,
@@ -291,6 +292,15 @@ class LocalTables:
                 if p.name.startswith("date=") and (p / INDEX).exists()
             }
         return sorted(found)
+
+    def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
+        base = self.root / table
+        out: dict[date, int] = {}
+        for day in sorted(base.glob("date=*")) if base.exists() else []:
+            when = date.fromisoformat(day.name.removeprefix("date="))
+            if start <= when <= end and (day / INDEX).exists():
+                out[when] = max_seq(read_index(day))
+        return out
 
     def names(self, own_run: str | None = None) -> list[str]:
         found = {t for t, _ in self._own_partitions(own_run)}

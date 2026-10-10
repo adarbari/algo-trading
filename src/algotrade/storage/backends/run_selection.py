@@ -95,6 +95,19 @@ def committed(
     return RunEntry(knowledge_ts, restates, visible, seq, ref, old)
 
 
+def max_seq(entries: Mapping[str, RunEntry]) -> int:
+    """The highest commit sequence of any entry of a partition's index, the version each
+    replaced (``prev``) included; an entry with no sequence (a direct write, or one from before
+    ADR 0022) counts 0, so a partition holding only those is 0."""
+    top = 0
+    for entry in entries.values():
+        version: RunEntry | None = entry
+        while version is not None:
+            top = max(top, version.seq or 0)
+            version = version.prev
+    return top
+
+
 def visible_entries(entries: Mapping[str, RunEntry], upto: int | None) -> dict[str, RunEntry]:
     """Each run's version a read that captured commit sequence ``upto`` sees: commits after
     ``upto`` fall back to the version they replaced, or hide a run first committed after
