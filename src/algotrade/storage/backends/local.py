@@ -434,6 +434,26 @@ class LocalRuns:
         self._parsed: OrderedDict[str, tuple[tuple[int, int, int], RunRecord]] = OrderedDict()
         self._parsed_bytes = 0
         self._parsed_lock = threading.Lock()
+        # the directory's file stems with their session (``run_session``), listed again only once
+        # ``generation`` changes: ``find`` ran once per edge and owner, each over ~10 000 files
+        self._listing: tuple[tuple[int, int], list[tuple[str, date | None]]] | None = None
+
+    def _stems(self) -> list[tuple[str, date | None]]:
+        """``(stem, run_session(stem))`` of every ``.json`` file; the stamp is read before the
+        listing, so a save during it leaves a stale stamp and the next call lists again."""
+        stamp = self.generation()
+        with self._parsed_lock:
+            held = self._listing
+        if held is not None and held[0] == stamp:
+            return held[1]
+        stems = [
+            (stem, run_session(stem))
+            for path in self.root.iterdir()
+            if path.suffix == ".json" and (stem := path.stem)
+        ]
+        with self._parsed_lock:
+            self._listing = (stamp, stems)
+        return stems
 
     def _record(self, name: str) -> RunRecord | None:
         """The record in file ``name``, parsed once per version of the file; a copy (its
@@ -492,13 +512,9 @@ class LocalRuns:
         # (parsing every record took 0.9 s a call over 6 400 files: the edges page made 26)
         prefix = f"{safe(job)}-"
         names = [
-            path.name
-            for path in self.root.iterdir()
-            if (name := path.name).endswith(".json")
-            and (
-                (day := run_session(stem := name.removesuffix(".json"))) is None
-                or (stem.startswith(prefix) and session_date in (None, day))
-            )
+            f"{stem}.json"
+            for stem, day in self._stems()
+            if day is None or (stem.startswith(prefix) and session_date in (None, day))
         ]
         records = [r for name in names if (r := self._record(name)) is not None]
         hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]
