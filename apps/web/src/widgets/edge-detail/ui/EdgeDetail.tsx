@@ -113,7 +113,10 @@ export function EdgeDetail({ id, onBack, onEdit }: EdgeDetailProps) {
             )}
           </Stack>
           <Stack gap={2} align="end">
-            <RunEvaluation edgeId={edge.id} />
+            <Stack direction="row" gap={1} align="center">
+              <RunEvaluation edgeId={edge.id} />
+              <GuideHelp entry={{ kind: 'term', id: 'run_backtest' }} />
+            </Stack>
             <Stack direction="row" gap={1} align="center">
               <EdgeActions edge={edge} onEdit={onEdit} />
               <GuideHelp entry={{ kind: 'term', id: 'follow_edge' }} />

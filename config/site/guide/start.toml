@@ -334,3 +334,216 @@ UNKNOWN means too little stored history to say, and Never fired means every stor
 before the low was off. The gap between the low and the last sign turning off is how long the
 end stayed unknown.
 """
+
+# --------------------------------------------------------------------------------------- 7
+[[page]]
+id = "read_an_edge_page"
+order = 7
+title = "Read an edge page"
+summary = "Walk down an edge page, from the verdict to the actions, with one real example: why a win rate 8 points above the base rate on 3 trades is noise."
+links = [
+  { kind = "term", id = "verdict" },
+  { kind = "term", id = "verdict_criteria" },
+  { kind = "term", id = "verdict_not_enough_data" },
+  { kind = "term", id = "win_rate" },
+  { kind = "term", id = "base_rate" },
+  { kind = "term", id = "lift" },
+  { kind = "term", id = "trades" },
+  { kind = "term", id = "top_vs_bottom_decile" },
+  { kind = "term", id = "robustness" },
+  { kind = "term", id = "sharpe_ratio" },
+  { kind = "term", id = "deflated_sharpe" },
+  { kind = "start", id = "edge_life" },
+]
+
+[[page.section]]
+title = "The header: verdict, status and official result"
+body = """
+The badge is the verdict: the app's judgement of the edge's official result. The sentence under
+it names the first test the edge fails. Beside it, Site edge or Your edge says whose it is, the
+status says where it stands in its life, and Last backtest dates the official result. Example:
+vrp_short_premium sells put options, contracts that pay out if a stock falls, and wins when they
+expire worthless. It is a site edge, its status is candidate, and its verdict is Not enough data:
+only 3 out-of-sample trades, 40 needed. The badge says the evidence is too thin to judge, not that
+the idea is wrong. Don't read a badge as advice to act.
+"""
+
+[[page.section]]
+title = "The figures strip"
+body = """
+Five figures sum up the official result: win rate, base rate, lift, trades and the top vs bottom
+decile spread. A win rate means little alone. Read it beside the base rate, then read both beside
+the number of trades. Example: vrp_short_premium wins 77% against a base rate of 69%, a lift of
++8 points. It rests on 3 trades out of 15 in all, and three independent test dates cannot tell
+skill from luck. Don't read a win rate as profit. A short put wins when the option expires
+worthless. Wins are frequent and the rare losses are large, and the app does not model profit
+and loss, so the win rate overstates what the trade earns.
+"""
+
+[[page.section]]
+title = "Deciles and robustness"
+body = """
+The decile bars rank every eligible name by the edge's own score, cut the ranking into ten equal
+groups and show each group's average outcome, best-ranked first. A ranking that works slopes down
+from left to right. The robustness histogram sets the edge's lift against 1,000 backtests of random
+picks; Works needs it to beat 95% of them. Example: the ten bars of vrp_short_premium read 7.5%,
+6.5%, 6.0%, 7.6%, 7.5%, 6.5%, 7.9%, 6.8%, 7.6% and 7.4%. They are flat, and the spread is -0.034
+with a t of -1.66: the ranking carries no information. The edge beats 91% of random backtests,
+short of the 95% it needs.
+"""
+
+[[page.section]]
+title = "Year by year"
+body = """
+This table splits the result by calendar year and marks each year in-sample or out-of-sample.
+Look for a result that holds in most years; one year carrying everything is a warning. A year with
+no trades has no result, which is different from zero. Example: vrp_short_premium has no trades
+from 2011 to 2023, because the data it needs starts around 2024. In 2024 it won 80% against 70% on
+2 trades, in 2025 70% against 71% on 8 trades, and in 2026 73% against 71% on 5. The in-sample
+lift is about zero.
+"""
+
+[[page.section]]
+title = "Backtests and the verdict tests"
+body = """
+Open Details for the evidence behind the badge. What the verdict tests lists every test with its
+value, what it needs and pass, fail or not measured. Backtests lists the runs, with the official
+result marked, and the figures add the Sharpe ratio, the deflated Sharpe and the overfitting
+probability. Example: vrp_short_premium fails 3 of the 7 Promising tests, passes 3 and does not
+measure one. Its Sharpe ratio of 1.74 looks strong, but the deflated Sharpe is 0.00 after 126
+variants tried: the best of that many tries shows a Sharpe like that by luck.
+"""
+
+[[page.section]]
+title = "Definition and why it should last"
+body = """
+How the edge is defined lists six lines: the idea, the screens, the picks, the trade, what it is
+compared against and the test. Why it should last gives the reason the pattern should survive
+being known, with sources. Read the definition before the figures, because every figure answers
+only the question it asks. Example: vrp_short_premium takes the top 20 of the vrp_iv_hv screen
+every session and holds a short put for 15, 21 or 31 trading days. It is compared with
+momentum_12_1 and size_small, and tested out-of-sample from 2026-04-01. Don't treat a good reason as evidence.
+"""
+
+[[page.section]]
+title = "Putting the example together"
+body = """
+Read the example as a chain. A lift of +8 points on 3 trades is noise. The in-sample lift was
+about zero. The deciles are flat and their t is negative, so the ranking carries no information.
+The deflated Sharpe of 0.00 says the Sharpe of 1.74 is what the best of 126 tries shows by luck.
+It beats 91% of random backtests, not 95%. Together they say the evidence is too thin to trust.
+More out-of-sample sessions settle it, not a different date.
+"""
+
+[[page.section]]
+title = "The actions"
+body = """
+Run backtest tests the edge now under your own split, and admins also see Run as site. Clone makes
+your own edge from this one, and Follow keeps a site edge in your list. Edit and the status moves
+appear on your own edges. An edge you run on a date of your own is exploratory and never changes
+the verdict. Don't change an edge and rerun until the numbers look good: that is how a lucky
+result is made.
+"""
+
+# --------------------------------------------------------------------------------------- 8
+[[page]]
+id = "edge_life"
+order = 8
+title = "An edge's life"
+summary = "An edge moves along one status line, from researching to retired; rejected and blocked sit off it. Who moves it, and what you can undo."
+links = [
+  { kind = "term", id = "edge_status" },
+  { kind = "term", id = "edge_state" },
+  { kind = "term", id = "edge_copy" },
+  { kind = "term", id = "follow_edge" },
+  { kind = "term", id = "paper_trading" },
+  { kind = "term", id = "forward_test" },
+  { kind = "term", id = "verdict" },
+  { kind = "start", id = "read_an_edge_page" },
+]
+
+[[page.section]]
+title = "One line, two owners"
+body = """
+Every edge has one status on one line: researching, candidate, evidenced, live, retired.
+Rejected and blocked sit off the line. A site edge's status is the site's, the same for everyone.
+The status of your own edge is yours to move. The verdict is different: the app computes it from
+the official result by a fixed rule. A status is a decision and a verdict is a measurement, so
+they can disagree, and the page shows both.
+"""
+
+[[page.section]]
+title = "Follow, or clone"
+body = """
+You cannot change a site edge's status. You can follow it, which keeps it in your list and leaves
+its status and official result as the site's; unfollowing removes the bookmark. Or you can clone
+it into an edge of your own that extends it. A clone starts as researching, has its own backtests,
+and keeps its out-of-sample result hidden until you show it or make it live. Following records
+your interest. It is not an order: the app never trades.
+"""
+
+[[page.section]]
+title = "Researching"
+body = """
+You get here by writing an edge or cloning one: every clone starts as researching. It means the
+idea is written and nothing is claimed. Run backtest gives it figures, and the page shows its
+verdict. Next, make it a candidate when you start testing it, or reject it. From candidate, live, retired or
+rejected, your own edge can go back to researching.
+"""
+
+[[page.section]]
+title = "Candidate"
+body = """
+You get here from researching, or a new version of an edge starts here. It means the edge is being
+tested. A verdict can show, but a verdict is not a status. Next, make it live when you intend to
+act on it, reject it, or go back to researching. A new version of an edge you follow is tried on
+paper beside it first (see Forward test). For a site edge, candidate says the site is still
+testing it.
+"""
+
+[[page.section]]
+title = "Evidenced"
+body = """
+Only the site sets this status, and only after an official result over the out-of-sample period
+shows the edge's picks beating the base rate and the baselines on enough trades. You cannot set
+it on your own edge: yours goes from candidate to live. It means the evidence is strong, not that
+the pattern will last. A later, weaker official result can show a lower verdict, and the site
+decides what happens to the status.
+"""
+
+[[page.section]]
+title = "Live"
+body = """
+For a site edge, live means evidenced and used to rank ideas. For your own edge, it means you
+intend to act on it. Next, retire it when it stops working or you stop acting on it, or go back to
+candidate or researching. Making your own edge live while its verdict is Not working puts the
+label Followed against the verdict on it for good. A candidate that replaces another edge of yours
+retires the old one when it goes live. Paper trades show how it does going forward.
+"""
+
+[[page.section]]
+title = "Retired"
+body = """
+A retired edge stopped working by its own retirement rule, or you stopped acting on it. It keeps
+its record, so you can still read why. Reopening it sends it back to researching. Retiring is the way to stop acting on an edge without deleting what
+you learned.
+"""
+
+[[page.section]]
+title = "Rejected and blocked"
+body = """
+Rejected means checked and dropped. The reason is kept, so the same idea is not filed again, and
+the Rejected view lists these edges. Reopening a rejected edge sends it back to researching.
+Blocked means worth testing but missing the data it needs; only the site sets it and clears it. Neither is a verdict: Waiting on data describes a result, blocked
+describes the edge.
+"""
+
+[[page.section]]
+title = "What you can undo"
+body = """
+On your own edge every move can be undone by going back to researching, and a rejected or retired
+edge can be reopened. Labels cannot be undone: Followed against the verdict and the others stay on
+the edge for good, so the record of a hasty choice is not erased. A site edge's status changes only
+by a reviewed change to the site's files. Don't move an edge to live to see what happens: the move
+is your record of a decision.
+"""

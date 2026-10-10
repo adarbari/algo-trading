@@ -32,13 +32,37 @@ const BY_LEVEL: DataTableGroupBy<VerdictCriterion> = {
 
 const NUMBER = { kind: 'number', digits: 2 } as const;
 
+function Labelled({ text, help }: { text: string; help: string }) {
+  return (
+    <Stack direction="row" gap={1} align="center">
+      <Text size="sm">{text}</Text>
+      {term(help)}
+    </Stack>
+  );
+}
+
 function figures(edge: Edge): KeyValueItem[] {
   const v = edge.verdict;
   return [
     { id: 'lift', label: 'Lift (ratio)', value: v.lift, format: NUMBER },
-    { id: 'sharpe', label: 'Sharpe ratio', value: v.sharpe, format: NUMBER },
-    { id: 'dsr', label: 'Deflated Sharpe', value: v.deflatedSharpe, format: NUMBER },
-    { id: 'pbo', label: 'Overfitting probability', value: v.pbo, format: NUMBER },
+    {
+      id: 'sharpe',
+      label: <Labelled text="Sharpe ratio" help="sharpe_ratio" />,
+      value: v.sharpe,
+      format: NUMBER,
+    },
+    {
+      id: 'dsr',
+      label: <Labelled text="Deflated Sharpe" help="deflated_sharpe" />,
+      value: v.deflatedSharpe,
+      format: NUMBER,
+    },
+    {
+      id: 'pbo',
+      label: <Labelled text="Overfitting probability" help="overfitting_probability" />,
+      value: v.pbo,
+      format: NUMBER,
+    },
   ];
 }
 
@@ -89,7 +113,11 @@ export function EdgeDetails({ edge }: EdgeDetailsProps) {
     <Disclosure label="Details" count={String(edge.verdict.criteria.length)}>
       <Stack gap={4}>
         <Stack gap={2}>
-          <Heading level={3}>What the verdict tests</Heading>
+          <Stack direction="row" gap={1} align="center">
+            <Heading level={3}>What the verdict tests</Heading>
+            {term('verdict_criteria')}
+            {term('baselines')}
+          </Stack>
           <DataTable<VerdictCriterion>
             label="Verdict tests"
             columns={criterionColumns}
@@ -103,6 +131,7 @@ export function EdgeDetails({ edge }: EdgeDetailsProps) {
         <Stack gap={2}>
           <Stack direction="row" gap={1} align="center">
             <Heading level={3}>Backtests</Heading>
+            {term('edge_backtests')}
             {term('variants_tried')}
           </Stack>
           <Backtests edge={edge} />

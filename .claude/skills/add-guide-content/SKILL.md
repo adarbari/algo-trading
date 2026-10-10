@@ -26,7 +26,7 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    | situation (fools many fields at once) | `config/site/field_guide/situations.toml` `[[situation]]` | |
    | regime indicator, episode | `config/site/regime/cards.toml`, `episodes.toml` | |
    | playbook (one per site preset screen) | `config/site/guide/playbooks/<family>/<id>.toml` (`[asks]`: one line per criterion of the latest version) | `add-screener` for a site preset |
-   | glossary term, how-to page | `config/site/guide/glossary.toml` `[[term]]`, `start.toml` `[[page]]`; the button takes `{ kind: 'term' | 'start', id }` | |
+   | glossary term, how-to page | `config/site/guide/glossary/<theme>.toml` `[[term]]`, `start.toml` `[[page]]`; the button takes `{ kind: 'term' | 'start', id }` | |
 
    A kind the table does not have yet: stop and add it through `add-responsibility` (an owner,
    a loader in the Guide read model, a page template in docs/ui/guide.md), not as page text.
@@ -34,7 +34,7 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    page's old text where it is (it is in the baseline); never add new text to a page.
    **Why a value is not available** (a gap on a page) is a glossary term per public kind
    (`unavailable_system`, `unavailable_not_stored`, ..., `not_run`; ADR 0056). A new
-   `UnavailableKind` needs its term in `config/site/guide/glossary.toml` and a line in
+   `UnavailableKind` needs its term in `config/site/guide/glossary/<theme>.toml` and a line in
    `GUIDE_TERMS` (`services/read/availability/cause.py`); the fitness test fails without one.
    The chain behind a gap (a table, a step, a source) is an admin's cause, never Guide text.
 3. **Write the entry for someone who does not follow markets**: what it is, how to read it from
@@ -53,3 +53,18 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    (explanatory prose in `apps/web/src` against the shrink-only baseline), the field-guide
    tests in `tests/architecture/test_features.py`, then `make changed` and push (CI is the full gate). A false finding of the
    prose test (a long label, say) is shortened, never added to the baseline.
+
+## Before you ship: ten checks (the standard: `docs/ui/guide.md` section 7)
+
+Yes to every line, or fix it:
+
+1. One kind of entry (Start page, term or field), not a mix.
+2. `short` is one sentence, at most 25 words, and makes sense alone.
+3. Body sentences are at most 30 words, second person, present tense; no filler.
+4. Every concept with its own entry is in `see_also` or linked, never restated.
+5. Every number has a worked example with real values and the threshold it crosses.
+6. The risk or the "it is not" comes before the hit case.
+7. One explicit "Don't ..." where misuse is plausible; no advice to buy or sell.
+8. A figure that can mislead says so and names the check that is authoritative.
+9. A lifecycle is one section per state: how you get there, what it means, what you do next.
+10. The entry ends with one to three next links, and the screen element has its `InfoButton`.

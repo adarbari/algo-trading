@@ -99,7 +99,11 @@ export function EdgeLive({ edgeId }: EdgeLiveProps) {
           )}
         </Stack>
       </Panel>
-      <Panel title="Paper trades" flush>
+      <Panel
+        title="Paper trades"
+        flush
+        actions={<GuideHelp entry={{ kind: 'term', id: 'paper_trading' }} />}
+      >
         <DataTable
           label="Paper trades"
           columns={tradeColumns}

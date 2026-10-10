@@ -85,6 +85,10 @@ describe('EdgeDetail', () => {
       'edge_status',
       'edge_state',
       'edge_copy',
+      'run_backtest',
+      'year_by_year',
+      'edge_definition',
+      'edge_persistence',
     ]) {
       expect(screen.getAllByText(`help ${id}`).length).toBeGreaterThan(0);
     }
@@ -154,6 +158,17 @@ describe('EdgeDetail', () => {
     expect(screen.getByText('EXPLORATORY')).toBeInTheDocument();
     expect(screen.getByText('momentum_12_1: rollup (4 sessions)')).toBeInTheDocument();
     expect(screen.getByText('Not measured yet')).toBeInTheDocument();
+    for (const id of [
+      'verdict_criteria',
+      'baselines',
+      'edge_backtests',
+      'variants_tried',
+      'sharpe_ratio',
+      'deflated_sharpe',
+      'overfitting_probability',
+    ]) {
+      expect(screen.getAllByText(`help ${id}`).length).toBeGreaterThan(0);
+    }
   });
 
   it("shows a copy's origin, its labels and the comparison with the out-of-sample hidden", async () => {

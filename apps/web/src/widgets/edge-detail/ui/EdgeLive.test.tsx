@@ -88,6 +88,7 @@ describe('EdgeLive', () => {
     expect(within(trades).getByText('+2.3%')).toBeVisible();
     expect(within(trades).getByText('Skipped')).toBeVisible();
     expect(screen.getByText('help usual_range')).toBeVisible();
+    expect(screen.getByText('help paper_trading')).toBeVisible();
     await expectNoA11yViolations(container);
   });
 

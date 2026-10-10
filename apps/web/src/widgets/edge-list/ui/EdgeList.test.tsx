@@ -43,7 +43,7 @@ describe('EdgeList', () => {
     const waiting = within(table).getByRole('row', { name: /S&P 500 index changes/ });
     expect(within(waiting).getByText('no screen yet · site edge')).toBeInTheDocument();
     expect(within(waiting).getByText('Rejected')).toBeInTheDocument();
-    for (const id of ['verdict', 'edge_state', 'trades', 'out_of_sample']) {
+    for (const id of ['verdict', 'edge_state', 'trades', 'out_of_sample', 'edge', 'edge_views']) {
       expect(screen.getByText(`help ${id}`)).toBeInTheDocument();
     }
     await expectNoA11yViolations(container);
@@ -53,6 +53,7 @@ describe('EdgeList', () => {
     const onViewChange = vi.fn();
     const { rerender } = render(<EdgeList onSelect={vi.fn()} onViewChange={onViewChange} />);
     expect(screen.getByText("broken.toml extends: no edge 'ghost'")).toBeInTheDocument();
+    expect(screen.getByText('help edge_left_out')).toBeInTheDocument();
     for (const name of ['All · 4', 'Mine · 1', 'Following · 0', 'Rejected · 1']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
