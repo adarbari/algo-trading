@@ -1,6 +1,8 @@
 /**
  * Trader > Screeners: the list (`/screeners`), a new screener (`/screeners/new`), a screener's
  * results (`/screeners/$id`, where the list opens) and its Builder (`/screeners/$id/edit`).
+ * The Builder and a new screener (`screener-builder-routes.tsx`, lazy) may carry
+ * `returnTo=<edge id>` (opened from an edge's builder): they then return to it.
  * Tickers open in Explore.
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
@@ -9,11 +11,8 @@ import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
 import { lazyPage } from '@/shared/lib/lazy';
 
-const NewScreenerPage = lazyPage(() => import('@/pages/screener-builder'), 'NewScreenerPage');
-const ScreenerBuilderPage = lazyPage(
-  () => import('@/pages/screener-builder'),
-  'ScreenerBuilderPage',
-);
+const NewScreener = lazyPage(() => import('./screener-builder-routes'), 'NewScreener');
+const EditScreener = lazyPage(() => import('./screener-builder-routes'), 'EditScreener');
 const ScreenerResultsPage = lazyPage(
   () => import('@/pages/screener-results'),
   'ScreenerResultsPage',
@@ -37,16 +36,6 @@ function ScreenersIndex() {
   );
 }
 
-function NewScreener() {
-  const navigate = useNavigate();
-  return (
-    <NewScreenerPage
-      onCancel={() => void navigate({ to: '/screeners' })}
-      onCreated={(id) => void navigate({ to: '/screeners/$id/edit', params: { id } })}
-    />
-  );
-}
-
 function ScreenerResultsRoute() {
   const { id } = resultsRoute.useParams();
   const navigate = useNavigate();
@@ -61,21 +50,6 @@ function ScreenerResultsRoute() {
         const search = compareSearch(symbols);
         if (search) void navigate({ to: '/explore', search });
       }}
-    />
-  );
-}
-
-function EditScreener() {
-  const { id } = editRoute.useParams();
-  const navigate = useNavigate();
-  return (
-    <ScreenerBuilderPage
-      id={id}
-      onDeleted={() => void navigate({ to: '/screeners' })}
-      onOpenTicker={(symbol) =>
-        void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })
-      }
-      onOpenRegime={() => void navigate({ to: '/regime' })}
     />
   );
 }

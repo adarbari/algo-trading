@@ -7,7 +7,7 @@ import { TRADER } from '../../workspaces';
 import { placeholderRoute } from '../section-route';
 
 import { calendarRoute } from './calendar-route';
-import { edgesRoute } from './edges-route';
+import { edgesBuilderRoutes, edgesRoute } from './edges-route';
 import { exploreRoute } from './explore-route';
 import { ideasRoute } from './ideas-route';
 import { traderRoute } from './layout-route';
@@ -20,6 +20,7 @@ export const traderRoutes = traderRoute.addChildren([
   ideasRoute,
   screenersRoutes,
   edgesRoute,
+  ...edgesBuilderRoutes,
   exploreRoute,
   regimeRoute,
   calendarRoute,

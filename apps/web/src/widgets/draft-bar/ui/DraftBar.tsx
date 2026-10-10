@@ -5,7 +5,8 @@
  * finalised screen runs nightly, ADR 0033). A newer preset version shows the rebase banner. A
  * site preset (or a copy of one) carries a link to its playbook in the Guide. A site
  * preset not yet copied is shown as it is (its live preview runs); the first edit makes the
- * user's copy, so there is no separate read-only mode.
+ * user's copy, so there is no separate read-only mode. Opened from an edge's builder it also
+ * offers "Save and return to edge".
  */
 import { Banner, Button, Heading, Mono, Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
 
@@ -21,9 +22,11 @@ export interface DraftBarProps {
   compact?: boolean;
   /** The screener was deleted: leave its pages. Without it there is no Delete. */
   onDeleted?: () => void;
+  /** Opened from an edge: "Save and return to edge" saves the draft and goes back. */
+  onReturn?: (() => void) | undefined;
 }
 
-export function DraftBar({ compact = false, onDeleted }: DraftBarProps) {
+export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps) {
   const builder = useScreenerBuilder();
   const { detail } = builder;
   const state = draftState(builder);
@@ -85,6 +88,19 @@ export function DraftBar({ compact = false, onDeleted }: DraftBarProps) {
           >
             Save draft
           </Button>
+          {onReturn && (
+            <Button
+              variant="primary"
+              loading={builder.saving}
+              onClick={() => {
+                void (builder.dirty ? builder.save() : Promise.resolve())
+                  .then(onReturn)
+                  .catch(() => undefined);
+              }}
+            >
+              Save and return to edge
+            </Button>
+          )}
           <FinaliseButton
             screenerId={builder.id}
             version={builder.nextVersion}

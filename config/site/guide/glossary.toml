@@ -538,6 +538,104 @@ fitted to the past.
 see_also = ["edge_copy", "show_out_of_sample", "win_rate"]
 
 [[term]]
+id = "edge_builder_idea"
+term = "Edge builder: the idea"
+short = "The claim the edge makes and why it should keep working."
+body = """
+Step 1 of the six. The name and the thesis say what the edge claims in one sentence. Why it should
+last asks who is forced or systematically wrong so that the pattern exists, and why it survives
+being known. List where the idea comes from: a paper with its link, or author, title and year.
+Everything else the edge does is tested; this part is the reason to believe the test is more than
+luck, so write it before you look at a result.
+"""
+see_also = ["edge", "edge_quality_bar", "edge_builder_screens"]
+
+[[term]]
+id = "edge_quality_bar"
+term = "The quality bar"
+short = "Nine written answers every edge gives before its numbers are read."
+body = """
+Who is forced or wrong, why the pattern survives being known, how the outcome is measured, when
+the trigger becomes known, how a stranger could replicate it, the size to expect, capacity and
+costs, how it fails, and what else could explain the result. The seven under More in step 1 are
+those after the first two. An answer is a few sentences; an edge that cannot answer them is a
+backtest looking for a story.
+"""
+see_also = ["edge", "edge_builder_idea"]
+
+[[term]]
+id = "edge_builder_screens"
+term = "Edge builder: screens"
+short = "The existing screens that decide which stocks qualify and in what order."
+body = """
+Step 2 of the six. A screen only decides which stocks qualify on a session and how they rank;
+everything after that (when the edge fires, how many it takes, how it is held) belongs to the
+edge. Choose one or more: each one is tested on its own as an implementation of the edge. The
+record beside a screen is its win rate against the base rate on the out-of-sample period, or No
+record yet. Edit in Screen Builder opens the screen and brings you back here with your draft kept.
+"""
+see_also = ["edge", "base_rate", "edge_builder_picks"]
+
+[[term]]
+id = "edge_builder_picks"
+term = "Edge builder: picks"
+short = "When the edge fires and how many of the screen's ranked stocks it takes."
+body = """
+Step 3 of the six. Every session or month end fires on the calendar; an event fires after that
+event, such as an earnings report, for the stocks that had it. Top N takes the first N of the
+screen's ranked list; all that qualify takes every stock that passes. Fewer stocks per session
+means fewer trades, so a verdict takes longer to reach.
+"""
+see_also = ["edge_builder_screens", "edge_builder_trade", "trades"]
+
+[[term]]
+id = "edge_builder_trade"
+term = "Edge builder: trade"
+short = "How each pick is entered and held, what it costs and what counts as a win."
+body = """
+Step 4 of the six. Enter says how many sessions after the trigger the position opens (at least
+one, so nothing is bought on a price that was not known yet). Each holding period is measured and
+reported on its own. Costs are for a round trip in basis points (100 bps is 1%). A win is either
+a return above the benchmark after costs, or simply a rise after costs.
+"""
+see_also = ["edge_builder_picks", "win_rate", "edge_builder_compare"]
+
+[[term]]
+id = "edge_builder_compare"
+term = "Edge builder: compare against"
+short = "The universe that sets the base rate and the decoys the edge must beat."
+body = """
+Step 5 of the six. The universe is the set of stocks a random pick could have been; its win rate
+is the base rate the edge has to beat. The decoys are other screens run on the same sessions: if
+a plain one does as well, the idea is not what explains the result.
+"""
+see_also = ["base_rate", "edge_builder_trade", "edge_builder_test"]
+
+[[term]]
+id = "edge_builder_test"
+term = "Edge builder: test and run"
+short = "Where the out-of-sample period starts, a summary, and the run."
+body = """
+Step 6 of the six. Before the date is in-sample, the period you may tune on; from it is
+out-of-sample, kept aside to check. Results for the out-of-sample period stay hidden while you
+change the edge. Moving the date after seeing a result is recorded as a permanent label on the
+edge. Save and run backtest saves the whole edge and starts the backtest; you can leave and the
+result lands on the edge's page.
+"""
+see_also = ["out_of_sample", "variants_tried", "show_out_of_sample"]
+
+[[term]]
+id = "edge_builder_running"
+term = "Backtest running"
+short = "The backtest of your edge is running; you can leave and the result will be on its page."
+body = """
+A backtest runs the edge on every past session using only what was known then. It can take a
+while, and one backtest of yours runs at a time. When it finishes the edge's page shows your
+copy beside the site edge and the decoys, in-sample; out-of-sample stays hidden until you show it.
+"""
+see_also = ["compare_versions", "show_out_of_sample", "official_result"]
+
+[[term]]
 id = "verdict"
 term = "Verdict"
 short = "What the official result says about an edge: Works, Promising, Not working, Not enough data or Waiting on data."

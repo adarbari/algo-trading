@@ -44,11 +44,11 @@ const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unk
   ...patch,
 });
 
-function setup(onDeleted?: () => void) {
+function setup(onDeleted?: () => void, onReturn?: () => void) {
   return render(
     <ToastProvider>
       <TestQueryProvider>
-        <DraftBar {...(onDeleted ? { onDeleted } : {})} />
+        <DraftBar {...(onDeleted ? { onDeleted } : {})} {...(onReturn ? { onReturn } : {})} />
       </TestQueryProvider>
     </ToastProvider>,
   );
@@ -62,6 +62,30 @@ beforeEach(() => {
 });
 
 describe('DraftBar', () => {
+  it('offers "Save and return to edge" only when opened from an edge: it saves unsaved edits first', async () => {
+    const { unmount } = setup();
+    expect(screen.queryByRole('button', { name: 'Save and return to edge' })).toBeNull();
+    unmount();
+    const onReturn = vi.fn();
+    state.builder = builder({ dirty: true });
+    setup(undefined, onReturn);
+    await userEvent.click(screen.getByRole('button', { name: 'Save and return to edge' }));
+    await vi.waitFor(() => {
+      expect(onReturn).toHaveBeenCalled();
+    });
+    expect(save).toHaveBeenCalledOnce();
+  });
+
+  it('returns without a save when nothing changed', async () => {
+    const onReturn = vi.fn();
+    setup(undefined, onReturn);
+    await userEvent.click(screen.getByRole('button', { name: 'Save and return to edge' }));
+    await vi.waitFor(() => {
+      expect(onReturn).toHaveBeenCalled();
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('shows the state, the preset and the separate actions', async () => {
     const { container } = setup();
     expect(screen.getByRole('heading', { level: 1, name: 'my-vrp' })).toBeInTheDocument();

@@ -1,0 +1,62 @@
+/* TextArea: the box carries border, background and focus; the textarea itself is transparent. */
+.box {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  padding-inline: var(--space-2);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition-duration: var(--duration-fast);
+  transition-property: border-color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.box:hover {
+  border-color: var(--color-muted);
+}
+
+.box:focus-within {
+  border-color: var(--color-accent);
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: calc(-1 * var(--border-width-thin));
+}
+
+.box[data-invalid] {
+  border-color: var(--color-negative);
+}
+
+.box[data-disabled] {
+  border-color: var(--color-border);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding-block: var(--space-1);
+  padding-inline: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  field-sizing: content;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-feature-settings: var(--font-features);
+  line-height: var(--line-height-base);
+  max-height: 16lh;
+  resize: vertical;
+}
+
+.input::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
