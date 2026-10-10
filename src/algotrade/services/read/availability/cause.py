@@ -69,7 +69,7 @@ GENERIC_REASONS: dict[UnavailableKind, str] = {
     UnavailableKind.NOT_RUN: "not run for this session",
 }
 
-# The Guide glossary term (config/site/guide/glossary.toml) that explains each kind; the
+# The Guide glossary term (config/site/guide/glossary/<theme>.toml) that explains each kind; the
 # fitness test ``test_every_kind_has_a_glossary_term`` keeps this complete.
 GUIDE_TERMS: dict[UnavailableKind, str] = {
     UnavailableKind.SYSTEM: "unavailable_system",

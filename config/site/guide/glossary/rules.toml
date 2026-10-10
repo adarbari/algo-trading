@@ -1,0 +1,94 @@
+# L3 site setting: the Guide glossary, the rule grammar (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+# ---------------------------------------------------------------------------- the rule grammar
+
+[[term]]
+id = "criterion"
+term = "Criterion"
+short = "One rule of a screen: a field, a comparison, a threshold and a mode."
+body = """
+A criterion compares one catalogue field with a threshold, for example the closing price
+rollup.price_stats@v2.close greater than 5. Its mode says what a miss does (hard, soft or
+score), a soft or score criterion may have a tolerance, and a soft one an on_miss. The
+funnel shows the criteria in the order written. A criterion can be switched off without
+deleting it.
+"""
+see_also = ["op", "mode", "tolerance", "on_miss"]
+
+[[term]]
+id = "op"
+term = "op"
+short = "The comparison a criterion makes, such as gte (greater than or equal to) or between."
+body = """
+The comparison operators are eq (equals), ne (not equal), gt and gte (greater than; or equal to), and lt and lte (less than; or equal to). The list operators are in and not_in (one of a list, or none of it). The operator between means within two bounds, both included. The operators is_null and not_null take no value. A tolerance works
+only with the numeric comparisons gt, gte, lt, lte and between. A value that is absent, not a
+number, or of the wrong type for the comparison counts as missing, and missing never passes.
+"""
+see_also = ["criterion", "tolerance"]
+
+[[term]]
+id = "mode"
+term = "mode"
+short = "What a criterion's miss does to a row: hard rejects it, soft may keep it as a near miss, score only lowers its score."
+body = """
+Every criterion has a mode, hard unless it says otherwise. A hard criterion must pass. A soft
+one may miss by up to its tolerance and keep the row as a near miss. A score criterion never
+removes a row; it only moves it down the list. Hard and soft criteria are the gating ones, the
+steps of the screen's funnel.
+"""
+see_also = ["hard", "soft", "score_mode", "gating_criterion", "near_miss"]
+
+[[term]]
+id = "hard"
+term = "hard"
+short = "A criterion that must pass: a miss, or no value, rejects the row."
+body = """
+A hard criterion is strict: with the closing price required to be greater than 5, a close of
+4.99 is a REJECT. A row with no value for it is rejected too, with the reason no <field>. A
+hard criterion takes no tolerance, and each hard miss costs the row 100 points of score.
+"""
+see_also = ["mode", "reject", "soft"]
+
+[[term]]
+id = "soft"
+term = "soft"
+short = "A criterion that may miss by a little: within its tolerance the row stays in as a near miss."
+body = """
+A soft criterion needs a tolerance. A value that passes is fine. One that misses by no more than the tolerance is a near miss, and gives the row the decision its on_miss names (WATCH by default). One that misses by more is a REJECT. A row with no value for it stays in, loses the
+full near-miss penalty of 10 points, and its reasons list no <field>.
+"""
+see_also = ["tolerance", "on_miss", "near_miss", "mode", "watch", "reject"]
+
+[[term]]
+id = "score_mode"
+term = "score (mode)"
+short = "A criterion that never removes a row: a miss only lowers the row's score."
+body = """
+Use score for a preference rather than a requirement: names that meet it rise, the others stay
+in lower down. Its tolerance is optional. A miss within it costs 0 to 10 points by how far it missed. A miss beyond it, a miss with no tolerance, or no value at all costs 10.
+"""
+see_also = ["score", "mode", "tolerance"]
+
+[[term]]
+id = "tolerance"
+term = "tolerance"
+short = "How far a value may miss a soft or score criterion's threshold and still count as a near miss."
+body = """
+A tolerance is either a number in the field's own unit or a share of the threshold (relative). A tolerance of 0.02 on a threshold of 0.10 makes 0.08 to 0.10 a near miss. A relative 0.2 on an average daily dollar volume of at least $50M (rollup.price_stats@v2.adv_usd_20d) makes $40M to $50M a near miss. It is required for soft, optional for score, not allowed for hard, and works
+only with numeric comparisons.
+"""
+see_also = ["near_miss", "soft", "score_mode"]
+
+[[term]]
+id = "on_miss"
+term = "on_miss"
+short = "What a soft criterion's near miss makes the row: WATCH (the default), LIQUIDITY_RISK or EVENT_RISK."
+body = """
+A row can nearly miss several soft criteria; it gets the most severe of their on_miss
+decisions, EVENT_RISK above LIQUIDITY_RISK above WATCH, and every reason is listed. Only soft
+criteria have an on_miss: a hard miss is always a REJECT and a score miss changes only the
+score.
+"""
+see_also = ["watch", "liquidity_risk", "event_risk", "near_miss", "reject"]

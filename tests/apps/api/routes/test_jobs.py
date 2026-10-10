@@ -114,7 +114,7 @@ def test_an_edge_job_is_read_through_the_screens_runner_over_one_store(
         {
             ("site", "selections", "active"): ACTIVE,
             ("site", "strategies", "momo"): screen(),
-            ("site", "edges", "drift"): edge_document(),
+            ("alice", "edges", "drift"): edge_document(),
             ("site", "settings", "users"): USERS,
         }
     )

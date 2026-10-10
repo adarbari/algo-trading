@@ -12,7 +12,10 @@ vi.mock('@/entities/edge', async (importOriginal) => ({
 }));
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
+  return {
+    GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text>,
+    termHelp: (id: string) => <Text>{`help ${id}`}</Text>,
+  };
 });
 
 stubElementSize();
@@ -88,6 +91,7 @@ describe('EdgeLive', () => {
     expect(within(trades).getByText('+2.3%')).toBeVisible();
     expect(within(trades).getByText('Skipped')).toBeVisible();
     expect(screen.getByText('help usual_range')).toBeVisible();
+    expect(screen.getByText('help paper_trading')).toBeVisible();
     await expectNoA11yViolations(container);
   });
 

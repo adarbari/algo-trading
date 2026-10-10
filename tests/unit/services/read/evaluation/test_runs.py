@@ -150,6 +150,16 @@ def test_a_legacy_local_run_is_the_sites_and_says_so(backend: MemoryBackend) -> 
     assert load_canonical_run(ctx, edge).run.legacy_owner is None  # type: ignore[union-attr]
 
 
+def test_a_run_serves_its_trigger_and_none_for_one_from_before(backend: MemoryBackend) -> None:
+    write_run(backend, "old", FROZEN, 0.5)
+    write_run(backend, "new", FROZEN, 0.6, minutes=5, trigger="ui")
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    by_id = {r.run_id: r for r in load_edge_runs(ctx, edge)}
+    assert (by_id["old"].trigger, by_id["new"].trigger) == (None, "ui")
+
+
 def test_a_local_run_after_the_cutoff_is_the_users_not_the_sites(backend: MemoryBackend) -> None:
     write_run(backend, "later-local", FROZEN, 0.5, owner="local", finished_minutes=60 * 24 * 30)
     ctx = stores(backend)

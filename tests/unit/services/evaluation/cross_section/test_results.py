@@ -324,3 +324,13 @@ def test_a_snapshot_after_a_session_never_ends_its_reads_log_past_it() -> None:
             elif rec.start > day and rec.kind == "dates":  # before the first: only the earliest
                 assert (rec.start, rec.end) == (DAYS[3], DAYS[3])
                 assert rec.digest == dates_digest([DAYS[3]])
+
+
+def test_the_run_record_names_its_owner_trigger_and_job(world: World) -> None:
+    ev = evaluate(world)
+    record = write_edge_eval(world.results, ev, NOW, owner="site", trigger="ui", job_id="j-1")
+    stats = world.results.load_run(record.run_id).stats  # type: ignore[union-attr]
+    assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("site", "ui", "j-1")
+    other = write_edge_eval(world.results, ev, NOW + timedelta(hours=1))
+    stats = world.results.load_run(other.run_id).stats  # type: ignore[union-attr]
+    assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("site", "cli", None)
