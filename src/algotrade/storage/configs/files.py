@@ -10,7 +10,9 @@ site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``,
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
-site/guide/{glossary,start}.toml           L3 Guide glossary, Start here pages (kind ``guide``)
+site/guide/start.toml                      L3 Guide Start here pages (kind ``guide``)
+site/guide/glossary/<theme>.toml           L3 Guide glossary, one file per theme (kind
+                                           ``guide_glossary``)
 site/guide/playbooks/<family>/<id>.toml    L3 Guide playbook prose, one folder per family (kind
                                            ``guide_playbooks``; the name is the id)
 site/edges/<id>.toml                       L3 edge documents (kind ``edges``, ADR 0053)
@@ -55,12 +57,13 @@ SITE_FOLDERS = {
     "studies": "studies",
     "guide": "guide",
     "guide_playbooks": "guide/playbooks",
+    "guide_glossary": "guide/glossary",
     "edges": "edges",
 }
 NESTED = (PLAYBOOKS, "features")  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
     "defaults", "settings", "field_guide", "regime", "events", "studies", "guide",
-    "guide_playbooks",
+    "guide_playbooks", "guide_glossary",
 )  # fmt: skip
 DRAFT = "draft.toml"
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens

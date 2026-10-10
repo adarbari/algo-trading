@@ -14,6 +14,7 @@ import {
 } from '@algotrade/ui';
 
 import type { Edge } from '@/entities/edge';
+import { termHelp } from '@/features/guide-help';
 
 export interface EdgeDefinitionProps {
   edge: Edge;
@@ -49,10 +50,10 @@ function parts(edge: Edge): KeyValueItem[] {
 export function EdgeDefinition({ edge }: EdgeDefinitionProps) {
   return (
     <Stack gap={3}>
-      <Panel title="How the edge is defined">
+      <Panel title="How the edge is defined" actions={termHelp('edge_definition')}>
         <KeyValue label={`${edge.name} definition`} items={parts(edge)} />
       </Panel>
-      <Panel title="Why it should last">
+      <Panel title="Why it should last" actions={termHelp('edge_persistence')}>
         <Stack gap={2}>
           <Text size="sm">{edge.persistence}</Text>
           {edge.sources.length > 0 && (

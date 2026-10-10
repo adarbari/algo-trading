@@ -74,12 +74,12 @@ values = { researching = "term:edge_status", candidate = "term:edge_status", evi
 [[enum]]
 source = "graphql:Edge.state"
 values_from = "python:algotrade.config.edges.follow:LEGACY"
-values = { researching = "term:edge_state", following = "term:edge_state", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:edge_state" }
+values = { researching = "term:edge_state", following = "term:follow_edge", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:forward_test" }
 
 [[enum]]
 source = "graphql:FollowedEdge.state"
 values_from = "python:algotrade.config.edges.follow:LEGACY"
-values = { researching = "term:edge_state", following = "term:edge_state", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:edge_state" }
+values = { researching = "term:edge_state", following = "term:follow_edge", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:forward_test" }
 
 [[enum]]
 source = "graphql:Edge.labels"
@@ -114,6 +114,21 @@ exempt = "the public UnavailableKind in generic words; covered with it (GUIDE_TE
 [[enum]]
 source = "graphql:RegimeIndicator.verdictFeature"
 exempt = "a catalogue field name; the field's own help explains it"
+
+[[enum]]
+source = "graphql:EdgeVerdict.verdict"
+values_from = "python:algotrade.services.read.evaluation.verdict:ORDER"
+values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data" }
+
+[[enum]]
+source = "graphql:VerdictCriterion.status"
+values_from = "python:algotrade.services.read.evaluation.verdict:CRITERION_STATUSES"
+values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_measured = "term:verdict_criteria" }
+names = { not_measured = "not measured" }
+
+[[enum]]
+source = "graphql:Edge.statusReason"
+exempt = "free text the user wrote (the reason for a rejection or retirement)"
 
 [[enum]]
 source = "graphql:Edge.stateReason"
@@ -176,6 +191,10 @@ path = "/screeners"
 start = "start:build_a_screen"
 
 [[section]]
+path = "/edges"
+start = "start:read_an_edge_page"
+
+[[section]]
 path = "/regime"
 start = "start:read_the_regime_page"
 
@@ -203,9 +222,9 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 
 [baseline]
 # The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
-max_enums = 36
-max_sections = 6
-max_panels = 77
+max_enums = 34
+max_sections = 5
+max_panels = 71
 enums = [
   "graphql:Adjustment",
   "graphql:AheadEvent.kind",
@@ -215,7 +234,6 @@ enums = [
   "graphql:EdgeRow.sliceKind",
   "graphql:EdgeRun.status",
   "graphql:EdgeSettings.kind",
-  "graphql:EdgeVerdict.verdict",
   "graphql:Episode.kind",
   "graphql:Event.kind",
   "graphql:FailureGroup.statuses",
@@ -242,9 +260,8 @@ enums = [
   "graphql:SignalKind",
   "graphql:SignalState",
   "graphql:UsageCap.kind",
-  "graphql:VerdictCriterion.status",
 ]
-sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/calendar", "/edges", "/explore"]
+sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/calendar", "/explore"]
 
 [baseline.panels]
 "src/entities/llm-usage/ui/UsagePanel.tsx" = 1
@@ -262,11 +279,7 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/widgets/describe-screen/ui/DescribeScreen.tsx" = 1
 "src/widgets/draft-bar/ui/DraftBar.tsx" = 2
 "src/widgets/drilldown-panel/ui/DrilldownPanel.tsx" = 1
-"src/widgets/edge-detail/ui/EdgeDefinition.tsx" = 2
 "src/widgets/edge-detail/ui/EdgeDetail.tsx" = 5
-"src/widgets/edge-detail/ui/EdgeLive.tsx" = 1
-"src/widgets/edge-detail/ui/EdgeYears.tsx" = 1
-"src/widgets/edge-list/ui/EdgeList.tsx" = 2
 "src/widgets/edge-signals/ui/EdgeSignals.tsx" = 2
 "src/widgets/event-calendar-panel/ui/EventCalendarPanel.tsx" = 3
 "src/widgets/event-study-panel/ui/EventStudyPanel.tsx" = 3

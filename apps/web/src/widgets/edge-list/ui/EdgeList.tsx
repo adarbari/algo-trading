@@ -18,6 +18,7 @@ import {
   type Edge,
   type EdgeView,
 } from '@/entities/edge';
+import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { edgeColumns } from '../model/columns';
 
@@ -52,23 +53,32 @@ export function EdgeList({ onSelect, view = 'all', onViewChange }: EdgeListProps
   return (
     <Stack gap={2}>
       {(problems.data ?? []).map((p) => (
-        <Banner key={p.edgeId} tone="warning" title={`Left out: ${p.edgeId}`}>
+        <Banner
+          key={p.edgeId}
+          tone="warning"
+          title={`Left out: ${p.edgeId}`}
+          actions={termHelp('edge_left_out')}
+        >
           {p.reason}
         </Banner>
       ))}
-      <ViewChips
-        views={EDGE_VIEWS.map((v) => ({
-          value: v.value,
-          label: `${v.label} · ${String(all.filter((e) => inView(e, v.value)).length)}`,
-        }))}
-        value={view}
-        onValueChange={(v) => {
-          onViewChange?.(v);
-        }}
-      />
+      <Stack direction="row" gap={1} align="center" wrap>
+        <ViewChips
+          views={EDGE_VIEWS.map((v) => ({
+            value: v.value,
+            label: `${v.label} · ${String(all.filter((e) => inView(e, v.value)).length)}`,
+          }))}
+          value={view}
+          onValueChange={(v) => {
+            onViewChange?.(v);
+          }}
+        />
+        {termHelp('edge_views')}
+      </Stack>
       <Panel
         title="Edges"
         flush
+        actions={<GuideHelp entry={{ kind: 'start', id: 'read_an_edge_page' }} />}
         state={state}
         loadingLabel="Loading edges…"
         emptyMessage="No edge is declared."
