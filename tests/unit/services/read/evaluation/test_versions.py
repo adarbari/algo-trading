@@ -237,3 +237,25 @@ def test_a_copy_that_does_not_load_is_served_with_its_reason_not_silently_droppe
     (problem,) = load_edge_problems(ctx)
     assert problem.edge_id == "mine" and "extends: no edge 'ghost'" in problem.reason
     assert load_edge_problems(ctx_for(MemoryBackend(), with_copy())) == ()
+
+
+def test_a_copy_serves_the_settings_the_builder_edits_and_its_own_document() -> None:
+    ctx = ctx_for(
+        MemoryBackend(),
+        with_copy({"state": "following"}, top_k=7, notes="n", frozen_from=date(2026, 7, 1)),
+    )
+    edges = {e.id: e for e in load_edges(ctx)}
+    settings = edges["mine"].settings
+    assert settings is not None
+    assert (settings.top_k, settings.universe, settings.start_offset_sessions) == (7, "active", 1)
+    assert settings.quality_bar[0].key == "outcome"
+    # what the user's file holds, dates as text, without the state: a save extends it
+    assert settings.own == {
+        "extends": "drift",
+        "screeners": ["momo"],
+        "top_k": 7,
+        "notes": "n",
+        "frozen_from": "2026-07-01",
+    }
+    site = edges["drift"].settings
+    assert site is not None and site.top_k == 5 and dict(site.own) == {}
