@@ -3,22 +3,27 @@ see an outcome (the lookahead tests), a deterministic result, and the trial coun
 
 import dataclasses
 import random
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, ClassVar
 
 import pytest
 
-from algotrade.config.edges.follow import Audit
+from algotrade.config.edges.document import Edge
+from algotrade.config.edges.follow import Audit, Follow
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section import harness
 from algotrade.services.evaluation.cross_section.harness import (
+    BOOKKEEPING,
+    RUN_INPUTS,
     EdgeEvaluation,
     _pbo,
     _prior_trials,
     evaluate_edge,
+    run_hash,
 )
 from algotrade.services.evaluation.cross_section.picks import screen_variant
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
@@ -155,6 +160,24 @@ def test_the_trial_count_is_every_distinct_variant_hash_and_horizon_tried_before
         }
     )
     assert run(w).trials == 2
+
+
+def test_every_edge_field_is_a_run_input_or_bookkeeping() -> None:
+    """A new ``Edge`` field fails here until it is classified (it joins the run hash or not)."""
+    named = {f.name for f in dataclasses.fields(Edge)}
+    assert set(RUN_INPUTS) | set(BOOKKEEPING) == named and not set(RUN_INPUTS) & set(BOOKKEEPING)
+
+
+def test_the_run_hash_ignores_status_follow_audit_owner_and_prose() -> None:
+    base, args = edge(), ([], DAYS[0], DAYS[-1], AS_OF)
+    hashed = run_hash(base, *args)
+    audit = Audit(status_since=DAYS[0], labels=("split_moved_after_viewing",))
+    for changes in (
+        {"status": "live"}, {"follow": Follow(since=DAYS[0])}, {"audit": audit},
+        {"owner": "alice", "extends": "other"}, {"name": "N", "notes": "n", "evidence": None},
+    ):  # fmt: skip
+        assert run_hash(replace(base, **changes), *args) == hashed
+    assert run_hash(replace(base, top_k=6), *args) != hashed
 
 
 def test_the_run_hash_follows_the_document_the_range_and_the_as_of(world: World) -> None:
@@ -888,9 +911,9 @@ def test_random_picks_need_an_out_of_sample_slice_and_are_drawn_only_there() -> 
     first = found.draws[0]
     assert (first.slice_kind, first.sessions, first.picks, first.eligible) == ("draw", 2, 10, 40)
     # Names earn (i - 9.5)%: the screener's top five always hit (lift 2.0, the ceiling); a random
-    # five rarely is the top five (1 in 252 a session), so the draws centre on 1.0.
+    # five is the top five only 1 time in 252 a session, so almost no draw reaches the ceiling.
     lifts = [d.lift for d in found.draws if d.lift is not None]
-    assert max(lifts) <= 2.0
+    assert sum(lift >= 2.0 for lift in lifts) < 0.01 * len(lifts)
     assert sum(lifts) / len(lifts) == pytest.approx(1.0, abs=0.05)
 
 

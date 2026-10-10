@@ -36,8 +36,10 @@ export const MOVE_LABELS: Record<Move, string> = {
 /** Showing the out-of-sample result is for a copy of the user's whose result is still withheld. */
 export const canReveal = (edge: Edge): boolean => edge.mine && edge.oosHidden;
 
-/** Rejecting needs a reason; retiring may give one. */
-export const asksReason = (move: Move): boolean => move === 'reject' || move === 'retire';
+/** Rejecting one's own edge needs a reason, retiring may give one; on a site edge Reject only
+ * removes the bookmark (the server keeps no reason), so nothing is asked. */
+export const asksReason = (move: Move, mine: boolean): boolean =>
+  mine && (move === 'reject' || move === 'retire');
 
 /** The verdicts a follow warns about (the server decides the label; this only shows the reason). */
 export const warnsFollow = (edge: Edge): boolean =>

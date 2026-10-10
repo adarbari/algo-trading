@@ -322,8 +322,8 @@ def old(state: str, **follow: Any) -> dict[str, Any]:
     ("state", "result"),
     [
         ("following", "followed"),
-        ("trial", "followed"),
-        ("researching", "followed"),
+        ("trial", "unfollowed"),
+        ("researching", "unfollowed"),
         ("rejected", "unfollowed"),
         ("retired", "unfollowed"),
     ],
@@ -403,3 +403,12 @@ def test_migrating_names_a_file_it_cannot_read_and_goes_on(writer: MemoryConfigW
     writer.save_user_document("alice", "edges", "other", {"extends": "drift"} | old("following"))
     done = edges.migrate_follows(writer, "alice")
     assert done["mine"].startswith("skipped:") and done["other"] == "status live"
+
+
+def test_the_old_state_wins_over_a_stray_status_when_migrating(writer: MemoryConfigWriter) -> None:
+    writer.save_user_document(
+        "alice", "edges", "mine", {"extends": "drift", "status": "candidate"} | old("following")
+    )
+    assert seen(writer)["mine"].status == "live"  # read the same before the migration
+    assert edges.migrate_follows(writer, "alice") == {"mine": "status live"}
+    assert (writer.load("alice", "edges", "mine") or {})["status"] == "live"

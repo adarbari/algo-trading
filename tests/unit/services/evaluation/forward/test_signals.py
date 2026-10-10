@@ -83,6 +83,16 @@ def test_a_followed_site_edge_is_paper_traded_from_the_bookmarks_session() -> No
     assert not paper_traded(unfollowed)
 
 
+def test_an_old_researching_or_trial_file_of_a_site_edge_is_unfollowed_and_does_not_trade() -> None:
+    site = edge_document(status="evidenced")
+    site["evidence"] = {"run_id": "r1", "split_from": "2026-01-02"}
+    for state in ("researching", "trial", "retired"):
+        old = {"follow": {"state": state, "since": DAYS[0].isoformat()}}
+        docs = {**build_world().configs._docs, ("site", "edges", "drift"): site}
+        (edge,) = load_edges(MemoryConfigStore({**docs, ("u1", "edges", "drift"): old}), "u1")
+        assert not paper_traded(edge)
+
+
 def test_an_edge_still_in_the_old_follow_shape_trades_as_before_the_migration() -> None:
     """trial -> candidate and following -> live: the same edges trade, from the same session."""
     for state in ("following", "trial"):

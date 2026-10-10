@@ -39,10 +39,10 @@ BOOKMARK_LABELS = ("followed_against_verdict",)
 FOLLOW_KEYS = ("since", "labels")
 AUDIT_KEYS = ("status_since", "status_reason", "replaces", "labels", "oos_revealed")
 # The old ``[follow]`` state -> (the status of an own edge, whether a bookmark of a site edge
-# keeps it). Removed once every file is migrated (PR 5).
+# keeps it: only ``following`` does). Removed once every file is migrated (PR 5).
 LEGACY: Mapping[str, tuple[str, bool]] = {
-    "researching": ("researching", True),
-    "trial": ("candidate", True),
+    "researching": ("researching", False),
+    "trial": ("candidate", False),
     "following": ("live", True),
     "rejected": ("rejected", False),
     "retired": ("retired", False),

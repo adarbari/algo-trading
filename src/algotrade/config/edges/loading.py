@@ -229,7 +229,8 @@ def _modernised(doc: Mapping[str, Any], where: str) -> Mapping[str, Any]:
         )
     status, audit = legacy_own(doc[FOLLOW], where)
     rest = {k: v for k, v in doc.items() if k != FOLLOW}
-    return {**rest, "status": rest.get("status", status), AUDIT: rest.get(AUDIT, audit)}
+    # the old state is the truth: it wins over a stray ``status`` or ``[audit]``
+    return {**rest, "status": status, AUDIT: audit}
 
 
 def _strip(document: Mapping[str, Any]) -> dict[str, Any]:

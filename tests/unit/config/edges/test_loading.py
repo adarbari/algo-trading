@@ -113,7 +113,7 @@ def test_a_follow_only_file_of_a_site_id_is_the_users_bookmark_of_that_edge() ->
 
 @pytest.mark.parametrize(
     ("state", "followed"),
-    [("following", True), ("trial", True), ("researching", True), ("rejected", False),
+    [("following", True), ("trial", False), ("researching", False), ("rejected", False),
      ("retired", False)],
 )  # fmt: skip
 def test_an_old_follow_state_of_a_site_edge_reads_as_a_bookmark_or_none(
@@ -148,6 +148,12 @@ def test_an_old_follow_table_of_an_own_edge_reads_as_its_status_and_audit(
     assert (mine.audit.labels, mine.audit.oos_revealed) == (("oos_viewed_during_tuning",), True)
     assert not mine.followed
     assert mine.rejection_reason == ("why" if status in ("rejected", "retired") else "")
+
+
+def test_the_old_state_wins_over_a_stray_status_key_of_an_own_edge() -> None:
+    old = {"extends": "drift", "status": "candidate", "follow": {"state": "following"}}
+    by_id = {e.id: e for e in load_edges(store(site__drift=document(), alice__mine=old), "alice")}
+    assert by_id["mine"].status == "live"
 
 
 def test_an_own_edge_keeps_its_own_status_and_audit_and_a_copy_does_not_inherit_them() -> None:

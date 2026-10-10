@@ -399,8 +399,9 @@ def migrate_follows(writer: ConfigWriter, user: str) -> dict[str, str]:
             else:
                 status, audit = legacy_own(legacy, where)
                 document.pop(FOLLOW)
-                document.setdefault("status", status)
-                if audit and AUDIT not in document:
+                document["status"] = status  # the old state wins over a stray status
+                document.pop(AUDIT, None)
+                if audit:
                     document[AUDIT] = audit
                 writer.save_user_document(who, KIND, name, document)
                 done[name] = f"status {document['status']}"

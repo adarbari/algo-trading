@@ -108,7 +108,19 @@ from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
 
-HARNESS_VERSION = 1
+HARNESS_VERSION = 2  # 2: the run hash is an allowlist of ``RUN_INPUTS``, not the whole Edge
+# What an edge contributes to a run's identity (``run_hash``); every other field of ``Edge`` is
+# ``BOOKKEEPING`` (the user's or the server's state, prose, the site's decisions): changing one
+# never changes what a run measures, so it never makes a new run (nor reseeds the random draws).
+# A fitness test classifies every field: a new one fails until it is named here.
+RUN_INPUTS = (
+    "id", "outcome", "schedule", "universe", "top_k", "screeners", "baselines", "frozen_from",
+    "site_frozen_from", "base", "picks", "variants", "scorer_features",
+)  # fmt: skip
+BOOKKEEPING = (
+    "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
+    "rejection_reason", "evidence", "promoted", "compared", "extends", "follow", "audit", "owner",
+)  # fmt: skip
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
 PBO_SPLITS = 16
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
@@ -192,11 +204,11 @@ def run_hash(
     split_from: date | None = None,
     random_draws: int = DEFAULT_DRAWS,
 ) -> str:
-    """Identity of one evaluation: the parsed document, each variant's config hash, the range,
+    """Identity of one evaluation: the edge's ``RUN_INPUTS``, each variant's config hash, the range,
     the outcomes' ``as_of``, the run's implied-vol field, its effective split, the random draws
     per session and their seed scheme (``SEED_VERSION``), and the harness version."""
     payload = {
-        "edge": asdict(edge),
+        "edge": {k: asdict(edge)[k] for k in RUN_INPUTS},
         "iv_field": iv_field,
         "variants": [(v.id, v.config.hash) for v in variants],
         "range": [start, end],
