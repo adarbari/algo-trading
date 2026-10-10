@@ -32,10 +32,10 @@ def test_reads_are_logged_per_attributed_day_found_or_not() -> None:
         assert reader.table_range(A, D1, D2) is not None
         reader.require(A, D1, "hint")
     assert reader.reads(D2) == (
-        ReadRecord(A, D2, D2, "rows"),
-        ReadRecord(B, D2, D2, "rows"),
-        ReadRecord(A, D1, D2, "rows"),
-        ReadRecord(A, D1, D1, "rows"),
+        ReadRecord(A, D2, D2, "rows", dates_digest([D2])),
+        ReadRecord(B, D2, D2, "rows", dates_digest([])),  # none found: a partition that
+        ReadRecord(A, D1, D2, "rows", dates_digest([D1, D2])),  # appears later is noticed
+        ReadRecord(A, D1, D1, "rows", dates_digest([D1])),
     )
     assert reader.reads(D1) == () and reader.attributed_days() == [D2]
 
@@ -81,7 +81,7 @@ def test_reads_outside_a_block_are_not_logged_and_blocks_do_not_nest() -> None:
             pass
         reader.table(A, D1)
     reader.table(A, D1)  # the block ended: not logged again
-    assert reader.reads(D1) == (ReadRecord(A, D1, D1, "rows"),)
+    assert reader.reads(D1) == (ReadRecord(A, D1, D1, "rows", dates_digest([D1])),)
 
 
 def test_inputs_seq_is_the_sequence_at_the_first_read_of_the_day() -> None:
@@ -112,7 +112,10 @@ def test_including_keeps_recording_into_the_same_log() -> None:
     with reader.attribute(D2):
         assert own.table(A, D2) is not None  # sees its own pending write
         reader.table(A, D1)
-    assert reader.reads(D2) == (ReadRecord(A, D2, D2, "rows"), ReadRecord(A, D1, D1, "rows"))
+    assert reader.reads(D2) == (
+        ReadRecord(A, D2, D2, "rows", dates_digest([D2])),
+        ReadRecord(A, D1, D1, "rows", dates_digest([D1])),
+    )
     assert own.reads(D2) == reader.reads(D2)
 
 
@@ -132,4 +135,16 @@ def test_a_store_reader_makes_a_recording_one_of_its_own_view() -> None:
     assert isinstance(recording, RecordingReader) and recording.own_run == "mine"
     with recording.attribute(D1):
         recording.table(A, D1)
-    assert recording.reads(D1) == (ReadRecord(A, D1, D1, "rows"),)
+    assert recording.reads(D1) == (ReadRecord(A, D1, D1, "rows", dates_digest([D1])),)
+
+
+def test_a_read_filtered_by_instruments_or_as_of_cannot_tell_presence_and_carries_no_digest() -> (
+    None
+):
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    reader = RecordingReader(backend)
+    with reader.attribute(D1):
+        reader.table(A, D1, instruments=["EQ:A"])
+        reader.table_range(A, D1, D1, T0 + timedelta(days=9))
+    assert reader.reads(D1) == (ReadRecord(A, D1, D1, "rows"),)  # both: one distinct, unknown read

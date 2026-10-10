@@ -745,6 +745,7 @@ EDGE_LEGS = _fixed(
     *_floats("rest_mean", "rest_m2", "top_decile", "spread"),
     "pre_snapshot bool",
     "implied_stored bool",
+    "tombstone bool",  # a leg row that says its key has no leg any more (ADR 0063 amendment 7)
     "value_sums float32[]",
     "hit_sums float32[]",
     "read_table string[]",

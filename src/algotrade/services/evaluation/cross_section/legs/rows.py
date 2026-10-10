@@ -192,6 +192,16 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
     return row
 
 
+def encode_tombstone(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
+    """The row that replaces ``record`` under its key and says it is gone: a leg of a trial the
+    edge no longer has, or one the run did not compute again at a session it rewrote."""
+    row = _base(
+        LEG, user_id, edge_id, record.day, record.key, record.edge_variant, record.variant,
+        record.horizon,
+    )  # fmt: skip
+    return {**row, "tombstone": True}
+
+
 def decode_leg(row: Mapping[str, Any]) -> LegRecord:
     """The leg of a ``leg`` row (a dict ``encode_leg`` made, or a row of the stored frame)."""
     day = _day(row["session_date"])
@@ -318,6 +328,8 @@ def decode_frame(frame: pd.DataFrame | None) -> StoredLegs:
     for record in frame.to_dict("records"):
         row = {str(k): v for k, v in record.items()}
         kind = row["row_kind"]
+        if kind == LEG and not _null(row.get("tombstone")) and bool(row["tombstone"]):
+            continue  # the latest row of its key says the leg is gone
         if kind == LEG:
             leg = decode_leg(row)
             legs[leg.key, leg.edge_variant, leg.variant, leg.horizon, leg.day] = leg

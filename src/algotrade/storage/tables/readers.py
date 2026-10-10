@@ -115,7 +115,9 @@ class StoreReader:
 @dataclass(frozen=True)
 class ReadRecord:
     """One read an attributed day made. ``kind`` ``rows``: partitions ``start..end`` of
-    ``table`` were read (found or not: a read that found nothing is recorded too); ``dates``:
+    ``table`` were read (found or not: a read that found nothing is recorded too; ``digest``, when
+    the read could tell, the hash of the partition dates it returned, so a partition purged since
+    is noticed); ``dates``:
     the partition dates of ``table`` the caller used were listed, ``digest`` their hash
     (``dates_digest``), ``start`` the earliest of them; ``end`` is the day, or the latest date
     listed when that is after it (a read of the future: never reusable)."""
@@ -130,6 +132,18 @@ class ReadRecord:
 def dates_digest(days: Sequence[date]) -> str:
     """The hash of a list of partition dates: what a ``dates`` read is compared by."""
     return hashlib.sha256(",".join(d.isoformat() for d in days).encode()).hexdigest()[:16]
+
+
+def _rows(table: str, start: date, end: date, found: list[date] | None) -> ReadRecord:
+    """A ``rows`` record; ``found`` the partitions the read returned (None: not known, a read
+    filtered by instruments or ``as_of`` cannot tell an empty partition from none)."""
+    return ReadRecord(table, start, end, "rows", None if found is None else dates_digest(found))
+
+
+def _partition_days(frame: pd.DataFrame) -> list[date] | None:
+    if "session_date" not in frame.columns:
+        return None
+    return sorted({pd.Timestamp(v).date() for v in frame["session_date"].unique()})
 
 
 @dataclass
@@ -204,9 +218,12 @@ class RecordingReader(StoreReader):
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        if self._open():
-            self._log(ReadRecord(table, session_date, session_date, "rows"))
-        return super().table(table, session_date, as_of, instruments)
+        recording = self._open()
+        frame = super().table(table, session_date, as_of, instruments)
+        if recording:
+            found = None if as_of or instruments else ([] if frame is None else [session_date])
+            self._log(_rows(table, session_date, session_date, found))
+        return frame
 
     def table_range(
         self,
@@ -217,9 +234,14 @@ class RecordingReader(StoreReader):
         instruments: Sequence[str] | None = None,
         columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        if self._open():
-            self._log(ReadRecord(table, start, end, "rows"))
-        return super().table_range(table, start, end, as_of, instruments, columns)
+        recording = self._open()
+        frame = super().table_range(table, start, end, as_of, instruments, columns)
+        if recording:
+            found = None
+            if not (as_of or instruments):
+                found = [] if frame is None else _partition_days(frame)
+            self._log(_rows(table, start, end, found))
+        return frame
 
     def _log_dates(self, table: str, seen: list[date]) -> None:
         """Log the listing the caller used. A date after the day is a read of the future: the

@@ -237,6 +237,11 @@ def test_evaluate_edges_takes_a_split_flag_that_is_a_date(cli: Cli) -> None:
         build_parser().parse_args(["evaluate-edges", "--split-from", "soon"])
 
 
+def test_evaluate_edges_takes_a_full_flag_that_defaults_off() -> None:
+    parse = build_parser().parse_args
+    assert parse(["evaluate-edges", "--full"]).full and not parse(["evaluate-edges"]).full
+
+
 def test_study_winners_needs_the_stored_history_and_draft_edges_a_known_run(cli: Cli) -> None:
     study = cli("study-winners")  # the golden store has no outcomes or listing history
     assert study.returncode == 2 and "error:" in study.stderr
