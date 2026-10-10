@@ -178,8 +178,8 @@ describe('EdgeBuilder', () => {
     expect(unstash('my_momentum')?.thesis).toContain(' more');
     unmount();
     setup({ addScreen: 'size_small' });
-    expect(screen.getByRole('textbox', { name: /^Thesis/ })).toHaveValue(
-      expect.stringContaining(' more') as string,
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: /^Thesis/ }).value).toContain(
+      ' more',
     );
     expect(screens().getByRole('checkbox', { name: /^size_small/ })).toBeChecked();
     expect(screens().getByRole('checkbox', { name: /^momentum_12_1/ })).toBeChecked();
