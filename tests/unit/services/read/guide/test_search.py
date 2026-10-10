@@ -90,7 +90,7 @@ def test_results_group_by_kind_best_group_first_with_a_limit_per_kind() -> None:
 def test_a_prose_snippet_is_cut_around_the_first_word() -> None:
     long = "word " * 40 + "takeover " + "tail " * 60
     entry = GuideEntryText("term", "t", "T", ("t",), ("T",), (), (long.strip(),), "lead")
-    docs = {**DOCUMENTS, ("site", "guide", "glossary"): {"term": [
+    docs = {**DOCUMENTS, ("site", "guide_glossary", "alpha"): {"term": [
         {"id": "t", "term": "T", "short": "lead.", "body": long},
     ]}}  # fmt: skip
     assert rank(entry, "takeover") is not None

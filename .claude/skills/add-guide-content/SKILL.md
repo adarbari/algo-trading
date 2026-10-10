@@ -33,7 +33,7 @@ an item, then delete its baseline line.
    | situation (fools many fields at once) | `config/site/field_guide/situations.toml` `[[situation]]` | |
    | regime indicator, episode | `config/site/regime/cards.toml`, `episodes.toml` | |
    | playbook (one per site preset screen) | `config/site/guide/playbooks/<family>/<id>.toml` (`[asks]`: one line per criterion of the latest version) | `add-screener` for a site preset |
-   | glossary term, how-to page | `config/site/guide/glossary.toml` `[[term]]`, `start.toml` `[[page]]`; the button takes `{ kind: 'term' | 'start', id }` | |
+   | glossary term, how-to page | `config/site/guide/glossary/<theme>.toml` `[[term]]`, `start.toml` `[[page]]`; the button takes `{ kind: 'term' | 'start', id }` | |
 
    A kind the table does not have yet: stop and add it through `add-responsibility` (an owner,
    a loader in the Guide read model, a page template in docs/ui/guide.md), not as page text.
@@ -41,7 +41,7 @@ an item, then delete its baseline line.
    page's old text where it is (it is in the baseline); never add new text to a page.
    **Why a value is not available** (a gap on a page) is a glossary term per public kind
    (`unavailable_system`, `unavailable_not_stored`, ..., `not_run`; ADR 0056). A new
-   `UnavailableKind` needs its term in `config/site/guide/glossary.toml` and a line in
+   `UnavailableKind` needs its term in `config/site/guide/glossary/<theme>.toml` and a line in
    `GUIDE_TERMS` (`services/read/availability/cause.py`); the fitness test fails without one.
    The chain behind a gap (a table, a step, a source) is an admin's cause, never Guide text.
 3. **Write the entry for someone who does not follow markets**: what it is, how to read it from
@@ -76,3 +76,17 @@ an item, then delete its baseline line.
    one, lower the count when you fix one, never add a line), then `make changed` and push (CI
    is the full gate). A false finding of the prose test (a long label, say) is shortened, never
    added to the baseline; a banned word is rewritten, never the pattern widened.
+
+## Before you ship (beyond the bar in step 3)
+
+The principles: `docs/ui/guide.md` section 7; the full checklist: `docs/ui/guide-quality.md`
+section 3. Also yes to each of these, or fix it:
+
+1. One kind of entry (Start page, term or field), not a mix.
+2. Every concept with its own entry is linked, never restated.
+3. The worked example uses real values from a real run and the threshold they cross.
+4. One explicit "Don't ..." where misuse is plausible.
+5. A figure that can mislead names the check that is authoritative, not "interpret with care".
+6. A lifecycle is a Start page, one section per state: how you get there, what it means, what
+   you and the app do next, what can be undone.
+7. The entry ends with one to three next links, and the screen element has its `InfoButton`.

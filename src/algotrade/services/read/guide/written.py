@@ -1,7 +1,7 @@
 """The Guide's own written pages (ADR 0051), the two kinds whose only source is Guide prose:
 
-- ``GuideTerm``: a glossary term (``config/site/guide/glossary.toml``) by its id: the index's
-  entry (id, term, short), the body split at the catalogue names it mentions and its
+- ``GuideTerm``: a glossary term (``config/site/guide/glossary/<theme>.toml``) by its id: the
+  index's entry (id, term, short), the body split at the catalogue names it mentions and its
   ``see_also`` terms as index entries (an id that is no term is left out; a fitness test
   forbids that in the shipped file);
 - ``GuideStartPage``: a Start here page (``config/site/guide/start.toml``) by its id: the

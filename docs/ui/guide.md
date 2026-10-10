@@ -203,7 +203,7 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
 - **Sources**: Guide-only sources live under `config/site/guide/`: `sections.toml` (the
   section order, the theme groups, the playbook families), one
   `config/site/guide/playbooks/<family>/<id>.toml` per site preset (the playbook prose above, GD4),
-  `glossary.toml` (GD6a: one `[[term]]` each, `id, term, short` (one sentence, the hover),
+  `glossary/<theme>.toml` (GD6a: one `[[term]]` each, `id, term, short` (one sentence, the hover),
   `body`, `see_also` (term ids); read as `Query.guideTerm(id)`) and `start.toml` (GD6a: one
   `[[page]]` each, `id, order, title, summary`, `[[page.section]]` (`title, body`) and `links`
   (`{kind, id}`, kind one of start, indicator, episode, playbook, field, situation, term); read
@@ -233,7 +233,7 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   and drafter hooks.
 - **GD5**: market regime pages (indicators, episodes) and the Regime page's drawers.
 - **GD6**: Start here, glossary, grouped search behind ⌘K, the remaining migrations, the
-  baseline at its floor. GD6a (server side and content, done): `glossary.toml`, `start.toml`,
+  baseline at its floor. GD6a (server side and content, done): `glossary/<theme>.toml`, `start.toml`,
   `Query.guideTerm` / `guideStartPage` / `guideSearch`, the index's terms and pages. **GD6b
   (done)**: `/guide/start` and `/guide/start/<id>` (numbered, in order, each with its links and
   the next step), `/guide/glossary` (A to Z under letters) and `/guide/glossary/<id>`; the home and
@@ -255,3 +255,46 @@ thinkorswim RSI study page and Technical Indicators index; Fidelity RSI guide pa
 index; Koyfin help index and Data Dictionary; Finviz screener help; tastylive Delta page and
 Learn index; Stripe docs home; Linear docs home; Schwab learn topic pages; IBKR Campus press
 pages. Placement comparisons in section 3 are recalled from use.
+
+## 7. Writing standard (owner ask 2026-10-10)
+
+How an entry is written, so the Guide reads like the best product docs (research: Stripe's
+[payment lifecycle](https://docs.stripe.com/payments/paymentintents/lifecycle),
+[decline codes](https://docs.stripe.com/declines/codes) and
+[error handling](https://docs.stripe.com/error-handling), the
+[Markdoc post](https://stripe.dev/blog/markdoc), Slab on
+[Stripe's writing culture](https://slab.com/blog/stripe-writing-culture), the
+[Linear docs](https://linear.app/docs), the
+[Twilio glossary](https://www.twilio.com/docs/glossary)). The principles are ours, in our words. They are the why behind the checklist in
+`docs/ui/guide-quality.md` section 3 (the what to check), which this section does not repeat.
+
+1. **One kind per entry, by what the reader came to do.** A task or reading order is a Start
+   here page (verb title); a concept is a term; a measured value is a field. Never one entry
+   that is half of each.
+2. **The summary stands alone.** `short` is the drawer's header and the hover: one sentence,
+   at most 25 words, readable without the body.
+3. **Define once, link everywhere.** A concept has one term. Every other entry names it in
+   `see_also` or a link and does not restate it. A body that mentions a term with its own entry lists it.
+4. **Help sits beside the thing.** Every metric, column header, status badge and panel title
+   has an `InfoButton`; a screen element without one is a gap (the coverage checks list it).
+5. **Every number gets a worked example.** Real values and the threshold they cross, so the
+   reader sees why 77% against 69% on 3 trades is noise. Examples come from a real run.
+6. **A lifecycle is a table of states.** Per state: how you get there, what it means, what you
+   and the app do next, and which moves can be undone. Write one Start page per lifecycle.
+7. **A gap or error says what, why, what next.** An empty state or `UNKNOWN` names the cause
+   in public words (ADR 0056) and the next move; the chain behind it stays admin-only.
+8. **Say when a figure is uninformative, and name the check that is.** "Flat deciles: the
+   ranking carries no information; read the lift against the baselines" beats "interpret with care".
+9. **Say what not to do.** One explicit "Don't ..." wherever misuse is plausible (reading a
+   win rate as profit, acting on 3 trades).
+10. **Plain and terse.** Second person, present tense, one idea per sentence: at most 25 words
+    in a `short`, 30 in a body sentence. Risk before the hit case. No filler ("simply",
+    "powerful", "easy"), no jargon without a link, and no advice to buy or sell.
+11. **End with the next move.** A Start page and a term end with one to three links.
+12. **The checks are structured data.** Ids, `see_also` and links resolve in CI; a new screen
+    element lands with its entry (reviewed like code), never after it.
+
+How they map to the Guide's kinds: principles 1 to 3 shape the term, the Start page and
+the field; 4 and 12 the `InfoButton` and the checks; 5 to 9 the body of a term or a field's
+"when it lies"; 6 the Start pages; 10 and 11 every entry. The glossary index shows only the
+first sentence (the `short`); the drawer shows the entry.

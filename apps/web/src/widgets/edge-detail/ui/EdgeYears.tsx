@@ -3,10 +3,11 @@
  * with an In-sample / Out-of-sample / Both switch. The server marks each year's period (a year
  * the split falls in is `both` and shows under Both only); this only filters by that mark.
  */
-import { DataTable, Panel, SegmentedControl, type SegmentedOption } from '@algotrade/ui';
+import { DataTable, Panel, SegmentedControl, Stack, type SegmentedOption } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import type { VerdictYear } from '@/entities/edge';
+import { termHelp } from '@/features/guide-help';
 
 import { yearColumns } from '../model/columns';
 
@@ -32,13 +33,16 @@ export function EdgeYears({ years }: EdgeYearsProps) {
       title="Year by year"
       flush
       actions={
-        <SegmentedControl
-          aria-label="Period shown"
-          size="sm"
-          options={OPTIONS}
-          value={view}
-          onValueChange={setView}
-        />
+        <Stack direction="row" gap={1} align="center">
+          {termHelp('year_by_year')}
+          <SegmentedControl
+            aria-label="Period shown"
+            size="sm"
+            options={OPTIONS}
+            value={view}
+            onValueChange={setView}
+          />
+        </Stack>
       }
     >
       <DataTable<VerdictYear>

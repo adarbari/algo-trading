@@ -120,6 +120,17 @@ def test_the_guide_playbooks_are_site_only_under_the_guide_folder(root: Path) ->
     assert store.load("alice", "guide_playbooks", "pullback") is None  # never a user's
 
 
+def test_the_guide_glossary_is_site_only_one_file_per_theme(root: Path) -> None:
+    (root / "site" / "guide" / "glossary").mkdir(parents=True)
+    (root / "site" / "guide" / "glossary" / "day.toml").write_text('[[term]]\nid = "run"\n')
+    (root / "site" / "guide" / "sections.toml").write_text("")
+    store = FileConfigStore(root)
+    assert store.names("site", "guide_glossary") == ["day"]
+    assert store.names("site", "guide") == ["sections"]  # the subfolder is not a guide file
+    assert store.load("site", "guide_glossary", "day") == {"term": [{"id": "run"}]}
+    assert store.load("alice", "guide_glossary", "day") is None  # never a user's
+
+
 def test_screen_documents_are_read_through_every_store(tmp_path: Path) -> None:
     """Drafts and versions are read through the ``ConfigStore`` (the read model reads them;
     only the writer writes them): files, memory and an overlay over either."""

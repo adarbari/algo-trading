@@ -1,0 +1,366 @@
+# L3 site setting: the Guide glossary, edges: the evidence behind a verdict (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "verdict"
+term = "Verdict"
+short = "What the official result says about an edge: Works, Promising, Not working, Not enough data or Waiting on data."
+body = """
+One fixed rule judges the edge's official result, on its best screen and holding period (the
+page says which). Works: strong out-of-sample evidence on many trades. Promising: every
+Promising test passes, but not yet every Works test. Not working: enough trades, and a test
+fails clearly. Not enough data: too few out-of-sample trades, or a figure the rule needs is not
+measured. Waiting on data: no official result yet, or the run could not read an input. The
+reason line names the first test missed, and the details list every test with its value and
+threshold. The verdict is a measurement, not advice, and it is not the edge's status. Don't
+read a badge as an instruction to act.
+"""
+see_also = [
+  "verdict_works", "verdict_promising", "verdict_not_working", "verdict_not_enough_data",
+  "verdict_waiting_on_data", "verdict_criteria", "official_result", "edge_status",
+]
+
+[[term]]
+id = "official_result"
+term = "Official result"
+short = "The one backtest an edge is judged on: the site's latest run at its out-of-sample start."
+body = """
+Each edge document fixes the date its out-of-sample period starts. The official result is the
+latest committed site backtest run at that date. A backtest you run with another date is
+EXPLORATORY and never becomes the official result, so the verdict cannot be moved by choosing a
+date after seeing the numbers. Example: the official result of vrp_short_premium is its latest
+site run at the split 2026-04-01, out of 5 committed site runs.
+"""
+see_also = ["out_of_sample", "exploratory", "variants_tried"]
+
+[[term]]
+id = "win_rate"
+term = "Win rate"
+short = "The share of an edge's picks whose outcome came true."
+body = """
+For each past session the app takes the screen's top picks and checks the edge's outcome for each
+one. An outcome is, for example, "beat the S&P 500 over the next 20 trading days after costs" or
+"the short put expired worthless". The win rate is wins divided by picks. A window that has not
+closed yet is left out, never counted as a loss. On its own a win rate says little: compare it
+with the base rate. Example: a win rate of 77% reads well, but vrp_short_premium's base rate is
+69% and the 77% rests on 3 trades. Don't read a win rate as profit: it counts outcomes, not
+amounts, and the rare losses of a short put are large.
+"""
+see_also = ["base_rate", "lift", "trades"]
+
+[[term]]
+id = "base_rate"
+term = "Base rate"
+short = "How often the same outcome came true for every eligible name, picked or not."
+body = """
+The base rate is the win rate of doing nothing clever: every name the edge could have picked on
+the same sessions, judged by the same outcome. If 55% of picks beat the market but 54% of all
+names did too, the screen added almost nothing. Every win rate in the app is shown beside its
+base rate for that reason. Example: vrp_short_premium's picks won 77% of the time while every
+eligible name won 69%.
+"""
+see_also = ["win_rate", "lift"]
+
+[[term]]
+id = "lift"
+term = "Lift"
+short = "The win rate minus the base rate, in points: how much better the picks did than the field."
+body = """
+A lift of +5 pts means the picks' outcome came true 5 percentage points more often than for
+every eligible name; 0 means they did no better. The details also show the ratio (win rate
+divided by base rate). Lift on a handful of trades is noise: read it with the number of trades
+beside it, and prefer the out-of-sample lift to the whole history's. Example: vrp_short_premium
+shows +8 pts (a ratio of 1.11) on 3 trades, which is noise, and about 0 in-sample.
+"""
+see_also = ["base_rate", "trades", "out_of_sample", "win_rate"]
+
+[[term]]
+id = "trades"
+term = "Trades"
+short = "How many non-overlapping test dates a number rests on: the real sample size."
+body = """
+Picks made on the same day share that day's market, so they are not independent: fifty picks
+on one session are one trade, not fifty. The app spaces test sessions at least one holding
+period apart, and pools overlapping events into one block, so that no two windows overlap. It
+shows the count beside every number. Fewer than about 40 cannot tell a real edge from luck;
+the top vs bottom decile's t statistic says the same thing in another way. Example:
+vrp_short_premium has 15 trades in all and 3 out-of-sample, so its verdict needs 37 more.
+"""
+see_also = ["lift", "top_vs_bottom_decile"]
+
+[[term]]
+id = "top_vs_bottom_decile"
+term = "Top vs bottom decile"
+short = "The return of the best-ranked tenth of names minus the worst-ranked tenth."
+body = """
+On each test session every eligible name is ranked by the edge's own score (for example its
+12-1 momentum) and cut into ten equal groups. The spread is the average outcome of the top
+group minus the bottom group. A positive spread says the ranking itself carries information,
+beyond the few names a screen picks. Sessions where too few names have a score are left out of
+the deciles and counted. Its t statistic says how far the spread is from luck: 2 or more is
+promising, 3 or more strong. The bars show the average outcome of each group on the in-sample
+period, best-ranked first. A ranking that works falls from left to right; one that does not is
+flat or jagged. A bar is missing where the run stored none, never drawn as zero. Example:
+vrp_short_premium's bars read 7.5%, 6.5%, 6.0%, 7.6%, 7.5%, 6.5%, 7.9%, 6.8%, 7.6% and 7.4%. They
+are flat, with a spread of -0.034 and a t of -1.66, so the ranking carries no information.
+"""
+see_also = ["trades", "base_rate", "robustness"]
+
+[[term]]
+id = "out_of_sample"
+term = "Out-of-sample (OOS)"
+short = "Recent history held back from tuning: an edge must also work there to be trusted."
+body = """
+While an edge is built and compared, many versions get tried, and some will fit the past by
+luck. The out-of-sample period, from the date in the edge's Test line on, is kept apart: it is
+reported on its own, and the verdict rests on it. The date is fixed and moves only by a
+recorded decision, so the test cannot be quietly shifted. Example: vrp_short_premium's period
+starts on 2026-04-01 and holds only 3 trades so far. Don't move the date to improve a result.
+"""
+see_also = ["in_sample", "exploratory", "verdict", "variants_tried"]
+
+[[term]]
+id = "in_sample"
+term = "In-sample"
+short = "The older history an edge was built and tuned on: it flatters the edge."
+body = """
+Everything before the out-of-sample start. Many versions were tried on it, so even a good
+in-sample result says little by itself. It is shown beside the out-of-sample result to see whether
+the edge held up or faded. Example: vrp_short_premium's in-sample lift is about 0, so its
+out-of-sample gain is not a faded edge but a thin sample.
+"""
+see_also = ["out_of_sample", "variants_tried"]
+
+[[term]]
+id = "exploratory"
+term = "Exploratory"
+short = "A backtest over an out-of-sample date you chose, not the site's."
+body = """
+You can run an edge's backtest with your own out-of-sample date to explore. Such numbers are labelled EXPLORATORY. They never feed the track record shown on screeners, the verdict or an edge's status. A date chosen after seeing results is no longer a fair test. The site's
+out-of-sample date is the one that counts.
+"""
+see_also = ["out_of_sample", "official_result", "edge_status"]
+
+[[term]]
+id = "variants_tried"
+term = "Variants tried"
+short = "Every version of an edge that was ever tested, so luck from many tries is discounted."
+body = """
+Each variant, setting and holding period tried on an edge is counted. The more versions tried,
+the more likely the best one looks good by chance. The deflated Sharpe ratio uses the count to
+discount it. The probability of backtest overfitting estimates how often the best version in one
+half of history fails in the other. A result shown without its count of variants tried
+is not comparable. Example: vrp_short_premium tried 126 variants, which takes its deflated Sharpe
+from a Sharpe ratio of 1.74 down to 0.00.
+"""
+see_also = ["out_of_sample", "trades", "deflated_sharpe", "overfitting_probability", "sharpe_ratio"]
+
+[[term]]
+id = "robustness"
+term = "Robustness"
+short = "How the out-of-sample lift compares with backtests of random picks: the chance it is luck."
+body = """
+On each out-of-sample session the screen was measured, the harness draws as many names at random
+as the screen held. It does this 1,000 times, with the same draws on every run of the same data,
+and measures each draw like the screen's picks. The histogram is those random lifts; the marker is the edge's. Beating 95% of the draws
+is what Works asks for. The count of variants tried is beside it because trying more versions
+makes the best one look better than it is. Example: vrp_short_premium's lift beats 91% of the 1,000
+random backtests, short of the 95% Works needs.
+"""
+see_also = ["lift", "variants_tried", "verdict", "out_of_sample"]
+
+[[term]]
+id = "harness_exclusions"
+term = "What a run left out"
+short = "The sessions and names a backtest run could not measure, counted so none is quietly dropped."
+body = """
+A run counts what it set aside instead of ignoring it. Unclosed: decision sessions whose
+holding window had not finished by the run's end. Coverage: sessions with no screen run, or a
+screen run that lacked an input table. Score coverage: the lowest share of eligible names that
+had a score to rank; below the minimum the deciles are skipped. No entry bar: names with no
+price on the session they would have been bought. A figure shown as unknown was not recorded by
+the run, which is different from none.
+"""
+see_also = ["variants_tried", "exploratory", "trades"]
+
+[[term]]
+id = "verdict_works"
+term = "Verdict: Works"
+short = "The edge passed every Promising test and the stricter Works tests, on enough out-of-sample trades."
+body = """
+Shown when the official result passes both levels. It needs at least 100 trades, 40 of them
+out-of-sample, a top vs bottom decile t of 3 or more and a deflated Sharpe of 0.95 or more. It
+needs an overfitting probability of 0.2 or less and a decile spread above every baseline. Its
+out-of-sample lift must beat 95% of 1,000 random-pick backtests. A result with no random-pick
+backtests cannot reach it. Works is not a promise: it says the past out-of-sample evidence is
+strong, not that the pattern lasts or that a trade will profit. Don't size a position from the
+badge. A newer official result can change the verdict.
+"""
+next = "Next, read why it should last and check the year by year table for one year carrying the whole result."
+see_also = ["verdict", "verdict_criteria", "edge_persistence", "year_by_year", "robustness", "official_result", "top_vs_bottom_decile", "deflated_sharpe", "overfitting_probability"]
+
+[[term]]
+id = "verdict_promising"
+term = "Verdict: Promising"
+short = "Every Promising test passes, but not every Works test: enough evidence to keep testing, not to rely on."
+body = """
+Shown when all seven Promising tests pass. They are at least 40 out-of-sample trades, a win rate
+above the base rate and a decile t of 2 or more. They also need an overfitting probability of 0.5
+or less, a deflated Sharpe of 0.8 or more and a lift above every baseline. The seventh is an
+out-of-sample lift that keeps at least half of the in-sample lift. The reason line names the first
+Works test still missed. It is not a trading signal and not a smaller Works. The out-of-sample
+sample is still short, and more sessions can lift it or sink it. Don't run the edge again on
+another date to push it over: that is exploratory and never counts.
+"""
+next = "Next, watch whether the missed Works test moves as new sessions pass."
+see_also = ["verdict", "verdict_criteria", "verdict_works", "exploratory", "out_of_sample", "win_rate", "base_rate", "deflated_sharpe", "overfitting_probability"]
+
+[[term]]
+id = "verdict_not_working"
+term = "Verdict: Not working"
+short = "With enough out-of-sample trades, a test fails clearly: the picks did no better than chance or the plain baselines."
+body = """
+Shown only when there are at least 40 out-of-sample trades, so the numbers can speak. A test fails
+clearly. The win rate is not above the base rate, or the decile t is below 1, or the deflated
+Sharpe is below 0.5. Or the overfitting probability is above 0.5, the lift is below the median
+baseline, or another Promising test fails outright. The reason line names it. It says this data
+does not support the idea, not that the idea is wrong for ever: a different screen or holding
+period is a new test. Don't follow an edge while it reads Not working: the app labels that choice
+for good.
+"""
+next = "Next, read the reason, then reject the edge with the reason kept, or clone it and change one thing."
+see_also = ["verdict", "verdict_criteria", "edge_state", "edge_labels", "follow_edge", "win_rate", "base_rate", "deflated_sharpe", "overfitting_probability"]
+
+[[term]]
+id = "verdict_not_enough_data"
+term = "Verdict: Not enough data"
+short = "Too few out-of-sample trades, or a figure the rule needs is not measured: the numbers cannot say yes or no."
+body = """
+Shown when there are fewer than 40 out-of-sample trades (the reason says how many) or a Promising
+test has no value yet, such as the overfitting probability. It is the usual verdict of a young
+edge, or one whose data starts late. It is not a mild Not working and not a mild Promising: no
+judgement is possible. Example: vrp_short_premium shows a win rate of 77% against 69% on 3
+out-of-sample trades, and the verdict stays Not enough data. Don't read the win rate and lift
+beside this badge as a result.
+"""
+next = "It clears by itself as sessions pass or the missing figure is stored; nothing you do speeds it up."
+see_also = ["verdict", "trades", "verdict_criteria", "out_of_sample", "overfitting_probability", "win_rate"]
+
+[[term]]
+id = "verdict_waiting_on_data"
+term = "Verdict: Waiting on data"
+short = "There is no official result yet, or the run could not read an input it needs."
+body = """
+Shown when the edge has no official result, because nobody has run it at its out-of-sample start,
+or when the run lost inputs for its best variant. The reason line says which, and Backtests lists
+what the run could not read. It is not bad news about the idea: nothing has been judged. If an
+input was lost, the reason names it, and a run made after the data is stored can read it. Don't
+read an edge in this state as failed.
+"""
+next = "A backtest at the edge's out-of-sample start creates the official result: Run backtest for your own edge, Run as site for an admin."
+see_also = ["verdict", "official_result", "edge_backtests", "run_backtest"]
+
+[[term]]
+id = "verdict_criteria"
+term = "What the verdict tests"
+short = "The table of every test behind the verdict: its value, what it needs, and pass, fail or not measured."
+body = """
+Open Details to see it. The tests come in two groups: the seven Promising tests, then the six
+Works tests. Each row shows the test, its Value for this edge, what is Needed and the Result. Not
+measured means the run did not store the figure, which is different from a fail; it keeps the
+verdict at Not enough data. All Promising tests passing means at least Promising, and all Works
+tests as well means Works. Example: vrp_short_premium fails three tests: trades (3 against at
+least 40), the decile t (-1.66 against 2) and the deflated Sharpe (0.00 against 0.8). It passes
+the win rate, baselines and keeps-its-size tests, and does not measure the overfitting
+probability. A pass means a threshold was crossed, not that the edge is proven.
+"""
+next = "Next, read the first failing row: it is the reason line under the verdict badge."
+see_also = ["verdict", "sharpe_ratio", "deflated_sharpe", "overfitting_probability", "baselines", "win_rate"]
+
+[[term]]
+id = "sharpe_ratio"
+term = "Sharpe ratio"
+short = "An edge's average result per trade divided by how much the results swing: higher is steadier."
+body = """
+The mean of the results divided by their spread, per test session and not scaled to a year. It is
+measured on the whole history, in-sample and out-of-sample together, so an edge tuned on that
+history looks better than it will. A high number can come from luck when many versions were
+tried. Read it beside the deflated Sharpe, which corrects for the count of variants tried.
+Example: vrp_short_premium has a Sharpe ratio of 1.74 and a deflated Sharpe of 0.00 after 126
+variants tried. The best of that many tries shows a Sharpe like that by luck. Don't judge an edge
+by its Sharpe ratio alone.
+"""
+see_also = ["deflated_sharpe", "variants_tried", "in_sample"]
+
+[[term]]
+id = "deflated_sharpe"
+term = "Deflated Sharpe"
+short = "The Sharpe ratio corrected for how many versions were tried: the chance it is more than luck, from 0 to 1."
+body = """
+Try enough versions and the best one shows a high Sharpe ratio by luck alone. The deflated Sharpe
+corrects for the count of variants tried and for the shape of the results. It reads as a chance
+from 0 to 1: Promising needs 0.8 or more, Works needs 0.95, and below 0.5 the edge is Not
+working. Example: vrp_short_premium's Sharpe ratio of 1.74 deflates to 0.00 after 126 variants.
+Don't compare deflated Sharpes from runs that tried different numbers of variants: the count is
+part of the figure.
+"""
+see_also = ["sharpe_ratio", "variants_tried", "overfitting_probability", "verdict_criteria"]
+
+[[term]]
+id = "overfitting_probability"
+term = "Overfitting probability"
+short = "An estimate of how often the version that looks best on part of history ranks poorly on the rest."
+body = """
+The harness splits history into pieces, picks the best variant on some of them and checks how
+that variant ranks on the pieces left out. The overfitting probability is the share of splits
+where it ranks at or below the middle. Promising needs 0.5 or less, Works 0.2 or less, and above
+0.5 the edge is Not working. It needs several variants to compare, so an edge with a single
+variant has none. The page shows not stored, the test is not measured, and the verdict stays at
+Not enough data. Example: vrp_short_premium has no value stored yet.
+"""
+see_also = ["variants_tried", "deflated_sharpe", "verdict_criteria", "verdict_not_enough_data"]
+
+[[term]]
+id = "baselines"
+term = "Baselines (decoys)"
+short = "Plain, well-known screens the edge must beat on the same sessions: a result that does not beat them adds nothing."
+body = """
+The edge's Compare line names them, for example momentum_12_1 (stocks that rose most over the
+past year) and size_small (the smallest companies). The harness tests each on the same sessions
+and the same outcome, so an edge is judged against what a plain screen did, not against nothing.
+Promising needs the out-of-sample lift above every baseline's, Works needs the decile spread
+above every baseline's, and a lift below the median baseline is Not working. An edge that declares
+no baselines passes those tests without being run, so read its result with care. Example:
+vrp_short_premium has a lift ratio of 1.11 against 0.86 for the best baseline: a pass.
+"""
+see_also = ["lift", "top_vs_bottom_decile", "verdict_criteria", "edge_definition"]
+
+[[term]]
+id = "year_by_year"
+term = "Year by year"
+short = "The result of the verdict's screen and holding period for each calendar year, with the trades behind it."
+body = """
+One row per year: win rate, base rate, lift, top vs bottom decile and trades, marked in-sample or
+out-of-sample. The year the split falls in is marked both and shows only under Both. Use it to see
+whether the result is steady or comes from one year. A year with no trades has no result, which is
+different from a result of zero. Example: vrp_short_premium has no trades from 2011 to 2023, as
+the data it needs starts around 2024. In 2024 it won 80% against 70% on 2 trades. In 2025 it won
+70% against 71% on 8, and in 2026 73% against 71% on 5. Don't read a year with 2 trades as a result.
+"""
+see_also = ["trades", "in_sample", "out_of_sample", "win_rate", "base_rate", "top_vs_bottom_decile"]
+
+[[term]]
+id = "edge_backtests"
+term = "Backtests"
+short = "The runs of an edge's test: the official result and any others, each with its split, its variants tried and what it could not read."
+body = """
+Each row is one run: its id, the date out-of-sample starts and the date the data runs to. Official
+result marks the one run the verdict rests on. EXPLORATORY marks a run over a date you chose, which
+never moves the verdict. A run also lists the variants it tried and the inputs it lost, so no gap
+is hidden. While a run you started works, the button says Evaluating; it ends Done, Done
+(exploratory) or Done, with some data missing, or it says the run failed. Example: vrp_short_premium
+has 5 committed site runs, and the official result is the latest at its frozen split, 2026-04-01.
+Don't compare figures of runs with different splits.
+"""
+see_also = ["official_result", "exploratory", "variants_tried", "run_backtest", "harness_exclusions"]
