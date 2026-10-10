@@ -69,12 +69,18 @@ class RunRecord:
         )
 
 
+def published(record: RunRecord) -> bool:
+    """Whether the run finished and left its rows: COMPLETE or PARTIAL. FAILED, WAITING and
+    unfinished (a killed RUNNING one) published nothing a reader may rely on."""
+    return record.status in (RunStatus.COMPLETE, RunStatus.PARTIAL)
+
+
 def done_sessions(records: Iterable[RunRecord]) -> set[date]:
     """The sessions ``records`` finished: any record COMPLETE (SUCCEEDED, waived steps included)
     or PARTIAL (written before ADR 0039) counts; FAILED, WAITING and unfinished ones do not. The
     one rule of "a session is done": the nightly planner (``last_finished_session``) and the
     read side's last complete session (ADR 0062) both use it."""
-    return {r.session_date for r in records if r.status in (RunStatus.COMPLETE, RunStatus.PARTIAL)}
+    return {r.session_date for r in records if published(r)}
 
 
 def new_run_id(job: str, session_date: date, now: datetime) -> str:

@@ -149,3 +149,14 @@ is FAILED as above.
 A screener's coverage excludes the stale chains the chains gate tolerated (`Decision.EXCLUDED`, out
 of the denominator, with a reason), so a night the gate passed does not FAIL the `screens` step on
 those same names.
+
+## Amendment (2026-10-10, carried results)
+"Retried from where it stopped" has one exception: a carried step is dropped and re-run when
+its own job published a run since its stored `task_run` (since the carried attempt for a
+result without one) that is COMPLETE or PARTIAL and that no attempt of the session cites as a
+`task_run`: a forced attempt killed after its task, or a standalone `run <task>`. The step
+re-runs under its acceptance checks, and its dependents re-run through `reruns_after`/`needs`
+as for any rerun (2026-10-09: a killed forced attempt re-ran rollups, the next attempt carried
+rollups and history-copy and left the history copy stale). A FAILED or RUNNING run published
+nothing and does not count; only the step's own job is checked. SUCCEED / FAIL by acceptance and
+the owner-only waive are unchanged.

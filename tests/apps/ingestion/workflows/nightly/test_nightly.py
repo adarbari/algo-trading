@@ -594,6 +594,82 @@ def test_a_failed_refetch_keeps_the_earlier_chains(fake: Callable[..., Calls]) -
     assert statuses(second)["screens"] == "FAILED"  # still short: the session stays FAILED
 
 
+def _standalone_run(
+    writer: StoreWriter, job: str, status: RunStatus, minutes: int, tag: str
+) -> RunRecord:
+    """A task run no nightly attempt cites (a forced attempt killed after its task, or a
+    ``run <task>`` by hand), started ``minutes`` after the session's close."""
+    started = AFTER_CLOSE + timedelta(minutes=minutes)
+    record = RunRecord(f"{job}-{tag}", job, D, started, status, started)
+    writer.save_run(record)
+    return record
+
+
+def test_carry_rejected_after_uncited_rollups_run(fake: Callable[..., Calls]) -> None:
+    # 2026-10-09: rollups, then history-copy; a killed forced attempt re-ran rollups (cited by
+    # no attempt); the next attempt carried both and left the history copy stale.
+    calls = fake()
+    writer = store()
+    run_nightly(task_ctx(writer), Plan([D]))
+    assert calls.sessions("rollups") == [D] and calls.sessions("history-copy") == [D]
+    _standalone_run(writer, "rollups", RunStatus.COMPLETE, 600, "killed-forced")
+    later = AFTER_CLOSE + timedelta(hours=12)  # the attempts after the killed one
+    second = run_nightly(task_ctx(writer, clock=lambda: later), Plan([D]))
+    assert calls.sessions("rollups") == [D, D]  # the carried result no longer stands
+    assert calls.sessions("market-rollups") == [D, D] and calls.sessions("history-copy") == [D, D]
+    assert calls.sessions("bars") == [D]  # unrelated steps are still carried
+    assert statuses(second)["rollups"] == "SUCCEEDED"
+    assert "earlier attempt" not in (steps_of(second)["rollups"].get("reason") or "")
+    third = run_nightly(task_ctx(writer, clock=lambda: later + timedelta(hours=1)), Plan([D]))
+    # the rerun is cited: carried again
+    assert calls.sessions("rollups") == [D, D] and "earlier attempt" in str(
+        steps_of(third)["rollups"]["reason"]
+    )
+
+
+def test_standalone_task_run_reruns_step_and_dependents(fake: Callable[..., Calls]) -> None:
+    calls = fake()
+    writer = store()
+    run_nightly(task_ctx(writer), Plan([D]))
+    _standalone_run(writer, "rollups", RunStatus.PARTIAL, 30, "by-hand")
+    run_nightly(task_ctx(writer), Plan([D]))
+    for name in ("rollups", "market-rollups", "history-copy"):
+        assert calls.sessions(name) == [D, D], name  # the step and what needs it
+    assert calls.sessions("chains") == [D] and calls.sessions("earnings") == [D]
+
+
+def test_failed_refetch_run_does_not_force_rerun(fake: Callable[..., Calls]) -> None:
+    calls = fake()
+    writer = store()
+    run_nightly(task_ctx(writer), Plan([D]))
+    _standalone_run(writer, "rollups", RunStatus.FAILED, 30, "failed")
+    _standalone_run(writer, "rollups", RunStatus.RUNNING, 40, "killed")
+    # an older uncited COMPLETE run (before the stored one) does not count either
+    _standalone_run(writer, "rollups", RunStatus.COMPLETE, -90, "older")
+    run_nightly(task_ctx(writer), Plan([D]))
+    assert calls.sessions("rollups") == [D] and calls.sessions("history-copy") == [D]
+
+
+def test_a_partial_refetch_that_fails_acceptance_keeps_the_earlier_chains(
+    fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the refetch's own task run (PARTIAL, uncited) is not a superseding run: the earlier
+    # success is kept, not recorded FAILED (which would hold the workflow back)
+    monkeypatch.setattr(nightly_module, "job_name", lambda step: f"fake-{step}")
+    gate: list[Check] = []
+    calls, screens = fake(checks={"chains": gate}, items=STALE), Screens()
+    writer = store()
+    run_nightly(task_ctx(writer), Plan([D]), screens=screens)
+    _chains_staging(writer)
+    calls.partial = ("chains",)
+    gate.append(Check("chains_fresh", "FAIL", "still stale"))
+    later = AFTER_CLOSE + timedelta(hours=1)  # the refetch starts after the stored run
+    second = run_nightly(task_ctx(writer, clock=lambda: later), Plan([D]), screens=screens)
+    chains = steps_of(second)["chains"]
+    assert calls.sessions("chains") == [D, D] and chains["status"] == "SUCCEEDED"
+    assert "refetch failed" in chains["reason"]
+
+
 def test_a_reused_step_cites_the_attempt_that_produced_it(fake: Callable[..., Calls]) -> None:
     calls = fake(fail=("bars",))
     writer = store()
