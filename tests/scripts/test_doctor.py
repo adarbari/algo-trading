@@ -124,6 +124,23 @@ def test_store_path_must_exist(tmp_path: Path) -> None:
     )
 
 
+def test_a_missing_or_stale_history_copy_warns_with_the_command_to_run(tmp_path: Path) -> None:
+    ok = doctor.check_history_copy(probes(tmp_path, {}, history_stale=lambda: None))
+    assert ok.level == "ok"
+    stale = doctor.check_history_copy(
+        probes(tmp_path, {}, history_stale=lambda: "bars/1d has no history copy holding session X")
+    )
+    assert stale.level == doctor.WARN and "algotrade-ingest history-copy" in stale.fix
+    assert "nightly" in stale.fix and "bars/1d" in stale.detail
+
+
+def test_an_unreadable_store_leaves_the_history_copy_unchecked(tmp_path: Path) -> None:
+    def boom() -> str | None:
+        raise OSError("no store")
+
+    assert doctor.check_history_copy(probes(tmp_path, {}, history_stale=boom)).level == doctor.INFO
+
+
 def test_exit_code_is_non_zero_only_for_hard_failures() -> None:
     soft = [doctor.Result(doctor.WARN, "a", "x", "fix a"), doctor.Result(doctor.INFO, "b", "y")]
     text, code = doctor.render(soft)

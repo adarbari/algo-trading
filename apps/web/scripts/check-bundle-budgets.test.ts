@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   measure,
   staticClosure,
+  buildEnv,
+  PLACEHOLDER_ENV,
   table,
   updated,
   violations,
@@ -149,11 +151,25 @@ describe('reasons', () => {
   });
 });
 
+describe('buildEnv', () => {
+  it('fills the unset Supabase variables with the placeholders CI builds with', () => {
+    expect(buildEnv({ PATH: '/bin' })).toEqual({ PATH: '/bin', ...PLACEHOLDER_ENV });
+    expect(buildEnv({ VITE_SUPABASE_URL: 'https://x.supabase.co' })).toMatchObject({
+      VITE_SUPABASE_URL: 'https://x.supabase.co',
+      VITE_SUPABASE_ANON_KEY: PLACEHOLDER_ENV.VITE_SUPABASE_ANON_KEY,
+    });
+  });
+  it('builds nothing when both are set, or in CI', () => {
+    expect(buildEnv({ ...PLACEHOLDER_ENV })).toBeNull();
+    expect(buildEnv({ CI: 'true' })).toBeNull();
+  });
+});
+
 describe('table', () => {
   it('marks a size over its budget', () => {
     const sizes = measure(manifest, gzipSize, LAZY);
     const text = table(sizes, { ...budgets, entry_gzip_bytes: 10 });
-    expect(text).toMatch(/entry chunk \(JS \+ CSS\) \| 0.0 kB \| 0.0 kB \| OVER/);
-    expect(text).toMatch(/src\/pages\/b\/index.ts \| 0.0 kB \| 0.0 kB \| ok/);
+    expect(text).toMatch(/entry chunk \(JS \+ CSS\) \| 0.0 kB \(\d+ B\) \| 0.0 kB \(10 B\) \| OVER/);
+    expect(text).toMatch(/src\/pages\/b\/index.ts \| 0.0 kB \(\d+ B\) \| 0.0 kB \(\d+ B\) \| ok/);
   });
 });

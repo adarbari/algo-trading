@@ -267,6 +267,10 @@ class LocalTables:
         """Bytes of the table's history copy (``history.py``)."""
         return self.history.size(table)
 
+    def history_current(self, table: str, day: date) -> bool:
+        """Whether the history copy holds ``day``'s partition as it is now (``history.py``)."""
+        return self.history.current(table, day)
+
     def free_bytes(self) -> int:
         """Bytes free on the volume the store is on (a build checks it before writing)."""
         return self.history.free_bytes()

@@ -200,6 +200,12 @@ class HistoryCopy:
         order = pc.sort_indices(data, sort_keys=[(DAY, "ascending"), (POS, "ascending")])
         return data.take(order).drop_columns([DAY, POS])
 
+    def current(self, table: str, day: date) -> bool:
+        """Whether the copy holds ``day``'s year and ``day``'s partition as it is now (a
+        partition committed or restated since the build makes it stale)."""
+        copy = self.years(table).get(day.year)
+        return copy is not None and self._signature(table, day) == copy.days.get(day.isoformat())
+
     def size(self, table: str) -> int:
         """Bytes the table's copy takes on disk (files and manifest)."""
         folder = self._folder(table)
