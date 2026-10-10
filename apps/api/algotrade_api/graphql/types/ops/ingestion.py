@@ -1,5 +1,6 @@
-"""``Completeness`` (every dataset x a window of sessions: rows stored against rows expected)
-and ``CellDetail`` (one dataset on one session with the reasons behind it)."""
+"""``Completeness`` (every dataset x a window of sessions: rows stored against rows expected),
+``CellDetail`` (one dataset on one session with the reasons behind it) and ``ChainCoverage``
+(the option chains fetched OK, the names the feed keeps serving stale)."""
 
 import datetime as dt
 from typing import Self
@@ -76,4 +77,65 @@ class CellDetail:
             job=d.job,
             groups=[FailureGroup.of(g) for g in d.groups],
             runs=[RunDetail.of(r) for r in d.runs],
+        )
+
+
+@strawberry.type(description="A chain status code and how many underlyings had it")
+class ChainStatusCount:
+    code: str
+    count: int
+
+    @classmethod
+    def of(cls, d: ingestion.StatusCount) -> Self:
+        return cls(code=d.code, count=d.count)
+
+
+@strawberry.type(
+    description="The chains of one tier (`core` or `rest`) of the session: fetched OK and stale"
+)
+class ChainTier:
+    tier: str
+    total: int
+    ok: int
+    stale: int
+
+    @classmethod
+    def of(cls, d: ingestion.TierCoverage) -> Self:
+        return cls(tier=d.tier, total=d.total, ok=d.ok, stale=d.stale)
+
+
+@strawberry.type(
+    description="Option-chain coverage of the session: `ok` of `total` optionable underlyings "
+    "fetched OK (`share`), by status and tier; `chronic` the names stale in 3 of the last 5 "
+    "sessions (`chronicNames` the most persistent); `medianShare` the median share of the five "
+    "sessions before and `previousChronic` the count the session before (null: not enough "
+    "history); `drift` what moved beyond the warning limits"
+)
+class ChainCoverage:
+    session: dt.date
+    total: int
+    ok: int
+    share: float
+    statuses: list[ChainStatusCount]
+    tiers: list[ChainTier]
+    chronic: int
+    chronic_names: list[str]
+    median_share: float | None
+    previous_chronic: int | None
+    drift: list[str]
+
+    @classmethod
+    def of(cls, d: ingestion.ChainCoverageRead) -> Self:
+        return cls(
+            session=d.session,
+            total=d.total,
+            ok=d.ok,
+            share=d.share,
+            statuses=[ChainStatusCount.of(s) for s in d.statuses],
+            tiers=[ChainTier.of(t) for t in d.tiers],
+            chronic=d.chronic,
+            chronic_names=list(d.chronic_names),
+            median_share=d.median_share,
+            previous_chronic=d.previous_chronic,
+            drift=list(d.drift),
         )

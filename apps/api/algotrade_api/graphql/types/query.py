@@ -72,7 +72,7 @@ from algotrade_api.graphql.types.market.regime import MarketRegime
 from algotrade_api.graphql.types.ops.backtest import Backtest, BacktestDetail
 from algotrade_api.graphql.types.ops.config import Config
 from algotrade_api.graphql.types.ops.harness import HarnessRun
-from algotrade_api.graphql.types.ops.ingestion import CellDetail, Completeness
+from algotrade_api.graphql.types.ops.ingestion import CellDetail, ChainCoverage, Completeness
 from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
 from algotrade_api.graphql.types.ops.review import ReviewList
 from algotrade_api.graphql.types.ops.run import NightlyRun, RunDetail, RunItem
@@ -565,6 +565,18 @@ class Query:
             await off_loop(ingestion.load_cell_detail, ctx, dataset) if ctx is not None else None
         )
         return CellDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Option-chain coverage of the session (OK share of the optionable "
+        "underlyings, by status and tier, the chronically stale names, drift); null: the "
+        "session has no chains run",
+        extensions=[AdminOnly()],
+    )
+    async def chain_coverage(self, info: Ctx, date: Day = None) -> ChainCoverage | None:
+        ctx = await info.context.aread(date)
+        # Off the event loop: six sessions of run records and one partition read.
+        found = await off_loop(ingestion.load_chain_coverage, ctx) if ctx is not None else None
+        return ChainCoverage.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Listings marked for FIGI review (the universe build's list on or before "

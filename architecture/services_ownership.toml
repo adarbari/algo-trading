@@ -169,7 +169,7 @@ detect = [{ call = "evaluate_screen" }, { call = "evaluate_criterion" }, { call 
 
 [[responsibility]]
 id = "run-item-summary"
-description = "Summarise a run record's per-item statuses: status codes, which are fine, failed items grouped by a normalised reason (the nightly report and the API share it)"
+description = "Summarise a run record's per-item statuses: status codes, which are fine, failed items grouped by a normalised reason, and the option-chain coverage of a session over the chains task's recent run records (OK share of the optionable names, the chronic stale names, the drift limits for the nightly warning); the nightly report and the API share it"
 owner = ["src/algotrade/services/run_items.py"]
 section = "docs/api/read-model.md#the-domain-objects"
 detect = [{ string = "<date>" }, { string = "<url>" }]

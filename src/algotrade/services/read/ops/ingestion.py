@@ -13,11 +13,18 @@ of the window it names through the context's inventory reads (``stored_dates``,
 - ``chains``: underlyings whose chain fetch is ``OK`` (``chains/status``) against the
   optionable instruments of the universe snapshot the session sees.
 - ``snapshot`` (reference, universe): COMPLETE when a snapshot was built that session, CARRIED
-  when an earlier one stands in, MISSING before the first."""
+  when an earlier one stands in, MISSING before the first.
+
+``ChainCoverageRead`` (``load_chain_coverage``) is the chains dataset read closer: the share of
+the optionable universe fetched OK on the session, the status counts, the tiers, and the names
+the feed keeps serving stale (``services.run_items.chain_coverage`` over the chains task's run
+records of the last six sessions), so a gap the acceptance check tolerates is still seen."""
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+
+import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import last_closed_session, sessions_ending
@@ -34,6 +41,13 @@ from algotrade.services.read.context import (
 )
 from algotrade.services.read.ops.runs import FailureGroup, RunDetail, failure_groups, run_detail
 from algotrade.services.read.values import Unknown
+from algotrade.services.run_items import (
+    CHAINS_JOB,
+    CHRONIC_WINDOW,
+    STALE_STATUS,
+    chain_coverage,
+    status_code,
+)
 
 COMPLETE_SHARE = 0.98
 MAX_SESSIONS = 60
@@ -210,3 +224,80 @@ def load_cell_detail(ctx: ReadContext, dataset: str) -> CellDetail | None:
         for record in records:
             items.update(record.items)
     return CellDetail(cell, d.job, failure_groups(items), tuple(run_detail(r) for r in records))
+
+
+@dataclass(frozen=True)
+class StatusCount:
+    code: str  # a chain status code (OK, STALE_DATA, NO_CHAIN, ...)
+    count: int
+
+
+@dataclass(frozen=True)
+class TierCoverage:
+    """The chains of one tier (``core`` or ``rest``, as stored with each status row)."""
+
+    tier: str
+    total: int
+    ok: int
+    stale: int
+
+
+@dataclass(frozen=True)
+class ChainCoverageRead:
+    """Option-chain coverage of the session: ``ok`` of ``total`` optionable underlyings fetched
+    OK (``share``); ``statuses`` and ``tiers`` its breakdown; ``chronic`` the names stale in 3
+    of the last 5 sessions (``chronic_names`` the most persistent tickers); ``median_share`` the
+    median share of the five sessions before and ``previous_chronic`` the count the session
+    before (``None``: not enough history); ``drift`` what moved beyond the warning limits."""
+
+    session: date
+    total: int
+    ok: int
+    share: float
+    statuses: tuple[StatusCount, ...]
+    tiers: tuple[TierCoverage, ...]
+    chronic: int
+    chronic_names: tuple[str, ...]
+    median_share: float | None
+    previous_chronic: int | None
+    drift: tuple[str, ...]
+
+
+def load_chain_coverage(ctx: ReadContext) -> ChainCoverageRead | None:
+    """The chain coverage of ``ctx.session.date`` from the chains task's run records (the six
+    sessions ending at it); ``None`` when the session has no chains record."""
+    days = sessions_ending(ctx.session.date, CHRONIC_WINDOW + 1)
+    found = chain_coverage(ctx.reader.runs_of([CHAINS_JOB], days[0], days[-1]), days)
+    if found is None:
+        return None
+    tiers: tuple[TierCoverage, ...] = ()
+    names = dict.fromkeys(found.chronic_top, "")
+    frame = partition(ctx, CHAIN_STATUS)  # the session's own partition: the one rule
+    if not isinstance(frame, Unknown):
+        codes = frame["status"].astype(str).map(status_code)
+        tier = (
+            frame["tier"].astype(str) if "tier" in frame else pd.Series("rest", index=frame.index)
+        )
+        tiers = tuple(
+            TierCoverage(str(t), len(g), int((codes[g.index] == "OK").sum()),
+                         int((codes[g.index] == STALE_STATUS).sum()))
+            for t, g in frame.groupby(tier, sort=True)
+        )  # fmt: skip
+        if "instrument_id" in frame and "symbol" in frame:
+            by_id = dict(
+                zip(frame["instrument_id"].astype(str), frame["symbol"].astype(str), strict=True)
+            )
+            names = {k: by_id.get(k, k) for k in found.chronic_top}
+    return ChainCoverageRead(
+        session=ctx.session.date,
+        total=found.total,
+        ok=found.ok,
+        share=found.share,
+        statuses=tuple(StatusCount(c, n) for c, n in found.statuses),
+        tiers=tiers,
+        chronic=found.chronic,
+        chronic_names=tuple(names.get(k) or k for k in found.chronic_top),
+        median_share=found.median_share,
+        previous_chronic=found.previous_chronic,
+        drift=found.drift(),
+    )

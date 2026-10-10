@@ -1,6 +1,7 @@
 /**
  * Read hooks for ingestion completeness over GraphQL (`Query.{completeness,ingestionCell}`;
- * ADR 0037): the grid (the window of sessions ending at the latest) and one cell's drill-down.
+ * ADR 0037): the grid (the window of sessions ending at the latest), one cell's drill-down and
+ * the option-chain coverage of the session (`Query.chainCoverage`).
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -68,6 +69,41 @@ const IngestionCell = graphql(`
     }
   }
 `);
+
+const ChainCoverage = graphql(`
+  query ChainCoverage {
+    chainCoverage {
+      session
+      total
+      ok
+      share
+      statuses {
+        code
+        count
+      }
+      tiers {
+        tier
+        total
+        ok
+        stale
+      }
+      chronic
+      chronicNames
+      medianShare
+      previousChronic
+      drift
+    }
+  }
+`);
+
+/** The option-chain coverage of the served session; null: it has no chains run. */
+export function useChainCoverage() {
+  return useQuery({
+    queryKey: queryKeys.gql('ChainCoverage', {}),
+    queryFn: () => gql(ChainCoverage, {}),
+    select: (data) => data.chainCoverage,
+  });
+}
 
 /** The grid; null: nothing stored. */
 export function useCompleteness(sessions = SESSIONS, enabled = true) {

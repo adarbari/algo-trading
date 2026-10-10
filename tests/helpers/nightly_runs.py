@@ -3,7 +3,11 @@
 from datetime import UTC, date, datetime
 from typing import Any
 
+from algotrade.core.time.calendar import sessions_ending
+from algotrade.data import StoreReader
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.tables.writers import StoreWriter
 
 D = date(2026, 10, 2)
 START = datetime(2026, 10, 3, 13, 26, 14, tzinfo=UTC)
@@ -125,3 +129,22 @@ def records() -> dict[tuple[str, str], RunRecord]:
             "data_quality", {"bars_fresh": "PASS", "chains_fetch": "FAIL", "chains_stale": "WARN"}
         ),
     }
+
+
+def chain_nights(stale_today: int) -> tuple[StoreReader, list[date]]:
+    """Six sessions of chains records: 100 OK each night, 5 names stale throughout and
+    ``stale_today`` more only on the last night."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    days = sessions_ending(D, 6)
+    for day in days:
+        items = {f"EQ:K{i}": "OK" for i in range(100)}
+        items |= {f"EQ:C{i}": "STALE_DATA: chain is for 2026-09-01" for i in range(5)}
+        if day == days[-1]:
+            items |= {f"EQ:T{i}": "STALE_DATA: chain is for 2026-09-01" for i in range(stale_today)}
+        start = datetime(day.year, day.month, day.day, 22, tzinfo=UTC)
+        writer.save_run(
+            RunRecord(f"option_chains-{day}", "option_chains", day, start, RunStatus.COMPLETE,
+                      start, items, {"order_tiers": {"liquidity": 90, "rest": 10}})
+        )  # fmt: skip
+    return StoreReader(backend), days

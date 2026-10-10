@@ -5,15 +5,24 @@ run record (and the ``purge-raw`` run after it), so ``algotrade-ingest report --
 renders the same report the nightly mailed. ``task_records`` finds, for each step of a
 summary, the registry task's run record that step produced (the latest one of that task for
 the session that finished inside the nightly's window); its per-item statuses feed the
-failure deep dive. ``labels`` maps instrument ids in the examples to tickers.
+failure deep dive. ``labels`` maps instrument ids in the examples to tickers. ``chains`` is
+each session's option-chain coverage from the chains task's run records; ``chain_drift`` the
+warnings for it.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime, timedelta
 from typing import Any
 
+from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.reference import instruments
+from algotrade.services.run_items import (
+    CHAINS_JOB,
+    CHRONIC_WINDOW,
+    ChainCoverage,
+    chain_coverage,
+)
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.report import Report, build_report
@@ -154,6 +163,27 @@ def arrivals(reader: StoreReader, sessions: int = DEFAULT_SESSIONS) -> tuple[Arr
     return arrival_stats(attempts, sessions)
 
 
+def chains(reader: StoreReader, sessions: Iterable[str]) -> tuple[ChainCoverage, ...]:
+    """The option-chain coverage of each of ``sessions`` (the chains task's run records of the
+    six sessions ending at it; a session without a chains record is left out)."""
+    out = []
+    for session in sessions:
+        days = sessions_ending(date.fromisoformat(session), CHRONIC_WINDOW + 1)
+        found = chain_coverage(reader.runs_of([CHAINS_JOB], days[0], days[-1]), days)
+        out += [found] if found is not None else []
+    return tuple(out)
+
+
+def chain_drift(reader: StoreReader, summary: Mapping[str, Any]) -> list[dict[str, str]]:
+    """WARN entries (the summary's ``warnings`` shape) for each session whose chain coverage or
+    chronic stale count drifted (``ChainCoverage.drift``); a warning only, never a failure."""
+    return [
+        {"check": "chain_coverage", "status": "WARN", "detail": f"{c.session}: {d}"}
+        for c in chains(reader, summary.get("sessions", []))
+        for d in c.drift()
+    ]
+
+
 def load_report(
     reader: StoreReader,
     summary: Mapping[str, Any],
@@ -166,9 +196,12 @@ def load_report(
     started = summary.get("started_at")
     past = history(reader, datetime.fromisoformat(started) if started else None)
     arrived = arrivals(reader)
-    report = build_report(summary, records, None, max_examples, past, max_duration_s, arrived)
+    coverage = chains(reader, summary.get("sessions", []))
+    args = (past, max_duration_s, arrived, coverage)
+    report = build_report(summary, records, None, max_examples, *args)
     keys = [e.key for g in report.failures for e in g.examples]
+    keys += [k for c in coverage for k in c.chronic_top]
     names = labels(reader, date.fromisoformat(report.sessions[-1]), keys) if report.sessions else {}
     if not names:
         return report
-    return build_report(summary, records, names, max_examples, past, max_duration_s, arrived)
+    return build_report(summary, records, names, max_examples, *args)

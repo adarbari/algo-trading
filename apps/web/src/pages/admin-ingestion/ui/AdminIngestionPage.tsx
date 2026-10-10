@@ -1,13 +1,14 @@
 /**
  * Admin › Ingestion: completeness and quality of the data, high level first with ways to drill
  * down. The summary strip; the completeness grid beside the selected cell's drill-down; the
- * quality checks; verification vs IBKR beside the open review items (their rows open the ticker
+ * option-chain coverage; the quality checks; verification vs IBKR beside the open review items (their rows open the ticker
  * in Explore); recent nightly runs. The
  * selected cell comes from the route (shareable); the page only lays the widgets out.
  */
 import { Grid, Heading, MasterDetail, Stack } from '@algotrade/ui';
 
 import { datasetLabel, type CellRef } from '@/entities/ingestion';
+import { ChainCoveragePanel } from '@/widgets/chain-coverage-panel';
 import { CompletenessPanel } from '@/widgets/completeness-panel';
 import { DrilldownPanel } from '@/widgets/drilldown-panel';
 import { IngestionSummary } from '@/widgets/ingestion-summary';
@@ -45,6 +46,7 @@ export function AdminIngestionPage({
         detailTitle={selected ? `${datasetLabel(selected.dataset)} · ${selected.session}` : ''}
         onDetailClose={onClearCell}
       />
+      <ChainCoveragePanel />
       <QualityChecksPanel />
       <Grid columns={2} gap={4} collapse="lg" align="start">
         <VerificationPanel {...(onOpenTicker ? { onOpen: onOpenTicker } : {})} />

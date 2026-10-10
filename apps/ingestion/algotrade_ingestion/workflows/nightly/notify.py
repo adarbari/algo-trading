@@ -30,7 +30,7 @@ from typing import Any, Protocol
 from algotrade.config import env
 from algotrade.config.site.settings import NightlySettings
 from algotrade.data import StoreReader
-from algotrade_ingestion.workflows.nightly.records import load_report
+from algotrade_ingestion.workflows.nightly.records import chain_drift, load_report
 from algotrade_ingestion.workflows.nightly.render import render_html, render_text
 
 TITLE = "algotrade nightly"
@@ -240,6 +240,12 @@ def report(
     entries in ``warnings`` (the file is rewritten with them). -> the summary."""
     out = dict(summary)
     path = Path(settings.summary_path)
+    if reader is not None:  # coverage drift: a WARN beside the others, whatever the delivery
+        try:
+            out["warnings"] = [*out.get("warnings", []), *chain_drift(reader, out)]
+        except Exception as exc:  # never fail the nightly for a coverage figure
+            warn = {"check": "chain_coverage", "status": "WARN", "detail": f"not computed: {exc}"}
+            out["warnings"] = [*out.get("warnings", []), warn]
     _write(path, out)
     only_waiting = out["status"] == "WAITING" and len(out.get("runs", [])) <= 1
     if not settings.notify_enabled or only_waiting:  # catch-up sessions that finished still mail
