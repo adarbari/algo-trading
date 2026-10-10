@@ -1,0 +1,696 @@
+{
+ "generated": "2026-10-10 08:51 UTC",
+ "repeats": 10,
+ "operations": {
+  "Viewer": {
+   "status": 200,
+   "cold_ms": 11.79179100017791,
+   "warm_p50_ms": 1.2667919999103106,
+   "warm_p95_ms": 1.6216956498965374,
+   "bytes": 101,
+   "rows": 2,
+   "nocache_p50_ms": 1.9143124998208805,
+   "nocache_p95_ms": 2.6216331500563688
+  },
+  "SessionDate": {
+   "status": 200,
+   "cold_ms": 122.14474999996128,
+   "warm_p50_ms": 1.0193330000447531,
+   "warm_p95_ms": 1.1922793501071283,
+   "bytes": 42,
+   "rows": 0,
+   "nocache_p50_ms": 3.8048335001121814,
+   "nocache_p95_ms": 6.542960600052084
+  },
+  "Regime": {
+   "status": 200,
+   "cold_ms": 1359.8910839998553,
+   "warm_p50_ms": 0.9611460000087391,
+   "warm_p95_ms": 1.2898977000190825,
+   "bytes": 28713,
+   "rows": 16,
+   "nocache_p50_ms": 30.741687000045204,
+   "nocache_p95_ms": 47.73656234997361
+  },
+  "StatusStrip": {
+   "status": 200,
+   "cold_ms": 1727.0150829999693,
+   "warm_p50_ms": 0.934416999939458,
+   "warm_p95_ms": 1.2104252999279197,
+   "bytes": 15494,
+   "rows": 50,
+   "nocache_p50_ms": 37.434228999927655,
+   "nocache_p95_ms": 39.27465175005409
+  },
+  "IdeasPage": {
+   "status": 200,
+   "cold_ms": 140.756791000058,
+   "warm_p50_ms": 1.034228999969855,
+   "warm_p95_ms": 1.6423836999706511,
+   "bytes": 6687,
+   "rows": 16,
+   "nocache_p50_ms": 23.81037500003913,
+   "nocache_p95_ms": 30.76522119995389
+  },
+  "EdgeDesk": {
+   "status": 200,
+   "cold_ms": 72.73970799997187,
+   "warm_p50_ms": 1.182250499937254,
+   "warm_p95_ms": 2.0461187499449807,
+   "bytes": 108,
+   "rows": 0,
+   "nocache_p50_ms": 8.05883349994474,
+   "nocache_p95_ms": 14.606585599938171
+  },
+  "ScreenerConfigs": {
+   "status": 200,
+   "cold_ms": 60.134833000120125,
+   "warm_p50_ms": 1.2129584999911458,
+   "warm_p95_ms": 1.7929526000784795,
+   "bytes": 3309,
+   "rows": 18,
+   "nocache_p50_ms": 18.778687999883914,
+   "nocache_p95_ms": 19.58286220002492
+  },
+  "MyScreens": {
+   "status": 200,
+   "cold_ms": 35.91220900011649,
+   "warm_p50_ms": 1.2310625000964137,
+   "warm_p95_ms": 3.0233892500177735,
+   "bytes": 521,
+   "rows": 5,
+   "nocache_p50_ms": 3.6632290000397916,
+   "nocache_p95_ms": 4.0243500001224675
+  },
+  "ScreenerRuns": {
+   "status": 200,
+   "cold_ms": 218.50674999996045,
+   "warm_p50_ms": 0.9158125000112705,
+   "warm_p95_ms": 1.3863294999737268,
+   "bytes": 36259,
+   "rows": 30,
+   "nocache_p50_ms": 27.20608350011844,
+   "nocache_p95_ms": 50.461275300097014
+  },
+  "ScreenerTrackRecords": {
+   "status": 200,
+   "cold_ms": 238.44183300002442,
+   "warm_p50_ms": 1.3936459999968065,
+   "warm_p95_ms": 2.2083770498852577,
+   "bytes": 3999,
+   "rows": 16,
+   "nocache_p50_ms": 145.2678329999344,
+   "nocache_p95_ms": 164.53474984998596
+  },
+  "FeatureCatalogue": {
+   "status": 200,
+   "cold_ms": 118.64229200000409,
+   "warm_p50_ms": 1.7842915000301218,
+   "warm_p95_ms": 2.146912500063536,
+   "bytes": 499750,
+   "rows": 457,
+   "nocache_p50_ms": 42.34497900006318,
+   "nocache_p95_ms": 64.22017714997995
+  },
+  "TableView": {
+   "status": 200,
+   "cold_ms": 198.5990830000901,
+   "warm_p50_ms": 1.0690419999264122,
+   "warm_p95_ms": 1.2569313999506448,
+   "bytes": 145,
+   "rows": 0,
+   "nocache_p50_ms": 7.96027100000174,
+   "nocache_p95_ms": 9.73613139998406
+  },
+  "ScreenerResults": {
+   "status": 200,
+   "cold_ms": 153.1015830000797,
+   "warm_p50_ms": 1.305645500110586,
+   "warm_p95_ms": 1.7832248499644268,
+   "bytes": 40707,
+   "rows": 43,
+   "nocache_p50_ms": 23.120604000041567,
+   "nocache_p95_ms": 26.55937705000042
+  },
+  "EdgesPage": {
+   "status": 200,
+   "cold_ms": 812.2784170000159,
+   "warm_p50_ms": 1.1209995000172057,
+   "warm_p95_ms": 1.6224733999706586,
+   "bytes": 25877,
+   "rows": 10,
+   "nocache_p50_ms": 620.7262914999774,
+   "nocache_p95_ms": 671.6169815500848
+  },
+  "GuideEntries": {
+   "status": 200,
+   "cold_ms": 35.134875000039756,
+   "warm_p50_ms": 1.0590624999622378,
+   "warm_p95_ms": 1.4219584500096971,
+   "bytes": 4818,
+   "rows": 4,
+   "nocache_p50_ms": 20.833583500120767,
+   "nocache_p95_ms": 22.500556099964797
+  },
+  "InstrumentFacts": {
+   "status": 200,
+   "cold_ms": 567.0396670000173,
+   "warm_p50_ms": 1.2571044999276637,
+   "warm_p95_ms": 1.7482479499335568,
+   "bytes": 64022,
+   "rows": 43,
+   "nocache_p50_ms": 263.4473959999468,
+   "nocache_p95_ms": 313.3641143999967
+  },
+  "InstrumentEvents": {
+   "status": 200,
+   "cold_ms": 417.71254199989016,
+   "warm_p50_ms": 1.1132079998787958,
+   "warm_p95_ms": 1.3773229499292938,
+   "bytes": 49754,
+   "rows": 160,
+   "nocache_p50_ms": 193.48264550001204,
+   "nocache_p95_ms": 235.29564215001534
+  },
+  "RegimeEpisodes": {
+   "status": 200,
+   "cold_ms": 1720.6737919998432,
+   "warm_p50_ms": 0.8926665000217326,
+   "warm_p95_ms": 1.3480061000223036,
+   "bytes": 6888,
+   "rows": 12,
+   "nocache_p50_ms": 36.644478999960484,
+   "nocache_p95_ms": 39.270514249983535
+  },
+  "RegimeSignals": {
+   "status": 200,
+   "cold_ms": 31856.15333299984,
+   "warm_p50_ms": 1.079999500007034,
+   "warm_p95_ms": 1.5768688999514782,
+   "bytes": 35493,
+   "rows": 12,
+   "nocache_p50_ms": 44.34316649997072,
+   "nocache_p95_ms": 47.5231644000246
+  },
+  "MarketHistory": {
+   "status": 200,
+   "cold_ms": 23925.658708000126,
+   "warm_p50_ms": 1.394937499981097,
+   "warm_p95_ms": 1.5271478000386196,
+   "bytes": 37763,
+   "rows": 424,
+   "nocache_p50_ms": 160.3740000000471,
+   "nocache_p95_ms": 215.631020349872
+  },
+  "EventCalendar": {
+   "status": 200,
+   "cold_ms": 692.9477080000197,
+   "warm_p50_ms": 0.8759165000356006,
+   "warm_p95_ms": 1.0861250000630207,
+   "bytes": 71744,
+   "rows": 104,
+   "nocache_p50_ms": 99.3400004998648,
+   "nocache_p95_ms": 110.27415214991835
+  },
+  "IngestionCompleteness": {
+   "status": 200,
+   "cold_ms": 2992.5652920001085,
+   "warm_p50_ms": 1.1611250000669315,
+   "warm_p95_ms": 1.3503686000376547,
+   "bytes": 96690,
+   "rows": 500,
+   "nocache_p50_ms": 16.583728999989944,
+   "nocache_p95_ms": 44.98948749994728
+  },
+  "QualityChecks": {
+   "status": 200,
+   "cold_ms": 77.51966699993318,
+   "warm_p50_ms": 1.2278334999109575,
+   "warm_p95_ms": 1.6293312500010873,
+   "bytes": 348,
+   "rows": 1,
+   "nocache_p50_ms": 25.224416500009283,
+   "nocache_p95_ms": 26.19003125001882
+  },
+  "NightlyRuns": {
+   "status": 200,
+   "cold_ms": 94.91475000004357,
+   "warm_p50_ms": 1.0906249999607098,
+   "warm_p95_ms": 1.6650145499056637,
+   "bytes": 27325,
+   "rows": 23,
+   "nocache_p50_ms": 27.49277100008385,
+   "nocache_p95_ms": 29.349749999983032
+  },
+  "FigiReview": {
+   "status": 200,
+   "cold_ms": 288.20237499985524,
+   "warm_p50_ms": 0.8973960000275838,
+   "warm_p95_ms": 1.2266481000779095,
+   "bytes": 935,
+   "rows": 5,
+   "nocache_p50_ms": 24.406353999893327,
+   "nocache_p95_ms": 31.271712349916925
+  },
+  "LeverageReview": {
+   "status": 200,
+   "cold_ms": 56.28249999995205,
+   "warm_p50_ms": 1.2178335000498919,
+   "warm_p95_ms": 1.3808186000005662,
+   "bytes": 96,
+   "rows": 0,
+   "nocache_p50_ms": 9.049333500001921,
+   "nocache_p95_ms": 10.021102450036778
+  },
+  "Verification": {
+   "status": 200,
+   "cold_ms": 67.50050000005103,
+   "warm_p50_ms": 1.0959579999507696,
+   "warm_p95_ms": 1.2730981001254804,
+   "bytes": 822,
+   "rows": 3,
+   "nocache_p50_ms": 3.980395999974462,
+   "nocache_p95_ms": 5.667304200062517
+  },
+  "IngestionCell": {
+   "status": 200,
+   "cold_ms": 613.6939999998958,
+   "warm_p50_ms": 1.5797295000083977,
+   "warm_p95_ms": 1.9536164498049402,
+   "bytes": 237,
+   "rows": 0,
+   "nocache_p50_ms": 26.05422950011871,
+   "nocache_p95_ms": 27.328546049875513
+  },
+  "LlmUsage": {
+   "status": 200,
+   "cold_ms": 166.1962499999845,
+   "warm_p50_ms": 107.31737550008802,
+   "warm_p95_ms": 133.35992080002373,
+   "bytes": 7955,
+   "rows": 30,
+   "nocache_p50_ms": 88.3497914999225,
+   "nocache_p95_ms": 93.00418574999867
+  },
+  "HarnessRuns": {
+   "status": 200,
+   "cold_ms": 732.5800000000982,
+   "warm_p50_ms": 1.1414164999905552,
+   "warm_p95_ms": 1.4565792000780675,
+   "bytes": 14105,
+   "rows": 24,
+   "nocache_p50_ms": 632.5191045000338,
+   "nocache_p95_ms": 713.4615812500329
+  },
+  "GuideIndex": {
+   "status": 200,
+   "cold_ms": 110.26095900001565,
+   "warm_p50_ms": 0.8847084999388244,
+   "warm_p95_ms": 1.8709939000586933,
+   "bytes": 40956,
+   "rows": 494,
+   "nocache_p50_ms": 35.08068749999893,
+   "nocache_p95_ms": 48.14686700009361
+  },
+  "GuidePlaybook": {
+   "status": 200,
+   "cold_ms": 118.0101669999658,
+   "warm_p50_ms": 1.1629169999878286,
+   "warm_p95_ms": 1.41607689997727,
+   "bytes": 5173,
+   "rows": 10,
+   "nocache_p50_ms": 32.75310399999398,
+   "nocache_p95_ms": 39.215470350075066
+  }
+ },
+ "pages": {
+  "/ideas": {
+   "ops": [
+    "Viewer",
+    "SessionDate",
+    "Regime",
+    "StatusStrip",
+    "IdeasPage",
+    "EdgeDesk"
+   ],
+   "count": 6,
+   "sum_cold_ms": 3434.3392069999936,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 6.39816749981037,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 105.76427049988979,
+   "critical_nocache_p50_ms": 37.434228999927655,
+   "slowest": "StatusStrip"
+  },
+  "/screeners": {
+   "ops": [
+    "Viewer",
+    "ScreenerConfigs",
+    "SessionDate",
+    "Regime",
+    "StatusStrip",
+    "MyScreens",
+    "ScreenerRuns",
+    "ScreenerTrackRecords"
+   ],
+   "count": 8,
+   "sum_cold_ms": 3773.8383330001852,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 8.935167499998897,
+   "critical_warm_p50_ms": 1.3936459999968065,
+   "sum_nocache_p50_ms": 268.81089549988246,
+   "critical_nocache_p50_ms": 145.2678329999344,
+   "slowest": "StatusStrip"
+  },
+  "/screeners/vrp_scanner": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "FeatureCatalogue",
+    "TableView",
+    "ScreenerResults"
+   ],
+   "count": 6,
+   "sum_cold_ms": 3569.0409160001764,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 7.321333999925628,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 143.51608249990022,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  },
+  "/screeners/new": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "ScreenerConfigs",
+    "MyScreens"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3194.745000000239,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.606375999946067,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 92.53214549971744,
+   "critical_nocache_p50_ms": 37.434228999927655,
+   "slowest": "StatusStrip"
+  },
+  "/edges": {
+   "ops": [
+    "Viewer",
+    "EdgesPage",
+    "SessionDate",
+    "Regime",
+    "StatusStrip",
+    "GuideEntries"
+   ],
+   "count": 6,
+   "sum_cold_ms": 4068.2560000000194,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 6.361749999882704,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 715.4549370000041,
+   "critical_nocache_p50_ms": 620.7262914999774,
+   "slowest": "StatusStrip"
+  },
+  "/explore": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip"
+   ],
+   "count": 3,
+   "sum_cold_ms": 3098.6979580000025,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 3.1623549998585077,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 70.09022849979374,
+   "critical_nocache_p50_ms": 37.434228999927655,
+   "slowest": "StatusStrip"
+  },
+  "/explore?sel=AAPL": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "InstrumentFacts",
+    "InstrumentEvents",
+    "RegimeEpisodes"
+   ],
+   "count": 6,
+   "sum_cold_ms": 5804.123958999753,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 6.4253339996867,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 563.6647489997131,
+   "critical_nocache_p50_ms": 263.4473959999468,
+   "slowest": "StatusStrip"
+  },
+  "/regime": {
+   "ops": [
+    "Viewer",
+    "SessionDate",
+    "Regime",
+    "StatusStrip",
+    "RegimeEpisodes",
+    "RegimeSignals",
+    "GuideEntries",
+    "MarketHistory"
+   ],
+   "count": 8,
+   "sum_cold_ms": 60758.46341599981,
+   "critical_cold_ms": 31856.15333299984,
+   "sum_warm_p50_ms": 8.608353999875362,
+   "critical_warm_p50_ms": 1.394937499981097,
+   "sum_nocache_p50_ms": 336.090291000005,
+   "critical_nocache_p50_ms": 160.3740000000471,
+   "slowest": "RegimeSignals"
+  },
+  "/calendar": {
+   "ops": [
+    "Viewer",
+    "EventCalendar",
+    "ScreenerConfigs",
+    "SessionDate",
+    "Regime",
+    "StatusStrip"
+   ],
+   "count": 6,
+   "sum_cold_ms": 3973.9252490001036,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 6.270562999930007,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 192.01375049965463,
+   "critical_nocache_p50_ms": 99.3400004998648,
+   "slowest": "StatusStrip"
+  },
+  "/admin/ingestion": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "IngestionCompleteness",
+    "QualityChecks",
+    "NightlyRuns",
+    "FigiReview",
+    "LeverageReview",
+    "Verification",
+    "IngestionCell"
+   ],
+   "count": 10,
+   "sum_cold_ms": 7289.377041999842,
+   "critical_cold_ms": 2992.5652920001085,
+   "sum_warm_p50_ms": 11.43285549983375,
+   "critical_warm_p50_ms": 1.5797295000083977,
+   "sum_nocache_p50_ms": 202.88145799986523,
+   "critical_nocache_p50_ms": 37.434228999927655,
+   "slowest": "IngestionCompleteness"
+  },
+  "/admin/llm-usage": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "LlmUsage",
+    "GuideEntries"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3300.0290830000267,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 111.53879299990876,
+   "critical_warm_p50_ms": 107.31737550008802,
+   "sum_nocache_p50_ms": 179.273603499837,
+   "critical_nocache_p50_ms": 88.3497914999225,
+   "slowest": "StatusStrip"
+  },
+  "/admin/harness-runs": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "HarnessRuns",
+    "GuideEntries"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3866.4128330001404,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.362833999811301,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 723.4429164999483,
+   "critical_nocache_p50_ms": 632.5191045000338,
+   "slowest": "StatusStrip"
+  },
+  "/admin/screener-runs": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip"
+   ],
+   "count": 3,
+   "sum_cold_ms": 3098.6979580000025,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 3.1623549998585077,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 70.09022849979374,
+   "critical_nocache_p50_ms": 37.434228999927655,
+   "slowest": "StatusStrip"
+  },
+  "/admin/users": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip"
+   ],
+   "count": 3,
+   "sum_cold_ms": 3098.6979580000025,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 3.1623549998585077,
+   "critical_warm_p50_ms": 1.2667919999103106,
+   "sum_nocache_p50_ms": 70.09022849979374,
+   "critical_nocache_p50_ms": 37.434228999927655,
+   "slowest": "StatusStrip"
+  },
+  "/guide": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "GuideIndex",
+    "FeatureCatalogue"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3327.601209000022,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.831354999827454,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 147.51589499985585,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  },
+  "/guide/start": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "GuideIndex",
+    "FeatureCatalogue"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3327.601209000022,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.831354999827454,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 147.51589499985585,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  },
+  "/guide/glossary": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "GuideIndex",
+    "FeatureCatalogue"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3327.601209000022,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.831354999827454,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 147.51589499985585,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  },
+  "/guide/fields": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "GuideIndex",
+    "FeatureCatalogue"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3327.601209000022,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.831354999827454,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 147.51589499985585,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  },
+  "/guide/playbooks": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "GuideIndex",
+    "FeatureCatalogue",
+    "GuidePlaybook"
+   ],
+   "count": 6,
+   "sum_cold_ms": 3445.611375999988,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 6.9942719998152825,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 180.26899899984983,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  },
+  "/guide/situations": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "GuideIndex",
+    "FeatureCatalogue"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3327.601209000022,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.831354999827454,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 147.51589499985585,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  },
+  "/guide/regime": {
+   "ops": [
+    "Viewer",
+    "Regime",
+    "StatusStrip",
+    "GuideIndex",
+    "FeatureCatalogue"
+   ],
+   "count": 5,
+   "sum_cold_ms": 3327.601209000022,
+   "critical_cold_ms": 1727.0150829999693,
+   "sum_warm_p50_ms": 5.831354999827454,
+   "critical_warm_p50_ms": 1.7842915000301218,
+   "sum_nocache_p50_ms": 147.51589499985585,
+   "critical_nocache_p50_ms": 42.34497900006318,
+   "slowest": "StatusStrip"
+  }
+ }
+}

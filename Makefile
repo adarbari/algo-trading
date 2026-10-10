@@ -141,6 +141,12 @@ perf:            ## strict timing budgets (the `perf` tests), serially; run on a
 load:            ## API load test by hand on an idle machine (an API on :8011 first); ARGS="--scenario warm --users 100 --seconds 30"
 	$(PY) scripts/perf/load.py $(ARGS)
 
+api-latency-capture: ## what each web route sends on load (own API + Vite, real store) -> benchmarks/api_latency_pages.json
+	node scripts/perf/capture_page_ops.mjs
+
+api-latency:     ## per-API latency baseline (cold / warm / nocache) on its own API, real store -> docs/perf/api-latency-baseline.md; idle machine
+	$(PY) scripts/perf/api_latency.py $(ARGS)
+
 datasets-verify: ## committed golden CSVs match their checksums
 	$(BIN)algotrade-ingest golden verify
 
