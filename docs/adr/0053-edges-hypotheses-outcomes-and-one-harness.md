@@ -446,8 +446,13 @@ to 14) on the existing documents, with one new grain still to come.
    Rows are partitioned by signal session and merge per (user, edge, signal session, name), so a
    settlement rewrites its own row and `as_of` still gives the book as an earlier night saw it;
    one atomic run and one run record `edge-paper:<user>` per user per night; a re-run writes the
-   same rows. First cut: event schedules and outcomes that need the implied vol are not paper
-   traded (the run record says so, never an empty record). The read model
+   same rows. Event schedules (`on_event:`) and implied-vol outcomes (`expires_otm`, the vol
+   ratio) are paper traded (ED8 PR-E): the legs are the harness's own (`sessions.leg_blocks`: the
+   event names read at D with the dedupe looking back `EVENT_LOOKBACK` sessions, S = D + 1) and a
+   trade settles with `hit.apply_outcome` over the implied vol read at D (`harness.implied_at`),
+   a missing or invalid vol skipped with its reason, never a loss; what is still unsupported (no
+   screener, a mixed-source vol field) is skipped with its reason in the run record, never an
+   empty record. The read model
    (`services/read/edge_desk/`, `Query.edgeDesk`, `Query.edgePaper`: `Edge` has no session) serves
    the Ideas signals and an edge's live record against the backtest's usual range, the 10th to
    90th percentile of the wins `n` closed trades would show if the official win rate held

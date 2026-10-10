@@ -29,7 +29,7 @@ EXPLORATORY: its rows carry its split in their key and the flag, and the split j
 import hashlib
 import json
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from functools import partial
@@ -94,9 +94,8 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
     reports_after,
 )
 from algotrade.services.evaluation.cross_section.sessions import (
-    decision_sessions,
-    entry_session,
-    event_blocks,
+    Leg,
+    leg_blocks,
 )
 from algotrade.services.features import catalogue
 from algotrade.services.screening.regime import session_market
@@ -306,23 +305,23 @@ class _Session:
         self, key: str, field_name: str, ids: frozenset[str], day: date
     ) -> dict[str, float | None]:
         if (key, day) not in self._implied:
-            wanted = sorted(ids)
-            view, _ = fields_view(self._reader, (field_name,), day, wanted, historical=True)
-            values = {i: view.get(i, field_name) for i in wanted}
-            self._implied[key, day] = {
-                i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
-                for i, v in values.items()
-            }
+            self._implied[key, day] = implied_at(self._reader, field_name, ids, day)
         return self._implied[key, day]
 
 
-@dataclass(frozen=True)
-class _Leg:
-    """One decision session D and its entry session S: the screen and the names are read at D,
-    the outcome rows of the partition at S."""
-
-    decision: date
-    entry: date
+def implied_at(
+    reader: StoreReader, field_name: str, ids: Iterable[str], day: date
+) -> dict[str, float | None]:
+    """The implied vol ``field_name`` of ``ids`` read at the decision session ``day`` (None: not
+    stored): what an ``expires_otm`` strike or a vol ratio is measured from, for the harness and
+    the paper record alike."""
+    wanted = sorted(ids)
+    view, _ = fields_view(reader, (field_name,), day, wanted, historical=True)
+    values = {i: view.get(i, field_name) for i in wanted}
+    return {
+        i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+        for i, v in values.items()
+    }
 
 
 @dataclass(frozen=True)
@@ -337,7 +336,7 @@ class _Scope:
 
 
 @dataclass(frozen=True)
-class _Names:
+class Names:
     """The names of one edge variant at one decision session: ``ids`` the base (the rate and
     the deciles are over them), ``pickable`` those a pick may be."""
 
@@ -345,10 +344,9 @@ class _Names:
     pickable: frozenset[str]
 
 
-def _names(scope: _Scope, eligible: frozenset[str], event_names: frozenset[str] | None) -> _Names:
+def names_for(edge: Edge, eligible: frozenset[str], event_names: frozenset[str] | None) -> Names:
     """The base and the pickable names: an event schedule narrows them to the event's names
     (``base = "event"``; ``picks = "universe"`` keeps every eligible name pickable)."""
-    edge = scope.edge
     pickable = (
         eligible if event_names is None or edge.picks == "universe" else event_names & eligible
     )
@@ -357,7 +355,7 @@ def _names(scope: _Scope, eligible: frozenset[str], event_names: frozenset[str] 
         if edge.base == "event"
         else eligible
     )
-    return _Names(ids, pickable)
+    return Names(ids, pickable)
 
 
 def _outcomes(
@@ -383,7 +381,7 @@ def _stat(
     scope: _Scope,
     session: _Session,
     variant: Variant,
-    leg: _Leg,
+    leg: Leg,
     rows: pd.DataFrame,
     event_names: frozenset[str] | None,
 ) -> SessionStat:
@@ -397,7 +395,7 @@ def _stat(
         run is None or run.coverage not in MEASURED_COVERAGE
     ):  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
-    names = _names(scope, eligible, event_names)
+    names = names_for(scope.edge, eligible, event_names)
     pickable, ids = names.pickable, names.ids
     scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
@@ -587,7 +585,7 @@ def evaluate_edge(
     schedules = _events(reader, session, scopes, days)
     session.release()  # the eligible sets read for the events are not kept
     plans = [
-        _Plan(scope, horizon, _blocks(scope.edge, schedules.get(scope.key), days, horizon))
+        _Plan(scope, horizon, leg_blocks(scope.edge, schedules.get(scope.key), days, horizon))
         for scope in scopes
         for horizon in scope.edge.outcome.horizon_sessions
     ]
@@ -704,7 +702,7 @@ class _Plan:
 
     scope: _Scope
     horizon: int
-    blocks: Sequence[Sequence[_Leg]]
+    blocks: Sequence[Sequence[Leg]]
 
     @property
     def key(self) -> tuple[str, int]:
@@ -832,7 +830,7 @@ def _measure_plan(
 def _measure_random(
     p: _Plan,
     variant: Variant,
-    leg: _Leg,
+    leg: Leg,
     stat: SessionStat,
     session: _Session,
     event_names: frozenset[str] | None,
@@ -846,7 +844,7 @@ def _measure_random(
     if stat.excluded_coverage:
         return
     eligible = session.eligible(p.scope.key, p.scope.universe, leg.decision)
-    names = _names(p.scope, eligible, event_names)
+    names = names_for(p.scope.edge, eligible, event_names)
     res = _outcomes(p.scope, session, leg.decision, rows, eligible, names.ids)
     found = random_stat(
         leg.decision,
@@ -860,7 +858,7 @@ def _measure_random(
         out.randoms.setdefault((p.key, variant.id), {})[leg.decision] = found
 
 
-def _drawn(block: Sequence[_Leg], legs: Mapping[date, RandomStat], closed: set[date]) -> bool:
+def _drawn(block: Sequence[Leg], legs: Mapping[date, RandomStat], closed: set[date]) -> bool:
     """Whether a block has draws: every leg whose window closed has them, as ``pool_stats`` drops
     a block with a day the screener could not measure, so must the draws matched to it."""
     mine = [leg for leg in block if leg.entry in closed]
@@ -927,23 +925,6 @@ def _events(
             )
         )
     return found
-
-
-def _blocks(
-    edge: Edge, events: EventSchedule | None, days: Sequence[date], horizon: int
-) -> list[list[_Leg]]:
-    """The blocks of decision legs a horizon's windows are measured in: one leg per decision
-    session of a plain schedule (S = D + the offset), a block of the event days within one
-    horizon of its first for an event schedule (S = D + 1: the offset places D, not S)."""
-    if events is None:
-        offset = edge.outcome.start_offset_sessions
-        return [[_Leg(d, entry_session(d, offset))] for d in decision_sessions(
-            edge.schedule, days, horizon
-        )]  # fmt: skip
-    return [
-        [_Leg(d, entry_session(d, 1)) for d in block]
-        for block in event_blocks(sorted(events.names), days, horizon)
-    ]
 
 
 def _licence(configs: ConfigStore, user: UserContext, iv_field: str) -> str:

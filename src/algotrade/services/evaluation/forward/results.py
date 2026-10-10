@@ -18,12 +18,12 @@ import pandas as pd
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.paper import LOOKBACK_DAYS, job_name, read_paper
 from algotrade.services.evaluation.forward.settle import OPEN, outcome_hash, settle_group
-from algotrade.services.evaluation.forward.signals import due, edge_signals, paper_traded
+from algotrade.services.evaluation.forward.signals import edge_signals, legs_between, paper_traded
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -144,25 +144,36 @@ def _signals(
 
 
 def _missed(
-    writer: ResultWriter, edges: dict[str, Edge], user_id: str, session: date
+    reader: StoreReader,
+    writer: ResultWriter,
+    configs: ConfigStore,
+    user: UserContext,
+    edges: dict[str, Edge],
+    session: date,
 ) -> list[dict[str, str]]:
     """The due sessions between this user's previous night and ``session`` that no night
     signalled (the step is latest-only: a catch-up skips sessions): recorded, never a silent gap."""
     done = [
         r.session_date
-        for r in writer.runs_for(job_name(user_id))
+        for r in writer.runs_for(job_name(user.user_id))
         if r.session_date < session and r.status is RunStatus.COMPLETE
     ]
     if not done:
         return []
     between = sessions_between(max(done), session)[1:-1]
-    return [
-        {"edge": e.id, "session": day.isoformat(), "reason": MISSED}
-        for e in edges.values()
-        if paper_traded(e)
-        for day in between
-        if due(e, day)
-    ]
+    missed: list[dict[str, str]] = []
+    for e in edges.values():
+        if not between or not paper_traded(e):
+            continue
+        try:
+            legs, _ = legs_between(reader, configs, user, e, between[0], between[-1])
+        except (MissingDataError, ConfigurationError) as error:
+            missed.append({"edge": e.id, "session": between[0].isoformat(), "reason": str(error)})
+            continue
+        missed += [
+            {"edge": e.id, "session": leg.decision.isoformat(), "reason": MISSED} for leg in legs
+        ]
+    return missed
 
 
 def paper_frame(rows: list[dict[str, Any]], run_id: str, now: datetime) -> pd.DataFrame:
@@ -194,7 +205,7 @@ def run_night(
     )  # fmt: skip
     rows = [*settled, *signals]
     record = start_run(job_name(user_id), session, now)
-    missed = _missed(writer, edges, user_id, session)
+    missed = _missed(reader, writer, configs, user, edges, session)
     night = PaperNight(session, signalled, settled_n, skipped, len(rows), tonight, missed)
     stats = {
         "signalled": night.signalled, "settled": night.settled, "skipped": night.skipped,

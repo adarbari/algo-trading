@@ -7,10 +7,13 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.config.edges.loading import load_edges
 from algotrade.config.user import UserContext
 from algotrade.core.time.calendar import next_session
 from algotrade.data.paper import job_name, read_paper
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.forward.results import MISSED, paper_users, run_night
+from algotrade.services.evaluation.forward.signals import advance
 from algotrade.storage.tables.schemas import EDGE_PAPER
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -19,7 +22,19 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     build_world,
     outcome_row,
 )
-from tests.unit.services.evaluation.forward.conftest import NOW, USER, Desk, desk
+from tests.unit.services.evaluation.cross_section.test_harness import (
+    EVENTS,
+    OTM_OUTCOME,
+    otm_world,
+)
+from tests.unit.services.evaluation.forward.conftest import (
+    NOW,
+    USER,
+    Desk,
+    desk,
+    event_changes,
+    event_world,
+)
 
 BUY = next_session(DAYS[0])  # the first signal's entry session
 SELL = DAYS[3]  # two sessions after it
@@ -218,3 +233,90 @@ def test_a_due_session_the_nightly_skipped_is_recorded_as_missed(following: Desk
 
 def test_the_schema_keys_one_row_per_trade() -> None:
     assert EDGE_PAPER.key == ("user_id", "edge_id", "signal_session", "instrument_id")
+
+
+# ---- the paper record of a historical session equals the harness's legs for it ---------------
+
+
+def paper_over_days(d: Desk) -> pd.DataFrame:
+    """Every session of the world's days as a night, so the trades signalled settle."""
+    for day in [*DAYS, advance(DAYS[-1], 4)]:  # the last night settles the last windows
+        night(d, day)
+    return book(d, until=advance(DAYS[-1], 4))
+
+
+def assert_equals_the_harness(d: Desk) -> pd.DataFrame:
+    """Per block of the harness's legs: the counted picks and the hits of the paper trades signalled
+    in it are the harness's ``pick_values`` and ``pick_hits``."""
+    (edge,) = load_edges(d.configs, "u1")
+    (variant,) = evaluate_edge(
+        d.world.reader, d.world.results, d.configs, USER, edge, DAYS[0], DAYS[-1], NOW
+    ).results
+    paper = paper_over_days(d)
+    counted = paper[paper["status"].isin(["won", "lost"])]
+    horizon = edge.outcome.horizon_sessions[0]
+    stats = variant.stats
+    for stat, following in zip(stats, [*[s.session for s in stats[1:]], None], strict=True):
+        mine = counted[
+            (counted["signal_session"] >= stat.session)
+            & (following is None or counted["signal_session"] < following)
+        ]
+        assert len(mine) == len(stat.pick_values)
+        assert int((mine["status"] == "won").sum()) == stat.pick_hits
+    assert (paper["horizon_sessions"] == horizon).all()
+    return paper
+
+
+def test_the_event_paper_trades_equal_the_harness_legs() -> None:
+    d = desk(event_world(EVENTS), **event_changes(2))
+    paper = assert_equals_the_harness(d)
+    assert sorted(set(paper["signal_session"])) == [DAYS[1], DAYS[2], DAYS[5]]
+    assert (paper["buy_session"] == paper["signal_session"].map(next_session)).all()
+    assert len(paper) == 8 and set(paper["status"]) == {"won", "lost"}
+
+
+def test_the_vrp_paper_trades_settle_by_the_harnesss_expires_otm_rule() -> None:
+    d = desk(otm_world(), outcome=OTM_OUTCOME)
+    paper = assert_equals_the_harness(d)
+    settled = paper[paper["signal_session"] == DAYS[0]]
+    assert set(settled["status"]) == {"won"} and settled["excess_return"].isna().all()
+
+
+def test_a_vrp_trade_the_window_breached_is_lost() -> None:
+    poisoned = otm_world({BUY})
+    d = desk(poisoned, outcome=OTM_OUTCOME)
+    paper = assert_equals_the_harness(d)
+    first = paper[paper["signal_session"] == DAYS[0]]
+    assert set(first["status"]) == {"lost"}
+
+
+def test_a_vrp_trade_with_no_usable_implied_vol_is_skipped_never_lost() -> None:
+    w = build_world()
+    levels = {DAYS[0]: 50.0, DAYS[2]: None}  # garbage on one decision session, no vol on another
+    for day in [*DAYS, next_session(DAYS[-1])]:
+        level = levels.get(day, 0.4)
+        iv = [
+            {"instrument_id": i, "iv30_ibkr": float("nan") if level is None else level} for i in IDS
+        ]
+        w.writer.write_table(
+            "rollups/instrument/ibkr_iv@v1", day, f"ib-{day}", stamped(iv, day, f"ib-{day}")
+        )
+    paper = paper_over_days(desk(w, outcome=OTM_OUTCOME))
+    garbage = paper[paper["signal_session"] == DAYS[0]]
+    assert set(garbage["status"]) == {"skipped"} and set(garbage["reason"]) == {
+        "the implied vol stored at the signal session was not usable"
+    }
+    missing = paper[paper["signal_session"] == DAYS[2]]
+    assert set(missing["status"]) == {"skipped"} and set(missing["reason"]) == {
+        "no implied vol was stored for the name at the signal session"
+    }
+    assert set(paper[paper["signal_session"] == DAYS[4]]["status"]) == {"won"}
+
+
+def test_an_event_night_is_idempotent() -> None:
+    d = desk(event_world(EVENTS), **event_changes(2))
+    first = night(d, DAYS[1])[0]
+    before = book(d)
+    again = night(d, DAYS[1])[0]
+    assert first.signalled == {"drift": 3} and again.signalled == {} and again.rows == 0
+    pd.testing.assert_frame_equal(book(d), before)
