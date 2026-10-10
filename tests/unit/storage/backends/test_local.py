@@ -234,3 +234,27 @@ def test_the_parsed_run_cache_evicts_past_its_byte_bound(
     monkeypatch.setattr(local, "MAX_PARSED_BYTES", 2 * size)
     assert len(runs.find("job")) == 6
     assert 0 < len(runs._parsed) <= 2 and runs._parsed_bytes <= 2 * size
+
+
+def test_find_lists_the_runs_directory_once_per_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The edges page called ``find`` 26 times, each listing ~10 000 files (0.4 s of the 0.6 s):
+    the listing is kept until a save changes the directory, and a run saved after a ``find`` is
+    still found by the next (same answer as an uncached listing)."""
+    runs = LocalBackend(tmp_path).runs
+    runs.save(start_run("job", D1, T0))
+    listed: list[str] = []
+    original = local.run_session
+
+    def spy(stem: str) -> date | None:
+        listed.append(stem)
+        return original(stem)
+
+    monkeypatch.setattr(local, "run_session", spy)
+    first = runs.find("job")
+    assert runs.find("job") == first and runs.find("job", D1) == first
+    assert len(listed) == 1  # one listing (one file) for three finds
+    time.sleep(0.01)
+    runs.save(start_run("job", D1, T0 + timedelta(1)))
+    assert len(runs.find("job")) == 2 and len(listed) == 3  # a save invalidates it
