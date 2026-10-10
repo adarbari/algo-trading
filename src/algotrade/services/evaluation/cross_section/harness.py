@@ -780,7 +780,7 @@ def _measure(
             raise missing
     for (_, variant_id), lost in out.lost.items():  # a variant measured nowhere is a failure
         if lost and len(lost) == len(out.legs[_, variant_id]):
-            raise session.errors.get(variant_id) or lost_error(lost)
+            raise lost_error(lost)
     return out
 
 
