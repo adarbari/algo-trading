@@ -56,6 +56,11 @@ RESULT_COLUMNS = (
 )  # fmt: skip
 
 
+def is_return(edge: Edge) -> bool:
+    """Whether the outcome's value is the net excess return (``apply_outcome``'s own test)."""
+    return edge.outcome.kind == "excess_return" or edge.outcome.measure == "excess_return"
+
+
 def needs_implied_vol(edge: Edge) -> bool:
     return edge.outcome.kind == "expires_otm" or edge.outcome.measure == "realised_to_implied_vol"
 
@@ -163,7 +168,7 @@ def apply_outcome(
         reasons = _implied_reasons(_implied_array(outcomes, implied))
         excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
         excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
-    elif o.kind == "excess_return" or o.measure == "excess_return":
+    elif is_return(edge):
         value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE
     elif o.measure == "realised_to_implied_vol":

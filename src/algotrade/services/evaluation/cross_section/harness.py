@@ -883,12 +883,15 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def iv_field_of(edge: Edge, run_field: str = IMPLIED_VOL_FIELD) -> str:
+    """The implied-vol field an edge's outcome reads: its own ``iv_field``, else the run's."""
+    return edge.outcome.iv_field or run_field
+
+
 def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) -> list[_Scope]:
     """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides. Each
     reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
-    scopes = [
-        _Scope(MAIN, edge, edge_universe(configs, user, edge), edge.outcome.iv_field or iv_field)
-    ]
+    scopes = [_Scope(MAIN, edge, edge_universe(configs, user, edge), iv_field_of(edge, iv_field))]
     for v in edge.variants:
         base, picks = v.base or edge.base, v.picks or edge.picks
         applied = replace(

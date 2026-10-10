@@ -10,7 +10,7 @@ with no outcome row although its window's partition is stored has no entry bar (
 window with no outcome at all ``GRACE_SESSIONS`` after its sell session is skipped too, with
 the reason: a missing result is never a loss and never a zero. An outcome that reads the implied
 vol (``expires_otm``: the strike is set from it) reads it at the signal session D, as the harness
-does (``harness.implied_at``, ``outcome.iv_field`` else ``IMPLIED_VOL_FIELD``); a name whose vol
+does (``harness.implied_at``, ``harness.iv_field_of``); a name whose vol
 is missing or invalid there is skipped with that reason, never a loss. ``excess_return`` of a
 settled trade is set only when the outcome's value is a return (not an ``expires_otm`` cushion)."""
 
@@ -25,14 +25,14 @@ from algotrade.config.edges.document import Edge
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.services.evaluation.cross_section.harness import BENCHMARK, implied_at
+from algotrade.services.evaluation.cross_section.harness import BENCHMARK, implied_at, iv_field_of
 from algotrade.services.evaluation.cross_section.hit import (
-    IMPLIED_VOL_FIELD,
     INVALID_IMPLIED_VOL,
     MISSING_DRAWDOWN,
     MISSING_VALUE,
     NO_IMPLIED_VOL,
     apply_outcome,
+    is_return,
     needs_implied_vol,
 )
 from algotrade.services.evaluation.forward.signals import advance
@@ -64,11 +64,6 @@ def outcome_hash(edge: Edge) -> str:
     """A fingerprint of the edge's ``[outcome]``: what a hit means."""
     text = json.dumps(asdict(edge.outcome), sort_keys=True, default=str)
     return hashlib.sha256(text.encode()).hexdigest()[:12]
-
-
-def _is_return(edge: Edge) -> bool:
-    """Whether the outcome's value is a net excess return (``hit.apply_outcome``'s own test)."""
-    return edge.outcome.kind == "excess_return" or edge.outcome.measure == "excess_return"
 
 
 def _skipped(instrument: str, why: str) -> Settled:
@@ -107,9 +102,7 @@ def settle_group(
     mine = stored[stored["instrument_id"].isin(names)]
     try:
         implied = (
-            implied_at(
-                reader, edge.outcome.iv_field or IMPLIED_VOL_FIELD, names, first["signal_session"]
-            )
+            implied_at(reader, iv_field_of(edge), names, first["signal_session"])
             if needs_implied_vol(edge)
             else None
         )
@@ -129,7 +122,7 @@ def settle_group(
                 name,
                 WON if row["hit"] else LOST,
                 "",
-                float(str(row["value"])) if _is_return(edge) else None,
+                float(str(row["value"])) if is_return(edge) else None,
                 bool(row["delisted"]),
             )
         )

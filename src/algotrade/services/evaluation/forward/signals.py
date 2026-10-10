@@ -29,6 +29,7 @@ from algotrade.data import StoreReader
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.events import (
     DEDUPE_SESSIONS,
+    EventDayMissingError,
     EventSchedule,
     read_events,
 )
@@ -36,15 +37,20 @@ from algotrade.services.evaluation.cross_section.harness import (
     MEASURED_COVERAGE,
     MIXED_SOURCE_IV,
     edge_universe,
+    iv_field_of,
     names_for,
 )
-from algotrade.services.evaluation.cross_section.hit import IMPLIED_VOL_FIELD, needs_implied_vol
+from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
 from algotrade.services.evaluation.cross_section.picks import eligible, screen_variant
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.storage.configs.store import ConfigStore
 
 PAPER_STATES = ("following", "trial")
-EVENT_LOOKBACK = 2 * DEDUPE_SESSIONS  # sessions an event schedule reads back to dedupe names
+# Sessions an event schedule reads back to dedupe names. The dedupe is a chain (a name counted
+# at X blocks the next DEDUPE_SESSIONS), so the bound is exact unless one name matches three or
+# more times within this many sessions (a moved report date): then the first match may lie
+# before the window and tonight's count can differ from the backtest's.
+EVENT_LOOKBACK = 2 * DEDUPE_SESSIONS
 
 
 @dataclass(frozen=True)
@@ -121,7 +127,7 @@ def legs_between(
 
 def _not_possible(edge: Edge) -> str | None:
     """Why the paper record cannot trade ``edge`` (None: it can)."""
-    if needs_implied_vol(edge) and (edge.outcome.iv_field or IMPLIED_VOL_FIELD) in MIXED_SOURCE_IV:
+    if needs_implied_vol(edge) and iv_field_of(edge) in MIXED_SOURCE_IV:
         return "its implied vol field mixes sources: name one vendor's field"
     if edge.promoted is None and not edge.screeners:
         return "the edge has no screener to take picks from"
@@ -138,14 +144,9 @@ def edge_signals(
     try:
         legs, events = legs_between(reader, configs, user, edge, session, session)
     except MissingDataError as missing:
+        day = missing.day if isinstance(missing, EventDayMissingError) else session
         return EdgeSignals(
-            edge.id,
-            session,
-            None,
-            None,
-            horizon,
-            (),
-            f"no {missing.dataset} for {session.isoformat()}",
+            edge.id, session, None, None, horizon, (), f"no {missing.dataset} for {day.isoformat()}"
         )
     if not legs:
         return EdgeSignals(edge.id, session, None, None, horizon)
