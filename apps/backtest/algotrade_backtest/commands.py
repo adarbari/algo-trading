@@ -265,7 +265,7 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
         params = {
             "edge": edge.id, "start": start.isoformat(), "end": end.isoformat(),
             "as_of": as_of.isoformat(), "iv_field": args.iv_field,
-            "extra_baselines": list(args.extra_baseline),
+            "extra_baselines": list(args.extra_baseline), "trigger": "cli",
             "split_from": args.split_from.isoformat() if args.split_from else None,
         }  # fmt: skip
         owner = UserContext(edge.owner)

@@ -39,5 +39,28 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
 ## Consequences
 - The Edges page's edge detail has a "Run evaluation" button; it shows the job's state and reads
   the edge's runs again when the job completes.
-- A second API process would not see the first's in-memory lock: the guard assumes one process.
+- A second API process would not see the first's in-memory lock: the guard assumed one process (superseded 2026-10-10: the lock is the store's).
 - A request to run an edge with no stored outcomes is a 400.
+
+## Amendment 2026-10-10: owner-only runs, a lock across processes, who and what in the run stats
+(owner decisions 2026-10-10; the owner-driven-edges series, PR 3)
+
+- **Only the owner runs an edge** (replaces decision 2). Every edge has a Run button, but a user
+  runs only an edge they own (`Edge.owner` is their id: their own edges, a clone of a site edge
+  included, which is theirs). A site edge by a non-admin, or by an admin as himself, is refused
+  with 403 (`PermissionDeniedError`). Admins run a site edge with `as_site` ("Run as site"): the
+  run uses the site owner and is the site's canonical run. An edge the caller cannot see (another
+  user's) is a 404, never a 403, so an id's existence is not disclosed. A run is recorded under
+  its owner with `trigger = ui`. Replaces "any user runs a site edge for themselves, exploratory".
+- **One at a time per owner, across processes** (replaces decision 3's in-process lock and the
+  consequence that one API process is assumed). The check-and-submit is one step under
+  `Backend.lock("edge-eval:<owner>")` taken without waiting: a request that finds it held (another
+  process between its check and its submit) is refused with the same 409. A job older than `STALE`
+  still does not count; the job runner stays single-worker.
+- **Who and what in the run stats.** The run record's `stats` carry `owner` (the edge's), `trigger`
+  (`nightly` | `ui` | `cli`) and `job_id` (the job that wrote it), written by `write_edge_eval`; the
+  job takes `trigger` as a param (default `cli`; the CLI passes `cli`, the on-request runner `ui`,
+  the nightly `nightly`). The job name `edge-eval:<edge>:<owner>` stays the lookup key, built only
+  by `job_name`. No new table. A run written before this has no trigger: the read model and
+  GraphQL (`EdgeRun.trigger`, `EdgeRun.legacyOwner`) serve null, never an invented value.
+- Guide terms "Who may run what" and "Run trigger" explain both to users (ADR 0051).

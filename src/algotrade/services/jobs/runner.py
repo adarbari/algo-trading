@@ -17,11 +17,13 @@ from algotrade.storage.tables.interfaces import RunStore
 class JobContext:
     """What a handler gets besides its params. Apps put their readers/writers here.
     ``jobs``: the runner executing this job, so a handler can run child jobs (nightly ->
-    ``screen``) through it."""
+    ``screen``) through it; ``job_id``: this job's id (None where the id is not yet known:
+    the identity function's context)."""
 
     user: UserContext
     resources: Mapping[str, Any]
     jobs: "JobRunner | None" = None
+    job_id: str | None = None
 
 
 # A handler returns a JSON-able summary; a ``"_partial": True`` entry marks a partial result.
@@ -151,7 +153,7 @@ class LocalJobRunner:
     def _execute(self, record: JobRecord) -> None:
         record.status = JobStatus.RUNNING
         self._runs.save(record.to_run())
-        context = JobContext(UserContext(record.user), self._resources, self)
+        context = JobContext(UserContext(record.user), self._resources, self, record.job_id)
         try:
             summary = dict(self._kinds[record.kind].handler(record.params, context))
             partial = summary.pop("_partial", False)

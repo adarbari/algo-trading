@@ -246,6 +246,13 @@ def test_edge_eval_handler_runs_the_harness_and_reports_rows() -> None:
     rows = job.result["rows"]
     assert rows[0]["variant"] == "momo" and rows[0]["lift"] == 2.0
     assert w.reader.table("results/edge_eval", DAYS[-1]) is not None
+    stats = w.results.load_run(job.result["run_id"]).stats  # type: ignore[union-attr]
+    assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("site", "cli", job.job_id)
+    other = runner.wait(
+        runner.submit("edge-eval", {**params, "as_of": AS_OF.isoformat(), "trigger": "ui"}, USER)
+    )
+    stats = w.results.load_run(other.result["run_id"]).stats  # type: ignore[union-attr]
+    assert (stats["trigger"], stats["job_id"]) == ("ui", other.job_id)
     missing = runner.wait(runner.submit("edge-eval", {**params, "edge": "nope"}, USER))
     assert missing.status is JobStatus.FAILED and "unknown edge" in (missing.error or "")
     runner.shutdown()

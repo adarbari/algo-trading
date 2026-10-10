@@ -1,9 +1,10 @@
-"""``POST /edges/{id}/evaluate``: run an edge evaluation
-on request (ADR 0059). The run is the owner's ``edge-eval`` job under the caller's own split (rows
-keyed by their user id; EXPLORATORY unless the split is the edge's frozen one); an admin may run
-it as the site (``as_site``). One evaluation at a time per user (409 while another runs). The
-request answers at once with the job, which the page polls at ``GET /jobs/{job_id}`` (ADR 0037,
-amended)."""
+"""``POST /edges/{id}/evaluate``: run an edge evaluation on request (ADR 0059, amended
+2026-10-10). Only the edge's owner runs it: a user their own edges (a clone of a site edge
+included; the run is their ``edge-eval`` job under their own split, rows keyed by their user id,
+EXPLORATORY unless the split is the edge's frozen one), an admin a site edge as the site
+(``as_site``); anyone else gets 403. One evaluation at a time per owner, across processes (409
+while another runs). The request answers at once with the job, which the page polls at
+``GET /jobs/{job_id}`` (ADR 0037, amended)."""
 
 from typing import Annotated
 

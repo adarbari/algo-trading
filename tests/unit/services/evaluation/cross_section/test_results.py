@@ -226,3 +226,13 @@ def test_an_iv_field_stored_part_of_the_range_counts_the_sessions_that_have_it()
     assert 0 < gap["stored"] < gap["sessions"] and gap["picks"] > 0
     assert iv_coverage(evaluate(iv_world(DAYS[0]), outcome=OTM, variants=variants)) == []
     assert iv_coverage(evaluate(iv_world(None))) == []  # an outcome that reads no implied vol
+
+
+def test_the_run_record_names_its_owner_trigger_and_job(world: World) -> None:
+    ev = evaluate(world)
+    record = write_edge_eval(world.results, ev, NOW, owner="site", trigger="ui", job_id="j-1")
+    stats = world.results.load_run(record.run_id).stats  # type: ignore[union-attr]
+    assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("site", "ui", "j-1")
+    other = write_edge_eval(world.results, ev, NOW + timedelta(hours=1))
+    stats = world.results.load_run(other.run_id).stats  # type: ignore[union-attr]
+    assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("site", "cli", None)

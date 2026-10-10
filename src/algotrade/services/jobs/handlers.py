@@ -117,7 +117,8 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory), ``extra_baselines``
     (screener ids scored as baselines besides the edge's own: the golden evaluation's, never a
     real edge document's), ``random_draws`` (random picks per out-of-sample session; default
-    1,000). The harness's rows land in ``results/edge_eval``."""
+    1,000), ``trigger`` (``nightly`` | ``ui`` | ``cli``, recorded in the run's stats; default
+    ``cli``). The harness's rows land in ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -138,7 +139,14 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
         random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
     )
-    record = write_edge_eval(ctx.resources["writer"], evaluation, now)
+    record = write_edge_eval(
+        ctx.resources["writer"],
+        evaluation,
+        now,
+        owner=edge.owner,
+        trigger=params.get("trigger") or "cli",
+        job_id=ctx.job_id,
+    )
     rows = edge_eval_frame(evaluation, record.run_id, now)
     return {
         "edge": evaluation.edge_id,

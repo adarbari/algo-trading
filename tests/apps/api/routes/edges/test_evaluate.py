@@ -1,5 +1,6 @@
-"""``POST /edges/{id}/evaluate``: an evaluation on request, one at a time per user, the site's
-for an admin only (ADR 0059); its job is read at ``GET /jobs/{id}`` (``test_jobs.py``)."""
+"""``POST /edges/{id}/evaluate``: an evaluation on request of the caller's own edges, one at a
+time per owner, a site edge's only by an admin as the site (ADR 0059); its job is read at
+``GET /jobs/{id}`` (``test_jobs.py``)."""
 
 import time
 from collections.abc import Iterator
@@ -37,6 +38,7 @@ def client(stub: StubAuthenticator) -> Iterator[TestClient]:
             ("site", "selections", "active"): ACTIVE,
             ("site", "strategies", "momo"): screen(),
             ("site", "edges", "drift"): edge_document(),
+            ("alice", "edges", "mine"): {"extends": "drift"},
             ("site", "settings", "users"): {
                 "user": [{"id": "alice", "role": "trader"}, {"id": "ana", "role": "admin"}]
             },
@@ -63,12 +65,18 @@ def poll(client: TestClient, url: str) -> dict[str, object]:
 
 
 def test_an_evaluation_is_started_polled_and_stored_for_the_caller(client: TestClient) -> None:
-    started = client.post(EVALUATE)
+    started = client.post("/edges/mine/evaluate")
     assert started.status_code == 202, started.text
     body = started.json()
     assert body["user"] == "alice" and body["state"] in ("queued", "running")
     done = poll(client, f"/jobs/{body['job_id']}")
     assert done["state"] == "complete" and done["run_id"]
+
+
+def test_a_trader_cannot_run_a_site_edge(client: TestClient, stub: StubAuthenticator) -> None:
+    assert client.post(EVALUATE).status_code == 403
+    stub.user = UserRecord("ana", Role.ADMIN)
+    assert client.post(EVALUATE).status_code == 403  # an admin runs it as the site
 
 
 def test_a_trader_cannot_run_as_the_site_but_an_admin_can(

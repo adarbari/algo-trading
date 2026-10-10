@@ -1,5 +1,6 @@
-"""An edge evaluation on request: a job under the owner's user, one at a time per user, the site's
-only for an admin, stored like the CLI's (ADR 0059)."""
+"""An edge evaluation on request: a job under the owner's user, only of an edge the caller owns
+(a site edge only as the site, by an admin), one at a time per owner across processes, stored like
+the CLI's with ``trigger = ui`` (ADR 0059, amended 2026-10-10)."""
 
 import threading
 import time
@@ -35,6 +36,8 @@ def configs() -> MemoryConfigStore:
             ("site", "selections", "active"): ACTIVE,
             ("site", "strategies", "momo"): screen(),
             ("site", "edges", "drift"): edge_document(),
+            ("alice", "edges", "mine"): {"extends": "drift"},  # alice's clone of the site edge
+            ("bob", "edges", "mine"): {"extends": "drift"},
         }
     )
 
@@ -64,12 +67,14 @@ def runner(world: World) -> Iterator[OnDemandEdges]:
 def test_a_request_starts_the_job_and_its_rows_are_keyed_by_the_user(
     runner: OnDemandEdges, world: World
 ) -> None:
-    started = runner.request("drift", ALICE)
+    started = runner.request("mine", ALICE)
     assert started.state in ("queued", "running") and started.job_id and started.user == "alice"
     done = wait(runner, started)
     assert done.state == "complete" and done.run_id and done.exploratory is not None
     frame = world.reader.table_range("results/edge_eval", *world_range(world))
     assert frame is not None and set(frame["user_id"]) == {"alice"}
+    stats = world.results.load_run(done.run_id).stats  # type: ignore[union-attr]
+    assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("alice", "ui", started.job_id)
 
 
 def world_range(world: World) -> tuple[Any, Any]:
@@ -89,24 +94,53 @@ def test_a_second_request_while_one_runs_is_refused_until_it_finishes(
     monkeypatch.setitem(ondemand_edges.LIBRARY_HANDLERS, "edge-eval", blocked)
     runner = OnDemandEdges(world.backend, configs())
     try:
-        first = runner.request("drift", ALICE)
+        first = runner.request("mine", ALICE)
         with pytest.raises(ConflictError, match="already running for alice"):
-            runner.request("drift", ALICE)
-        runner.request("drift", BOB)  # another user's evaluation is not blocked by alice's
+            runner.request("mine", ALICE)
+        runner.request("mine", BOB)  # another user's evaluation is not blocked by alice's
         gate.set()
         assert wait(runner, first).state == "complete"
-        assert runner.request("drift", ALICE).job_id == first.job_id  # free again: runs again
+        assert runner.request("mine", ALICE).job_id == first.job_id  # free again: runs again
     finally:
         gate.set()
         runner.close()
 
 
-def test_only_an_admin_runs_as_the_site(runner: OnDemandEdges) -> None:
+def test_a_user_runs_only_an_edge_they_own(runner: OnDemandEdges) -> None:
+    with pytest.raises(PermissionDeniedError, match="not yours"):
+        runner.request("drift", ALICE)  # a site edge: a trader has no way to run it
+    with pytest.raises(PermissionDeniedError, match="Run as site"):
+        runner.request("drift", ALICE, admin=True)  # an admin runs it as the site, not as himself
+    with pytest.raises(NotFoundError, match="unknown edge"):
+        runner.request("mine", UserContext("carol"))  # alice's and bob's clones are not hers
+
+
+def test_only_an_admin_runs_a_site_edge_and_as_the_site(
+    runner: OnDemandEdges, world: World
+) -> None:
     with pytest.raises(PermissionDeniedError, match="admin"):
         runner.request("drift", ALICE, as_site=True)
     site = runner.request("drift", ALICE, as_site=True, admin=True)
     assert site.user == SITE_USER
-    wait(runner, site)
+    done = wait(runner, site)
+    stats = world.results.load_run(done.run_id).stats  # type: ignore[union-attr]
+    assert (stats["owner"], stats["trigger"]) == ("site", "ui")
+    with pytest.raises(NotFoundError):  # as the site, a user's own edge is not visible
+        runner.request("mine", ALICE, as_site=True, admin=True)
+
+
+def test_the_check_and_submit_hold_the_stores_lock_across_processes(
+    runner: OnDemandEdges, world: World
+) -> None:
+    other_process = world.backend.lock("edge-eval:alice")
+    assert other_process.acquire(wait=False)
+    try:
+        with pytest.raises(ConflictError, match="being started"):
+            runner.request("mine", ALICE)
+        runner.request("mine", BOB)  # the lock is per owner
+    finally:
+        other_process.release()
+    wait(runner, runner.request("mine", ALICE))
 
 
 def test_an_unknown_edge_and_an_empty_store_are_refused(world: World) -> None:
@@ -119,7 +153,7 @@ def test_an_unknown_edge_and_an_empty_store_are_refused(world: World) -> None:
     empty = OnDemandEdges(build_world(closed=[]).backend, configs())
     try:
         with pytest.raises(ConfigurationError, match="no outcomes"):
-            empty.request("drift", ALICE)
+            empty.request("mine", ALICE)
     finally:
         empty.close()
 
@@ -134,12 +168,15 @@ def test_a_job_a_stopped_process_left_running_does_not_block_a_new_request(
     runner = OnDemandEdges(world.backend, configs())
     try:
         stored = stored_outcome_sessions(world.reader)
-        params = {"edge": "drift", "start": stored[0].isoformat(), "end": stored[-1].isoformat()}
+        params = {
+            "edge": "mine", "start": stored[0].isoformat(), "end": stored[-1].isoformat(),
+            "trigger": "ui",
+        }  # fmt: skip
         old = datetime.now(UTC) - ondemand_edges.STALE - timedelta(minutes=1)
         dead = JobRecord(job_id_for("edge-eval", params, ALICE), "edge-eval", params, "alice", old)
         dead.status = JobStatus.RUNNING
         runner._writer.runs_backend.save(dead.to_run())
-        started = runner.request("drift", ALICE)
+        started = runner.request("mine", ALICE)
         assert started.job_id == dead.job_id  # the same work: failed as abandoned, run again
         assert wait(runner, started).state == "complete"
     finally:
