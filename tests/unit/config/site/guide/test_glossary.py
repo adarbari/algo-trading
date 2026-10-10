@@ -1,5 +1,5 @@
-"""``config/site/guide/glossary.toml`` (ADR 0051): the fitness tests over the shipped file first
-(every term the spec lists is written; every ``see_also`` id is a term; ``short`` is one
+"""``config/site/guide/glossary/<theme>.toml`` (ADR 0051): the fitness tests over the shipped
+files first (every term the spec lists is written; every ``see_also`` id is a term; ``short`` is one
 sentence; every catalogue name in the prose is in the catalogue), then the loader's shape
 checks."""
 
@@ -10,7 +10,6 @@ import pytest
 
 from algotrade.config.site.guide.glossary import (
     FOLDER,
-    NAME,
     GlossaryTerm,
     GuideGlossary,
     load_guide_glossary,
@@ -26,7 +25,7 @@ from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from tests.conftest import REPO_ROOT
 
 SHIPPED = FileConfigStore(REPO_ROOT / "config")
-WHERE = "config/site/guide/glossary.toml"
+WHERE = "config/site/guide/glossary/*.toml"
 # The terms docs/ui/guide.md section 3 and the GD6 brief name: the app's words, the rule
 # grammar, the decisions a result shows and the regime gate.
 SPEC_TERMS = {
@@ -78,12 +77,27 @@ TERM: dict[str, Any] = {
 
 def test_a_document_is_typed_and_a_missing_file_has_no_terms() -> None:
     doc = {"term": [TERM, {**TERM, "id": "beta", "term": "Beta", "see_also": []}]}
-    found = load_guide_glossary(MemoryConfigStore({("site", FOLDER, NAME): doc}))
+    found = load_guide_glossary(MemoryConfigStore({("site", FOLDER, "alpha"): doc}))
     alpha, beta = found.terms
     assert alpha == GlossaryTerm("alpha", "Alpha", "The first.", "Comes before beta.", ("beta",))
     assert beta.see_also == ()
     assert found.get("beta") is beta and found.get("gamma") is None
     assert load_guide_glossary(MemoryConfigStore({})) == GuideGlossary()
+
+
+def test_themes_are_read_in_file_name_order_and_ids_are_unique_across_files() -> None:
+    other = {**TERM, "id": "beta", "term": "Beta", "see_also": []}
+    store = {
+        ("site", FOLDER, "b_theme"): {"term": [other]},
+        ("site", FOLDER, "a_theme"): {"term": [TERM]},
+    }
+    assert [t.id for t in load_guide_glossary(MemoryConfigStore(store)).terms] == ["alpha", "beta"]
+    clash = {
+        ("site", FOLDER, "a_theme"): {"term": [TERM]},
+        ("site", FOLDER, "b_theme"): {"term": [TERM]},
+    }
+    with pytest.raises(ConfigurationError, match="term ids listed more than once"):
+        load_guide_glossary(MemoryConfigStore(clash))
 
 
 @pytest.mark.parametrize(
@@ -103,11 +117,13 @@ def test_a_document_is_typed_and_a_missing_file_has_no_terms() -> None:
 )
 def test_bad_documents_fail_naming_the_file(terms: list[dict[str, Any]], message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
-        GuideGlossary.from_document({"term": terms})
+        GuideGlossary.from_documents({"alpha": {"term": terms}})
 
 
 def test_terms_must_be_a_list_of_tables() -> None:
-    with pytest.raises(ConfigurationError, match=r"guide/glossary.toml term: expected a list"):
-        GuideGlossary.from_document({"term": {"id": "alpha"}})
+    with pytest.raises(
+        ConfigurationError, match=r"guide/glossary/alpha.toml term: expected a list"
+    ):
+        GuideGlossary.from_documents({"alpha": {"term": {"id": "alpha"}}})
     with pytest.raises(ConfigurationError, match="unknown keys"):
-        GuideGlossary.from_document({"terms": []})
+        GuideGlossary.from_documents({"alpha": {"terms": []}})

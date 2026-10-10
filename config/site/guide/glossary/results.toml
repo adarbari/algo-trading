@@ -1,0 +1,128 @@
+# L3 site setting: the Guide glossary, reading a screen's result (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+# ------------------------------------------------------------------------ reading a screen's result
+
+[[term]]
+id = "near_miss"
+term = "Near miss"
+short = "A value that missed a soft or score criterion's threshold by no more than its tolerance."
+body = """
+A near miss costs points by how close it came: 10 times the distance divided by the
+tolerance, so 0 to 10. On a soft criterion it also sets the row's decision through on_miss; on
+a score criterion it only lowers the score. Every run and preview lists its narrow misses: the
+rows that missed only within tolerance, with each criterion, the value, the threshold and the
+distance, which is where a threshold set a little too tight shows up.
+"""
+see_also = ["tolerance", "on_miss", "watch", "score"]
+
+[[term]]
+id = "gating_criterion"
+term = "Gating criterion"
+short = "A hard or soft criterion: one that can remove a row (a score criterion never does)."
+body = """
+The Builder's funnel shows the gating criteria in order: the universe at the top, then for
+each one how many rows enter it, pass, miss narrowly, fail and have no value, and how many are
+left for the next. A row with no value for a soft criterion stays in; for a hard one it is
+removed.
+"""
+see_also = ["hard", "soft", "mode", "selection"]
+
+[[term]]
+id = "qualified"
+term = "QUALIFIED"
+short = "The decision of a row that met every hard and soft criterion."
+body = """
+A QUALIFIED row passed every gating criterion. Its score can still be below 100: score
+criteria it missed, or a soft criterion with no value (listed among its reasons), cost
+points.
+"""
+see_also = ["score", "watch", "reject"]
+
+[[term]]
+id = "watch"
+term = "WATCH"
+short = "The default decision of a near miss: close enough to keep an eye on, not a pass."
+body = """
+A row is WATCH when it passed every hard criterion and nearly missed at least one soft
+criterion whose on_miss is WATCH, and no near miss gave it anything more severe. It is a name
+that may qualify on a later day if the value moves a little.
+"""
+see_also = ["near_miss", "on_miss", "qualified"]
+
+[[term]]
+id = "liquidity_risk"
+term = "LIQUIDITY_RISK"
+short = "A near miss on a criterion about how much a name trades, so it may be harder to buy and sell than the screen wants."
+body = """
+A screen gives LIQUIDITY_RISK when a soft criterion with on_miss = LIQUIDITY_RISK nearly
+misses. Every site preset uses it on the average daily dollar volume
+(rollup.price_stats@v2.adv_usd_20d); one also uses it on option volume. It is more severe than
+WATCH and less than EVENT_RISK: the setup is there, but check the spread and the size you can
+trade.
+"""
+see_also = ["on_miss", "near_miss", "event_risk"]
+
+[[term]]
+id = "event_risk"
+term = "EVENT_RISK"
+short = "The most severe near-miss decision, meant for a criterion that keeps names away from an event such as earnings."
+body = """
+A screen gives EVENT_RISK when a soft criterion with on_miss = EVENT_RISK nearly misses, for
+example one asking for no earnings report within the next few days. It outranks LIQUIDITY_RISK
+and WATCH when a row has several near misses. No site preset uses it today; your own screens
+can.
+"""
+see_also = ["on_miss", "near_miss", "liquidity_risk"]
+
+[[term]]
+id = "reject"
+term = "REJECT"
+short = "The decision of a row that failed a hard criterion, had no value for one, or missed a soft one by more than its tolerance."
+body = """
+Rejected rows are still scored and kept with the run, so the funnel and the narrow misses can
+show why a name did not make it. Many hard misses tie at a score of 0.
+"""
+see_also = ["hard", "soft", "score"]
+
+[[term]]
+id = "paused"
+term = "PAUSED"
+short = "A pick the regime gate held back: it met the screen, but the market's regime is one the screen pauses in."
+body = """
+With the regime gate on, the [regime] settings (the site's defaults or your own config) list
+the regimes each screen pauses in, and on a session in one of them its QUALIFIED and WATCH rows become PAUSED, with the rule that paused them as the first
+reason. The VRP scanner, which sells option volatility, pauses in Storm and Severe storm. The
+gate fails closed: when the regime is UNKNOWN for the session, every QUALIFIED and WATCH row
+of a gated screen is paused. A paused pick stays visible with its reason (Ideas, Paused by regime), never silently
+dropped. The gate is off unless the site or your settings turn it on.
+"""
+see_also = ["regime", "qualified", "watch"]
+
+[[term]]
+id = "regime"
+term = "Regime"
+short = "The market's weather for the session: Clear, Clouds building, Storm or Severe storm."
+body = """
+The regime comes from two scores from 0 to 100: macro risk, the warning signs in the
+economy (the financial conditions index is one, though it moves fast), and market stress, the fast ones in prices. Clear (CALM) is neither high, Clouds
+building (CAUTION) macro risk only, Storm (STRESS) market stress only, Severe storm (CRISIS)
+both. It is UNKNOWN when either score cannot be computed, never Clear for lack of data. To
+avoid flickering, the label is the most severe one of the last five sessions, so a regime is
+left only after five sessions below it. It can size new positions and drive the regime gate,
+both off unless turned on.
+"""
+see_also = ["paused", "unknown"]
+
+[[term]]
+id = "score"
+term = "Score"
+short = "A row's number from 0 to 100 for sorting: 100 when every threshold is met, less a penalty for each miss."
+body = """
+A near miss costs 0 to 10 points by how close it came, a score criterion missed beyond its
+tolerance or a soft or score criterion with no value 10, and a hard miss or a soft miss beyond
+tolerance 100; the score stops at 0. It is for ordering the list, not a probability. Rows sort
+by score, then by the screen's tie-break field, then by instrument.
+"""
+see_also = ["near_miss", "score_mode", "qualified"]

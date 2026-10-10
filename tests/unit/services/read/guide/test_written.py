@@ -37,7 +37,7 @@ START = {
 }
 WRITTEN = {
     **DOCUMENTS,
-    ("site", "guide", "glossary"): GLOSSARY,
+    ("site", "guide_glossary", "alpha"): GLOSSARY,
     ("site", "guide", "start"): START,
 }
 
