@@ -73,11 +73,13 @@ values = { researching = "term:edge_status", candidate = "term:edge_status", evi
 
 [[enum]]
 source = "graphql:Edge.state"
-exempt = "deprecated derived field (followed or not) kept until the Edges page drops it (PR 4); the status and the bookmark carry the meaning"
+values_from = "python:algotrade.config.edges.follow:LEGACY"
+values = { researching = "term:edge_state", following = "term:edge_state", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:edge_state" }
 
 [[enum]]
 source = "graphql:FollowedEdge.state"
-exempt = "deprecated derived field (followed or not) kept until the Edges page drops it (PR 4); the status and the bookmark carry the meaning"
+values_from = "python:algotrade.config.edges.follow:LEGACY"
+values = { researching = "term:edge_state", following = "term:edge_state", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:edge_state" }
 
 [[enum]]
 source = "graphql:Edge.labels"
@@ -119,7 +121,7 @@ exempt = "free text the user wrote"
 
 [[enum]]
 source = "graphql:Edge.statusReason"
-exempt = "free text the user wrote"
+exempt = "free text the user wrote (why an edge was rejected or retired)"
 
 [[enum]]
 source = "graphql:EdgeRun.trigger"
