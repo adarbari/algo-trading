@@ -17,6 +17,9 @@ import {
 describe('status words', () => {
   it('capitalises the status and gives each a tone', () => {
     expect(statusLabel('candidate')).toBe('Candidate');
+    expect(statusLabel('researching')).toBe('Researching');
+    expect(statusTone('researching')).toBe('neutral');
+    expect(statusLabel('unheard')).toBe('unheard');
     expect(statusTone('evidenced')).toBe('positive');
     expect(statusTone('rejected')).toBe('negative');
     expect(statusTone('anything else')).toBe('neutral');

@@ -33,8 +33,9 @@ class Desk:
 
 def desk(world: World | None = None, **changes: Any) -> Desk:
     w = world or build_world()
-    follow = {"state": "following", "since": DAYS[0].isoformat()}
-    doc = edge_document(follow=changes.pop("follow", follow), **changes)
+    audit = {"status_since": DAYS[0].isoformat()}
+    status = changes.pop("status", "live")
+    doc = edge_document(status=status, audit=changes.pop("audit", audit), **changes)
     docs = {**w.configs._docs, ("u1", "edges", "drift"): doc}
     return Desk(w, MemoryConfigStore(docs))
 

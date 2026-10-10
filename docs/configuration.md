@@ -310,7 +310,11 @@ negative interval) and invalid leverage-marker regexes. Every key must also driv
 amendment 2026-10-09, typed by `src/algotrade/config/edges/loading.py`): a COPY (`extends = "<edge
 id>"`, a site edge or the user's own, deep-merged under the copy's own keys; it is a `candidate`
 and may set its own `frozen_from`, which is its split), a new edge, or, under a site edge's own id,
-only a `[follow]` table (the user's state about it: `config/edges/follow.py`). A user's edge never
+only a `[follow]` table: the user's bookmark of it (`since`, permanent `labels`; ADR 0053 amendment
+2026-10-10, `config/edges/follow.py`). An edge has ONE status (`researching`, `candidate`,
+`evidenced`, `live`, `retired`, `rejected`, `blocked`): a site edge's is the site's, a user's own
+edge sets its own `status` (a clone starts `researching`) and the server writes its `[audit]`
+(`status_since`, `status_reason`, `replaces`, `labels`, `oos_revealed`). A user's edge never
 shadows a site edge. A run whose split is not the site edge's `frozen_from` is exploratory: its
 rows carry it in their key (`results/edge_eval.split_from`) and `exploratory`, and it never moves
 an edge's status or the track-record chip. `algotrade-backtest evaluate-edges --split-from D` sets

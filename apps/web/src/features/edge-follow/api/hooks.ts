@@ -1,6 +1,6 @@
 /**
  * The writes of a user's edges (ADR 0053 amendment, `/edges/{id}`): copy an edge, or make a new
- * version of it (a new edge of theirs that extends it), move their state about one (follow, reject, retire, reopen) and show a
+ * version of it (a new edge of theirs that extends it), move their status about one (follow a site edge; reject, retire, reopen their own) and show a
  * copy's out-of-sample result, and the admin's read of one edge as the TOML to land in the site's
  * config. Each write reads the edges again.
  */
@@ -38,14 +38,31 @@ export interface StateMove {
   revealOos?: boolean;
 }
 
-export function useMoveEdge(id: string) {
+// Until the controls speak status (PR 4): the move's state word as the API takes it, a bookmark
+// for a site edge, the status for the user's own.
+const OWN_STATUS: Record<string, string> = {
+  researching: 'researching',
+  trial: 'candidate',
+  following: 'live',
+  rejected: 'rejected',
+  retired: 'retired',
+};
+
+export const moveBody = (state: string | undefined, mine: boolean) => {
+  if (state === undefined) return { follow: null, status: null };
+  return mine
+    ? { follow: null, status: OWN_STATUS[state] ?? state }
+    : { follow: state === 'following' || state === 'trial', status: null };
+};
+
+export function useMoveEdge(id: string, mine = false) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ state, reason = '', revealOos = false }: StateMove) =>
       unwrap(
         api.PUT('/edges/{edge_id}/state', {
           params: { path: { edge_id: id } },
-          body: { state: state ?? null, reason, reveal_oos: revealOos },
+          body: { ...moveBody(state, mine), reason, reveal_oos: revealOos },
         }),
       ),
     onSuccess: () => refreshEdges(client),

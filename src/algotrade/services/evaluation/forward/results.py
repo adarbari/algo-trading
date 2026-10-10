@@ -23,7 +23,12 @@ from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.paper import LOOKBACK_DAYS, job_name, read_paper
 from algotrade.services.evaluation.forward.settle import OPEN, outcome_hash, settle_group
-from algotrade.services.evaluation.forward.signals import edge_signals, legs_between, paper_traded
+from algotrade.services.evaluation.forward.signals import (
+    edge_signals,
+    legs_between,
+    paper_state,
+    paper_traded,
+)
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -41,9 +46,7 @@ def paper_users(reader: StoreReader, configs: ConfigStore, session: date) -> lis
     since = session - timedelta(days=LOOKBACK_DAYS)
     users = []
     for owner in configs.users():
-        state = any(
-            e.follow.state != "researching" for e in load_edges(configs, owner) if e.follow.since
-        )
+        state = any(paper_state(e) for e in load_edges(configs, owner))
         if state or (read_paper(reader, owner, since, session)["status"] == OPEN).any():
             users.append(UserContext(owner))
     return users

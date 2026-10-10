@@ -392,6 +392,22 @@
             "title": "Edge Id",
             "type": "string"
           },
+          "followed": {
+            "title": "Followed",
+            "type": "boolean"
+          },
+          "followed_since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Followed Since"
+          },
           "labels": {
             "items": {
               "type": "string"
@@ -418,7 +434,11 @@
             ],
             "title": "Replaces"
           },
-          "since": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_since": {
             "anyOf": [
               {
                 "format": "date",
@@ -428,17 +448,15 @@
                 "type": "null"
               }
             ],
-            "title": "Since"
-          },
-          "state": {
-            "title": "State",
-            "type": "string"
+            "title": "Status Since"
           }
         },
         "required": [
           "edge_id",
-          "state",
-          "since",
+          "status",
+          "followed",
+          "followed_since",
+          "status_since",
           "reason",
           "replaces",
           "labels",
@@ -1685,7 +1703,7 @@
         "properties": {
           "document": {
             "additionalProperties": true,
-            "description": "the edge's TOML keys as JSON: `extends` and the settings it changes (a `[follow]` table in it is ignored: the state has its own call)",
+            "description": "the edge's TOML keys as JSON: `extends` and the settings it changes (its status, `[follow]` and `[audit]` are ignored: the status has its own call)",
             "title": "Document",
             "type": "object"
           }
@@ -1887,6 +1905,18 @@
       },
       "StateBody": {
         "properties": {
+          "follow": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a site edge: true bookmarks it, false removes the bookmark; none keeps it",
+            "title": "Follow"
+          },
           "reason": {
             "default": "",
             "description": "why: a rejection needs one, a retirement may",
@@ -1899,7 +1929,7 @@
             "title": "Reveal Oos",
             "type": "boolean"
           },
-          "state": {
+          "status": {
             "anyOf": [
               {
                 "type": "string"
@@ -1908,8 +1938,8 @@
                 "type": "null"
               }
             ],
-            "description": "researching | following | rejected | retired | trial; none keeps it",
-            "title": "State"
+            "description": "the user's own edge: researching | candidate | live | retired | rejected; none keeps it",
+            "title": "Status"
           }
         },
         "title": "StateBody",
@@ -2623,8 +2653,8 @@
     },
     "/edges/{edge_id}/state": {
       "put": {
-        "description": "Move the user's state about an edge (follow, reject, retire, replace) and/or show its\nout-of-sample result. The server decides the permanent labels (a warning, never a block).",
-        "operationId": "set_state_edges__edge_id__state_put",
+        "description": "Bookmark a site edge (``follow``) or move the status of the user's own (``status``), and/or\nshow an own edge's out-of-sample result. The server decides the permanent labels (a warning,\nnever a block); 400 for a ``status`` of a site edge, a ``follow`` of an own edge or both.",
+        "operationId": "state_edges__edge_id__state_put",
         "parameters": [
           {
             "in": "path",
@@ -2686,7 +2716,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Set State",
+        "summary": "State",
         "tags": [
           "edges"
         ]

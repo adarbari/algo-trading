@@ -43,15 +43,35 @@ export const verdictLabel = (verdict: string): string => VERDICT_LABELS[verdict]
 
 export const verdictTone = (verdict: string): StatusTone => VERDICT_TONES[verdict] ?? 'neutral';
 
+/** The statuses an edge has (ADR 0053 amendment 2026-10-10), in the order of its life. */
+export const STATUSES = [
+  'researching',
+  'candidate',
+  'evidenced',
+  'live',
+  'retired',
+  'rejected',
+  'blocked',
+] as const;
+
+const STATUS_LABELS: Record<string, string> = {
+  researching: 'Researching',
+  candidate: 'Candidate',
+  evidenced: 'Evidenced',
+  live: 'Live',
+  retired: 'Retired',
+  rejected: 'Rejected',
+  blocked: 'Blocked',
+};
+
 /** An edge status as the list words it ("candidate" to "Candidate"). */
-export function statusLabel(status: string): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
+export const statusLabel = (status: string): string => STATUS_LABELS[status] ?? status;
 
 const TONES: Record<string, StatusTone> = {
   evidenced: 'positive',
   live: 'positive',
   candidate: 'info',
+  researching: 'neutral',
   blocked: 'warning',
   retired: 'neutral',
   rejected: 'negative',

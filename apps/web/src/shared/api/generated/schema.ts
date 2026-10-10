@@ -95,11 +95,12 @@ export interface paths {
         };
         get?: never;
         /**
-         * Set State
-         * @description Move the user's state about an edge (follow, reject, retire, replace) and/or show its
-         *     out-of-sample result. The server decides the permanent labels (a warning, never a block).
+         * State
+         * @description Bookmark a site edge (``follow``) or move the status of the user's own (``status``), and/or
+         *     show an own edge's out-of-sample result. The server decides the permanent labels (a warning,
+         *     never a block); 400 for a ``status`` of a site edge, a ``follow`` of an own edge or both.
          */
-        put: operations["set_state_edges__edge_id__state_put"];
+        put: operations["state_edges__edge_id__state_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -553,6 +554,10 @@ export interface components {
         EdgeState: {
             /** Edge Id */
             edge_id: string;
+            /** Followed */
+            followed: boolean;
+            /** Followed Since */
+            followed_since: string | null;
             /** Labels */
             labels: string[];
             /** Oos Revealed */
@@ -561,10 +566,10 @@ export interface components {
             reason: string;
             /** Replaces */
             replaces: string | null;
-            /** Since */
-            since: string | null;
-            /** State */
-            state: string;
+            /** Status */
+            status: string;
+            /** Status Since */
+            status_since: string | null;
         };
         /** EvaluationRequest */
         EvaluationRequest: {
@@ -1138,7 +1143,7 @@ export interface components {
         SaveEdgeBody: {
             /**
              * Document
-             * @description the edge's TOML keys as JSON: `extends` and the settings it changes (a `[follow]` table in it is ignored: the state has its own call)
+             * @description the edge's TOML keys as JSON: `extends` and the settings it changes (its status, `[follow]` and `[audit]` are ignored: the status has its own call)
              */
             document: {
                 [key: string]: unknown;
@@ -1219,6 +1224,11 @@ export interface components {
         /** StateBody */
         StateBody: {
             /**
+             * Follow
+             * @description a site edge: true bookmarks it, false removes the bookmark; none keeps it
+             */
+            follow?: boolean | null;
+            /**
              * Reason
              * @description why: a rejection needs one, a retirement may
              * @default
@@ -1231,10 +1241,10 @@ export interface components {
              */
             reveal_oos: boolean;
             /**
-             * State
-             * @description researching | following | rejected | retired | trial; none keeps it
+             * Status
+             * @description the user's own edge: researching | candidate | live | retired | rejected; none keeps it
              */
-            state?: string | null;
+            status?: string | null;
         };
         /** TableView */
         TableView: {
@@ -1571,7 +1581,7 @@ export interface operations {
             };
         };
     };
-    set_state_edges__edge_id__state_put: {
+    state_edges__edge_id__state_put: {
         parameters: {
             query?: never;
             header?: {

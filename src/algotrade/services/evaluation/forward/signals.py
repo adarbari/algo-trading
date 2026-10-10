@@ -1,7 +1,9 @@
 """Tonight's paper picks of one followed edge (ADR 0053 amendment 2026-10-09).
 
-An edge the user follows (``following``) or tries as a new version (``trial``) signals at a
-session when its schedule fires there, counted from the session its state began (``since``):
+An edge the user follows (a bookmarked site edge) or has as a ``candidate`` or ``live`` edge of
+their own signals at a session when its schedule fires there, counted from the session the
+bookmark or the status began (``paper_since``; an interim rule until the paper record is
+rewritten, ADR 0053 amendment 2026-10-10):
 the same decision sessions the backtest uses (``cross_section/sessions.decision_sessions``,
 spaced a horizon apart), and the picks are the harness's own (``cross_section/picks``: the
 screener's qualified names among the edge's eligible names, best first, the first ``top_k``),
@@ -17,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.loading import SITE
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import (
@@ -45,7 +48,7 @@ from algotrade.services.evaluation.cross_section.picks import eligible, screen_v
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.storage.configs.store import ConfigStore
 
-PAPER_STATES = ("following", "trial")
+PAPER_STATUSES = ("candidate", "live")  # of the user's own edge
 # Sessions an event schedule reads back to dedupe names. The dedupe is a chain (a name counted
 # at X blocks the next DEDUPE_SESSIONS), so the bound is exact unless one name matches three or
 # more times within this many sessions (a moved report date): then the first match may lie
@@ -85,8 +88,21 @@ def advance(day: date, sessions: int) -> date:
 
 
 def paper_traded(edge: Edge) -> bool:
-    """The user follows the edge (or trials it) from a session on."""
-    return edge.follow.state in PAPER_STATES
+    """The user follows the (site) edge, or has their own edge as a candidate or live."""
+    return edge.followed or (edge.owner != SITE and edge.status in PAPER_STATUSES)
+
+
+def paper_state(edge: Edge) -> bool:
+    """The edge has paper history to settle: followed, or an own edge that has left ``researching``
+    (a retired one still has open trades)."""
+    return edge.followed or (
+        edge.owner != SITE and edge.status != "researching" and edge.audit.status_since is not None
+    )
+
+
+def paper_since(edge: Edge) -> date | None:
+    """The session the edge's paper trading counts from: the bookmark's, else the status's."""
+    return edge.follow.since if edge.followed else edge.audit.status_since
 
 
 def legs_between(
@@ -104,7 +120,7 @@ def legs_between(
     where a name has the event, read at that session alone (``events.read_events``) with the
     once-per-name dedupe looking ``EVENT_LOOKBACK`` sessions back, so a paper trade is the leg
     the backtest would have taken."""
-    since = edge.follow.since or last
+    since = paper_since(edge) or last
     if since > last:
         return [], None
     horizon = edge.outcome.horizon_sessions[0]

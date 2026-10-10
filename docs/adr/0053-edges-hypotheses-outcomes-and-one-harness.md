@@ -467,3 +467,43 @@ counts it per pick (`excluded_unmeasured`, `unmeasured_base`: "unmeasured, not a
 session is `excluded_coverage` only when more than half its picks are UNMEASURED. The table name carries the new version,
 every reader follows it (`data/outcomes`, `services/evaluation`, the winners labels), and the v1
 table is no longer read.
+
+## Amendment 2026-10-10: one status per edge; follow is a bookmark (owner decision)
+
+Owner decision 2026-10-10. It replaces decision 3 of the 2026-10-09 amendment (the `[follow]`
+state with its transitions, and `trial`): two vocabularies (the site's status, the user's state)
+for one thing is removed.
+
+1. **One status per edge.** `researching`, `candidate`, `evidenced`, `live`, `retired`,
+   `rejected`, `blocked` (`document.STATUSES`; lifecycle researching, candidate, evidenced, live,
+   retired; `rejected` and `blocked` sit off it). A site edge's is the site's (a PR to
+   `config/site/edges/`); the user sets the status of their OWN edge, from `USER_STATUSES`
+   (a clone starts `researching`, a new version `candidate`). Transitions (the server decides):
+   researching to candidate or rejected; candidate to live, rejected or researching; live to
+   retired, candidate or researching; rejected or retired to researching. A candidate that goes
+   live retires the edge it `replaces`. `trial` is gone: a trial is a candidate.
+2. **The owner comes from where the document lives** (`config/site/edges/` is `site`,
+   `config/users/<id>/edges/` that user), never a key (`Edge.owner`).
+3. **Following is a bookmark of a site edge**: the file under the site edge's id holds only
+   `[follow]` with `since` and `labels` (`followed_against_verdict`); it never changes the site's
+   status. A rejected or retired site edge is not a personal state any more. The server's
+   bookkeeping of an own edge (`status_since`, `status_reason`, `replaces`, `labels`,
+   `oos_revealed`) is a server-written `[audit]` table, never the browser's.
+4. **Surfaces.** `Edge` serves `status`, `followed`, `followedSince`, `statusSince`,
+   `statusReason`; `state`, `since` and `stateReason` stay as deprecated derived fields until
+   the web speaks status (PR 4). `PUT /edges/{id}/state` takes `{follow?, status?, reason,
+   reveal_oos}`: `follow` for a site edge, `status` for an own one, never both.
+5. **Migration.** `follow.LEGACY` reads the old `[follow]` states tolerantly (following to live,
+   trial to candidate; on a site edge following and trial keep a bookmark, rejected and retired
+   are archived), and `scripts/migrate_edge_follows.py (--user U | --all) [--dry-run]` rewrites
+   the files, idempotently and atomically. Both go once every file is migrated (PR 5).
+6. **Paper trades, interim rule.** A followed site edge, or an own candidate or live edge,
+   trades on paper, so the same edges trade as before; PR 5 changes the rule by owner decision.
+7. **Run identity.** `run_hash` hashes `asdict(edge)`, which now includes the owner, status,
+   bookmark and audit: every edge's run hash changes once, and moving a status or following
+   changes the hash of that user's next run of the edge (it seeds the random-pick draws, so
+   they differ between runs of an unchanged definition; no figure of the verdict depends on a
+   particular draw). The trial log is NOT affected: a trial's identity is `_trial_hash`
+   (screener config hash, edge variant, outcome, universe), which does not read the document's
+   status or follow fields. Excluding bookkeeping from `run_hash` is a follow-up if the draw
+   stability matters.
