@@ -12,6 +12,7 @@ a ``below`` one. Every count is explicit; nothing is dropped silently by a stati
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from functools import partial
 
 import numpy as np
 
@@ -247,3 +248,38 @@ def slice_measures(
         seen = model and (frozen_from is None or any(r.session < frozen_from for r in kept))
         out.append(_measure(sl, kept, seen))
     return out
+
+
+def edge_slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
+    """The slices of a variant's sessions: all, each year and regime label, and with a split the
+    in-sample and frozen (or exploratory) sides."""
+    slices = [Slice("all", "all", _always)]
+    for year in sorted({s.session.year for s in stats}):
+        slices.append(Slice("year", str(year), partial(_in_year, year)))
+    for label in sorted({s.regime for s in stats}):
+        slices.append(Slice("regime", label, partial(_in_regime, label)))
+    if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
+        slices.append(Slice("in_sample", "in_sample", partial(_before, split)))  # ED8: the IS side
+        kind = "split" if exploratory else "frozen"
+        slices.append(Slice(kind, kind, partial(_since, split)))
+    return slices
+
+
+def _always(stat: SessionStat) -> bool:
+    return True
+
+
+def _in_year(year: int, stat: SessionStat) -> bool:
+    return stat.session.year == year
+
+
+def _in_regime(label: str, stat: SessionStat) -> bool:
+    return stat.regime == label
+
+
+def _before(day: date, stat: SessionStat) -> bool:
+    return stat.session < day
+
+
+def _since(day: date, stat: SessionStat) -> bool:
+    return stat.session >= day

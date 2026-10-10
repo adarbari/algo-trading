@@ -163,3 +163,10 @@ def test_pre_snapshot_run_carries_the_caveat() -> None:
     assert "HISTORICAL IDENTITY: 2 sessions" in report and "1 by the liquidity proxy" in report
     assert IdentityTally().caveat() is None
     assert historical_identity(SimpleNamespace(historical=None)) is None  # type: ignore[arg-type]
+
+
+def test_the_tally_serves_one_sessions_counts() -> None:
+    tally = IdentityTally()
+    tally.note("eligible", OLD, {"today_flag": 3, "proxy": 1})
+    assert tally.of("eligible", OLD) == {"today_flag": 3, "proxy": 1}
+    assert tally.of("screened", OLD) == {} and tally.of("eligible", SNAPSHOT) == {}

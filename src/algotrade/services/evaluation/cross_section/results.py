@@ -16,6 +16,7 @@ from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
 )
+from algotrade.services.evaluation.cross_section.legs.store import legs_frame, write_legs
 from algotrade.services.evaluation.cross_section.measures import BUCKETS, SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.storage.runs import RunRecord, start_run
@@ -215,8 +216,8 @@ def historical_identity(evaluation: EdgeEvaluation) -> dict[str, Any] | None:
 
 
 def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datetime) -> RunRecord:
-    """Save ``evaluation``: its rows (both visible or neither) and its run record, whose stats
-    hold the trial log. Returns the finished record."""
+    """Save ``evaluation``: its rows, its legs (``results/edge_legs``, ADR 0063; all visible or
+    none) and its run record, whose stats hold the trial log. Returns the finished record."""
     record = start_run(job_name(evaluation.edge_id, evaluation.user_id), evaluation.end, now)
     frame = edge_eval_frame(evaluation, record.run_id, now)
     stats = {
@@ -238,5 +239,7 @@ def write_edge_eval(writer: ResultWriter, evaluation: EdgeEvaluation, now: datet
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
     with writer.publishing(record.run_id, now):
         writer.write_result(RESULT, evaluation.end, record.run_id, frame, pending=True)
+        if evaluation.leg_rows:
+            write_legs(writer, record.run_id, legs_frame(evaluation.leg_rows, record.run_id, now))
         writer.save_run(record.finish(now, complete=True, stats=stats))
     return record

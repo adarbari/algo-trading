@@ -122,3 +122,14 @@ def test_it_is_a_store_reader_and_serves_partition_stamps() -> None:
     reader = RecordingReader(backend)
     assert isinstance(reader, StoreReader)
     assert reader.partition_seq(A, D1, D3) == {D1: backend.tables.visible_seq()}
+
+
+def test_a_store_reader_makes_a_recording_one_of_its_own_view() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    plain = StoreReader(backend, "mine")
+    recording = plain.recording()
+    assert isinstance(recording, RecordingReader) and recording.own_run == "mine"
+    with recording.attribute(D1):
+        recording.table(A, D1)
+    assert recording.reads(D1) == (ReadRecord(A, D1, D1, "rows"),)

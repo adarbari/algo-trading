@@ -30,6 +30,10 @@ class StoreReader:
         """This reader, also seeing ``run_id``'s pending writes."""
         return StoreReader(self._backend, run_id)
 
+    def recording(self) -> "RecordingReader":
+        """A reader of the same store and view that logs the reads of an attributed day."""
+        return RecordingReader(self._backend, self.own_run)
+
     def table(
         self,
         table: str,

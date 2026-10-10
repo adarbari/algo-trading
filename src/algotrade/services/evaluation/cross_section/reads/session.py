@@ -5,6 +5,7 @@ sessions is released; ``implied_at`` reads the implied vol of names at one sessi
 harness and the paper record alike."""
 
 from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -22,6 +23,7 @@ from algotrade.services.evaluation.cross_section.historical import (
     HistoricalCaveat,
     IdentityTally,
 )
+from algotrade.services.evaluation.cross_section.legs.rows import DayReads
 from algotrade.services.evaluation.cross_section.picks import (
     RankedRun,
     SelectionReads,
@@ -51,11 +53,13 @@ class SessionReads:
     universe read it once), the implied vol when the measure needs it (per ``iv_field`` and
     eligible names) at D and each scope's scored outcomes (``outcomes``). ``release``
     drops all of it (after a chunk of sessions): only the universe snapshot dates and the
-    sessions a screener could not be run on (``lost``: its missing table) are kept."""
+    sessions a screener could not be run on (``lost``: its missing table) are kept. It reads
+    through a recording reader: what a session reads inside ``attribute(day)`` is logged against
+    that day (``day_reads``, ADR 0063)."""
 
     def __init__(self, reader: StoreReader, label_field: str):
-        self._reader, self._label_field = reader, label_field
-        self._selections = SelectionReads(reader)
+        self._reader, self._label_field = reader.recording(), label_field
+        self._selections = SelectionReads(self._reader)
         self._runs: dict[tuple[str, date], RankedRun | None] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}  # (universe repr, D)
         self._labels: dict[date, str] = {}
@@ -65,6 +69,29 @@ class SessionReads:
         self._identity = IdentityTally()
         self.errors: dict[str, MissingDataError] = {}  # variant -> its first lost session's error
         self.lost: dict[tuple[str, date], str] = {}  # (variant, D) -> the table it had no data in
+
+    def attribute(self, day: date) -> AbstractContextManager[None]:
+        """Log the reads made inside the block against the decision session ``day``."""
+        return self._reader.attribute(day)
+
+    def day_reads(self, day: date) -> DayReads:
+        """What ``day`` read: its logged partitions, the commit sequence at its first read and
+        the historical-identity counts of its eligible and screened names."""
+        return DayReads(
+            day,
+            self._reader.reads(day),
+            self._reader.inputs_seq(day),
+            self._identity.of("eligible", day),
+            self._identity.of("screened", day),
+        )
+
+    def attributed_days(self) -> list[date]:
+        return self._reader.attributed_days()
+
+    def snapshot_of(self, variant: "Variant", day: date) -> date | None:
+        """The universe snapshot the screener's run at ``day`` read (None: no run)."""
+        found = self._runs.get((variant.id, day))
+        return None if found is None else found.snapshot
 
     def run(self, variant: "Variant", day: date) -> RankedRun | None:
         """The screener's run at ``day``; None when an input table has no data for it (the

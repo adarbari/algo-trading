@@ -71,6 +71,10 @@ class IdentityTally:
         if paths:
             self._seen.setdefault((kind, day), paths)
 
+    def of(self, kind: str, day: date) -> Mapping[str, int]:
+        """The paths ``kind`` (``eligible`` / ``screened``) noted for ``day`` (empty: none)."""
+        return self._seen.get((kind, day), {})
+
     def caveat(self) -> HistoricalCaveat | None:
         if not self._seen:
             return None

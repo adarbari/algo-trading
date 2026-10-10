@@ -58,6 +58,7 @@ from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
     OUTCOME_FIELDS,
     missing_outcomes,
+    outcome_seqs,
     read_stored,
     select_outcomes,
     stored_sessions,
@@ -83,11 +84,19 @@ from algotrade.services.evaluation.cross_section.legs.key import (
     leg_key,
     universe_hash,
 )
+from algotrade.services.evaluation.cross_section.legs.rows import (
+    LegRecord,
+    OutcomeRead,
+    decode_leg,
+    encode_leg,
+    encode_outcome,
+    encode_reads,
+)
 from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
-    Slice,
     SliceMeasure,
     decile_means,
+    edge_slices,
     pool_stats,
     slice_measures,
 )
@@ -197,6 +206,9 @@ class EdgeEvaluation:
     # amendment 2026-10-09): the rule and the names by path; None when none was read.
     historical: HistoricalCaveat | None = None
     random_picks: tuple[RandomPicks, ...] = ()  # out-of-sample only: none without a split
+    # The run's legs, the reads of its sessions and its outcome reads as ``results/edge_legs``
+    # rows (``legs/rows.py``): what ``write_edge_eval`` stores with the run (ADR 0063).
+    leg_rows: tuple[Mapping[str, Any], ...] = field(default=(), repr=False, compare=False)
 
 
 def run_hash(
@@ -390,39 +402,6 @@ def effective_split(run: date | None, edge: Edge) -> tuple[date | None, bool]:
     return split, split != edge.site_frozen_from or moved
 
 
-def _slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
-    slices = [Slice("all", "all", _always)]
-    for year in sorted({s.session.year for s in stats}):
-        slices.append(Slice("year", str(year), partial(_in_year, year)))
-    for label in sorted({s.regime for s in stats}):
-        slices.append(Slice("regime", label, partial(_in_regime, label)))
-    if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
-        slices.append(Slice("in_sample", "in_sample", partial(_before, split)))  # ED8: the IS side
-        kind = "split" if exploratory else "frozen"
-        slices.append(Slice(kind, kind, partial(_since, split)))
-    return slices
-
-
-def _always(stat: SessionStat) -> bool:
-    return True
-
-
-def _in_year(year: int, stat: SessionStat) -> bool:
-    return stat.session.year == year
-
-
-def _in_regime(label: str, stat: SessionStat) -> bool:
-    return stat.regime == label
-
-
-def _before(day: date, stat: SessionStat) -> bool:
-    return stat.session < day
-
-
-def _since(day: date, stat: SessionStat) -> bool:
-    return stat.session >= day
-
-
 def _prior_trials(
     writer: ResultWriter, edge_id: str, user_id: str
 ) -> set[tuple[str, str, str, int]]:
@@ -539,10 +518,12 @@ def evaluate_edge(
         for horizon in scope.edge.outcome.horizon_sessions
     ]
     hashed = run_hash(edge, variants, start, end, as_of, iv_field, split, random_draws)
-    spec = (
-        None
-        if split is None
-        else _RandomSpec(split, random_draws, expression_hash(catalogue(configs, user.user_id)))
+    spec = _RandomSpec(
+        split,
+        random_draws,
+        expression_hash(catalogue(configs, user.user_id)),
+        user.user_id,
+        edge.id,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec)
     results: list[VariantResult] = []
@@ -599,7 +580,7 @@ def evaluate_edge(
             measures = tuple(
                 slice_measures(
                     block_stats,
-                    _slices(block_stats, split, exploratory),
+                    edge_slices(block_stats, split, exploratory),
                     variant.config.config.impl == MODEL_IMPL,
                     edge.frozen_from,
                 )
@@ -646,7 +627,21 @@ def evaluate_edge(
         exploratory=exploratory,
         historical=session.caveat(),
         random_picks=tuple(randoms),
+        leg_rows=_leg_rows(stats, session, user.user_id, edge.id),
     )
+
+
+def _leg_rows(
+    stats: "_Measured", session: SessionReads, user_id: str, edge_id: str
+) -> tuple[Mapping[str, Any], ...]:
+    """The legs measured, the reads log of each decision session that has one and the outcome
+    reads, as ``results/edge_legs`` rows."""
+    held = {row["session_date"] for row in stats.rows}
+    reads = [
+        encode_reads(session.day_reads(d), user_id, edge_id) for d in session.attributed_days()
+    ]
+    outcomes = [encode_outcome(o, user_id, edge_id) for o in stats.outcome_reads.values()]
+    return (*stats.rows, *(r for r in reads if r["session_date"] in held), *outcomes)
 
 
 @dataclass(frozen=True)
@@ -673,17 +668,23 @@ class _Measured:
     closed: dict[int, set[date]]
     stored: dict[tuple[int, date], frozenset[str]]  # (horizon, S) -> names with an outcome row
     randoms: dict[tuple[tuple[str, int], str], dict[date, RandomStat]]  # per plan and screener
+    rows: list[Mapping[str, Any]] = field(default_factory=list)  # the legs, as stored rows
+    outcome_reads: dict[tuple[str, int, date], OutcomeRead] = field(default_factory=dict)
+    seqs: Mapping[date, int] = field(default_factory=dict)  # entry session -> outcome partition seq
 
 
 @dataclass(frozen=True)
 class _RandomSpec:
-    """What the random-pick backtest needs: the first out-of-sample session, the draws per
-    session and the hash of the user's expression-feature definitions, which with the trial
-    seed the draws through the leg key (``legs/key.py``); the run's range and ``as_of`` do not."""
+    """What a leg is keyed and drawn by: the first out-of-sample session (None: no draws), the
+    draws per session and the hash of the user's expression-feature definitions, which with the
+    trial seed the draws through the leg key (``legs/key.py``); the run's range and ``as_of`` do
+    not. ``user_id`` and ``edge_id`` name the rows the legs are stored as."""
 
-    split: date
+    split: date | None
     draws: int
     expr_hash: str
+    user_id: str
+    edge_id: str
     keys: dict[tuple[str, str], str] = field(default_factory=dict)  # (scope, variant) -> leg key
 
     def key_for(self, scope: "_Scope", variant: "Variant") -> str:
@@ -712,26 +713,31 @@ def _measure(
     variants: Sequence[Variant],
     schedules: Mapping[str, EventSchedule],
     as_of: datetime,
-    spec: _RandomSpec | None = None,
+    spec: _RandomSpec,
 ) -> _Measured:
     """One statistic per (plan, variant, leg), over chunks of ``CHUNK_SESSIONS`` decision
     sessions: each chunk reads the outcomes of its entry sessions, screens its sessions and
-    keeps only the statistics, so peak memory does not grow with the range."""
+    keeps only the statistics, so peak memory does not grow with the range. Every leg is
+    stored as a row (``legs/rows.py``) and measured from that row's decoded form, so a run that
+    computes a leg and one that reads it hold the same numbers."""
     out = _Measured({}, {}, {}, {}, {})
     days = sorted({leg.decision for p in plans for b in p.blocks for leg in b})
+    entries = {leg.entry for p in plans for b in p.blocks for leg in b}
+    out.seqs = outcome_seqs(reader, entries)  # before any outcome row is read
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set() for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):
         chunk = set(days[at : at + CHUNK_SESSIONS])
         closed = _read_closed(reader, plans, chunk, as_of, out, failed)
         for day in sorted(chunk):  # lockstep over the scopes: one selection read per session
-            for p in plans:
-                if any(leg.decision == day for b in p.blocks for leg in b):
-                    session.eligible(p.scope.universe, day)
+            with session.attribute(day):
+                for p in plans:
+                    if any(leg.decision == day for b in p.blocks for leg in b):
+                        session.eligible(p.scope.universe, day)
         for p in plans:
             for variant in variants:
                 events = schedules.get(p.scope.key)
-                _measure_plan(p, variant, session, events, chunk, closed, out, spec)
+                _measure_plan(p, variant, session, events, chunk, closed, out, spec, as_of)
         session.release()
     for horizon, missing in failed.items():
         if not out.closed[horizon]:  # nothing stored for any session of the range
@@ -789,10 +795,12 @@ def _measure_plan(
     chunk: set[date],
     closed: Mapping[int, Mapping[date, pd.DataFrame]],
     out: _Measured,
-    spec: _RandomSpec | None = None,
+    spec: _RandomSpec,
+    as_of: datetime,
 ) -> None:
     """The statistic of each of ``p``'s legs in the chunk whose window closed; for a screener
-    and a split, also its random-pick draws on the legs it measured (``_measure_random``)."""
+    and a split, also its random-pick draws on the legs it measured (``_measure_random``). The
+    reads of a leg are logged against its decision session."""
     mine = out.legs.setdefault((p.key, variant.id), {})
     lost = out.lost.setdefault((p.key, variant.id), {})
     for block in p.blocks:
@@ -801,13 +809,43 @@ def _measure_plan(
                 continue
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
-            stat = mine[leg.decision] = _stat(
-                p.scope, session, variant, leg, p.horizon, rows, names
+            drawing = (
+                spec.split is not None
+                and variant.role == "screener"
+                and block[0].decision >= spec.split
             )
-            if spec is not None and variant.role == "screener" and block[0].decision >= spec.split:
-                _measure_random(p, variant, leg, stat, session, names, rows, out, spec)
-            if (variant.id, leg.decision) in session.lost:
-                lost[leg.decision] = session.lost[variant.id, leg.decision]
+            with session.attribute(leg.decision):
+                stat = _stat(p.scope, session, variant, leg, p.horizon, rows, names)
+                drawn = (
+                    _measure_random(p, variant, leg, stat, session, names, rows, spec)
+                    if drawing
+                    else None
+                )
+            record = LegRecord(
+                key=spec.key_for(p.scope, variant),
+                trial_hash=_trial_hash(p.scope, variant),
+                edge_variant=p.scope.key,
+                variant=variant.id,
+                horizon=p.horizon,
+                entry=leg.entry,
+                stat=stat,
+                outcomes_as_of=as_of,
+                random=drawn,
+                event_ids=None if names is None else tuple(sorted(names)),
+                lost_table=session.lost.get((variant.id, leg.decision)),
+                snapshot=session.snapshot_of(variant, leg.decision),
+            )
+            row = encode_leg(record, spec.user_id, spec.edge_id)
+            out.rows.append(row)
+            stored = decode_leg(row)  # the numbers every statistic below is computed from
+            mine[leg.decision] = stored.stat
+            if stored.random is not None:
+                out.randoms.setdefault((p.key, variant.id), {})[leg.decision] = stored.random
+            if stored.lost_table is not None:
+                lost[leg.decision] = stored.lost_table
+            out.outcome_reads[p.scope.key, p.horizon, leg.decision] = OutcomeRead(
+                leg.decision, p.scope.key, p.horizon, leg.entry, as_of, out.seqs.get(leg.entry)
+            )
 
 
 def _measure_random(
@@ -818,18 +856,17 @@ def _measure_random(
     session: SessionReads,
     event_names: frozenset[str] | None,
     rows: pd.DataFrame,
-    out: _Measured,
     spec: _RandomSpec,
-) -> None:
+) -> RandomStat | None:
     """The random-pick draws matched to one screener at one leg it measured: as many names as
     the screener held there (``k = 0`` still keeps the leg's base), so the null has the same
     sample size, sessions and base as the screener's own result (``random_picks.py``)."""
     if stat.excluded_coverage:
-        return
+        return None
     eligible = session.eligible(p.scope.universe, leg.decision)
     names = names_for(p.scope.edge, eligible, event_names)
     res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
-    found = random_stat(
+    return random_stat(
         leg.decision,
         res[res["excluded"] == ""],
         names.pickable,
@@ -839,8 +876,6 @@ def _measure_random(
             spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}", p.horizon, leg.decision
         ),
     )
-    if found is not None:
-        out.randoms.setdefault((p.key, variant.id), {})[leg.decision] = found
 
 
 def _drawn(block: Sequence[Leg], legs: Mapping[date, RandomStat], closed: set[date]) -> bool:

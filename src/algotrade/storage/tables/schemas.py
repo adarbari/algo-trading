@@ -704,6 +704,59 @@ EDGE_PAPER = _fixed(
     runs="merge",
     key=("user_id", "edge_id", "signal_session", "instrument_id"),
 )  # fmt: skip
+# The edge harness's stored legs (ADR 0063): what one evaluation computed per decision session,
+# so a later run can reuse it. Written only by ``services/evaluation/cross_section/legs/``;
+# partition ``session_date`` is the decision session D (not written every session). ``row_kind``:
+# ``leg`` (one per leg key, edge variant, screener, horizon: every ``SessionStat`` field, the
+# entry session S, the trial hash, the screen's universe snapshot, the event names, the table a
+# lost session lacked, the ``as_of`` its outcome read used and, for a screener from the split on,
+# its random draws' sums as float32 lists), ``reads`` (one per (user, edge, D): every partition
+# the session read, ``read_*`` lists in step, the store's commit sequence ``inputs_seq`` at its
+# first read, the historical-identity counts) and ``outcome`` (one per (D, edge variant,
+# horizon): the entry session read, ``outcomes_as_of`` and the outcome partition's commit
+# sequence). A key column that does not apply is "" (or 0 for the horizon), never null. Runs
+# merge: a leg recomputed by a later run replaces the earlier one under the same key.
+EDGE_LEGS = _fixed(
+    "results/edge_legs",
+    "results",
+    (
+        "user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant",
+        "horizon_sessions",
+    ),
+    *_strings("user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant"),
+    *_strings("trial_hash", "regime", "lost_table"),
+    "horizon_sessions int64!",
+    "entry_session date",
+    "screen_snapshot date",
+    "outcomes_as_of timestamp_utc",
+    "pick_values float64[]",
+    "deciles float64[]",
+    "pick_reference float64[]",
+    "event_ids string[]",
+    *(f"{n} int64" for n in (
+        "pick_hits", "rest_n", "base_hits", "ranked", "unscored", "excluded_score_coverage",
+        "excluded_unclosed", "excluded_missing", "excluded_coverage", "excluded_unmeasured",
+        "unmeasured_base", "delisted", "outside_universe", "no_entry_bar", "pick_touches",
+        "no_implied_vol", "rand_picks", "rand_eligible", "rand_base_hits", "inputs_seq",
+        "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
+        "id_screened_proxy",
+    )),
+    *_floats("rest_mean", "rest_m2", "top_decile", "spread"),
+    "pre_snapshot bool",
+    "implied_stored bool",
+    "value_sums float32[]",
+    "hit_sums float32[]",
+    "read_table string[]",
+    "read_kind string[]",
+    "read_digest string[]",
+    "read_from date[]",
+    "read_to date[]",
+    runs="merge",
+    key=(
+        "user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant",
+        "horizon_sessions",
+    ),
+)  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -738,6 +791,7 @@ KNOWN: dict[str, TableSpec] = {
         EDGE_EVAL,
         WINNERS_STUDY,
         EDGE_PAPER,
+        EDGE_LEGS,
         LIVE_OPTION_QUOTES,
         USAGE_LLM_CALLS,
         ETF_HOLDINGS,

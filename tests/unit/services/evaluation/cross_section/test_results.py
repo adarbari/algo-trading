@@ -11,6 +11,8 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import DataValidationError
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
+from algotrade.services.evaluation.cross_section.legs.rows import decode_leg, encode_leg
+from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     iv_coverage,
@@ -226,3 +228,73 @@ def test_an_iv_field_stored_part_of_the_range_counts_the_sessions_that_have_it()
     assert 0 < gap["stored"] < gap["sessions"] and gap["picks"] > 0
     assert iv_coverage(evaluate(iv_world(DAYS[0]), outcome=OTM, variants=variants)) == []
     assert iv_coverage(evaluate(iv_world(None))) == []  # an outcome that reads no implied vol
+
+
+def test_the_legs_are_stored_with_the_run_and_hold_what_its_rows_were_measured_from(
+    world: World,
+) -> None:
+    """ADR 0063: one leg row per decision session, the reads log of each session and its
+    outcome read; the run's statistics come from the decoded legs, so the stored ones are
+    exactly what produced its ``edge_eval`` rows."""
+    ev = evaluate(world, frozen_from="2026-09-04")
+    record = write_edge_eval(world.results, ev, NOW)
+    found = read_legs(world.reader, "site", "drift", DAYS[0], DAYS[-1])
+    (result,) = ev.results
+    decisions = [s.session for s in result.stats]
+    assert len(decisions) == 4
+    assert sorted(d for *_, d in found.legs) == decisions and sorted(found.reads) == decisions
+    assert [leg.stat for leg in sorted(found.legs.values(), key=lambda x: x.day)] == list(
+        result.stats
+    )
+    drawn = [leg for leg in found.legs.values() if leg.random is not None]
+    assert sorted(leg.day for leg in drawn) == [d for d in decisions if d >= date(2026, 9, 4)]
+    assert all(leg.random is not None and leg.random.value_sums.size == 1000 for leg in drawn)
+    assert all(leg.known == NOW and leg.outcomes_as_of == AS_OF for leg in found.legs.values())
+    day = decisions[1]
+    reads = found.reads[day]
+    tables = {(r.table, r.start, r.kind) for r in reads.reads}
+    assert ("rollups/instrument/option_liquidity@v1", day, "rows") in tables
+    assert {"universe", "instruments/reference"} <= {
+        r.table for r in reads.reads if r.kind == "dates"
+    }
+    assert all(r.end <= day for r in reads.reads)  # nothing after D is ever read
+    assert not any("forward_returns" in r.table for r in reads.reads)  # outcomes: their own rows
+    assert reads.inputs_seq is not None
+    seen = found.outcomes["main", 2, day]
+    assert seen.entry == DAYS[DAYS.index(day) + 1] and seen.as_of == AS_OF
+    assert seen.seq is not None
+    stored = world.reader.table_range("results/edge_legs", DAYS[0], DAYS[-1])
+    assert stored is not None and (stored["run_id"] == record.run_id).all()
+
+
+def test_a_crash_while_publishing_leaves_no_legs_and_no_rows(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ev = evaluate(world)
+    writer = world.results
+
+    def crash(_: object) -> None:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(writer, "save_run", crash)
+    with pytest.raises(RuntimeError):
+        write_edge_eval(writer, ev, NOW)
+    assert world.reader.table_range("results/edge_legs", DAYS[0], DAYS[-1]) is None
+    assert world.reader.table("results/edge_eval", ev.end) is None
+    assert writer.runs_for("edge-eval:drift:site") == []
+
+
+def test_a_rerun_replaces_a_leg_under_its_key_instead_of_adding_one(world: World) -> None:
+    write_edge_eval(world.results, evaluate(world), NOW)
+    write_edge_eval(world.results, evaluate(world), NOW + timedelta(hours=1))
+    found = read_legs(world.reader, "site", "drift", DAYS[0], DAYS[-1])
+    assert len(found.legs) == 4 and {leg.known for leg in found.legs.values()} == {
+        NOW + timedelta(hours=1)
+    }
+
+
+def test_the_evaluations_own_leg_rows_decode_to_the_statistics_it_measured(world: World) -> None:
+    ev = evaluate(world)
+    legs = [decode_leg(r) for r in ev.leg_rows if r["row_kind"] == "leg"]
+    assert [leg.stat for leg in legs] == list(ev.results[0].stats)
+    assert all(encode_leg(leg, "site", "drift")["leg_key"] == leg.key for leg in legs)

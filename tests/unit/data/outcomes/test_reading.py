@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.outcomes import OUTCOME_FIELDS, read_outcomes
+from algotrade.data.outcomes import OUTCOME_FIELDS, outcome_seqs, read_outcomes
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
@@ -97,3 +97,12 @@ def test_with_as_of_the_error_keeps_the_span_semantics() -> None:
         read_outcomes(reader, 20, [date(2026, 9, 20), date(2026, 9, 22)], as_of=as_of)
     none_wanted = [date(2026, 8, 30), date(2026, 9, 4)]  # partitions inside, none wanted
     assert read_outcomes(reader, 20, none_wanted, as_of=as_of).empty
+
+
+def test_outcome_seqs_are_the_wanted_committed_partitions_commit_sequences() -> None:
+    reader = _store()
+    seqs = outcome_seqs(reader, [S1, S3])
+    assert set(seqs) == {S1, S3} and all(isinstance(v, int) for v in seqs.values())
+    assert set(outcome_seqs(reader, [S2])) == {S2}
+    assert outcome_seqs(reader, []) == {}
+    assert outcome_seqs(reader, [date(2020, 1, 1)]) == {}  # no such partition
