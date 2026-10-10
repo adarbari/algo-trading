@@ -18,6 +18,7 @@ from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
 )
+from algotrade.services.evaluation.cross_section.legs.store import legs_frame, write_legs
 from algotrade.services.evaluation.cross_section.measures import BUCKETS, SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.storage.runs import RunRecord, start_run
@@ -226,9 +227,10 @@ def write_edge_eval(
     trigger: str = "cli",
     job_id: str | None = None,
 ) -> RunRecord:
-    """Save ``evaluation``: its rows (both visible or neither) and its run record, whose stats
-    hold the trial log and who ran it (``owner``: the edge's, default the rows' user; ``trigger``:
-    ``nightly`` | ``ui`` | ``cli``; ``job_id``: the job that wrote it, none for a direct call).
+    """Save ``evaluation``: its rows and its legs (``results/edge_legs``, ADR 0063; all visible
+    or none) and its run record, whose stats hold the trial log and who ran it (``owner``: the
+    edge's, default the rows' user; ``trigger``: ``nightly`` | ``ui`` | ``cli``; ``job_id``: the
+    job that wrote it, none for a direct call).
     Returns the finished record."""
     if trigger not in TRIGGERS:
         raise ConfigurationError(f"unknown run trigger {trigger!r}; known: {list(TRIGGERS)}")
@@ -256,5 +258,7 @@ def write_edge_eval(
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
     with writer.publishing(record.run_id, now):
         writer.write_result(RESULT, evaluation.end, record.run_id, frame, pending=True)
+        if evaluation.leg_rows:
+            write_legs(writer, record.run_id, legs_frame(evaluation.leg_rows, record.run_id, now))
         writer.save_run(record.finish(now, complete=True, stats=stats))
     return record

@@ -30,6 +30,10 @@ class StoreReader:
         """This reader, also seeing ``run_id``'s pending writes."""
         return StoreReader(self._backend, run_id)
 
+    def recording(self) -> "RecordingReader":
+        """A reader of the same store and view that logs the reads of an attributed day."""
+        return RecordingReader(self._backend, self.own_run)
+
     def table(
         self,
         table: str,
@@ -90,6 +94,11 @@ class StoreReader:
         should see is ``algotrade.data.reference.snapshot``, not this."""
         dates = [d for d in self.dates(table) if on_or_before is None or d <= on_or_before]
         return dates[-1] if dates else None
+
+    def earliest_date(self, table: str) -> date | None:
+        """The first partition date (the stand-in of a read before every snapshot)."""
+        dates = self.dates(table)
+        return dates[0] if dates else None
 
     def runs(self, job: str, session_date: date | None = None) -> list[RunRecord]:
         return self._backend.runs.find(job, session_date)
@@ -234,3 +243,12 @@ class RecordingReader(StoreReader):
         if recording:
             self._log_dates(table, seen)
         return seen[-1] if seen else None
+
+    def earliest_date(self, table: str) -> date | None:
+        """Logged as the one partition it names: a later partition never changes the answer,
+        an earlier one does (``dates`` digest of ``[first]``)."""
+        recording = self._open()
+        found = StoreReader.dates(self, table)
+        if recording and found:
+            self._log(ReadRecord(table, found[0], found[0], "dates", dates_digest(found[:1])))
+        return found[0] if found else None

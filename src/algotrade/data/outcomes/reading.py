@@ -5,7 +5,7 @@ excludes it, never counts it a miss; an ``UNMEASURED`` row (a flagged bar in the
 ``outcome_reason``) has no returns and is excluded the same way. ``as_of`` keeps only rows
 known by then (row by row, not only by run)."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -24,6 +24,16 @@ _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "windo
 def stored_sessions(reader: StoreReader) -> list[date]:
     """The start sessions with a stored outcome partition, ascending (empty: none stored)."""
     return list(reader.dates(FORWARD_RETURNS))
+
+
+def outcome_seqs(reader: StoreReader, sessions: Iterable[date]) -> dict[date, int]:
+    """The commit sequence of each start session's committed outcome partition (those of
+    ``sessions`` that exist), read before the rows so a later commit changes it (ADR 0063)."""
+    wanted = sorted(set(sessions))
+    if not wanted:
+        return {}
+    found = reader.partition_seq(FORWARD_RETURNS, wanted[0], wanted[-1])
+    return {d: s for d, s in found.items() if d in set(wanted)}
 
 
 def missing_outcomes(sessions: Sequence[date]) -> MissingDataError:

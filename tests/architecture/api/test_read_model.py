@@ -44,6 +44,9 @@ PARTITION_READERS = {
     "the run names (missing data is an error, ADR 0008)",
     SERVICES / "datasets.py": "run inputs: the golden dataset catalogue the evaluation suite "
     "and the backtest CLI read",
+    SERVICES / "evaluation/cross_section/legs/store.py": "the edge harness's own stored legs "
+    "(ADR 0063): one range read of results/edge_legs by the evaluation that wrote them, for "
+    "the reuse of its legs; never a page read, and no other module names the table",
 }
 PARTITION_READS = {
     "table", "require", "table_range", "dates", "latest_date", "snapshot", "read_snapshot",
