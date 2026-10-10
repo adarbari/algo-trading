@@ -261,3 +261,16 @@ def test_load_all_edges_is_the_site_edges_and_every_users_own_once() -> None:
     )
     found = sorted((e.id, e.owner) for e in load_all_edges(configs))
     assert found == [("drift", "site"), ("idea", "alice"), ("idea", "bob")]
+
+
+def test_load_all_edges_skips_a_users_folder_named_site() -> None:
+    class WithSiteFolder(MemoryConfigStore):
+        def users(self) -> list[str]:
+            return ["site"]
+
+    base = store(site__drift=document(), site__idea=document(id="idea"))
+    configs = WithSiteFolder(base._docs)
+    assert [(e.id, e.owner) for e in load_all_edges(configs)] == [
+        ("drift", "site"),
+        ("idea", "site"),
+    ]

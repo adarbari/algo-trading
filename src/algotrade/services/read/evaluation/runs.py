@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from algotrade.config.edges.document import LEGACY_SITE_OWNERS, job_name
+from algotrade.config.edges.document import LEGACY_SITE_CUTOFF, LEGACY_SITE_OWNERS, job_name
 from algotrade.config.user import SITE_USER
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext, Stores, run_partition
@@ -152,15 +152,15 @@ def _lost(stats: Mapping[str, Any]) -> tuple[str, ...]:
 def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
     """The committed runs of ``owner``, newest first; the site's include the records of
     ``LEGACY_SITE_OWNERS`` (built as the site's, the old owner disclosed)."""
-    sources = [
-        (owner, None),
-        *((legacy, legacy) for legacy in LEGACY_SITE_OWNERS if owner == SITE_USER),
-    ]
+    sources: list[tuple[str, str | None]] = [(owner, None)]
+    if owner == SITE_USER and not edge.mine:  # a user's own edge has no legacy runs
+        sources += [(legacy, legacy) for legacy in LEGACY_SITE_OWNERS]
     found = [
         (r, legacy)
         for who, legacy in sources
         for r in ctx.reader.runs(job_name(edge.id, who))
         if r.status is RunStatus.COMPLETE
+        and (legacy is None or (r.finished_at or r.started_at) < LEGACY_SITE_CUTOFF)
     ]
     ordered = sorted(found, key=lambda f: f[0].finished_at or f[0].started_at, reverse=True)
     return [_run(ctx, r, edge, owner, legacy) for r, legacy in ordered]
@@ -169,8 +169,12 @@ def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
 def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:
     """Every committed run of ``edge`` the user sees (theirs, then the site's), newest first."""
     owners = dict.fromkeys([ctx.user.user_id, SITE_USER])
-    runs = [r for o in owners for r in _committed(ctx, edge, o)]
-    return tuple(sorted(runs, key=lambda r: r.knowledge_ts, reverse=True))
+    runs: dict[str, EdgeRun] = {}
+    for o in owners:  # a legacy ``local`` run is the viewer's own record too: the site's copy wins
+        for r in _committed(ctx, edge, o):
+            if r.run_id not in runs or r.legacy_owner is not None:
+                runs[r.run_id] = r
+    return tuple(sorted(runs.values(), key=lambda r: r.knowledge_ts, reverse=True))
 
 
 def load_runs_of(ctx: Stores, edge_id: str) -> tuple[EdgeRun, ...]:

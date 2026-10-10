@@ -41,7 +41,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from algotrade.config.edges.document import LEGACY_SITE_OWNERS, MAIN, Edge, job_name
+from algotrade.config.edges.document import (
+    LEGACY_SITE_CUTOFF,
+    LEGACY_SITE_OWNERS,
+    MAIN,
+    Edge,
+    job_name,
+)
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -506,8 +512,14 @@ def _prior_trials(
     edge variants existed is the edge's own ("main"). The site's log includes the runs recorded
     under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them."""
     found: set[tuple[str, str, str, int]] = set()
-    owners = (user_id, *(LEGACY_SITE_OWNERS if user_id == SITE_USER else ()))
-    records = [r for owner in owners for r in writer.runs_for(job_name(edge_id, owner))]
+    records = list(writer.runs_for(job_name(edge_id, user_id)))
+    if user_id == SITE_USER:  # the legacy owners' records from before the cutoff only
+        for legacy in LEGACY_SITE_OWNERS:
+            records += [
+                r
+                for r in writer.runs_for(job_name(edge_id, legacy))
+                if (r.finished_at or r.started_at) < LEGACY_SITE_CUTOFF
+            ]
     for record in records:
         for t in record.stats.get("trials", []):
             found.add(

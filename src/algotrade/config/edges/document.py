@@ -62,7 +62,7 @@ Whether the named presets exist is checked by ``loading.py``, which sees the sto
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
 from algotrade.config.edges.follow import Follow, parse_follow
@@ -246,7 +246,10 @@ class Edge:
 # Owners an evaluation run was once recorded under for what are now site edges: the backtest CLI
 # fell back to the user ``local`` before an edge's owner came from its document. Their records
 # are read as the site's (disclosed as ``legacy_owner``), never rewritten.
+# ``local`` is a real user too, so a record counts as the site's only if it finished before the
+# cutoff (the day owner-from-document landed); later ``local`` runs are the user's own.
 LEGACY_SITE_OWNERS = ("local",)
+LEGACY_SITE_CUTOFF = datetime(2026, 10, 11, tzinfo=UTC)
 
 
 def job_name(edge_id: str, user_id: str) -> str:

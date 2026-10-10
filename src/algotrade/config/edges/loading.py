@@ -78,7 +78,8 @@ def load_all_edges(configs: UserDocuments) -> tuple[Edge, ...]:
     ``users()``; a user whose file is faulty contributes what loads."""
     found = list(load_edges(configs))
     for user in configs.users():
-        found.extend(e for e in load_edges(configs, user) if e.owner == user)
+        if user != SITE_USER:
+            found.extend(e for e in load_edges(configs, user) if e.owner == user)
     return tuple(found)
 
 

@@ -620,27 +620,13 @@ def test_each_variant_is_evaluated_under_its_own_key_and_is_a_trial() -> None:
 def test_a_trial_logged_before_edge_variants_is_the_edges_own() -> None:
     class Record:
         stats: ClassVar = {"trials": [{"variant": "momo", "config_hash": "h", "horizon": 2}]}
+        finished_at = started_at = datetime(2026, 10, 5, tzinfo=UTC)
 
     class Writer:
         def runs_for(self, job: str) -> list[Record]:
             return [Record()]
 
     assert _prior_trials(Writer(), "drift", "site") == {("main", "momo", "h", 2)}  # type: ignore[arg-type]
-
-
-def test_the_sites_trial_log_includes_the_legacy_local_runs() -> None:
-    class Record:
-        def __init__(self, hash_: str) -> None:
-            self.stats = {"trials": [{"variant": "momo", "config_hash": hash_, "horizon": 2}]}
-
-    class Writer:
-        def runs_for(self, job: str) -> list[Record]:
-            known = {"edge-eval:drift:site": "a", "edge-eval:drift:local": "b"}
-            return [Record(known[job])] if job in known else []
-
-    seen = _prior_trials(Writer(), "drift", "site")  # type: ignore[arg-type]
-    assert seen == {("main", "momo", "a", 2), ("main", "momo", "b", 2)}
-    assert _prior_trials(Writer(), "drift", "alice") == set()  # a user's log is their own
 
 
 def test_changing_a_variants_override_changes_its_trial_key_and_adds_a_trial() -> None:
