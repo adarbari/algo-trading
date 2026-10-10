@@ -116,6 +116,14 @@ detect = [
 ]
 
 [[responsibility]]
+id = "partition-stamps"
+description = "The commit-sequence stamp of each committed partition in a range (TableStore.partition_seq: the highest sequence of any run in its index, 0 for a direct write, pending ignored) and the per-day log of the reads a computation made (RecordingReader, with the sequence at its first read): what lets a reader tell the partitions it read have not changed (ADR 0063)"
+owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/readers.py"]
+allowed = ["src/algotrade/storage/tables/interfaces.py"]  # declares partition_seq on TableStore
+section = "docs/adr/0022-atomic-run-publication.md#decision"
+detect = [{ call = "partition_seq" }, { call = "RecordingReader" }]
+
+[[responsibility]]
 id = "rates-reads"
 description = "Which Treasury curve a date sees (latest on or before, earliest flagged) and rates for a time to expiry: consumers call data.rates.curve, never read rates/treasury themselves"
 owner = ["src/algotrade/data/rates.py"]
@@ -136,14 +144,6 @@ description = "Save vendor payloads as received to the raw store before parsing"
 owner = ["src/algotrade/storage/backends/*", "apps/ingestion/algotrade_ingestion/tasks/framework/run.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "raw.put" }]
-
-[[responsibility]]
-id = "partition-stamps"
-description = "The commit-sequence stamp of each committed partition in a range (TableStore.partition_seq: the highest sequence of any run in its index, 0 for a direct write, pending ignored) and the per-day log of the reads a computation made (RecordingReader, with the sequence at its first read): what lets a reader tell the partitions it read have not changed (ADR 0063)"
-owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/readers.py"]
-allowed = ["src/algotrade/storage/tables/interfaces.py"]  # declares partition_seq on TableStore
-section = "docs/adr/0022-atomic-run-publication.md#decision"
-detect = [{ call = "partition_seq" }, { call = "RecordingReader" }]
 
 [[responsibility]]
 id = "run-publish"
