@@ -63,12 +63,12 @@ def differing_legs(
     edge_id: str,
 ) -> list[LegDifference]:
     """The legs among the ``leg`` rows of a full run (``EdgeEvaluation.leg_rows``) that differ from
-    ``stored`` (``StoredLegs.legs``), in key order. A stored leg the full run does not hold is not
-    reported: the run's range and trials bound what it checks."""
+    ``stored`` (``StoredLegs.legs``), in key order. A tombstone is skipped; a stored leg the full
+    run does not hold is not reported: the run's range and trials bound what it checks."""
     found = []
     for row in full:
-        if row["row_kind"] != LEG:
-            continue
+        if row["row_kind"] != LEG or row.get("tombstone"):
+            continue  # a tombstone says a leg is gone: nothing was computed to compare
         fresh = decode_leg(row)
         old = stored.get(_key(fresh))
         if old is None:

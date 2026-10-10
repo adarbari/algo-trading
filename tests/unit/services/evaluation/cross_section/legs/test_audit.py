@@ -15,20 +15,21 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
     LegRecord,
     decode_leg,
     encode_leg,
+    encode_tombstone,
 )
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 
 AS_OF = datetime(2026, 10, 5, tzinfo=UTC)
 
 
-def leg(day: date, **stat: Any) -> LegRecord:
+def leg(day: date, key: str = "k", **stat: Any) -> LegRecord:
     base = SessionStat(
         session=day, regime="CALM", pick_values=(0.1, float("nan")), pick_hits=1,
         rest=(5, 0.01, 0.2), base_hits=2, top_decile=None, spread=None, deciles=(0.1,) * 10,
         ranked=7, unscored=0,
     )  # fmt: skip
     return LegRecord(
-        key="k", trial_hash="t", edge_variant="main", variant="momo", horizon=1,
+        key=key, trial_hash="t", edge_variant="main", variant="momo", horizon=1,
         entry=day + timedelta(days=1), stat=replace(base, **stat), outcomes_as_of=AS_OF,
         outcome_seq=3,
     )  # fmt: skip
@@ -75,3 +76,15 @@ def test_the_rows_kept_are_every_row_of_a_session_with_a_differing_leg() -> None
     found = differing_legs(rows, stored_of(leg(DAYS[0]), leg(DAYS[2])), "site", "e")
     kept = keep_differing(rows, found)
     assert [r["session_date"] for r in kept] == [DAYS[1], DAYS[1]]
+
+
+def test_a_tombstone_is_not_compared_and_is_kept_for_a_differing_session() -> None:
+    gone = leg(DAYS[0])  # a trial the edge no longer has: its stored leg is tombstoned
+    tomb = {**encode_tombstone(gone, "site", "e")}
+    fresh = [tomb, *rows_of(leg(DAYS[0], "k2", pick_hits=2))]
+    stored = stored_of(gone, leg(DAYS[0], "k2", pick_hits=2))
+    assert differing_legs(fresh, stored, "site", "e") == []
+    stored = stored_of(gone, leg(DAYS[0], "k2"))
+    found = differing_legs(fresh, stored, "site", "e")
+    assert [d.key[0] for d in found] == ["k2"]
+    assert tomb in keep_differing(fresh, found)

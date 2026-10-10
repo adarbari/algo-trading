@@ -220,7 +220,8 @@ def _audited(
     differing = differing_legs(
         evaluation.leg_rows, stored.legs, evaluation.user_id, evaluation.edge_id
     )
-    return replace(evaluation, leg_rows=keep_differing(evaluation.leg_rows, differing)), differing
+    kept = keep_differing(evaluation.leg_rows, differing)
+    return replace(evaluation, mode="audit", leg_rows=kept), differing
 
 
 def _audit_failure(edge_id: str, differing: list[LegDifference]) -> str:
