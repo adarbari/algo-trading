@@ -1,15 +1,18 @@
-"""``/edges/{id}``: copy an edge, save and delete the user's own, and move their state about one
-(follow, reject, retire, a new version's trial, show the out-of-sample result): ADR 0053
-amendment 2026-10-09, ADR 0029 writes into ``config/users/<id>/edges/``. Reading an edge is
-GraphQL (``Query.edge``); a run is ``POST /edges/{id}/evaluate``; publishing site-wide is an
-admin read (``Query.publishedEdgeDocument``), never a write to the site's config.
+"""``/edges/{id}``: copy an edge, save and delete the user's own, and move their status about one
+(follow a site edge, move the status of their own, show the out-of-sample result): ADR 0053
+amendments 2026-10-09 and 2026-10-10, ADR 0029 writes into ``config/users/<id>/edges/``.
+Reading an edge is GraphQL (``Query.edge``); a run is ``POST /edges/{id}/evaluate``;
+publishing site-wide is an admin read (``Query.publishedEdgeDocument``), never a write to the
+site's config.
 The write is for the caller; an admin names another user in the ``X-Act-For`` header (ADR 0040)."""
 
 from fastapi import APIRouter
 
+from algotrade.config.edges.loading import USER_STATUSES
 from algotrade.config.user import UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring import edges
-from algotrade.services.authoring.edges import StateChange
+from algotrade.services.authoring.edges import StatusChange
 from algotrade.services.read.context import open_stores
 from algotrade.services.read.evaluation import versions
 from algotrade_api.deps import Context, Store, User, Writer
@@ -53,22 +56,30 @@ def delete(writer: Writer, user: User, edge_id: str) -> None:
 
 
 @router.put("/{edge_id}/state")
-def set_state(
+def state(
     writer: Writer, user: User, ctx: Context, store: Store, edge_id: str, body: StateBody
 ) -> EdgeState:
-    """Move the user's state about an edge (follow, reject, retire, replace) and/or show its
-    out-of-sample result. The server decides the permanent labels (a warning, never a block)."""
-    change = StateChange(body.state, body.reason, body.reveal_oos)
+    """Bookmark a site edge (``follow``) or move the status of the user's own (``status``), and/or
+    show an own edge's out-of-sample result. The server decides the permanent labels (a warning,
+    never a block); 400 for a ``status`` of a site edge, a ``follow`` of an own edge or both."""
+    if body.follow is not None and body.status is not None:
+        raise ConfigurationError("send follow (a site edge) or status (your own edge), not both")
+    if body.status is not None and body.status not in USER_STATUSES:
+        raise ConfigurationError(f"status {body.status!r}: expected one of {list(USER_STATUSES)}")
+    change = StatusChange(body.status, body.follow, body.reason, body.reveal_oos)
     # The verdict is the one the acted-for user sees (X-Act-For), not the caller's.
     theirs = open_stores(store.reader, store.configs, UserContext(user), store.cache)
-    verdict = versions.verdict_level(theirs, edge_id) if body.state == "following" else None
-    follow = edges.set_state(writer, user, edge_id, change, today=ctx.session.date, verdict=verdict)
+    judged = body.follow is True or body.status == "live"
+    verdict = versions.verdict_level(theirs, edge_id) if judged else None
+    edge = edges.set_status(writer, user, edge_id, change, today=ctx.session.date, verdict=verdict)
     return EdgeState(
         edge_id=edge_id,
-        state=follow.state,
-        since=follow.since,
-        reason=follow.reason,
-        replaces=follow.replaces,
-        labels=list(follow.labels),
-        oos_revealed=follow.oos_revealed,
+        status=edge.status,
+        followed=edge.followed,
+        followed_since=edge.follow.since,
+        status_since=edge.audit.status_since,
+        reason=edge.audit.status_reason,
+        replaces=edge.audit.replaces,
+        labels=[*dict.fromkeys([*edge.follow.labels, *edge.audit.labels])],
+        oos_revealed=edge.audit.oos_revealed,
     )

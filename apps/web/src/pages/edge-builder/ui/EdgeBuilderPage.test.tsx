@@ -54,7 +54,7 @@ vi.mock('@/features/edge-evaluation', () => ({
   useRunEvaluation: () => ({ start: state.start, ...state.runner }),
   evaluationMessage: () => 'Evaluating…',
 }));
-vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null }));
+vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null, termHelp: () => null }));
 
 beforeEach(() => {
   state.start.mockClear();

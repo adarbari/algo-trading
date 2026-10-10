@@ -5,10 +5,15 @@ A user document never shadows a site edge (ADR 0053 amendment 2026-10-09):
 - with ``extends = "<edge id>"`` it is a COPY: a new edge under its own id, the extended
   document (a site edge, or the user's own: v2 extends v1) deep-merged under it (tables
   deeply, lists replaced). What the site decides (``status``, ``rejection_reason``,
-  ``evidence``, ``implementation``) is never inherited nor set: a copy is a ``candidate``;
-- without it, an id that is no site edge's is a new edge of the user's, a ``candidate`` too;
-- the file of a site edge's own id holds nothing but ``[follow]``: the user's state about a
+  ``evidence``, ``implementation``) is never inherited nor set. The edge's ``status`` is the
+  user's own (ADR 0053 amendment 2026-10-10: ``USER_STATUSES``, a copy starts as ``researching``;
+  ``evidenced`` and ``blocked`` stay the site's) and so is its ``[audit]``, the server's
+  bookkeeping of it; a rejected or retired edge's reason is the audit's ``status_reason``;
+- without it, an id that is no site edge's is a new edge of the user's, a ``researching`` too;
+- the file of a site edge's own id holds nothing but ``[follow]``: the user's bookmark of a
   site edge they have not copied (changing its settings needs a copy).
+A user's own document still holding the old ``[follow]`` state is read as its status and audit
+(``follow.legacy_own``) until ``scripts/migrate_edge_follows.py`` has rewritten it.
 
 Each layered document is typed by ``document.parse_edge``, then checked against the store: every
 screener and baseline must name a screener preset that exists (a site preset, or the user's own
@@ -26,8 +31,8 @@ from dataclasses import replace
 from typing import Any, Protocol
 
 from algotrade.config.edges.document import Edge, parse_edge
+from algotrade.config.edges.follow import AUDIT, is_legacy, legacy_own, parse_audit, parse_follow
 from algotrade.config.edges.follow import KEY as FOLLOW
-from algotrade.config.edges.follow import parse_follow
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import deep_merge
 from algotrade.config.user import SITE_USER
@@ -41,7 +46,8 @@ RULE_SCREENS = "screeners"
 CONFIGS = "strategies"
 SELECTIONS = "selections"
 SITE_DECIDES = ("rejection_reason", "evidence", "implementation")  # a user's edge never has these
-DRAFT_STATUS = "candidate"
+DRAFT_STATUS = "researching"
+USER_STATUSES = ("researching", "candidate", "live", "retired", "rejected")  # a user sets these
 MAX_CHAIN = 8  # a copy of a copy of ...: deeper is a mistake (and a cycle is refused earlier)
 
 
@@ -176,6 +182,7 @@ def _own_document(
             )
         parse_follow(doc, where)
         return {**site[name], FOLLOW: doc.get(FOLLOW, {})}, f"{_folder(SITE)}/{name}.toml", None
+    doc = _modernised(doc, where)
     chain: list[tuple[str, Mapping[str, Any]]] = [(name, doc)]  # outermost first
     base: Mapping[str, Any] = {}
     root = name
@@ -189,7 +196,7 @@ def _own_document(
         if target in site:
             base, extends = site[target], None
         elif target in own:
-            chain.append((target, own[target]))
+            chain.append((target, _modernised(own[target], f"{_folder(user)}/{target}.toml")))
             extends = own[target].get("extends")
         else:
             known = sorted({*site, *own} - {name})
@@ -199,18 +206,38 @@ def _own_document(
         merged = _copy_over(merged, layer, f"{_folder(user)}/{layer_name}.toml")
     # A copy is its own edge (the extended document's id is not its); a new one names itself.
     merged = {**merged, "id": name} if len(chain) > 1 or base else {"id": name, **merged}
-    merged["status"] = DRAFT_STATUS
+    merged["status"] = doc.get("status", DRAFT_STATUS)
     if doc.get("extends") is not None:
         merged["extends"] = doc["extends"]
-    if doc.get(FOLLOW) is not None:
-        merged[FOLLOW] = doc[FOLLOW]
+    if doc.get(AUDIT) is not None:
+        merged[AUDIT] = doc[AUDIT]
+        reason = parse_audit(doc, where).status_reason
+        if merged["status"] in ("rejected", "retired") and reason:
+            merged["rejection_reason"] = reason  # the reason the document type asks for
+    if merged["status"] == "rejected" and "rejection_reason" not in merged:
+        merged["rejection_reason"] = "rejected by the user"
     return merged, where, root
+
+
+def _modernised(doc: Mapping[str, Any], where: str) -> Mapping[str, Any]:
+    """``doc`` with an old ``[follow]`` state turned into its ``status`` and ``[audit]``."""
+    if doc.get(FOLLOW) is None:
+        return doc
+    if not is_legacy(doc[FOLLOW]):
+        raise ConfigurationError(
+            f"{where} [follow]: an own edge has a status (a bookmark is of a site edge)"
+        )
+    status, audit = legacy_own(doc[FOLLOW], where)
+    rest = {k: v for k, v in doc.items() if k != FOLLOW}
+    # the old state is the truth: it wins over a stray ``status`` or ``[audit]``
+    return {**rest, "status": status, AUDIT: audit}
 
 
 def _strip(document: Mapping[str, Any]) -> dict[str, Any]:
     """The part of an extended document a copy inherits: not the site's decisions, not
-    ``[follow]`` (the user's own state) and not its ``extends`` (the copy has its own)."""
-    out = {k: v for k, v in document.items() if k not in (*SITE_DECIDES, "status", FOLLOW)}
+    ``[follow]`` or ``[audit]`` (the user's own state) and not its ``extends`` (the copy has its
+    own)."""
+    out = {k: v for k, v in document.items() if k not in (*SITE_DECIDES, "status", FOLLOW, AUDIT)}
     out.pop("extends", None)
     return out
 
@@ -219,9 +246,13 @@ def _copy_over(base: Mapping[str, Any], layer: Mapping[str, Any], where: str) ->
     decided = [k for k in SITE_DECIDES if k in layer]
     if decided:
         raise ConfigurationError(f"{where}: {decided} are the site's to set, not a user's")
-    if layer.get("status", DRAFT_STATUS) != DRAFT_STATUS:
-        raise ConfigurationError(f"{where} status: a user's edge is a {DRAFT_STATUS!r}")
-    return deep_merge(base, {k: v for k, v in layer.items() if k not in ("extends", FOLLOW)})
+    if layer.get("status", DRAFT_STATUS) not in USER_STATUSES:
+        raise ConfigurationError(
+            f"{where} status: a user's edge is one of {list(USER_STATUSES)} "
+            "(evidenced and blocked are the site's)"
+        )
+    skipped = ("extends", "status", FOLLOW, AUDIT)
+    return deep_merge(base, {k: v for k, v in layer.items() if k not in skipped})
 
 
 def _folder(scope: str) -> str:

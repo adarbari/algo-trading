@@ -228,9 +228,9 @@ def _forward(
 ) -> ForwardTest | None:
     """The trial ``edge``'s forward test against the edge it replaces (None: it replaces none)."""
     old = next((e for e in load_edges(ctx) if e.id == edge.replaces), None)
-    if old is None or edge.since is None:
+    if old is None or edge.paper_since is None:
         return None
-    start = edge.since
+    start = edge.paper_since
     theirs = live_record(
         ctx,
         old,
@@ -268,5 +268,9 @@ def load_edge_paper(ctx: ReadContext, edge_id: str) -> EdgePaper | None:
     own = [t for t in trades if t.edge_id == edge.id]
     ordered = sorted(own, key=lambda t: (t.signal_session, -t.rank), reverse=True)
     record = live_record(ctx, edge, own, settings)
-    forward = _forward(ctx, edge, record, settings, trades) if edge.state == "trial" else None
+    forward = (
+        _forward(ctx, edge, record, settings, trades)
+        if edge.mine and edge.status == "candidate"
+        else None
+    )
     return EdgePaper(edge.id, record, with_instruments(ctx, tuple(ordered)), forward)

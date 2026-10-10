@@ -13,7 +13,7 @@
 
 import ast
 import fnmatch
-import tomllib
+import importlib.util
 from collections.abc import Collection, Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -22,8 +22,14 @@ import pytest
 
 from tests.conftest import REPO_ROOT
 
-LAYOUT_FILE = "architecture/layout.toml"
-LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / LAYOUT_FILE).read_text())
+_SPEC = importlib.util.spec_from_file_location(
+    "layout_report", REPO_ROOT / "scripts" / "layout_report.py"
+)
+assert _SPEC and _SPEC.loader
+layout_report = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(layout_report)
+LAYOUT_FILE = "architecture/layout*.toml"  # split by kind, merged by read_layout
+LAYOUT: dict[str, Any] = layout_report.read_layout(REPO_ROOT)
 GUIDE = "CLAUDE.md 'Directory layout' (where does this go) and .claude/skills/add-responsibility"
 SOURCE_DIRS = [d["path"] for d in LAYOUT["dir"]]
 MIRRORS: list[dict[str, str]] = LAYOUT["test_mirror"]

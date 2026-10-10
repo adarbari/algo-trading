@@ -21,11 +21,15 @@ describe('the moves a state allows', () => {
   });
 
   it('asks a reason for a rejection and a retirement', () => {
-    expect([asksReason('reject'), asksReason('retire'), asksReason('follow')]).toEqual([
-      true,
-      true,
-      false,
-    ]);
+    expect([
+      asksReason('reject', true),
+      asksReason('retire', true),
+      asksReason('follow', true),
+    ]).toEqual([true, true, false]);
+  });
+
+  it('asks nothing when a site edge is rejected: it only drops the bookmark', () => {
+    expect([asksReason('reject', false), asksReason('retire', false)]).toEqual([false, false]);
   });
 
   it('shows a copy its hidden result, never a site edge', () => {

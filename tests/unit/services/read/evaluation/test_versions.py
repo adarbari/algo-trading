@@ -27,11 +27,11 @@ HERE = datetime(2026, 10, 3, 3, tzinfo=UTC)
 
 
 def with_copy(
-    follow: dict[str, Any] | None = None, **changes: Any
+    audit: dict[str, Any] | None = None, **changes: Any
 ) -> dict[tuple[str, str, str], Any]:
     document: dict[str, Any] = {"extends": "drift", "screeners": ["momo"], **changes}
-    if follow is not None:
-        document["follow"] = follow
+    if audit is not None:
+        document["audit"] = audit
     return {**DOCS, ("me", "edges", "mine"): document}
 
 
@@ -107,20 +107,29 @@ def mine(ctx: StoreContext) -> Edge:
     return found
 
 
-def test_an_edge_reads_its_state_and_whether_it_is_the_users_own() -> None:
-    follow = {"state": "following", "since": "2026-09-01", "labels": ["followed_against_verdict"]}
-    ctx = ctx_for(MemoryBackend(), with_copy(follow))
+def test_an_edge_reads_its_status_bookmark_and_whether_it_is_the_users_own() -> None:
+    audit = {"status_since": "2026-09-01", "labels": ["followed_against_verdict"]}
+    docs = with_copy(audit, status="live")
+    docs[("me", "edges", "drift")] = {"follow": {"since": "2026-08-03"}}
+    ctx = ctx_for(MemoryBackend(), docs)
     edges = {e.id: e for e in load_edges(ctx)}
-    assert (edges["drift"].mine, edges["drift"].state, edges["drift"].extends) == (
-        False,
-        "researching",
-        None,
-    )
+    site = edges["drift"]
+    assert (site.mine, site.extends, site.followed) == (False, None, True)
+    assert site.followed_since == date(2026, 8, 3)
     copy = edges["mine"]
-    assert (copy.mine, copy.state, copy.extends) == (True, "following", "drift")
-    assert copy.since == date(2026, 9, 1)
+    assert (copy.mine, copy.status, copy.extends, copy.followed) == (True, "live", "drift", False)
+    assert (copy.status_since, copy.status_reason) == (date(2026, 9, 1), "")
     assert copy.labels == ("followed_against_verdict",)
     assert not copy.oos_revealed and copy.oos_hidden
+
+
+def test_an_old_follow_state_still_reads_until_the_files_are_migrated() -> None:
+    old = {"state": "following", "since": "2026-09-01", "labels": ["followed_against_verdict"]}
+    docs = with_copy()
+    docs[("me", "edges", "mine")] = {**docs[("me", "edges", "mine")], "follow": old}
+    copy = {e.id: e for e in load_edges(ctx_for(MemoryBackend(), docs))}["mine"]
+    assert (copy.status, copy.status_since) == ("live", date(2026, 9, 1))
+    assert copy.labels == ("followed_against_verdict",)
 
 
 def test_a_hidden_runs_rows_are_the_in_sample_slice_only() -> None:
@@ -132,7 +141,7 @@ def test_a_hidden_runs_rows_are_the_in_sample_slice_only() -> None:
     shown = runs.load_run_rows(ctx, run)
     assert {r.slice_kind for r in shown} == {"in_sample"}  # no frozen / split / all / year rows
     assert all(r.hit_rate != 0.80 for r in shown)  # the withheld figure is nowhere
-    revealed_ctx = ctx_for(backend, with_copy({"state": "researching", "oos_revealed": True}))
+    revealed_ctx = ctx_for(backend, with_copy({"oos_revealed": True}))
     (shown_run,) = runs.load_edge_runs(revealed_ctx, mine(revealed_ctx))
     assert not shown_run.oos_hidden
     assert {"split", "all", "year"} <= {
@@ -164,7 +173,7 @@ def test_a_hidden_copy_is_judged_on_in_sample_and_says_so_and_never_beyond_not_e
 def test_a_revealed_copy_is_judged_on_its_out_of_sample_figures() -> None:
     backend = MemoryBackend()
     write_own_run(backend)
-    ctx = ctx_for(backend, with_copy({"state": "researching", "oos_revealed": True}))
+    ctx = ctx_for(backend, with_copy({"oos_revealed": True}))
     found = versions.load_verdict(ctx, mine(ctx))
     assert found.win_rate == 0.80  # the split slice stands for the frozen one
     assert not found.headline.startswith(versions.HIDDEN_WORDS)
@@ -200,7 +209,7 @@ def test_the_comparison_is_in_sample_only_while_the_result_is_hidden() -> None:
 def test_the_comparison_shows_out_of_sample_once_revealed() -> None:
     backend = MemoryBackend()
     write_own_run(backend)
-    ctx = ctx_for(backend, with_copy({"state": "following", "oos_revealed": True}))
+    ctx = ctx_for(backend, with_copy({"oos_revealed": True}, status="live"))
     compare = versions.load_compare(ctx, mine(ctx))
     assert compare is not None and not compare.oos_hidden
     this = next(r for r in compare.rows if r.kind == "this")
@@ -217,17 +226,19 @@ def test_the_comparison_says_why_it_is_empty_and_is_none_for_a_site_edge() -> No
 
 
 def test_the_published_document_is_one_whole_toml_without_the_users_state() -> None:
-    ctx = ctx_for(MemoryBackend(), with_copy({"state": "following"}, top_k=3))
+    ctx = ctx_for(
+        MemoryBackend(), with_copy({"status_since": "2026-09-01"}, status="live", top_k=3)
+    )
     published = tomllib.loads(versions.load_published_document(ctx, "mine"))
     assert published["id"] == "mine" and published["top_k"] == 3
     assert published["thesis"] == "Dear names keep rising."  # inherited, resolved
-    assert not {"follow", "extends"} & set(published)
+    assert not {"follow", "audit", "extends"} & set(published)
 
 
 @pytest.mark.parametrize("hidden", [True, False])
 def test_the_oos_hidden_flag_follows_the_users_reveal(hidden: bool) -> None:
-    follow = None if hidden else {"state": "researching", "oos_revealed": True}
-    ctx = ctx_for(MemoryBackend(), with_copy(follow))
+    audit = None if hidden else {"oos_revealed": True}
+    ctx = ctx_for(MemoryBackend(), with_copy(audit))
     assert mine(ctx).oos_hidden is hidden
 
 
@@ -242,7 +253,13 @@ def test_a_copy_that_does_not_load_is_served_with_its_reason_not_silently_droppe
 def test_a_copy_serves_the_settings_the_builder_edits_and_its_own_document() -> None:
     ctx = ctx_for(
         MemoryBackend(),
-        with_copy({"state": "following"}, top_k=7, notes="n", frozen_from=date(2026, 7, 1)),
+        with_copy(
+            {"status_since": "2026-09-01"},
+            status="live",
+            top_k=7,
+            notes="n",
+            frozen_from=date(2026, 7, 1),
+        ),
     )
     edges = {e.id: e for e in load_edges(ctx)}
     settings = edges["mine"].settings

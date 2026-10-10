@@ -23,8 +23,8 @@ export interface MoveEdgeDialogProps {
 
 export function MoveEdgeDialog({ edge, move, open, onOpenChange }: MoveEdgeDialogProps) {
   const [reason, setReason] = useState('');
-  const mover = useMoveEdge(edge.id);
-  const needsReason = move === 'reject' && reason.trim() === '';
+  const mover = useMoveEdge(edge.id, edge.mine);
+  const needsReason = move === 'reject' && edge.mine && reason.trim() === '';
   const close = () => {
     onOpenChange(false);
   };
@@ -71,7 +71,7 @@ export function MoveEdgeDialog({ edge, move, open, onOpenChange }: MoveEdgeDialo
         {(move === 'reveal' || (move === 'follow' && edge.oosHidden)) && (
           <Banner tone="info">The out-of-sample result is shown and cannot be hidden again.</Banner>
         )}
-        {asksReason(move) && (
+        {asksReason(move, edge.mine) && (
           <Field label={move === 'reject' ? 'Why' : 'Why (optional)'}>
             <Input value={reason} onValueChange={setReason} autoComplete="off" />
           </Field>

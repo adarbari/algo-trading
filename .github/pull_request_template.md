@@ -16,7 +16,7 @@
 <!-- Paste the warning list from `make layout` (folders at 8+ of 10 modules) if this PR adds
      modules to any of them, and say whether a split is planned. -->
 - [ ] Placed per the "Where does this go?" table (CLAUDE.md); nothing parked in a neighbouring folder
-- [ ] New folders declared in `architecture/layout.toml` with a purpose (+ `__init__.py` docstring, contracts if a boundary guards them)
+- [ ] New folders declared in `architecture/layout*.toml` with a purpose (+ `__init__.py` docstring, contracts if a boundary guards them)
 - [ ] No directory over 10 modules; folders in the `make layout` warning band considered (split planned or not needed)
 - [ ] Tests mirror the source folders; no grab-bag module names (`utils`, `helpers`, `common`, ...)
 
@@ -26,6 +26,7 @@
 - [ ] No HTML elements, `className` / `style`, CSS, colours or px outside `design-system/`; only `src/shared/api` talks HTTP
 - [ ] New / changed design-system component: stories (Default, Loading, Empty, Error, Dense), test with axe, screenshots updated (`npm run visual:update`) and reviewed; `COMPONENTS.md` regenerated
 - [ ] API changes: `npm run api:generate` run and the generated schema committed
+- [ ] Guide (ADR 0051): every new user-visible word (enum value, status, verdict, control), section and titled panel has its Guide entry, declared in `architecture/guide_coverage.toml` (each value its own entry, not one generic term); baselines only shrink
 - [ ] `make web-check` passes
 
 ## Checklist

@@ -42,7 +42,8 @@ def test_a_module_without_its_own_test_maps_to_the_mirrored_folder() -> None:
 def test_any_web_change_maps_to_the_web_fitness_tests() -> None:
     # #319: a .tsx string and an 11-module apps/web/e2e passed `make changed`, failed CI.
     web = "tests/architecture/test_layout_web.py"
-    assert covering("apps/web/src/pages/ideas/ui/IdeasPage.tsx") == [web]
+    guide = "tests/architecture/guide"
+    assert covering("apps/web/src/pages/ideas/ui/IdeasPage.tsx") == [guide, web]
     assert covering("apps/web/e2e/screeners.spec.ts") == [web]
     assert covering("architecture/web_prose.toml") == ["tests/architecture"]
 
@@ -78,6 +79,15 @@ def test_areas_without_the_base_ref_are_every_code_area(
     assert changed_tests.main(["changed_tests.py", "--areas", "no/such/ref"]) == 0
     out = capsys.readouterr()
     assert out.out.strip() == "python web" and "every area" in out.err
+
+
+def test_what_the_guide_coverage_test_reads_maps_to_it() -> None:
+    # the Guide coverage test (ADR 0051) reads the web code, the schema and the Guide sources
+    guide = changed_tests.GUIDE_FITNESS
+    assert guide in covering("apps/api/schema.graphql")
+    assert guide in changed_tests.covering_tests(
+        ["config/site/guide/glossary.toml"], {guide}.__contains__
+    )
 
 
 def test_a_site_config_change_maps_to_the_tests_that_read_the_site_config() -> None:

@@ -58,5 +58,7 @@ from the API.
 6. **OpenAPI.** `.venv/bin/python scripts/export_openapi.py`, commit `apps/api/openapi.json`,
    then in `apps/web` run `npm run api:generate`. On a merge conflict in a generated file take
    main's and regenerate.
-7. **Docs.** The endpoint table in `docs/architecture.md` section 12.
+7. **Docs.** The endpoint table in `docs/architecture.md` section 12. A new user-visible
+   word the endpoint introduces (a run trigger, a status the page shows) is a glossary term,
+   declared where GraphQL serves it (`add-graphql-field`, "Guide entry"; `add-guide-content`).
 8. `make changed`, then push: CI is the full gate.

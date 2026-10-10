@@ -345,7 +345,7 @@ Each app declares only its own dependencies; `uv.lock` pins everything (`make lo
 ## Layout
 
 Every directory under `src/`, `libs/` and `apps/` is declared, with its purpose, in
-[`architecture/layout.toml`](architecture/layout.toml) (one kind of thing per folder, at most
+[`architecture/layout*.toml`](architecture/layout.toml) (one kind of thing per folder, at most
 10 modules; checked by `tests/architecture/test_layout.py`, ADR 0020).
 
 ```

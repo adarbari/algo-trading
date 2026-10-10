@@ -12,7 +12,7 @@ Data loading, adjustment, selection, sizing, costs and run records are owned els
 (`architecture/*_ownership.toml`); reuse them through `services/backtests/run.py`, never copy
 them. Shared signal maths belongs in one helper: `make dupes` must pass.
 
-0. **Where it goes:** `strategies/trading/`; shared maths in `quant/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
+0. **Where it goes:** `strategies/trading/`; shared maths in `quant/` (`grep -n purpose architecture/*layout*.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Location:** one module in `src/algotrade/strategies/trading/`. Subclass `Strategy`
    (`strategies/trading/base.py`): `warmup_bars`, `on_bar(view) -> target weights | None`,
    `params()`. The view is `core/views/market_view.py` (`MarketView`); weights and errors
@@ -34,4 +34,6 @@ them. Shared signal maths belongs in one helper: `make dupes` must pass.
    "Rebalancing selections"): the set in `view.instruments` can then change between bars, so
    size from `view.instruments` on each call and do not assume an instrument stays (one that
    leaves is closed by the engine). Check it with `algotrade-backtest config validate <id>`.
-8. Run `make changed`, then push: CI is the full gate.
+8. **Guide:** a word the strategy shows users (a signal, a parameter's meaning) is a glossary
+   term (`.claude/skills/add-guide-content`), never page text.
+9. Run `make changed`, then push: CI is the full gate.

@@ -16,10 +16,9 @@ from algotrade.data.paper import job_name
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.live import LiveRecord, live_record
 from algotrade.services.read.edge_desk.paper import OPEN, PaperTrade, load_trades, with_instruments
-from algotrade.services.read.evaluation.edges import load_edges
+from algotrade.services.read.evaluation.edges import Edge, load_edges
 from algotrade.storage.runs import RunStatus
 
-FOLLOWING = ("following", "trial")
 SIGNALLED, NO_PICKS, NOT_DUE, SKIPPED, NOT_RUN = (
     "signalled", "no_picks", "not_due", "skipped", "not_run",
 )  # fmt: skip
@@ -84,11 +83,16 @@ class EdgeDesk:
     followed: tuple[FollowedEdge, ...]
 
 
+def _state(edge: Edge) -> str:
+    """``trial`` for an own candidate (a new version on trial), else ``following``."""
+    return "trial" if edge.mine and edge.status == "candidate" else "following"
+
+
 def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
     """The desk for ``ctx.session``."""
     day = ctx.session.date
     edges = {e.id: e for e in load_edges(ctx)}
-    followed = [e for e in edges.values() if e.state in FOLLOWING]
+    followed = [e for e in edges.values() if e.paper_traded]
     nxt = next_session(day)
     if not followed:
         return EdgeDesk(day, nxt, (), (), ())
@@ -101,7 +105,7 @@ def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
     night = _night(ctx)
     records = tuple(
         FollowedEdge(
-            e.id, e.name, e.state, e.since,
+            e.id, e.name, _state(e), e.paper_since,
             live_record(ctx, e, [t for t in trades if t.edge_id == e.id], settings),
             *_tonight(night, e.id), _missed(night, e.id),
         )

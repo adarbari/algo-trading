@@ -16,7 +16,7 @@ ingest loop owner, `IngestRun` in `apps/ingestion/.../tasks/framework/run.py` (r
 save, stamping, id resolution), not a copy of it. New site settings for it are read by the
 settings owner and must drive code (a test checks).
 
-0. **Where it goes:** schema in `storage/tables/`, backends in `storage/backends/`, reads in `data/`, the task in `tasks/<domain>/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
+0. **Where it goes:** schema in `storage/tables/`, backends in `storage/backends/`, reads in `data/`, the task in `tasks/<domain>/` (`grep -n purpose architecture/*layout*.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Pick the grain:** reference, event, bar(interval), chain snapshot, universe,
    cross-section, feature or result. New intervals of bars are **not** new datasets; add
    the `interval` value. Only create a new grain with an ADR.
@@ -32,7 +32,7 @@ settings owner and must drive code (a test checks).
 6. **Golden fixtures:** if backtests or screeners will read it, add synthetic fixtures so
    CI exercises it.
 7. **Ingestion task:** write `tasks/<domain>/<dataset>.py` (domain: `reference`, `market`,
-   `derived` or `maintenance`; a new domain folder is declared in `architecture/layout.toml`
+   `derived` or `maintenance`; a new domain folder is declared in `architecture/layout*.toml`
    first) with only the task's own logic (what to
    fetch, how to combine frames, task stats) inside `with IngestRun(ctx, TASK, session) as
    run:` using `run.fetch`, `run.attempt` (per-item status), `run.resolve`, `run.write`

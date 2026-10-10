@@ -484,7 +484,7 @@ type = "forbidden"
 source_modules = ["algotrade_backtest"]
 forbidden_modules = ["algotrade_sources"]
 
-# ---- Directory layout (architecture/layout.toml, tests/architecture/test_layout.py).
+# ---- Directory layout (architecture/layout*.toml, tests/architecture/test_layout.py).
 
 [[tool.importlinter.contracts]]
 name = "Layout: vendors never import each other (one folder per vendor)"
