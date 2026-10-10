@@ -157,7 +157,7 @@ describe('EdgeDetail', () => {
   it('keeps the tests and backtests in the details', async () => {
     render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} onEdit={vi.fn()} />);
     await userEvent.click(screen.getByText('Details'));
-    expect(screen.getByText('Official result')).toBeInTheDocument();
+    expect(await screen.findByText('Official result')).toBeInTheDocument();
     expect(screen.getByText('EXPLORATORY')).toBeInTheDocument();
     expect(screen.getByText('momentum_12_1: rollup (4 sessions)')).toBeInTheDocument();
     expect(screen.getByText('Not measured yet')).toBeInTheDocument();
