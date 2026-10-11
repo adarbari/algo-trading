@@ -414,7 +414,7 @@ Source: `design-system/components/DataTable`
 | `errorMessage` | `ReactNode` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no rows. |
 | `visibleRows` | `number` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. |
-| `rowLines` | `1 \| 2` | no | Lines of text per row: 1 (default) or 2 (a symbol with its name underneath). |
+| `rowLines` | `1 \| 2 \| 3` | no | Lines of text per row: 1 (default), 2 (a symbol with its name underneath) or 3 (a cell that wraps a short list of links). |
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
 | `toolbarEnd` | `ReactNode` | no | Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the two sit in one row, so a narrow table does not spend a row on each. |
 | `pinFirst` | `boolean` | no | Pin the checkbox column and the first column at the start while the table scrolls sideways (default true): pass false when the first column is not the row's key. |

@@ -30,8 +30,6 @@ export interface TopIdeasProps {
   onCompare: (search: IdeaCompareSearch) => void;
   /** Open a ticker in Explore, with the screener (config id) that surfaced it. */
   onOpen: (symbol: string, via: string) => void;
-  /** Open a screener's results (a screener chip in a row). */
-  onOpenScreener: (screenerId: string) => void;
   /** Open the Screeners list (where a screener is run). */
   onScreeners: () => void;
 }
@@ -41,16 +39,12 @@ export function TopIdeas({
   onSearchChange,
   onCompare,
   onOpen,
-  onOpenScreener,
   onScreeners,
 }: TopIdeasProps) {
   const ideas = useIdeas();
   const [selected, setSelected] = useState<string[]>([]);
   const all = useMemo(() => ideas.data?.ideas ?? [], [ideas.data]);
-  const columns = useMemo(
-    () => ideaColumns(all, onOpenScreener, search.columns),
-    [all, onOpenScreener, search.columns],
-  );
+  const columns = useMemo(() => ideaColumns(all, search.columns), [all, search.columns]);
   const rows = useMemo(() => filterIdeas(all, search), [all, search]);
   const symbols = selected.flatMap((id) => {
     const symbol = all.find((idea) => idea.instrumentId === id)?.symbol;
@@ -137,7 +131,7 @@ export function TopIdeas({
           emptyMessage={
             all.length === 0 ? 'No screener picked anything in this session.' : filteredEmpty
           }
-          rowLines={2}
+          rowLines={search.columns === 'options' ? 2 : 3}
           visibleRows={14}
         />
       </Panel>

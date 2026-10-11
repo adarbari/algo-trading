@@ -8,12 +8,12 @@
  * column appears only when some idea has a value for it.
  */
 import {
-  Button,
   Mono,
   OutcomeDots,
   Stack,
   StatusBadge,
   Text,
+  TextLink,
   type DataTableColumn,
   type OutcomeDot,
   type ValueFormat,
@@ -27,6 +27,7 @@ import {
   type Idea,
   type IdeaColumnSet,
 } from '@/entities/idea';
+import { screenerResultsPath } from '@/entities/guide';
 import { DecisionBadge, decisionLabel, outcomeLabel } from '@/entities/screen';
 
 import { dteReason, earningsCell, expiryDte, iv30, served } from './facts';
@@ -169,12 +170,23 @@ const tickerColumn: DataTableColumn<Idea> = {
   },
 };
 
-/** Why the idea is here: the best pick's reasons, its screener, and how many others picked it. */
-const whyColumn = (onOpenScreener: (screenerId: string) => void): DataTableColumn<Idea> => ({
+/** The idea's picks, one per screener, the best pick's screener first. */
+function screenerPicks(idea: Idea): Idea['picks'] {
+  const seen = new Set<string>();
+  return [idea.best, ...idea.picks].filter((pick) => {
+    if (seen.has(pick.screenerId)) return false;
+    seen.add(pick.screenerId);
+    return true;
+  });
+}
+
+/** Why the idea is here: the best pick's reasons, then every screener that picked it (the best
+ * first), each a link to that screener's results. */
+const whyColumn: DataTableColumn<Idea> = {
   id: 'why',
   header: "Why it's here",
   value: (idea) => idea.best.reasons || null,
-  width: 'xl',
+  width: '2xl',
   grow: true,
   sortable: false,
   essential: true,
@@ -185,20 +197,19 @@ const whyColumn = (onOpenScreener: (screenerId: string) => void): DataTableColum
           {row.best.reasons}
         </Text>
       )}
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => {
-          onOpenScreener(row.best.screenerId);
-        }}
-      >
-        {row.picks.length > 1
-          ? `${row.best.screenerName} +${String(row.picks.length - 1)} more`
-          : row.best.screenerName}
-      </Button>
+      <Stack direction="row" gap={1} wrap>
+        {screenerPicks(row).map((pick, index, all) => (
+          <Text key={pick.screenerId} size="xs">
+            <TextLink href={screenerResultsPath(pick.screenerId)} size="inherit">
+              {pick.screenerName}
+            </TextLink>
+            {index < all.length - 1 && <Text tone="muted"> ·</Text>}
+          </Text>
+        ))}
+      </Stack>
     </Stack>
   ),
-});
+};
 
 const scoreColumn: DataTableColumn<Idea> = {
   id: 'score',
@@ -295,7 +306,6 @@ const watchOutColumn: DataTableColumn<Idea> = {
 /** The columns for these ideas in the chosen set (what is served decides which facts show). */
 export function ideaColumns(
   ideas: readonly Idea[],
-  onOpenScreener: (screenerId: string) => void,
   set: IdeaColumnSet = 'stocks',
 ): DataTableColumn<Idea>[] {
   const size = anyValue(ideas, (idea) => idea.sizeMultiplier) ? [SIZE] : [];
@@ -315,7 +325,7 @@ export function ideaColumns(
   return [
     RANK,
     tickerColumn,
-    whyColumn(onOpenScreener),
+    whyColumn,
     decisionColumn,
     scoreColumn,
     ...size,

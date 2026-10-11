@@ -173,7 +173,6 @@ function setup(initial: IdeasSearch = {}) {
   const handlers = {
     onCompare: vi.fn(),
     onOpen: vi.fn(),
-    onOpenScreener: vi.fn(),
     onScreeners: vi.fn(),
   };
   const view = render(
@@ -199,16 +198,19 @@ describe('TopIdeas', () => {
       'title',
       'IV rank high, spread tight',
     );
-    expect(within(aapl).getByRole('button', { name: 'VRP scanner +1 more' })).toBeInTheDocument();
+    expect(within(aapl).getByRole('link', { name: 'VRP scanner' })).toBeInTheDocument();
+    expect(within(aapl).getByRole('link', { name: 'Liquidity' })).toBeInTheDocument();
     expect(within(aapl).getByText('200.50')).toBeInTheDocument();
     expect(within(aapl).getByText('−1.2%')).toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
+    expect(within(ko).getByRole('link', { name: 'Liquidity' })).toBeInTheDocument();
+    expect(within(ko).queryByRole('link', { name: 'VRP scanner' })).not.toBeInTheDocument();
     expect(within(ko).queryByText(/more/)).not.toBeInTheDocument();
   });
 
-  it('gives every row two lines, so the name under a ticker and the move under a price fit', () => {
+  it('gives every row three lines, so the screener names can wrap under the reasons', () => {
     const { grid } = setup();
-    expect(grid()).toHaveAttribute('data-lines', '2');
+    expect(grid()).toHaveAttribute('data-lines', '3');
   });
 
   it('draws one labelled square per criterion of the best pick', () => {
@@ -236,11 +238,17 @@ describe('TopIdeas', () => {
     expect(headers()).toMatch(/Why it's here/);
   });
 
-  it("opens a screener's results from its name in a row", async () => {
-    const { grid, onOpenScreener } = setup();
+  it("links every screener name in a row to that screener's results, not to the ticker", async () => {
+    const { grid, onOpen } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
-    await userEvent.click(within(aapl).getByRole('button', { name: 'VRP scanner +1 more' }));
-    expect(onOpenScreener).toHaveBeenCalledWith('vrp');
+    expect(within(aapl).getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
+      'href',
+      '/screeners/vrp',
+    );
+    const liquidity = within(aapl).getByRole('link', { name: 'Liquidity' });
+    expect(liquidity).toHaveAttribute('href', '/screeners/liq');
+    await userEvent.click(liquidity);
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it('shows the next earnings, else a muted last date, else Unknown', () => {
