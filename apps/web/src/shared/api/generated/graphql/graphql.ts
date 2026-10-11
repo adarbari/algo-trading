@@ -117,6 +117,7 @@ export type UnknownCode =
   | 'LICENCE'
   | 'NOT_APPLICABLE'
   | 'NOT_IN_CATALOGUE'
+  | 'NOT_RECORDING'
   | 'NOT_RUN'
   | 'NOT_STORED'
   | 'NO_PARTITION'
@@ -163,7 +164,7 @@ export type EdgeResultDrawdownQueryVariables = Exact<{
 }>;
 
 
-export type EdgeResultDrawdownQuery = { edgeResult: { drawdown: { unit: string | null, maxInSample: number | null, maxOutOfSample: number | null, volInSample: number | null, volOutOfSample: number | null, points: Array<{ exit: string, depth: number }>, episodes: Array<{ peak: string, trough: string, recovered: string | null, depth: number }>, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
+export type EdgeResultDrawdownQuery = { edgeResult: { drawdown: { state: string, unit: string | null, maxInSample: number | null, maxOutOfSample: number | null, volInSample: number | null, volOutOfSample: number | null, points: Array<{ exit: string, depth: number }>, episodes: Array<{ peak: string, trough: string, recovered: string | null, depth: number }>, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
 
 export type EdgeResultRollingStartsQueryVariables = Exact<{
   id: string;
@@ -792,6 +793,7 @@ export const EdgeResultDrawdownDocument = new TypedDocumentString(`
     query EdgeResultDrawdown($id: String!) {
   edgeResult(id: $id) {
     drawdown {
+      state
       unit
       points {
         exit

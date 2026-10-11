@@ -84,7 +84,7 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   ]) {
     await expect(nav.getByRole('link', { name })).toBeVisible();
   }
-  await expect(nav.getByRole('link', { name: 'Live record' })).toHaveCount(0); // nothing recorded
+  await expect(nav.getByRole('link', { name: 'Live record' })).toBeVisible(); // says why when nothing is recorded
   // Evidence: the curve (read as it comes near) and the figures of both sides of the split.
   await expect(page.getByRole('heading', { level: 2, name: 'Evidence' })).toBeVisible();
   await expect(page.getByRole('img', { name: /^Evidence curve of the picks/ })).toBeVisible();

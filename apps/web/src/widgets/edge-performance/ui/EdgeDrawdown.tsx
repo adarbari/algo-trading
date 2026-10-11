@@ -2,8 +2,9 @@
  * Drawdown: how far the evidence curve fell below its previous high (an underwater chart of the
  * windows, by the session each was known), the deepest drops with their dates, and the deepest
  * drop and volatility of each side of the split (its own read, `edgeResult.drawdown`, fetched
- * when this view opens). An outcome with no return has none: the server says why. States:
- * loading, error, unknown, ready.
+ * when this view opens). An outcome with no return (a hit or a count) has none: the server's
+ * `not_a_return` state says so in a word with its Guide term, never a gap. States: loading, error,
+ * unknown, not a return, ready.
  */
 import {
   Chart,
@@ -12,11 +13,18 @@ import {
   Skeleton,
   Stack,
   StatStrip,
+  Text,
   type StatItem,
 } from '@algotrade/ui';
 
 import { UnknownNote } from '@/entities/availability';
-import { EDGE_UNKNOWN_WORDS, useEdgeDrawdown, type DrawdownEpisode } from '@/entities/edge';
+import {
+  EDGE_UNKNOWN_WORDS,
+  sliceStateLabel,
+  useEdgeDrawdown,
+  type DrawdownEpisode,
+} from '@/entities/edge';
+import { termHelp } from '@/features/guide-help';
 
 import { episodeColumns } from '../model/columns';
 
@@ -37,6 +45,14 @@ export function EdgeDrawdown({ edgeId }: EdgeDrawdownProps) {
         title="The drawdown failed to load."
         onRetry={() => void query.refetch()}
       />
+    );
+  }
+  if (drawdown.state === 'not_a_return') {
+    return (
+      <Stack direction="row" gap={1} align="center">
+        <Text tone="secondary">{sliceStateLabel(drawdown.state)}</Text>
+        {termHelp('not_a_return')}
+      </Stack>
     );
   }
   if (drawdown.unknown)

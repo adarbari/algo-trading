@@ -77,6 +77,14 @@ section = "docs/adr/0060-history-copy.md#decision"
 detect = [{ call = "build_history" }, { call = "HistoryCopy" }]
 
 [[responsibility]]
+id = "listing-ticker-asof"
+description = "The ticker a listing carried on a session, for a name no reference snapshot ever held (a delisted pick of an edge's trade ledger, EQ:TIINGO:<perma>): the latest instruments/listing_history row of the id that started on or before the session (a name listed later has none, never a later ticker; the vendor's end_date is not read), read once per publish by the ledger's cache; edge_ledger/trades.py only"
+owner = ["src/algotrade/data/listings/tickers.py"]
+allowed = ["src/algotrade/services/read/edge_ledger/trades.py"]  # the ledger names its delisted picks
+section = "docs/adr/0018-figi-instrument-ids.md#decision"
+detect = [{ call = "listing_tickers" }]
+
+[[responsibility]]
 id = "locking"
 description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock and the one-evaluation-per-owner edge-eval claim every caller takes (services/jobs)"
 owner = ["src/algotrade/storage/locks.py", "src/algotrade/services/jobs/exclusive.py"]

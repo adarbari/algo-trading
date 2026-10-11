@@ -407,6 +407,7 @@ export const CURVE_FIXTURE = {
 
 /** The drawdown of momentum_12_1 as `edgeResult.drawdown` answers it (test builder). */
 export const DRAWDOWN_FIXTURE = {
+  state: 'measured',
   unit: 'return',
   points: [
     { exit: '2026-02-02', depth: 0 },

@@ -487,12 +487,21 @@ def _row_of(r: EdgeRow, year: str, period: str, first: date, last: date, part: b
     )  # fmt: skip
 
 
-def _years(c: _Candidate, split: date | None) -> tuple[YearRow, ...]:
-    """The year rows; a year the split falls in is its in-sample then its out-of-sample part
-    (a run from before the parts keeps the one ``both`` row)."""
+def _live_years(years: tuple[EdgeRow, ...]) -> tuple[EdgeRow, ...]:
+    """``years`` from the first to the last that has sessions: the years the baselines cover
+    before (or after) the screen's inputs exist are not rows (a year with no sessions says
+    nothing about the screen)."""
+    live = [i for i, r in enumerate(years) if r.sessions]
+    return years[live[0] : live[-1] + 1] if live else ()
+
+
+def _years(c: _Candidate, split: date | None, range_to: date | None = None) -> tuple[YearRow, ...]:
+    """The year rows from the screen's first year with sessions to its last; a year the split
+    falls in is its in-sample then its out-of-sample part, the latter up to the run's last
+    session ``range_to`` (a run from before the parts keeps the one ``both`` row)."""
     parts = {r.slice_value: r for r in c.year_parts}
     out: list[YearRow] = []
-    for r in c.years:
+    for r in _live_years(c.years):
         year = r.slice_value
         mine = [(side, parts.get(f"{year}:{side}")) for side in (IN_SAMPLE, OUT_OF_SAMPLE)]
         cut = split is not None and year.isdigit() and split.year == int(year)
@@ -500,7 +509,7 @@ def _years(c: _Candidate, split: date | None) -> tuple[YearRow, ...]:
             first, last = date(int(year), 1, 1), date(int(year), 12, 31)
             bounds = {
                 IN_SAMPLE: (first, split - timedelta(days=1)),
-                OUT_OF_SAMPLE: (split, last),
+                OUT_OF_SAMPLE: (split, min(last, range_to) if range_to else last),
             }
             out += [
                 _row_of(p, year, side, *bounds[side], True) for side, p in mine if p is not None
@@ -639,13 +648,15 @@ def judge(
     declared: Declared = UNDECLARED,
     basis: BasisChoice | None = None,
     facts: EdgeFacts | None = None,
+    range_to: date | None = None,
 ) -> EdgeVerdict:
     """The verdict of ``edge_id`` from its official result's ``rows`` (None: it has no official
     result); ``split``: the out-of-sample start; ``draws``: the run's random-pick draws (none:
     not measured, which caps the verdict at Promising); ``declared``: the document's basis;
     ``basis``: one already chosen (a hidden copy's, from rows the verdict does not see), else
     ``choose_basis`` over ``rows``; ``facts``: the edge's
-    published figure, schedule and whether its out-of-sample result is hidden."""
+    published figure, schedule and whether its out-of-sample result is hidden; ``range_to``: the
+    run's last session (the out-of-sample year part ends there)."""
     if rows is None:
         return _waiting(edge_id, "No official result yet")
     found = _candidates(rows)
@@ -660,7 +671,7 @@ def judge(
         reason = f"The official result has no out-of-sample figures for {on}{lost}"
         return replace(_waiting(edge_id, reason), basis=on)
     judged = _judge_candidate(c, t, draws, decoys, lost_inputs, facts or EdgeFacts())
-    return replace(judged, edge_id=edge_id, years=_years(c, split))
+    return replace(judged, edge_id=edge_id, years=_years(c, split, range_to))
 
 
 def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
@@ -685,4 +696,5 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             edge.schedule,
             measured=lambda: runs.load_measured_sessions(ctx, run),
         ),
+        range_to=run.range_to,
     )
