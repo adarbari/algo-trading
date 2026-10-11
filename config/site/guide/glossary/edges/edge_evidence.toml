@@ -169,8 +169,8 @@ Each variant, setting and holding period tried on an edge is counted. The more v
 the more likely the best one looks good by chance. The deflated Sharpe ratio uses the count to
 discount it. The probability of backtest overfitting estimates how often the best version in one
 half of history fails in the other. A result shown without its count of variants tried
-is not comparable. Example: vrp_short_premium tried 126 variants, which takes its deflated Sharpe
-from a Sharpe ratio of 1.74 down to 0.00.
+is not comparable. Example: vrp_short_premium tried 126 variants, so its deflated Sharpe asks
+whether its Sharpe ratio beats what the best of 126 tries shows by luck.
 """
 see_also = ["out_of_sample", "trades", "deflated_sharpe", "overfitting_probability", "sharpe_ratio"]
 
@@ -289,7 +289,8 @@ Open Details to see it. The tests come in two groups: the seven Promising tests,
 Works tests. Each row shows the test, its Value for this edge, what is Needed and the Result. Not
 measured means the run did not store the figure, which is different from a fail; it keeps the
 verdict at Not enough data. Does not apply means the test has nothing to test: the two decoy tests
-read it when the edge document declares no decoys, because nothing was compared. It counts neither
+read it when the edge document declares no decoys, because nothing was compared. The two
+overfitting tests read it when only one variant was tried at the holding period. It counts neither
 for nor against the verdict and is not a pass. All Promising tests passing means at least Promising, and all Works
 tests as well means Works. Example: vrp_short_premium fails three tests: trades (3 against at
 least 40), the decile t (-1.66 against 2) and the deflated Sharpe (0.00 against 0.8). It passes
@@ -302,17 +303,17 @@ see_also = ["verdict", "sharpe_ratio", "deflated_sharpe", "overfitting_probabili
 [[term]]
 id = "sharpe_ratio"
 term = "Sharpe ratio"
-short = "An edge's average result per trade divided by how much the results swing: higher is steadier."
+short = "An edge's average result per decision session divided by how much it swings: higher is steadier."
 body = """
-The mean of the results divided by their spread, per test session and not scaled to a year. It is
-measured on the whole history, in-sample and out-of-sample together, so an edge tuned on that
-history looks better than it will. A high number can come from luck when many versions were
-tried. Read it beside the deflated Sharpe, which corrects for the count of variants tried.
-Example: vrp_short_premium has a Sharpe ratio of 1.74 and a deflated Sharpe of 0.00 after 126
-variants tried. The best of that many tries shows a Sharpe like that by luck. Don't judge an edge
-by its Sharpe ratio alone.
+The mean of one value per decision session divided by its spread, not scaled to a year. For a
+return outcome the value is the picks' mean return. A cushion to a strike or a vol ratio is not
+money earned, so for those outcomes the value is the session's win rate minus its base rate. Example: picks that win 9 of 10 against a base rate of 80% give 0.10
+that session. Sessions of +0.10, +0.30 and -0.10 have a mean of 0.10 and a spread of 0.20, a Sharpe
+ratio of 0.5. It covers the whole history, in-sample and out-of-sample together, and under about
+30 sessions it is noise. A high number can come from luck when many versions were tried, so read
+the deflated Sharpe instead.
 """
-see_also = ["deflated_sharpe", "variants_tried", "in_sample"]
+see_also = ["deflated_sharpe", "variants_tried", "in_sample", "win_rate", "base_rate"]
 
 [[term]]
 id = "deflated_sharpe"
@@ -320,13 +321,15 @@ term = "Deflated Sharpe"
 short = "The Sharpe ratio corrected for how many versions were tried: the chance it is more than luck, from 0 to 1."
 body = """
 Try enough versions and the best one shows a high Sharpe ratio by luck alone. The deflated Sharpe
-corrects for the count of variants tried and for the shape of the results. It reads as a chance
-from 0 to 1: Promising needs 0.8 or more, Works needs 0.95, and below 0.5 the edge is Not
-working. Example: vrp_short_premium's Sharpe ratio of 1.74 deflates to 0.00 after 126 variants.
-Don't compare deflated Sharpes from runs that tried different numbers of variants: the count is
-part of the figure.
+corrects for the count of variants tried and for the shape of the results. It compares the
+edge with its own screeners at the same holding period and in the same unit, never with a
+baseline. For a cushion or vol-ratio outcome it uses the series the Sharpe ratio uses: the win
+rate minus the base rate per decision session. It reads as a chance from 0 to 1: Promising needs
+0.8 or more, Works needs 0.95, and below 0.5 the edge is Not working. Example: a Sharpe ratio of
+0.5 over 40 sessions after 126 variants, whose Sharpe ratios spread by 0.2, deflates to about 0.45. Don't compare deflated Sharpes from
+runs that tried different numbers of variants: the count is part of the figure.
 """
-see_also = ["sharpe_ratio", "variants_tried", "overfitting_probability", "verdict_criteria"]
+see_also = ["sharpe_ratio", "variants_tried", "overfitting_probability", "verdict_criteria", "win_rate", "base_rate"]
 
 [[term]]
 id = "overfitting_probability"
@@ -336,9 +339,10 @@ body = """
 The harness splits history into pieces, picks the best variant on some of them and checks how
 that variant ranks on the pieces left out. The overfitting probability is the share of splits
 where it ranks at or below the middle. Promising needs 0.5 or less, Works 0.2 or less, and above
-0.5 the edge is Not working. It needs several variants to compare, so an edge with a single
-variant has none. The page shows not stored, the test is not measured, and the verdict stays at
-Not enough data. Example: vrp_short_premium has no value stored yet.
+0.5 the edge is Not working. It compares the edge's own variants at the same holding period and
+in the same unit, never its baselines. With a single variant there is nothing to compare: the
+page shows none and both overfitting tests do not apply. Example: vrp_short_premium compares its
+cushion variants, not the ratio one.
 """
 see_also = ["variants_tried", "deflated_sharpe", "verdict_criteria", "verdict_not_enough_data"]
 

@@ -56,14 +56,21 @@ function authClient(): Auth | null {
         storageKey: `sb-${base.hostname.split('.')[0] ?? ''}-auth-token`,
         flowType: 'implicit',
         persistSession: true,
-        autoRefreshToken: true,
+        // Off: auth-js's own ticker (it fires right after start-up) reads the stored session and
+        // refreshes on its own, racing `readSession`; with a spent refresh token both calls hit the
+        // endpoint. `getSession()` already refreshes an expiring token, and every request goes
+        // through `readSession`, so the refresh has the one single-flight caller.
+        autoRefreshToken: false,
         detectSessionInUrl: false,
       });
       // The session ended somewhere else (another tab signed out, or the refresh token was
       // refused): this tab leaves too, at once. Our own sign-out is ignored here: its callers
-      // already notify.
-      client.onAuthStateChange((event, session) => {
-        if (!session && event === 'SIGNED_OUT' && !signingOut) notifyUnauthorized();
+      // already notify. Registered once the start-up read is done (see `startedUp`).
+      const created = client;
+      void startedUp(created).then(() => {
+        created.onAuthStateChange((event, session) => {
+          if (!session && event === 'SIGNED_OUT' && !signingOut) notifyUnauthorized();
+        });
       });
     } else {
       client = null;
@@ -77,6 +84,36 @@ type SessionRead = ReturnType<Auth['getSession']>;
 let reading: SessionRead | null = null;
 
 /**
+ * Runs `read` while holding a browser-wide lock (Web Locks): auth-js without its legacy lock
+ * option does not stop two tabs (or the page being reloaded and the new one) from each sending the
+ * stored refresh token, and the second request carries a spent token. Inside the lock the later
+ * reader finds the rotated session in storage. Without Web Locks (old browsers, tests) it just runs.
+ */
+/** An abort signal after 10 s; `AbortSignal.timeout` is missing on Safari 15.x, which has Web Locks. */
+function lockTimeout(): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(10_000);
+  const controller = new AbortController();
+  setTimeout(() => {
+    controller.abort(new DOMException('Timed out', 'AbortError'));
+  }, 10_000);
+  return controller.signal;
+}
+
+function acrossTabs<T>(read: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  if (!locks) return read();
+  // Waiting for the lock is bounded: a tab that holds it and stalls must not freeze the others.
+  return (async () => {
+    try {
+      return await locks.request('algotrade-session-read', { signal: lockTimeout() }, read);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return await read();
+      throw error;
+    }
+  })();
+}
+
+/**
  * One session read in flight, shared by every concurrent caller (single-flight): a page boot
  * fires several authenticated requests at once, and with an expired token each read would start
  * its own refresh; refresh tokens rotate, so a second refresh with the spent token can sign the
@@ -86,13 +123,27 @@ function readSession(auth: Auth): SessionRead {
   // auth-js runs its own start-up recovery (and its refresh of an expired session) in
   // `initialize()`; a `getSession()` that starts before it ends runs a second refresh with the
   // refresh token the first one just spent. So every read waits for the start-up first.
-  reading ??= auth
-    .initialize()
-    .then(() => auth.getSession())
-    .finally(() => {
-      reading = null;
-    });
+  reading ??= acrossTabs(() => auth.initialize().then(() => auth.getSession())).finally(() => {
+    reading = null;
+  });
   return reading;
+}
+
+let startup: Promise<void> | null = null;
+
+/**
+ * Resolves once the client's start-up (its recovery and the first session read, so the refresh
+ * of an expired token) is done. `onAuthStateChange` makes auth-js read the session itself, to
+ * emit INITIAL_SESSION; registered while the token is expired, each such read starts a refresh
+ * beside ours with the same refresh token (a second request with a spent token). So every
+ * listener registers only after this.
+ */
+function startedUp(auth: Auth): Promise<void> {
+  startup ??= readSession(auth).then(
+    () => undefined,
+    () => undefined,
+  );
+  return startup;
 }
 
 /** The current access token, or null when signed out (or when Supabase is not configured). */
@@ -118,11 +169,17 @@ export function subscribeSession(listener: (session: AuthSession | null) => void
     listener(null);
     return () => undefined;
   }
-  const { data } = auth.onAuthStateChange((_event, session) => {
-    listener(session ? { email: session.user.email } : null);
+  let subscription: { unsubscribe: () => void } | undefined;
+  let stopped = false;
+  void startedUp(auth).then(() => {
+    if (stopped) return;
+    subscription = auth.onAuthStateChange((_event, session) => {
+      listener(session ? { email: session.user.email } : null);
+    }).data.subscription;
   });
   return () => {
-    data.subscription.unsubscribe();
+    stopped = true;
+    subscription?.unsubscribe();
   };
 }
 

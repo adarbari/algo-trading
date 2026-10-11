@@ -553,3 +553,21 @@ def test_the_figures_columns_carry_the_touch_and_risk_neutral_rates_when_stored(
     assert (by["out_of_sample"].reference_rate, by["out_of_sample"].touch_rate) == (0.61, 0.42)
     assert (by["in_sample"].reference_rate, by["in_sample"].touch_rate) == (None, 0.54)
     assert by["all"].touch_rate is None  # not stored: never a zero
+
+
+def test_a_lone_trial_has_no_overfitting_test_and_can_still_reach_promising() -> None:
+    """ADR 0064 amendment 2026-10-11: PBO needs alternatives of the edge, never baselines, so a
+    lone screener's PBO is None and the two PBO criteria do not apply (not a pass, not a gap)."""
+    no_pbo = {"oos": {"pbo": None}, "whole": {"pbo": None}}
+    lone = verdict(result(**no_pbo))  # type: ignore[arg-type]
+    assert lone.verdict == PROMISING
+    pbo = {c.id: c.status for c in lone.criteria if c.id in ("pbo", "works_pbo")}
+    assert pbo == {"pbo": "not_applicable", "works_pbo": "not_applicable"}
+    assert "overfitting" not in lone.rationale
+    # a second screener at the holding period: PBO None means not stored, which blocks
+    peer = row(variant="scr2", kind="all", pbo=None)
+    two = verdict([*result(**no_pbo), peer])  # type: ignore[arg-type]
+    assert next(c for c in two.criteria if c.id == "pbo").status == "not_measured"
+    assert two.verdict != PROMISING
+    # the hard fail still fires when PBO exists
+    assert verdict(result(whole={"pbo": 0.51})).verdict == NOT_WORKING

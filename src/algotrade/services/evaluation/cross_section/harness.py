@@ -64,9 +64,11 @@ from algotrade.services.evaluation.cross_section.detail.licences import (
 )
 from algotrade.services.evaluation.cross_section.detail.windows import (
     SeriesFacts,
+    counts_wins,
     plan_exits,
     projection_count,
     series_facts,
+    unit_of,
 )
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.historical import (
@@ -95,6 +97,8 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
 )
 from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.measures import (
+    BASELINE,
+    SCREENER,
     CostGrid,
     SessionStat,
     SliceMeasure,
@@ -183,6 +187,16 @@ class VariantResult:
         """The trial's: the strictest of its implied-vol field, screen and universe features."""
         return None if self.licences is None else self.licences.trial
 
+    @property
+    def unit(self) -> str | None:
+        """What the values measure (``series.unit``); None when no series was built."""
+        return None if self.series is None else self.series.unit
+
+    @property
+    def wins(self) -> bool:
+        """The trial statistics read the excess wins: the values are not returns."""
+        return counts_wins(self.unit)
+
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
     report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
     series: SeriesFacts | None = None  # the windows of ``stats``, the unit, the projection (0064)
@@ -197,11 +211,13 @@ def _slice_rows(
     frozen_from: date | None,
     costs: CostGrid | None,
     adv_floor: float,
+    wins: bool = False,
 ) -> tuple[tuple[SliceMeasure, ...], tuple[SliceMeasure, ...]]:
     """One variant's slice rows and, for a return outcome (``costs``), its cost rows (ADR 0064
-    decision 5: none for an outcome that is not a return)."""
+    decision 5: none for an outcome that is not a return). ``wins``: the Sharpe ratio is of the
+    excess wins (``measures.trial_value``)."""
     slices = edge_slices(stats, split, exploratory)
-    measures = slice_measures(stats, slices, model, frozen_from, adv_floor)
+    measures = slice_measures(stats, slices, model, frozen_from, adv_floor, wins)
     costed = cost_measures(stats, slices, measures, costs) if costs is not None else []
     return tuple(measures), tuple(costed)
 
@@ -278,8 +294,8 @@ def run_hash(
 
 def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Variant]:
     found = [
-        *(Variant(s, "screener", resolve_config(configs, s, user)) for s in edge.screeners),
-        *(Variant(s, "baseline", resolve_config(configs, s, user)) for s in edge.baselines),
+        *(Variant(s, SCREENER, resolve_config(configs, s, user)) for s in edge.screeners),
+        *(Variant(s, BASELINE, resolve_config(configs, s, user)) for s in edge.baselines),
     ]
     if not found:
         raise ConfigurationError(f"edge {edge.id}: no screeners or baselines to evaluate")
@@ -310,7 +326,8 @@ def _prior_trials(
 ) -> set[tuple[str, str, str, int]]:
     """(edge variant, variant, config hash, horizon) of earlier runs; a trial logged before
     edge variants existed is the edge's own ("main"). The site's log includes the runs recorded
-    under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them."""
+    under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them. A logged
+    baseline is not a trial."""
     found: set[tuple[str, str, str, int]] = set()
     records = list(writer.runs_for(job_name(edge_id, user_id)))
     if user_id == SITE_USER:  # the legacy owners' records from before the cutoff only
@@ -322,6 +339,8 @@ def _prior_trials(
             ]
     for record in records:
         for t in record.stats.get("trials", []):
+            if t.get("role") == BASELINE:  # a comparison, not a trial; no role: counted
+                continue
             found.add(
                 (t.get("edge_variant") or MAIN, t["variant"], t["config_hash"], int(t["horizon"]))
             )
@@ -465,6 +484,7 @@ def evaluate_edge(
                 if is_return(scope.edge)
                 else None,
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
+                counts_wins(unit_of(scope.edge)),
             )
             results.append(
                 VariantResult(
@@ -501,7 +521,10 @@ def evaluate_edge(
     for events in schedules.values():
         for reason, n in events.unknown_total().items():
             unknown[reason] = unknown.get(reason, 0) + n
-    tried = {(r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results}
+    # a trial is a screener: a baseline is a comparison (ADR 0064 amendment 2026-10-11)
+    tried = {
+        (r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results if r.role == SCREENER
+    }
     trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(
