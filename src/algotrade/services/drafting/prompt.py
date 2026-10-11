@@ -283,13 +283,18 @@ def system_prompt(
     phrasebook: Iterable[Phrase] = (),
     guide: FieldGuideSettings | None = None,
 ) -> str:
-    """The task with its examples, the catalogue (in the order given: the caller's catalogue
-    order), the phrasebook (file order; entries with none of this catalogue's fields left
-    out) and the field guide (file order; entries and situations over this catalogue's fields
-    only)."""
+    """The prompt as a byte-stable prefix across users and sentences: the task with its
+    examples, the SITE catalogue (sorted by name), the phrasebook (file order; entries with
+    none of the catalogue's fields left out), the field guide (file order; entries and
+    situations over the catalogue's fields only), then last the caller's own features
+    (``scope != "site"``, sorted by name; empty for most users). Phrasebook, guide and
+    situation entries are filtered against the union of both, so an entry naming a user
+    feature still shows."""
     infos = list(catalogue)
     names = {info.name for info in infos}
-    lines = "\n".join(catalogue_line(info) for info in infos)
+    site = sorted((i for i in infos if i.scope == "site"), key=lambda i: i.name)
+    own = sorted((i for i in infos if i.scope != "site"), key=lambda i: i.name)
+    lines = "\n".join(catalogue_line(info) for info in site)
     phrases = [line for p in phrasebook if (line := phrase_line(p, names)) is not None]
     out = (
         f"{TASK}\n{examples_text()}\n"
@@ -311,6 +316,9 @@ def system_prompt(
                 "\nSituations that fool a threshold (situation | signs | affects | what to do):\n"
             )
             out += "\n".join(situations) + "\n"
+    if own:
+        out += "\nYour own features (name | type | unit | description | values):\n"
+        out += "\n".join(catalogue_line(info) for info in own) + "\n"
     return out
 
 
