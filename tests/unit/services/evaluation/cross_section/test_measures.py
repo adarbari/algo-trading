@@ -6,7 +6,7 @@ from datetime import date
 import numpy as np
 import pytest
 
-from algotrade.quant.edge_statistics import moments
+from algotrade.quant.edges.statistics import moments
 from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     Slice,

@@ -25,7 +25,7 @@ from algotrade.config.edges.document import Edge
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.services.evaluation.cross_section.harness import BENCHMARK, iv_field_of
+from algotrade.services.evaluation.cross_section.harness import iv_field_of
 from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
     MISSING_DRAWDOWN,
@@ -35,6 +35,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     is_return,
     needs_implied_vol,
 )
+from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.reads.session import implied_at
 from algotrade.services.evaluation.forward.signals import advance
 

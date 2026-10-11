@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.services.evaluation.cross_section import picks
-from algotrade.services.evaluation.cross_section.harness import (
+from algotrade.services.evaluation.cross_section.measuring import (
     _Measured,
     _Plan,
     _read_closed,
