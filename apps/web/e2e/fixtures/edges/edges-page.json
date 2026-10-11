@@ -31,6 +31,7 @@
           "headline": "Out-of-sample, momentum_12_1, 20 trading days: win rate 58% against a base rate of 51% (+7 pts).",
           "result": "Win rate 58% · base rate 51%",
           "basis": "momentum_12_1, 20 trading days",
+          "basisWhy": "",
           "trades": 70,
           "oosTrades": 6,
           "winRate": 0.58,
@@ -122,7 +123,9 @@
               "sharpe": 1.1,
               "deflatedSharpe": 0.9,
               "pbo": null,
-              "thin": false
+              "thin": false,
+              "referenceRate": null,
+              "touchRate": null
             },
             {
               "period": "out_of_sample",
@@ -135,7 +138,9 @@
               "sharpe": 1.1,
               "deflatedSharpe": 0.9,
               "pbo": null,
-              "thin": true
+              "thin": true,
+              "referenceRate": null,
+              "touchRate": null
             },
             {
               "period": "all",
@@ -148,7 +153,9 @@
               "sharpe": 1.1,
               "deflatedSharpe": 0.9,
               "pbo": null,
-              "thin": false
+              "thin": false,
+              "referenceRate": null,
+              "touchRate": null
             }
           ],
           "evidence": {
@@ -177,7 +184,11 @@
               "remaining": 34,
               "projectionState": "projected",
               "expectedBy": "2027-03-15",
-              "fillRatio": 0.5
+              "fillRatio": 0.5,
+              "cadenceSessions": null,
+              "nextClose": null,
+              "projections": [],
+              "atTarget": null
             }
           },
           "haircut": {
@@ -253,6 +264,7 @@
           "headline": "No official result yet",
           "result": "No official result yet",
           "basis": null,
+          "basisWhy": "",
           "trades": null,
           "oosTrades": null,
           "winRate": null,

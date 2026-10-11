@@ -17,7 +17,7 @@
       "src/pages/trader-ideas/index.ts": 41929,
       "src/pages/trader-regime/index.ts": 59260,
       "src/pages/trader-screeners/index.ts": 17586,
-      "src/pages/trader-edges/ui/EdgeSections.tsx": 76111
+      "src/pages/trader-edges/ui/EdgeSections.tsx": 76573
     }
   },
   "e2e": {
@@ -84,6 +84,6 @@
     "e2e./screeners/vrp_scanner.dom_nodes": "2026-10-10 #461 ED8 E8 the six-step edge builder reuses Checkbox, SectionNav, NumberInput and ScreenerRecord, so they leave the page chunk that inlined them and load as shared chunks: one more small request and its modulepreload link (measured)",
     "e2e./admin/ingestion.dom_nodes": "2026-10-10 #486 the option-chain coverage panel (a Panel and its StatStrip) is new content on the page (+5 nodes, measured); its read rides the grid's request, so requests stay at 58",
     "bundle.routes.src/pages/login/index.ts": "2026-10-10 #486 chain coverage merged with main: shared chunks (Guide glossary) grow; measured 1769 B, +70 B margin for CI/local and main drift",
-    "bundle.routes.src/pages/trader-edges/ui/EdgeSections.tsx": "2026-10-11 #512 ED9 PR 13b: the Trades section, the regime, holding-period and cost views and the Details diagnostics join the one lazy chunk (measured locally 76041 B, +70 B margin for CI/local drift); then, before it: 2026-10-11 #511 ED9 PR 9: everything below an edge's verdict is one lazy chunk (one import, not seven: each lazy chunk adds its ids to the dependency lists the entry carries); loaded when the page opens, each section reading its data when in view; measured locally 71258 B, +70 B margin for CI/local drift"
+    "bundle.routes.src/pages/trader-edges/ui/EdgeSections.tsx": "2026-10-11 #517 WP3: the outlook dates, the rates rows, the decoy toggles and the capacity position join the lazy chunk (CI measured 76503 B, +70 B margin); then, before it: 2026-10-11 #512 ED9 PR 13b: the Trades section, the regime, holding-period and cost views and the Details diagnostics join the one lazy chunk (measured locally 76041 B, +70 B margin for CI/local drift); then, before it: 2026-10-11 #511 ED9 PR 9: everything below an edge's verdict is one lazy chunk (one import, not seven: each lazy chunk adds its ids to the dependency lists the entry carries); loaded when the page opens, each section reading its data when in view; measured locally 71258 B, +70 B margin for CI/local drift"
   }
 }
