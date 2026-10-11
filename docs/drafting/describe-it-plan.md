@@ -60,7 +60,7 @@ current criteria, catalogue version, prompt version and model. Model versions ar
 Measured live, by the owner only (CI never calls a model): `algotrade-api golden run [--cases ID,...]
 [--split train|held_out|all] [--provider ID ...] [--repeat 3] [--record] [--json] --yes` runs the real
 `draft_screen` over the golden cases per provider and reports pass rate, consistency, invalid rate, tokens,
-cache, latency and cost, under `--max-calls` / `--budget-usd` caps (`apps/api/algotrade_api/ops/golden.py`).
+cache, latency and cost, under `--max-calls` / `--budget-usd` caps (`src/algotrade/services/drafting/golden_run.py`).
 
 ## Token and latency budget
 

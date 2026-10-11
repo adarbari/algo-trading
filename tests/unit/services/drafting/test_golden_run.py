@@ -1,4 +1,4 @@
-"""``algotrade-api golden run`` (``ops/golden.py``): the live golden evaluation, driven here by
+"""``algotrade-api golden run`` (``golden_run.py``): the live golden evaluation, driven here by
 fake models (CI never calls the network): scoring and its aggregation, the consistency metric,
 the guard rails (refusal, ``--yes``, the caps) and the ``--record`` file layout."""
 
@@ -13,9 +13,7 @@ from algotrade.config.site.llm import LlmSettings
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.drafting.golden import GoldenCase
-from algotrade.services.drafting.screens import ScreenDraft, criteria_of, parse_answer
-from algotrade.services.text_model.model import TextModel
-from algotrade_api.ops.golden import (
+from algotrade.services.drafting.golden_run import (
     UNAVAILABLE_STREAK,
     CostTap,
     Plan,
@@ -34,6 +32,8 @@ from algotrade_api.ops.golden import (
     slug,
     write_recordings,
 )
+from algotrade.services.drafting.screens import ScreenDraft, criteria_of, parse_answer
+from algotrade.services.text_model.model import TextModel
 
 CATALOGUE = {"f.a", "f.b", "f.c"}
 GOOD = json.dumps({"criteria": [{"field": "f.a", "op": "gt", "value": 10}]})

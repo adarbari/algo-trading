@@ -10,7 +10,7 @@ writes the auto-deploy agent; ``deploy-plan`` and ``deploy-verify`` are what
 open-files soft limit to ``OPEN_FILES`` and caps the connections served at once at
 ``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08).
 ``algotrade-api golden run`` is the owner-run live evaluation of the drafting prompt against
-the golden set (``ops/golden.py``: it calls real models and spends money, only with ``--yes``)."""
+the golden set (``services/drafting/golden_run.py``: real models and money, only with ``--yes``)."""
 
 import argparse
 import json
@@ -35,7 +35,18 @@ from algotrade.config.env import (
 from algotrade.config.site.settings import load_llm
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.screens import ScreenDraft, draft_screen
+from algotrade.services.drafting.golden_run import (
+    DEFAULT_BUDGET_USD,
+    DEFAULT_MAX_CALLS,
+    DEFAULT_REPEAT,
+    GOLDEN_ROOT,
+    SPLITS,
+    CostTap,
+    RunArgs,
+    drafter,
+    run_golden,
+)
+from algotrade.services.drafting.screens import ScreenDraft
 from algotrade.services.read.context import NotFoundError, ReadContext, open_context
 from algotrade.services.text_model.model import TextModel
 from algotrade_api.auth.local import require_loopback
@@ -43,17 +54,6 @@ from algotrade_api.auth.mode import AuthMode
 from algotrade_api.deps import open_store
 from algotrade_api.ops.build import Fetch, fetch_http, running_mismatches, write_web_stamp
 from algotrade_api.ops.deploy import CHECKS, actions, holds_ingest, verify
-from algotrade_api.ops.golden import (
-    DEFAULT_BUDGET_USD,
-    DEFAULT_MAX_CALLS,
-    DEFAULT_REPEAT,
-    GOLDEN_ROOT,
-    SCREENER_ID,
-    SPLITS,
-    CostTap,
-    RunArgs,
-    run_golden,
-)
 from algotrade_api.ops.schedule import (
     DEFAULT_PORT,
     DEPLOY_LABEL,
@@ -151,7 +151,7 @@ def golden_run(args: argparse.Namespace) -> int:
         return out
 
     def draft(model: TextModel, sentence: str) -> ScreenDraft:
-        return draft_screen(holder[0], model, SCREENER_ID, sentence)
+        return drafter(holder[0])(model, sentence)
 
     def to_stderr(line: str) -> None:
         print(line, file=sys.stderr)

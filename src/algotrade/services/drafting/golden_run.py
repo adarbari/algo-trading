@@ -44,7 +44,8 @@ from algotrade.config.site.llm import LlmSettings, ProviderSettings, Rate
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.drafting.golden import GoldenCase, load_cases, score
-from algotrade.services.drafting.screens import ScreenDraft
+from algotrade.services.drafting.screens import ScreenDraft, draft_screen
+from algotrade.services.read.context import ReadContext
 from algotrade.services.text_model.model import TextModel
 
 SCREENER_ID = "golden-eval"
@@ -55,6 +56,11 @@ UNAVAILABLE_STREAK = 3  # unavailable answers in a row after which a provider is
 SPLITS = ("train", "held_out", "all")
 
 type Draft = Callable[[TextModel, str], ScreenDraft]
+
+
+def drafter(ctx: ReadContext) -> Draft:
+    """The real ``draft_screen`` over ``ctx`` (the caller's catalogue), as ``evaluate`` calls it."""
+    return lambda model, sentence: draft_screen(ctx, model, SCREENER_ID, sentence)
 
 
 # ------------------------------------------------------------------------------ the plan
