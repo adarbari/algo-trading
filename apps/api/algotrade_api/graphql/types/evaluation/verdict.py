@@ -329,7 +329,8 @@ class EdgePublished:
     description="One bar of the decay: `period` (published, in_sample, out_of_sample), its "
     "`value` (null unless `state` is measured) over `n` (the trades, or the decile sessions of a "
     "decile spread; null for the paper's) and the `state` that says why a value is missing "
-    "(not_stored, not_comparable: another holding period than the paper's, oos_hidden)"
+    "(not_stored, not_comparable: another holding period than the paper's, oos_hidden, "
+    "not_given: the document publishes no figure)"
 )
 class DecayBar:
     period: str
@@ -345,13 +346,14 @@ class DecayBar:
 @strawberry.type(
     description="The decay of one statistic: the paper's figure (`published`) against the "
     "harness's in-sample and out-of-sample ones (`bars`, in that order after the paper's) at the "
-    "verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). Null: "
-    "the edge's document publishes no figure"
+    "verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). "
+    "`published` is null when the edge's document gives no figure (the paper's bar is then "
+    "not_given and `measure` is lift_pts)"
 )
 class EdgeDecay:
     measure: str
     unit: str
-    published: EdgePublished
+    published: EdgePublished | None
     basis_horizon: int
     bars: list[DecayBar]
 
@@ -360,7 +362,7 @@ class EdgeDecay:
         return cls(
             measure=d.measure,
             unit=d.unit,
-            published=EdgePublished.of(d.published),
+            published=EdgePublished.of(d.published) if d.published else None,
             basis_horizon=d.basis_horizon,
             bars=[DecayBar.of(b) for b in d.bars],
         )

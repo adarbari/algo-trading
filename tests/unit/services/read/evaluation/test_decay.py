@@ -5,6 +5,7 @@ import pytest
 from algotrade.services.read.evaluation.decay import (
     MEASURED,
     NOT_COMPARABLE,
+    NOT_GIVEN,
     NOT_STORED,
     OOS_HIDDEN,
     POINTS,
@@ -85,6 +86,13 @@ def test_a_hidden_out_of_sample_result_is_withheld() -> None:
     assert d.bars[2].value is None and d.bars[2].n is None
 
 
-def test_an_edge_that_publishes_nothing_has_no_decay() -> None:
-    assert judge("e", result(), SPLIT, T).decay is None
-    assert decay_of(None, 20, None, None) is None
+def test_an_edge_that_publishes_nothing_keeps_its_decay_with_the_paper_not_given() -> None:
+    d = judge("e", result(), SPLIT, T).decay
+    assert d is not None and d.published is None
+    assert (d.measure, d.unit) == ("lift_pts", POINTS)
+    by = {b.period: b for b in d.bars}
+    assert (by["published"].value, by["published"].state) == (None, NOT_GIVEN)
+    assert by["out_of_sample"].state == MEASURED and by["out_of_sample"].value == pytest.approx(
+        10.0
+    )
+    assert decay_of(None, 20, None, None).bars[1].state == NOT_STORED

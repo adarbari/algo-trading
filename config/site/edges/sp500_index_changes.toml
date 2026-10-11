@@ -51,12 +51,3 @@ url = "https://doi.org/10.1111/j.1540-6261.1986.tb04550.x"
 [[sources]]
 title = "CXO Advisory, Revisiting Effects of S&P 500 Additions and Deletions"
 url = "https://www.cxoadvisory.com/equity-premium/revisiting-effects-of-sp-500-additions-and-deletions/"
-
-# The literature's figure (ADR 0064): the abnormal return of S&P 500 additions from the
-# announcement to the effective date, under 1% (0.8%) over 2010-2020, against 7.6% in the 1990s.
-[published]
-measure = "mean_excess"
-value = 0.008
-horizon_sessions = 20
-sample = 11
-source = 0
