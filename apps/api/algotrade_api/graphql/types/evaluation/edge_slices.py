@@ -87,8 +87,9 @@ class OosBy:
 
 
 @strawberry.type(
-    description="One holding period of `horizon` sessions: `basis` is the verdict's own, its "
-    "`figures` by period and `oosBy`"
+    description="One holding period of `horizon` sessions: `basis` is the verdict's own pre-chosen "
+    "test; any other row is not the pre-chosen test, one of several tries. Its `figures` by "
+    "period and `oosBy`"
 )
 class HorizonRow:
     horizon: int

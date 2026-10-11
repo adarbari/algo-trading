@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.site.guide.glossary import (
+    EDGES_FOLDER,
     FOLDER,
     GlossaryTerm,
     GuideGlossary,
@@ -25,7 +26,7 @@ from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from tests.conftest import REPO_ROOT
 
 SHIPPED = FileConfigStore(REPO_ROOT / "config")
-WHERE = "config/site/guide/glossary/*.toml"
+WHERE = "config/site/guide/glossary/*.toml"  # and edges/*.toml (kind guide_glossary_edges)
 # The terms docs/ui/guide.md section 3 and the GD6 brief name: the app's words, the rule
 # grammar, the decisions a result shows and the regime gate.
 SPEC_TERMS = {
@@ -137,3 +138,15 @@ def test_terms_must_be_a_list_of_tables() -> None:
         GuideGlossary.from_documents({"alpha": {"term": {"id": "alpha"}}})
     with pytest.raises(ConfigurationError, match="unknown keys"):
         GuideGlossary.from_documents({"alpha": {"terms": []}})
+
+
+def test_the_edges_glossary_folder_is_read_after_the_main_one() -> None:
+    store = MemoryConfigStore(
+        {
+            ("site", FOLDER, "alpha"): {"term": [{**TERM, "see_also": []}]},
+            ("site", EDGES_FOLDER, "beta"): {
+                "term": [{**TERM, "id": "beta", "term": "Beta", "see_also": []}]
+            },
+        }
+    )
+    assert [t.id for t in load_guide_glossary(store).terms] == ["alpha", "beta"]
