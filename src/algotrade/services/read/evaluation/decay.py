@@ -4,11 +4,13 @@ statistic, each with the count it rests on. Pure over the verdict's basis rows: 
 is the document's ``[published]`` ``measure``, read from the stored row, never recomputed.
 
 A bar is ``measured`` or has a state saying why not: ``not_stored`` (an older run, or the
-statistic was undefined there), ``not_comparable`` (the verdict's holding period is not the
-one the paper reports) or ``oos_hidden`` (a copy's out-of-sample result is withheld).
+statistic was undefined there; for the live bar, no settled paper trade yet), ``not_comparable``
+(the verdict's holding period is not the one the paper reports), ``oos_hidden`` (a copy's
+out-of-sample result is withheld) or ``not_measured_live`` (a decile spread needs the whole
+ranked field, which the paper record does not keep).
 A document that publishes no figure still has its decay: the published bar is ``not_given``
-and the other two read the lift in points. The live bar comes with the stored paper trades
-(a later change)."""
+and the other bars read the lift in points. The live bar is the fourth: it is added by
+``services/read/edge_evidence/decay.py`` from the stored paper trades (``live`` period)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -18,24 +20,33 @@ from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import EdgePublished
 from algotrade.services.read.evaluation.runs import EdgeRow
 
-PUBLISHED, IN_SAMPLE, OUT_OF_SAMPLE = "published", "in_sample", "out_of_sample"
-MEASURED, NOT_STORED, NOT_COMPARABLE, OOS_HIDDEN, NOT_GIVEN = (
+PUBLISHED, IN_SAMPLE, OUT_OF_SAMPLE, LIVE = "published", "in_sample", "out_of_sample", "live"
+MEASURED, NOT_STORED, NOT_COMPARABLE, OOS_HIDDEN, NOT_GIVEN, NOT_MEASURED_LIVE = (
     "measured",
     "not_stored",
     "not_comparable",
     "oos_hidden",
     "not_given",
+    "not_measured_live",
 )
-BAR_STATES: Final = (MEASURED, NOT_STORED, NOT_COMPARABLE, OOS_HIDDEN, NOT_GIVEN)
+BAR_STATES: Final = (
+    MEASURED,
+    NOT_STORED,
+    NOT_COMPARABLE,
+    OOS_HIDDEN,
+    NOT_GIVEN,
+    NOT_MEASURED_LIVE,
+)
 DEFAULT_MEASURE: Final = "lift_pts"  # what the bars show when the document publishes nothing
 POINTS, RETURN = "points", "return"  # the unit of a bar's value
 
 
 @dataclass(frozen=True)
 class DecayBar:
-    """One bar: ``period`` (``published``, ``in_sample``, ``out_of_sample``), its ``value`` (None
-    unless ``measured``) over ``n`` (the trades, or the decile sessions for a decile spread; None
-    for the paper's), and the ``state`` that says why a value is missing."""
+    """One bar: ``period`` (``published``, ``in_sample``, ``out_of_sample``, ``live``), its
+    ``value`` (None unless ``measured``) over ``n`` (the trades, or the decile sessions for a
+    decile spread; the signal sessions for the live bar; None for the paper's), and the ``state``
+    that says why a value is missing."""
 
     period: str
     value: float | None

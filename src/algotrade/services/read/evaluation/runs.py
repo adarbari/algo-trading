@@ -8,8 +8,9 @@ same range end). Every run discloses its ``run_id``, range, ``split_from``, ``kn
 canonical run of an edge is the latest committed run of the site user whose split is its
 ``frozen_from``: none is ``NOT_RUN`` with the reason, never an older or exploratory run."""
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any
 
@@ -27,6 +28,7 @@ from algotrade.storage.tables.schemas import result_table
 EDGE_EVAL = "edge_eval"
 EDGE_SERIES = "edge_series"  # the per-session series of a run (ADR 0064)
 MAIN = "main"
+BASELINE = "baseline"
 RANDOM = "random"  # the role of a random-pick draw (ED8), never a screener or a baseline
 DECILES = 10
 IN_SAMPLE = "in_sample"  # the slice before the split
@@ -98,6 +100,14 @@ class EdgeRow:
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
     decile_means: tuple[float | None, ...] = ()  # each tenth's mean outcome, best-ranked first;
     # empty when the slice had none or the run is older than the columns (never zeros)
+    # ADR 0064 decision 7, on a calendar schedule's ``all`` row only: the exit sessions of its
+    # next decision sessions, and how many decision sessions the run scheduled and measured
+    # (the ``_oos`` pair: from the split on; None without a split). Empty / None: not stored.
+    projected_exits: tuple[date, ...] = ()
+    decisions_scheduled: int | None = None
+    decisions_measured: int | None = None
+    decisions_scheduled_oos: int | None = None
+    decisions_measured_oos: int | None = None
 
 
 @dataclass(frozen=True)
@@ -250,6 +260,13 @@ def _deciles(row: Mapping[str, Any]) -> tuple[float | None, ...]:
     return found if any(x is not None for x in found) else ()
 
 
+def _exits(value: Any) -> tuple[date, ...]:
+    """The stored list of exit sessions (a null is a missing list, never an empty projection)."""
+    if value is None or isinstance(value, float):
+        return ()
+    return tuple(d for d in (_day_of(x) for x in value) if d is not None)
+
+
 def _row(row: Mapping[str, Any]) -> EdgeRow:
     return EdgeRow(
         edge_variant=str(to_scalar(row.get("edge_variant")) or MAIN),  # a null is NaN in a frame
@@ -277,6 +294,11 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         decile_sessions=_int(row.get("decile_sessions")),
         in_sample=to_scalar(row.get("in_sample")) is True,
         decile_means=_deciles(row),
+        projected_exits=_exits(row.get("projected_exits")),
+        decisions_scheduled=_int(row.get("decisions_scheduled")),
+        decisions_measured=_int(row.get("decisions_measured")),
+        decisions_scheduled_oos=_int(row.get("decisions_scheduled_oos")),
+        decisions_measured_oos=_int(row.get("decisions_measured_oos")),
     )
 
 
@@ -344,7 +366,20 @@ def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
     here, in the one reader, not in the browser."""
     record = ctx.reader.run(run.run_id)
     found = rows_of_record(ctx, record) if record is not None else ()
-    return tuple(r for r in found if r.slice_kind == IN_SAMPLE) if run.oos_hidden else found
+    if not run.oos_hidden:
+        return found
+    return tuple(_without_oos_counts(r) for r in found if r.slice_kind == IN_SAMPLE)
+
+
+def _without_oos_counts(row: EdgeRow) -> EdgeRow:
+    """``row`` with what only the out-of-sample side knows removed: the projected exits (the
+    schedule's future, counted from the split) and the out-of-sample decision-session counts."""
+    return replace(
+        row,
+        projected_exits=(),
+        decisions_scheduled_oos=None,
+        decisions_measured_oos=None,
+    )
 
 
 def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
@@ -370,3 +405,20 @@ def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
     found = [_series_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records")]
     kept = [r for r in found if r.before_split] if run.oos_hidden else found
     return tuple(sorted(kept, key=lambda r: (r.variant, r.horizon_sessions, r.decision_session)))
+
+
+def measured_sessions(series: Sequence[SeriesRow]) -> dict[tuple[str, int], int]:
+    """Per (screen, holding period) of the main edge variant, the decision sessions that were
+    measured with picks (status ``measured``, at least one pick): the count the haircut Sharpe
+    ratio rests on. A baseline is not a screen; a window that holds no number is not a session."""
+    found: Counter[tuple[str, int]] = Counter()
+    for r in series:
+        if r.role != BASELINE and r.status == "measured" and (r.picks or 0) > 0:
+            found[(r.variant, r.horizon_sessions)] += 1
+    return dict(found)
+
+
+def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], int] | None:
+    """``measured_sessions`` of ``run``'s series; None when it stored none (an older run)."""
+    series = load_run_series(ctx, run)
+    return measured_sessions(series) if series else None

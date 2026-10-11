@@ -53,6 +53,7 @@ from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeProblem, EdgeRun
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
+from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.guide.entries import GuideEntries
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
@@ -425,6 +426,17 @@ class Query:
         ctx = await info.context.aread(date)
         found = await off_loop(edge_live.load_edge_paper, ctx, id) if ctx is not None else None
         return EdgePaper.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The sections of the result of the edge `id` (the evidence curve, drawdown, "
+        "rolling starts, monthly map and decay), each about the verdict's own run and basis and "
+        "read only when selected. `date` resolves the session of the live stroke and bar only; "
+        "null: the user has no such edge"
+    )
+    async def edge_result(self, info: Ctx, id: str, date: Day = None) -> EdgeResult | None:
+        ctx = await info.context.aread(date)
+        found = await off_loop(edge_reads.load_edge, ctx, id) if ctx is not None else None
+        return EdgeResult.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The edge `id`; null: the user has no such edge"

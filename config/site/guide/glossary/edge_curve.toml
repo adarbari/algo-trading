@@ -1,0 +1,60 @@
+# L3 site setting: the Guide glossary, edges: the shape of a result over time (ADR 0051, ADR 0064). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "evidence_curve"
+term = "Evidence curve"
+short = "What the picks of the verdict's basis earned, window by window, added up, against what every eligible name earned."
+body = """
+Each point is one block of decision sessions on the basis, valued when its outcome was known (its exit session), never when it was decided. For a return outcome the value is the mean excess return of the picks, and the curve is the running sum of them: cumulative excess. The base line adds the mean of every eligible name in the same windows, so the picks earn something only when the curve runs above it. An outcome that is not a return (a cushion or a ratio) has no return to add. Its curve is excess wins: the wins above what the field's base rate predicts for that many picks. Its zero line is the base. The curve adds windows, it does not compound them, and windows of an every-session schedule overlap, so the same days count more than once. Read its shape and its two sides, not its final height. The harness marks each window in-sample or out-of-sample by the split, and the out-of-sample stretch is the fair test.
+"""
+next = "Read where the out-of-sample stretch leaves the in-sample slope, and trust the curve no further than the number of trades behind it."
+see_also = ["verdict_basis", "in_sample", "out_of_sample", "base_rate", "trades", "curve_gap", "live_stroke", "drawdown"]
+
+[[term]]
+id = "curve_gap"
+term = "Gap in the curve"
+short = "A stretch of windows that hold no number, and why: excluded coverage, lost input or no picks."
+body = """
+A window with no number is not a point, and the line joins its neighbours over it. A flat stretch would read as a return of zero, which is not what happened. Excluded coverage: the screen's inputs covered too few names that day to trust it. Lost input: a table the screen needs was not stored for those sessions, so nothing was measured. No picks: the screen qualified no name. The gap shows how long the span is, never what the edge earned in it.
+"""
+next = "A long gap is worth a look before you trust the curve around it; re-run the backtest after the data is restored."
+see_also = ["evidence_curve", "harness_exclusions", "unavailable_system"]
+
+[[term]]
+id = "live_stroke"
+term = "Live stroke"
+short = "The edge's settled paper trades laid on the curve, starting where the backtest stood when the record began."
+body = """
+Once an edge records paper trades, each signal session that has settled is one point at its sell session. The value is the mean excess return of its trades, or for an outcome with no return the wins above the base rate. The server anchors the stroke at the backtest's value on the first signal, so the two lines meet there and the gap that opens between them is the drift. Open and skipped trades are not points, and a trade whose sell session is after the day you view is still open. Recorded: the stroke has points. None: no trade of the basis has settled yet. Hidden: the out-of-sample result of a copy is withheld until you show it, and so is its live record.
+"""
+next = "Judge the stroke over many signal sessions; a few settled sessions can sit far from the backtest by chance."
+see_also = ["evidence_curve", "paper_trading", "live_record", "base_rate", "out_of_sample", "show_out_of_sample"]
+
+[[term]]
+id = "drawdown"
+term = "Drawdown and volatility"
+short = "How far the curve fell below its previous high, the deepest drops with their dates, and how much the windows move."
+body = """
+The underwater line is the curve's distance below its running high, so it is zero at a new high. An episode runs from a high down to its low and back to that high, or is still open. The page lists the three deepest. The drop of each side of the split is measured on its own curve, so an out-of-sample drop is never a fall from an in-sample peak. The curve is built from whole windows, so it understates a dip inside a window. Volatility is the spread of the windows, scaled to a year by the independent windows a year holds. Windows of an every-session schedule overlap, and counting each as independent would overstate it. An outcome that is not a return has neither.
+"""
+see_also = ["evidence_curve", "in_sample", "out_of_sample", "sharpe_ratio"]
+
+[[term]]
+id = "rolling_starts"
+term = "Rolling starts"
+short = "The lift you would have seen starting at the beginning of each year and holding every window after it."
+body = """
+A result depends on when you began. Each row takes the windows decided from the first of a year to the end and pools them. The lift is the pooled win rate of the picks minus the pooled base rate, in points. A window with a count missing is left out of it. Rows that disagree in sign show an edge whose answer turns on the start date. Rows with few trades are noise.
+"""
+see_also = ["lift", "win_rate", "base_rate", "trades", "year_by_year"]
+
+[[term]]
+id = "monthly_map"
+term = "Monthly map"
+short = "What the curve gained or lost in each calendar month, by the month the outcomes were known."
+body = """
+Each cell is the sum of the values of the windows that closed in the month, so the months add up to the curve. A month that holds windows from both sides of the split says so. Dark runs of one sign show when an edge worked, and an edge that earns in a few months only is carried by them.
+"""
+see_also = ["evidence_curve", "in_sample", "out_of_sample"]
