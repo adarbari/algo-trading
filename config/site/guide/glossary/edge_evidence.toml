@@ -349,15 +349,18 @@ different from a result of zero. Example: vrp_short_premium has no trades from 2
 the data it needs starts around 2024. In 2024 it won 80% against 70% on 2 trades. In 2025 it won
 70% against 71% on 8, and in 2026 73% against 71% on 5. Don't read a year with 2 trades as a result.
 """
-see_also = ["trades", "in_sample", "out_of_sample", "win_rate", "base_rate", "top_vs_bottom_decile"]
+see_also = [
+  "trades", "in_sample", "out_of_sample", "win_rate", "base_rate", "top_vs_bottom_decile",
+  "partial_year",
+]
 
 [[term]]
 id = "partial_year"
 term = "Year cut by the split"
 short = "A year the out-of-sample start falls in shows as two rows, one per side, each a part of the year."
 body = """
-The out-of-sample period starts on one date, so the year that holds it is split in two rows: the
-months before it are in-sample and the months from it on are out-of-sample. Each row says its
+The out-of-sample period starts on one date, so the year that holds it shows as two rows. The
+months before that date are in-sample; the months from it on are out-of-sample. Each row says its
 months. A trade belongs to the side of the session it was decided on, so a trade decided late in
 March settles in April and still counts in-sample. A part-year row has fewer trades than a whole
 year and its figures are never scaled up to a year. Example: with the split on 2026-04-01, 2026
@@ -380,7 +383,9 @@ period apart, so the count grows by about one trade per holding period. Example:
 decides once a month, so 12 trades take a year, and 40 need about three. Don't read a full meter
 as a good result; it only says the verdict can now judge.
 """
-see_also = ["verdict", "verdict_criteria", "out_of_sample", "trades"]
+see_also = [
+  "verdict", "verdict_criteria", "out_of_sample", "trades", "win_rate", "base_rate",
+]
 
 [[term]]
 id = "edge_backtests"
