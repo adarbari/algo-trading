@@ -39,7 +39,12 @@ def ctx_for(backend: MemoryBackend, docs: dict[tuple[str, str, str], Any]) -> St
     return open_stores(StoreReader(backend), MemoryConfigStore(docs), UserContext("me"))
 
 
-def write_own_run(backend: MemoryBackend, run_id: str = "mine1", split: date = MOVED) -> None:
+def write_own_run(
+    backend: MemoryBackend,
+    run_id: str = "mine1",
+    split: date = MOVED,
+    extra: list[dict[str, Any]] | None = None,
+) -> None:
     """The user's run of ``mine``: in-sample, whole-history, year, split rows of one screen and
     one baseline (the figures differ by slice so a leak shows)."""
     kind = "split"
@@ -97,6 +102,7 @@ def write_own_run(backend: MemoryBackend, run_id: str = "mine1", split: date = M
             user_id="me",
             exploratory=True,
         ),
+        *(extra or []),
     ]
     frame = stamped(rows, END, run_id, HERE, "edge-eval")
     stats = {
@@ -188,6 +194,24 @@ def test_a_revealed_copy_is_judged_on_its_out_of_sample_figures() -> None:
     found = versions.load_verdict(ctx, mine(ctx))
     assert found.win_rate == 0.80  # the split slice stands for the frozen one
     assert not found.headline.startswith(versions.HIDDEN_WORDS)
+
+
+def test_revealing_a_copys_result_never_moves_its_basis() -> None:
+    # A second holding period, worse in-sample (0.41) but far better out-of-sample (0.95): the
+    # basis is the in-sample best, hidden and revealed alike, never the out-of-sample best.
+    longer = {"edge_id": "mine", "user_id": "me", "exploratory": True, "horizon_sessions": 40}
+    extra = [
+        row("momo", "in_sample", 0.41, MOVED, sessions=20, hits=8, **longer),
+        row("momo", "all", 0.55, MOVED, **longer),
+        row("momo", "split", 0.95, MOVED, sessions=50, **longer),
+    ]
+    backend = MemoryBackend()
+    write_own_run(backend, extra=extra)
+    for audit in (None, {"oos_revealed": True}):
+        ctx = ctx_for(backend, with_copy(audit))
+        assert versions.load_verdict(ctx, mine(ctx)).basis == "momo, 20 trading days"
+        compare = versions.load_compare(ctx, mine(ctx))
+        assert compare is not None and compare.rows[0].basis == "momo, 20 trading days"
 
 
 def test_a_copy_with_no_run_is_waiting_and_a_site_edge_keeps_its_official_verdict() -> None:

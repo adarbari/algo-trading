@@ -2,18 +2,22 @@
 Waiting on data, judged on its official result (the canonical run) by one deterministic rule.
 
 The candidates are the main edge variant's implementation rows (role not ``baseline``), each
-(screen, holding period) with its out-of-sample (``frozen``) and whole-history (``all``) rows;
-the edge's verdict is its best candidate's, and names the screen and holding period it rests on.
-First match wins: Waiting on data (no official result, or no candidate rows); Not enough data
-(fewer out-of-sample trades than ``min_oos_trades``, or a criterion that is not measured);
-Not working (a hard failure: out-of-sample win rate not above the base rate, t, overfitting
-probability, deflated Sharpe, or worse than the median baseline; then any criterion of
-Promising missed); Promising;
-Works (more trades, stricter thresholds, and an out-of-sample lift above at least
-``random_beat_share`` of the random-pick backtest's draws, ``quant.edges.statistics.percentile_of``;
-a run with no draws is "not measured" and caps the verdict at Promising). The statistics are
-the stored rows' (``quant/edges/statistics.py``), never recomputed; the thresholds are site data
-(``config/site/verdict.toml``); the sentences are the server's, the browser words nothing."""
+(screen, holding period) with its out-of-sample (``frozen``) and whole-history (``all``) rows. The
+verdict rests on ONE of them, its basis, fixed before the frozen period is read (ADR 0065,
+``choose_basis``): the edge document's declared screener and horizon (``Declared``) narrow the
+candidates; of those left, the best by the verdict's own ranking (level, then lift) applied to the
+in-sample figures alone. No frozen, split, year or whole-history figure takes part, so the best of
+several out-of-sample results is never what is tested. The other candidates are not judged for the
+headline. First match wins: Waiting on data (no official result, no candidate rows, or no basis);
+Not enough data (fewer out-of-sample trades than ``min_oos_trades``, or a criterion that is not
+measured); Not working (a hard failure: out-of-sample win rate not above the base rate, t,
+overfitting probability, deflated Sharpe, or worse than the median baseline; then any criterion of
+Promising missed); Promising; Works (more trades, stricter thresholds, and an out-of-sample lift
+above at least ``random_beat_share`` of the random-pick backtest's draws,
+``quant.edges.statistics.percentile_of``; a run with no draws is "not measured" and caps the verdict
+at Promising). The statistics are the stored rows' (``quant/edges/statistics.py``), never
+recomputed; the thresholds are site data (``config/site/verdict.toml``); the sentences are the
+server's, the browser words nothing."""
 
 import statistics
 from collections.abc import Sequence
@@ -352,6 +356,10 @@ def _columns(c: _Candidate, t: VerdictSettings) -> tuple[VerdictColumn, ...]:
     )
 
 
+def _basis_words(key: tuple[str, int]) -> str:
+    return f"{key[0]}, {key[1]} trading days"
+
+
 def _judge_one(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> EdgeVerdict:
@@ -359,7 +367,7 @@ def _judge_one(
     level, reason = _level(c, crit, t)
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
-    basis = f"{c.variant}, {c.horizon} trading days"
+    basis = _basis_words((c.variant, c.horizon))
     body = (
         f"Out-of-sample, {basis}: win rate {_pct(oos.hit_rate)} against a base rate of "
         f"{_pct(oos.base_rate)} ({_num(pts, 0)} pts)."
@@ -445,6 +453,96 @@ def _rank(lift_pts: float | None) -> float:
     return float("-inf") if lift_pts is None else lift_pts
 
 
+@dataclass(frozen=True)
+class Declared:
+    """The basis an edge document fixes (ADR 0065): ``[implementation] promoted`` (the screen)
+    and ``[implementation] horizon`` (the holding period); None: not declared."""
+
+    screener: str | None = None
+    horizon: int | None = None
+
+
+UNDECLARED: Final = Declared()
+
+
+@dataclass(frozen=True)
+class BasisChoice:
+    """The basis ``(screen, holding period)`` the verdict rests on, or None with the ``reason``
+    no basis can be fixed (the verdict is then Waiting on data)."""
+
+    key: tuple[str, int] | None
+    reason: str = ""
+
+
+def _in_sample_rank(
+    key: tuple[str, int], ins: EdgeRow, main: Sequence[EdgeRow], t: VerdictSettings, decoys: bool
+) -> tuple[int, float]:
+    """The verdict's ranking (level, then lift points) over the in-sample figures alone: the
+    in-sample row stands for every period and the baselines are their in-sample rows; no
+    random draws (they are out-of-sample), so the level is at most Promising for every one."""
+    base = tuple(
+        r
+        for r in main
+        if r.role == "baseline" and r.horizon_sessions == key[1] and r.slice_kind == runs.IN_SAMPLE
+    )
+    c = _Candidate(key[0], key[1], ins, ins, ins, base, ())
+    level, _ = _level(c, _criteria(c, t, (), decoys), t)
+    return ORDER.index(level), _rank(runs.lift_points(ins.hit_rate, ins.base_rate))
+
+
+def choose_basis(
+    rows: Sequence[EdgeRow],
+    t: VerdictSettings,
+    declared: Declared = UNDECLARED,
+    decoys: bool = True,
+) -> BasisChoice:
+    """The basis of a result's ``rows`` (ADR 0065), read from the in-sample rows only (the
+    candidates are named by their ``in_sample`` and ``all`` rows, whose figures are not read):
+    the declared screen and horizon narrow the candidates; one left is the basis; of several,
+    the best in-sample (ties: the first by screen, then horizon). A run from before the
+    in-sample slice cannot rank several: no basis, Waiting on data. A model screener's in-sample
+    row is its training fit and is never ranked."""
+    main = [r for r in rows if r.edge_variant == runs.MAIN and not r.exploratory]
+    named = {
+        (r.variant, r.horizon_sessions)
+        for r in main
+        if r.role != "baseline" and r.slice_kind in (runs.IN_SAMPLE, ALL)
+    }
+    keys = sorted(
+        k for k in named if declared.screener in (None, k[0]) and declared.horizon in (None, k[1])
+    )
+    if not keys:
+        if declared.screener is None and declared.horizon is None:
+            return BasisChoice(None, "The official result has no figures to rest a verdict on")
+        wanted = f"{declared.screener or 'any screen'}, {declared.horizon or 'any'} trading days"
+        return BasisChoice(
+            None, f"The official result has no figures for the declared basis {wanted}"
+        )
+    if len(keys) == 1:
+        return BasisChoice(keys[0])
+    ins = {
+        (r.variant, r.horizon_sessions): r
+        for r in main
+        if r.role != "baseline" and r.slice_kind == runs.IN_SAMPLE
+    }
+    # a model screener's in-sample row is its training fit (``in_sample``): never ranked, so a
+    # model is the basis only when it is the one candidate left (``promoted``)
+    fair = {k: r for k, r in ins.items() if not r.in_sample}
+    ranked = [(k, _in_sample_rank(k, fair[k], main, t, decoys)) for k in keys if k in fair]
+    if not ranked:
+        if any(k in ins for k in keys):
+            return BasisChoice(
+                None, "Only a model screener's training fit is in-sample; it needs promoting"
+            )
+        return BasisChoice(
+            None,
+            "The official result predates the in-sample figures its basis is chosen on; "
+            "it needs a new run",
+        )
+    best = max(ranked, key=lambda p: p[1])  # max keeps the first of equals: keys are sorted
+    return BasisChoice(best[0])
+
+
 def _judge_candidate(
     c: _Candidate,
     t: VerdictSettings,
@@ -457,7 +555,7 @@ def _judge_candidate(
     lost = [x for x in lost_inputs if x.startswith(f"{runs.MAIN}/{c.variant}:")]
     if lost:
         reason = f"The result lost inputs for {c.variant}: {'; '.join(lost)}"
-        return replace(_waiting("", reason), basis=f"{c.variant}, {c.horizon} trading days")
+        return replace(_waiting("", reason), basis=_basis_words((c.variant, c.horizon)))
     return _judge_one(c, t, draws, decoys)
 
 
@@ -469,19 +567,29 @@ def judge(
     lost_inputs: Sequence[str] = (),
     draws: Sequence[EdgeRow] = (),
     decoys: bool = True,
+    declared: Declared = UNDECLARED,
+    basis: BasisChoice | None = None,
 ) -> EdgeVerdict:
     """The verdict of ``edge_id`` from its official result's ``rows`` (None: it has no official
     result); ``split``: the out-of-sample start; ``draws``: the run's random-pick draws (none:
-    not measured, which caps the verdict at Promising)."""
+    not measured, which caps the verdict at Promising); ``declared``: the document's basis;
+    ``basis``: one already chosen (a hidden copy's, from rows the verdict does not see), else
+    ``choose_basis`` over ``rows``."""
     if rows is None:
         return _waiting(edge_id, "No official result yet")
     found = _candidates(rows)
-    if not found:
+    choice = basis if basis is not None else choose_basis(rows, t, declared, decoys)
+    if choice.key is None:
+        lost = f": {'; '.join(lost_inputs)}" if lost_inputs and not found else ""
+        return _waiting(edge_id, f"{choice.reason}{lost}")
+    on = _basis_words(choice.key)
+    c = next((x for x in found if (x.variant, x.horizon) == choice.key), None)
+    if c is None:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs else ""
-        return _waiting(edge_id, f"The official result has no out-of-sample figures{lost}")
-    judged = [(c, _judge_candidate(c, t, draws, decoys, lost_inputs)) for c in found]
-    best_c, best = max(judged, key=lambda p: (ORDER.index(p[1].verdict), _rank(p[1].lift_pts)))
-    return replace(best, edge_id=edge_id, years=_years(best_c, split))
+        reason = f"The official result has no out-of-sample figures for {on}{lost}"
+        return replace(_waiting(edge_id, reason), basis=on)
+    judged = _judge_candidate(c, t, draws, decoys, lost_inputs)
+    return replace(judged, edge_id=edge_id, years=_years(c, split))
 
 
 def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
@@ -500,4 +608,5 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
         found.run.lost_inputs,
         draws=runs.load_run_draws(ctx, found.run),
         decoys=bool(edge.baselines),
+        declared=Declared(edge.promoted, edge.basis_horizon),
     )

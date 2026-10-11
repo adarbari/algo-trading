@@ -8,6 +8,10 @@ shows it (``Edge.oos_hidden``: they have not followed it nor asked to see it). U
 say Not working or Not enough data, never Promising or Works) with the reason saying so, and the
 comparison carries in-sample figures only with ``oos_hidden`` set. The browser never filters.
 
+The verdict and every comparison line rest on one basis fixed by the verdict's own rule before
+the out-of-sample figures are read (ADR 0065, ``verdict.choose_basis``): for a hidden copy it is
+chosen from the in-sample rows it is served, so revealing the result never moves it.
+
 The statistics are the stored rows', never recomputed; the sentences are the server's."""
 
 from collections.abc import Sequence
@@ -74,12 +78,21 @@ def own_run(ctx: Stores, edge: Edge) -> EdgeRun | None:
     return found[0] if found else None
 
 
+def _own(rows: Sequence[EdgeRow]) -> list[EdgeRow]:
+    """The user's own run is not exploratory against itself."""
+    return [replace(r, exploratory=False) for r in rows]
+
+
+def _declared(edge: Edge) -> verdict.Declared:
+    return verdict.Declared(edge.promoted, edge.basis_horizon)
+
+
 def _official(rows: Sequence[EdgeRow], hidden: bool) -> tuple[EdgeRow, ...]:
     """``rows`` as the verdict rule reads an official result: the user's own run is not
     exploratory against itself; hidden, only the in-sample rows exist, standing for the whole
     history and the frozen slice, so no figure of the withheld period can enter; revealed, a
     moved split's ``split`` slice stands for ``frozen``."""
-    own = [replace(r, exploratory=False) for r in rows]
+    own = _own(rows)
     if hidden:
         before = [r for r in own if r.slice_kind == runs.IN_SAMPLE]
         return tuple(
@@ -108,14 +121,16 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
     if run is None:
         return verdict.judge(edge.id, None, edge.frozen_from, settings)
     hidden = edge.oos_hidden
-    rows = _official(runs.load_run_rows(ctx, run), hidden)
+    served = runs.load_run_rows(ctx, run)
+    decoys = bool(edge.baselines)
     found = verdict.judge(
         edge.id,
-        rows,
+        _official(served, hidden),
         run.split_from or edge.frozen_from,  # a copy's run may have moved its split
         settings,
         run.lost_inputs,
-        decoys=bool(edge.baselines),
+        decoys=decoys,
+        basis=verdict.choose_basis(_own(served), settings, _declared(edge), decoys),
     )
     if not hidden or found.verdict == verdict.WAITING:
         return found
@@ -163,20 +178,11 @@ def _pick(
     return found[0] if len(found) == 1 else None
 
 
-def _basis(rows: Sequence[EdgeRow]) -> tuple[str, int] | None:
-    """The (screen, horizon) with the best in-sample lift (out-of-sample when none has one): the
-    figure every line of a comparison is read at."""
-    best: tuple[float, str, int] | None = None
-    for kinds in ((runs.IN_SAMPLE,), OUT_OF_SAMPLE):
-        for r in rows:
-            if r.edge_variant != runs.MAIN or r.role == "baseline" or r.slice_kind not in kinds:
-                continue
-            pts = runs.lift_points(r.hit_rate, r.base_rate)
-            if pts is not None and (best is None or pts > best[0]):
-                best = (pts, r.variant, r.horizon_sessions)
-        if best is not None:
-            break
-    return None if best is None else (best[1], best[2])
+def _basis(ctx: Stores, edge: Edge, rows: Sequence[EdgeRow]) -> verdict.BasisChoice:
+    """The (screen, horizon) every line of a comparison is read at: the verdict's basis of
+    ``edge``'s ``rows`` (ADR 0065: declared, else the best in-sample; never out-of-sample)."""
+    settings = load_verdict_settings(ctx.configs)
+    return verdict.choose_basis(_own(rows), settings, _declared(edge), bool(edge.baselines))
 
 
 def _line(
@@ -228,10 +234,10 @@ def load_compare(ctx: Stores, edge: Edge) -> EdgeCompare | None:
     if run is None:
         return EdgeCompare(edge.id, edge.extends, hidden, "You have not run this edge yet")
     rows = runs.load_run_rows(ctx, run)
-    found = _basis(rows)
-    if found is None:
-        return EdgeCompare(edge.id, edge.extends, hidden, "The run has no figures to compare")
-    variant, horizon = found
+    found = _basis(ctx, edge, rows)
+    if found.key is None:
+        return EdgeCompare(edge.id, edge.extends, hidden, found.reason)
+    variant, horizon = found.key
     lines: list[CompareRow | None] = [
         _line("this", edge.name, edge.id, run, rows, variant, horizon, hidden, "implementation")
     ]
@@ -239,7 +245,7 @@ def load_compare(ctx: Stores, edge: Edge) -> EdgeCompare | None:
     if parent is not None and parent[1] is not None:
         other, other_run = parent[0], parent[1]
         other_rows = runs.load_run_rows(ctx, other_run)
-        basis = _basis(other_rows)
+        basis = _basis(ctx, other, other_rows).key
         if basis is not None:
             v, h = (
                 (variant, horizon)
