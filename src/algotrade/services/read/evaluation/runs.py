@@ -126,6 +126,11 @@ class EdgeRow:
     pick_adv_median: float | None = None  # capacity (ADR 0064): the picks' median 20-day dollar
     pick_adv_known: int | None = None  # volume, how many have one, how many are below the
     pick_adv_low: int | None = None  # site's floor; None in a run from before the columns
+    # expires_otm outcomes only (a short put that ends out of the money): the picks' mean
+    # risk-neutral probability of it, and the share whose strike was touched on the way; None
+    # for any other outcome or a run from before the columns (never 0)
+    reference_rate: float | None = None
+    touch_rate: float | None = None
 
 
 @dataclass(frozen=True)
@@ -326,6 +331,8 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         pick_adv_median=_float(row.get("pick_adv_median")),
         pick_adv_known=_int(row.get("pick_adv_known")),
         pick_adv_low=_int(row.get("pick_adv_low")),
+        reference_rate=_float(row.get("reference_rate")),
+        touch_rate=_float(row.get("touch_rate")),
     )
 
 

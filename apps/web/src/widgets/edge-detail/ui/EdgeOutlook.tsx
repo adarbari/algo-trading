@@ -2,8 +2,9 @@
  * What would change the verdict: the server's sentence (the first test not passed and what it
  * would take), the evidence collected against the evidence needed as meters (out-of-sample
  * trades toward Promising and Works, all trades toward Works; the caption is the projected date,
- * or why there is none) and the checks that say whether the result is real, one row each. Every
- * count, date, sentence and state is the server's; nothing is projected or judged here.
+ * or why there is none), the verdict at the count on today's figures, when each count is expected
+ * and the next trade to close, and the checks that say whether the result is real, one row each.
+ * Every count, date, sentence and state is the server's; nothing is projected or judged here.
  */
 import {
   EvidenceMeter,
@@ -24,6 +25,7 @@ const CHECK_STATUS: Record<string, IndicatorStatus> = {
   pass: { tone: 'positive', label: 'Pass' },
   fail: { tone: 'negative', label: 'Fail' },
   not_measured: { tone: 'neutral', label: 'Not measured' },
+  not_applicable: { tone: 'neutral', label: 'Does not apply' },
 };
 
 type Outlook = NonNullable<EvidenceProgress['outlook']>;
@@ -35,6 +37,29 @@ function caption(outlook: Outlook | null): ReactNode {
   return outlook.expectedBy
     ? `${state}: ${formatValue(outlook.expectedBy, { kind: 'date', style: 'short' }).text}`
     : state;
+}
+
+type Count = Outlook['projections'][number];
+
+/** "40 out-of-sample ≈ Apr 2031", or the state's words when the count has no date. */
+function countDate(count: Count): string {
+  const what = `${String(count.needed)} ${count.oos ? 'out-of-sample' : 'trades'}`;
+  if (count.expectedBy) {
+    return `${what} ≈ ${formatValue(count.expectedBy, { kind: 'date', style: 'short' }).text}`;
+  }
+  return `${what}: ${projectionLabel(count.state)}`;
+}
+
+/** When each count still short is expected, then the next trade to close. */
+function expectation(outlook: Outlook | null): string | undefined {
+  if (!outlook) return undefined;
+  const parts = outlook.projections.map(countDate);
+  if (outlook.nextClose) {
+    parts.push(
+      `next closes ${formatValue(outlook.nextClose, { kind: 'date', style: 'short' }).text}`,
+    );
+  }
+  return parts.length > 0 ? parts.join(' · ') : undefined;
 }
 
 export interface EdgeOutlookProps {
@@ -50,6 +75,7 @@ export function EdgeOutlook({ evidence }: EdgeOutlookProps) {
       : []),
   ];
   const projected = caption(outlook);
+  const dates = expectation(outlook);
   return (
     <Panel
       title="What would change the verdict"
@@ -63,6 +89,7 @@ export function EdgeOutlook({ evidence }: EdgeOutlookProps) {
     >
       <Stack gap={3}>
         {outlook && <Text>{outlook.sentence}</Text>}
+        {outlook?.atTarget && <Text>{outlook.atTarget.sentence}</Text>}
         <Stack gap={3}>
           <EvidenceMeter
             label="Out-of-sample trades"
@@ -79,6 +106,11 @@ export function EdgeOutlook({ evidence }: EdgeOutlookProps) {
             {...(outlook?.criterion === 'works_trades' && projected ? { caption: projected } : {})}
           />
         </Stack>
+        {dates && (
+          <Text size="sm" tone="secondary">
+            {dates}
+          </Text>
+        )}
         {evidence.checks.length > 0 && (
           <Stack as="ul" gap={0} aria-label="Checks that the result is real">
             {evidence.checks.map((check) => (

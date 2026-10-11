@@ -54,7 +54,11 @@ function bands(curve: EdgeCurve): ChartBand[] {
   }));
 }
 
-export function curveChart(curve: EdgeCurve): CurveChart {
+/** The decoys the curve can draw, by name (a decoy is a toggle on the page, off at first). */
+export const decoyNames = (curve: EdgeCurve): string[] => curve.baselines.map((b) => b.baseline);
+
+/** The curve with the decoys named in `decoys` drawn as lines beside the picks. */
+export function curveChart(curve: EdgeCurve, decoys: readonly string[] = []): CurveChart {
   const series: ChartSeries[] = [
     {
       id: 'picks',
@@ -67,6 +71,14 @@ export function curveChart(curve: EdgeCurve): CurveChart {
       id: 'base',
       label: 'Universe',
       points: oneADay(curve.points.map((p) => ({ time: p.exit, value: p.baseCumulative }))),
+    });
+  }
+  for (const decoy of curve.baselines) {
+    if (!decoys.includes(decoy.baseline)) continue;
+    series.push({
+      id: `decoy:${decoy.baseline}`,
+      label: decoy.baseline,
+      points: oneADay(decoy.points.map((p) => ({ time: p.exit, value: p.cumulative }))),
     });
   }
   const live = curve.live;

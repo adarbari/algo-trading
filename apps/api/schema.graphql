@@ -21,6 +21,16 @@ type AheadEvent {
 }
 
 """
+The verdict with the count of the outlook's test met (`needed` trades), on today's figures: its `level`, `reasons` it is not better (the failing tests, in words) and the server's `sentence`. An estimate, never an input to the verdict
+"""
+type AtTarget {
+  needed: Int!
+  level: String!
+  reasons: [String!]!
+  sentence: String!
+}
+
+"""
 A saved backtest run: `status` complete, partial or failed; `start` / `end` its first and last session; `metrics` (sharpe, cagr, max drawdown, ...)
 """
 type Backtest {
@@ -80,7 +90,7 @@ type CalendarName {
 }
 
 """
-One period of the capacity: the `advMedian` (dollars) of the 20-day average dollar volume of the `advKnown` counted picks that have one (of `picks`), `advLow` of them below the site's floor; its `state` (measured, not_stored, oos_hidden)
+One period of the capacity: the `advMedian` (dollars) of the 20-day average dollar volume of the `advKnown` counted picks that have one (of `picks`), `advLow` of them below the site's floor; `positionShare` what a position of `EdgeCapacity.positionUsd` is of the median pick's volume (0 to 1); its `state` (measured, not_stored, oos_hidden)
 """
 type CapacityPeriod {
   period: String!
@@ -89,6 +99,7 @@ type CapacityPeriod {
   advMedian: Float
   advKnown: Int
   advLow: Int
+  positionShare: Float
 }
 
 """A value of a non-numeric feature and how many instruments have it"""
@@ -252,6 +263,21 @@ type CostPeriod {
 }
 
 """
+One count of trades still short: `have` of `needed` (`oos`: out-of-sample trades, else the whole history's), `remaining` to come, `state` of its projection (projected, beyond_projection, not_stored, unprojectable, oos_hidden), `expectedBy` the exit of the trade that completes it at `fillRatio` of the decision sessions measured and one trade every `cadenceSessions` sessions
+"""
+type CountProjection {
+  criterion: String!
+  oos: Boolean!
+  have: Int!
+  needed: Int!
+  remaining: Int!
+  state: String!
+  expectedBy: Date
+  fillRatio: Float
+  cadenceSessions: Int
+}
+
+"""
 What one criterion judged: the value (null: missing), PASS / NEAR / FAIL / MISSING and, for a near miss or a fail, how far from passing
 """
 type CriterionResult {
@@ -261,6 +287,14 @@ type CriterionResult {
   outcome: String!
   value: JSON
   distance: Float
+}
+
+"""
+One decoy's own curve: the `baseline` (a screener preset the edge declares) and its `points` by exit, added up the way the basis's own are
+"""
+type CurveBaseline {
+  baseline: String!
+  points: [CurvePoint!]!
 }
 
 """
@@ -386,7 +420,7 @@ type EdgeAnswer {
 }
 
 """
-How much money the picks of an edge's official result (the verdict's basis: `variant`, `horizon` sessions) can take: `floorUsd` is the site's low-liquidity floor today and `periods` one row per period; `state` is measured when any period is, else not_stored
+How much money the picks of an edge's official result (the verdict's basis: `variant`, `horizon` sessions) can take: `floorUsd` is the site's low-liquidity floor today and `periods` one row per period; `positionUsd` the position the site sizes against the median pick's volume; `universeFloorUsd` the floor the edge's own universe already requires (null: none known) and `floorBinds`: the site floor is above it, so the low-liquidity row says something; `state` is measured when any period is, else not_stored
 """
 type EdgeCapacity {
   state: String!
@@ -394,6 +428,9 @@ type EdgeCapacity {
   horizon: Int
   floorUsd: Float!
   periods: [CapacityPeriod!]!
+  positionUsd: Float!
+  universeFloorUsd: Float
+  floorBinds: Boolean!
 }
 
 """
@@ -420,7 +457,7 @@ type EdgeCosts {
 }
 
 """
-The evidence curve of the verdict's basis: what its picks earned, window by window, added up (`kind` cumulative_excess in a return `unit`; excess_wins for an outcome with no return: wins above what the base rate predicts), against what the field earned. `splitFrom` where the out-of-sample side starts, `hidden` a copy's withheld out-of-sample result (the points are in-sample only), `gaps` the spans that hold no number and `live` the settled paper trades. `unknown`: why there is no curve (then the rest is empty)
+The evidence curve of the verdict's basis: what its picks earned, window by window, added up (`kind` cumulative_excess in a return `unit`; excess_wins for an outcome with no return: wins above what the base rate predicts), against what the field earned. `splitFrom` where the out-of-sample side starts, `hidden` a copy's withheld out-of-sample result (the points are in-sample only), `gaps` the spans that hold no number and `live` the settled paper trades; `baselines` the decoys' own curves over the same windows (empty: none declared or stored). `unknown`: why there is no curve (then the rest is empty)
 """
 type EdgeCurve {
   kind: String
@@ -431,6 +468,7 @@ type EdgeCurve {
   gaps: [CurveGap!]!
   live: EdgeLive
   unknown: Unknown
+  baselines: [CurveBaseline!]!
 }
 
 """
@@ -560,7 +598,7 @@ type EdgeMonthly {
 }
 
 """
-What would change the verdict: `criterion` (the first test not passed; `level`: the verdict it gates) in `sentence`. For a count of trades (`trades`, `works_trades`) `have` of `needed` and `remaining` to come, and `projectionState`: projected (`expectedBy`: the exit of the trade that completes the count, at `fillRatio` of the decision sessions measured), beyond_projection (the count needs more sessions than the run stored), not_stored (an older run), unprojectable (an event schedule), oos_hidden. An estimate, never an input to the verdict. Null for the other tests: a t statistic is not projected
+What would change the verdict: `criterion` (the first test not passed; `level`: the verdict it gates) in `sentence`. `projections` every count of trades still short (Promising's and Works's), `nextClose` the exit of the next trade to close (the first stored exit after the run) and, for a count, `atTarget` the verdict once it is met. For a count of trades (`trades`, `works_trades`) `have` of `needed` and `remaining` to come, and `projectionState`: projected (`expectedBy`: the exit of the trade that completes the count, at `fillRatio` of the decision sessions measured), beyond_projection (the count needs more sessions than the run stored), not_stored (an older run), unprojectable (an event schedule), oos_hidden. An estimate, never an input to the verdict. Null for the other tests: a t statistic is not projected
 """
 type EdgeOutlook {
   criterion: String!
@@ -572,6 +610,10 @@ type EdgeOutlook {
   projectionState: String
   expectedBy: Date
   fillRatio: Float
+  cadenceSessions: Int
+  projections: [CountProjection!]!
+  nextClose: Date
+  atTarget: AtTarget
 }
 
 """
@@ -826,7 +868,7 @@ type EdgeVariants {
 }
 
 """
-An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests; `columns` the basis's figures in-sample, out-of-sample and over all (empty: no result yet); `evidence` the trades against what the verdict needs; `haircut` the basis's Sharpe ratio after the variants tried; `decay` the paper's figure against the in- and out-of-sample ones
+An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on (`basisWhy`: for a basis chosen among several, the in-sample lifts it was chosen on). The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests; `columns` the basis's figures in-sample, out-of-sample and over all (empty: no result yet); `evidence` the trades against what the verdict needs; `haircut` the basis's Sharpe ratio after the variants tried; `decay` the paper's figure against the in- and out-of-sample ones
 """
 type EdgeVerdict {
   verdict: String!
@@ -834,6 +876,7 @@ type EdgeVerdict {
   headline: String!
   result: String!
   basis: String
+  basisWhy: String!
   trades: Int
   oosTrades: Int
   winRate: Float
@@ -3207,7 +3250,7 @@ type VariantFigures {
 }
 
 """
-The basis's figures over one `period` (in_sample, out_of_sample or all); `liftPts`: win rate minus base rate, in points; `thin`: the out-of-sample column has fewer trades than the verdict needs. A figure not stored is null
+The basis's figures over one `period` (in_sample, out_of_sample or all); `liftPts`: win rate minus base rate, in points; `thin`: the out-of-sample column has fewer trades than the verdict needs; `referenceRate` (the risk-neutral rate of a win) and `touchRate` (picks whose strike was touched) only an expires-out-of-the-money outcome has. A figure not stored is null
 """
 type VerdictColumn {
   period: String!
@@ -3221,10 +3264,12 @@ type VerdictColumn {
   deflatedSharpe: Float
   pbo: Float
   thin: Boolean!
+  referenceRate: Float
+  touchRate: Float
 }
 
 """
-One test of the verdict: the `value` measured, the `threshold` it must reach and its `status` (pass, fail, not_measured); `level`: the verdict it gates (promising, works)
+One test of the verdict: the `value` measured, the `threshold` it must reach and its `status` (pass, fail, not_measured, not_applicable: nothing to test, as decoys that are not declared; it counts neither for nor against the level); `level`: the verdict it gates (promising, works)
 """
 type VerdictCriterion {
   id: String!

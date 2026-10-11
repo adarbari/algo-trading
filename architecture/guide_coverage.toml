@@ -123,8 +123,14 @@ values = { works = "term:verdict_works", promising = "term:verdict_promising", n
 [[enum]]
 source = "graphql:VerdictCriterion.status"
 values_from = "python:algotrade.services.read.evaluation.verdict:CRITERION_STATUSES"
-values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_measured = "term:verdict_criteria" }
-names = { not_measured = "not measured" }
+values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_measured = "term:verdict_criteria", not_applicable = "term:verdict_criteria" }
+names = { not_measured = "not measured", not_applicable = "does not apply" }
+
+[[enum]]
+source = "graphql:CountProjection.state"
+values_from = "python:algotrade.services.read.evaluation.evidence:PROJECTION_STATES"
+values = { projected = "term:outlook_projection", not_stored = "term:outlook_projection", beyond_projection = "term:outlook_projection", unprojectable = "term:outlook_projection", oos_hidden = "term:outlook_projection" }
+names = { oos_hidden = "hidden", beyond_projection = "beyond the projection" }
 
 [[enum]]
 source = "graphql:EdgeOutlook.projectionState"

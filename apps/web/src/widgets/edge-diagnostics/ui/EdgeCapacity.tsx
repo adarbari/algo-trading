@@ -6,6 +6,7 @@
  */
 import {
   ErrorState,
+  formatValue,
   KeyValue,
   SegmentedControl,
   Skeleton,
@@ -46,14 +47,17 @@ export function EdgeCapacity({ edgeId }: EdgeCapacityProps) {
     );
   }
   const period = capacity.periods.find((p) => p.period === view);
-  const items: KeyValueItem[] = [
-    {
-      id: 'floor',
-      label: 'Universe floor, 20-day dollar volume',
-      value: capacity.floorUsd,
-      format: { kind: 'currency-compact' },
-    },
-  ];
+  // The site floor says something only when it is above the floor the universe already has.
+  const items: KeyValueItem[] = capacity.floorBinds
+    ? [
+        {
+          id: 'floor',
+          label: 'Universe floor, 20-day dollar volume',
+          value: capacity.floorUsd,
+          format: { kind: 'currency-compact' },
+        },
+      ]
+    : [];
   if (period?.state === 'measured') {
     items.push(
       { id: 'picks', label: 'Picks counted', value: period.picks, format: { kind: 'number' } },
@@ -69,11 +73,21 @@ export function EdgeCapacity({ edgeId }: EdgeCapacityProps) {
         value: period.advKnown,
         format: { kind: 'number' },
       },
+      ...(capacity.floorBinds
+        ? [
+            {
+              id: 'low',
+              label: 'Picks under the floor',
+              value: period.advLow,
+              format: { kind: 'number' as const },
+            },
+          ]
+        : []),
       {
-        id: 'low',
-        label: 'Picks under the floor',
-        value: period.advLow,
-        format: { kind: 'number' },
+        id: 'position',
+        label: `${formatValue(capacity.positionUsd, { kind: 'currency-compact' }).text} position, share of the median pick's volume`,
+        value: period.positionShare,
+        format: { kind: 'percent', digits: 2 },
       },
     );
   }

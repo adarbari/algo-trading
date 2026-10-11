@@ -28,6 +28,8 @@ live_low = 0.10          # the usual range of the live win rate: these quantiles
 live_high = 0.90         # ... n signal sessions would show if the backtest's win rate held
 capacity_adv_floor_usd = 5000000 # a pick trading less than this (20-day average dollar volume at the
                          # decision session) counts as low liquidity in an edge's capacity figures
+capacity_position_usd = 100000 # the position the capacity page sizes against a pick's volume
+                         # (read when served, not stored: a change needs no run)
 
 [edge_costs]               # ADR 0064: the round-trip costs (bp) a return edge is also measured at,
 levels_bps = [0, 15, 30, 50] # beside its own cost_bps; in the leg key (a change recomputes every leg)
