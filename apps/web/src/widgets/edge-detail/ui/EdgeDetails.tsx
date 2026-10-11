@@ -3,12 +3,11 @@
  * behind the verdict. The body loads on first open, so the page's first paint stays small.
  */
 import { Disclosure } from '@algotrade/ui';
-import { Suspense, useState } from 'react';
+import { useState } from 'react';
 
 import type { Edge } from '@/entities/edge';
-import { lazyPage } from '@/shared/lib/lazy';
 
-const EdgeDetailsBody = lazyPage(() => import('./EdgeDetailsBody'), 'EdgeDetailsBody');
+import { EdgeDetailsBody } from './EdgeDetailsBody';
 
 export interface EdgeDetailsProps {
   edge: Edge;
@@ -23,11 +22,7 @@ export function EdgeDetails({ edge }: EdgeDetailsProps) {
       open={open}
       onOpenChange={setOpen}
     >
-      {open && (
-        <Suspense fallback={null}>
-          <EdgeDetailsBody edge={edge} />
-        </Suspense>
-      )}
+      {open && <EdgeDetailsBody edge={edge} />}
     </Disclosure>
   );
 }

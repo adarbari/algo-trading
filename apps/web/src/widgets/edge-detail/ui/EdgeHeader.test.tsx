@@ -1,0 +1,120 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
+import { edgeFixture } from '@/entities/edge';
+import { expectNoA11yViolations } from '@/shared/lib/testing';
+
+import { EdgeHeader } from './EdgeHeader';
+
+vi.mock('@/entities/edge', async (importOriginal) => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    ...(await importOriginal<Record<string, unknown>>()),
+    EdgeLiveBadge: ({ edgeId }: { edgeId: string }) => <Text>{`live badge ${edgeId}`}</Text>,
+  };
+});
+vi.mock('@/features/edge-evaluation', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { RunEvaluation: ({ edgeId }: { edgeId: string }) => <Text>{`run ${edgeId}`}</Text> };
+});
+vi.mock('@/features/edge-follow', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    EdgeActions: ({ edge }: { edge: { id: string } }) => <Text>{`actions ${edge.id}`}</Text>,
+  };
+});
+vi.mock('@/features/guide-help', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { termHelp: (id: string) => <Text>{`help ${id}`}</Text> };
+});
+
+const momentum = edgeFixture('momentum_12_1');
+const mine = edgeFixture('my_momentum');
+const waiting = edgeFixture('sp500_index_changes');
+const header = (edge = momentum, onBack = vi.fn()) =>
+  render(<EdgeHeader edge={edge} onBack={onBack} onEdit={vi.fn()} />);
+
+describe('EdgeHeader', () => {
+  it('shows the name, verdict with the server headline, the actions and the live badge', async () => {
+    const { container } = header();
+    expect(screen.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeInTheDocument();
+    expect(screen.getByText('live badge momentum_12_1')).toBeInTheDocument();
+    expect(screen.getAllByText('Promising').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Out-of-sample, momentum_12_1, 20 trading days/)).toBeInTheDocument();
+    expect(screen.getByText('run momentum_12_1')).toBeInTheDocument();
+    expect(screen.getByText('actions momentum_12_1')).toBeInTheDocument();
+    for (const id of ['verdict', 'edge_status', 'edge_state', 'edge_copy', 'run_backtest']) {
+      expect(screen.getAllByText(`help ${id}`).length).toBeGreaterThan(0);
+    }
+    await expectNoA11yViolations(container);
+  });
+
+  it('says whose edge it is, the official result date, the data it read and the basis', () => {
+    header();
+    expect(screen.getByText('Site edge · Candidate')).toBeInTheDocument();
+    expect(screen.getByText('Official result 5 Oct')).toBeInTheDocument();
+    expect(screen.getByText('data to 2 Oct')).toBeInTheDocument();
+    expect(screen.getByText('momentum_12_1, 20 trading days')).toBeInTheDocument();
+    for (const id of ['official_result', 'verdict_basis']) {
+      expect(screen.getAllByText(`help ${id}`).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('says what would change the verdict: the sentence, the meters with the projected date and the checks', () => {
+    header();
+    expect(
+      screen.getByRole('heading', { name: 'What would change the verdict' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Promising needs 40 out-of-sample trades: 6 so far, 34 to go.'),
+    ).toBeInTheDocument();
+    const oos = screen.getByRole('meter', { name: 'Out-of-sample trades' });
+    expect(oos).toHaveAttribute('aria-valuenow', '6');
+    expect(oos).toHaveAttribute('aria-valuemax', '60');
+    expect(screen.getByRole('meter', { name: 'All trades' })).toHaveAttribute(
+      'aria-valuenow',
+      '70',
+    );
+    expect(screen.getByText('Projected: 15 Mar 2027')).toBeInTheDocument();
+    const checks = screen.getByRole('list', { name: 'Checks that the result is real' });
+    expect(within(checks).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(checks).getByText('Deflated Sharpe')).toBeInTheDocument();
+    expect(within(checks).getByText('Not measured')).toBeInTheDocument();
+    expect(screen.getByText('help verdict_outlook')).toBeInTheDocument();
+  });
+
+  it('gives the reason there is no date instead of a date', () => {
+    const evidence = momentum.verdict.evidence;
+    if (!evidence?.outlook) throw new Error('the fixture has an outlook');
+    header({
+      ...momentum,
+      verdict: {
+        ...momentum.verdict,
+        evidence: {
+          ...evidence,
+          outlook: { ...evidence.outlook, projectionState: 'unprojectable', expectedBy: null },
+        },
+      },
+    });
+    expect(screen.getByText('Not projected: event schedule')).toBeInTheDocument();
+  });
+
+  it('has no outlook card for an edge with no evidence yet', () => {
+    header(waiting);
+    expect(
+      screen.queryByRole('heading', { name: 'What would change the verdict' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText('No official result yet').length).toBeGreaterThan(0);
+    expect(screen.getByText('The effect vanished after 2005.')).toBeInTheDocument();
+  });
+
+  it("shows a copy's origin and labels, and offers the way back", async () => {
+    const onBack = vi.fn();
+    header({ ...mine, labels: ['followed_against_verdict'] }, onBack);
+    expect(screen.getByText(/^Your edge · extends momentum_12_1/)).toBeInTheDocument();
+    expect(screen.getByText('Followed against the verdict')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '← Edges' }));
+    expect(onBack).toHaveBeenCalled();
+  });
+});

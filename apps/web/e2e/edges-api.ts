@@ -1,5 +1,6 @@
 /**
- * Playwright route mock for the edges: the `EdgesPage`, `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record) GraphQL
+ * Playwright route mock for the edges: the `EdgesPage`, `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record)
+ * and the result sections (`EdgeResultCurve`, `EdgeResultDrawdown`, `EdgeResultDecay`) GraphQL
  * operations (POST /api/graphql). The golden store holds no edge runs, so the answers are
  * synthetic with the real API's shapes (`Query.edges`, `Screener.trackRecords`): one candidate
  * edge with an official result and an exploratory run beside it, one rejected edge with no
@@ -49,6 +50,60 @@ const BUILDER = {
     ].map((key) => ({ key, text: `The ${key} answer.` })),
     own: { extends: 'momentum_12_1' },
   },
+};
+
+// The result sections of momentum_12_1 as `Query.edgeResult` answers them: a curve with both sides
+// of the split and a gap, a drawdown with one open episode, and a decay with the paper's bar not given.
+const CURVE = {
+  kind: 'cumulative_excess',
+  unit: 'return',
+  splitFrom: '2026-04-01',
+  hidden: false,
+  points: [
+    ['2026-01-02', '2026-02-02', 'in_sample', 0.01, 0.01, 0.002],
+    ['2026-03-02', '2026-04-02', 'in_sample', 0.02, 0.03, 0.004],
+    ['2026-05-04', '2026-06-03', 'out_of_sample', -0.01, 0.02, 0.006],
+    ['2026-06-01', '2026-07-01', 'out_of_sample', 0.015, 0.035, 0.008],
+  ].map(([decision, exit, period, value, cumulative, baseCumulative]) => ({
+    decision,
+    exit,
+    period,
+    value,
+    cumulative,
+    baseValue: 0.002,
+    baseCumulative,
+    trades: 1,
+  })),
+  gaps: [{ from: '2026-02-10', to: '2026-02-20', kind: 'no_picks', unknown: null }],
+  live: null,
+  unknown: null,
+};
+const DRAWDOWN = {
+  unit: 'return',
+  points: [
+    { exit: '2026-02-02', depth: 0 },
+    { exit: '2026-04-02', depth: 0 },
+    { exit: '2026-06-03', depth: -0.01 },
+    { exit: '2026-07-01', depth: 0 },
+  ],
+  episodes: [{ peak: '2026-04-02', trough: '2026-06-03', recovered: '2026-07-01', depth: 0.01 }],
+  maxInSample: 0.005,
+  maxOutOfSample: 0.01,
+  volInSample: 0.12,
+  volOutOfSample: null,
+  unknown: null,
+};
+const DECAY = {
+  measure: 'lift_pts',
+  unit: 'points',
+  basisHorizon: 20,
+  published: null,
+  bars: [
+    { period: 'published', value: null, n: null, state: 'not_given' },
+    { period: 'in_sample', value: 6, n: 64, state: 'measured' },
+    { period: 'out_of_sample', value: 5, n: 6, state: 'measured' },
+    { period: 'live', value: null, n: 0, state: 'not_measured_live' },
+  ],
 };
 
 const VRP_IDS = ['vrp-scanner', 'vrp_scanner'];
@@ -137,6 +192,12 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
       await route.fulfill({ json: { data: { edgeDesk: null } } });
     } else if (/query\s+EdgePaper\b/.test(query)) {
       await route.fulfill({ json: { data: { edgePaper: null } } });
+    } else if (/query\s+EdgeResultCurve\b/.test(query)) {
+      await route.fulfill({ json: { data: { edgeResult: { curve: CURVE } } } });
+    } else if (/query\s+EdgeResultDrawdown\b/.test(query)) {
+      await route.fulfill({ json: { data: { edgeResult: { drawdown: DRAWDOWN } } } });
+    } else if (/query\s+EdgeResultDecay\b/.test(query)) {
+      await route.fulfill({ json: { data: { edgeResult: { decay: DECAY } } } });
     } else if (/query\s+ScreenerTrackRecords\b/.test(query)) {
       await route.fulfill({ json: { data: trackRecords() } });
     } else {

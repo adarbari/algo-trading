@@ -18,6 +18,7 @@ import {
 } from '@algotrade/ui';
 
 import {
+  hasLiveRecord,
   rangeBins,
   rangeMarkers,
   recordLabel,
@@ -57,7 +58,7 @@ export interface EdgeLiveProps {
 
 export function EdgeLive({ edgeId }: EdgeLiveProps) {
   const paper = useEdgePaper(edgeId).data;
-  if (!paper || (paper.record.state === 'no_trades' && !paper.forward)) return null;
+  if (!hasLiveRecord(paper)) return null;
   const record = paper.record;
   return (
     <Stack gap={4}>

@@ -25,7 +25,9 @@ const PENDING = [
 const STRUCTURE = [
   'src/widgets/edge-detail/model/columns.tsx', // one edge's years, verdict tests and paper trades, one row each
   'src/widgets/edge-signals/model/columns.tsx', // an edge's paper trades and the followed edges, one row each
+  'src/widgets/edge-evidence/model/figures.tsx', // one figure of an edge's verdict per row, a column per side of the split
   'src/widgets/edge-list/model/columns.tsx', // the edge documents, one row each
+  'src/widgets/edge-performance/model/columns.tsx', // an edge's years and deepest drawdowns, one row each
   'src/widgets/events-panel/ui/EventsPanel.tsx', // an instrument's stored events
   'src/widgets/event-study-panel/model/columns.tsx', // an instrument's events ahead and its 8-Ks
   'src/widgets/features-panel/model/rows.tsx', // one instrument's features, one row each

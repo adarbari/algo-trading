@@ -1,0 +1,43 @@
+# L3 site setting: the Guide glossary, edges: the sections of an edge's page and the figures table (ADR 0051, ADR 0064). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "edge_evidence_section"
+term = "Evidence"
+short = "The picture and the numbers that justify the verdict: the curve, the out-of-sample result and the figures of both sides of the split."
+body = """
+The curve comes first because it shows how the result came about, not only where it ended. Under it the strip gives the out-of-sample result in five numbers. They are the win rate, the base rate it is compared with and the lift between them. Then come the trades behind it, with the count the verdict needs, and the share of random-pick backtests it beats. The line under the strip says the same in one sentence. It adds the screen, the holding period and the number of variants tried. The Figures table puts three sets of numbers in three columns: in-sample, out-of-sample and the whole history. A number that holds on one side and not on the other is seen at once. Everything is read for the verdict's own basis, the screen and holding period fixed before the out-of-sample period was read.
+"""
+next = "Look first at whether the out-of-sample column agrees with the in-sample one, then at how many trades it rests on."
+see_also = ["evidence_curve", "verdict_basis", "edge_figures", "out_of_sample", "base_rate", "win_rate", "variants_tried"]
+
+[[term]]
+id = "edge_figures"
+term = "Figures"
+short = "The verdict's numbers in three columns, in-sample, out-of-sample and all, with the out-of-sample column marked."
+body = """
+Each row is one figure, and each column is one side of the split the edge was frozen at. The out-of-sample column is tinted because it is the fair test: nothing was tuned on it. When its sample is thin, fewer trades than the verdict asks for, the header says n= and the trade count, and its figures swing widely on a few trades. A figure the run did not store reads as a dash, never as zero. The deflated Sharpe ratio and the chance of overfitting are measured on the whole history only, so a dash on one side is normal. The whole-history column adds the other two.
+"""
+next = "Trust a figure in proportion to the trades behind it: read the n= before the number."
+see_also = ["win_rate", "base_rate", "lift", "trades", "sharpe_ratio", "deflated_sharpe", "overfitting_probability"]
+
+[[term]]
+id = "edge_how_sure"
+term = "How sure"
+short = "Whether the result could be luck: the decile staircase, the lifts of random picks, the variants tried and how the number has decayed."
+body = """
+Three questions about one result. Does the ranking work: the deciles show whether the best-ranked tenth did better than the worst, step by step. Could random picks do as well: the histogram puts the edge's lift among the lifts of random-pick backtests. The line under it counts the variants tried, with the deflated Sharpe ratio, the Sharpe ratio after the haircut and the chance of overfitting. Has it faded: the decay bars follow one number from the paper to the in-sample test, the out-of-sample test and the live record. A bar that says why it is empty (not given, not stored, hidden) is not a zero.
+"""
+next = "Read the three together: a staircase, a lift beyond most random picks, and a number that holds from stage to stage."
+see_also = ["top_vs_bottom_decile", "robustness", "decay", "haircut_sharpe", "variants_tried", "sharpe_ratio", "deflated_sharpe", "live_record"]
+
+[[term]]
+id = "edge_where_worked"
+term = "Where it worked"
+short = "The result cut by time: year by year with the split marked, and the drawdown of the evidence curve."
+body = """
+An average hides when an edge worked. Year by year gives one row for each calendar year. A switch shows the in-sample years, the out-of-sample years or all of them, so a single good year is seen as one. The year the split falls in is two rows, one for each side. The drawdown view draws how far the curve fell below its previous high. It lists the deepest drops with their dates, and the deepest drop and volatility of each side. An edge that earns in one year, or that fell as far out-of-sample as it ever earned, is not the edge its average describes.
+"""
+next = "Look for a result that is spread over the years, and a drawdown that is no deeper out-of-sample than in-sample."
+see_also = ["year_by_year", "drawdown", "partial_year", "in_sample", "out_of_sample", "evidence_curve"]

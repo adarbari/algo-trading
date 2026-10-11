@@ -251,11 +251,32 @@ test('Edges: a tapped edge opens its page', async ({ page }) => {
   await page.goto('/edges');
   await page.getByRole('row', { name: /Momentum 12-1/ }).tap();
   await expect(page.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeVisible();
-  await expect(page.getByText('+7 pts').first()).toBeVisible();
+  await expect(page.getByText('+7.0 pts').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Run backtest' })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-    page.viewportSize()?.width ?? 0,
-  );
+  const fits = async () => {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      page.viewportSize()?.width ?? 0,
+    );
+  };
+  await fits();
+  // The sections stack in one column and none widens the page: the curve, the three cards of
+  // How sure, the years and the drawdown view.
+  await expect(page.getByRole('img', { name: /^Evidence curve of the picks/ })).toBeVisible();
+  await fits();
+  await page
+    .getByRole('navigation', { name: 'Sections of this edge' })
+    .getByRole('link', { name: 'How sure' })
+    .tap();
+  await expect(page.getByRole('list', { name: 'Decay by stage' })).toBeVisible();
+  await fits();
+  await page
+    .getByRole('navigation', { name: 'Sections of this edge' })
+    .getByRole('link', { name: 'Where it worked' })
+    .tap();
+  await page.getByRole('tab', { name: 'Drawdown' }).tap();
+  await expect(page.getByRole('grid', { name: 'Deepest drawdowns' })).toBeVisible();
+  await fits();
+  await expectAccessible(page);
 });
 
 test('Edge builder: the six steps fit a phone, the steps scroll sideways and a step opens from the nav', async ({

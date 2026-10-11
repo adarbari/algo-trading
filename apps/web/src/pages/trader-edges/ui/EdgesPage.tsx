@@ -7,8 +7,9 @@ import { Button, Heading, Stack, Text } from '@algotrade/ui';
 
 import type { EdgeView } from '@/entities/edge';
 
-import { EdgeDetail } from '@/widgets/edge-detail';
 import { EdgeList } from '@/widgets/edge-list';
+
+import { EdgePage } from './EdgePage';
 
 export interface EdgesPageProps {
   /** The chosen edge (from the URL), or null for the list. */
@@ -31,7 +32,7 @@ export function EdgesPage({
   view,
   onViewChange,
 }: EdgesPageProps) {
-  if (selected !== null) return <EdgeDetail id={selected} onBack={onClear} onEdit={onBuild} />;
+  if (selected !== null) return <EdgePage id={selected} onBack={onClear} onEdit={onBuild} />;
   return (
     <Stack gap={3}>
       <Stack direction="row" gap={3} align="center" justify="between" wrap>

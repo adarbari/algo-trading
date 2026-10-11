@@ -4,7 +4,7 @@
  * split falls in is two rows (`2026 Jan–Mar` in-sample, `2026 Apr–Dec` out-of-sample); a run from
  * before that split is one `both` row, shown under All only. This only filters by that mark.
  */
-import { DataTable, Panel, SegmentedControl, Stack, type SegmentedOption } from '@algotrade/ui';
+import { DataTable, SegmentedControl, Stack, type SegmentedOption } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import type { VerdictYear } from '@/entities/edge';
@@ -30,22 +30,17 @@ export function EdgeYears({ years }: EdgeYearsProps) {
   const [view, setView] = useState<View>('both');
   const rows = useMemo(() => years.filter((y) => shows(view, y)), [years, view]);
   return (
-    <Panel
-      title="Year by year"
-      flush
-      actions={
-        <Stack direction="row" gap={1} align="center">
-          {termHelp('year_by_year')}
-          <SegmentedControl
-            aria-label="Period shown"
-            size="sm"
-            options={OPTIONS}
-            value={view}
-            onValueChange={setView}
-          />
-        </Stack>
-      }
-    >
+    <Stack gap={2}>
+      <Stack direction="row" gap={1} align="center">
+        <SegmentedControl
+          aria-label="Period shown"
+          size="sm"
+          options={OPTIONS}
+          value={view}
+          onValueChange={setView}
+        />
+        {termHelp('year_by_year')}
+      </Stack>
       <DataTable<VerdictYear>
         label="Year by year"
         columns={yearColumns}
@@ -54,6 +49,6 @@ export function EdgeYears({ years }: EdgeYearsProps) {
         emptyMessage="No years to show"
         visibleRows={8}
       />
-    </Panel>
+    </Stack>
   );
 }

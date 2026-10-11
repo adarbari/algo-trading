@@ -73,6 +73,17 @@ export default defineConfig({
               test: /(feature-table[\\/]model[\\/]rows|features[\\/]guide-help[\\/]ui[\\/]helped)/,
               priority: 10,
             },
+            {
+              // IndicatorRow is used by the regime and edge pages, which both already load the
+              // SectionNav chunk: one shared chunk, not two, so the entry's preload map (every
+              // route's file list) carries no extra JS + CSS file names (ED9 #511). Only the
+              // components themselves: their dependencies stay in the chunks they are in, or the
+              // group would pull modules the entry uses into a chunk the entry must load.
+              name: 'SectionNav',
+              test: /design-system[\\/]components[\\/](SectionNav|IndicatorRow)[\\/]/,
+              priority: 10,
+              includeDependenciesRecursively: false,
+            },
           ],
         },
       },

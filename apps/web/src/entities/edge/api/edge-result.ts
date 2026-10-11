@@ -21,9 +21,20 @@ const ResultBasis = graphql(`
         splitFrom
         oosHidden
         unknown {
+          code
+          reason
           kind
           guideTerm
           kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
       }
     }
@@ -54,9 +65,20 @@ const ResultCurve = graphql(`
           to
           kind
           unknown {
+            code
+            reason
             kind
             guideTerm
             kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
           }
         }
         live {
@@ -73,9 +95,20 @@ const ResultCurve = graphql(`
           }
         }
         unknown {
+          code
+          reason
           kind
           guideTerm
           kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
       }
     }
@@ -102,9 +135,20 @@ const ResultDrawdown = graphql(`
         volInSample
         volOutOfSample
         unknown {
+          code
+          reason
           kind
           guideTerm
           kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
       }
     }
@@ -123,9 +167,20 @@ const ResultRollingStarts = graphql(`
           meanExcess
         }
         unknown {
+          code
+          reason
           kind
           guideTerm
           kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
       }
     }
@@ -144,9 +199,20 @@ const ResultMonthly = graphql(`
           period
         }
         unknown {
+          code
+          reason
           kind
           guideTerm
           kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
       }
     }

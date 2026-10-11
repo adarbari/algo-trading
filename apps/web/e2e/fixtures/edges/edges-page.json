@@ -20,16 +20,16 @@
           }
         ],
         "definition": {
-          "picks": "Every month end \u00b7 top 50 of the screen",
-          "trade": "Enter 1 session after the decision \u00b7 hold 20 trading days \u00b7 0.1% costs \u00b7 win = beats SPY",
-          "compare": "Universe: liquid_common_stocks \u00b7 against equal_weight",
+          "picks": "Every month end · top 50 of the screen",
+          "trade": "Enter 1 session after the decision · hold 20 trading days · 0.1% costs · win = beats SPY",
+          "compare": "Universe: liquid_common_stocks · against equal_weight",
           "test": "Out-of-sample from 2026-04-01"
         },
         "verdict": {
           "verdict": "promising",
           "rationale": "Trades, and out-of-sample trades is 70 and 6; it needs at least 100 and 40",
           "headline": "Out-of-sample, momentum_12_1, 20 trading days: win rate 58% against a base rate of 51% (+7 pts).",
-          "result": "Win rate 58% \u00b7 base rate 51%",
+          "result": "Win rate 58% · base rate 51%",
           "basis": "momentum_12_1, 20 trading days",
           "trades": 70,
           "oosTrades": 6,
@@ -109,7 +109,87 @@
               "decileSpread": 0.067,
               "trades": 6
             }
-          ]
+          ],
+          "columns": [
+            {
+              "period": "in_sample",
+              "winRate": 0.56,
+              "baseRate": 0.5,
+              "liftPts": 6,
+              "trades": 64,
+              "decileSpread": 0.067,
+              "decileT": 2.5,
+              "sharpe": 1.1,
+              "deflatedSharpe": 0.9,
+              "pbo": null,
+              "thin": false
+            },
+            {
+              "period": "out_of_sample",
+              "winRate": 0.57,
+              "baseRate": 0.52,
+              "liftPts": 5,
+              "trades": 6,
+              "decileSpread": 0.067,
+              "decileT": 2.5,
+              "sharpe": 1.1,
+              "deflatedSharpe": 0.9,
+              "pbo": null,
+              "thin": true
+            },
+            {
+              "period": "all",
+              "winRate": 0.56,
+              "baseRate": 0.5,
+              "liftPts": 6,
+              "trades": 70,
+              "decileSpread": 0.067,
+              "decileT": 2.5,
+              "sharpe": 1.1,
+              "deflatedSharpe": 0.9,
+              "pbo": null,
+              "thin": false
+            }
+          ],
+          "evidence": {
+            "oosTrades": 6,
+            "needed": 40,
+            "worksOosNeeded": 60,
+            "wholeTrades": 70,
+            "wholeNeeded": 100,
+            "reached": false,
+            "checks": [
+              {
+                "id": "dsr",
+                "label": "Deflated Sharpe",
+                "value": "0.90",
+                "threshold": "at least 0.5",
+                "status": "pass",
+                "level": "promising"
+              }
+            ],
+            "outlook": {
+              "criterion": "trades",
+              "level": "promising",
+              "sentence": "Promising needs 40 out-of-sample trades: 6 so far, 34 to go.",
+              "have": 6,
+              "needed": 40,
+              "remaining": 34,
+              "projectionState": "projected",
+              "expectedBy": "2027-03-15",
+              "fillRatio": 0.5
+            }
+          },
+          "haircut": {
+            "sharpe": 1.1,
+            "haircutSharpe": 0.4,
+            "cut": 0.64,
+            "trials": 3,
+            "sessions": 70,
+            "method": "bonferroni",
+            "summary": "Sharpe 1.10 over 70 trades with 3 variants becomes 0.40."
+          },
+          "decay": null
         },
         "canonicalRun": {
           "runId": "run-frozen",
@@ -162,9 +242,9 @@
         "rejectionReason": "The effect vanished after 2005.",
         "sources": [],
         "definition": {
-          "picks": "Every month end \u00b7 top 50 of the screen",
-          "trade": "Enter 1 session after the decision \u00b7 hold 20 trading days \u00b7 0.1% costs \u00b7 win = beats SPY",
-          "compare": "Universe: liquid_common_stocks \u00b7 against equal_weight",
+          "picks": "Every month end · top 50 of the screen",
+          "trade": "Enter 1 session after the decision · hold 20 trading days · 0.1% costs · win = beats SPY",
+          "compare": "Universe: liquid_common_stocks · against equal_weight",
           "test": "Out-of-sample from 2026-04-01"
         },
         "verdict": {
@@ -188,7 +268,11 @@
           "deciles": [],
           "robustness": null,
           "criteria": [],
-          "years": []
+          "years": [],
+          "columns": [],
+          "evidence": null,
+          "haircut": null,
+          "decay": null
         },
         "canonicalRun": null,
         "runs": [],

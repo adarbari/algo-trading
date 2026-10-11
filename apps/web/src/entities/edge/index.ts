@@ -45,6 +45,15 @@ export {
   type VerdictColumn,
   type EvidenceProgress,
 } from './model/edges';
+export {
+  barStateLabel,
+  EDGE_UNKNOWN_WORDS,
+  measureLabel,
+  periodLabel,
+  projectionLabel,
+  type DecayBar,
+  type DrawdownEpisode,
+} from './model/edge-result';
 export type {
   EdgeTradePage,
   EdgeTradeRow,
@@ -74,6 +83,7 @@ export type {
   SliceFigure,
 } from './model/edge-result';
 export {
+  hasLiveRecord,
   rangeBins,
   rangeMarkers,
   recordLabel,
@@ -99,4 +109,12 @@ export {
 } from './model/track-records';
 export { EdgeLiveBadge } from './ui/EdgeLiveBadge';
 export { ScreenerEdgeName, ScreenerRecord, type ScreenerRecordProps } from './ui/ScreenerRecord';
-export { EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from './model/fixtures';
+export {
+  CURVE_FIXTURE,
+  DECAY_FIXTURE,
+  DRAWDOWN_FIXTURE,
+  edgeFixture,
+  EDGES_FIXTURE,
+  TRACK_RECORDS_FIXTURE,
+  UNKNOWN_FIXTURE,
+} from './model/fixtures';
