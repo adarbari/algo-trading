@@ -5,7 +5,7 @@
 [[term]]
 id = "live_state"
 term = "Live state"
-short = "How an edge's settled paper trades compare with its backtest: on track, below or above range, too few trades, no record, not recording or not settled."
+short = "How an edge's settled paper trades compare with its backtest: on track, below or above range, too few trades, no record, not recording."
 body = """
 The live state is one word for how an edge is doing on paper against what its backtest led you
 to expect. It reads only settled paper trades, as the session knew them. A trade still open, or
