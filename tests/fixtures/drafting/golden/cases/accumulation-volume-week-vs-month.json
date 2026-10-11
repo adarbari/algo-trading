@@ -1,0 +1,36 @@
+{
+  "id": "accumulation-volume-week-vs-month",
+  "sentence": "accumulation, 5-day volume vs the month",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "accumulation",
+        "bucket": "A",
+        "fields": [
+          "feature.volume_bias"
+        ],
+        "op": "eq",
+        "value": "ACCUMULATION",
+        "tolerance": 0.0
+      },
+      {
+        "span": "5-day volume vs the month",
+        "bucket": "A",
+        "fields": [
+          "rollup.volume@v1.volume_ratio_5d_20d"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 1.0,
+        "tolerance": 0.3
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

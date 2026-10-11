@@ -212,8 +212,24 @@ def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
     assert slice_guide_line(RSI, names) == (
         "rollup.b@v1.x | use: oversold: lt 30 soft tolerance 5.0 (with a trend); "
         'liquid: gte 50000000.0 soft tolerance {"relative": 0.2} on_miss LIQUIDITY_RISK; '
-        'known: not_null hard; high: eq "HIGH" hard | caveat: pinned by a deal'
-    )  # no "reads", the first caveat only
+        'known: not_null hard; high: eq "HIGH" hard | caveat: pinned by a deal.'
+    )  # no "reads"
+    long = FieldGuideEntry(
+        name="rollup.b@v1.x",
+        theme="t",
+        reads="r",
+        caveats=(
+            "A big move lifts it. Check feature.other first. Do not gate hard on a large value.",
+            "Sector talk. Null after a gap in the last 60 sessions.",
+            "Filler words only.",
+            "Pair with feature.nope or rollup.b@v1.x itself.",
+        ),
+    )
+    # lead sentence, every sentence naming a catalogue field, the null rule; nothing else
+    assert slice_guide_line(long, {"rollup.b@v1.x", "feature.other"}) == (
+        "rollup.b@v1.x | use: - | caveat: A big move lifts it. Check feature.other first. "
+        "Null after a gap in the last 60 sessions. Pair with feature.nope or rollup.b@v1.x itself."
+    )
     assert slice_guide_line(ELSEWHERE, names) is None
     infos = [info("rollup.b@v1.x"), info("feature.other"), info("feature.c", description="rsi")]
     guide = FieldGuideSettings((RSI,), (DEAL, NOWHERE))

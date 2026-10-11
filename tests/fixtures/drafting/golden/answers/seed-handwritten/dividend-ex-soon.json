@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "yield",
+      "field": "feature.div_yield",
+      "op": "gt",
+      "value": 0.04,
+      "mode": "hard",
+      "why": "dividend yield above 4%"
+    },
+    {
+      "id": "ex",
+      "field": "rollup.dividend_schedule@v1.days_to_ex_date",
+      "op": "lte",
+      "value": 14,
+      "mode": "hard",
+      "why": "ex-date within 2 weeks"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "candle",
+      "field": "rollup.candle@v1.candle",
+      "op": "eq",
+      "value": "BULLISH_ENGULFING",
+      "mode": "hard",
+      "why": "bullish engulfing"
+    },
+    {
+      "id": "support",
+      "field": "feature.dist_to_support",
+      "op": "lte",
+      "value": 0.03,
+      "mode": "hard",
+      "why": "at support"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

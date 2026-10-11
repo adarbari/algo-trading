@@ -1,0 +1,33 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "rs",
+      "field": "rollup.relative_strength@v1.rs_spy_63d",
+      "op": "gt",
+      "value": 0,
+      "mode": "hard",
+      "why": "outperforming SPY over 3 months"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

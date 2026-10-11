@@ -220,6 +220,12 @@ or CI could have reached a model. The socket guard does not stop a child process
 4. **Pinned** by `tests/architecture/pipeline/test_llm_off.py` (workflows, Makefile targets,
    Playwright config, and every test that builds the text model or a `ClaudeCli`).
 
+## Amended 2026-10-11: the prompt is a field index plus a per-sentence slice
+
+The system prompt carries an index of every catalogue field (`name | type | unit`) and, in detail, only
+the slice `services/drafting/retrieval.py` picks for the sentence (`PROMPT_VERSION` 2; ~12-14k tokens, was
+~110k). A field with no detail is still valid; the golden set's recall test guards against a false "missing".
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

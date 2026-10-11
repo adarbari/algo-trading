@@ -70,7 +70,7 @@ prefix: static text, site catalogue index, variable slice, the caller's own feat
 (3) skip the model when the phrasebook resolves every clause; (4) cheap model first, escalate on invalid
 output after the repair, not on missing or unresolved items; (5) two phases: a local `draft-resolve` returns
 the A rows and alternatives at once, then the model call; (6) caps: compact keys, ~800 answer tokens,
-`reasoning_effort = low`; (7) result cache. Measured through `usage/llm_calls` (cache tokens, call id,
+`reasoning_effort = low`; (7) result cache (none for drafting today: `TextCache` serves only explaining; not added by PR 3). Measured through `usage/llm_calls` (cache tokens, call id,
 prompt version, stage first / repair / escalate).
 
 ## Learning from iteration (golden set)
@@ -109,8 +109,9 @@ statuses, pending formula, needs your call) ships its Guide entry in the same PR
 1. Meter fix: cache read / write tokens, `call_id`, `prompt_version`, `stage` on `usage/llm_calls`
    (ADR 0058 amendment; the CLI adapter drops cache tokens today, so input is under-reported ~10^5).
 2. Prompt reorder for a stable prefix; the guide trimmed to its criterion lines.
-3. Retrieval slice, phrasebook skip-the-model and the golden replay harness (architect review: a missed
-   field must not turn into a false "missing").
+3. Done: #529 retrieval slice (field index + per-sentence slice, `PROMPT_VERSION` 2) and the golden replay
+   harness (#526). Not done: the phrasebook skip-the-model short-cut (lever 3): phrasebook hints are free text,
+   so wiring it needs structured thresholds in the phrasebook first (a later PR).
 4. Cheap-model-first tiering, the repair retry, fall-through on invalid output, schema-constrained JSON.
 5. The A / B / C contract: parsing, validation, dry run, fingerprint, `feature_backlog.toml` (ADR 0041
    amendment).

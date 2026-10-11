@@ -15,6 +15,7 @@ field (name, type, unit) as a prefix no sentence changes, then in detail only th
 ``retrieval.select_slice`` picks for the sentence (9-12k tokens), then the caller's own features."""
 
 import json
+import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -25,7 +26,7 @@ from algotrade.config.site.field_guide import (
     Situation,
 )
 from algotrade.config.site.llm import Phrase
-from algotrade.services.drafting.retrieval import select_slice
+from algotrade.services.drafting.retrieval import FIELD_REF, select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
 # Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice.
@@ -337,7 +338,6 @@ INDEX_HEADER = (
     "Field index (every field you may use: name | type | unit). Detail for the fields most "
     "likely to matter follows it; a field with no detail is still valid:"
 )
-CAVEAT_CHARS = 200
 
 
 def index_line(info: FeatureInfo) -> str:
@@ -345,19 +345,38 @@ def index_line(info: FeatureInfo) -> str:
     return f"{info.name} | {info.dtype} | {info.unit or '-'}"
 
 
-def slice_guide_line(entry: FieldGuideEntry, catalogue: set[str]) -> str | None:
-    """A field guide entry trimmed for the slice: ``name | use: ... | caveat: <the first one,
-    its first sentence>``. None when the field is not in this catalogue."""
+_SENTENCE = re.compile(r"(?<=[.!?])\s+")
+_NULL_RULE = re.compile(r"\b(null|unknown)\b", re.IGNORECASE)
+
+
+def caveat_sentences(entry: FieldGuideEntry, catalogue: set[str]) -> list[str]:
+    """The caveat text a slice keeps, in file order: the first sentence of the first caveat,
+    then every sentence that names a catalogue field (what to check) or states the null rule."""
+    keep: list[str] = []
+    for n, caveat in enumerate(entry.caveats):
+        for k, sentence in enumerate(_SENTENCE.split(" ".join(caveat.split()))):
+            named = any(m in catalogue for m in FIELD_REF.findall(sentence))
+            wanted = (n == 0 and k == 0) or named or _NULL_RULE.search(sentence)
+            if wanted and sentence not in keep:
+                keep.append(sentence)
+    return keep
+
+
+def slice_guide_line(
+    entry: FieldGuideEntry, catalogue: set[str], caveats: bool = True
+) -> str | None:
+    """A field guide entry trimmed for the slice: ``name | use: ... | caveat: ...`` where the
+    caveat keeps its lead sentence, every sentence naming a field to check, and the null rule
+    (no ``reads``: the catalogue line describes the field); ``caveats=False`` leaves them out
+    (a brief field). None when the field is not in this
+    catalogue."""
     if entry.name not in catalogue:
         return None
     uses = "use: " + "; ".join(use_text(u) for u in entry.uses) if entry.uses else "use: -"
     parts = [entry.name, uses]
-    if entry.caveats:
-        first = " ".join(entry.caveats[0].split())
-        first = first.split(". ")[0].rstrip(".")
-        if len(first) > CAVEAT_CHARS:
-            first = first[: CAVEAT_CHARS - 1].rstrip() + "…"
-        parts.append(f"caveat: {first}")
+    kept = caveat_sentences(entry, catalogue) if caveats else []
+    if kept:
+        parts.append("caveat: " + " ".join(kept))
     return " | ".join(parts)
 
 
@@ -398,7 +417,8 @@ def sliced_system_prompt(
         entries = [
             line
             for e in guide.fields
-            if e.name in picked and (line := slice_guide_line(e, names)) is not None
+            if e.name in picked
+            and (line := slice_guide_line(e, names, e.name not in chosen.brief)) is not None
         ]
         if entries:
             out += "\nField guide (field | the criterion per intent | main caveat):\n"

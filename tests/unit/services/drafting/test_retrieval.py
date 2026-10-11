@@ -18,7 +18,6 @@ from algotrade.services.drafting.retrieval import (
     content_words,
     name_words,
     phrase_matches,
-    resolves_without_model,
     select_slice,
     stem,
     words_of,
@@ -126,12 +125,13 @@ def test_a_cross_reference_in_a_caveat_adds_the_field() -> None:
     assert "feature.beta" not in select_slice("alpha names", [a, b], (), None).fields
 
 
-def test_a_users_own_feature_the_sentence_names_is_in_the_prompt(site) -> None:
+def test_a_users_own_feature_is_always_in_the_prompt_in_full(site) -> None:
     infos, book, guide = site
     mine = info("feature.my_quality_score", scope="user", owner="alice", description="my score")
     sentence = "stocks with my quality score above 3"
-    chosen = select_slice(sentence, [*infos, mine], book, guide)
-    assert "feature.my_quality_score" in chosen.fields
+    assert (
+        "feature.my_quality_score" not in select_slice(sentence, [*infos, mine], book, guide).fields
+    )
     prompt = sliced_system_prompt([*infos, mine], sentence, book, guide)
     own = prompt.split("\nYour own features (")[1]
     assert "feature.my_quality_score | float" in own
@@ -143,47 +143,15 @@ def test_words_stem_join_units_and_drop_noise() -> None:
     assert {"200d", "200"} <= set(words_of("above the 200 day average"))
     assert {"52w", "52"} <= set(words_of("a 52-week high"))
     assert content_words("the stocks with") == set()
+    assert words_of("SMA50 and RSI14") == ["sma", "and", "rsi"]  # digits only beside a field word
+    vocab = {"sma", "rsi", "iv"}
+    assert words_of("SMA50, RSI14 under 30", vocab) == ["sma", "50", "rsi", "14", "under"]
+    assert "30" in words_of("IV 30", vocab) and "30" not in words_of("under 30", vocab)
+    assert name_words("rollup.momentum@v1.rsi_14") == {"momentum", "rsi", "14"}
+    assert name_words("rollup.iv30@v1.iv30") >= {"iv", "30"}
     assert name_words("rollup.price_stats@v2.ret_20d") == {"price", "stat", "ret", "20d", "20"}
     assert phrase_matches("breaking out now", Phrase(("breaking out",), ("x",)))
     assert not phrase_matches("outbreaking", Phrase(("breaking out",), ("x",)))
-
-
-BOOK = [
-    Phrase(("price floor",), ("rollup.a@v1.close",), "close gt 5"),
-    Phrase(("liquid",), ("rollup.a@v1.adv",), "adv gte 50000000"),
-    Phrase(("momentum",), ("rollup.a@v1.ret", "rollup.a@v1.rsi"), "gate: ret gt 0"),
-    Phrase(("calm",), ("rollup.a@v1.hv", "rollup.a@v1.atr"), "hv lt 0.2"),
-]
-CATALOGUE = {"rollup.a@v1.close", "rollup.a@v1.adv", "rollup.a@v1.ret", "rollup.a@v1.rsi"}
-
-
-def test_a_sentence_every_clause_of_which_the_phrasebook_pins_resolves_without_the_model() -> None:
-    got = resolves_without_model("price floor and liquid", BOOK, CATALOGUE)
-    assert got == [
-        {
-            "id": "close",
-            "field": "rollup.a@v1.close",
-            "op": "gt",
-            "value": 5,
-            "mode": "hard",
-            "why": "price floor",
-        },
-        {
-            "id": "adv",
-            "field": "rollup.a@v1.adv",
-            "op": "gte",
-            "value": 50000000,
-            "mode": "hard",
-            "why": "liquid",
-        },
-    ]
-
-
-def test_one_clause_the_phrasebook_cannot_pin_leaves_it_to_the_model() -> None:
-    assert resolves_without_model("liquid, with momentum", BOOK, CATALOGUE) is None  # 2 fields
-    assert resolves_without_model("liquid and cheap", BOOK, CATALOGUE) is None  # no phrase
-    assert resolves_without_model("calm", BOOK, CATALOGUE) is None  # field not in the catalogue
-    assert resolves_without_model("", BOOK, CATALOGUE) is None
 
 
 def info(name: str, **kw: object) -> FeatureInfo:
@@ -196,3 +164,41 @@ def info(name: str, **kw: object) -> FeatureInfo:
         "null_meaning": "n",
     }
     return FeatureInfo(name=name, **{**base, **kw})  # type: ignore[arg-type]
+
+
+def test_joined_and_spaced_tokens_find_the_same_fields() -> None:
+    sma, rsi, iv, other = (
+        info("feature.pct_vs_sma_50"),
+        info("rollup.momentum@v1.rsi_14"),
+        info("rollup.iv30@v1.iv30"),
+        info("feature.pct_vs_sma_200"),
+    )
+    infos = [sma, rsi, iv, other]
+    for text in ("above SMA50, RSI14 under 30", "above sma 50 and rsi 14 under 30"):
+        chosen = select_slice(text, infos).fields
+        assert {sma.name, rsi.name} <= set(chosen)
+    first = select_slice("IV 30 above 40", infos).fields
+    assert iv.name in first
+
+
+def test_the_cap_leaves_phrasebook_fields_whole_and_ranking_skips_own_features() -> None:
+    many = [info(f"feature.vol_{n:02d}") for n in range(40)]
+    say = Phrase(("calm",), tuple(f"feature.vol_{n:02d}" for n in range(30)), "x")
+    chosen = select_slice("calm vol", many, [say]).fields
+    assert {f"feature.vol_{n:02d}" for n in range(30)} <= set(chosen)  # all 30, over the cap
+    assert len(chosen) <= 30 + MAX_FIELDS
+    mine = info("feature.vol_mine", scope="user", owner="u")
+    assert "feature.vol_mine" not in select_slice("vol", [*many, mine]).fields
+
+
+def test_a_brief_field_has_no_caveats_and_a_full_one_keeps_its_checks(site) -> None:
+    infos, book, guide = site
+    case = CASES[0]
+    chosen = select_slice(case.sentence, infos, book, guide)
+    prompt = sliced_system_prompt(infos, case.sentence, book, guide)
+    guide_text = prompt.split("Field guide (")[1].split("\nSituations")[0]
+    lines = {line.split(" | ")[0]: line for line in guide_text.splitlines()[1:]}
+    briefs = [n for n in chosen.brief if n in lines]
+    assert briefs and all("caveat:" not in lines[n] for n in briefs)
+    full = [n for n in lines if n not in chosen.brief and "caveat:" in lines[n]]
+    assert full  # the sentence's own fields keep theirs

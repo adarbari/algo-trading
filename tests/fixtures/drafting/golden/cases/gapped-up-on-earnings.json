@@ -1,0 +1,41 @@
+{
+  "id": "gapped-up-on-earnings",
+  "sentence": "gapped up on earnings",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "gapped up",
+        "bucket": "A",
+        "fields": [
+          "rollup.gaps@v1.gap_open_pct"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.02,
+        "tolerance": 1.0
+      },
+      {
+        "span": "on earnings",
+        "bucket": "A",
+        "fields": [
+          "rollup.earnings_reaction@v1.sessions_since_reaction",
+          "rollup.earnings_reaction@v1.reaction_excess_return"
+        ],
+        "op": [
+          "lte",
+          "gt",
+          "gte"
+        ],
+        "value": 1,
+        "tolerance": 1.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}
