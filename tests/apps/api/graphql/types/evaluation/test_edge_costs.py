@@ -1,6 +1,6 @@
-"""``Edge.costs`` and ``Edge.capacity`` serve the read model's figures and states as they are
-(ADR 0064 decision 5): the break-even, the cost-invariant decile spread and the state that says
-why a figure is missing (never a zero)."""
+"""``EdgeResult.costs`` and ``EdgeResult.capacity`` serve the read model's figures and states as
+they are (ADR 0064 decision 5): the break-even, the cost-invariant decile spread and the state
+that says why a figure is missing (never a zero)."""
 
 from algotrade.services.read.edge_evidence import capacity, costs
 from algotrade_api.graphql.schema import schema
@@ -34,8 +34,12 @@ def test_capacity_serves_unknown_as_null_not_zero() -> None:
     assert served.periods[1].adv_median is None and served.periods[1].adv_known is None
 
 
-def test_the_schema_has_both_sections_on_the_edge_with_an_optional_basis() -> None:
+def test_costs_and_capacity_are_sections_of_the_result_on_the_verdicts_basis_not_of_the_edge() -> (
+    None
+):
+    """They take no screen or holding period: a section never re-chooses the basis (ADR 0065)."""
     sdl = schema.as_str()
-    block = sdl[sdl.index("type Edge {") :].split("\n}")[0]
-    assert "costs(variant: String = null, horizon: Int = null): EdgeCosts!" in block
-    assert "capacity(variant: String = null, horizon: Int = null): EdgeCapacity!" in block
+    result = sdl[sdl.index("type EdgeResult {") :].split("\n}")[0]
+    assert "  costs: EdgeCosts!" in result and "  capacity: EdgeCapacity!" in result
+    edge = sdl[sdl.index("type Edge {") :].split("\n}")[0]
+    assert "  costs" not in edge and "  capacity" not in edge

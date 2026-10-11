@@ -12,6 +12,7 @@ from typing import Final
 
 from algotrade.config.site.settings import load_verdict
 from algotrade.services.read.context import Stores
+from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
 from algotrade.services.read.edge_evidence.costs import (
     IN_SAMPLE,
     MEASURED,
@@ -71,10 +72,8 @@ def capacity_of(basis: BasisRows, floor_usd: float) -> EdgeCapacity:
     return EdgeCapacity(state, basis.variant, basis.horizon, floor_usd, periods)
 
 
-def load_edge_capacity(
-    ctx: Stores, edge: Edge, variant: str | None = None, horizon: int | None = None
-) -> EdgeCapacity:
-    """The capacity of ``edge``'s official result at the verdict's basis (or the screen and
-    holding period named), against the site's floor."""
+def load_edge_capacity(ctx: Stores, edge: Edge, basis: OfficialBasis | None = None) -> EdgeCapacity:
+    """The capacity of ``edge``'s official result at the verdict's basis (``basis``: the
+    one the page resolved; resolved here when not given), against the site's floor."""
     floor = load_verdict(ctx.configs).capacity_adv_floor_usd
-    return capacity_of(load_basis_rows(ctx, edge, variant, horizon), floor)
+    return capacity_of(load_basis_rows(ctx, basis or official_basis(ctx, edge)), floor)

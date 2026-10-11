@@ -393,7 +393,7 @@ class EdgeFacts:
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
 
 
-def _projection(whole: EdgeRow) -> Projection:
+def projection_of(whole: EdgeRow) -> Projection:
     """What the basis's ``all`` row stores for a projection (ADR 0064 decision 7)."""
     return Projection(
         whole.projected_exits,
@@ -429,7 +429,7 @@ def _judge_one(
         t,
         facts.schedule,
         facts.hidden,
-        _projection(c.whole),
+        projection_of(c.whole),
     )
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)

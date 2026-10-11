@@ -4,16 +4,20 @@
  * sees) and each screener's track records (`Screener.trackRecords`) for the Screeners
  * list's chip and the Ideas odds line, and the paper record (`Query.edgeDesk`, `Query.edgePaper`:
  * the Ideas signals and an edge's live record) and the sections of an edge's result
- * (`Query.edgeResult`: the evidence curve, drawdown, rolling starts, monthly map and decay, one
- * read each). Never reads an exploratory run as a track record.
+ * (`Query.edgeResult`: the evidence curve, drawdown, rolling starts, monthly map, decay, costs,
+ * capacity, regimes and horizons, one read each). Never reads an exploratory run as a track record.
  */
 export { prefetchEdges, refreshEdges, useEdgeProblems, useEdges } from './api/edges';
 export { useEdgeTrades, useEdgeVariants, type TradesRequest } from './api/evidence';
 export {
+  useEdgeCapacity,
+  useEdgeCosts,
   useEdgeCurve,
   useEdgeDecay,
   useEdgeDrawdown,
+  useEdgeHorizons,
   useEdgeMonthly,
+  useEdgeRegimes,
   useEdgeResultBasis,
   useEdgeRollingStarts,
 } from './api/edge-result';
@@ -54,13 +58,20 @@ export type {
 export type {
   CurveGap,
   CurvePoint,
+  EdgeCapacity,
+  EdgeCosts,
   EdgeCurve,
   EdgeDrawdown,
+  EdgeHorizons,
   EdgeLive,
   EdgeMonthly,
+  EdgeRegimes,
   EdgeResultBasis,
   EdgeResultDecay,
   EdgeRollingStarts,
+  HorizonRow,
+  RegimeRow,
+  SliceFigure,
 } from './model/edge-result';
 export {
   rangeBins,

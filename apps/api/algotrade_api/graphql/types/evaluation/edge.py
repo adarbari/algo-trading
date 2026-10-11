@@ -11,11 +11,9 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
-from algotrade.services.read.edge_evidence import capacity, costs
 from algotrade.services.read.evaluation import edges, runs, versions
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.evaluation.compare import EdgeCompare
-from algotrade_api.graphql.types.evaluation.edge_costs import EdgeCapacity, EdgeCosts
 from algotrade_api.graphql.types.evaluation.verdict import (
     EdgeDefinition,
     EdgeSettings,
@@ -308,27 +306,3 @@ class Edge:
     async def compare(self, info: Info) -> EdgeCompare | None:
         found = await off_loop(versions.load_compare, self.ctx, self.edge)
         return EdgeCompare.of(found) if found is not None else None
-
-    @strawberry.field(  # type: ignore[untyped-decorator]
-        description="How the official result holds up under trading costs (ADR 0064): the win "
-        "rate, lift and mean excess return at each round-trip cost the harness measured, the "
-        "break-even cost and the decile spread, at the verdict's basis unless `variant` and "
-        "`horizon` name a screen and holding period. `state` says why there is none "
-        "(not_a_cost_outcome: the outcome is not a return)"
-    )
-    async def costs(
-        self, info: Info, variant: str | None = None, horizon: int | None = None
-    ) -> EdgeCosts:
-        found = await off_loop(costs.load_edge_costs, self.ctx, self.edge, variant, horizon)
-        return EdgeCosts.of(found)
-
-    @strawberry.field(  # type: ignore[untyped-decorator]
-        description="How much money the picks can take (ADR 0064): the median 20-day dollar "
-        "volume of the counted picks and how many trade below the site's floor, per period, at "
-        "the verdict's basis unless `variant` and `horizon` name a screen and holding period"
-    )
-    async def capacity(
-        self, info: Info, variant: str | None = None, horizon: int | None = None
-    ) -> EdgeCapacity:
-        found = await off_loop(capacity.load_edge_capacity, self.ctx, self.edge, variant, horizon)
-        return EdgeCapacity.of(found)

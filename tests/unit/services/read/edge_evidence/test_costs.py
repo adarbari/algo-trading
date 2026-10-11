@@ -11,6 +11,7 @@ import pytest
 from algotrade.config.edges.document import Outcome
 from algotrade.quant.edges.statistics import break_even_cost
 from algotrade.services.read.edge_evidence import capacity, costs
+from algotrade.services.read.edge_evidence.basis import official_basis
 from algotrade.services.read.edge_evidence.rows import load_basis_rows
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.storage.backends.memory import MemoryBackend
@@ -88,7 +89,7 @@ def test_the_levels_are_the_stored_rows_by_period_and_cost_and_break_even_is_the
 
 def test_the_documents_own_cost_is_marked_and_break_even_is_exact_from_any_level() -> None:
     ctx, edge = site_world(cost_rows("all"))
-    basis = load_basis_rows(ctx, edge)
+    basis = load_basis_rows(ctx, official_basis(ctx, edge))
     found = costs.costs_of(basis, OWN_BP)
     assert [lv.bp for lv in found.levels if lv.assumed] == [OWN_BP]
     assert found.assumed_bp == OWN_BP
@@ -131,16 +132,21 @@ def test_an_edge_with_no_run_has_no_rows_and_no_state_beyond_not_stored() -> Non
     ctx = stores(MemoryBackend())
     edge = load_edge(ctx, "drift")
     assert edge is not None
-    basis = load_basis_rows(ctx, edge)
+    basis = load_basis_rows(ctx, official_basis(ctx, edge))
     assert basis.run is None and basis.rows == () and "no official result" in basis.reason
     assert costs.load_edge_costs(ctx, edge).state == costs.NOT_STORED
 
 
-def test_a_screen_and_holding_period_can_be_named_and_default_to_the_verdicts_basis() -> None:
+def test_the_rows_are_read_at_the_basis_the_page_resolved_and_never_re_chosen() -> None:
     ctx, edge = site_world(cost_rows("all"))
-    assert load_basis_rows(ctx, edge).variant == "momo"
-    other = load_basis_rows(ctx, edge, "momo", 5)
-    assert (other.variant, other.horizon, other.rows) == ("momo", 5, ())
+    basis = official_basis(ctx, edge)
+    assert (load_basis_rows(ctx, basis).variant, load_basis_rows(ctx, basis).horizon) == (
+        "momo",
+        20,
+    )
+    assert costs.load_edge_costs(ctx, edge, basis) == costs.load_edge_costs(ctx, edge)
+    shifted = replace(basis, key=("momo", 5))  # another horizon's rows are none: no cost rows
+    assert load_basis_rows(ctx, shifted).rows == ()
 
 
 def test_a_hidden_copy_shows_the_in_sample_period_and_the_rest_is_hidden_not_missing() -> None:

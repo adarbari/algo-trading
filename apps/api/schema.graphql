@@ -377,16 +377,6 @@ type Edge {
   The user's own edge against the edge it extends and its baselines, in-sample only while `oosHidden`; null for a site edge
   """
   compare: EdgeCompare
-
-  """
-  How the official result holds up under trading costs (ADR 0064): the win rate, lift and mean excess return at each round-trip cost the harness measured, the break-even cost and the decile spread, at the verdict's basis unless `variant` and `horizon` name a screen and holding period. `state` says why there is none (not_a_cost_outcome: the outcome is not a return)
-  """
-  costs(variant: String = null, horizon: Int = null): EdgeCosts!
-
-  """
-  How much money the picks can take (ADR 0064): the median 20-day dollar volume of the counted picks and how many trade below the site's floor, per period, at the verdict's basis unless `variant` and `horizon` name a screen and holding period
-  """
-  capacity(variant: String = null, horizon: Int = null): EdgeCapacity!
 }
 
 """One quality-bar answer: `key` names the question, `text` the answer"""
@@ -512,6 +502,16 @@ type EdgeHaircut {
 }
 
 """
+The verdict's screen (`variant`) at every holding period the run measured, shortest first, the basis marked; `needed` is the verdict's out-of-sample trades. `state`: measured or not_stored
+"""
+type EdgeHorizons {
+  state: String!
+  variant: String
+  needed: Int!
+  rows: [HorizonRow!]!
+}
+
+"""
 The live stroke: the edge's settled paper trades on the basis, as the session knew them, laid on the curve. `state`: recorded (trades have settled; `points` can be fewer than `sessions`), none (no settled trade yet) or oos_hidden (a copy's out-of-sample result is withheld). `since` the first signal session, `anchor` the backtest's cumulative value it starts from (added by the server), `closed` settled trades over `sessions` signal sessions
 """
 type EdgeLive {
@@ -604,6 +604,16 @@ type EdgePublished {
 }
 
 """
+The verdict's basis (`variant` at `horizon` sessions) in each market regime, least to most severe. The harness stores a regime over the whole run, so a regime's in_sample and out_of_sample figures are not_stored. `state`: measured, not_stored (a run from before the regime rows, or none) or oos_hidden (a copy's out-of-sample result is withheld, and the regime rows hold it)
+"""
+type EdgeRegimes {
+  state: String!
+  variant: String
+  horizon: Int
+  rows: [RegimeRow!]!
+}
+
+"""
 The sections of an edge's result, each about the verdict's own run and basis. Select only the sections the page shows: each is read on its own. `date` of the query resolves the session only for the live stroke and the live bar (ADR 0036): the backtest part is read by run
 """
 type EdgeResult {
@@ -628,6 +638,26 @@ type EdgeResult {
   The decay of the edge's number, the paper's figure then the in-sample, out-of-sample and live bars of the verdict's basis; null: the verdict has no basis
   """
   decay: EdgeDecay
+
+  """
+  How the verdict's basis holds up under trading costs (ADR 0064): the win rate, lift and mean excess return at each round-trip cost the harness measured, the break-even cost and the decile spread. `state` says why there is none (not_a_cost_outcome: the outcome is not a return)
+  """
+  costs: EdgeCosts!
+
+  """
+  How much money the basis's picks can take (ADR 0064): the median 20-day dollar volume of the counted picks and how many trade below the site's floor, per period
+  """
+  capacity: EdgeCapacity!
+
+  """
+  The verdict's basis in each market regime: win rate, base rate, lift and trades per regime, whole run only (the split's two sides are not stored)
+  """
+  regimes: EdgeRegimes!
+
+  """
+  The verdict's screen at every holding period: in-sample, out-of-sample and whole-history lift with trades, the basis marked, and the date each out-of-sample count is expected to reach the verdict's bar
+  """
+  horizons: EdgeHorizons!
 }
 
 """
@@ -1547,6 +1577,16 @@ type Holdings {
 }
 
 """
+One holding period of `horizon` sessions: `basis` is the verdict's own pre-chosen test; any other row is not the pre-chosen test, one of several tries. Its `figures` by period and `oosBy`
+"""
+type HorizonRow {
+  horizon: Int!
+  basis: Boolean!
+  figures: [SliceFigure!]!
+  oosBy: OosBy!
+}
+
+"""
 A ticker some screener picked: its picks, best screener first. `regime` and `sizeMultiplier`: the session's label and the size of its best pick, as the run stamped them (null: gate off, regime unknown, or a run before the stamp)
 """
 type Idea {
@@ -1866,6 +1906,18 @@ enum NullReason {
   NOT_ANNOUNCED
   NEW_LISTING
   FEW_BARS
+}
+
+"""
+When a holding period's out-of-sample count reaches the `needed` trades: `state` (projected, not_stored, beyond_projection, unprojectable, oos_hidden, reached), `have` and `remaining` trades and, when projected, `expectedBy` (the exit of the trade that completes the count) at `fillRatio` of the decision sessions measured. An estimate
+"""
+type OosBy {
+  state: String!
+  needed: Int!
+  have: Int
+  remaining: Int
+  expectedBy: Date
+  fillRatio: Float
 }
 
 """
@@ -2466,6 +2518,12 @@ enum RegimeLabel {
   UNKNOWN
 }
 
+"""One market `regime` label and its `figures` by period"""
+type RegimeRow {
+  regime: String!
+  figures: [SliceFigure!]!
+}
+
 """
 A 0-100 score; `value` is null exactly when `unknown` says why. `feature`: its catalogue field; `coverageFeature`: the field of the share of its weight known (null: fragility has none); `threshold`: at or above it the score is high for the label (null: context only)
 """
@@ -2838,6 +2896,19 @@ type SignalTiming {
   flaggedDayFromTrough: Int
   verdictSessions: Int!
   windowSessions: Int!
+}
+
+"""
+One period (all, in_sample, out_of_sample) of a slice: its `state` (measured, not_stored, oos_hidden) and, when measured, the `winRate` and `baseRate` (fractions), `liftPts` (win rate less base rate, in points), `trades` (independent sessions) and `thin` (fewer trades than the verdict needs out of sample)
+"""
+type SliceFigure {
+  period: String!
+  state: String!
+  winRate: Float
+  baseRate: Float
+  liftPts: Float
+  trades: Int
+  thin: Boolean!
 }
 
 """

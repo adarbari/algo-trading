@@ -61,6 +61,10 @@ path = "config/site/guide/glossary"
 purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-line aim per file; the day, the rule grammar, a screen's result, why a value is not available, edges, the evidence behind a verdict, the text model's cost): the app's own words, [[term]] each (loaded by config/site/guide/glossary.py in file-name order; fitness tests: ids and terms unique across the files)"
 
 [[config_dir]]
+path = "config/site/guide/glossary/edges"
+purpose = "the Guide's glossary of the edges (ADR 0051, ADR 0064), one <theme>.toml per theme: the edge page, its evidence and curve, the live record, the outlook and haircut, the ledger and variants, cost and capacity, where the result worked (loaded after the glossary folder; kind guide_glossary_edges)"
+
+[[config_dir]]
 path = "config/site/guide/playbooks"
 purpose = "the Guide's playbook prose (ADR 0051), one subfolder per playbook family of config/site/guide/sections.toml (the 12-file cap per folder), one <id>.toml per site rule-screen preset in its family's folder: summary, what a hit looks like, what it does not check, the caveats before acting, related playbooks, sources and what each criterion asks (loaded by config/site/guide/playbooks.py, one level of subfolders; fitness tests: one per preset, in its family's folder, asks match the latest version)"
 

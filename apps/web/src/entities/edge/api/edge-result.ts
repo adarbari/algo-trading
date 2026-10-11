@@ -2,7 +2,8 @@
  * The sections of an edge's result (ADR 0037 / 0064 / 0065): `Query.edgeResult`, one document per
  * section so a page reads only the sections it shows (each resolves lazily on the server, about the
  * verdict's own run and basis, which the page never passes): the basis, the evidence curve with its
- * live stroke, the drawdown, the rolling starts, the monthly map and the decay with its live bar.
+ * live stroke, the drawdown, the rolling starts, the monthly map, the decay with its live bar, the
+ * cost sensitivity, the capacity and where it worked (by regime, by holding period).
  * `date` resolves the session of the live stroke and bar only. Every number, date and state is the
  * server's; the browser derives nothing from them. The cache holds each response.
  */
@@ -180,6 +181,114 @@ const ResultDecay = graphql(`
   }
 `);
 
+const ResultCosts = graphql(`
+  query EdgeResultCosts($id: String!) {
+    edgeResult(id: $id) {
+      costs {
+        state
+        variant
+        horizon
+        assumedBp
+        levels {
+          period
+          bp
+          assumed
+          sessions
+          picks
+          winRate
+          baseRate
+          liftPts
+          meanExcess
+        }
+        periods {
+          period
+          state
+          breakEvenBp
+          decileSpread
+        }
+      }
+    }
+  }
+`);
+
+const ResultCapacity = graphql(`
+  query EdgeResultCapacity($id: String!) {
+    edgeResult(id: $id) {
+      capacity {
+        state
+        variant
+        horizon
+        floorUsd
+        periods {
+          period
+          state
+          picks
+          advMedian
+          advKnown
+          advLow
+        }
+      }
+    }
+  }
+`);
+
+const ResultRegimes = graphql(`
+  query EdgeResultRegimes($id: String!) {
+    edgeResult(id: $id) {
+      regimes {
+        state
+        variant
+        horizon
+        rows {
+          regime
+          figures {
+            period
+            state
+            winRate
+            baseRate
+            liftPts
+            trades
+            thin
+          }
+        }
+      }
+    }
+  }
+`);
+
+const ResultHorizons = graphql(`
+  query EdgeResultHorizons($id: String!) {
+    edgeResult(id: $id) {
+      horizons {
+        state
+        variant
+        needed
+        rows {
+          horizon
+          basis
+          figures {
+            period
+            state
+            winRate
+            baseRate
+            liftPts
+            trades
+            thin
+          }
+          oosBy {
+            state
+            needed
+            have
+            remaining
+            expectedBy
+            fillRatio
+          }
+        }
+      }
+    }
+  }
+`);
+
 /** The run and basis every section reads (null: no such edge). */
 export function useEdgeResultBasis(id: string) {
   return useQuery({
@@ -231,5 +340,41 @@ export function useEdgeDecay(id: string, date?: string) {
     queryKey: queryKeys.gql('EdgeResultDecay', { id, date }),
     queryFn: () => gql(ResultDecay, { id, date }),
     select: (data) => data.edgeResult?.decay ?? null,
+  });
+}
+
+/** The cost sensitivity of the verdict's basis (null: no such edge). */
+export function useEdgeCosts(id: string) {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeResultCosts', { id }),
+    queryFn: () => gql(ResultCosts, { id }),
+    select: (data) => data.edgeResult?.costs ?? null,
+  });
+}
+
+/** The capacity of the verdict's basis (null: no such edge). */
+export function useEdgeCapacity(id: string) {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeResultCapacity', { id }),
+    queryFn: () => gql(ResultCapacity, { id }),
+    select: (data) => data.edgeResult?.capacity ?? null,
+  });
+}
+
+/** The verdict's basis by market regime (null: no such edge). */
+export function useEdgeRegimes(id: string) {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeResultRegimes', { id }),
+    queryFn: () => gql(ResultRegimes, { id }),
+    select: (data) => data.edgeResult?.regimes ?? null,
+  });
+}
+
+/** The verdict's screen at every holding period (null: no such edge). */
+export function useEdgeHorizons(id: string) {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeResultHorizons', { id }),
+    queryFn: () => gql(ResultHorizons, { id }),
+    select: (data) => data.edgeResult?.horizons ?? null,
   });
 }

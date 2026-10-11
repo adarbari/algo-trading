@@ -377,6 +377,11 @@ purpose = "the edge evidence read objects (ADR 0037, ADR 0064): the basis of a v
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/edge_evidence/slices"
+purpose = "where an edge's result worked (ADR 0064): the figures of the verdict's basis by regime and by holding period (a period's win rate, base rate, lift and trades, the thin flag, the date the out-of-sample count is expected), read from the stored slice rows; split from edge_evidence, at its module cap (10)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/edge_ledger"
 purpose = "the ledger and the variant grid of an edge's verdict basis (ADR 0064, 0065): its picks paged and sorted by the server and as a CSV file, and every screen and holding period the official run tried"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
