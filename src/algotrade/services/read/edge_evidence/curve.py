@@ -1,7 +1,9 @@
 """The evidence curve of an edge (ADR 0064, ``EdgeCurve``): what the basis's picks earned, window
 by window, added up, against what the field earned, with the live stroke on it.
 
-Additive: ``cumulative`` is the running sum of the windows' values, each plotted at its
+Additive: ``cumulative`` is the running sum of the windows' weighted values (windows that overlap
+are weighted ``min(1, spacing / horizon)``, a portfolio of staggered tranches, so the same days
+are not counted ``horizon`` times), each plotted at its
 ``exit`` session (when the outcome was known, never at the decision), the in-sample and
 out-of-sample sides by the harness's own flag (the split is the run's). A return outcome adds the
 picks' mean excess return and the base line adds the field's; any other outcome (``cushion``,
@@ -36,7 +38,8 @@ GAP_KINDS: Final = (EXCLUDED_COVERAGE, LOST_INPUT, NO_PICKS)
 class CurvePoint:
     """One window: decided at ``decision``, known at ``exit`` (the x), on ``period``'s side of
     the split, with its ``value`` and the ``cumulative`` curve; ``base_value`` and
-    ``base_cumulative`` the field's (None: no base line, or not stored); ``trades`` its picks."""
+    ``base_cumulative`` the field's (None: no base line, or not stored); ``trades`` its picks;
+    ``weight`` its share in the sums (below 1 where windows overlap): ``value`` is weighted."""
 
     decision: date
     exit: date
@@ -46,12 +49,13 @@ class CurvePoint:
     base_value: float | None
     base_cumulative: float | None
     trades: int
+    weight: float
 
 
 @dataclass(frozen=True)
 class CurveGap:
-    """A span of windows that hold no number, ``start`` (a decision session) to ``end`` (its
-    last exit), and why in public words (``kind``). ``unknown`` is set for ``lost_input`` only:
+    """A span of windows that hold no number, ``start`` to ``end`` in the curve's x (exit
+    sessions), and why in public words (``kind``). ``unknown`` is set for ``lost_input`` only:
     its admin cause names the table the screen lost."""
 
     start: date
@@ -78,27 +82,32 @@ class EdgeCurve:
 
 
 def curve_points(series: BasisSeries) -> tuple[CurvePoint, ...]:
-    """The windows of ``series`` as a running sum, in the order their outcomes became known."""
+    """The windows of ``series`` as a running sum of their weighted values, in the order their
+    outcomes became known. A window with no base value leaves ``base_cumulative`` None at that
+    point (never the previous total); the base line sums the windows that have one."""
     windows = series.windows
     if not windows:
         return ()
-    running = paths.cumulative([w.value for w in windows])
+    running = paths.cumulative([w.weighted for w in windows])
     base_sum = 0.0
     points: list[CurvePoint] = []
     for w, total in zip(windows, running, strict=True):
-        if series.is_return and w.base_value is not None:
-            base_sum += w.base_value
-        has_base = series.is_return
+        has_base = series.is_return and w.base_value is not None
+        if has_base and w.base_value is not None:
+            base_sum += w.base_value * w.weight
         points.append(
             CurvePoint(
                 decision=w.row.decision_session,
                 exit=w.exit,
                 period=w.period,
-                value=w.value,
+                value=w.weighted,
                 cumulative=float(total),
-                base_value=w.base_value if has_base else None,
+                base_value=w.base_value * w.weight
+                if has_base and w.base_value is not None
+                else None,
                 base_cumulative=base_sum if has_base else None,
                 trades=w.row.picks or 0,
+                weight=w.weight,
             )
         )
     return tuple(points)
@@ -114,17 +123,23 @@ def _gap(row: SeriesRow) -> CurveGap:
         if kind == LOST_INPUT and row.lost_table
         else None
     )
-    return CurveGap(row.decision_session, row.exit_session or row.decision_session, kind, lost)
+    at = row.exit_session or row.decision_session  # the curve's x: when the window would be known
+    return CurveGap(at, at, kind, lost)
 
 
 def curve_gaps(series: BasisSeries) -> tuple[CurveGap, ...]:
-    """The rows that hold no number as spans, a kind's overlapping or touching windows joined
-    (every-session windows overlap). A lost input keeps each lost table apart: its cause."""
+    """The rows that hold no number as spans in the curve's x (exit sessions): the gaps of one
+    kind (and lost table) with no point of the curve between them are joined. A lost input keeps
+    each lost table apart: its cause."""
+    exits = sorted(w.exit for w in series.windows)
     found: list[CurveGap] = []
-    for g in sorted((_gap(r) for r in series.gaps), key=lambda g: (g.kind, g.start)):
+    for g in sorted(
+        (_gap(r) for r in series.gaps), key=lambda g: (g.kind, _table(g) or "", g.start)
+    ):
         last = found[-1] if found else None
         same = last is not None and last.kind == g.kind and _table(last) == _table(g)
-        if last is not None and same and g.start <= last.end:
+        between = last is not None and any(last.end < e < g.start for e in exits)
+        if last is not None and same and not between:
             found[-1] = CurveGap(last.start, max(last.end, g.end), last.kind, last.unknown)
         else:
             found.append(g)

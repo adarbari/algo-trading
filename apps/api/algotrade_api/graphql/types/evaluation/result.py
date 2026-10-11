@@ -38,7 +38,9 @@ def _unknown(found: ReadUnknown | None) -> Unknown | None:
     description="One window of the curve: decided at `decision`, known at `exit` (the x: never "
     "the decision), on `period`'s side of the split (in_sample, out_of_sample, or all for a run "
     "with no split), its `value` and the `cumulative` curve; `baseValue` and `baseCumulative` "
-    "the field's (null: no base line, or not stored); `trades` its picks"
+    "the field's (null: no base line, or not stored; a window with no base value leaves it null "
+    "there); `trades` its picks; `weight` its share in the sums (below 1 where windows overlap): "
+    "`value` and the cumulatives are weighted"
 )
 class CurvePoint:
     decision: dt.date
@@ -49,6 +51,7 @@ class CurvePoint:
     base_value: float | None
     base_cumulative: float | None
     trades: int
+    weight: float
 
     @classmethod
     def of(cls, d: curve.CurvePoint) -> Self:
@@ -61,11 +64,13 @@ class CurvePoint:
             base_value=d.base_value,
             base_cumulative=d.base_cumulative,
             trades=d.trades,
+            weight=d.weight,
         )
 
 
 @strawberry.type(
-    description="A span of windows that hold no number, `from` to `to`, and why in public words "
+    description="A span of windows that hold no number, `from` to `to` (exit sessions, the "
+    "curve's x), and why in public words "
     "(`kind`: excluded_coverage, lost_input, no_picks). The line joins over it; it is never a "
     "zero. `unknown` is set for lost_input: its admin cause names the table the screen lost"
 )
@@ -97,7 +102,8 @@ class LivePoint:
 
 @strawberry.type(
     description="The live stroke: the edge's settled paper trades on the basis, as the session "
-    "knew them, laid on the curve. `state`: recorded, none (no settled trade yet) or oos_hidden "
+    "knew them, laid on the curve. `state`: recorded (trades have settled; `points` can be "
+    "fewer than `sessions`), none (no settled trade yet) or oos_hidden "
     "(a copy's out-of-sample result is withheld). `since` the first signal session, `anchor` the "
     "backtest's cumulative value it starts from (added by the server), `closed` settled trades "
     "over `sessions` signal sessions"

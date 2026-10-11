@@ -84,7 +84,8 @@ def load_rolling_starts(series: BasisSeries | Unknown) -> EdgeRollingStarts:
         if not kept:
             continue
         hits, picks, base_hits, eligible = (
-            list(col) for col in zip(*(c for _, c in kept), strict=True)
+            [x * w.weight for x, (w, _) in zip(col, kept, strict=True)]
+            for col in zip(*(c for _, c in kept), strict=True)
         )
         mean = sum(w.value for w, _ in kept) / len(kept) if series.is_return else None
         lift = paths.pooled_lift(hits, picks, base_hits, eligible)
@@ -100,7 +101,7 @@ def load_monthly(series: BasisSeries | Unknown) -> EdgeMonthly:
     if not windows:
         return EdgeMonthly(series.unit)
     keys = [w.exit.year * 12 + w.exit.month - 1 for w in windows]
-    found, sums, counts = paths.sum_by_key(keys, [w.value for w in windows])
+    found, sums, counts = paths.sum_by_key(keys, [w.weighted for w in windows])
     sides = {k: {w.period for w, key in zip(windows, keys, strict=True) if key == k} for k in found}
     months = tuple(
         MonthRow(

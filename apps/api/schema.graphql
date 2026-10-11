@@ -227,7 +227,7 @@ type CriterionResult {
 }
 
 """
-A span of windows that hold no number, `from` to `to`, and why in public words (`kind`: excluded_coverage, lost_input, no_picks). The line joins over it; it is never a zero. `unknown` is set for lost_input: its admin cause names the table the screen lost
+A span of windows that hold no number, `from` to `to` (exit sessions, the curve's x), and why in public words (`kind`: excluded_coverage, lost_input, no_picks). The line joins over it; it is never a zero. `unknown` is set for lost_input: its admin cause names the table the screen lost
 """
 type CurveGap {
   from: Date!
@@ -237,7 +237,7 @@ type CurveGap {
 }
 
 """
-One window of the curve: decided at `decision`, known at `exit` (the x: never the decision), on `period`'s side of the split (in_sample, out_of_sample, or all for a run with no split), its `value` and the `cumulative` curve; `baseValue` and `baseCumulative` the field's (null: no base line, or not stored); `trades` its picks
+One window of the curve: decided at `decision`, known at `exit` (the x: never the decision), on `period`'s side of the split (in_sample, out_of_sample, or all for a run with no split), its `value` and the `cumulative` curve; `baseValue` and `baseCumulative` the field's (null: no base line, or not stored; a window with no base value leaves it null there); `trades` its picks; `weight` its share in the sums (below 1 where windows overlap): `value` and the cumulatives are weighted
 """
 type CurvePoint {
   decision: Date!
@@ -248,6 +248,7 @@ type CurvePoint {
   baseValue: Float
   baseCumulative: Float
   trades: Int!
+  weight: Float!
 }
 
 """Date (isoformat)"""
@@ -441,7 +442,7 @@ type EdgeHaircut {
 }
 
 """
-The live stroke: the edge's settled paper trades on the basis, as the session knew them, laid on the curve. `state`: recorded, none (no settled trade yet) or oos_hidden (a copy's out-of-sample result is withheld). `since` the first signal session, `anchor` the backtest's cumulative value it starts from (added by the server), `closed` settled trades over `sessions` signal sessions
+The live stroke: the edge's settled paper trades on the basis, as the session knew them, laid on the curve. `state`: recorded (trades have settled; `points` can be fewer than `sessions`), none (no settled trade yet) or oos_hidden (a copy's out-of-sample result is withheld). `since` the first signal session, `anchor` the backtest's cumulative value it starts from (added by the server), `closed` settled trades over `sessions` signal sessions
 """
 type EdgeLive {
   state: String!

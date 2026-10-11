@@ -491,7 +491,7 @@ def test_the_in_sample_ranking_puts_a_hard_failure_below_a_candidate_without_one
 def test_the_haircut_of_a_stored_run_counts_the_series_sessions_with_picks(
     backend: MemoryBackend,
 ) -> None:
-    days = [date(2026, 3, 2) + timedelta(days=i) for i in range(5)]
+    days = [date(2026, 1, 2) + timedelta(days=30 * i) for i in range(5)]  # no overlap: weight 1
     stored = [series_row(d, FROZEN) for d in days[:3]]
     stored += [series_row(d, FROZEN, status="excluded_coverage", picks=None) for d in days[3:]]
     write_run(

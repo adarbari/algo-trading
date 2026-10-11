@@ -1,6 +1,6 @@
 """Rolling starts and the monthly map: pooled from the same windows, never from another source."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -20,9 +20,9 @@ from tests.unit.services.read.evaluation.conftest import FROZEN, series_row
 def test_each_years_start_pools_the_windows_decided_from_it_on(backend: MemoryBackend) -> None:
     kw = {"picks": 4, "eligible": 20, "base_hits": 10}
     rows = [
-        series_row(date(2026, 12, 7), FROZEN, pick_hits=1, pick_mean=0.01, **kw),
-        series_row(date(2027, 1, 4), FROZEN, pick_hits=3, pick_mean=0.03, **kw),
-        series_row(date(2027, 2, 1), FROZEN, pick_hits=4, pick_mean=0.05, **kw),
+        series_row(date(2026, 12, 14), FROZEN, pick_hits=1, pick_mean=0.01, **kw),
+        series_row(date(2027, 2, 1), FROZEN, pick_hits=3, pick_mean=0.03, **kw),
+        series_row(date(2027, 3, 15), FROZEN, pick_hits=4, pick_mean=0.05, **kw),
         series_row(
             date(2028, 3, 6), FROZEN, pick_hits=None, pick_mean=0.09, **kw
         ),  # no wins stored
@@ -49,14 +49,47 @@ def test_a_month_is_the_sum_of_the_windows_that_closed_in_it(backend: MemoryBack
     )
     m = load_monthly(series_of(read(backend)))
     by = {x.month: x for x in m.months}
-    closes = [d + EXIT for d in DAYS]  # 2026-06-02 .. 2026-07-21
+    closes = [d + EXIT for d in DAYS]
     assert all(x.month.day == 1 for x in m.months)
     assert sum(x.trades for x in m.months) == 8
-    june = [i for i, c in enumerate(closes) if c.month == 6]
-    assert by[date(2026, 6, 1)].value == pytest.approx(sum(0.01 * (i + 1) for i in june))
-    assert by[date(2026, 6, 1)].period == "both"  # decided before and after the split
+    may = [i for i, c in enumerate(closes) if (c.year, c.month) == (2026, 5)]
+    assert len(may) == 2 and by[date(2026, 5, 1)].trades == 2
+    assert by[date(2026, 5, 1)].value == pytest.approx(sum(0.01 * (i + 1) for i in may))
+    assert by[date(2026, 5, 1)].period == "in_sample"
     assert by[date(2026, 7, 1)].period == "out_of_sample"
     assert sum(x.value for x in m.months) == pytest.approx(0.36)  # the curve's last value
+
+
+def test_a_month_that_closes_windows_of_both_sides_says_both(backend: MemoryBackend) -> None:
+    june = {"exit_session": date(2026, 6, 10)}
+    stored_run(
+        backend,
+        [
+            series_row(DAYS[3], FROZEN, pick_mean=0.01, **june),  # decided before the split
+            series_row(DAYS[4], FROZEN, pick_mean=0.02, exit_session=date(2026, 6, 20)),
+        ],
+    )
+    (month,) = load_monthly(series_of(read(backend))).months
+    assert (month.month, month.period, month.trades) == (date(2026, 6, 1), "both", 2)
+
+
+def test_overlapping_windows_are_weighted_in_a_month_and_in_the_lift(
+    backend: MemoryBackend,
+) -> None:
+    kw = {"picks": 4, "eligible": 20, "base_hits": 10}
+    rows = [
+        series_row(
+            date(2026, 3, 2) + timedelta(days=i), FROZEN, pick_mean=0.02,
+            pick_hits=4 if i < 2 else 0, exit_session=date(2026, 4, 1), **kw,
+        )
+        for i in range(3)  # decided on consecutive days: weights 1 / 20 each (a weekend or not)
+    ]  # fmt: skip
+    stored_run(backend, rows)
+    series = series_of(read(backend))
+    (month,) = load_monthly(series).months
+    assert month.trades == 3 and month.value < 0.06 and month.value > 0.0
+    weights = [w.weight for w in series.windows]  # type: ignore[union-attr]
+    assert month.value == pytest.approx(0.02 * sum(weights))
 
 
 def test_no_series_is_unknown(backend: MemoryBackend) -> None:

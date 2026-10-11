@@ -23,6 +23,7 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.paper import LOST, WON, PaperTrade, load_trades
 from algotrade.services.read.edge_evidence.series import BasisSeries
 from algotrade.services.read.evaluation.edges import Edge
+from algotrade.services.read.evaluation.runs import window_weights
 
 RECORDED, NONE, OOS_HIDDEN = "recorded", "none", "oos_hidden"
 LIVE_STATES: Final = (RECORDED, NONE, OOS_HIDDEN)
@@ -42,7 +43,8 @@ class LivePoint:
 
 @dataclass(frozen=True)
 class EdgeLive:
-    """The live stroke: ``state`` (``recorded``: it has points; ``none``: no settled trade of the
+    """The live stroke: ``state`` (``recorded``: trades have settled, ``points`` may be fewer
+    than ``sessions`` when a session has nothing to value; ``none``: no settled trade of the
     basis yet; ``oos_hidden``: a copy's out-of-sample result is withheld), ``since`` the first
     signal session of the settled record, ``anchor`` the backtest's cumulative value it starts from,
     ``closed`` settled trades over ``sessions`` signal sessions, ``points`` by sell session."""
@@ -112,8 +114,11 @@ def load_live(
     if not sessions:
         return EdgeLive(NONE)
     bases = _bases(series)
+    weights = window_weights(
+        sessions, series.horizon
+    )  # overlapping signals count as the curve's do
     valued = [
-        (max(t.sell_session for t in trades), signal, len(trades), v)
+        (max(t.sell_session for t in trades), signal, len(trades), v * weights[signal])
         for signal, trades in sessions.items()
         if (v := session_value(trades, series, bases.get(signal))) is not None
     ]
@@ -125,7 +130,7 @@ def load_live(
         running += value
         points.append(LivePoint(sell, value, running, n))
     return EdgeLive(
-        RECORDED if points else NONE,
+        RECORDED,  # settled trades exist; a session with nothing to value is just no point
         since=first,
         anchor=anchor,
         closed=sum(len(t) for t in sessions.values()),

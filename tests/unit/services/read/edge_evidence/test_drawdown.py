@@ -2,10 +2,12 @@
 on its own, volatility by independent windows, and no drawdown for an outcome with no return."""
 
 import math
+from datetime import date, timedelta
 
 import numpy as np
 import pytest
 
+from algotrade.core.time.calendar import is_session
 from algotrade.services.read.edge_evidence.drawdown import load_drawdown
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -65,16 +67,20 @@ def test_an_open_drop_from_the_start_has_no_recovery(backend: MemoryBackend) -> 
     assert (episode.recovered, round(episode.depth, 4)) == (None, 0.03)
 
 
-def test_volatility_counts_independent_windows_not_overlapping_ones(backend: MemoryBackend) -> None:
+def test_volatility_counts_independent_windows_by_intervals_not_overlapping_windows(
+    backend: MemoryBackend,
+) -> None:
     stored(backend, VALUES)
     d = load_drawdown(series_of(read(backend)))
-    # weekly 20-session windows overlap: 4 windows in 21 days would be ~70 a year, but only
-    # 252 / 20 = 12.6 independent windows fit a year
-    sd = float(np.std(VALUES[:4], ddof=1))
-    assert d.vol_in_sample == pytest.approx(sd * math.sqrt(252 / 20))
-    assert d.vol_out_of_sample == pytest.approx(
-        float(np.std(VALUES[4:], ddof=1)) * math.sqrt(252 / 20)
-    )
+
+    def expected(values: list[float]) -> float:
+        years = 90 / 365.25  # four windows 30 days apart span three intervals
+        independent = min((len(values) - 1) / years, 252 / 20)  # never more than a year holds
+        return float(np.std(values, ddof=1)) * math.sqrt(independent)
+
+    assert d.vol_in_sample == pytest.approx(expected(VALUES[:4]))
+    assert d.vol_out_of_sample == pytest.approx(expected(VALUES[4:]))
+    assert d.vol_in_sample < float(np.std(VALUES[:4], ddof=1)) * math.sqrt(4 / (90 / 365.25))
 
 
 def test_one_window_has_no_volatility_and_no_window_no_drawdown(backend: MemoryBackend) -> None:
@@ -96,3 +102,21 @@ def test_no_series_is_unknown(backend: MemoryBackend) -> None:
     stored_run(backend, [])
     found = series_of(read(backend))
     assert isinstance(found, Unknown) and load_drawdown(found).unknown is found
+
+
+def test_an_every_session_curve_is_a_tranche_portfolio_not_a_sum_of_overlaps(
+    backend: MemoryBackend,
+) -> None:
+    days = [d for d in (date(2026, 1, 5) + timedelta(days=i) for i in range(40)) if is_session(d)]
+    values = [0.02 if i % 2 == 0 else -0.02 for i in range(len(days))]
+    stored_run(
+        backend,
+        [
+            series_row(d, FROZEN, pick_mean=v, exit_session=d + timedelta(days=28))
+            for d, v in zip(days, values, strict=True)
+        ],
+    )
+    d = load_drawdown(series_of(read(backend)))
+    # each window is 1 / 20 of the capital (the first takes the second's spacing): the deepest
+    # drop is one losing window's weighted value, 0.02 / 20, not 0.02
+    assert d.episodes and max(e.depth for e in d.episodes) == pytest.approx(0.02 / 20)

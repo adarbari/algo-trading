@@ -3,9 +3,11 @@ series of the evidence curve (its distance below its running high), its three de
 with dates, the deepest drop on each side of the split and the annualised volatility of the
 windows, in-sample and out-of-sample apart.
 
-A drop is measured on the per-window curve, so it understates a dip INSIDE a window (the Guide
-says so). The out-of-sample side is its own curve from its first window (zero), so an
-out-of-sample drop is never a fall from an in-sample high. Volatility is the standard deviation of
+The curve adds each window at its weight (windows that overlap are weighted so the same days are
+not counted again, see ``evidence_curve``). A drop is measured on the per-window curve, so it
+understates a dip INSIDE a window (the Guide says so). The out-of-sample side is its own curve
+from its first window (zero), so an out-of-sample drop is never a fall from an in-sample high.
+Volatility is the standard deviation of
 the windows' values times the root of the independent windows a year: the windows the run
 observed a year, never more than the sessions a year allow a window of the holding period (the
 windows of an every-session schedule overlap, and counting each as independent would overstate
@@ -70,7 +72,7 @@ def _vol(windows: list[Window], horizon: int) -> float | None:
     years = days / DAYS_PER_YEAR
     if years <= 0.0:
         return None
-    observed = len(windows) / years
+    observed = (len(windows) - 1) / years  # intervals, not windows, span the years
     independent = min(observed, TRADING_DAYS / max(horizon, 1))
     return paths.annualised_vol([w.value for w in windows], len(windows) / independent)
 
@@ -79,7 +81,7 @@ def _max_depth(windows: list[Window]) -> float | None:
     """The deepest drop of the curve of ``windows`` alone, from zero at its first window."""
     if not windows:
         return None
-    return float(-paths.underwater(paths.cumulative([w.value for w in windows])).min())
+    return float(-paths.underwater(paths.cumulative([w.weighted for w in windows])).min())
 
 
 def load_drawdown(series: BasisSeries | Unknown) -> EdgeDrawdown:
@@ -94,7 +96,7 @@ def load_drawdown(series: BasisSeries | Unknown) -> EdgeDrawdown:
     windows = list(series.windows)
     if not windows:
         return EdgeDrawdown(series.unit)
-    curve = paths.cumulative([w.value for w in windows])
+    curve = paths.cumulative([w.weighted for w in windows])
     depth = paths.underwater(curve)
     start = windows[0].row.decision_session
 

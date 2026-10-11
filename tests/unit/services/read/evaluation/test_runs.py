@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
+from algotrade.core.time.calendar import is_session
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
     load_canonical_run,
@@ -14,6 +15,7 @@ from algotrade.services.read.evaluation.runs import (
     load_run_rows,
     load_run_series,
     measured_sessions,
+    window_weights,
 )
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -263,7 +265,7 @@ def test_a_hidden_run_withholds_the_out_of_sample_counts_and_the_exits(
 
 
 def test_measured_sessions_count_the_basis_windows_with_picks(backend: MemoryBackend) -> None:
-    days = [date(2026, 3, 2) + timedelta(days=i) for i in range(4)]
+    days = [date(2026, 1, 2) + timedelta(days=30 * i) for i in range(4)]  # 20+ sessions apart
     stored = [
         series_row(days[0], FROZEN),
         series_row(days[1], FROZEN, status="excluded_coverage", picks=None, pick_mean=None),
@@ -278,3 +280,23 @@ def test_measured_sessions_count_the_basis_windows_with_picks(backend: MemoryBac
     run = load_canonical_run(ctx, edge).run
     assert run is not None
     assert measured_sessions(load_run_series(ctx, run)) == {("momo", 20): 1}
+
+
+def test_window_weights_are_a_tranche_portfolio_share() -> None:
+    days = [date(2026, 3, 2), date(2026, 3, 3), date(2026, 3, 4), date(2026, 4, 20)]
+    w = window_weights(days, 20)
+    assert [w[d] for d in days[:3]] == [1 / 20, 1 / 20, 1 / 20]  # the first takes the next's gap
+    assert w[days[3]] == 1.0  # 33 sessions after the previous: no overlap
+    assert window_weights(days[:1], 20) == {days[0]: 1.0}
+
+
+def test_overlapping_sessions_are_not_independent_for_the_haircut(backend: MemoryBackend) -> None:
+    days = [d for d in (date(2026, 1, 5) + timedelta(days=i) for i in range(60)) if is_session(d)]
+    write_run(backend, "r1", FROZEN, 0.6, series=[series_row(d, FROZEN) for d in days])
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None
+    found = measured_sessions(load_run_series(ctx, run))
+    assert found == {("momo", 20): round(len(days) / 20)}  # about two, not forty

@@ -78,7 +78,7 @@ short = "The Sharpe ratio left once the variants tried are counted: Harvey and L
 body = """
 Try many versions and the best one looks good by luck. Harvey and Liu turn the Sharpe ratio into a
 t-ratio and a p-value. They multiply the p-value by the number of variants tried and turn the result back into a Sharpe ratio. The share lost is the haircut. Their illustration: a t-ratio of 3.0
-whose p-value is adjusted to 0.05 becomes about 2.0, a haircut of about a third. Here the Sharpe ratio is the stored one, per trade and not annualised, over the whole history. The adjustment is the Bonferroni bound, which is Holm's value for the best of the variants. The others' t statistics are not stored. When the picks of an edge overlap in time, as on an every-session schedule, the t-ratio is overstated and so is the Sharpe ratio behind it. The verdict uses the deflated Sharpe ratio, not this one;
+whose p-value is adjusted to 0.05 becomes about 2.0, a haircut of about a third. Here the Sharpe ratio is the stored one, per trade and not annualised, over the whole history. The number of trades behind it counts independent sessions: windows that overlap are weighted by the sessions since the previous decision over the holding period. The adjustment is the Bonferroni bound, which is Holm's value for the best of the variants. The others' t statistics are not stored. When the picks of an edge overlap in time, as on an every-session schedule, the t-ratio is overstated and so is the Sharpe ratio behind it. The verdict uses the deflated Sharpe ratio, not this one;
 the haircut is shown beside it as a second view of the same luck.
 """
 next = "Read the cut against the trial count: a large cut with many variants means the best may be luck."

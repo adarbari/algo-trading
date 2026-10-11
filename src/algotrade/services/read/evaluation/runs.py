@@ -8,16 +8,17 @@ same range end). Every run discloses its ``run_id``, range, ``split_from``, ``kn
 canonical run of an edge is the latest committed run of the site user whose split is its
 ``frozen_from``: none is ``NOT_RUN`` with the reason, never an older or exploratory run."""
 
-from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
+from itertools import pairwise
 from typing import Any
 
 import pandas as pd
 
 from algotrade.config.edges.document import LEGACY_SITE_CUTOFF, LEGACY_SITE_OWNERS, job_name
 from algotrade.config.user import SITE_USER
+from algotrade.core.time.calendar import sessions_to
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext, Stores, run_partition
 from algotrade.services.read.evaluation.edges import Edge, load_edges
@@ -407,15 +408,40 @@ def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
     return tuple(sorted(kept, key=lambda r: (r.variant, r.horizon_sessions, r.decision_session)))
 
 
+def window_weights(days: Iterable[date], horizon: int) -> dict[date, float]:
+    """The weight of each decision session's window in a sum over windows: ``min(1, spacing /
+    horizon)``, the spacing the sessions since the previous decision (the first takes the next
+    one's). Windows of ``horizon`` sessions started every session overlap: counted whole they
+    add each day ``horizon`` times. A portfolio of ``horizon`` staggered tranches, each 1 /
+    ``horizon`` of the capital, earns each day the average of the windows covering it, which is
+    this weighting; a schedule spaced at least ``horizon`` apart has weight 1."""
+    ordered = sorted(set(days))
+    if len(ordered) < 2 or horizon <= 1:
+        return dict.fromkeys(ordered, 1.0)
+    steps = [sessions_to(a, b) for a, b in pairwise(ordered)]
+    return {d: min(1.0, n / horizon) for d, n in zip(ordered, [steps[0], *steps], strict=True)}
+
+
 def measured_sessions(series: Sequence[SeriesRow]) -> dict[tuple[str, int], int]:
-    """Per (screen, holding period) of the main edge variant, the decision sessions that were
-    measured with picks (status ``measured``, at least one pick): the count the haircut Sharpe
-    ratio rests on. A baseline is not a screen; a window that holds no number is not a session."""
-    found: Counter[tuple[str, int]] = Counter()
+    """Per (screen, holding period) of the main edge variant, the independent sessions measured
+    with picks: the windows with status ``measured`` and at least one pick, each counted at its
+    ``window_weights`` (overlapping windows are not independent); the count the haircut Sharpe
+    ratio rests on. A baseline is not a screen; a window that holds no number is not counted."""
+    screens: dict[tuple[str, int], list[SeriesRow]] = {}
     for r in series:
-        if r.role != BASELINE and r.status == "measured" and (r.picks or 0) > 0:
-            found[(r.variant, r.horizon_sessions)] += 1
-    return dict(found)
+        if r.role != BASELINE:
+            screens.setdefault((r.variant, r.horizon_sessions), []).append(r)
+    found: dict[tuple[str, int], int] = {}
+    for key, rows in screens.items():
+        weights = window_weights((r.decision_session for r in rows), key[1])
+        total = sum(
+            weights[r.decision_session]
+            for r in rows
+            if r.status == "measured" and (r.picks or 0) > 0
+        )
+        if round(total) > 0:
+            found[key] = round(total)
+    return found
 
 
 def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], int] | None:

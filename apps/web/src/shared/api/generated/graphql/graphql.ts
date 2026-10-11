@@ -134,7 +134,7 @@ export type EdgeResultCurveQueryVariables = Exact<{
 }>;
 
 
-export type EdgeResultCurveQuery = { edgeResult: { curve: { kind: string | null, unit: string | null, splitFrom: string | null, hidden: boolean, points: Array<{ decision: string, exit: string, period: string, value: number, cumulative: number, baseValue: number | null, baseCumulative: number | null, trades: number }>, gaps: Array<{ from: string, to: string, kind: string, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, live: { state: string, since: string | null, anchor: number | null, closed: number, sessions: number, points: Array<{ sell: string, value: number, cumulative: number, trades: number }> } | null, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type EdgeResultCurveQuery = { edgeResult: { curve: { kind: string | null, unit: string | null, splitFrom: string | null, hidden: boolean, points: Array<{ decision: string, exit: string, period: string, value: number, cumulative: number, baseValue: number | null, baseCumulative: number | null, trades: number, weight: number }>, gaps: Array<{ from: string, to: string, kind: string, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, live: { state: string, since: string | null, anchor: number | null, closed: number, sessions: number, points: Array<{ sell: string, value: number, cumulative: number, trades: number }> } | null, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
 
 export type EdgeResultDrawdownQueryVariables = Exact<{
   id: string;
@@ -653,6 +653,7 @@ export const EdgeResultCurveDocument = new TypedDocumentString(`
         baseValue
         baseCumulative
         trades
+        weight
       }
       gaps {
         from

@@ -46,6 +46,7 @@ const ResultCurve = graphql(`
           baseValue
           baseCumulative
           trades
+          weight
         }
         gaps {
           from

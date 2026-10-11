@@ -13,16 +13,17 @@ from algotrade.storage.backends.memory import MemoryBackend
 from tests.unit.services.read.edge_desk.conftest import context
 from tests.unit.services.read.evaluation.conftest import FROZEN, series_row, write_run
 
-MONDAY = date(2026, 5, 4)  # four Mondays before FROZEN, then after it
-DAYS = [MONDAY + timedelta(days=7 * i) for i in range(8)]  # 05-04 .. 06-22: split at 06-01
+FIRST = FROZEN - timedelta(days=120)
+# 30 days apart is at least 20 sessions: windows of 20 sessions do not overlap, so every weight is 1
+DAYS = [FIRST + timedelta(days=30 * i) for i in range(8)]  # four before the split, then FROZEN on
 EXIT = timedelta(days=29)
 
 
 def stored_run(
     backend: MemoryBackend, rows: list[dict[str, Any]] | None = None, **kw: Any
 ) -> list[dict[str, Any]]:
-    """Write ``drift``'s canonical run with ``rows`` (default: one measured window per Monday,
-    picks' mean 1% then 2%... see ``DAYS``) as its series; the rows are returned."""
+    """Write ``drift``'s canonical run with ``rows`` (default: one measured window per ``DAYS``
+    entry) as its series; the rows are returned."""
     found = rows if rows is not None else [series_row(d, FROZEN, pick_mean=0.01) for d in DAYS]
     write_run(backend, "r1", FROZEN, 0.6, series=found, **kw)
     return found

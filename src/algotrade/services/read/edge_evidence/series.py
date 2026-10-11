@@ -6,7 +6,9 @@ the outcome's ``unit``.
 A window is a block of decision sessions whose outcome is known at its ``exit_session``, the x of
 every picture. A return outcome (``excess_return``, ``return``) is valued in the picks' mean; any
 other (``cushion``, ``ratio``) has no return to add up, so a window is valued in the picks' wins
-above what the field's base rate predicts. A row that holds no number (``excluded_coverage``,
+above what the field's base rate predicts. Windows that overlap (a schedule spaced closer than
+the holding period) are weighted so a sum over them is a portfolio of staggered tranches, not the
+same days counted again (``Window.weight``). A row that holds no number (``excluded_coverage``,
 ``lost_input``, ``no_picks``, or a measured row with a field missing) is no window: it is kept
 apart as a gap, never valued at zero. Not stored (an older run) is ``NOT_STORED``."""
 
@@ -32,13 +34,20 @@ MEASURED, NO_PICKS = "measured", "no_picks"
 class Window:
     """One measured block: ``row``, its ``period`` (``in_sample`` or ``out_of_sample`` by the
     harness's ``before_split``; ``all`` for a run with no split), ``value`` (the picks' mean in a
-    return outcome, else the wins above the base rate) and the field's ``base_value`` (the mean
-    of every eligible name; None for a non-return outcome or when not stored)."""
+    return outcome, else the wins above the base rate), the field's ``base_value`` (the mean of
+    every eligible name; None for a non-return outcome or when not stored) and ``weight`` (its
+    share when windows are added: ``runs.window_weights``, below 1 where windows overlap)."""
 
     row: SeriesRow
     period: str
     value: float
     base_value: float | None
+    weight: float = 1.0
+
+    @property
+    def weighted(self) -> float:
+        """``value`` at its ``weight``: what the window adds to a curve, a month or a drop."""
+        return self.value * self.weight
 
     @property
     def exit(self) -> date:
@@ -87,13 +96,13 @@ def _value(row: SeriesRow, unit: str) -> tuple[float, float | None] | None:
     return float(paths.excess_wins([hits], [picks], [base_hits], [eligible])[0]), None
 
 
-def _window(row: SeriesRow, unit: str, split: date | None) -> Window | None:
+def _window(row: SeriesRow, unit: str, split: date | None, weight: float) -> Window | None:
     if row.status != MEASURED or not (row.picks or 0) > 0 or row.exit_session is None:
         return None
     valued = _value(row, unit)
     if valued is None:
         return None
-    return Window(row, period_of(row, split), valued[0], valued[1])
+    return Window(row, period_of(row, split), valued[0], valued[1], weight)
 
 
 def _unit(rows: list[SeriesRow]) -> str:
@@ -119,7 +128,12 @@ def load_basis_series(ctx: Stores, basis: OfficialBasis) -> BasisSeries | Unknow
         why = f"{basis.run.run_id} stored no per-session series for {basis.key[0]}: re-run it"
         return Unknown(UnknownCode.NO_ROW, run_cause(job, why))
     unit = _unit(mine)
-    windows = [w for r in mine if (w := _window(r, unit, basis.split_from)) is not None]
+    weights = runs.window_weights((r.decision_session for r in mine), basis.key[1])
+    windows = [
+        w
+        for r in mine
+        if (w := _window(r, unit, basis.split_from, weights[r.decision_session])) is not None
+    ]
     windows.sort(key=lambda w: (w.exit, w.row.decision_session))
     used = {id(w.row) for w in windows}
     gaps = tuple(r for r in mine if id(r) not in used)
