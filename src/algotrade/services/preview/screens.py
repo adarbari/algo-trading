@@ -14,26 +14,29 @@ run for that session, who the draft would pick that the run did not and the reve
 is cached (``preview.frame``), so an edit that keeps the field set re-evaluates in memory.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from functools import partial
 from typing import Any
 
+from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.core.model.screen_spec import Mode, ScreenSpec
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.core.views.feature_view import FeatureView
-from algotrade.services.configs import resolve_rule_draft
+from algotrade.services.configs import resolve_config, resolve_rule_draft
 from algotrade.services.features import config_features
-from algotrade.services.preview.frame import field_frame
+from algotrade.services.preview.frame import FieldFrame, field_frame
 from algotrade.services.read.context import ReadContext, ResultCache, open_context
 from algotrade.services.read.screens.runs import is_picked, latest_run, run_rows
 from algotrade.services.read.screens.screeners import (
     ScreenColumn,
     ScreenCriterion,
     load_screener,
+    load_screeners,
 )
 from algotrade.services.screening.run import rule_run, settle_coverage
 from algotrade.services.views import to_value
@@ -221,6 +224,42 @@ def _row(row: RuleRow, symbol: str | None, name: str | None) -> PreviewRow:
     )
 
 
+@dataclass(frozen=True)
+class SavedPicks:
+    """Who a screener's saved run picked for a session (``run_id`` None: it has no run)."""
+
+    run_id: str | None
+    session: date
+    picked: frozenset[str]
+
+
+def saved_picks(ctx: ReadContext, who: UserContext, screener_id: str, session: date) -> SavedPicks:
+    """``screener_id``'s saved run for ``session`` as ``who`` sees it (the read model's
+    latest-run rule), and its picks. Cached per user, screener, session and published state
+    (read before computing, ADR 0022): finding the run groups the session's whole partition
+    and its rows sort it, a cost every preview paid again (1.6 s cold, 0.2 s warm) for a set
+    that only a publish changes."""
+    key = ("preview.saved_picks", who.user_id, screener_id, session, ctx.reader.own_run,
+           ctx.reader.visible_seq())  # fmt: skip
+    found: SavedPicks | None = ctx.cache.get(key)
+    if found is None:
+        mine = open_context(ctx.reader, ctx.configs, who, session, ctx.cache)
+        screener = load_screener(mine, screener_id)
+        run = None if screener is None else latest_run(mine, screener.owner, screener_id).run
+        if run is None:
+            found = SavedPicks(None, session, frozenset())
+        else:
+            saved = run_rows(mine, run)
+            picked = frozenset(
+                str(i)
+                for i, d in zip(saved["instrument_id"], saved["decision"], strict=True)
+                if is_picked(str(d))
+            )
+            found = SavedPicks(run.run_id, run.session, picked)
+        ctx.cache.put(key, found)
+    return found
+
+
 def preview_changes(
     ctx: ReadContext,
     who: UserContext,
@@ -231,19 +270,48 @@ def preview_changes(
 ) -> PreviewChanges | None:
     """``rows`` (the draft's, every one) against ``screener_id``'s saved run for ``session``
     (the read model's latest-run rule, as ``who`` sees the screener); None without one."""
-    mine = open_context(ctx.reader, ctx.configs, who, session, ctx.cache)
-    screener = load_screener(mine, screener_id)
-    run = None if screener is None else latest_run(mine, screener.owner, screener_id).run
-    if run is None:
+    saved = saved_picks(ctx, who, screener_id, session)
+    if saved.run_id is None:
         return None
-    saved = run_rows(mine, run)
-    before = {str(i) for i, d in zip(saved["instrument_id"], saved["decision"], strict=True)
-              if is_picked(str(d))}  # fmt: skip
+    before = saved.picked
     after = {r.instrument_id for r in rows if is_picked(r.decision.value)}
     # Tickers by the frame's universe; one it does not name (snapshot drift) is left out.
     entered = sorted(symbols[i] for i in after - before if i in symbols)
     left = sorted(symbols[i] for i in before - after if i in symbols)
-    return PreviewChanges(run.run_id, run.session, entered, left)
+    return PreviewChanges(saved.run_id, saved.session, entered, left)
+
+
+def screen_frame(
+    ctx: ReadContext, frames: ResultCache, config: ResolvedConfig, session: date
+) -> tuple[FieldFrame, bool]:
+    """The field frame ``config``'s rule screen reads on ``session`` (its selection's fields,
+    its criteria's and its order) and whether it came from ``frames``: the one place a screen's
+    frame key is made, so what the warmer reads is what a preview asks for."""
+    rules, selection = config.screen_spec, config.selection
+    if selection is None:  # a rule screen always resolves with one
+        raise ConfigurationError(f"{config.user.user_id}/{config.config.id}: needs a selection")
+    fields = {r.field for r in selection.where.rules()} | set(rules.fields())
+    if selection.order_by:
+        fields.add(selection.order_by)
+    return field_frame(
+        ctx.reader, frames, session, sorted(fields), config_features(config), config.features
+    )
+
+
+def warm_preview(ctx: ReadContext, frames: ResultCache, config_id: str) -> None:
+    """Read what the Builder's first preview of ``config_id`` (as the context's user opens
+    it) reads: its field frame, into ``frames``, and the picks of its saved run."""
+    config = resolve_config(ctx.configs, config_id, ctx.user)
+    screen_frame(ctx, frames, config, ctx.session.date)
+    saved_picks(ctx, ctx.user, config_id, ctx.session.date)
+
+
+def warm_steps(frames: ResultCache, ctx: ReadContext) -> list[tuple[str, Callable[[], object]]]:
+    """One named step per screen on the Screeners list: ``warm_preview`` of it (the API's
+    cache warmer runs them)."""
+    return [
+        (f"preview {s.id}", partial(warm_preview, ctx, frames, s.id)) for s in load_screeners(ctx)
+    ]
 
 
 def preview_screen(
@@ -266,17 +334,7 @@ def preview_screen(
     if selection is None:  # a rule screen always resolves with one; never run without it
         raise ConfigurationError(f"{who.user_id}/{name}: a screener needs a selection")
     session, closed = ctx.session.date, last_closed_session(now or datetime.now(UTC))
-    fields = {r.field for r in selection.where.rules()} | set(rules.fields())
-    if selection.order_by:
-        fields.add(selection.order_by)
-    frame, cached = field_frame(
-        ctx.reader,
-        frames,
-        session,
-        sorted(fields),
-        config_features(config),
-        config.features,
-    )
+    frame, cached = screen_frame(ctx, frames, config, session)
     selected = frame.selected(selection)
     ids = list(selected.instruments)
     view = FeatureView(session, {i: frame.view.row(i) for i in ids})

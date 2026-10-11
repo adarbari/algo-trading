@@ -37,6 +37,7 @@ from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.edges import OnDemandEdges, open_ondemand_edges
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
+from algotrade.services.preview.screens import warm_steps
 from algotrade.services.read.availability.cause import (
     GENERIC_REASONS,
     UnavailableKind,
@@ -251,7 +252,13 @@ def create_app(
         dependencies=caller,
     )
     user = app.state.store.user
-    app.state.warmer = CacheWarmer(lambda: reads(user, None)) if settings.live else None
+    app.state.warmer = (
+        CacheWarmer(
+            lambda: reads(user, None), extra=partial(warm_steps, app.state.store.preview_cache)
+        )
+        if settings.live
+        else None
+    )
     if settings.web_dist is not None:  # last: its catch-all GET must not shadow an API route
         app.include_router(web_router(settings.web_dist))
     return app
