@@ -352,16 +352,13 @@ def partition(
 
 def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | None:
     """The rows ``run`` wrote to the session-grain ``table`` (a ``results/*`` table it
-    publishes to its own end session), read as of the run: a later run with the same end
-    session replaces the partition, so it is read as the run left it. ``None``: nothing
+    publishes to its own end session), read as the run left them whatever later run shares
+    the partition (``read_run``: only that run's file, ADR 0064). ``None``: nothing
     stored for it. ``ValueError`` for a table that is not session grain."""
     grain = grain_of(table)
     if grain is not Grain.SESSION:
         raise ValueError(f"{table} is {grain} grain: a run's results are session grain")
-    frame = ctx.reader.table(table, run.session_date, as_of=run.started_at)
-    if frame is None:
-        return None
-    return frame[frame["run_id"] == run.run_id].reset_index(drop=True)
+    return ctx.reader.read_run(table, run.session_date, run.run_id)
 
 
 # ---------------------------------------------------------------------------- inventory

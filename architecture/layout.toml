@@ -252,7 +252,12 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/quant"
-purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, edge statistics (lift, effect size, deciles, deflated Sharpe, PBO), discovery statistics (sign stability, rank-correlation clusters, the permutation null)"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, the edge statistics in edges/"
+contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/quant/edges"
+purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -283,7 +288,11 @@ purpose = "use case: evaluate every strategy on every golden dataset against the
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
-purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run joining outcomes (harness.py, the one reader of them), what it reads once per session (reads/), the key of a reusable leg (legs/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
+purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run planning its legs and assembling the evaluation (harness.py), the measuring of those legs over chunks of sessions, the one reader of outcomes with the harness (measuring.py), what it reads once per session (reads/), the key of a reusable leg (legs/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/cross_section/detail"
+purpose = "the framing of what an edge evaluation publishes beside its measures (ADR 0064): the per-session series and the trade-ledger rows of each leg, from the stored legs, never recomputed"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/legs"
@@ -360,6 +369,11 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 [[dir]]
 path = "src/algotrade/services/read/edge_desk"
 purpose = "read objects over the forward paper record (ADR 0053 amendment 2026-10-09) for one session: the paper trades as the session knew them (paper.py), an edge's live record against the backtest's usual range, its trades and a trial's forward test (live.py), and the Ideas signals of the followed edges (desk.py: buys, sells, followed)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/edge_evidence"
+purpose = "the edge evidence read objects (ADR 0037, ADR 0064): the basis of a verdict, the curve, the decay, the costs, the capacity, the variants and the trades of an edge's committed evaluation"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

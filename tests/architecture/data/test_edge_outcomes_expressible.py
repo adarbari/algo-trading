@@ -32,6 +32,7 @@ from tests.conftest import REPO_ROOT
 STORE = FileConfigStore(REPO_ROOT / "config", local=False)
 EDGES = [e for e in load_edges(STORE) if e.status not in CLOSED]  # a closed edge is not scored
 HARNESS = "src/algotrade/services/evaluation/cross_section/harness.py"
+MEASURING = "src/algotrade/services/evaluation/cross_section/measuring.py"  # the harness's split
 TRAINING = "src/algotrade/services/evaluation/training/frame.py"  # the one door for fit labels
 DISCOVERY = "src/algotrade/services/evaluation/discovery/labels.py"  # the winners of the ED6 study
 FORWARD = (
@@ -141,12 +142,13 @@ def test_only_the_named_modules_read_outcomes() -> None:
                 [node.module or ""] if isinstance(node, ast.ImportFrom) else []
             )
         }  # fmt: skip
-        if rel not in (HARNESS, TRAINING, DISCOVERY, FORWARD) and any(
+        if rel not in (HARNESS, MEASURING, TRAINING, DISCOVERY, FORWARD) and any(
             n == PROTECTED or n.startswith(f"{PROTECTED}.") for n in names
         ):
             offenders.append(rel)
     assert not offenders, (
-        f"only {HARNESS}, {TRAINING}, {DISCOVERY}, {FORWARD} may read outcomes: {offenders}"
+        f"only {HARNESS}, {MEASURING}, {TRAINING}, {DISCOVERY}, {FORWARD} may read outcomes: "
+        f"{offenders}"
     )
 
 

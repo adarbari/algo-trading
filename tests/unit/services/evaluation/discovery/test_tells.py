@@ -7,8 +7,8 @@ from datetime import date
 import numpy as np
 import pytest
 
-from algotrade.quant import discovery_statistics as ds
-from algotrade.quant.edge_statistics import standardised_effect
+from algotrade.quant.edges import discovery as ds
+from algotrade.quant.edges.statistics import standardised_effect
 from algotrade.services.evaluation.discovery.proposer import propose
 from algotrade.services.evaluation.discovery.results import PROPOSED_BY
 from algotrade.services.evaluation.discovery.tells import (

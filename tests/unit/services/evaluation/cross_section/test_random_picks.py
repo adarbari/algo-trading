@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.services.evaluation.cross_section import harness
+from algotrade.services.evaluation.cross_section import measuring
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.random_picks import (
     DRAW,
@@ -108,7 +108,7 @@ def test_a_sessions_random_draws_do_not_change_with_the_range_or_the_as_of(
     """ADR 0063: the draws are seeded by the leg key, not the run hash, so moving the start, the
     end or the ``as_of`` leaves the names drawn at a session as they were."""
     drawn: dict[date, list[Any]] = {}
-    real = harness.random_stat
+    real = measuring.random_stat
 
     def record(day: date, *args: Any, **kwargs: Any) -> Any:
         found = real(day, *args, **kwargs)
@@ -116,7 +116,7 @@ def test_a_sessions_random_draws_do_not_change_with_the_range_or_the_as_of(
             drawn.setdefault(day, []).append((found.value_sums.tolist(), found.hit_sums.tolist()))
         return found
 
-    monkeypatch.setattr(harness, "random_stat", record)
+    monkeypatch.setattr(measuring, "random_stat", record)
     e = edge(frozen_from="2026-09-04")
     w = build_world()
     evaluate_edge(w.reader, w.results, w.configs, USER, e, DAYS[0], DAYS[-1], AS_OF)

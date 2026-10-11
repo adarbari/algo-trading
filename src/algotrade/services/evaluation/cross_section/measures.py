@@ -17,7 +17,7 @@ from typing import Protocol
 
 import numpy as np
 
-from algotrade.quant.edge_statistics import (
+from algotrade.quant.edges.statistics import (
     Moments,
     decile_spread,
     deflated_sharpe,
