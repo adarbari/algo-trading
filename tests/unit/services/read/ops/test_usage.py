@@ -215,3 +215,46 @@ def test_a_call_just_either_side_of_midnight_in_new_york_lands_in_its_day() -> N
     by_day = {p.day: p.tally.calls for p in usage.daily}
     assert by_day[date(2026, 10, 7)] == 1 and by_day[TODAY] == 1
     assert usage.windows[0].tally.calls == 1
+
+
+def test_failures_list_the_failed_and_rejected_calls_with_their_detail() -> None:
+    yesterday = date(2026, 10, 7)
+    detail = {
+        "stage": "answer", "error": "the model's answer is not JSON", "sentence": "typed",
+        "answer": "Sure! no json", "prompt_chars": 4321,
+    }  # fmt: skip
+    usage = load_llm_usage(
+        stores(
+            {
+                yesterday: [row(yesterday, 0)],  # a partition written before the columns existed
+                TODAY: [
+                    row(TODAY, 0),
+                    row(
+                        TODAY, 1, outcome="rejected", cost_usd=None, cost_basis="unknown", **detail
+                    ),
+                    row(
+                        TODAY,
+                        2,
+                        outcome="failed",
+                        cost_usd=0.1,
+                        cost_basis="bound",
+                        stage="provider",
+                        error="HTTP 529",
+                        sentence="typed",
+                    ),
+                ],
+            }
+        ),
+        TODAY,
+    )
+    assert [c.outcome for c in usage.failures] == ["failed", "rejected"]  # newest first
+    failed, rejected = usage.failures
+    assert (failed.stage, failed.error, failed.answer, failed.prompt_chars) == (
+        "provider", "HTTP 529", None, None)  # fmt: skip
+    assert (rejected.stage, rejected.error, rejected.sentence, rejected.answer) == (
+        "answer", "the model's answer is not JSON", "typed", "Sure! no json")  # fmt: skip
+    assert rejected.prompt_chars == 4321 and rejected.cost_usd is None
+    old = next(c for c in usage.recent if c.ts.date() == yesterday)
+    assert (old.error, old.stage, old.sentence, old.answer, old.prompt_chars) == (None,) * 5
+    assert usage.reliability.rejected == 1 and usage.reliability.failed == 1
+    assert usage.windows[0].tally.spent_usd == 0.25 + 0.1  # a rejected row adds nothing

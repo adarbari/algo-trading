@@ -1,7 +1,15 @@
 /** The columns of the recent calls: one stored attempt per row, every column of the log. */
 import type { DataTableColumn } from '@algotrade/ui';
 
-import { BasisBadge, OutcomeBadge, stamp, TOKENS, USD, type UsageCall } from '@/entities/llm-usage';
+import {
+  BasisBadge,
+  OutcomeBadge,
+  STAGE_LABEL,
+  stamp,
+  TOKENS,
+  USD,
+  type UsageCall,
+} from '@/entities/llm-usage';
 
 export const CALL_COLUMNS: DataTableColumn<UsageCall>[] = [
   { id: 'ts', header: 'When', value: (c) => c.ts, cell: ({ row }) => stamp(row.ts), mono: true },
@@ -43,4 +51,10 @@ export const CALL_COLUMNS: DataTableColumn<UsageCall>[] = [
     value: (c) => c.outcome,
     cell: ({ row }) => <OutcomeBadge outcome={row.outcome} />,
   },
+  {
+    id: 'stage',
+    header: 'Failure',
+    value: (c) => (c.stage ? (STAGE_LABEL[c.stage] ?? c.stage) : null),
+  },
+  { id: 'error', header: 'Reason', value: (c) => c.error },
 ];

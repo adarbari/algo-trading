@@ -7,20 +7,21 @@ never silently kept); the rest is validated with ``resolve_rule_draft`` as final
 only the catalogue and the configs; writes nothing."""
 
 import json
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from algotrade.config.site.settings import load_field_guide, load_phrasebook
-from algotrade.core.model.completion import CallTag
+from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
 from algotrade.services.drafting.prompt import system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
-from algotrade.services.text_model.model import TextModel
+from algotrade.services.text_model.model import TextModel, reject_answer
 
 MODES = ("hard", "soft", "score")
 MISSES = ("WATCH", "LIQUIDITY_RISK", "EVENT_RISK")
@@ -29,6 +30,8 @@ _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _NAMED_CRITERION = re.compile(r"\.criteria\.([A-Za-z0-9_-]+)")
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
 type Scalar = str | int | float | bool
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -73,8 +76,19 @@ def draft_screen(
     guide = load_field_guide(ctx.configs)
     system = system_prompt(infos.values(), phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
-    answer = model.complete(system, user, tag=CallTag("screener-draft", ctx.user.user_id)).text
-    proposal = parse_answer(answer)
+    tag = CallTag("screener-draft", ctx.user.user_id)
+    completion = model.complete(system, user, tag=tag)
+    try:
+        return _draft(ctx, screener_id, completion, infos)
+    except ModelUnavailableError as exc:  # an answer the provider gave and we cannot use
+        reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
+        raise
+
+
+def _draft(
+    ctx: ReadContext, screener_id: str, completion: Completion, infos: Mapping[str, Any]
+) -> ScreenDraft:
+    proposal = parse_answer(completion.text)
     criteria, dropped = criteria_of(proposal, set(infos))
     document: dict[str, Any] = {
         "id": screener_id,

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { callAt, callId, emptyUsage, usageFixture } from '@/entities/llm-usage';
+import { callAt, callId, emptyUsage, failureAt, usageFixture } from '@/entities/llm-usage';
 import { gql, TestQueryProvider } from '@/shared/api';
 
 import { UsageCallsPanel } from './UsageCallsPanel';
@@ -57,6 +57,20 @@ describe('UsageCallsPanel', () => {
     view(onSelect);
     await userEvent.click(await screen.findByText('2026-10-08 13:00:00 UTC'));
     expect(onSelect).toHaveBeenCalledWith(callId(callAt(1)));
+  });
+
+  it('lists only the failed and rejected calls under Failures, with their reason', async () => {
+    serve(usageFixture());
+    const onSelect = vi.fn();
+    view(onSelect);
+    await userEvent.click(await screen.findByRole('radio', { name: 'Failures' }));
+    const grid = await screen.findByRole('grid', { name: 'Failed text-model calls' });
+    expect(grid).toHaveTextContent('rejected');
+    expect(grid).toHaveTextContent("the model's answer is not JSON");
+    expect(grid).toHaveTextContent('claude_cli: the call timed out after 60 s');
+    expect(grid).not.toHaveTextContent('skipped budget');
+    await userEvent.click(screen.getByText('2026-10-08 11:00:00 UTC'));
+    expect(onSelect).toHaveBeenCalledWith(callId(failureAt(1)));
   });
 
   it('says when no call has been recorded', async () => {

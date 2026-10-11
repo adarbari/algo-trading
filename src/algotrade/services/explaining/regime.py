@@ -9,14 +9,14 @@ question is never free text from the page: it is one of the fixed ones or a card
 from dataclasses import dataclass
 
 from algotrade.core.model.completion import CallTag
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.explaining.answer import Explanation, ask, verify
 from algotrade.services.explaining.cache import TextCache, cache_key
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.explaining.prompt import WHAT_IS_HAPPENING, regime_facts
 from algotrade.services.read.context import NotFoundError, ReadContext
 from algotrade.services.read.regime.regime import RegimeLabel, load_regime
-from algotrade.services.text_model.model import TextModel
+from algotrade.services.text_model.model import TextModel, reject_answer
 
 
 @dataclass(frozen=True)
@@ -65,8 +65,15 @@ def explain_regime(
             if explanation.checked:
                 return Explained(explanation, True)
     limiter.take(user, "regime explanations")
-    answer = ask(model, facts, asked, CallTag("regime-explain", user))
-    explanation = verify(answer.text, facts)
+    tag = CallTag("regime-explain", user)
+    answer = ask(model, facts, asked, tag)
+    try:
+        explanation = verify(answer.text, facts)
+    except ModelUnavailableError as exc:  # an answer the provider gave and we cannot use
+        reject_answer(model, tag, answer, str(exc), asked)
+        raise
+    if not explanation.checked:
+        reject_answer(model, tag, answer, explanation.note or "the answer was not verified", asked)
     if explanation.checked:
         cache.put(cache_key(regime, asked, answer.model), answer.text)
     return Explained(explanation, False)

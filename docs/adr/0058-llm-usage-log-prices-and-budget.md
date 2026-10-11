@@ -89,6 +89,24 @@ exception to ADR 0036's one-session rule after ADR 0053's outcomes: spend is a t
 a fact of one session. It feeds the ledger's seed now and the Admin usage page in the next PR.
 It is not a session-grain table: the read model never lists it as missing for a session.
 
+### Amendment 2026-10-11: failures keep their detail
+
+A trader saw "the model's answer is not JSON" and the log could not say why: the chain records
+an attempt `ok` as soon as the provider answers, and the refusal happens afterwards in the
+caller; a provider that raised kept no message. `usage/llm_calls` gains nullable columns `error`
+(the message), `stage` (`provider`: the attempt raised; `answer`: the provider answered and the
+caller refused), `sentence` (the prompt, clipped to 2,000 characters), `answer` (the raw text,
+clipped to 8,000) and `prompt_chars` (system + user length; the system prompt is never stored).
+They are null on every other row and on partitions written before (readers add the missing
+columns as null; no migration). A failed attempt records them at once. A caller that refuses a
+well-formed answer (`services/drafting/screens.py`, `services/explaining/regime.py`) calls
+`reject_answer`, which reaches `FallbackTextModel.reject`: it writes a **second** row, outcome
+`rejected` (a new `OUTCOMES` value), same provider, model, use case and user, `cost_usd` null
+and basis `unknown`, so the `ok` row still carries the cost once and the budget never counts
+it twice. The Admin read adds `failures` (the newest failed and rejected calls) and
+`reliability.rejected`; the failure detail is admin-only like the rest of the page (the
+messages carry no credential: the adapters never quote stderr or keys).
+
 ## Consequences
 - A paid provider cannot be added without its price, and a day's or month's spend stops at its
   cap by construction (the bound is reserved before the call, the counter moves before the write).

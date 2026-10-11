@@ -1805,7 +1805,7 @@ type LiveRecord {
 }
 
 """
-The text model's usage and cost up to `today` (exchange date): windows with their caps, 30-day breakdowns, a daily series, reliability and the latest calls. A date range, not one session (ADR 0058); `recorded` false when the log is empty
+The text model's usage and cost up to `today` (exchange date): windows with their caps, 30-day breakdowns, a daily series, reliability, the latest calls and the latest failures (failed or rejected). A date range, not one session (ADR 0058); `recorded` false when the log is empty
 """
 type LlmUsage {
   today: Date!
@@ -1816,6 +1816,7 @@ type LlmUsage {
   daily: [UsageDay!]!
   reliability: UsageReliability!
   recent: [UsageCall!]!
+  failures: [UsageCall!]!
 }
 
 """
@@ -3101,7 +3102,7 @@ type UsageBudget {
 }
 
 """
-One stored attempt; `unknownFields` names the values stored null (tokens a provider did not report, a cost not known), `unknown` says why
+One stored attempt; `unknownFields` names the values stored null (tokens a provider did not report, a cost not known), `unknown` says why. A failed or rejected call (Admin only, like the whole read) also carries `stage` (provider: the attempt raised; answer: the provider answered and the caller refused it), `error`, the prompt sent (`sentence`, clipped), the raw `answer` (clipped) and `promptChars`
 """
 type UsageCall {
   ts: DateTime!
@@ -3117,6 +3118,11 @@ type UsageCall {
   outcome: String!
   fellBackFrom: String
   runId: String!
+  error: String
+  stage: String
+  sentence: String
+  answer: String
+  promptChars: Int
   unknownFields: [String!]!
   unknown: Unknown
 }
@@ -3145,6 +3151,7 @@ type UsageReliability {
   fellBack: Int!
   failed: Int!
   skippedBudget: Int!
+  rejected: Int!
   fallbackRate: Float
   failureRate: Float
 }

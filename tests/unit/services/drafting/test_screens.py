@@ -252,3 +252,45 @@ def test_the_current_criteria_go_to_the_model(ctx: ReadContext) -> None:
     current = {"id": "s", "criteria": {"price": {"field": PRICE, "op": "gt", "value": 5}}}
     draft_screen(ctx, model, "s", "raise the price floor to 50", current)
     assert f'"price": {{"field": "{PRICE}", "op": "gt", "value": 5}}' in model.asked[0][1]
+
+
+class Rejecting(Canned):
+    """A ``Canned`` model that keeps what the caller rejected (as the chain would log it)."""
+
+    def __init__(self, answer: Any) -> None:
+        super().__init__(answer)
+        self.rejected: list[tuple[object, Completion, str, str, int | None]] = []
+
+    def reject(
+        self, tag: object, completion: Completion, reason: str, user_text: str, chars: int | None
+    ) -> None:
+        self.rejected.append((tag, completion, reason, user_text, chars))
+
+
+def test_an_answer_that_is_not_json_is_reported_rejected_with_the_prompt(ctx: ReadContext) -> None:
+    model = Rejecting("Sure! Support lines are not in the catalogue.")
+    with pytest.raises(ModelUnavailableError, match="not JSON"):
+        draft_screen(ctx, model, "s", "stocks near support")
+    ((tag, completion, reason, user_text, chars),) = model.rejected
+    assert tag == CallTag("screener-draft", ALICE)
+    assert completion.text.startswith("Sure! Support")
+    assert reason == "the model's answer is not JSON"
+    assert user_text == model.asked[0][1] and "stocks near support" in user_text
+    assert chars == len(model.asked[0][0]) + len(model.asked[0][1])
+
+
+def test_an_answer_with_no_criteria_list_is_rejected_and_a_usable_one_is_not(
+    ctx: ReadContext,
+) -> None:
+    model = Rejecting('{"screen": 1}')
+    with pytest.raises(ModelUnavailableError, match="no criteria"):
+        draft_screen(ctx, model, "s", "anything")
+    assert [r[2] for r in model.rejected] == ["the model's answer has no criteria list"]
+    fine = Rejecting(proposal())
+    draft_screen(ctx, fine, "s", "anything")
+    assert fine.rejected == []
+
+
+def test_a_model_that_cannot_report_a_rejection_is_unaffected(ctx: ReadContext) -> None:
+    with pytest.raises(ModelUnavailableError, match="not JSON"):
+        draft_screen(ctx, Canned("nope"), "s", "anything")  # no ``reject``: ignored

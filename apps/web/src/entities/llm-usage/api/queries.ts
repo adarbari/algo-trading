@@ -1,7 +1,7 @@
 /**
  * The read hook for the text model's usage and cost over GraphQL (`Query.llmUsage`, Admin only;
  * ADR 0058, ADR 0037): windows with their caps, 30-day breakdowns, the daily series, reliability
- * and the latest calls. One operation serves the whole page, so every widget shares one request.
+ * the latest calls and the latest failures. One operation serves the whole page, so every widget shares one request.
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -88,6 +88,7 @@ const LlmUsageQuery = graphql(`
         fellBack
         failed
         skippedBudget
+        rejected
         fallbackRate
         failureRate
       }
@@ -105,6 +106,47 @@ const LlmUsageQuery = graphql(`
         outcome
         fellBackFrom
         runId
+        error
+        stage
+        sentence
+        answer
+        promptChars
+        unknownFields
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+      }
+      failures {
+        ts
+        provider
+        model
+        useCase
+        user
+        inputTokens
+        outputTokens
+        latencyS
+        costUsd
+        costBasis
+        outcome
+        fellBackFrom
+        runId
+        error
+        stage
+        sentence
+        answer
+        promptChars
         unknownFields
         unknown {
           code

@@ -8,7 +8,15 @@ from dataclasses import dataclass
 from datetime import datetime
 
 OK, FAILED, FELL_BACK, SKIPPED_BUDGET = "ok", "failed", "fell_back", "skipped_budget"
-OUTCOMES = (OK, FAILED, FELL_BACK, SKIPPED_BUDGET)
+REJECTED = "rejected"  # the provider answered but the caller could not use the answer (ADR 0058)
+OUTCOMES = (OK, FAILED, FELL_BACK, SKIPPED_BUDGET, REJECTED)
+PROVIDER, ANSWER = "provider", "answer"  # ``Attempt.stage``: where a failure happened
+MAX_SENTENCE, MAX_ANSWER = 2000, 8000  # characters of a failure's prompt / answer kept
+
+
+def clip(text: str, limit: int) -> str:
+    """``text`` cut to ``limit`` characters (a cut one ends with an ellipsis)."""
+    return text if len(text) <= limit else text[: limit - 1] + "\u2026"
 
 
 @dataclass(frozen=True)
@@ -42,7 +50,12 @@ class Attempt:
     (``OUTCOMES``: ``ok``, ``failed``, ``fell_back`` = answered after an earlier provider
     failed, ``skipped_budget`` = not asked: the budget is spent), how long the attempt took,
     tokens as the provider reported them (``None``: not reported, never ``0``) and the notional
-    cost a subscription login reported (``reported_cost_usd``)."""
+    cost a subscription login reported (``reported_cost_usd``). A failure carries what is needed
+    to diagnose it: ``stage`` (``provider``: the attempt raised, ``error`` its message;
+    ``answer``: the provider answered but the caller refused it, a ``rejected`` attempt reported
+    after the ``ok`` one, ``error`` the reason), ``sentence`` (the user prompt, clipped),
+    ``answer`` (the raw model text, clipped) and ``prompt_chars`` (system + user length; the
+    system prompt itself is never kept)."""
 
     at: datetime
     provider: str
@@ -55,3 +68,8 @@ class Attempt:
     output_tokens: int | None = None
     reported_cost_usd: float | None = None
     fell_back_from: str | None = None
+    error: str | None = None
+    stage: str | None = None
+    sentence: str | None = None
+    answer: str | None = None
+    prompt_chars: int | None = None

@@ -224,3 +224,24 @@ def test_the_store_is_read_outside_the_lock() -> None:
     assert not thread.is_alive()
     assert seen == [0.0, None]  # free answers, a paying provider still refused mid-seed
     assert ledger.admit("paid", CHARS) is not None  # and once read it is admitted
+
+
+def test_a_rejected_row_carries_the_failure_columns_and_never_a_cost() -> None:
+    sink = Sink()
+    ledger = UsageLedger(settings(), sink)
+    ledger.record(attempt("paid"), PAID_BOUND)  # the answer: counted here
+    spent = ledger.spent_today
+    ledger.record(
+        attempt("paid", outcome="rejected", input_tokens=None, output_tokens=None, stage="answer",
+                error="the model's answer is not JSON", sentence="typed", answer="Sure!",
+                prompt_chars=300)
+    )  # fmt: skip
+    ledger.record(attempt("tier", outcome="rejected"))  # a free provider: still no cost
+    ok, rejected, free = sink.rows
+    assert (ok["stage"], ok["error"], ok["answer"]) == (None, None, None)
+    assert (rejected["cost_usd"], rejected["cost_basis"]) == (None, "unknown")
+    assert (free["cost_usd"], free["cost_basis"]) == (None, "unknown")
+    assert rejected["stage"] == "answer" and rejected["answer"] == "Sure!"
+    assert rejected["sentence"] == "typed" and rejected["prompt_chars"] == 300
+    assert rejected["error"] == "the model's answer is not JSON"
+    assert ledger.spent_today == spent  # never counted twice

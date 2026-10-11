@@ -56,6 +56,27 @@ test('a call opens its detail and the choice is in the URL', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
+test('the Failures view lists a rejected answer and its detail shows the raw answer', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockRegimeApi(page);
+  await mockViewer(page);
+  await mockNoGuideEntries(page);
+  await mockAdminApi(page);
+  await page.goto('/admin/llm-usage');
+  await page.getByRole('radio', { name: 'Failures' }).click();
+  await expect(page.getByRole('grid', { name: 'Failed text-model calls' })).toContainText(
+    "the model's answer is not JSON",
+  );
+  await page.getByText('2026-10-08 14:30:00 UTC').click();
+  await expect(page.getByRole('textbox', { name: 'Raw model answer' })).toContainText(
+    'Support lines are not in the catalogue',
+  );
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('a failed read shows its error with a retry', async ({ page }) => {
   await mockRegimeApi(page);
   await mockViewer(page);

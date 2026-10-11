@@ -87,3 +87,21 @@ def test_the_store_seed_reads_the_spend_back() -> None:
     recorder = open_recorder("memory://")
     recorder.close()
     assert store_seed("memory://")(date(2026, 10, 1), date(2026, 10, 3)) == {}
+
+
+def test_failure_columns_are_stored_and_other_rows_hold_null() -> None:
+    backend = MemoryBackend()
+    recorder = UsageRecorder(UsageWriter(backend), clock=lambda: NEXT)
+    recorder.submit(call(LATE))  # a row with none of the failure columns
+    recorder.submit(call(NEXT, "claude", outcome="rejected", cost_usd=None, cost_basis="unknown",
+                         error="not JSON", stage="answer", sentence="typed", answer="Sure!",
+                         prompt_chars=1234))  # fmt: skip
+    recorder.flush()
+    frame = read_llm_calls(StoreReader(backend), date(2026, 10, 2), date(2026, 10, 3))
+    assert frame is not None
+    by = frame.set_index("provider")
+    assert by.loc["claude", ["error", "stage", "sentence", "answer"]].tolist() == [
+        "not JSON", "answer", "typed", "Sure!"]  # fmt: skip
+    assert by.loc["claude", "prompt_chars"] == 1234
+    assert by.loc["gemini", ["error", "stage", "sentence", "answer", "prompt_chars"]].isna().all()
+    recorder.close()

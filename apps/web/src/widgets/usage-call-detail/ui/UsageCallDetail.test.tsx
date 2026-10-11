@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { callAt, callId, usageFixture } from '@/entities/llm-usage';
+import { callAt, callId, failureAt, usageFixture } from '@/entities/llm-usage';
 import { gql, TestQueryProvider } from '@/shared/api';
 
 import { UsageCallDetail } from './UsageCallDetail';
@@ -36,6 +36,36 @@ describe('UsageCallDetail', () => {
       await screen.findByText('Not known: Input tokens, Output tokens, Cost'),
     ).toBeInTheDocument();
     expect(screen.getByText('not available for this instrument')).toBeInTheDocument();
+  });
+
+  it('shows a rejected answer with its reason, the prompt and the raw answer', async () => {
+    view(callId(failureAt(0)));
+    expect(await screen.findByText('Answer rejected')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Error message' })).toHaveTextContent(
+      "the model's answer is not JSON",
+    );
+    expect(screen.getByRole('textbox', { name: /Prompt sent/ })).toHaveTextContent(
+      'stocks near support with rising volume',
+    );
+    expect(screen.getByRole('textbox', { name: 'Raw model answer' })).toHaveTextContent(
+      'Sure! Support lines are not in the catalogue',
+    );
+    expect(document.body).toHaveTextContent('5,200 characters');
+  });
+
+  it('shows a failed provider attempt with its message and no raw answer', async () => {
+    view(callId(failureAt(1)));
+    expect(await screen.findByText('Provider failed')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Error message' })).toHaveTextContent(
+      'claude_cli: the call timed out after 60 s',
+    );
+    expect(screen.queryByRole('textbox', { name: 'Raw model answer' })).not.toBeInTheDocument();
+  });
+
+  it('shows no failure section for a call that succeeded', async () => {
+    view(callId(callAt(0)));
+    await screen.findByText('claude-haiku-4-5');
+    expect(screen.queryByRole('textbox', { name: 'Error message' })).not.toBeInTheDocument();
   });
 
   it('asks for a call when none is chosen, and says one that left the list', async () => {

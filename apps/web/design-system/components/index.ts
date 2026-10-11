@@ -198,6 +198,7 @@ export {
 } from './StatusStrip';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { TextArea, type TextAreaProps } from './TextArea';
+export { TextBlock, type TextBlockProps } from './TextBlock';
 export { TickerTag, type TickerTagProps } from './TickerTag';
 export { ViewChips, type ViewChipsProps, type ViewOption } from './ViewChips';
 export {

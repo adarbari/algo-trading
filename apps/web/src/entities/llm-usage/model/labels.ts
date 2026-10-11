@@ -34,6 +34,15 @@ export const BASIS_LABEL: Record<string, string> = {
   unknown: 'Unknown',
 };
 
+/** The Guide glossary terms that explain a rejected answer and where a failure happened. */
+export const TERM_OF_REJECTED = 'llm_rejected_answer';
+export const TERM_OF_STAGE = 'llm_failure_stage';
+
+export const STAGE_LABEL: Record<string, string> = {
+  provider: 'Provider failed',
+  answer: 'Answer rejected',
+};
+
 /** The Guide glossary term that explains a cost basis. */
 export const TERM_OF_BASIS = 'llm_cost_basis';
 
@@ -49,7 +58,7 @@ export function basisTone(basis: string): BasisTone {
 export function outcomeTone(outcome: string): 'positive' | 'warning' | 'negative' | 'neutral' {
   if (outcome === 'ok') return 'positive';
   if (outcome === 'fell_back') return 'warning';
-  if (outcome === 'failed') return 'negative';
+  if (outcome === 'failed' || outcome === 'rejected') return 'negative';
   return 'neutral';
 }
 
@@ -69,5 +78,9 @@ export function callId(call: UsageCall): string {
 
 export function findCall(usage: LlmUsage | null | undefined, id: string | null): UsageCall | null {
   if (!usage || !id) return null;
-  return usage.recent.find((c) => callId(c) === id) ?? null;
+  return (
+    usage.recent.find((c) => callId(c) === id) ??
+    usage.failures.find((c) => callId(c) === id) ??
+    null
+  );
 }
