@@ -40,22 +40,50 @@ FAILURES = ("failed", "rejected")  # the outcomes the failures list holds
 COLUMNS = (
     "ts", "day", "provider", "model", "use_case", "user", "input_tokens", "output_tokens",
     "latency_s", "cost_usd", "cost_basis", "outcome", "fell_back_from", "run_id",
-    "error", "stage", "sentence", "answer", "prompt_chars",
+    "error", "stage", "sentence", "answer", "prompt_chars", "cache_read_tokens",
+    "cache_write_tokens", "call_id", "prompt_version", "call_stage",
 )  # fmt: skip
-ADDED = ("error", "stage", "sentence", "answer", "prompt_chars")  # absent in older partitions
+ADDED = (
+    "error", "stage", "sentence", "answer", "prompt_chars", "cache_read_tokens",
+    "cache_write_tokens", "call_id", "prompt_version", "call_stage",
+)  # fmt: skip  # absent in older partitions
+
+
+def total_input(frame: pd.DataFrame) -> pd.Series:
+    """The whole input of each row: regular input + cache read + cache write (a cache count not
+    reported adds nothing); NaN (unknown) when the input was not reported, and for a row of a
+    ``reported`` login written before the cache columns existed (``call_stage`` null: its input
+    is the uncached part only, the cache was never stored), so it never reads as a small number.
+    A chat row from before is complete: its ``prompt_tokens`` already included the cache."""
+
+    def num(column: str) -> pd.Series:
+        return pd.to_numeric(frame[column], errors="coerce")
+
+    cache = num("cache_read_tokens").fillna(0) + num("cache_write_tokens").fillna(0)
+    total = num("input_tokens") + cache
+    old_login = (frame["cost_basis"] == "reported") & frame["call_stage"].isna()
+    return total.mask(old_login)
 
 
 @dataclass(frozen=True)
 class Tally:
     """The calls of a slice: ``calls`` attempts; tokens summed over the calls that reported them
     (``calls_without_tokens`` the others, skipped attempts aside; ``unknown`` set when none
-    reported); ``spent_usd`` what counts against the budget, split into ``billed_usd``
+    reported); ``input_tokens`` is the regular (uncached) input and ``cache_read_tokens`` /
+    ``cache_write_tokens`` the cached prompt; ``total_input_tokens`` the whole input summed over
+    the calls whose whole input is known, ``calls_without_total_input`` the others (a login call
+    written before the cache was stored: ADR 0058 amended 2026-10-11);
+    ``spent_usd`` what counts against the budget, split into ``billed_usd``
     (``price``), ``reported_usd`` (notional seat cost) and ``bound_usd`` (an upper bound charged
     for an unknown cost); ``free_calls`` the ones logged at 0."""
 
     calls: int
     input_tokens: int
     output_tokens: int
+    cache_read_tokens: int
+    cache_write_tokens: int
+    total_input_tokens: int
+    calls_without_total_input: int
     calls_without_tokens: int
     spent_usd: float
     billed_usd: float
@@ -135,7 +163,10 @@ class Call:
     ``unknown`` saying why): tokens a provider did not report, a cost not known. A failure
     (``failed``, ``rejected``) also holds ``stage`` (``provider`` / ``answer``), ``error``, the
     prompt (``sentence``) and the raw ``answer``; ``prompt_chars`` the prompt's length. Null on
-    every other call and on a call recorded before they were kept."""
+    every other call and on a call recorded before they were kept. ``cache_read_tokens`` /
+    ``cache_write_tokens`` (null: not reported) are the cached prompt beside ``input_tokens``
+    (the regular input); ``call_id`` ties the attempts of one call, ``prompt_version`` and
+    ``call_stage`` (``first`` / ``repair`` / ``escalate``) are the caller's tags."""
 
     ts: datetime
     provider: str
@@ -155,6 +186,12 @@ class Call:
     sentence: str | None
     answer: str | None
     prompt_chars: int | None
+    cache_read_tokens: int | None
+    cache_write_tokens: int | None
+    total_input_tokens: int | None  # regular + cache; null when not known (see ``total_input``)
+    call_id: str | None
+    prompt_version: str | None
+    call_stage: str | None
     unknown_fields: tuple[str, ...]
     unknown: Unknown | None
 
@@ -269,6 +306,10 @@ def _tally(frame: pd.DataFrame) -> Tally:
         calls=len(frame),
         input_tokens=_tokens(frame, "input_tokens"),
         output_tokens=_tokens(frame, "output_tokens"),
+        cache_read_tokens=_tokens(frame, "cache_read_tokens"),
+        cache_write_tokens=_tokens(frame, "cache_write_tokens"),
+        total_input_tokens=int(total_input(made).sum()),
+        calls_without_total_input=int(total_input(made).isna().sum()),
         calls_without_tokens=without,
         spent_usd=_cost(frame, *SPENDING),
         billed_usd=_cost(frame, "price"),
@@ -352,6 +393,12 @@ def _call(row: Mapping[Any, Any]) -> Call:
         sentence=_text(row["sentence"]),
         answer=_text(row["answer"]),
         prompt_chars=_number(row["prompt_chars"], int),
+        cache_read_tokens=_number(row["cache_read_tokens"], int),
+        cache_write_tokens=_number(row["cache_write_tokens"], int),
+        total_input_tokens=_number(total_input(pd.DataFrame([row])).iloc[0], int),
+        call_id=_text(row["call_id"]),
+        prompt_version=_text(row["prompt_version"]),
+        call_stage=_text(row["call_stage"]),
         unknown_fields=missing,
         unknown=Unknown(UnknownCode.NULL, table_cause(LLM_CALLS, why, "NULL")) if missing else None,
     )

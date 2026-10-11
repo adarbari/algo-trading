@@ -19,7 +19,7 @@ from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.drafting.prompt import sliced_system_prompt, user_prompt
+from algotrade.services.drafting.prompt import PROMPT_VERSION, sliced_system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.services.text_model.model import TextModel, reject_answer
@@ -77,7 +77,7 @@ def draft_screen(
     guide = load_field_guide(ctx.configs)
     system = sliced_system_prompt(infos.values(), sentence, phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
-    tag = CallTag("screener-draft", ctx.user.user_id)
+    tag = CallTag("screener-draft", ctx.user.user_id, PROMPT_VERSION)
     completion = model.complete(system, user, tag=tag)
     try:
         return _draft(ctx, screener_id, completion, infos)

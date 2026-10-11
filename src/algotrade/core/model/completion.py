@@ -31,16 +31,26 @@ class Completion:
     cost_usd: float | None = (
         None  # a notional cost the provider reported (a subscription's), else None
     )
+    # ``input_tokens`` is the regular (uncached) input as the provider reported it; the prompt
+    # served from or written to its cache is counted apart, ``None`` when not reported (ADR 0058
+    # amended 2026-10-11): total input = input + cache read + cache write.
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    call_id: str | None = None  # one id per ``complete`` call, shared by its attempts
 
 
 @dataclass(frozen=True)
 class CallTag:
     """Who asks and for what, passed by keyword to ``TextModel.complete``: ``use_case``
     ("screener-draft", "regime-explain") and ``user`` (a registry user id). A provider restricted
-    with ``only_users`` answers only a tagged call by one of them; no user is no one."""
+    with ``only_users`` answers only a tagged call by one of them; no user is no one.
+    ``prompt_version`` is the caller's version of its prompt, and ``stage`` where in its flow
+    the call is (``first``, ``repair``, ``escalate``): both only recorded (ADR 0058)."""
 
     use_case: str
     user: str | None = None
+    prompt_version: str | None = None
+    stage: str = "first"
 
 
 @dataclass(frozen=True)
@@ -55,7 +65,9 @@ class Attempt:
     ``answer``: the provider answered but the caller refused it, a ``rejected`` attempt reported
     after the ``ok`` one, ``error`` the reason), ``sentence`` (the user prompt, clipped),
     ``answer`` (the raw model text, clipped) and ``prompt_chars`` (system + user length; the
-    system prompt itself is never kept)."""
+    system prompt itself is never kept). Metering (ADR 0058 amended 2026-10-11): the cache
+    tokens (``None``: not reported), ``call_id`` (shared by every attempt of one call and its
+    ``rejected`` row), the caller's ``prompt_version`` and ``call_stage`` (``CallTag.stage``)."""
 
     at: datetime
     provider: str
@@ -73,3 +85,8 @@ class Attempt:
     sentence: str | None = None
     answer: str | None = None
     prompt_chars: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    call_id: str | None = None
+    prompt_version: str | None = None
+    call_stage: str = "first"

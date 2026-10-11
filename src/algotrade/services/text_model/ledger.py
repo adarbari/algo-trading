@@ -5,8 +5,9 @@ provider keeps answering.
 
 Cost per attempt: a ``free`` provider costs 0 (basis ``free``); a ``reported`` one (the Claude
 Code login) the notional ``total_cost_usd`` it reported; a ``price`` one tokens x its ``[[price]]``
-per million. When the cost is not known (tokens or reported cost missing, or an attempt that
-failed: it may still have billed) a spending provider is charged the **upper bound** reserved
+per million (input + cache read + cache write tokens, all at the input price: conservative).
+When the cost is not known (tokens or reported cost missing, or an attempt that failed: it may
+still have billed) a spending provider is charged the **upper bound** reserved
 for the call (basis ``bound``): prompt characters / 3 x the input price + the provider's
 ``answer_limit`` x the output price, or ``[budget] reported_call_usd`` for a login. A skipped
 attempt cost nothing, and a ``rejected`` one (the caller refused an answer already counted
@@ -132,6 +133,10 @@ class UsageLedger:
                     "error": attempt.error, "stage": attempt.stage,
                     "sentence": attempt.sentence, "answer": attempt.answer,
                     "prompt_chars": attempt.prompt_chars,
+                    "cache_read_tokens": attempt.cache_read_tokens,
+                    "cache_write_tokens": attempt.cache_write_tokens,
+                    "call_id": attempt.call_id, "prompt_version": attempt.prompt_version,
+                    "call_stage": attempt.call_stage,
                 }
             )  # fmt: skip
 
@@ -217,4 +222,8 @@ def _known(rate: Rate | None, a: Attempt) -> float | None:
         return a.reported_cost_usd
     if a.input_tokens is None or a.output_tokens is None:
         return None
-    return (a.input_tokens * rate.input_per_mtok + a.output_tokens * rate.output_per_mtok) / 1e6
+    # cache tokens are charged at the full input price (conservative, ADR 0058 amended
+    # 2026-10-11): a cached call never costs less than the same call without the cache
+    cached = (a.cache_read_tokens or 0) + (a.cache_write_tokens or 0)
+    tokens_in = a.input_tokens + cached
+    return (tokens_in * rate.input_per_mtok + a.output_tokens * rate.output_per_mtok) / 1e6

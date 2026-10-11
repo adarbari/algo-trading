@@ -11,7 +11,7 @@ from algotrade.core.model.errors import ConfigurationError, ModelUnavailableErro
 from algotrade.services.explaining.answer import ENVELOPE
 from algotrade.services.explaining.cache import cache_key
 from algotrade.services.explaining.limits import RateLimiter
-from algotrade.services.explaining.prompt import WHAT_IS_HAPPENING, user_prompt
+from algotrade.services.explaining.prompt import PROMPT_VERSION, WHAT_IS_HAPPENING, user_prompt
 from algotrade.services.explaining.regime import explain_regime
 from algotrade.services.read.context import NotFoundError, ReadContext
 from algotrade.services.read.regime.regime import load_regime
@@ -170,10 +170,12 @@ def test_the_owners_login_answer_is_never_served_to_another_user(ctx: ReadContex
 
     assert not explain("abhi").cached  # answered by the owner's login, kept under "haiku"
     assert cache.get(cache_key(regime, WHAT_IS_HAPPENING, "haiku")) == GOOD
-    assert cli.tags == [CallTag("regime-explain", "abhi")] and not gemini.tags
+    assert cli.tags == [CallTag("regime-explain", "abhi", str(PROMPT_VERSION))] and not gemini.tags
     assert explain("abhi").cached  # the owner reads it back
     other = explain("bob")  # another user never sees it: the model is asked, and it is gemini
-    assert not other.cached and gemini.tags == [CallTag("regime-explain", "bob")]
+    assert not other.cached and gemini.tags == [
+        CallTag("regime-explain", "bob", str(PROMPT_VERSION))
+    ]
     assert len(cli.tags) == 1
 
 
@@ -196,7 +198,7 @@ def test_an_unusable_answer_is_reported_rejected_with_its_reason(ctx: ReadContex
         ask(ctx, not_json, MemoryTextCache(), RateLimiter())
     ask(ctx, usable, MemoryTextCache(), RateLimiter())
     ((tag, done, reason, asked),) = unchecked.rejected
-    assert tag == CallTag("regime-explain", "ann") and done.text == BAD
+    assert tag == CallTag("regime-explain", "ann", str(PROMPT_VERSION)) and done.text == BAD
     assert "99" in reason and asked == user_prompt(WHAT_IS_HAPPENING)
     assert [r[2] for r in not_json.rejected] == [ENVELOPE]
     assert usable.rejected == []

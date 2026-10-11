@@ -241,6 +241,23 @@ def test_every_attempt_is_recorded_the_failed_one_and_the_one_that_answered() ->
     assert {a.user for a in ledger.attempts} == {"abhi"}
 
 
+def test_one_call_id_ties_its_attempts_and_its_rejection_and_the_tag_is_recorded() -> None:
+    ledger = Ledger()
+    model = with_ledger(ledger, Member("claude", ModelUnavailableError("down")), Member("gemini"))
+    tag = CallTag("screener-draft", "abhi", prompt_version="3", stage="repair")
+    done = model.complete("s", "u", tag=tag)
+    model.reject(tag, done, "not JSON", "u", 2)
+    model.complete("s", "u", tag=tag)  # a second call: its own id
+    failed, answered, rejected, _failed_again, other = ledger.attempts
+    assert failed.call_id and failed.call_id == answered.call_id == rejected.call_id == done.call_id
+    assert other.call_id != failed.call_id
+    for a in ledger.attempts:
+        assert (a.prompt_version, a.call_stage) == ("3", "repair")
+    ledger2 = Ledger()
+    with_ledger(ledger2, Member("x")).complete("s", "u")
+    assert (ledger2.attempts[0].prompt_version, ledger2.attempts[0].call_stage) == (None, "first")
+
+
 def test_every_member_failing_still_records_each_attempt() -> None:
     ledger = Ledger()
     both = [Member(p, ModelUnavailableError("down")) for p in ("a", "b")]

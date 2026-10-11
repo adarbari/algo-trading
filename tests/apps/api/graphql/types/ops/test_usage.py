@@ -23,11 +23,14 @@ from tests.helpers.stored_frames import stamped
 
 QUERY = """{ llmUsage(recent: 5) {
   today recorded budget { dailyUsd error }
-  windows { key tally { calls spentUsd reportedUsd inputTokens unknown { code } } cap { kind } }
+  windows { key cap { kind }
+    tally { calls spentUsd reportedUsd inputTokens cacheReadTokens cacheWriteTokens
+      unknown { code } } }
   breakdowns { by rows { key provider costShare } }
   daily { day tally { calls } }
   reliability { attempts failureRate }
-  recent { provider costBasis costUsd inputTokens unknownFields unknown { code } runId }
+  recent { provider costBasis costUsd inputTokens cacheReadTokens cacheWriteTokens
+    callId promptVersion callStage unknownFields unknown { code } runId }
 } }"""
 
 
@@ -39,6 +42,7 @@ def _graph(role: Role, with_rows: bool) -> Callable[[str], dict[str, Any]]:
         rows: list[dict[str, object]] = [
             {"ts": pd.Timestamp(now), "provider": "cli", "model": "haiku", "use_case": "regime",
              "user": "abhi", "input_tokens": None, "output_tokens": None, "latency_s": 2.0,
+             "cache_read_tokens": 7, "call_id": "abc", "prompt_version": "1", "call_stage": "first",
              "cost_usd": 0.2, "cost_basis": "reported", "outcome": "ok", "fell_back_from": None}
         ]  # fmt: skip
         StoreWriter(backend).write_table(LLM_CALLS, day, "r1", stamped(rows, day, "r1"))
@@ -64,6 +68,9 @@ def test_an_admin_reads_the_usage_with_unknown_tokens_kept_unknown() -> None:
     [call] = usage["recent"]
     assert call["inputTokens"] is None and "input_tokens" in call["unknownFields"]
     assert call["unknown"]["code"] == "NULL" and call["costBasis"] == "reported"
+    assert (call["cacheReadTokens"], call["cacheWriteTokens"]) == (7, None)  # absent stays null
+    assert (call["callId"], call["promptVersion"], call["callStage"]) == ("abc", "1", "first")
+    assert today["tally"]["cacheReadTokens"] == 7 and today["tally"]["cacheWriteTokens"] == 0
     assert len(usage["daily"]) == 30
 
 

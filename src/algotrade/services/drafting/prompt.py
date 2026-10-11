@@ -28,7 +28,8 @@ from algotrade.config.site.llm import Phrase
 from algotrade.services.drafting.retrieval import select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
-PROMPT_VERSION = "2"  # the prompt's shape: v2 = field index + per-sentence slice (was: all of it)
+# Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice.
+PROMPT_VERSION = "2"
 
 TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored

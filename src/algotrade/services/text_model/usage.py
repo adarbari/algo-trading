@@ -33,7 +33,8 @@ KEY = ["ts", "provider", "use_case", "user", "outcome"]  # as the table's key (s
 COLUMNS = (
     "ts", "provider", "model", "use_case", "user", "input_tokens", "output_tokens", "latency_s",
     "cost_usd", "cost_basis", "outcome", "fell_back_from", "error", "stage", "sentence", "answer",
-    "prompt_chars",
+    "prompt_chars", "cache_read_tokens", "cache_write_tokens", "call_id", "prompt_version",
+    "call_stage",
 )  # fmt: skip
 
 
@@ -74,7 +75,7 @@ def _frame(rows: list[Mapping[str, Any]]) -> pd.DataFrame:
     """The stamped frame of ``rows``: tokens as nullable integers (unknown is null, never 0)."""
     frame = pd.DataFrame([{c: r.get(c) for c in COLUMNS} for r in rows], columns=list(COLUMNS))
     ts = pd.to_datetime(frame["ts"], utc=True)
-    for column in ("input_tokens", "output_tokens"):
+    for column in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"):
         frame[column] = frame[column].astype("Int64")
     frame["prompt_chars"] = frame["prompt_chars"].astype("Int64")
     frame["cost_usd"] = frame["cost_usd"].astype("float64")

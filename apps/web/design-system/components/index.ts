@@ -121,6 +121,12 @@ export {
   type FilterDefinition,
   type FilterValues,
 } from './FilterChips';
+export {
+  FormulaPreview,
+  type FormulaPreviewProps,
+  type FormulaSample,
+  type FormulaSampleRow,
+} from './FormulaPreview';
 export { KeyHints, type KeyHint, type KeyHintsProps } from './KeyHints';
 export { NavList, type NavListItem, type NavListProps } from './NavList';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
@@ -196,6 +202,12 @@ export {
   type StatusStripProps,
   type StatusStripWords,
 } from './StatusStrip';
+export {
+  TaggedSentence,
+  type SentenceKind,
+  type SentenceSegment,
+  type TaggedSentenceProps,
+} from './TaggedSentence';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { TextArea, type TextAreaProps } from './TextArea';
 export { TextBlock, type TextBlockProps } from './TextBlock';

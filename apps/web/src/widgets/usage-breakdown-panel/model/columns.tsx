@@ -16,9 +16,10 @@ export function sliceColumns(by: string): DataTableColumn<UsageSlice>[] {
     { id: 'calls', header: 'Calls', value: (s) => s.tally.calls, format: TOKENS, align: 'end' },
     {
       id: 'input',
-      header: 'Input tokens',
-      description: 'summed over the calls that reported them',
-      value: (s) => s.tally.inputTokens,
+      header: 'Input tokens (incl. cache)',
+      description:
+        'regular input + cache read + cache write, summed over the calls that reported them',
+      value: (s) => s.tally.totalInputTokens,
       format: TOKENS,
       align: 'end',
     },
