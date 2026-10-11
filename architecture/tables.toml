@@ -416,7 +416,7 @@ note = "the API's one write (ADR 0028): live IBKR quotes it served; personal-use
 [[table]]
 name = "usage/llm_calls"
 owner = "src/algotrade/services/text_model/usage.py"
-note = "the API's fifth write (ADR 0058): one row per text-model provider attempt; read across a date range by data/usage"
+note = "the API's fifth write (ADR 0058): one row per text-model provider attempt, plus a `rejected` row for an answer the caller refused (failures keep error, stage, prompt and raw answer, clipped; null elsewhere); read across a date range by data/usage"
 
 [[table]]
 name = "verification/ibkr"

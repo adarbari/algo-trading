@@ -9,7 +9,8 @@ per million. When the cost is not known (tokens or reported cost missing, or an 
 failed: it may still have billed) a spending provider is charged the **upper bound** reserved
 for the call (basis ``bound``): prompt characters / 3 x the input price + the provider's
 ``answer_limit`` x the output price, or ``[budget] reported_call_usd`` for a login. A skipped
-attempt cost nothing (``unknown``, null). Never an invented $0.
+attempt cost nothing, and a ``rejected`` one (the caller refused an answer already counted
+on its ``ok`` row) adds nothing (``unknown``, null). Never an invented $0.
 
 The budget counters (today's and this month's spend, by exchange calendar date) live in this
 process and are authoritative. ``admit`` checks and reserves atomically: it admits a spending
@@ -27,7 +28,7 @@ from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 
 from algotrade.config.site.llm import FREE, PRICED, REPORTED, LlmSettings, Rate
-from algotrade.core.model.completion import FAILED, SKIPPED_BUDGET, Attempt
+from algotrade.core.model.completion import FAILED, REJECTED, SKIPPED_BUDGET, Attempt
 from algotrade.core.time.calendar import exchange_date
 from algotrade.services.text_model.usage import Seed, UsageSink
 
@@ -128,6 +129,9 @@ class UsageLedger:
                     "input_tokens": attempt.input_tokens, "output_tokens": attempt.output_tokens,
                     "latency_s": attempt.latency_s, "cost_usd": cost, "cost_basis": basis,
                     "outcome": attempt.outcome, "fell_back_from": attempt.fell_back_from,
+                    "error": attempt.error, "stage": attempt.stage,
+                    "sentence": attempt.sentence, "answer": attempt.answer,
+                    "prompt_chars": attempt.prompt_chars,
                 }
             )  # fmt: skip
 
@@ -153,6 +157,8 @@ class UsageLedger:
         return (tokens_in * rate.input_per_mtok + rate.answer_limit * rate.output_per_mtok) / 1e6
 
     def _cost(self, a: Attempt, bound: float) -> tuple[float | None, str]:
+        if a.outcome == REJECTED:  # its ``ok`` row already carries the cost, whatever the basis
+            return None, UNKNOWN
         rate = self._rates.get(a.provider)
         if rate is not None and rate.basis == FREE:
             return 0.0, FREE

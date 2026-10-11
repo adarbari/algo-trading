@@ -13,7 +13,9 @@ asked, for any other user and for a call with no user; ``names_for(user)`` lists
 models that user may be answered by, so a cache never serves them another user's answer.
 An optional ``CallLedger`` (ADR 0058) sees every attempt, the failed ones too, and may refuse
 a call or skip the members that spend when the budget is used up; it never raises into the
-chain (a bug in recording must not stop an answer)."""
+chain (a bug in recording must not stop an answer). A failed attempt is recorded with its
+message, the prompt and its length; ``reject`` records, as a second row, an answer the caller
+could not use (outcome ``rejected``, no cost: the ``ok`` row already carries it)."""
 
 import logging
 import re
@@ -24,13 +26,19 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from algotrade.core.model.completion import (
+    ANSWER,
     FAILED,
     FELL_BACK,
+    MAX_ANSWER,
+    MAX_SENTENCE,
     OK,
+    PROVIDER,
+    REJECTED,
     SKIPPED_BUDGET,
     Attempt,
     CallTag,
     Completion,
+    clip,
 )
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade.services.text_model.model import TextModel
@@ -89,6 +97,7 @@ class FallbackTextModel:
 
     def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
         started = self.clock()
+        chars = len(system) + len(user)
         asking = tag.user if tag is not None else None
         failures: list[str] = []
         first_failed: str | None = None
@@ -104,7 +113,7 @@ class FallbackTextModel:
                 skipped = [pid for pid, _ in members[position:]]
                 failures.append(f"not tried, the {self.deadline_s:g} s deadline passed: {skipped}")
                 break
-            reserved = self._admit(provider, len(system) + len(user))
+            reserved = self._admit(provider, chars)
             if reserved is None:
                 self._note(tag, provider, model, SKIPPED_BUDGET)
                 failures.append(f"{provider}: skipped, the budget is spent")
@@ -113,7 +122,10 @@ class FallbackTextModel:
             try:
                 completion = model.complete(system, user, tag=tag)
             except ModelUnavailableError as exc:
-                self._note(tag, provider, model, FAILED, reserved, took=self.clock() - began)
+                self._note(
+                    tag, provider, model, FAILED, reserved, took=self.clock() - began,
+                    error=str(exc), stage=PROVIDER, user_text=user, chars=chars,
+                )  # fmt: skip
                 failures.append(f"{provider}: {exc}")
                 first_failed = first_failed or provider
                 later = position + 1 < len(members)
@@ -127,12 +139,17 @@ class FallbackTextModel:
                     exc,
                 )
                 continue
-            except Exception:  # a bug propagates, but what it may have cost is settled first
-                self._note(tag, provider, model, FAILED, reserved, took=self.clock() - began)
+            except Exception as exc:  # a bug propagates, but what it may have cost is settled first
+                self._note(
+                    tag, provider, model, FAILED, reserved, took=self.clock() - began,
+                    error=f"{type(exc).__name__}: {exc}", stage=PROVIDER, user_text=user,
+                    chars=chars,
+                )  # fmt: skip
                 raise
             self._note(
                 tag, provider, model, FELL_BACK if first_failed else OK, reserved,
                 took=self.clock() - began, answer=completion, fell_back_from=first_failed,
+                chars=chars,
             )  # fmt: skip
             return replace(
                 completion,
@@ -140,6 +157,42 @@ class FallbackTextModel:
                 fell_back_from=first_failed,
             )
         raise ModelUnavailableError("no text model could answer: " + "; ".join(failures))
+
+    def reject(
+        self,
+        tag: CallTag | None,
+        completion: Completion,
+        reason: str,
+        user_text: str,
+        prompt_chars: int | None = None,
+    ) -> None:
+        """The caller could not use ``completion`` (``reason``): log it, with the raw answer and
+        ``user_text`` (the prompt), as a ``rejected`` row of the provider that gave it. The ``ok``
+        row already carries the cost, so this one has none. Never raises."""
+        log.warning(  # the answer itself is in the usage table, not in this log
+            "text model %s answer rejected (%s), %d chars",
+            completion.provider, clip(reason, MAX_SENTENCE), len(completion.text),
+        )  # fmt: skip
+        if self.ledger is None:
+            return
+        try:
+            self.ledger.record(
+                Attempt(
+                    at=self.now(),
+                    provider=completion.provider,
+                    model=completion.model,
+                    use_case=tag.use_case if tag is not None else "untagged",
+                    user=tag.user if tag is not None else None,
+                    outcome=REJECTED,
+                    error=clip(reason, MAX_SENTENCE),
+                    stage=ANSWER,
+                    sentence=clip(user_text, MAX_SENTENCE),
+                    answer=clip(completion.text, MAX_ANSWER),
+                    prompt_chars=prompt_chars,
+                ),
+            )
+        except Exception:
+            log.exception("the text-model ledger could not record a rejection; the call goes on")
 
     def close(self) -> None:
         """Shutdown: the ledger writes what it still holds."""
@@ -183,6 +236,10 @@ class FallbackTextModel:
         took: float = 0.0,
         answer: Completion | None = None,
         fell_back_from: str | None = None,
+        error: str | None = None,
+        stage: str | None = None,
+        user_text: str | None = None,
+        chars: int | None = None,
     ) -> None:
         if self.ledger is None:
             return
@@ -200,6 +257,10 @@ class FallbackTextModel:
                     output_tokens=answer.output_tokens if answer is not None else None,
                     reported_cost_usd=answer.cost_usd if answer is not None else None,
                     fell_back_from=fell_back_from,
+                    error=None if error is None else clip(error, MAX_SENTENCE),
+                    stage=stage,
+                    sentence=None if user_text is None else clip(user_text, MAX_SENTENCE),
+                    prompt_chars=chars,
                 ),
                 reserved,
             )

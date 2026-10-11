@@ -3,6 +3,7 @@
 and one deadline stops a chain from starting more providers."""
 
 import logging
+from dataclasses import replace
 
 import pytest
 
@@ -324,3 +325,54 @@ def test_close_closes_the_ledger() -> None:
     with_ledger(ledger, Member("free")).close()
     assert ledger.closed
     FallbackTextModel([("free", Member("free"))]).close()  # no ledger: nothing to do
+
+
+def test_a_failed_attempt_records_its_message_the_prompt_and_its_length() -> None:
+    ledger = Ledger()
+    claude = Member("claude", ModelUnavailableError("claude: is_error: timed out"))
+    with_ledger(ledger, claude, Member("gemini")).complete(
+        "system text", "what the trader typed", tag=CallTag("screener-draft", "abhi")
+    )
+    failed, answered = ledger.attempts
+    assert (failed.stage, failed.error) == ("provider", "claude: is_error: timed out")
+    assert failed.sentence == "what the trader typed"
+    assert failed.prompt_chars == len("system text") + len("what the trader typed")
+    assert (answered.error, answered.stage, answered.sentence, answered.answer) == (None,) * 4
+    assert answered.prompt_chars == failed.prompt_chars
+
+
+def test_a_prompt_over_the_cap_is_clipped_in_the_record() -> None:
+    ledger = Ledger()
+    claude = Member("claude", ModelUnavailableError("down"))
+    with pytest.raises(ModelUnavailableError):
+        with_ledger(ledger, claude).complete("s", "x" * 5000)
+    (failed,) = ledger.attempts
+    assert failed.sentence is not None and len(failed.sentence) == 2000
+    assert failed.prompt_chars == 5001
+
+
+def test_reject_records_the_unusable_answer_as_a_second_row_and_logs_it(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ledger = Ledger()
+    model = with_ledger(ledger, Member("claude"))
+    tag = CallTag("screener-draft", "abhi")
+    done = model.complete("s", "typed", tag=tag)
+    with caplog.at_level("WARNING"):
+        model.reject(tag, replace(done, text="Sure! not json"), "not JSON", "typed", 6)
+    ok, rejected = ledger.attempts
+    assert ok.outcome == "ok" and ok.stage is None
+    assert (rejected.outcome, rejected.stage, rejected.error) == ("rejected", "answer", "not JSON")
+    assert (rejected.provider, rejected.use_case, rejected.user) == (
+        "claude", "screener-draft", "abhi")  # fmt: skip
+    assert (rejected.sentence, rejected.answer, rejected.prompt_chars) == (
+        "typed", "Sure! not json", 6)  # fmt: skip
+    assert rejected.input_tokens is None and rejected.reported_cost_usd is None
+    assert "not JSON" in caplog.text and "14 chars" in caplog.text
+    assert "Sure! not json" not in caplog.text  # the answer is in the usage table, not the log
+
+
+def test_reject_never_raises_when_the_ledger_breaks_and_works_without_one() -> None:
+    done = Completion("t", "m", "claude")
+    with_ledger(Ledger(deaf=True), Member("claude")).reject(None, done, "why", "u")
+    FallbackTextModel([("claude", Member("claude"))]).reject(None, done, "why", "u")

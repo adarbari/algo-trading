@@ -9,3 +9,4 @@ export type UsageSlice = UsageBreakdown['rows'][number];
 export type UsageDay = LlmUsage['daily'][number];
 export type UsageCall = LlmUsage['recent'][number];
 export type UsageReliability = LlmUsage['reliability'];
+export type UsageFailure = LlmUsage['failures'][number];

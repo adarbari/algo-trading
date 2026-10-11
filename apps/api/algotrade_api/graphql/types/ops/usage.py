@@ -128,6 +128,7 @@ class UsageReliability:
     fell_back: int
     failed: int
     skipped_budget: int
+    rejected: int
     fallback_rate: float | None
     failure_rate: float | None
 
@@ -139,6 +140,7 @@ class UsageReliability:
             fell_back=d.fell_back,
             failed=d.failed,
             skipped_budget=d.skipped_budget,
+            rejected=d.rejected,
             fallback_rate=d.fallback_rate,
             failure_rate=d.failure_rate,
         )
@@ -146,7 +148,10 @@ class UsageReliability:
 
 @strawberry.type(
     description="One stored attempt; `unknownFields` names the values stored null (tokens a "
-    "provider did not report, a cost not known), `unknown` says why"
+    "provider did not report, a cost not known), `unknown` says why. A failed or rejected call "
+    "(Admin only, like the whole read) also carries `stage` (provider: the attempt raised; "
+    "answer: the provider answered and the caller refused it), `error`, the prompt sent "
+    "(`sentence`, clipped), the raw `answer` (clipped) and `promptChars`"
 )
 class UsageCall:
     ts: dt.datetime
@@ -162,6 +167,11 @@ class UsageCall:
     outcome: str
     fell_back_from: str | None
     run_id: str
+    error: str | None
+    stage: str | None
+    sentence: str | None
+    answer: str | None
+    prompt_chars: int | None
     unknown_fields: list[str]
     unknown: Unknown | None
 
@@ -181,6 +191,11 @@ class UsageCall:
             outcome=d.outcome,
             fell_back_from=d.fell_back_from,
             run_id=d.run_id,
+            error=d.error,
+            stage=d.stage,
+            sentence=d.sentence,
+            answer=d.answer,
+            prompt_chars=d.prompt_chars,
             unknown_fields=list(d.unknown_fields),
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
         )
@@ -210,7 +225,8 @@ class UsageBudget:
 
 @strawberry.type(
     description="The text model's usage and cost up to `today` (exchange date): windows with "
-    "their caps, 30-day breakdowns, a daily series, reliability and the latest calls. A date "
+    "their caps, 30-day breakdowns, a daily series, reliability, the latest calls and the latest "
+    "failures (failed or rejected). A date "
     "range, not one session (ADR 0058); `recorded` false when the log is empty"
 )
 class LlmUsage:
@@ -222,6 +238,7 @@ class LlmUsage:
     daily: list[UsageDay]
     reliability: UsageReliability
     recent: list[UsageCall]
+    failures: list[UsageCall]
 
     @classmethod
     def of(cls, d: usage.LlmUsage) -> Self:
@@ -234,4 +251,5 @@ class LlmUsage:
             daily=[UsageDay.of(p) for p in d.daily],
             reliability=UsageReliability.of(d.reliability),
             recent=[UsageCall.of(c) for c in d.recent],
+            failures=[UsageCall.of(c) for c in d.failures],
         )

@@ -29,6 +29,11 @@ export const call = (over: Partial<UsageCall> = {}): UsageCall => ({
   outcome: 'ok',
   fellBackFrom: null,
   runId: 'llm_usage-2026-10-08-1',
+  error: null,
+  stage: null,
+  sentence: null,
+  answer: null,
+  promptChars: 5200,
   unknownFields: [],
   unknown: null,
   ...over,
@@ -164,6 +169,7 @@ export function usage(over: Partial<LlmUsage> = {}): LlmUsage {
       fellBack: 2,
       failed: 1,
       skippedBudget: 1,
+      rejected: 1,
       fallbackRate: 0.1,
       failureRate: 0.05,
     },
@@ -189,6 +195,37 @@ export function usage(over: Partial<LlmUsage> = {}): LlmUsage {
         inputTokens: null,
         outputTokens: null,
         unknownFields: ['input_tokens', 'output_tokens', 'cost_usd'],
+        unknown: NOT_REPORTED,
+      }),
+    ],
+    failures: [
+      call({
+        ts: '2026-10-08T14:30:00+00:00',
+        outcome: 'rejected',
+        stage: 'answer',
+        error: "the model's answer is not JSON",
+        sentence: 'stocks near support with rising volume',
+        answer: 'Sure! Support lines are not in the catalogue.',
+        costUsd: null,
+        costBasis: 'unknown',
+        inputTokens: null,
+        outputTokens: null,
+        unknownFields: ['input_tokens', 'output_tokens', 'cost_usd'],
+        unknown: NOT_REPORTED,
+      }),
+      call({
+        ts: '2026-10-08T11:00:00+00:00',
+        provider: 'claude_cli',
+        model: 'sonnet',
+        outcome: 'failed',
+        stage: 'provider',
+        error: 'claude_cli: the call timed out after 60 s',
+        sentence: 'cheap puts on high iv rank',
+        costUsd: 0.25,
+        costBasis: 'bound',
+        inputTokens: null,
+        outputTokens: null,
+        unknownFields: ['input_tokens', 'output_tokens'],
         unknown: NOT_REPORTED,
       }),
     ],
@@ -232,10 +269,12 @@ export function emptyUsage(): LlmUsage {
       fellBack: 0,
       failed: 0,
       skippedBudget: 0,
+      rejected: 0,
       fallbackRate: null,
       failureRate: null,
     },
     recent: [],
+    failures: [],
   };
 }
 
@@ -243,5 +282,12 @@ export function emptyUsage(): LlmUsage {
 export function callAt(i: number): UsageCall {
   const found = usage().recent[i];
   if (!found) throw new Error(`the fixture has no call ${String(i)}`);
+  return found;
+}
+
+/** The `i`th of the fixture's failures (a rejected answer, then a failed provider attempt). */
+export function failureAt(i: number): UsageCall {
+  const found = usage().failures[i];
+  if (!found) throw new Error(`the fixture has no failure ${String(i)}`);
   return found;
 }

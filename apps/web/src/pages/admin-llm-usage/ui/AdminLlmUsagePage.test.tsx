@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,9 +21,13 @@ afterEach(() => {
 });
 
 describe('AdminLlmUsagePage', () => {
-  it('lays out every section and passes the chosen call down', () => {
+  it('lays out every section and passes the chosen call down', async () => {
     render(<AdminLlmUsagePage selected="c1" onSelectCall={vi.fn()} onClearCall={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 1, name: 'LLM usage & cost' })).toBeInTheDocument();
+    // the calls section is one lazy chunk
+    await waitFor(() => {
+      expect(document.body).toHaveTextContent('[calls c1]');
+    });
     for (const name of ['budget', 'trend', 'breakdown', 'reliability', 'calls c1', 'detail']) {
       expect(document.body).toHaveTextContent(`[${name}]`);
     }

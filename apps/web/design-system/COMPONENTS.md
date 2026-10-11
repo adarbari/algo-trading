@@ -1403,6 +1403,19 @@ Source: `design-system/components/TextArea`
 | `onBlur` | `FocusEventHandler<HTMLTextAreaElement> \| undefined` | no |  |
 | `ref` | `Ref<HTMLTextAreaElement>` | no |  |
 
+### TextBlock
+
+TextBlock: a block of raw text shown as written (a model's answer, an error message, a log excerpt): monospace, line breaks and spaces kept, long lines wrapped, and a height cap past which it scrolls. The block is a labelled region that takes the keyboard focus so it can be scrolled without a mouse; `label` names it for a screen reader. Never for text a reader is meant to read as prose (Text) or for a value in a row (Mono).
+
+Source: `design-system/components/TextBlock`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `text` | `string \| null \| undefined` | yes | The text, shown as given (null or empty: the `empty` words). |
+| `label` | `string` | yes | What the text is ("Raw model answer"); required: it is the block's accessible name. |
+| `size` | `'sm' \| 'md'` | no | The height before it scrolls: `sm` about 8 lines, `md` (default) about 16. |
+| `empty` | `string` | no | What reads when there is no text (default "nothing"). |
+
 ### TextLink
 
 TextLink: a link inside the app (a field's page, a section of this page, Explore): accent text, an optional leading icon and a trailing key hint; `current` marks the page the link points at. In-app paths go through the app's router link (`LinkProvider`); anchors ("#reads") and URLs are plain anchors. A link to another site is an ExternalLink.

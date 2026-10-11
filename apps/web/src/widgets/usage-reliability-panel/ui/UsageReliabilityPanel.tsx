@@ -1,6 +1,6 @@
 /**
  * How the last 30 days of attempts ended: answered, answered by a later provider (fallback),
- * failed, skipped for the budget; with the fallback and failure rates. A failure rate is the
+ * failed, answered but rejected by the caller (not JSON, a number the facts lack), skipped for the budget; with the fallback and failure rates. A failure rate is the
  * signal that calls are lost and a paid attempt that failed may still have been billed.
  */
 import { formatValue, StatStrip, type StatItem } from '@algotrade/ui';
@@ -27,6 +27,12 @@ function items(r: UsageReliability): StatItem[] {
       value: count(r.failed),
       sub: `rate ${formatValue(r.failureRate, PERCENT).text}`,
       tone: r.failed > 0 ? 'negative' : 'default',
+    },
+    {
+      id: 'rejected',
+      label: 'Answers rejected',
+      value: count(r.rejected),
+      tone: r.rejected > 0 ? 'negative' : 'default',
     },
     { id: 'skipped', label: 'Skipped for budget', value: count(r.skippedBudget) },
   ];

@@ -6,7 +6,7 @@ import { call, callAt, usage } from './fixtures';
 describe('usage labels', () => {
   it('names a call by the key the log merges on and finds it in the latest list', () => {
     const c = call();
-    expect(callId(c)).toBe('2026-10-08T14:00:00+00:00~claude~screener-draft');
+    expect(callId(c)).toBe('2026-10-08T14:00:00+00:00~claude~screener-draft~abhi~ok');
     const u = usage();
     expect(findCall(u, callId(callAt(1)))).toEqual(u.recent[1]);
     expect(findCall(u, 'nope')).toBeNull();

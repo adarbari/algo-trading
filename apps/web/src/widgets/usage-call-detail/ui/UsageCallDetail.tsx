@@ -1,7 +1,8 @@
 /**
  * One stored call in full: when, provider, model, use case, user, tokens, latency, cost and how
  * it was worked out, the outcome and the provider it fell back from, the run that wrote it. A
- * value the log holds as null reads "unknown" with the reason beside it, never as zero.
+ * value the log holds as null reads "unknown" with the reason beside it, never as zero. A failed
+ * or rejected call also shows where it failed, the message, the prompt sent and the raw answer.
  */
 import { EmptyState, KeyValue, Stack, Text } from '@algotrade/ui';
 
@@ -16,6 +17,8 @@ import {
   USD,
   type UsageCall,
 } from '@/entities/llm-usage';
+
+import { FailureDetail } from './FailureDetail';
 
 export interface UsageCallDetailProps {
   /** The chosen call (its `callId`), if any. */
@@ -55,6 +58,7 @@ function Detail({ call }: { call: UsageCall }) {
           { id: 'run', label: 'Written by run', value: call.runId, mono: true },
         ]}
       />
+      {(call.stage || call.error) && <FailureDetail call={call} />}
       {call.unknown && (
         <Stack gap={1}>
           <Text size="sm" tone="muted">

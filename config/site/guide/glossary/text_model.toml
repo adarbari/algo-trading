@@ -65,3 +65,21 @@ body = """
 The text model tries its providers in order. When the first is down, out of retries or skipped for the budget, the next one answers. The call is logged as a fallback, with the provider it fell back from. A high fallback rate means the first choice is unreliable or the budget is tight. A high failure rate means calls are being lost. A failed attempt of a paid provider may still have been billed.
 """
 see_also = ["llm_budget", "llm_cost_basis"]
+
+[[term]]
+id = "llm_rejected_answer"
+term = "Rejected answer"
+short = "The model answered, but the app could not use what it said, so the draft or explanation failed."
+body = """
+A call can succeed at the provider and still fail for the trader. The model answered, but the answer was not the JSON a screener draft needs, had no criteria list, or quoted a number the regime facts do not contain. The first row of the call stays "ok": it was answered and paid for. The app then logs a second row with the outcome "rejected", the reason, the prompt it sent and the raw answer. A rejected row has no cost of its own, so spend is never counted twice. Open the call to read the raw answer. It shows whether the model refused, explained itself in prose, or invented a field. A provider that failed is a "failed" row with its message instead: a timeout, an HTTP error, or an error the Claude Code login reported.
+"""
+see_also = ["llm_failure_stage", "llm_fallback", "llm_cost_basis"]
+
+[[term]]
+id = "llm_failure_stage"
+term = "Failure stage"
+short = "Where a text-model call failed: at the provider, or in the answer the app received."
+body = """
+Provider failed: the attempt itself raised, so there is no answer: the message says why (a timeout, an HTTP status, an error from the Claude Code login). The chain then tries the next provider. Answer rejected: the provider answered, the app refused the answer, and the log keeps what the model said. The prompt shown is what the app sent for that call, cut to 2,000 characters; the answer is cut to 8,000. The long system instructions are not kept, only their length. Messages never carry a key or a token.
+"""
+see_also = ["llm_rejected_answer", "llm_fallback"]

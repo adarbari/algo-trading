@@ -28,6 +28,7 @@ describe('UsageReliabilityPanel', () => {
     expect(strip).toHaveTextContent('rate 10.0%');
     expect(strip).toHaveTextContent('rate 5.0%');
     expect(strip).toHaveTextContent('Skipped for budget');
+    expect(strip).toHaveTextContent('Answers rejected');
   });
 
   it('says when nothing is recorded', async () => {

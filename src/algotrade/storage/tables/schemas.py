@@ -288,7 +288,10 @@ LIVE_OPTION_QUOTES = fixed(
 # and ``fell_back_from`` are null when unknown or not applicable, never 0: ``cost_basis`` says
 # where ``cost_usd`` came from (``price`` tokens x the model's [[price]], ``reported`` a
 # subscription's notional total, ``bound`` the upper bound reserved when the cost is unknown or
-# the attempt failed, ``free`` 0 for a free provider, ``unknown`` null: a skipped attempt). Written
+# the attempt failed, ``free`` 0 for a free provider, ``unknown`` null: a skipped attempt or a
+# ``rejected`` one). A failure also carries ``error``, ``stage`` (``provider`` / ``answer``), the
+# prompt (``sentence``, clipped), the raw ``answer`` (clipped) and ``prompt_chars``: null on
+# every other row and on partitions written before they existed. Written
 # only through ``UsageWriter`` (``usage/*``); read across a date range by ``data.usage``.
 USAGE_LLM_CALLS = fixed(
     "usage/llm_calls",
@@ -306,8 +309,13 @@ USAGE_LLM_CALLS = fixed(
     "cost_basis string!",
     "outcome string!",
     "fell_back_from string",
+    "error string",
+    "stage string",
+    "sentence string",
+    "answer string",
+    "prompt_chars int64",
     runs="merge",
-    key=("ts", "provider", "use_case"),
+    key=("ts", "provider", "use_case", "user", "outcome"),
 )
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
