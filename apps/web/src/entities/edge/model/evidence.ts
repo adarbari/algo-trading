@@ -4,14 +4,16 @@
  * (`Query.edgeVariants`). A per-name value under a licence the viewer lacks is an `unknown`, never
  * a number; every figure is the read model's. Names only: no derivation here.
  */
+import type { gqlTypes } from '@/shared/api';
+
 export type TradePeriod = 'IN_SAMPLE' | 'OUT_OF_SAMPLE' | 'LIVE' | 'ALL';
 
 export type TradeSort =
   'DECISION' | 'EXIT' | 'INSTRUMENT' | 'RANK' | 'STATUS' | 'VALUE' | 'SCORE' | 'DRAWDOWN' | 'ADV';
 
 export interface EvidenceUnknown {
-  code: string;
-  kind: string;
+  code: gqlTypes.UnknownCode;
+  kind: gqlTypes.UnavailableKind;
   guideTerm: string;
   kindText: string;
 }

@@ -48,6 +48,7 @@ export function EdgePage({ id, onBack, onEdit }: EdgePageProps) {
     { id: 'edge-sure', label: 'How sure' },
     { id: 'edge-where', label: 'Where it worked' },
     ...(hasLive ? [{ id: 'edge-live', label: 'Live record' }] : []),
+    { id: 'edge-trades', label: 'Trades' },
     { id: 'edge-definition', label: 'Definition' },
     { id: 'edge-details', label: 'Details' },
   ];

@@ -3,7 +3,7 @@
  * behind the verdict. The body loads on first open, so the page's first paint stays small.
  */
 import { Disclosure } from '@algotrade/ui';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import type { Edge } from '@/entities/edge';
 
@@ -11,9 +11,11 @@ import { EdgeDetailsBody } from './EdgeDetailsBody';
 
 export interface EdgeDetailsProps {
   edge: Edge;
+  /** More sections of the details (the page composes them), shown with the body once opened. */
+  children?: ReactNode;
 }
 
-export function EdgeDetails({ edge }: EdgeDetailsProps) {
+export function EdgeDetails({ edge, children }: EdgeDetailsProps) {
   const [open, setOpen] = useState(false);
   return (
     <Disclosure
@@ -22,7 +24,12 @@ export function EdgeDetails({ edge }: EdgeDetailsProps) {
       open={open}
       onOpenChange={setOpen}
     >
-      {open && <EdgeDetailsBody edge={edge} />}
+      {open && (
+        <>
+          <EdgeDetailsBody edge={edge} />
+          {children}
+        </>
+      )}
     </Disclosure>
   );
 }

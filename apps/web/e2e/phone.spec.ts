@@ -276,6 +276,15 @@ test('Edges: a tapped edge opens its page', async ({ page }) => {
   await page.getByRole('tab', { name: 'Drawdown' }).tap();
   await expect(page.getByRole('grid', { name: 'Deepest drawdowns' })).toBeVisible();
   await fits();
+  await page.getByRole('tab', { name: 'Holding period' }).tap();
+  await expect(page.getByRole('grid', { name: 'By holding period' })).toBeVisible();
+  await fits();
+  await page
+    .getByRole('navigation', { name: 'Sections of this edge' })
+    .getByRole('link', { name: 'Trades' })
+    .tap();
+  await expect(page.getByRole('grid', { name: 'Trade ledger' })).toBeVisible();
+  await fits(); // the ledger scrolls sideways inside its own box, never the page
   await expectAccessible(page);
 });
 

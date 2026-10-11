@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+import { Text } from '@algotrade/ui';
 import { describe, expect, it, vi } from 'vitest';
 
 import { edgeFixture } from '@/entities/edge';
@@ -26,5 +28,16 @@ describe('EdgeDetails', () => {
     for (const id of ['verdict_criteria', 'baselines', 'edge_backtests', 'variants_tried']) {
       expect(screen.getAllByText(`help ${id}`).length).toBeGreaterThan(0);
     }
+  });
+
+  it('shows the sections the page composes in, once opened and not before', async () => {
+    render(
+      <EdgeDetails edge={edgeFixture('momentum_12_1')}>
+        <Text>more details</Text>
+      </EdgeDetails>,
+    );
+    expect(screen.queryByText('more details')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Details'));
+    expect(await screen.findByText('more details')).toBeInTheDocument();
   });
 });

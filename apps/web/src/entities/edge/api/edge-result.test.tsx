@@ -13,6 +13,7 @@ import {
   useEdgeHorizons,
   useEdgeRegimes,
   useEdgeResultBasis,
+  useEdgeVariants,
 } from './edge-result';
 
 vi.mock('@/shared/api', async (importOriginal) => {
@@ -84,5 +85,14 @@ describe('the edge result sections', () => {
     expect(String(GQL.mock.calls[1]?.[0])).toContain('query EdgeResultHorizons');
     expect(String(GQL.mock.calls[2]?.[0])).toContain('query EdgeResultCosts');
     expect(horizons.result.current.data?.state).toBe('measured');
+  });
+
+  it('reads the variant grid of the edge alone', async () => {
+    GQL.mockResolvedValue({ edgeVariants: { trials: 3, rows: [] } });
+    const { result } = renderHook(() => useEdgeVariants('drift'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ edgeId: 'drift' });
   });
 });

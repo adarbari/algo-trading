@@ -8,7 +8,7 @@
  * capacity, regimes and horizons, one read each). Never reads an exploratory run as a track record.
  */
 export { prefetchEdges, refreshEdges, useEdgeProblems, useEdges } from './api/edges';
-export { useEdgeTrades, useEdgeVariants, type TradesRequest } from './api/evidence';
+export { useEdgeTrades, type TradesRequest } from './api/evidence';
 export {
   useEdgeCapacity,
   useEdgeCosts,
@@ -20,6 +20,7 @@ export {
   useEdgeRegimes,
   useEdgeResultBasis,
   useEdgeRollingStarts,
+  useEdgeVariants,
 } from './api/edge-result';
 export { useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
 export { useTrackRecords } from './api/track-records';
@@ -48,9 +49,15 @@ export {
 export {
   barStateLabel,
   EDGE_UNKNOWN_WORDS,
+  excludedLabel,
   measureLabel,
+  oosByLabel,
   periodLabel,
   projectionLabel,
+  regimeLabel,
+  sliceStateLabel,
+  tradeStatusLabel,
+  tradeStatusTone,
   type DecayBar,
   type DrawdownEpisode,
 } from './model/edge-result';
@@ -60,6 +67,7 @@ export type {
   EdgeVariant,
   EdgeVariants,
   EvidenceUnknown,
+  TradeNumber,
   TradePeriod,
   TradeSort,
   VariantFigures,
@@ -118,3 +126,13 @@ export {
   TRACK_RECORDS_FIXTURE,
   UNKNOWN_FIXTURE,
 } from './model/fixtures';
+export {
+  CAPACITY_FIXTURE,
+  COSTS_FIXTURE,
+  HORIZONS_FIXTURE,
+  MONTHLY_FIXTURE,
+  REGIMES_FIXTURE,
+  ROLLING_STARTS_FIXTURE,
+  TRADES_FIXTURE,
+  VARIANTS_FIXTURE,
+} from './model/fixtures-slices';

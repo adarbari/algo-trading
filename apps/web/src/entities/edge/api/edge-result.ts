@@ -3,7 +3,9 @@
  * section so a page reads only the sections it shows (each resolves lazily on the server, about the
  * verdict's own run and basis, which the page never passes): the basis, the evidence curve with its
  * live stroke, the drawdown, the rolling starts, the monthly map, the decay with its live bar, the
- * cost sensitivity, the capacity and where it worked (by regime, by holding period).
+ * cost sensitivity, the capacity and where it worked (by regime, by holding period), and
+ * the variant grid (`Query.edgeVariants`: every screen and holding period the run tried, the basis
+ * marked official).
  * `date` resolves the session of the live stroke and bar only. Every number, date and state is the
  * server's; the browser derives nothing from them. The cache holds each response.
  */
@@ -355,6 +357,51 @@ const ResultHorizons = graphql(`
   }
 `);
 
+const EdgeVariantGrid = graphql(`
+  query EdgeVariantGrid($edgeId: String!) {
+    edgeVariants(edgeId: $edgeId) {
+      basis
+      trials
+      oosHidden
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+      rows {
+        edgeVariant
+        variant
+        horizonSessions
+        inSample {
+          winRate
+          baseRate
+          liftPts
+          decileSpread
+          trades
+        }
+        outOfSample {
+          winRate
+          baseRate
+          liftPts
+          decileSpread
+          trades
+        }
+        all {
+          winRate
+          baseRate
+          liftPts
+          decileSpread
+          trades
+        }
+        official
+        notPreChosen
+        modelFit
+      }
+    }
+  }
+`);
+
 /** The run and basis every section reads (null: no such edge). */
 export function useEdgeResultBasis(id: string) {
   return useQuery({
@@ -442,5 +489,14 @@ export function useEdgeHorizons(id: string) {
     queryKey: queryKeys.gql('EdgeResultHorizons', { id }),
     queryFn: () => gql(ResultHorizons, { id }),
     select: (data) => data.edgeResult?.horizons ?? null,
+  });
+}
+
+/** The variant grid of the edge's official run (null: no such edge). */
+export function useEdgeVariants(edgeId: string) {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeVariantGrid', { edgeId }),
+    queryFn: () => gql(EdgeVariantGrid, { edgeId }),
+    select: (data) => data.edgeVariants,
   });
 }

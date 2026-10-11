@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EDGES_FIXTURE } from '@/entities/edge';
@@ -22,7 +23,12 @@ vi.mock('@/widgets/edge-detail', async () => {
     ),
     EdgeCompare: ({ edgeId }: { edgeId: string }) => <Text>{`compare ${edgeId}`}</Text>,
     EdgeDefinition: ({ edge }: { edge: { id: string } }) => <Text>{`definition ${edge.id}`}</Text>,
-    EdgeDetails: ({ edge }: { edge: { id: string } }) => <Text>{`details ${edge.id}`}</Text>,
+    EdgeDetails: ({ edge, children }: { edge: { id: string }; children?: ReactNode }) => (
+      <>
+        <Text>{`details ${edge.id}`}</Text>
+        {children}
+      </>
+    ),
     EdgeLive: ({ edgeId }: { edgeId: string }) => <Text>{`live ${edgeId}`}</Text>,
   };
 });
@@ -33,6 +39,16 @@ vi.mock('@/widgets/edge-evidence', async () => {
 vi.mock('@/widgets/edge-sureness', async () => {
   const { Text } = await import('@algotrade/ui');
   return { EdgeSureness: ({ edgeId }: { edgeId: string }) => <Text>{`sureness ${edgeId}`}</Text> };
+});
+vi.mock('@/widgets/edge-diagnostics', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    EdgeDiagnostics: ({ edgeId }: { edgeId: string }) => <Text>{`diagnostics ${edgeId}`}</Text>,
+  };
+});
+vi.mock('@/widgets/edge-trades', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { EdgeTrades: ({ edgeId }: { edgeId: string }) => <Text>{`trades ${edgeId}`}</Text> };
 });
 vi.mock('@/widgets/edge-performance', async () => {
   const { Text } = await import('@algotrade/ui');
@@ -61,6 +77,7 @@ describe('EdgePage', () => {
       'How sure',
       'Where it worked',
       'Live record',
+      'Trades',
       'Definition',
       'Details',
     ]);
@@ -69,8 +86,10 @@ describe('EdgePage', () => {
       'sureness momentum_12_1',
       'performance momentum_12_1',
       'live momentum_12_1',
+      'trades momentum_12_1',
       'definition momentum_12_1',
       'details momentum_12_1',
+      'diagnostics momentum_12_1',
     ];
     const found = await Promise.all(order.map((text) => screen.findByText(text)));
     found.slice(1).forEach((node, i) => {
@@ -80,7 +99,7 @@ describe('EdgePage', () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
     });
-    for (const id of ['evidence', 'sure', 'where', 'live', 'definition', 'details']) {
+    for (const id of ['evidence', 'sure', 'where', 'live', 'trades', 'definition', 'details']) {
       expect(container.querySelector(`#edge-${id}`)).toBeInTheDocument(); // what the navigation scrolls to
     }
     await expectNoA11yViolations(container);
