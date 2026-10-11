@@ -198,6 +198,36 @@ def test_a_hidden_runs_rows_are_the_in_sample_slice_only() -> None:
     }
 
 
+def cost_row(period: str, bp: int, hit_rate: float) -> dict[str, Any]:
+    return row(
+        "momo", "cost", hit_rate, MOVED, edge_id="mine", user_id="me", exploratory=True,
+        slice_value=f"{period}:{bp}", mean_excess_picks=0.01,
+    )  # fmt: skip
+
+
+def test_a_hidden_runs_cost_rows_are_the_in_sample_period_only() -> None:
+    """ADR 0064 decision 3: a cost row is cut by period, so only ``in_sample:`` ones are served;
+    ``all`` and ``frozen`` ones hold the withheld sessions (and no figure of them leaks)."""
+    backend = MemoryBackend()
+    costs = [
+        cost_row("in_sample", 15, 0.46),
+        cost_row("all", 15, 0.81),
+        cost_row("split", 15, 0.82),
+    ]
+    write_own_run(backend, extra=costs)
+    ctx = ctx_for(backend, with_copy())
+    (run,) = runs.load_edge_runs(ctx, mine(ctx))
+    shown = runs.load_run_rows(ctx, run)
+    assert [(r.slice_kind, r.slice_value) for r in shown if r.slice_kind == "cost"] == [
+        ("cost", "in_sample:15")
+    ]
+    assert not {0.81, 0.82} & {r.hit_rate for r in shown}
+    revealed = ctx_for(backend, with_copy({"oos_revealed": True}))
+    (open_run,) = runs.load_edge_runs(revealed, mine(revealed))
+    kept = [r.slice_value for r in runs.load_run_rows(revealed, open_run) if r.slice_kind == "cost"]
+    assert sorted(kept) == ["all:15", "in_sample:15", "split:15"]
+
+
 def test_a_site_edges_rows_are_never_hidden() -> None:
     backend = MemoryBackend()
     write_run(backend, "site1", FROZEN, 0.7)
