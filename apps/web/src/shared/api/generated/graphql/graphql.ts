@@ -122,10 +122,55 @@ export type OptionQuotesQueryVariables = Exact<{
 
 export type OptionQuotesQuery = { instrument: { instrumentId: string, chain: { quotes: Array<{ instrumentId: string, expiry: string, right: string, strike: number, bid: number | null, ask: number | null, last: number | null, volume: number | null, openInterest: number | null, iv: number | null, delta: number | null, gamma: number | null, theta: number | null, vega: number | null }> } | null } | null };
 
+export type EdgeResultBasisQueryVariables = Exact<{
+  id: string;
+  date?: string | null | undefined;
+}>;
+
+
+export type EdgeResultBasisQuery = { edgeResult: { basis: { runId: string | null, variant: string | null, horizonSessions: number | null, splitFrom: string | null, oosHidden: boolean, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+
+export type EdgeResultCurveQueryVariables = Exact<{
+  id: string;
+  date?: string | null | undefined;
+}>;
+
+
+export type EdgeResultCurveQuery = { edgeResult: { curve: { kind: string | null, unit: string | null, splitFrom: string | null, hidden: boolean, points: Array<{ decision: string, exit: string, period: string, value: number, cumulative: number, baseValue: number | null, baseCumulative: number | null, trades: number, weight: number }>, gaps: Array<{ from: string, to: string, kind: string, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, live: { state: string, since: string | null, anchor: number | null, closed: number, sessions: number, points: Array<{ sell: string, value: number, cumulative: number, trades: number }> } | null, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+
+export type EdgeResultDrawdownQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgeResultDrawdownQuery = { edgeResult: { drawdown: { unit: string | null, maxInSample: number | null, maxOutOfSample: number | null, volInSample: number | null, volOutOfSample: number | null, points: Array<{ exit: string, depth: number }>, episodes: Array<{ peak: string, trough: string, recovered: string | null, depth: number }>, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+
+export type EdgeResultRollingStartsQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgeResultRollingStartsQuery = { edgeResult: { rollingStarts: { unit: string | null, starts: Array<{ start: string, trades: number, liftPts: number | null, meanExcess: number | null }>, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+
+export type EdgeResultMonthlyQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgeResultMonthlyQuery = { edgeResult: { monthly: { unit: string | null, months: Array<{ month: string, value: number, trades: number, period: string }>, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+
+export type EdgeResultDecayQueryVariables = Exact<{
+  id: string;
+  date?: string | null | undefined;
+}>;
+
+
+export type EdgeResultDecayQuery = { edgeResult: { decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null } | null };
+
 export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
+export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -575,6 +620,170 @@ export const OptionQuotesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<OptionQuotesQuery, OptionQuotesQueryVariables>;
+export const EdgeResultBasisDocument = new TypedDocumentString(`
+    query EdgeResultBasis($id: String!, $date: Date) {
+  edgeResult(id: $id, date: $date) {
+    basis {
+      runId
+      variant
+      horizonSessions
+      splitFrom
+      oosHidden
+      unknown {
+        kind
+        guideTerm
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultBasisQuery, EdgeResultBasisQueryVariables>;
+export const EdgeResultCurveDocument = new TypedDocumentString(`
+    query EdgeResultCurve($id: String!, $date: Date) {
+  edgeResult(id: $id, date: $date) {
+    curve {
+      kind
+      unit
+      splitFrom
+      hidden
+      points {
+        decision
+        exit
+        period
+        value
+        cumulative
+        baseValue
+        baseCumulative
+        trades
+        weight
+      }
+      gaps {
+        from
+        to
+        kind
+        unknown {
+          kind
+          guideTerm
+          kindText
+        }
+      }
+      live {
+        state
+        since
+        anchor
+        closed
+        sessions
+        points {
+          sell
+          value
+          cumulative
+          trades
+        }
+      }
+      unknown {
+        kind
+        guideTerm
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultCurveQuery, EdgeResultCurveQueryVariables>;
+export const EdgeResultDrawdownDocument = new TypedDocumentString(`
+    query EdgeResultDrawdown($id: String!) {
+  edgeResult(id: $id) {
+    drawdown {
+      unit
+      points {
+        exit
+        depth
+      }
+      episodes {
+        peak
+        trough
+        recovered
+        depth
+      }
+      maxInSample
+      maxOutOfSample
+      volInSample
+      volOutOfSample
+      unknown {
+        kind
+        guideTerm
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultDrawdownQuery, EdgeResultDrawdownQueryVariables>;
+export const EdgeResultRollingStartsDocument = new TypedDocumentString(`
+    query EdgeResultRollingStarts($id: String!) {
+  edgeResult(id: $id) {
+    rollingStarts {
+      unit
+      starts {
+        start
+        trades
+        liftPts
+        meanExcess
+      }
+      unknown {
+        kind
+        guideTerm
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultRollingStartsQuery, EdgeResultRollingStartsQueryVariables>;
+export const EdgeResultMonthlyDocument = new TypedDocumentString(`
+    query EdgeResultMonthly($id: String!) {
+  edgeResult(id: $id) {
+    monthly {
+      unit
+      months {
+        month
+        value
+        trades
+        period
+      }
+      unknown {
+        kind
+        guideTerm
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultMonthlyQuery, EdgeResultMonthlyQueryVariables>;
+export const EdgeResultDecayDocument = new TypedDocumentString(`
+    query EdgeResultDecay($id: String!, $date: Date) {
+  edgeResult(id: $id, date: $date) {
+    decay {
+      measure
+      unit
+      basisHorizon
+      published {
+        measure
+        value
+        horizonSessions
+        sample
+        source {
+          title
+          url
+        }
+      }
+      bars {
+        period
+        value
+        n
+        state
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultDecayQuery, EdgeResultDecayQueryVariables>;
 export const EdgesPageDocument = new TypedDocumentString(`
     query EdgesPage {
   edgeProblems {
@@ -694,6 +903,8 @@ export const EdgesPageDocument = new TypedDocumentString(`
           needed
           remaining
           projectionState
+          expectedBy
+          fillRatio
         }
       }
       haircut {

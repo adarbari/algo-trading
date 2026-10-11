@@ -20,7 +20,7 @@ recomputed; the thresholds are site data (``config/site/verdict.toml``); the sen
 server's, the browser words nothing."""
 
 import statistics
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final
@@ -31,7 +31,12 @@ from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.decay import EdgeDecay, decay_of
 from algotrade.services.read.evaluation.edges import Edge, EdgePublished
-from algotrade.services.read.evaluation.evidence import EvidenceProgress, evidence_of, outlook_of
+from algotrade.services.read.evaluation.evidence import (
+    EvidenceProgress,
+    Projection,
+    evidence_of,
+    outlook_of,
+)
 from algotrade.services.read.evaluation.robustness import (
     EdgeHaircut,
     Robustness,
@@ -377,12 +382,37 @@ def _next_gap(crit: Sequence[VerdictCriterion]) -> VerdictCriterion | None:
 @dataclass(frozen=True)
 class EdgeFacts:
     """What the verdict knows about the edge beyond its rows: its ``published`` figure, its
-    ``schedule`` (an event schedule's count date cannot be projected) and whether the
-    out-of-sample result is ``hidden``."""
+    ``schedule`` (an event schedule's count date cannot be projected), whether the
+    out-of-sample result is ``hidden`` and ``measured``: the sessions each (screen, holding
+    period) measured with picks, read from the run's series only when called (None: no series
+    is stored, as in an older run: the haircut keeps the stored count)."""
 
     published: EdgePublished | None = None
     schedule: str | None = None
     hidden: bool = False
+    measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
+
+
+def _projection(whole: EdgeRow) -> Projection:
+    """What the basis's ``all`` row stores for a projection (ADR 0064 decision 7)."""
+    return Projection(
+        whole.projected_exits,
+        whole.decisions_scheduled,
+        whole.decisions_measured,
+        whole.decisions_scheduled_oos,
+        whole.decisions_measured_oos,
+    )
+
+
+def _haircut(c: _Candidate, facts: EdgeFacts) -> EdgeHaircut | None:
+    """The basis's haircut Sharpe ratio over the sessions the run's series measured with picks
+    (``measured``); the stored count when the run has no series."""
+    whole = c.whole
+    if whole.sharpe is None or facts.measured is None:
+        return load_haircut(whole.sharpe, whole.sessions, whole.trials)
+    counted = facts.measured()
+    n = whole.sessions if counted is None else counted.get((c.variant, c.horizon), 0)
+    return load_haircut(whole.sharpe, n, whole.trials)
 
 
 def _judge_one(
@@ -399,6 +429,7 @@ def _judge_one(
         t,
         facts.schedule,
         facts.hidden,
+        _projection(c.whole),
     )
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
@@ -436,7 +467,7 @@ def _judge_one(
         robustness=load_robustness(oos.lift, draws, c.horizon, c.variant, whole.trials),
         columns=_columns(c, t),
         evidence=evidence_of(oos.sessions, whole.sessions, crit, t, outlook),
-        haircut=load_haircut(whole.sharpe, whole.sessions, whole.trials),
+        haircut=_haircut(c, facts),
         decay=decay_of(facts.published, c.horizon, c.insample, oos, facts.hidden),
     )
 
@@ -636,18 +667,22 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
     """The verdict of ``edge`` from its canonical run's stored rows. Like ``canonicalRun`` it
     ignores ``after_session`` (ADR 0036: runs are read by run, not by session)."""
     settings = load_verdict(ctx.configs)
-    found = runs.load_canonical_run(ctx, edge)
-    if found.run is None:
+    run = runs.load_canonical_run(ctx, edge).run
+    if run is None:
         return judge(edge.id, None, edge.frozen_from, settings)
-    rows = runs.load_run_rows(ctx, found.run)
+    rows = runs.load_run_rows(ctx, run)
     return judge(
         edge.id,
         rows,
-        found.run.split_from or edge.frozen_from,  # the split its year parts were cut at
+        run.split_from or edge.frozen_from,  # the split its year parts were cut at
         settings,
-        found.run.lost_inputs,
-        draws=runs.load_run_draws(ctx, found.run),
+        run.lost_inputs,
+        draws=runs.load_run_draws(ctx, run),
         decoys=bool(edge.baselines),
         declared=Declared(edge.promoted, edge.basis_horizon),
-        facts=EdgeFacts(edge.published, edge.schedule),
+        facts=EdgeFacts(
+            edge.published,
+            edge.schedule,
+            measured=lambda: runs.load_measured_sessions(ctx, run),
+        ),
     )

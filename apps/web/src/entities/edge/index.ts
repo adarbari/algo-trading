@@ -3,9 +3,19 @@
  * pages' read (`Query.edges`: status, verdict, how it is defined, sources and the runs the user
  * sees) and each screener's track records (`Screener.trackRecords`) for the Screeners
  * list's chip and the Ideas odds line, and the paper record (`Query.edgeDesk`, `Query.edgePaper`:
- * the Ideas signals and an edge's live record). Never reads an exploratory run as a track record.
+ * the Ideas signals and an edge's live record) and the sections of an edge's result
+ * (`Query.edgeResult`: the evidence curve, drawdown, rolling starts, monthly map and decay, one
+ * read each). Never reads an exploratory run as a track record.
  */
 export { prefetchEdges, refreshEdges, useEdgeProblems, useEdges } from './api/edges';
+export {
+  useEdgeCurve,
+  useEdgeDecay,
+  useEdgeDrawdown,
+  useEdgeMonthly,
+  useEdgeResultBasis,
+  useEdgeRollingStarts,
+} from './api/edge-result';
 export { useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
 export { useTrackRecords } from './api/track-records';
 export {
@@ -30,6 +40,17 @@ export {
   type VerdictColumn,
   type EvidenceProgress,
 } from './model/edges';
+export type {
+  CurveGap,
+  CurvePoint,
+  EdgeCurve,
+  EdgeDrawdown,
+  EdgeLive,
+  EdgeMonthly,
+  EdgeResultBasis,
+  EdgeResultDecay,
+  EdgeRollingStarts,
+} from './model/edge-result';
 export {
   rangeBins,
   rangeMarkers,

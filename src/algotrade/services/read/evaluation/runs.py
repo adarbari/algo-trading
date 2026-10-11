@@ -15,9 +15,10 @@ viewer does not hold as ``Unknown(LICENCE)``, and a ledger the retention purge r
 its admin cause (ADR 0056). ``ledger_keep`` says which partitions the
 purge spares: those of each edge's canonical run, latest run per user and cited run."""
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import date, datetime
+from itertools import pairwise
 from typing import Any, Final
 
 import pandas as pd
@@ -26,6 +27,7 @@ from algotrade.config.edges.document import LEGACY_SITE_CUTOFF, LEGACY_SITE_OWNE
 from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
+from algotrade.core.time.calendar import sessions_to
 from algotrade.data import StoreReader
 from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, run_partition
@@ -38,6 +40,7 @@ from algotrade.storage.tables.schemas import result_table
 EDGE_EVAL = "edge_eval"
 EDGE_SERIES = "edge_series"  # the per-session series of a run (ADR 0064)
 MAIN = "main"
+BASELINE = "baseline"
 RANDOM = "random"  # the role of a random-pick draw (ED8), never a screener or a baseline
 DECILES = 10
 IN_SAMPLE = "in_sample"  # the slice before the split
@@ -112,6 +115,14 @@ class EdgeRow:
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
     decile_means: tuple[float | None, ...] = ()  # each tenth's mean outcome, best-ranked first;
     # empty when the slice had none or the run is older than the columns (never zeros)
+    # ADR 0064 decision 7, on a calendar schedule's ``all`` row only: the exit sessions of its
+    # next decision sessions, and how many decision sessions the run scheduled and measured
+    # (the ``_oos`` pair: from the split on; None without a split). Empty / None: not stored.
+    projected_exits: tuple[date, ...] = ()
+    decisions_scheduled: int | None = None
+    decisions_measured: int | None = None
+    decisions_scheduled_oos: int | None = None
+    decisions_measured_oos: int | None = None
     pick_adv_median: float | None = None  # capacity (ADR 0064): the picks' median 20-day dollar
     pick_adv_known: int | None = None  # volume, how many have one, how many are below the
     pick_adv_low: int | None = None  # site's floor; None in a run from before the columns
@@ -273,6 +284,13 @@ def _deciles(row: Mapping[str, Any]) -> tuple[float | None, ...]:
     return found if any(x is not None for x in found) else ()
 
 
+def _exits(value: Any) -> tuple[date, ...]:
+    """The stored list of exit sessions (a null is a missing list, never an empty projection)."""
+    if value is None or isinstance(value, float):
+        return ()
+    return tuple(d for d in (_day_of(x) for x in value) if d is not None)
+
+
 def _row(row: Mapping[str, Any]) -> EdgeRow:
     return EdgeRow(
         edge_variant=str(to_scalar(row.get("edge_variant")) or MAIN),  # a null is NaN in a frame
@@ -300,6 +318,11 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         decile_sessions=_int(row.get("decile_sessions")),
         in_sample=to_scalar(row.get("in_sample")) is True,
         decile_means=_deciles(row),
+        projected_exits=_exits(row.get("projected_exits")),
+        decisions_scheduled=_int(row.get("decisions_scheduled")),
+        decisions_measured=_int(row.get("decisions_measured")),
+        decisions_scheduled_oos=_int(row.get("decisions_scheduled_oos")),
+        decisions_measured_oos=_int(row.get("decisions_measured_oos")),
         pick_adv_median=_float(row.get("pick_adv_median")),
         pick_adv_known=_int(row.get("pick_adv_known")),
         pick_adv_low=_int(row.get("pick_adv_low")),
@@ -371,7 +394,20 @@ def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
     3): the ``in_sample:`` ones stay, by the harness's period, never by a date."""
     record = ctx.reader.run(run.run_id)
     found = rows_of_record(ctx, record) if record is not None else ()
-    return tuple(r for r in found if _in_sample_only(r)) if run.oos_hidden else found
+    if not run.oos_hidden:
+        return found
+    return tuple(_without_oos_counts(r) for r in found if _in_sample_only(r))
+
+
+def _without_oos_counts(row: EdgeRow) -> EdgeRow:
+    """``row`` with what only the out-of-sample side knows removed: the projected exits (the
+    schedule's future, counted from the split) and the out-of-sample decision-session counts."""
+    return replace(
+        row,
+        projected_exits=(),
+        decisions_scheduled_oos=None,
+        decisions_measured_oos=None,
+    )
 
 
 def _in_sample_only(row: EdgeRow) -> bool:
@@ -404,6 +440,48 @@ def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
     found = [_series_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records")]
     kept = [r for r in found if r.before_split] if run.oos_hidden else found
     return tuple(sorted(kept, key=lambda r: (r.variant, r.horizon_sessions, r.decision_session)))
+
+
+def window_weights(days: Iterable[date], horizon: int) -> dict[date, float]:
+    """The weight of each decision session's window in a sum over windows: ``min(1, spacing /
+    horizon)``, the spacing the sessions since the previous decision (the first takes the next
+    one's). Windows of ``horizon`` sessions started every session overlap: counted whole they
+    add each day ``horizon`` times. A portfolio of ``horizon`` staggered tranches, each 1 /
+    ``horizon`` of the capital, earns each day the average of the windows covering it, which is
+    this weighting; a schedule spaced at least ``horizon`` apart has weight 1."""
+    ordered = sorted(set(days))
+    if len(ordered) < 2 or horizon <= 1:
+        return dict.fromkeys(ordered, 1.0)
+    steps = [sessions_to(a, b) for a, b in pairwise(ordered)]
+    return {d: min(1.0, n / horizon) for d, n in zip(ordered, [steps[0], *steps], strict=True)}
+
+
+def measured_sessions(series: Sequence[SeriesRow]) -> dict[tuple[str, int], int]:
+    """Per (screen, holding period) of the main edge variant, the independent sessions measured
+    with picks: the windows with status ``measured`` and at least one pick, each counted at its
+    ``window_weights`` (overlapping windows are not independent); the count the haircut Sharpe
+    ratio rests on. A baseline is not a screen; a window that holds no number is not counted."""
+    screens: dict[tuple[str, int], list[SeriesRow]] = {}
+    for r in series:
+        if r.role != BASELINE:
+            screens.setdefault((r.variant, r.horizon_sessions), []).append(r)
+    found: dict[tuple[str, int], int] = {}
+    for key, rows in screens.items():
+        weights = window_weights((r.decision_session for r in rows), key[1])
+        total = sum(
+            weights[r.decision_session]
+            for r in rows
+            if r.status == "measured" and (r.picks or 0) > 0
+        )
+        if round(total) > 0:
+            found[key] = round(total)
+    return found
+
+
+def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], int] | None:
+    """``measured_sessions`` of ``run``'s series; None when it stored none (an older run)."""
+    series = load_run_series(ctx, run)
+    return measured_sessions(series) if series else None
 
 
 # ---------------------------------------------------------------------------- the trade ledger

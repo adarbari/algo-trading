@@ -135,8 +135,24 @@ names = { oos_hidden = "hidden", beyond_projection = "beyond the projection" }
 [[enum]]
 source = "graphql:DecayBar.state"
 values_from = "python:algotrade.services.read.evaluation.decay:BAR_STATES"
-values = { measured = "term:decay_bar_state", not_stored = "term:decay_bar_state", not_comparable = "term:decay_bar_state", oos_hidden = "term:decay_bar_state", not_given = "term:decay_bar_state" }
-names = { oos_hidden = "hidden", not_given = "not given" }
+values = { measured = "term:decay_bar_state", not_stored = "term:decay_bar_state", not_comparable = "term:decay_bar_state", oos_hidden = "term:decay_bar_state", not_given = "term:decay_bar_state", not_measured_live = "term:decay_bar_state" }
+names = { oos_hidden = "hidden", not_given = "not given", not_measured_live = "not measured live" }
+
+[[enum]]
+source = "graphql:EdgeCurve.kind"
+values_from = "python:algotrade.services.read.edge_evidence.curve:CURVE_KINDS"
+values = { cumulative_excess = "term:evidence_curve", excess_wins = "term:evidence_curve" }
+
+[[enum]]
+source = "graphql:CurveGap.kind"
+values_from = "python:algotrade.services.read.edge_evidence.curve:GAP_KINDS"
+values = { excluded_coverage = "term:curve_gap", lost_input = "term:curve_gap", no_picks = "term:curve_gap" }
+
+[[enum]]
+source = "graphql:EdgeLive.state"
+values_from = "python:algotrade.services.read.edge_evidence.live:LIVE_STATES"
+values = { recorded = "term:live_stroke", none = "term:live_stroke", oos_hidden = "term:live_stroke" }
+names = { oos_hidden = "hidden" }
 
 [[enum]]
 source = "graphql:LiveRecord.state"

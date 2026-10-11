@@ -263,6 +263,31 @@ type CriterionResult {
   distance: Float
 }
 
+"""
+A span of windows that hold no number, `from` to `to` (exit sessions, the curve's x), and why in public words (`kind`: excluded_coverage, lost_input, no_picks). The line joins over it; it is never a zero. `unknown` is set for lost_input: its admin cause names the table the screen lost
+"""
+type CurveGap {
+  from: Date!
+  to: Date!
+  kind: String!
+  unknown: Unknown
+}
+
+"""
+One window of the curve: decided at `decision`, known at `exit` (the x: never the decision), on `period`'s side of the split (in_sample, out_of_sample, or all for a run with no split), its `value` and the `cumulative` curve; `baseValue` and `baseCumulative` the field's (null: no base line, or not stored; a window with no base value leaves it null there); `trades` its picks; `weight` its share in the sums (below 1 where windows overlap): `value` and the cumulatives are weighted
+"""
+type CurvePoint {
+  decision: Date!
+  exit: Date!
+  period: String!
+  value: Float!
+  cumulative: Float!
+  baseValue: Float
+  baseCumulative: Float
+  trades: Int!
+  weight: Float!
+}
+
 """Date (isoformat)"""
 scalar Date
 
@@ -270,7 +295,7 @@ scalar Date
 scalar DateTime
 
 """
-One bar of the decay: `period` (published, in_sample, out_of_sample), its `value` (null unless `state` is measured) over `n` (the trades, or the decile sessions of a decile spread; null for the paper's) and the `state` that says why a value is missing (not_stored, not_comparable: another holding period than the paper's, oos_hidden, not_given: the document publishes no figure)
+One bar of the decay: `period` (published, in_sample, out_of_sample, live: the settled paper trades, on `Query.edgeResult.decay` only), its `value` (null unless `state` is measured) over `n` (the trades, or the decile sessions of a decile spread, or the live signal sessions; null for the paper's) and the `state` that says why a value is missing (not_stored, not_comparable: another holding period than the paper's, oos_hidden, not_given: the document publishes no figure, not_measured_live: a decile spread cannot be measured from the paper record)
 """
 type DecayBar {
   period: String!
@@ -283,6 +308,16 @@ type DecayBar {
 type DecisionCount {
   decision: String!
   count: Int!
+}
+
+"""
+One drop of the curve: from the high at `peak` down `depth` (positive) to `trough` and back to `recovered` (null: not yet)
+"""
+type DrawdownEpisode {
+  peak: Date!
+  trough: Date!
+  recovered: Date
+  depth: Float!
 }
 
 """
@@ -395,6 +430,20 @@ type EdgeCosts {
 }
 
 """
+The evidence curve of the verdict's basis: what its picks earned, window by window, added up (`kind` cumulative_excess in a return `unit`; excess_wins for an outcome with no return: wins above what the base rate predicts), against what the field earned. `splitFrom` where the out-of-sample side starts, `hidden` a copy's withheld out-of-sample result (the points are in-sample only), `gaps` the spans that hold no number and `live` the settled paper trades. `unknown`: why there is no curve (then the rest is empty)
+"""
+type EdgeCurve {
+  kind: String
+  unit: String
+  splitFrom: Date
+  hidden: Boolean!
+  points: [CurvePoint!]!
+  gaps: [CurveGap!]!
+  live: EdgeLive
+  unknown: Unknown
+}
+
+"""
 The decay of one statistic: the paper's figure (`published`) against the harness's in-sample and out-of-sample ones (`bars`, in that order after the paper's) at the verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). `published` is null when the edge's document gives no figure (the paper's bar is then not_given and `measure` is lift_pts)
 """
 type EdgeDecay {
@@ -428,6 +477,20 @@ type EdgeDesk {
 }
 
 """
+How far the curve fell and how much it moves: the `points` below its high, its deepest `episodes`, the deepest drop of each side of the split (`maxInSample`, `maxOutOfSample`: positive; the out-of-sample side from its own first window) and the annualised volatility of the windows of each side (null: fewer than two windows). Measured on the per-window curve, so it understates a dip inside a window. `unknown`: none for an outcome with no return (not applicable), or no series
+"""
+type EdgeDrawdown {
+  unit: String
+  points: [UnderwaterPoint!]!
+  episodes: [DrawdownEpisode!]!
+  maxInSample: Float
+  maxOutOfSample: Float
+  volInSample: Float
+  volOutOfSample: Float
+  unknown: Unknown
+}
+
+"""
 The run an evidenced or live edge cites and the split it was measured at
 """
 type EdgeEvidence {
@@ -449,6 +512,18 @@ type EdgeHaircut {
 }
 
 """
+The live stroke: the edge's settled paper trades on the basis, as the session knew them, laid on the curve. `state`: recorded (trades have settled; `points` can be fewer than `sessions`), none (no settled trade yet) or oos_hidden (a copy's out-of-sample result is withheld). `since` the first signal session, `anchor` the backtest's cumulative value it starts from (added by the server), `closed` settled trades over `sessions` signal sessions
+"""
+type EdgeLive {
+  state: String!
+  since: Date
+  anchor: Float
+  closed: Int!
+  sessions: Int!
+  points: [LivePoint!]!
+}
+
+"""
 One edge's live state for the session, the word a list, a header and the Ideas banner show. `state` is the live record's: on_track, below or above the backtest's usual range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or no_trades (no live record yet) or not_settled (the session's nightly has not completed: nothing is judged); `closed` settled trades, `wins`, `winRate`; `headline` the sentence; `term` the Guide entry that explains the state; `followed` the edge is on the user's desk (else a site edge the site records). Settled trades only, as the session's cutoff knew them
 """
 type EdgeLiveState {
@@ -466,7 +541,26 @@ type EdgeLiveState {
 }
 
 """
-What would change the verdict: `criterion` (the first test not passed; `level`: the verdict it gates) in `sentence`. For a count of trades (`trades`, `works_trades`) `have` of `needed` and `remaining` to come, and `projectionState` (why there is no date: not_stored, unprojectable, oos_hidden; projected and beyond_projection once a run stores the schedule's exits). Null for the other tests: a t statistic is not projected
+One calendar `month` (its first day): the sum of the `value` of the `trades` (windows) that closed in it, on `period`'s side of the split (both: it holds both)
+"""
+type EdgeMonth {
+  month: Date!
+  value: Float!
+  trades: Int!
+  period: String!
+}
+
+"""
+What the curve gained or lost in each calendar month (the heat map), earliest first, in `unit`. `unknown`: why there are none
+"""
+type EdgeMonthly {
+  unit: String
+  months: [EdgeMonth!]!
+  unknown: Unknown
+}
+
+"""
+What would change the verdict: `criterion` (the first test not passed; `level`: the verdict it gates) in `sentence`. For a count of trades (`trades`, `works_trades`) `have` of `needed` and `remaining` to come, and `projectionState`: projected (`expectedBy`: the exit of the trade that completes the count, at `fillRatio` of the decision sessions measured), beyond_projection (the count needs more sessions than the run stored), not_stored (an older run), unprojectable (an event schedule), oos_hidden. An estimate, never an input to the verdict. Null for the other tests: a t statistic is not projected
 """
 type EdgeOutlook {
   criterion: String!
@@ -476,6 +570,8 @@ type EdgeOutlook {
   needed: Int
   remaining: Int
   projectionState: String
+  expectedBy: Date
+  fillRatio: Float
 }
 
 """
@@ -505,6 +601,52 @@ type EdgePublished {
   horizonSessions: Int!
   source: EdgeSource!
   sample: Int
+}
+
+"""
+The sections of an edge's result, each about the verdict's own run and basis. Select only the sections the page shows: each is read on its own. `date` of the query resolves the session only for the live stroke and the live bar (ADR 0036): the backtest part is read by run
+"""
+type EdgeResult {
+  id: String!
+
+  """The run and basis every section reads"""
+  basis: ResultBasis!
+
+  """The evidence curve with the live stroke"""
+  curve: EdgeCurve!
+
+  """The drawdown and the volatility of the windows"""
+  drawdown: EdgeDrawdown!
+
+  """The lift from each year's start forward"""
+  rollingStarts: EdgeRollingStarts!
+
+  """The calendar months of the curve (the heat map)"""
+  monthly: EdgeMonthly!
+
+  """
+  The decay of the edge's number, the paper's figure then the in-sample, out-of-sample and live bars of the verdict's basis; null: the verdict has no basis
+  """
+  decay: EdgeDecay
+}
+
+"""
+The windows decided from `start` (a January 1st) to the end: `trades` of them, their pooled `liftPts` (win rate minus base rate, in points) and, for a return outcome, their mean `meanExcess`
+"""
+type EdgeRollingStart {
+  start: Date!
+  trades: Int!
+  liftPts: Float
+  meanExcess: Float
+}
+
+"""
+The lift from the start of each calendar year forward, earliest first: how the result depends on when you began. `unknown`: why there are none
+"""
+type EdgeRollingStarts {
+  unit: String
+  starts: [EdgeRollingStart!]!
+  unknown: Unknown
 }
 
 """
@@ -1524,6 +1666,16 @@ type LadderRung {
 }
 
 """
+One signal session of the live stroke: its settled trades plotted at their `sell` session with the session's `value` and the `cumulative` stroke from its anchor
+"""
+type LivePoint {
+  sell: Date!
+  value: Float!
+  cumulative: Float!
+  trades: Int!
+}
+
+"""
 An edge's live record over its closed paper trades. `state`: on_track, below or above the backtest's usual range (`low` to `high`: quantiles of the wins n closed trades would show if the backtest's win rate held), too_early (fewer than the site's minimum closed), no_backtest or no_trades. `backtestRate` and its `basis`; `bins` the picture; open and skipped trades are counted apart; `headline` the sentence
 """
 type LiveRecord {
@@ -2025,6 +2177,18 @@ type Query {
     date: Date = null
   ): EdgePaper
 
+  """
+  The sections of the result of the edge `id` (the evidence curve, drawdown, rolling starts, monthly map and decay), each about the verdict's own run and basis and read only when selected. `date` resolves the session of the live stroke and bar only; null: the user has no such edge
+  """
+  edgeResult(
+    id: String!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): EdgeResult
+
   """The edge `id`; null: the user has no such edge"""
   edge(id: String!): Edge
 
@@ -2246,6 +2410,18 @@ type RegimeSizing {
   multipliers: [LabelSize!]!
   unknownMultiplier: Float!
   screeners: [ScreenerGate!]!
+}
+
+"""
+The run and the basis every section of the result reads: the verdict's own (the declared screen and holding period, else the best in-sample, fixed before the out-of-sample period was read). `variant` and `horizonSessions` are null with no basis (`unknown` says why); `splitFrom` where the run's out-of-sample side starts; `oosHidden` a copy's out-of-sample result is withheld
+"""
+type ResultBasis {
+  runId: String
+  variant: String
+  horizonSessions: Int
+  splitFrom: Date
+  oosHidden: Boolean!
+  unknown: Unknown
 }
 
 """One of the screen's display columns for the instrument"""
@@ -2652,6 +2828,14 @@ enum UnavailableKind {
   ILLIQUID
   LICENCE
   NOT_RUN
+}
+
+"""
+The curve's distance below its running high at `exit`: `depth` is 0 or negative
+"""
+type UnderwaterPoint {
+  exit: Date!
+  depth: Float!
 }
 
 """
