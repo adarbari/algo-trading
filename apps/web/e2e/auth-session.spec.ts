@@ -88,7 +88,10 @@ test('sign-in uses the password grant, stores the session under sb-<ref>-auth-to
 test('an expired token is refreshed with the refresh token', async ({ page }) => {
   const stub = await withAuth(page);
   await signIn(page);
-  await page.evaluate((key) => {
+  // Expire the token as the next document starts, not while this page is alive: a live page that
+  // read the expired token would refresh too, and tearing it down mid-request would lose the
+  // rotated token (a test-made race, not the app's).
+  await page.addInitScript((key) => {
     const session = JSON.parse(window.localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
     session['expires_at'] = Math.floor(Date.now() / 1000) - 60;
     window.localStorage.setItem(key, JSON.stringify(session));
