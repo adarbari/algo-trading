@@ -17,14 +17,12 @@ import {
 
 import { useEdgeLiveStates, useEdges } from '@/entities/edge';
 import { EdgeHeader } from '@/widgets/edge-detail';
+import { EdgeEvidence } from '@/widgets/edge-evidence';
+import { EdgePerformance } from '@/widgets/edge-performance';
+import { EdgeSureness } from '@/widgets/edge-sureness';
 import { EdgeCompare, EdgeDefinition, EdgeDetails, EdgeLive } from '@/widgets/edge-detail';
-import { lazyPage } from '@/shared/lib/lazy';
 
 import { EdgeSection } from './EdgeSection';
-
-const EdgeEvidence = lazyPage(() => import('@/widgets/edge-evidence'), 'EdgeEvidence');
-const EdgeSureness = lazyPage(() => import('@/widgets/edge-sureness'), 'EdgeSureness');
-const EdgePerformance = lazyPage(() => import('@/widgets/edge-performance'), 'EdgePerformance');
 
 export interface EdgePageProps {
   /** The chosen edge's id (from the URL). */
