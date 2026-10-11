@@ -118,13 +118,14 @@ def _floors(group: Group) -> list[float]:
     return found
 
 
-def universe_floor(ctx: Stores, edge: Edge) -> float | None:
+def universe_floor(ctx: Stores, edge: Edge, owner: str) -> float | None:
     """The 20-day dollar-volume floor of ``edge``'s universe selection (a named preset; None:
-    an inline selection, none, or no such floor)."""
+    an inline selection, none, or no such floor), read from the scope of the run's ``owner`` then
+    the site, as the harness resolved it."""
     name = edge.settings.universe if edge.settings else ""
     if not name:
         return None
-    for scope in (ctx.user.user_id, "site"):
+    for scope in (owner, "site"):
         doc = ctx.configs.load(scope, "selections", name)
         if doc is not None:
             selection: Selection = parse_selection(doc, f"{scope}/selections/{name}")
@@ -137,9 +138,11 @@ def load_edge_capacity(ctx: Stores, edge: Edge, basis: OfficialBasis | None = No
     """The capacity of ``edge``'s official result at the verdict's basis (``basis``: the
     one the page resolved; resolved here when not given), against the site's floor."""
     settings = load_verdict(ctx.configs)
+    basis = basis or official_basis(ctx, edge)
+    owner = basis.run.owner if basis.run is not None else ctx.user.user_id
     return capacity_of(
-        load_basis_rows(ctx, basis or official_basis(ctx, edge)),
+        load_basis_rows(ctx, basis),
         settings.capacity_adv_floor_usd,
         settings.capacity_position_usd,
-        universe_floor(ctx, edge),
+        universe_floor(ctx, edge, owner),
     )

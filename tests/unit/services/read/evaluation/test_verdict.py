@@ -291,6 +291,19 @@ def test_no_declared_baselines_is_not_applicable_never_a_pass_and_the_level_is_u
     assert verdict(result(baselines=(0.5,)), decoys=False).verdict == verdict(result()).verdict
 
 
+def test_no_decoys_never_block_works() -> None:
+    strong = result(
+        oos={"decile_t": 3.0, "decile_spread": 0.9},
+        whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
+        baselines=(),
+    )
+    v = verdict(strong, draws=draws(100), decoys=False)
+    assert v.verdict == WORKS
+    assert {c.status for c in v.criteria if c.id in ("baselines", "works_spread")} == {
+        "not_applicable"
+    }
+
+
 def test_a_basis_chosen_among_several_says_what_it_was_chosen_on() -> None:
     rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
     choice = choose_basis(rows, T)
