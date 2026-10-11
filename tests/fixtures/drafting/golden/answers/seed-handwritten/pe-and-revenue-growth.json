@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "pe",
+      "field": "feature.pe_ratio",
+      "op": "lt",
+      "value": 15,
+      "mode": "hard",
+      "why": "P/E under 15"
+    },
+    {
+      "id": "growth",
+      "field": "feature.revenue_growth_yoy",
+      "op": "gt",
+      "value": 0.1,
+      "mode": "hard",
+      "why": "revenue growth over 10% a year"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

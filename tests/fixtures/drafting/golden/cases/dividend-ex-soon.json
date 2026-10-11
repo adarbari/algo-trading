@@ -1,0 +1,36 @@
+{
+  "id": "dividend-ex-soon",
+  "sentence": "dividend yield above 4%, ex-date within 2 weeks",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "dividend yield above 4%",
+        "bucket": "A",
+        "fields": [
+          "feature.div_yield"
+        ],
+        "op": "gt",
+        "value": 0.04,
+        "tolerance": 0.0
+      },
+      {
+        "span": "ex-date within 2 weeks",
+        "bucket": "A",
+        "fields": [
+          "rollup.dividend_schedule@v1.days_to_ex_date"
+        ],
+        "op": [
+          "lte",
+          "lt"
+        ],
+        "value": 14,
+        "tolerance": 0.1
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

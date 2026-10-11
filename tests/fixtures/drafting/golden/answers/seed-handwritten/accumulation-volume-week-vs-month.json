@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "acc",
+      "field": "feature.volume_bias",
+      "op": "eq",
+      "value": "ACCUMULATION",
+      "mode": "hard",
+      "why": "accumulation"
+    },
+    {
+      "id": "vol",
+      "field": "rollup.volume@v1.volume_ratio_5d_20d",
+      "op": "gt",
+      "value": 1.0,
+      "mode": "hard",
+      "why": "5-day volume vs the month"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

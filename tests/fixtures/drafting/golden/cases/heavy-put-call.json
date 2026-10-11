@@ -1,0 +1,28 @@
+{
+  "id": "heavy-put-call",
+  "sentence": "heavy put/call ratio",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "heavy put/call ratio",
+        "bucket": "A",
+        "fields": [
+          "feature.put_call_volume_ratio",
+          "feature.put_call_oi_ratio",
+          "rollup.flow_history@v1.pc_volume_ratio_20d"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 1.0,
+        "tolerance": 0.3
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "above_sma50",
+      "field": "feature.pct_vs_sma_50",
+      "op": "gt",
+      "value": 0,
+      "mode": "hard",
+      "why": "above SMA50"
+    },
+    {
+      "id": "rsi",
+      "field": "rollup.momentum@v1.rsi_14",
+      "op": "lt",
+      "value": 30,
+      "mode": "hard",
+      "why": "RSI14 under 30"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

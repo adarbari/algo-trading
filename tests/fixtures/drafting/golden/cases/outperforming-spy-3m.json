@@ -1,0 +1,27 @@
+{
+  "id": "outperforming-spy-3m",
+  "sentence": "outperforming SPY over 3 months",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "outperforming SPY over 3 months",
+        "bucket": "A",
+        "fields": [
+          "rollup.relative_strength@v1.rs_spy_63d",
+          "feature.rs_spy_positive"
+        ],
+        "op": [
+          "gt",
+          "eq"
+        ],
+        "value": 0,
+        "tolerance": 1.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

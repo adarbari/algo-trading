@@ -1,0 +1,37 @@
+{
+  "id": "bullish-engulfing-at-support",
+  "sentence": "bullish engulfing at support",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "bullish engulfing",
+        "bucket": "A",
+        "fields": [
+          "rollup.candle@v1.candle"
+        ],
+        "op": "eq",
+        "value": "BULLISH_ENGULFING",
+        "tolerance": 0.0
+      },
+      {
+        "span": "at support",
+        "bucket": "A",
+        "fields": [
+          "feature.dist_to_support",
+          "feature.dist_to_support_atr"
+        ],
+        "op": [
+          "lte",
+          "lt"
+        ],
+        "value": 0.03,
+        "tolerance": 40.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

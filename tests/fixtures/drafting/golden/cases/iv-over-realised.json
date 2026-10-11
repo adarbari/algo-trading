@@ -1,0 +1,26 @@
+{
+  "id": "iv-over-realised",
+  "sentence": "stocks where implied volatility is more than 1.3 times realised volatility",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "implied volatility more than 1.3 times realised",
+        "bucket": "A",
+        "fields": [
+          "feature.iv_hv_ratio"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 1.3,
+        "tolerance": 0.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

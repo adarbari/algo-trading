@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "above_sma50",
+      "field": "feature.pct_vs_sma_50",
+      "op": "gt",
+      "value": 0,
+      "mode": "hard",
+      "why": "above their 50 day average"
+    },
+    {
+      "id": "range",
+      "field": "feature.atr_pct",
+      "op": "gte",
+      "value": 0.03,
+      "mode": "hard",
+      "why": "daily range over 3%"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

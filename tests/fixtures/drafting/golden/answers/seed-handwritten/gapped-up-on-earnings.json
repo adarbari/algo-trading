@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "gap",
+      "field": "rollup.gaps@v1.gap_open_pct",
+      "op": "gt",
+      "value": 0.02,
+      "mode": "hard",
+      "why": "gapped up"
+    },
+    {
+      "id": "earn",
+      "field": "rollup.earnings_reaction@v1.sessions_since_reaction",
+      "op": "lte",
+      "value": 1,
+      "mode": "hard",
+      "why": "on earnings"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

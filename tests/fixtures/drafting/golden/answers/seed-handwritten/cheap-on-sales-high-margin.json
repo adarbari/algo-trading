@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "ps",
+      "field": "feature.ps_ratio",
+      "op": "lt",
+      "value": 2.0,
+      "mode": "hard",
+      "why": "cheap on sales"
+    },
+    {
+      "id": "margin",
+      "field": "feature.net_margin",
+      "op": "gt",
+      "value": 0.2,
+      "mode": "hard",
+      "why": "net margin > 20%"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

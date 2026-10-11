@@ -17,11 +17,14 @@ from algotrade.config.site.settings import load_field_guide, load_phrasebook
 from algotrade.services.configs import field_catalog
 from algotrade.services.drafting.prompt import (
     EXAMPLES,
+    PROMPT_VERSION,
     catalogue_line,
-    guide_line,
+    index_line,
     phrase_line,
+    prefix_text,
     situation_line,
-    system_prompt,
+    slice_guide_line,
+    sliced_system_prompt,
     use_text,
     user_prompt,
 )
@@ -64,17 +67,21 @@ def test_a_long_description_is_cut() -> None:
     assert line.endswith("…") and len(line) < 200
 
 
-def test_system_prompt_sorts_the_catalogue_and_is_stable() -> None:
+def test_sliced_prompt_sorts_the_index_and_is_stable() -> None:
     infos = [info("rollup.b@v1.x"), info("instrument.a", "str")]
-    first = system_prompt(infos)
-    assert first == system_prompt(infos) == system_prompt(infos[::-1])
+    first = sliced_system_prompt(infos, "b things")
+    assert (
+        first
+        == sliced_system_prompt(infos, "b things")
+        == sliced_system_prompt(infos[::-1], "b things")
+    )
     assert first.index("instrument.a") < first.index("rollup.b@v1.x")
     assert "ONE JSON object" in first and "tie_break" in first
     assert "Example 1" in first and "Example 2" in first and "Phrasebook" not in first
-    assert "Field guide (" not in first and "Field guide (" not in system_prompt(
-        infos, (), FieldGuideSettings()
+    assert "Field guide (" not in first and "Field guide (" not in sliced_system_prompt(
+        infos, "b things", (), FieldGuideSettings()
     )
-    assert first.index("Example 2") < first.index("Catalogue (")
+    assert first.index("Example 2") < first.index("Field index (")
 
 
 def test_phrasebook_keeps_only_this_catalogues_fields() -> None:
@@ -83,12 +90,10 @@ def test_phrasebook_keeps_only_this_catalogues_fields() -> None:
     names = {"rollup.b@v1.x"}
     assert phrase_line(momentum, names) == "momentum / trending up | rollup.b@v1.x | x gt 0"
     assert phrase_line(elsewhere, names) is None
-    text = system_prompt([info("rollup.b@v1.x")], [momentum, elsewhere])
-    assert text.index("Catalogue (") < text.index("Phrasebook (")
+    text = sliced_system_prompt([info("rollup.b@v1.x")], "momentum", [momentum, elsewhere])
+    assert text.index("Detail (") < text.index("Phrasebook (")
     assert text.endswith("momentum / trending up | rollup.b@v1.x | x gt 0\n")
-    assert "yield" not in text and text == system_prompt(
-        [info("rollup.b@v1.x")], [momentum, elsewhere]
-    )
+    assert "yield" not in text
 
 
 def test_shipped_phrasebook_and_examples_name_catalogue_fields() -> None:
@@ -101,20 +106,12 @@ def test_shipped_phrasebook_and_examples_name_catalogue_fields() -> None:
         for c in answer["criteria"]:
             assert c["field"] in catalogue, f"example {sentence!r}: {c['field']}"
         assert answer["tie_break"]["field"] in catalogue
-    # Every phrase survives in a prompt over the site catalogue.
-    text = system_prompt([info(n) for n in sorted(catalogue)], book)
-    assert text.count("\n", text.index("Phrasebook (")) == len(book) + 1
-    # And every field guide entry and situation.
+    # Every phrase, guide entry and situation renders over the site catalogue.
+    assert all(phrase_line(p, catalogue) for p in book)
     guide = load_field_guide(store)
-    text = system_prompt([info(n) for n in sorted(catalogue)], book, guide)
-    fields, situations = (
-        text.index("Field guide ("),
-        text.index("Situations that fool a threshold ("),
-    )
-    assert text.index("Phrasebook (") < fields < situations
-    assert text.count("\n", fields, situations) == len(guide.fields) + 2
-    assert text.count("\n", situations) == len(guide.situations) + 1
-    assert "Sources:" not in text and "http" not in text[fields:]
+    assert all(slice_guide_line(e, catalogue) for e in guide.fields)
+    assert all(situation_line(s, catalogue) for s in guide.situations)
+    assert not any("http" in (slice_guide_line(e, catalogue) or "") for e in guide.fields)
 
 
 def test_user_prompt_carries_the_sentence_and_current_criteria() -> None:
@@ -152,27 +149,22 @@ def test_guide_lines_keep_only_this_catalogues_fields_and_no_sources() -> None:
     )
     assert use_text(RSI.uses[2]) == "known: not_null hard"
     assert use_text(RSI.uses[3]) == 'high: eq "HIGH" hard'
-    assert guide_line(RSI, names) == (
-        "rollup.b@v1.x | 0 to 100 | use: oversold: lt 30 soft tolerance 5.0 (with a trend); "
-        'liquid: gte 50000000.0 soft tolerance {"relative": 0.2} on_miss LIQUIDITY_RISK; '
-        'known: not_null hard; high: eq "HIGH" hard | caveats: pinned by a deal. thin names.'
-    )
-    assert guide_line(ELSEWHERE, names) is None
+    assert slice_guide_line(ELSEWHERE, names) is None
     assert (
         situation_line(DEAL, names)
         == "pending takeover | flat tape | affects: rollup.b@v1.x | drop it"
     )
     assert situation_line(NOWHERE, names) is None
     guide = FieldGuideSettings((RSI, ELSEWHERE), (DEAL, NOWHERE))
-    text = system_prompt([info("rollup.b@v1.x")], (), guide)
-    assert "Phrasebook (" not in text and "Wilder" not in text
-    assert (
-        text.index("Catalogue (") < text.index("Field guide (") < text.index("Situations that fool")
-    )
+    pull = [Phrase(("b",), ("rollup.b@v1.x",))]
+    text = sliced_system_prompt([info("rollup.b@v1.x")], "b", pull, guide)
+    assert "Wilder" not in text
+    assert text.index("Detail (") < text.index("Field guide (") < text.index("Situations that fool")
     assert text.endswith("pending takeover | flat tape | affects: rollup.b@v1.x | drop it\n")
     assert "feature.nope" not in text.split("Field guide (")[1].split("Situations")[0]
-    assert text == system_prompt([info("rollup.b@v1.x")], (), guide)
-    only_fields = system_prompt([info("rollup.b@v1.x")], (), FieldGuideSettings((RSI,), (NOWHERE,)))
+    only_fields = sliced_system_prompt(
+        [info("rollup.b@v1.x")], "b", pull, FieldGuideSettings((RSI,), (NOWHERE,))
+    )
     assert "Field guide (" in only_fields and "Situations that fool" not in only_fields
 
 
@@ -181,19 +173,73 @@ def test_users_share_the_site_prefix_and_own_features_come_last() -> None:
     mine = info("feature.mine", scope="user", owner="u1")
     other = info("feature.zeta", scope="user", owner="u2")
     momentum = Phrase(("mine",), ("feature.mine", "rollup.b@v1.x"), "x gt 0")
-    first = system_prompt([site[0], mine, site[1]], [momentum])
-    second = system_prompt([other, *site], [momentum])
+    first = sliced_system_prompt([site[0], mine, site[1]], "mine", [momentum])
+    second = sliced_system_prompt([other, *site], "mine", [momentum])
     marker = "\nYour own features ("
-    shared = first.split(marker)[0]
-    # The phrasebook entry naming the user's feature is the only difference before the marker.
     assert "feature.zeta" not in second.split(marker)[0]
-    plain = system_prompt(site)
-    assert plain.split("\nPhrasebook")[0] == shared.split("\nPhrasebook")[0]
-    assert (
-        system_prompt([*site, mine, other]).split(marker)[0] == system_prompt(site).split(marker)[0]
-    )
+    assert first.split("Detail (")[0] == second.split("Detail (")[0] == prefix_text(site) + "\n"
+    plain = sliced_system_prompt(site, "mine")
     assert marker not in plain
     assert first.endswith(catalogue_line(mine) + "\n")
-    # every catalogue field appears exactly once as a catalogue line
-    for i in (*site, mine):
-        assert first.count("\n" + catalogue_line(i) + "\n") == 1
+    assert first.count("\n" + catalogue_line(mine) + "\n") == 1  # once, in full
+
+
+def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
+    assert PROMPT_VERSION == "2"
+    names = {"rollup.b@v1.x"}
+    assert (
+        index_line(info("instrument.a", "str", unit="category")) == "instrument.a | str | category"
+    )
+    assert slice_guide_line(RSI, names) == (
+        "rollup.b@v1.x | use: oversold: lt 30 soft tolerance 5.0 (with a trend); "
+        'liquid: gte 50000000.0 soft tolerance {"relative": 0.2} on_miss LIQUIDITY_RISK; '
+        'known: not_null hard; high: eq "HIGH" hard | caveat: pinned by a deal.'
+    )  # no "reads"
+    long = FieldGuideEntry(
+        name="rollup.b@v1.x",
+        theme="t",
+        reads="r",
+        caveats=(
+            "A big move lifts it. Check feature.other first. Do not gate hard on a large value.",
+            "Sector talk. Null after a gap in the last 60 sessions.",
+            "Filler words only.",
+            "Pair with feature.nope or rollup.b@v1.x itself.",
+        ),
+    )
+    # lead sentence, sentences naming a field, the null rule or how to use it; no filler
+    assert slice_guide_line(long, {"rollup.b@v1.x", "feature.other"}) == (
+        "rollup.b@v1.x | use: - | caveat: A big move lifts it. Check feature.other first. "
+        "Do not gate hard on a large value. Null after a gap in the last 60 sessions. "
+        "Pair with feature.nope or rollup.b@v1.x itself."
+    )
+    assert slice_guide_line(ELSEWHERE, names) is None
+    infos = [info("rollup.b@v1.x"), info("feature.other"), info("feature.c", description="rsi")]
+    guide = FieldGuideSettings((RSI,), (DEAL, NOWHERE))
+    text = sliced_system_prompt(infos, "oversold b names", (), guide)
+    assert text.index("Field index") < text.index("Detail (") < text.index("Field guide (")
+    index = text.split("Detail (")[0]
+    assert all(f"{i.name} | float | -" in index for i in infos)  # every field is indexed
+    assert "feature.other | float | - | x" not in text  # but only the slice has detail
+    assert "pending takeover" in text and "Phrasebook (" not in text
+
+
+def test_a_slice_keeps_every_caveat_sentence_that_says_how_to_use_the_field() -> None:
+    entry = FieldGuideEntry(
+        name="rollup.b@v1.x",
+        theme="t",
+        reads="r",
+        caveats=(
+            "Lead sentence. Background talk. A hard 'gt 10' rejects every ETF; use soft.",
+            "Never a one-sided upper bound. Use adv_usd_20d for a gate.",
+            "Check market.market_trend@v2 first. More background.",
+            "Pure filler.",
+        ),
+    )
+    line = slice_guide_line(entry, {"rollup.b@v1.x"})
+    assert line is not None
+    caveat = line.split("caveat: ")[1]
+    assert caveat == (
+        "Lead sentence. A hard 'gt 10' rejects every ETF; use soft. "
+        "Never a one-sided upper bound. Use adv_usd_20d for a gate. "
+        "Check market.market_trend@v2 first."
+    )

@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "uptrend",
+      "field": "feature.trend_state",
+      "op": "eq",
+      "value": "UPTREND",
+      "mode": "hard",
+      "why": "in an uptrend"
+    },
+    {
+      "id": "no_earnings",
+      "field": "rollup.earnings@v1.days_to_earnings",
+      "op": "gt",
+      "value": 10,
+      "mode": "hard",
+      "why": "earnings more than 10 sessions away"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}
