@@ -14,15 +14,15 @@ import {
   Stack,
   type SectionNavItem,
 } from '@algotrade/ui';
+import { Suspense } from 'react';
 
 import { useEdgeLiveStates, useEdges } from '@/entities/edge';
 import { EdgeHeader } from '@/widgets/edge-detail';
-import { EdgeEvidence } from '@/widgets/edge-evidence';
-import { EdgePerformance } from '@/widgets/edge-performance';
-import { EdgeSureness } from '@/widgets/edge-sureness';
-import { EdgeCompare, EdgeDefinition, EdgeDetails, EdgeLive } from '@/widgets/edge-detail';
+import { lazyPage } from '@/shared/lib/lazy';
 
-import { EdgeSection } from './EdgeSection';
+// One lazy chunk for everything below the verdict: each lazy chunk adds its id to the entry's
+// dependency lists (a budget that only shrinks), and each section still renders when in view.
+const EdgeSections = lazyPage(() => import('./EdgeSections'), 'EdgeSections');
 
 export interface EdgePageProps {
   /** The chosen edge's id (from the URL). */
@@ -55,31 +55,9 @@ export function EdgePage({ id, onBack, onEdit }: EdgePageProps) {
     <Stack gap={4}>
       <EdgeHeader edge={edge} onBack={onBack} onEdit={onEdit} />
       <SectionNav items={sections} aria-label="Sections of this edge" />
-      <EdgeSection id="edge-evidence" label="Evidence" size="xl">
-        <EdgeEvidence edgeId={edge.id} verdict={edge.verdict} />
-      </EdgeSection>
-      <EdgeSection id="edge-sure" label="How sure">
-        <EdgeSureness edgeId={edge.id} verdict={edge.verdict} />
-      </EdgeSection>
-      <EdgeSection id="edge-where" label="Where it worked">
-        <EdgePerformance edgeId={edge.id} verdict={edge.verdict} />
-      </EdgeSection>
-      {edge.mine && (
-        <EdgeSection id="edge-compare" label="Compare versions" size="md">
-          <EdgeCompare edgeId={edge.id} />
-        </EdgeSection>
-      )}
-      {hasLive && (
-        <EdgeSection id="edge-live" label="Live record">
-          <EdgeLive edgeId={edge.id} />
-        </EdgeSection>
-      )}
-      <EdgeSection id="edge-definition" label="Definition">
-        <EdgeDefinition edge={edge} />
-      </EdgeSection>
-      <EdgeSection id="edge-details" label="Details" size="sm">
-        <EdgeDetails edge={edge} />
-      </EdgeSection>
+      <Suspense fallback={<Skeleton variant="rect" height="lg" label="Loading the sections" />}>
+        <EdgeSections edge={edge} hasLive={hasLive} />
+      </Suspense>
     </Stack>
   );
 }
