@@ -936,7 +936,7 @@ def test_random_draws_are_stored_with_the_decile_means_and_leave_the_screener_ro
     assert set(drawn["variant"]) == {"random:momo"} and drawn["decile_mean_01"].isna().all()
     screener = frame[(frame["role"] != "random") & (frame["slice_kind"] == "all")]
     assert screener.iloc[0]["decile_mean_01"] == pytest.approx(0.09)
-    assert len(frame[frame["role"] != "random"]) == len(ev.results[0].measures)
+    assert len(frame[frame["role"] != "random"]) == len(ev.results[0].measures) + 3 * 4  # + costs
 
 
 def test_the_random_null_is_matched_to_the_screener_sessions_and_pick_counts() -> None:

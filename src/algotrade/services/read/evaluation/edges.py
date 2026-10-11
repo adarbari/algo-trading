@@ -83,6 +83,8 @@ class EdgeSettings:
     cost_bps: float | None
     quality_bar: tuple[EdgeAnswer, ...]
     own: Mapping[str, Any] = field(default_factory=dict)
+    cost_applies: bool = True  # the outcome's value is a return, so a round-trip cost applies
+    outcome_sign: float = 1.0  # -1 for direction ``below``: the stored values are oriented
 
 
 @dataclass(frozen=True)
@@ -212,6 +214,8 @@ def _settings(e: document.Edge, own: Mapping[str, Any] | None) -> EdgeSettings:
         benchmark=e.outcome.benchmark,
         start_offset_sessions=e.outcome.start_offset_sessions,
         cost_bps=e.outcome.cost_bps,
+        cost_applies=e.outcome.is_return,
+        outcome_sign=e.outcome.sign,
         quality_bar=tuple(EdgeAnswer(k, e.quality_bar.get(k, "")) for k in document.QUALITY_BAR),
         own={k: _json(v) for k, v in (own or {}).items() if k not in (FOLLOW, AUDIT, "status")},
     )
