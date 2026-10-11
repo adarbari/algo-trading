@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from algotrade.quant.edges.statistics import percentile_of
+from algotrade.quant.edges.statistics import haircut_sharpe, percentile_of
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.runs import EdgeRow
 
@@ -38,6 +38,48 @@ class Robustness:
     beats: float
     bins: tuple[RobustnessBin, ...]
     summary: str
+
+
+@dataclass(frozen=True)
+class EdgeHaircut:
+    """The Sharpe ratio after the multiple-testing haircut (Harvey and Liu, ADR 0064 decision 8):
+    the stored ``sharpe`` (per trade, not annualised) over ``sessions`` trades becomes
+    ``haircut_sharpe`` once ``trials`` variants tried are counted, ``cut`` (0 to 1) the share
+    lost; ``method`` names the adjustment and ``summary`` is the server's sentence."""
+
+    sharpe: float
+    haircut_sharpe: float
+    cut: float
+    trials: int
+    sessions: int
+    method: str
+    summary: str
+
+
+BONFERRONI = "bonferroni"  # Holm's value for the best of the trials; the peers' t are not stored
+
+
+def load_haircut(
+    sharpe: float | None, sessions: int | None, trials: int | None
+) -> EdgeHaircut | None:
+    """The haircut of the basis's ``sharpe`` over ``sessions`` trades after ``trials`` variants;
+    None when any is not stored or the Sharpe ratio is not above zero."""
+    h = haircut_sharpe(sharpe, sessions, trials)
+    if h is None or sharpe is None or sessions is None or trials is None:
+        return None
+    return EdgeHaircut(
+        sharpe=sharpe,
+        haircut_sharpe=h.sharpe,
+        cut=h.cut,
+        trials=trials,
+        sessions=sessions,
+        method=BONFERRONI,
+        summary=(
+            f"A Sharpe ratio of {sharpe:.2f} per trade falls to {h.sharpe:.2f} after "
+            f"{trials:,} variant{'' if trials == 1 else 's'} tried, a haircut of "
+            f"{h.cut * 100:.0f}%."
+        ),
+    )
 
 
 def draw_lifts(draws: Sequence[EdgeRow], horizon: int, variant: str) -> list[float]:

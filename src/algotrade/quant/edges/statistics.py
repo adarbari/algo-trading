@@ -16,6 +16,8 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
     sharpe               per-period mean over sample sd
     deflated_sharpe      Bailey and Lopez de Prado (2014): the probability the true Sharpe
                          beats what the best of ``n_trials`` noise strategies would show
+    haircut_sharpe       Harvey and Liu (2015): the Sharpe ratio left after the multiple-testing
+                         adjustment of its p-value for ``trials`` tried strategies
     win_rate_pmf         the binomial distribution of the number of wins in n trades
     win_rate_band        the usual range of a live win rate: two quantiles of that distribution
     pbo_cscv             Bailey, Borwein, Lopez de Prado, Zhu (2017): the probability of
@@ -27,6 +29,7 @@ The normal CDF is ``black_scholes.norm_cdf``, its owner.
 import itertools
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -37,6 +40,20 @@ type Array = npt.NDArray[np.float64]
 type ArrayLike = npt.ArrayLike
 
 _EULER_GAMMA = 0.5772156649015329
+_TINY_P = 1e-12  # an adjusted p-value below this is read as a t-ratio of ``t`` itself
+
+
+@dataclass(frozen=True)
+class Haircut:
+    """``t`` the Sharpe ratio's t-ratio, ``p`` its two-sided p-value, ``p_adjusted`` after the
+    trials, ``sharpe`` the Sharpe ratio that p-value supports (per period) and ``cut`` the share
+    of the Sharpe ratio lost (0 to 1)."""
+
+    t: float
+    p: float
+    p_adjusted: float
+    sharpe: float
+    cut: float
 
 
 def _cdf(x: float) -> float:
@@ -189,6 +206,37 @@ def deflated_sharpe(x: ArrayLike, n_trials: int, sr_variance: float) -> float | 
     if denom <= 0.0:  # pragma: no cover (>= 0 by Cauchy-Schwarz; guards float drift)
         return None
     return _cdf((sr - sr0) * math.sqrt(v.size - 1.0) / math.sqrt(denom))
+
+
+def haircut_sharpe(
+    sr: float | None, observations: int | None, trials: int | None
+) -> Haircut | None:
+    """Harvey and Liu (2015, "Backtesting"), the Bonferroni bound: a per-period Sharpe ratio
+    ``sr`` over ``observations`` independent periods has ``t = sr sqrt(n)`` and a two-sided
+    p-value ``p``; ``trials`` tried strategies adjust it to ``min(trials p, 1)``, which is back
+    in a t-ratio and a Sharpe ratio (``t' / sqrt(n)``); the haircut is the share lost.
+
+    Holm's adjustment equals this for the best of the trials (its p-value is the smallest), the
+    case of the edge's best candidate; the peers' t statistics are not stored, so no looser
+    Holm or BHY step is computed. The normal distribution stands for the t distribution (the
+    paper's reference code uses n - 1 degrees of freedom; the difference is small from about 40
+    periods). None without a positive ``sr``, two or more observations or a trial.
+    A p-value adjusted to one leaves a Sharpe ratio of zero (a haircut of 1)."""
+    if sr is None or observations is None or trials is None:
+        return None
+    if sr <= 0.0 or observations < 2 or trials < 1:
+        return None
+    t = sr * math.sqrt(observations)
+    p = 2.0 * _cdf(-t)
+    adjusted = min(trials * p, 1.0)
+    if adjusted >= 1.0:
+        t_adjusted = 0.0
+    elif adjusted < _TINY_P:  # beyond the inverse's precision: no visible haircut
+        t_adjusted = t
+    else:
+        t_adjusted = inverse_normal_cdf(1.0 - adjusted / 2.0)
+    sr_adjusted = t_adjusted / math.sqrt(observations)
+    return Haircut(t, p, adjusted, sr_adjusted, 1.0 - sr_adjusted / sr)
 
 
 def pbo_cscv(m: ArrayLike, splits: int = 16) -> float | None:

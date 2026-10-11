@@ -1,0 +1,93 @@
+# L3 site setting: the Guide glossary, edges: what would change a verdict, the paper's number and the haircut Sharpe (ADR 0051, ADR 0064). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "verdict_outlook"
+term = "What would change the verdict"
+short = "The first test the verdict has not passed, in words, and for a count of trades how many are still missing."
+body = """
+The verdict is a fixed rule over a list of tests. The outlook names the first test that is not yet
+passed, so you can see what the result is waiting for. For a count of trades it also says how many the edge has, how many it needs and how many are still to come. The counts are the minimum out-of-sample trades and the trades Works asks for. For any other test, such as a decile t statistic, it names the test and the value it needs. A statistic is not something that can be counted down.
+There is no date yet: see the projection states. Example: an edge with 12 out-of-sample trades
+against the 40 needed reads "28 trades to come", not a day. The outlook describes the rule, it
+does not predict the verdict: more trades can move a test either way.
+"""
+next = "Read the outlook together with the criteria list, where every test shows its value and threshold."
+see_also = ["verdict", "verdict_criteria", "outlook_projection", "trades", "out_of_sample"]
+
+[[term]]
+id = "outlook_projection"
+term = "Projection state"
+short = "Why the outlook shows no date for the missing trades: not stored, unprojectable, hidden, projected or beyond the projection."
+body = """
+When trades are missing the outlook would like to say when they will exist. That date comes from
+the schedule: the harness works out the exit sessions of the next decision sessions and stores
+them with the run. Not stored: no run has stored them yet, so no date is shown (every run is in
+this state today). Unprojectable: the edge fires on an event, such as an earnings report, and no
+calendar says when the next one will come. Hidden: the out-of-sample result of a copy is withheld
+until you show it, so its count is too. Projected: the run stored the exits and the outlook shows
+the date they imply, scaled by how often the edge has fired. Beyond the projection: the count
+needs more sessions than the stored list reaches, and the next run extends it. A date is an
+estimate, never an input to the verdict.
+"""
+next = "Do not wait for a date; the verdict changes when a run records enough trades."
+see_also = ["verdict_outlook", "trades", "official_result"]
+
+[[term]]
+id = "published_number"
+term = "Published number"
+short = "The figure the research behind an edge reports for the statistic the harness also measures, with its source."
+body = """
+An edge's document can cite one number from the paper it rests on. It is a mean excess return, a decile spread or a lift in points, over a holding period. The page shows the years the paper covers and a link.
+The harness measures the same statistic on our own stored sessions, so the page can set the
+two side by side. The published number is the paper's own, before costs and usually from a
+long, older sample and a wider set of stocks. It is not a promise: papers report the best
+version of an effect. Example: Jegadeesh and Titman report 1.31% a month for the winners-minus-losers
+decile spread of 12-month momentum over 1965 to 1989. An edge with no number here has none that
+compares honestly with what the harness measures.
+"""
+next = "Compare it with the out-of-sample bar, not the in-sample one."
+see_also = ["decay", "top_vs_bottom_decile", "lift", "in_sample", "out_of_sample"]
+
+[[term]]
+id = "decay"
+term = "Decay"
+short = "How much smaller an edge's number is in our data than the paper's: published, in-sample, then out-of-sample."
+body = """
+Effects shrink once they are known and traded. A study of 97 published predictors found about a
+quarter of the return gone out of sample and more than half after publication. The decay bars show one statistic three times. They are the paper's figure, the harness's in-sample figure and its out-of-sample figure, each with the number of trades or sessions it rests on. Bars falling from left to right is
+the usual shape. A bar can be missing for a stated reason: see the bar states. The bars compare only
+the paper's holding period, so a verdict that rests on another one shows them as not comparable.
+Example: a decile spread of 1.31% in the paper, 0.9% in-sample and 0.2% out-of-sample is a decay
+the edge may not survive. The live record is not a bar yet.
+"""
+next = "Trust a bar by its count: an out-of-sample bar on a few trades is noise."
+see_also = ["published_number", "decay_bar_state", "live_record", "in_sample", "out_of_sample", "trades", "top_vs_bottom_decile"]
+
+[[term]]
+id = "decay_bar_state"
+term = "Decay bar state"
+short = "Why a decay bar has no value: not stored, not comparable or hidden; a measured bar has one."
+body = """
+Measured: the bar has its value and the count it rests on. Not stored: the run behind the verdict
+is older than the figure, or the statistic could not be computed on that slice. The bar shows no value, never a zero. Not comparable: the paper reports one holding period and the verdict rests
+on another, so putting them side by side would compare unlike things. Hidden: the out-of-sample
+result of a copy is withheld until you show it. Not given: the edge's document cites no comparable
+paper, so the paper's bar is empty and the other bars show the lift in points. A missing bar is not a bad result.
+"""
+next = "Re-run the backtest to fill a not stored bar; wait for a count to fill a hidden one."
+see_also = ["decay", "published_number", "out_of_sample"]
+
+[[term]]
+id = "haircut_sharpe"
+term = "Haircut Sharpe ratio"
+short = "The Sharpe ratio left once the variants tried are counted: Harvey and Liu's adjustment, shown beside the trial count."
+body = """
+Try many versions and the best one looks good by luck. Harvey and Liu turn the Sharpe ratio into a
+t-ratio and a p-value. They multiply the p-value by the number of variants tried and turn the result back into a Sharpe ratio. The share lost is the haircut. Their illustration: a t-ratio of 3.0
+whose p-value is adjusted to 0.05 becomes about 2.0, a haircut of about a third. Here the Sharpe ratio is the stored one, per trade and not annualised, over the whole history. The adjustment is the Bonferroni bound, which is Holm's value for the best of the variants. The others' t statistics are not stored. When the picks of an edge overlap in time, as on an every-session schedule, the t-ratio is overstated and so is the Sharpe ratio behind it. The verdict uses the deflated Sharpe ratio, not this one;
+the haircut is shown beside it as a second view of the same luck.
+"""
+next = "Read the cut against the trial count: a large cut with many variants means the best may be luck."
+see_also = ["sharpe_ratio", "deflated_sharpe", "variants_tried", "robustness"]

@@ -39,6 +39,12 @@ and the key.
     [evidence]        run_id and split_from of the run an evidenced or live edge rests on; its
                       split_from must equal frozen_from (ADR 0053 amendment, ED5a)
     rejection_reason  required when rejected or blocked, allowed when retired, else an error
+    [published]       optional: the number the literature reports, to set beside the harness's:
+                      ``measure`` (PUBLISHED_MEASURES; ``mean_excess`` and ``decile_spread`` in
+                      return as a fraction, ``lift_pts`` in points), ``value``,
+                      ``horizon_sessions`` (one of the outcome's), ``source`` (the index of its
+                      ``[[sources]]`` entry) and optional ``sample`` (years it covers; ADR 0064
+                      decision 6). A copy inherits it
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
     notes             optional: a proxy, an open decision
@@ -117,11 +123,13 @@ QUALITY_BAR = (
     "failure_modes",
     "decoys",
 )
+PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
+PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source")
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
-    "extends", "follow", "audit",
+    "extends", "follow", "audit", "published",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -193,6 +201,20 @@ class Compared:
 
 
 @dataclass(frozen=True)
+class Published:
+    """The figure a paper reports for the edge's own statistic: ``measure`` (what it measures,
+    comparable with the harness's ``mean_excess_picks``, ``decile_spread`` or the lift in points)
+    equal to ``value`` over ``horizon_sessions``, from ``sources[source]``, over ``sample`` years
+    (None: not stated)."""
+
+    measure: str
+    value: float
+    horizon_sessions: int
+    source: int
+    sample: int | None = None
+
+
+@dataclass(frozen=True)
 class Source:
     title: str
     url: str = ""
@@ -222,6 +244,7 @@ class Edge:
     variants: tuple[EdgeVariant, ...] = ()
     scorer_features: tuple[str, ...] = ()  # the fields a learned scorer reads (ADR 0053, ED7)
     evidence: Evidence | None = None
+    published: Published | None = None  # the literature's figure, for the decay read (ADR 0064)
     promoted: str | None = None  # the screener that implements the edge for use (ED7c)
     compared: tuple[Compared, ...] = ()  # the numbers the promotion rests on
     basis_horizon: int | None = None  # the horizon the verdict rests on (ADR 0065)
@@ -290,6 +313,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     universe = _universe(t, edge_id)
     base = _base(t, schedule)
     picks = _picks(t, schedule, base)
+    sources = _sources(t)
     edge = Edge(
         id=edge_id,
         name=_required(t, "name"),
@@ -303,7 +327,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         screeners=_ids(t, "screeners"),
         baselines=_ids(t, "baselines"),
         status=status,
-        sources=_sources(t),
+        sources=sources,
         quality_bar=_quality_bar(t, closed),
         rejection_reason=_prose(t, "rejection_reason"),
         notes=_prose(t, "notes"),
@@ -313,6 +337,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         variants=_variants(t, schedule, edge_id, universe, base, picks),
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
+        published=_published(t, outcome, len(sources)),
         promoted=_promoted(t),
         compared=_compared(t),
         basis_horizon=_basis_horizon(t, outcome),
@@ -371,6 +396,33 @@ def _evidence(t: Table) -> Evidence | None:
     if not run_id or split is None:
         raise ConfigurationError(f"{sub.where}: run_id and split_from are both required")
     return Evidence(run_id, _date(sub, "split_from", split))
+
+
+def _published(t: Table, outcome: Outcome, sources: int) -> Published | None:
+    if t.raw("published") is None:
+        return None
+    sub = t.table("published", PUBLISHED_KEYS)
+    for key in ("measure", "value", "horizon_sessions", "source"):
+        if key not in sub.names():
+            _missing(sub, key)
+    horizon = sub.integer("horizon_sessions", 0, 1)
+    if horizon not in outcome.horizon_sessions:
+        raise ConfigurationError(
+            f"{sub.where} horizon_sessions: {horizon} is not one of the outcome's "
+            f"{list(outcome.horizon_sessions)}"
+        )
+    source = sub.integer("source", 0, 0)
+    if source >= sources:
+        raise ConfigurationError(
+            f"{sub.where} source: {source} is not an index of the {sources} [[sources]]"
+        )
+    return Published(
+        measure=sub.choice("measure", "", PUBLISHED_MEASURES),
+        value=sub.number("value", 0.0),
+        horizon_sessions=horizon,
+        source=source,
+        sample=sub.integer("sample", 0, 1) if "sample" in sub.names() else None,
+    )
 
 
 def _extends(t: Table, edge_id: str) -> str | None:

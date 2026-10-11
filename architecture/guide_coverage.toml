@@ -127,6 +127,18 @@ values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_m
 names = { not_measured = "not measured" }
 
 [[enum]]
+source = "graphql:EdgeOutlook.projectionState"
+values_from = "python:algotrade.services.read.evaluation.evidence:PROJECTION_STATES"
+values = { projected = "term:outlook_projection", not_stored = "term:outlook_projection", beyond_projection = "term:outlook_projection", unprojectable = "term:outlook_projection", oos_hidden = "term:outlook_projection" }
+names = { oos_hidden = "hidden", beyond_projection = "beyond the projection" }
+
+[[enum]]
+source = "graphql:DecayBar.state"
+values_from = "python:algotrade.services.read.evaluation.decay:BAR_STATES"
+values = { measured = "term:decay_bar_state", not_stored = "term:decay_bar_state", not_comparable = "term:decay_bar_state", oos_hidden = "term:decay_bar_state", not_given = "term:decay_bar_state" }
+names = { oos_hidden = "hidden", not_given = "not given" }
+
+[[enum]]
 source = "graphql:VerdictYear.label"
 exempt = "free text: the row's name (the year, or its months), explained in Year by year"
 

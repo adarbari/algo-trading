@@ -29,9 +29,16 @@ from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import runs
-from algotrade.services.read.evaluation.edges import Edge
-from algotrade.services.read.evaluation.evidence import EvidenceProgress, evidence_of
-from algotrade.services.read.evaluation.robustness import Robustness, beat_share, load_robustness
+from algotrade.services.read.evaluation.decay import EdgeDecay, decay_of
+from algotrade.services.read.evaluation.edges import Edge, EdgePublished
+from algotrade.services.read.evaluation.evidence import EvidenceProgress, evidence_of, outlook_of
+from algotrade.services.read.evaluation.robustness import (
+    EdgeHaircut,
+    Robustness,
+    beat_share,
+    load_haircut,
+    load_robustness,
+)
 from algotrade.services.read.evaluation.runs import EdgeRow
 
 WORKS: Final = "works"
@@ -134,6 +141,8 @@ class EdgeVerdict:
     robustness: Robustness | None = None  # the lift among the random-pick backtests
     columns: tuple[VerdictColumn, ...] = ()  # in-sample, out-of-sample, all (empty: waiting)
     evidence: EvidenceProgress | None = None  # the trades against what the verdict needs
+    haircut: EdgeHaircut | None = None  # the basis's Sharpe ratio after the variants tried
+    decay: EdgeDecay | None = None  # the paper's figure against the in- and out-of-sample ones
 
 
 def _pct(x: float | None) -> str:
@@ -360,11 +369,37 @@ def _basis_words(key: tuple[str, int]) -> str:
     return f"{key[0]}, {key[1]} trading days"
 
 
+def _next_gap(crit: Sequence[VerdictCriterion]) -> VerdictCriterion | None:
+    """The first test not passed: Promising's in order, then Works's (None: all pass)."""
+    return _first(crit, PROMISING) or _first(crit, WORKS)
+
+
+@dataclass(frozen=True)
+class EdgeFacts:
+    """What the verdict knows about the edge beyond its rows: its ``published`` figure, its
+    ``schedule`` (an event schedule's count date cannot be projected) and whether the
+    out-of-sample result is ``hidden``."""
+
+    published: EdgePublished | None = None
+    schedule: str | None = None
+    hidden: bool = False
+
+
 def _judge_one(
-    c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
+    c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool, facts: EdgeFacts
 ) -> EdgeVerdict:
     crit = _criteria(c, t, draws, decoys)
     level, reason = _level(c, crit, t)
+    gap = _next_gap(crit)
+    outlook = outlook_of(
+        gap,
+        _words(gap) if gap else "",
+        c.oos.sessions,
+        c.whole.sessions,
+        t,
+        facts.schedule,
+        facts.hidden,
+    )
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     basis = _basis_words((c.variant, c.horizon))
@@ -400,7 +435,9 @@ def _judge_one(
         deciles=c.insample.decile_means if c.insample else (),
         robustness=load_robustness(oos.lift, draws, c.horizon, c.variant, whole.trials),
         columns=_columns(c, t),
-        evidence=evidence_of(oos.sessions, whole.sessions, crit, t),
+        evidence=evidence_of(oos.sessions, whole.sessions, crit, t, outlook),
+        haircut=load_haircut(whole.sharpe, whole.sessions, whole.trials),
+        decay=decay_of(facts.published, c.horizon, c.insample, oos, facts.hidden),
     )
 
 
@@ -549,6 +586,7 @@ def _judge_candidate(
     draws: Sequence[EdgeRow],
     decoys: bool,
     lost_inputs: Sequence[str],
+    facts: EdgeFacts,
 ) -> EdgeVerdict:
     """A candidate that lost inputs (its own screen could not read a table on some decision
     sessions) is Waiting on data even when it has rows: the figures are not the whole test."""
@@ -556,7 +594,7 @@ def _judge_candidate(
     if lost:
         reason = f"The result lost inputs for {c.variant}: {'; '.join(lost)}"
         return replace(_waiting("", reason), basis=_basis_words((c.variant, c.horizon)))
-    return _judge_one(c, t, draws, decoys)
+    return _judge_one(c, t, draws, decoys, facts)
 
 
 def judge(
@@ -569,12 +607,14 @@ def judge(
     decoys: bool = True,
     declared: Declared = UNDECLARED,
     basis: BasisChoice | None = None,
+    facts: EdgeFacts | None = None,
 ) -> EdgeVerdict:
     """The verdict of ``edge_id`` from its official result's ``rows`` (None: it has no official
     result); ``split``: the out-of-sample start; ``draws``: the run's random-pick draws (none:
     not measured, which caps the verdict at Promising); ``declared``: the document's basis;
     ``basis``: one already chosen (a hidden copy's, from rows the verdict does not see), else
-    ``choose_basis`` over ``rows``."""
+    ``choose_basis`` over ``rows``; ``facts``: the edge's
+    published figure, schedule and whether its out-of-sample result is hidden."""
     if rows is None:
         return _waiting(edge_id, "No official result yet")
     found = _candidates(rows)
@@ -588,7 +628,7 @@ def judge(
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs else ""
         reason = f"The official result has no out-of-sample figures for {on}{lost}"
         return replace(_waiting(edge_id, reason), basis=on)
-    judged = _judge_candidate(c, t, draws, decoys, lost_inputs)
+    judged = _judge_candidate(c, t, draws, decoys, lost_inputs, facts or EdgeFacts())
     return replace(judged, edge_id=edge_id, years=_years(c, split))
 
 
@@ -609,4 +649,5 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
         draws=runs.load_run_draws(ctx, found.run),
         decoys=bool(edge.baselines),
         declared=Declared(edge.promoted, edge.basis_horizon),
+        facts=EdgeFacts(edge.published, edge.schedule),
     )

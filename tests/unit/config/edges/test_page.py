@@ -70,6 +70,27 @@ def test_the_page_lists_edges_by_status_with_their_answers() -> None:
     assert "- A paper <https://example.org>" in page
     assert "**Screeners:** `vrp_scanner`" in page
     assert "**Baselines:** none yet" in page
+    assert "**Published:**" not in page
+
+
+def test_a_published_figure_is_shown_with_its_source() -> None:
+    e = parse_edge(
+        document(
+            sources=[{"title": "A paper"}],
+            published={
+                "measure": "decile_spread",
+                "value": 0.0131,
+                "horizon_sessions": 20,
+                "source": 0,
+                "sample": 25,
+            },
+        ),
+        "drift",
+        "drift.toml",
+    )
+    assert "- **Published:** decile spread 1.31% over 20 sessions (A paper, 25 years)" in render(
+        [e]
+    )
 
 
 def test_the_committed_page_is_up_to_date() -> None:
