@@ -1,7 +1,8 @@
 /**
  * Trader > Edges end to end, against the production build with the edges mocked (edges-api.ts):
- * the list shows each edge under its verdict, the chosen edge's page shows the verdict, the
- * out-of-sample figures and the details (an exploratory run is labelled and never shown as
+ * the list shows each edge under its verdict, the chosen edge's page shows the verdict, what would
+ * change it, its sections in order (the evidence curve, how sure, where it worked, the definition)
+ * each loaded as it is reached, the out-of-sample figures and the details (an exploratory run is labelled and never shown as
  * figures), the chosen edge lives in the URL, and the six-step builder (clone, edit a screen in the
  * Screen Builder and return, save the whole edge, run the backtest); the Screeners list shows a track-record chip and Ideas an odds line for a
  * screener a candidate edge lists.
@@ -41,10 +42,63 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
   await list.getByRole('row', { name: /Momentum 12-1/ }).click();
   await expect(page).toHaveURL(/\/edges\?edge=momentum_12_1$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeVisible();
-  await expect(page.getByText('+7 pts').first()).toBeVisible();
-  await page.getByText('Details').click();
+  await expect(page.getByText('+7.0 pts').first()).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Sections of this edge' })
+    .getByRole('link', { name: 'Details' })
+    .click();
+  await page.getByRole('button', { name: /^Details/ }).click();
   await expect(page.getByText('EXPLORATORY')).toBeVisible();
   await expect(page.getByText('99.0%')).toHaveCount(0);
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
+test("the chosen edge's page reads in order: the verdict and what would change it, then each section as it is reached", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const sections = new Set<string>();
+  page.on('request', (request) => {
+    const query = (request.postDataJSON() as { query?: string } | null)?.query ?? '';
+    const name = /query\s+(EdgeResult\w+)/.exec(query)?.[1];
+    if (name) sections.add(name);
+  });
+  await page.goto('/edges?edge=momentum_12_1');
+  await expect(page.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeVisible();
+  // The head: the verdict, what would change it, with its meters and checks.
+  await expect(
+    page.getByText('Promising needs 40 out-of-sample trades: 6 so far, 34 to go.'),
+  ).toBeVisible();
+  await expect(page.getByRole('meter', { name: 'Out-of-sample trades' })).toBeVisible();
+  await expect(page.getByText('Projected: 15 Mar 2027')).toBeVisible();
+  const nav = page.getByRole('navigation', { name: 'Sections of this edge' });
+  for (const name of ['Evidence', 'How sure', 'Where it worked', 'Definition', 'Details']) {
+    await expect(nav.getByRole('link', { name })).toBeVisible();
+  }
+  await expect(nav.getByRole('link', { name: 'Live record' })).toHaveCount(0); // nothing recorded
+  // Evidence: the curve (read as it comes near) and the figures of both sides of the split.
+  await expect(page.getByRole('heading', { level: 2, name: 'Evidence' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /^Evidence curve of the picks/ })).toBeVisible();
+  const figures = page.getByRole('grid', { name: 'In-sample, out-of-sample and all figures' });
+  await expect(figures.getByRole('columnheader', { name: 'Out-of-sample · n=6' })).toBeVisible();
+  await expect(figures.getByRole('row', { name: /Win rate/ })).toContainText('57.0%');
+  // How sure: deciles, robustness with the multiple-testing line, decay with the paper not given.
+  await nav.getByRole('link', { name: 'How sure' }).click();
+  await expect(page.getByRole('list', { name: 'Mean outcome by decile' })).toBeVisible();
+  await expect(
+    page.getByText('Sharpe 1.10 over 70 trades with 3 variants becomes 0.40.'),
+  ).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Decay by stage' })).toContainText('Not given');
+  // Where it worked: the years, then the drawdown, read only when its view opens.
+  await nav.getByRole('link', { name: 'Where it worked' }).click();
+  await expect(page.getByRole('grid', { name: 'Year by year' })).toBeVisible();
+  expect(sections.has('EdgeResultDrawdown')).toBe(false);
+  await page.getByRole('tab', { name: 'Drawdown' }).click();
+  await expect(page.getByRole('grid', { name: 'Deepest drawdowns' })).toBeVisible();
+  await expect(
+    page.getByRole('img', { name: 'Evidence curve below its previous high' }),
+  ).toBeVisible();
   await expectAccessible(page);
   expect(errors).toEqual([]);
 });

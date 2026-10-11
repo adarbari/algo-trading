@@ -8,9 +8,9 @@ vi.mock('@/widgets/edge-list', async () => {
   const { Text } = await import('@algotrade/ui');
   return { EdgeList: () => <Text>list</Text> };
 });
-vi.mock('@/widgets/edge-detail', async () => {
+vi.mock('./EdgePage', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { EdgeDetail: ({ id }: { id: string }) => <Text>{`detail ${id}`}</Text> };
+  return { EdgePage: ({ id }: { id: string }) => <Text>{`detail ${id}`}</Text> };
 });
 
 const onBuild = vi.fn();

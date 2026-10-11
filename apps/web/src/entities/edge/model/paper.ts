@@ -85,6 +85,10 @@ export interface EdgePaper {
   forward: ForwardTest | null;
 }
 
+/** An edge's page shows its Live record only once it has paper trades or a forward test. */
+export const hasLiveRecord = (paper: EdgePaper | null | undefined): paper is EdgePaper =>
+  paper != null && !(paper.record.state === 'no_trades' && !paper.forward);
+
 /** One edge's live state for the session (`EdgeDesk.liveStates`): the live record's state, its settled trades and the server's sentence. */
 export interface LiveState {
   edgeId: string;

@@ -1,5 +1,5 @@
 /**
- * The columns of an edge page's tables: the year-by-year rows of the verdict's basis, the tests
+ * The columns of an edge page's tables: the tests
  * of the verdict (value, threshold, pass / fail / not measured), a copy's comparison and the paper
  * trades of a followed edge. Rows are served records, not instruments; every figure and word is
  * the server's.
@@ -13,45 +13,8 @@ import {
   type StatusTone,
 } from '@algotrade/ui';
 
-import {
-  tradeLabel,
-  tradeTone,
-  type PaperTrade,
-  type VerdictCriterion,
-  type VerdictYear,
-} from '@/entities/edge';
+import { tradeLabel, tradeTone, type PaperTrade, type VerdictCriterion } from '@/entities/edge';
 import type { CompareRow } from '@/features/edge-compare';
-
-export const yearColumns: DataTableColumn<VerdictYear>[] = [
-  { id: 'year', header: 'Period', value: (y) => y.label, align: 'start', hideable: false },
-  {
-    id: 'win',
-    header: 'Win rate',
-    value: (y) => y.winRate,
-    format: { kind: 'percent', digits: 0 },
-    essential: true,
-  },
-  {
-    id: 'base',
-    header: 'Base rate',
-    value: (y) => y.baseRate,
-    format: { kind: 'percent', digits: 0 },
-  },
-  {
-    id: 'lift',
-    header: 'Lift',
-    value: (y) => y.liftPts,
-    format: { kind: 'delta', unit: 'points', digits: 0 },
-    essential: true,
-  },
-  {
-    id: 'spread',
-    header: 'Top vs bottom decile',
-    value: (y) => y.decileSpread,
-    format: { kind: 'percent', digits: 1 },
-  },
-  { id: 'trades', header: 'Trades', value: (y) => y.trades, format: { kind: 'number' } },
-];
 
 const STATUS: Record<string, { label: string; tone: StatusTone }> = {
   pass: { label: 'Pass', tone: 'positive' },

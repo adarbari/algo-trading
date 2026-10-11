@@ -1,0 +1,80 @@
+/**
+ * The evidence curve of an edge (its own read, `edgeResult.curve`): what the picks of the
+ * verdict's basis earned window by window, added up, against the universe, with the in-sample and
+ * out-of-sample stretches shaded, the paper record continuing it as a dashed stroke and the
+ * spans with no number in a lane. A gap in the data says why through the Guide; a copy's
+ * withheld out-of-sample result says so. States: loading, error, unknown, hidden, ready.
+ */
+import { Chart, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
+
+import { UnknownNote } from '@/entities/availability';
+import { useEdgeCurve } from '@/entities/edge';
+import { termHelp } from '@/features/guide-help';
+
+import { curveChart } from '../model/curve';
+
+export interface EdgeCurveProps {
+  edgeId: string;
+}
+
+export function EdgeCurve({ edgeId }: EdgeCurveProps) {
+  const query = useEdgeCurve(edgeId);
+  const curve = query.data;
+  if (query.isPending) {
+    return (
+      <Panel
+        title="Evidence curve"
+        headingLevel={3}
+        actions={termHelp('evidence_curve')}
+        state="loading"
+        loadingLabel="Loading the curve…"
+      />
+    );
+  }
+  if (query.isError || !curve) {
+    return (
+      <Panel
+        title="Evidence curve"
+        headingLevel={3}
+        actions={termHelp('evidence_curve')}
+        state="error"
+        errorMessage="The curve failed to load."
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+  if (curve.unknown) {
+    return (
+      <Panel title="Evidence curve" headingLevel={3} actions={termHelp('evidence_curve')}>
+        <UnknownNote unknown={curve.unknown} />
+      </Panel>
+    );
+  }
+  const chart = curveChart(curve);
+  return (
+    <Panel title="Evidence curve" headingLevel={3} actions={termHelp('evidence_curve')}>
+      <Stack gap={2}>
+        {curve.hidden && (
+          <Stack direction="row" gap={1} align="center">
+            <StatusBadge tone="neutral">Out-of-sample hidden</StatusBadge>
+            {termHelp('show_out_of_sample')}
+          </Stack>
+        )}
+        <Text size="xs" tone="muted">
+          {curve.kind === 'excess_wins' ? 'Excess wins, cumulative' : 'Excess return, cumulative'}
+        </Text>
+        <Chart
+          label="Evidence curve of the picks against the universe"
+          series={chart.series}
+          bands={chart.bands}
+          lanes={chart.lanes}
+          format={chart.format}
+          emptyMessage="No windows to draw"
+        />
+        {curve.gaps.map((gap) =>
+          gap.unknown ? <UnknownNote key={`${gap.from}:${gap.to}`} unknown={gap.unknown} /> : null,
+        )}
+      </Stack>
+    </Panel>
+  );
+}

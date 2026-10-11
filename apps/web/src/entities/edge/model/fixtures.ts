@@ -1,5 +1,5 @@
 /** Test builders for the edge entity (exported for widget tests): edges as the API answers them. */
-import type { EdgesResponse } from './edges';
+import type { Edge, EdgesResponse } from './edges';
 import type { TrackRecordsResponse } from './track-records';
 
 const criterion = (id: string, label: string, status: string, level = 'promising') => ({
@@ -9,6 +9,27 @@ const criterion = (id: string, label: string, status: string, level = 'promising
   threshold: 'at least 2',
   status,
   level,
+});
+
+const side = (
+  period: string,
+  winRate: number,
+  baseRate: number,
+  liftPts: number,
+  trades: number,
+  thin: boolean,
+) => ({
+  period,
+  winRate,
+  baseRate,
+  liftPts,
+  trades,
+  decileSpread: 0.066,
+  decileT: 2.4,
+  sharpe: 1.0,
+  deflatedSharpe: 0.8,
+  pbo: null,
+  thin,
 });
 
 const verdict = (over: Record<string, unknown>) => ({
@@ -115,6 +136,43 @@ export const EDGES_FIXTURE = {
             { start: 1.0, end: 1.1, count: 360 },
             { start: 1.1, end: 1.2, count: 40 },
           ],
+        },
+        columns: [
+          side('in_sample', 0.56, 0.5, 6, 64, false),
+          side('out_of_sample', 0.57, 0.52, 5, 6, true),
+          side('all', 0.56, 0.5, 6, 70, false),
+        ],
+        evidence: {
+          oosTrades: 6,
+          needed: 40,
+          worksOosNeeded: 60,
+          wholeTrades: 70,
+          wholeNeeded: 100,
+          reached: false,
+          checks: [
+            criterion('dsr', 'Deflated Sharpe', 'pass'),
+            criterion('pbo', 'Chance of overfitting', 'not_measured', 'works'),
+          ],
+          outlook: {
+            criterion: 'trades',
+            level: 'promising',
+            sentence: 'Promising needs 40 out-of-sample trades: 6 so far, 34 to go.',
+            have: 6,
+            needed: 40,
+            remaining: 34,
+            projectionState: 'projected',
+            expectedBy: '2027-03-15',
+            fillRatio: 0.5,
+          },
+        },
+        haircut: {
+          sharpe: 1.1,
+          haircutSharpe: 0.4,
+          cut: 0.64,
+          trials: 3,
+          sessions: 70,
+          method: 'bonferroni',
+          summary: 'Sharpe 1.10 over 70 trades with 3 variants becomes 0.40.',
         },
         criteria: [
           criterion('trades', 'Trades', 'pass'),
@@ -284,3 +342,112 @@ export const TRACK_RECORDS_FIXTURE = {
     { id: 'plain', trackRecords: [] },
   ],
 } as unknown as TrackRecordsResponse;
+
+const unknown = (kind: string, kindText: string, guideTerm: string) => ({
+  code: 'UNKNOWN',
+  reason: null,
+  kind,
+  guideTerm,
+  kindText,
+  cause: null,
+});
+
+/** The evidence curve of momentum_12_1 as `edgeResult.curve` answers it (test builder). */
+export const CURVE_FIXTURE = {
+  kind: 'cumulative_excess',
+  unit: 'return',
+  splitFrom: '2026-04-01',
+  hidden: false,
+  points: [
+    {
+      decision: '2026-01-02',
+      exit: '2026-02-02',
+      period: 'in_sample',
+      value: 0.01,
+      cumulative: 0.01,
+      baseValue: 0.002,
+      baseCumulative: 0.002,
+      trades: 1,
+    },
+    {
+      decision: '2026-03-02',
+      exit: '2026-04-02',
+      period: 'in_sample',
+      value: 0.02,
+      cumulative: 0.03,
+      baseValue: 0.002,
+      baseCumulative: 0.004,
+      trades: 1,
+    },
+    {
+      decision: '2026-05-04',
+      exit: '2026-06-03',
+      period: 'out_of_sample',
+      value: -0.01,
+      cumulative: 0.02,
+      baseValue: 0.002,
+      baseCumulative: 0.006,
+      trades: 1,
+    },
+  ],
+  gaps: [{ from: '2026-02-10', to: '2026-02-20', kind: 'lost_input', unknown: null }],
+  live: {
+    state: 'recorded',
+    since: '2026-08-03',
+    anchor: 0.02,
+    closed: 2,
+    sessions: 2,
+    points: [
+      { sell: '2026-09-03', value: 0.004, cumulative: 0.024, trades: 1 },
+      { sell: '2026-10-02', value: -0.002, cumulative: 0.022, trades: 1 },
+    ],
+  },
+  unknown: null,
+};
+
+/** The drawdown of momentum_12_1 as `edgeResult.drawdown` answers it (test builder). */
+export const DRAWDOWN_FIXTURE = {
+  unit: 'return',
+  points: [
+    { exit: '2026-02-02', depth: 0 },
+    { exit: '2026-04-02', depth: 0 },
+    { exit: '2026-06-03', depth: -0.01 },
+  ],
+  episodes: [
+    { peak: '2026-04-02', trough: '2026-06-03', recovered: null, depth: 0.01 },
+    { peak: '2026-01-02', trough: '2026-01-20', recovered: '2026-02-02', depth: 0.005 },
+  ],
+  maxInSample: 0.005,
+  maxOutOfSample: 0.01,
+  volInSample: 0.12,
+  volOutOfSample: null,
+  unknown: null,
+};
+
+/** The decay of momentum_12_1 as `edgeResult.decay` answers it: the paper's bar not given (test builder). */
+export const DECAY_FIXTURE = {
+  measure: 'lift_pts',
+  unit: 'points',
+  basisHorizon: 20,
+  published: null,
+  bars: [
+    { period: 'published', value: null, n: null, state: 'not_given' },
+    { period: 'in_sample', value: 6, n: 64, state: 'measured' },
+    { period: 'out_of_sample', value: 5, n: 6, state: 'measured' },
+    { period: 'live', value: null, n: 0, state: 'not_measured_live' },
+  ],
+};
+
+/** A gap in a section's read the server explains (test builder): why a curve or drawdown is not there. */
+export const UNKNOWN_FIXTURE = unknown(
+  'NOT_STORED',
+  'not stored for this run',
+  'unavailable_not_stored',
+);
+
+/** One edge of {@link EDGES_FIXTURE} by id (test builder): fails loudly when the id is not there. */
+export function edgeFixture(id: string): Edge {
+  const found = EDGES_FIXTURE.edges.find((e) => e.id === id);
+  if (!found) throw new Error(`no edge ${id} in the fixture`);
+  return found;
+}

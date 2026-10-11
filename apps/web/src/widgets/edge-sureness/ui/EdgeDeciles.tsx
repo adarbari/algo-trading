@@ -1,7 +1,8 @@
 /**
- * Top vs bottom decile as bars: the in-sample mean outcome of each tenth of the screen's ranking,
- * best-ranked first, as signed bars around a zero axis (`BarList` `diverging`). Every number is
- * served; a decile the run did not store is left out, and without any the panel says so.
+ * Deciles: the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first,
+ * as signed bars around a zero axis (`BarList` `diverging`): a staircase when the ranking
+ * works, flat when it does not. Every number is served; a decile the run did not store is left
+ * out, and without any the panel says so.
  */
 import { BarList, Panel, Stack, Text, type BarListItem } from '@algotrade/ui';
 
@@ -14,11 +15,14 @@ export interface EdgeDecilesProps {
 
 export function EdgeDeciles({ deciles }: EdgeDecilesProps) {
   const items: BarListItem[] = deciles.flatMap((value, i) =>
-    value == null ? [] : [{ id: `decile-${i + 1}`, label: `Decile ${i + 1}`, value }],
+    value == null
+      ? []
+      : [{ id: `decile-${String(i + 1)}`, label: `Decile ${String(i + 1)}`, value }],
   );
   return (
     <Panel
-      title="Top vs bottom decile"
+      title="Deciles"
+      headingLevel={3}
       state={items.length === 0 ? 'empty' : 'ready'}
       emptyMessage="Not stored for this result."
       actions={

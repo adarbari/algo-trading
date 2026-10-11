@@ -1,19 +1,16 @@
 /**
  * The body of an edge's Details, loaded on first open (its own chunk): every test of the verdict
- * with its value and threshold, the backtests (the official result, EXPLORATORY ones, the variants tried and what
- * a run could not read), the Sharpe, deflated Sharpe and overfitting figures, and the user's own
- * out-of-sample split. Every figure and sentence is served.
+ * with its value and threshold, and the backtests (the official result, EXPLORATORY ones, the
+ * variants tried and what a run could not read). Every figure and sentence is served.
  */
 import {
   DataTable,
   Heading,
-  KeyValue,
   Mono,
   Stack,
   StatusBadge,
   Text,
   type DataTableGroupBy,
-  type KeyValueItem,
 } from '@algotrade/ui';
 
 import { verdictLabel, type Edge, type VerdictCriterion } from '@/entities/edge';
@@ -21,40 +18,11 @@ import { termHelp } from '@/features/guide-help';
 
 import { criterionColumns } from '../model/columns';
 
-import { Labelled } from './EdgeFigures';
-
 const BY_LEVEL: DataTableGroupBy<VerdictCriterion> = {
   getGroup: (c) => c.level,
   order: ['promising', 'works'],
   label: (group) => verdictLabel(group),
 };
-
-const NUMBER = { kind: 'number', digits: 2 } as const;
-
-function figures(edge: Edge): KeyValueItem[] {
-  const v = edge.verdict;
-  return [
-    { id: 'lift', label: 'Lift (ratio)', value: v.lift, format: NUMBER },
-    {
-      id: 'sharpe',
-      label: <Labelled text="Sharpe ratio" help="sharpe_ratio" />,
-      value: v.sharpe,
-      format: NUMBER,
-    },
-    {
-      id: 'dsr',
-      label: <Labelled text="Deflated Sharpe" help="deflated_sharpe" />,
-      value: v.deflatedSharpe,
-      format: NUMBER,
-    },
-    {
-      id: 'pbo',
-      label: <Labelled text="Overfitting probability" help="overfitting_probability" />,
-      value: v.pbo,
-      format: NUMBER,
-    },
-  ];
-}
 
 function Backtests({ edge }: { edge: Edge }) {
   if (edge.runs.length === 0) return <Text size="sm">No backtest yet</Text>;
@@ -122,7 +90,6 @@ export function EdgeDetailsBody({ edge }: { edge: Edge }) {
         </Stack>
         <Backtests edge={edge} />
       </Stack>
-      <KeyValue label="Figures behind the verdict" items={figures(edge)} />
     </Stack>
   );
 }
