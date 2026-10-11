@@ -48,10 +48,11 @@ def context(
     user: str = "me",
     extra: dict[tuple[str, str, str], Any] | None = None,
     cutoff: datetime | None = None,
+    reference: date | None = None,
 ) -> ReadContext:
     docs = {**DOCS, ("site", "settings", "users"): USERS, **(extra or {})}
     stores = open_stores(StoreReader(backend), MemoryConfigStore(docs), UserContext(user))
-    session = Session(SESSION, None, True, None, None, False, (), (), cutoff=cutoff)
+    session = Session(SESSION, None, True, None, reference, False, (), (), cutoff=cutoff)
     return ReadContext(
         stores.reader, stores.configs, stores.user, session, stores.features, stores.cache
     )

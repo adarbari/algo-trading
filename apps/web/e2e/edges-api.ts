@@ -1,6 +1,7 @@
 /**
  * Playwright route mock for the edges: the `EdgesPage`, `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record)
- * and the result sections (`EdgeResultCurve`, `EdgeResultDrawdown`, `EdgeResultDecay`) GraphQL
+ * and the result sections (`EdgeResultCurve`, `EdgeResultDrawdown`, `EdgeResultDecay`, the regimes,
+ * holding periods, costs, capacity, rolling starts and monthly map, `EdgeTrades`, `EdgeVariantGrid`) GraphQL
  * operations (POST /api/graphql). The golden store holds no edge runs, so the answers are
  * synthetic with the real API's shapes (`Query.edges`, `Screener.trackRecords`): one candidate
  * edge with an official result and an exploratory run beside it, one rejected edge with no
@@ -106,6 +107,182 @@ const DECAY = {
   ],
 };
 
+const figure = (
+  period: string,
+  winRate: number,
+  baseRate: number,
+  liftPts: number,
+  trades: number,
+) => ({
+  period,
+  state: 'measured',
+  winRate,
+  baseRate,
+  liftPts,
+  trades,
+  thin: trades < 5,
+});
+const SLICES = (liftPts: number) => [
+  figure('in_sample', 0.6, 0.55, liftPts, 12),
+  figure('out_of_sample', 0.62, 0.55, liftPts, 6),
+  figure('all', 0.61, 0.55, liftPts, 18),
+];
+// The lower sections of momentum_12_1 as the API answers them: where it worked by regime and by
+// holding period, the cost strip, the capacity, the rolling starts and the monthly map.
+const REGIMES = {
+  state: 'measured',
+  variant: 'main',
+  horizon: 20,
+  rows: [
+    { regime: 'CALM', figures: SLICES(5) },
+    { regime: 'STRESS', figures: SLICES(-2) },
+  ],
+};
+const HORIZONS = {
+  state: 'measured',
+  variant: 'main',
+  needed: 40,
+  rows: [10, 20].map((horizon) => ({
+    horizon,
+    basis: horizon === 20,
+    figures: SLICES(horizon === 20 ? 7 : 4),
+    oosBy: {
+      state: 'projected',
+      needed: 40,
+      have: 6,
+      remaining: 34,
+      expectedBy: '2027-03-15',
+      fillRatio: null,
+    },
+  })),
+};
+const COSTS = {
+  state: 'measured',
+  variant: 'main',
+  horizon: 20,
+  assumedBp: 15,
+  levels: [0, 15, 30].map((bp) => ({
+    period: 'out_of_sample',
+    bp,
+    assumed: bp === 15,
+    sessions: 6,
+    picks: 30,
+    winRate: 0.62,
+    baseRate: 0.55,
+    liftPts: 2 - bp / 10,
+    meanExcess: 0.01,
+  })),
+  periods: ['in_sample', 'out_of_sample', 'all'].map((period) => ({
+    period,
+    state: 'measured',
+    breakEvenBp: 20,
+    decileSpread: 0.05,
+  })),
+};
+const CAPACITY = {
+  state: 'measured',
+  variant: 'main',
+  horizon: 20,
+  floorUsd: 5000000,
+  periods: ['in_sample', 'out_of_sample', 'all'].map((period) => ({
+    period,
+    state: 'measured',
+    picks: 30,
+    advMedian: 4e8,
+    advKnown: 30,
+    advLow: 2,
+  })),
+};
+const ROLLING = {
+  unit: 'points',
+  starts: [
+    { start: '2026-01-02', trades: 18, liftPts: 7, meanExcess: 0.01 },
+    { start: '2026-04-01', trades: 6, liftPts: 5, meanExcess: 0.008 },
+  ],
+  unknown: null,
+};
+const MONTHLY = {
+  unit: 'return',
+  months: [
+    { month: '2026-02', value: 0.01, trades: 3, period: 'in_sample' },
+    { month: '2026-05', value: -0.01, trades: 2, period: 'out_of_sample' },
+  ],
+  unknown: null,
+};
+const TRADES = {
+  period: 'ALL',
+  page: 1,
+  pageSize: 50,
+  total: 2,
+  basis: 'main at 20 sessions',
+  licence: null,
+  oosHidden: false,
+  symbolsSnapshot: '2026-10-01',
+  unknown: null,
+  rows: [
+    ['2026-05-04', 'US-AAA', 'won', 0.031],
+    ['2026-02-02', 'US-BBB', 'lost', -0.012],
+  ].map(([decisionSession, instrumentId, status, value]) => ({
+    variant: 'main',
+    horizonSessions: 20,
+    decisionSession,
+    entrySession: decisionSession,
+    exitSession: decisionSession,
+    instrumentId,
+    symbol: { value: String(instrumentId).replace('US-', ''), unknown: null },
+    company: { value: null, unknown: null },
+    symbolAsOf: '2026-01-15',
+    rank: 1,
+    status,
+    excludedReason: null,
+    hit: status === 'won',
+    delisted: false,
+    beforeSplit: String(decisionSession) < '2026-04-01',
+    source: 'backtest',
+    score: { value: 1.2, unknown: null },
+    value: { value, unknown: null },
+    grossValue: { value, unknown: null },
+    maxDrawdown: -0.02,
+    advUsd: { value: 4e8, unknown: null },
+    reference: { value: 0.01, unknown: null },
+    touch: { value: null, unknown: null },
+  })),
+};
+const FIGS = (liftPts: number, trades: number) => ({
+  winRate: 0.6,
+  baseRate: 0.55,
+  liftPts,
+  decileSpread: 0.05,
+  trades,
+});
+const VARIANTS = {
+  basis: 'main at 20 sessions',
+  trials: 3,
+  oosHidden: false,
+  unknown: null,
+  rows: [10, 20].map((horizonSessions) => ({
+    edgeVariant: 'main',
+    variant: 'main',
+    horizonSessions,
+    inSample: FIGS(1, 12),
+    outOfSample: FIGS(horizonSessions === 20 ? 7 : 4, 6),
+    all: FIGS(2, 18),
+    official: horizonSessions === 20,
+    notPreChosen: horizonSessions !== 20,
+    modelFit: false,
+  })),
+};
+const SECTIONS: [RegExp, Record<string, unknown>][] = [
+  [/query\s+EdgeResultRegimes\b/, { edgeResult: { regimes: REGIMES } }],
+  [/query\s+EdgeResultHorizons\b/, { edgeResult: { horizons: HORIZONS } }],
+  [/query\s+EdgeResultCosts\b/, { edgeResult: { costs: COSTS } }],
+  [/query\s+EdgeResultCapacity\b/, { edgeResult: { capacity: CAPACITY } }],
+  [/query\s+EdgeResultRollingStarts\b/, { edgeResult: { rollingStarts: ROLLING } }],
+  [/query\s+EdgeResultMonthly\b/, { edgeResult: { monthly: MONTHLY } }],
+  [/query\s+EdgeTrades\b/, { edgeTrades: TRADES }],
+  [/query\s+EdgeVariantGrid\b/, { edgeVariants: VARIANTS }],
+];
+
 const VRP_IDS = ['vrp-scanner', 'vrp_scanner'];
 
 function trackRecords() {
@@ -198,6 +375,9 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
       await route.fulfill({ json: { data: { edgeResult: { drawdown: DRAWDOWN } } } });
     } else if (/query\s+EdgeResultDecay\b/.test(query)) {
       await route.fulfill({ json: { data: { edgeResult: { decay: DECAY } } } });
+    } else if (SECTIONS.some(([name]) => name.test(query))) {
+      const [, data] = SECTIONS.find(([name]) => name.test(query)) ?? [];
+      await route.fulfill({ json: { data } });
     } else if (/query\s+ScreenerTrackRecords\b/.test(query)) {
       await route.fulfill({ json: { data: trackRecords() } });
     } else {

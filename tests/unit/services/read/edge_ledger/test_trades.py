@@ -4,7 +4,7 @@ value `LICENCE` to a viewer without the licence (and its sort order never disclo
 copy's in-sample rows only; PRUNED and NOT_STORED told apart; live rows from the paper record as
 the session's cutoff knew them."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -17,6 +17,8 @@ from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.result_writer import ResultWriter
+from algotrade.storage.tables.writers import StoreWriter
+from tests.helpers.rollup_store import write_rows
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.edge_desk.conftest import CUTOFF, KNOWN, store, trade
 from tests.unit.services.read.edge_ledger.conftest import LEDGER, context, pick
@@ -204,3 +206,106 @@ def test_a_hidden_copys_live_trades_are_served() -> None:
     assert edge is not None and edge.oos_hidden
     page = load_edge_trades(ctx, edge, Period.LIVE)
     assert [r.instrument_id for r in page.rows] == ["EQ:F"] and not page.oos_hidden
+
+
+JAN, JUN, OCT = date(2026, 1, 15), date(2026, 6, 1), date(2026, 10, 1)
+
+
+def snapshot(backend: MemoryBackend, day: date, names: dict[str, tuple[str, str]]) -> None:
+    """The reference snapshot of ``day``: instrument id -> (ticker, listing name)."""
+    rows = [
+        {"instrument_id": i, "symbol": t, "name": n, "asset_class": "EQ",
+         "security_type": "COMMON_STOCK", "exchange": "NYSE", "multiplier": 1.0,
+         "status": "ACTIVE", "is_etf": False, "optionable": True}
+        for i, (t, n) in names.items()
+    ]  # fmt: skip
+    write_rows(StoreWriter(backend), "instruments/reference", day, rows)
+
+
+def named(backend: MemoryBackend) -> MemoryBackend:
+    """``backend`` with three snapshots: A was OLD in January and NEW from June; B is BBB with no
+    listing name; D (delisted) is named only in October; C is in none."""
+    snapshot(backend, JAN, {"EQ:A": ("OLD", "Old Inc"), "EQ:B": ("BBB", "")})
+    snapshot(backend, JUN, {"EQ:A": ("NEW", "New Inc"), "EQ:B": ("BBB", "")})
+    snapshot(backend, OCT, {"EQ:D": ("DDD", "D Inc")})
+    return backend
+
+
+def test_a_trade_shows_the_ticker_it_had_at_its_decision_session(backend: MemoryBackend) -> None:
+    ctx = context(named(backend), "owner", reference=OCT)
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL)
+    a, b, c, d = page.rows  # A and B decided 2 Feb (the January snapshot), C and D in July
+    assert (a.symbol.value, a.symbol_as_of, a.company.value) == ("OLD", JAN, "Old Inc")
+    assert (b.symbol.value, b.symbol_as_of) == ("BBB", JAN)
+    assert page.symbols_snapshot == JAN  # the newest snapshot a ticker on this page came from
+    # a name no snapshot in force names is Unknown, never its id
+    assert c.symbol.value is None and c.symbol.unknown is not None
+    assert c.symbol.unknown.code is UnknownCode.NO_ROW and c.symbol_as_of is None
+    assert d.symbol.value is None  # not flagged delisted in this ledger: no last-known fallback
+
+
+def test_a_delisted_pick_shows_its_last_known_ticker(backend: MemoryBackend) -> None:
+    gone = [pick(date(2026, 7, 2), "EQ:D", 1, False, delisted=True, status="lost", hit=False)]
+    write_run(backend, "site1", FROZEN, 0.6, trades=gone)
+    ctx = context(named(backend), "owner", reference=OCT)
+    (row,) = load_edge_trades(ctx, edge_of(ctx), Period.ALL).rows
+    assert row.delisted and (row.symbol.value, row.symbol_as_of) == ("DDD", OCT)
+
+
+def test_a_known_name_with_no_company_name_is_unknown_with_its_reason(
+    backend: MemoryBackend,
+) -> None:
+    ctx = context(named(backend), "owner", reference=OCT)
+    b = load_edge_trades(ctx, edge_of(ctx), Period.ALL).rows[1]
+    assert b.symbol.value == "BBB"
+    assert b.company.value is None and b.company.unknown is not None  # not a silent null
+    assert b.company.unknown.code is UnknownCode.NO_ROW
+
+
+def test_the_symbol_sort_orders_the_whole_ledger_by_ticker(backend: MemoryBackend) -> None:
+    ctx = context(named(backend), "owner", reference=OCT)
+    edge = edge_of(ctx)
+    asc = load_edge_trades(ctx, edge, Period.ALL, sort="symbol", limit=3)
+    assert [r.symbol.value for r in asc.rows] == ["BBB", "OLD", None]  # unknown last
+    assert (asc.page, asc.total) == (1, 4)
+    desc = load_edge_trades(ctx, edge, Period.ALL, sort="symbol", descending=True, limit=3)
+    assert [r.symbol.value for r in desc.rows] == ["OLD", "BBB", None]
+    second = load_edge_trades(ctx, edge, Period.ALL, page=2, sort="symbol", limit=3)
+    assert [r.instrument_id for r in second.rows] == ["EQ:D"] and second.page == 2
+
+
+def test_with_no_reference_snapshot_every_symbol_is_unknown(backend: MemoryBackend) -> None:
+    ctx = context(backend, "owner")
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL)
+    assert page.symbols_snapshot is None
+    assert all(r.symbol.value is None and r.symbol.unknown is not None for r in page.rows)
+
+
+def test_a_ledger_of_many_decision_days_reads_each_snapshot_once(
+    backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """500 picks over 100 decision days still read the reference and company tables once per
+    distinct snapshot in force (two here), not once per day or per row."""
+    days = [
+        date(2026, 2, 2) + timedelta(days=2 * n) for n in range(100)
+    ]  # the Jan and Jun snapshots
+    big = [pick(d, "EQ:A" if k == 0 else f"EQ:K{k}", 1 + k, True) for d in days for k in range(5)]
+    write_run(backend, "site1", FROZEN, 0.6, trades=big)
+    named(backend)
+    ctx = context(backend, "owner", reference=OCT)
+    reads: list[tuple[str, date]] = []
+    real = ctx.reader.table
+
+    def counting(table: str, on: date, *args: Any, **kwargs: Any) -> Any:
+        if table.startswith("instruments/"):
+            reads.append((table, on))
+        return real(table, on, *args, **kwargs)
+
+    monkeypatch.setattr(ctx.reader, "table", counting)
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL, sort="symbol", limit=None)
+    assert page.total == 500 and len(reads) == len(set(reads))  # never the same read twice
+    assert {on for table, on in reads if table == "instruments/reference"} == {JAN, JUN}
+    assert len(reads) <= 4  # a reference and a company read per distinct snapshot
+    reads.clear()
+    load_edge_trades(ctx, edge_of(ctx), Period.ALL, sort="symbol", limit=None)
+    assert reads == []  # warm: the per-publish cache holds both snapshots

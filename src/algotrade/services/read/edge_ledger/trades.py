@@ -9,16 +9,20 @@ the edge's paper record (``edge_desk.paper.load_trades``: the rows as the sessio
 them, never re-derived). The GraphQL page and the CSV file both call it, so they cannot differ;
 an excluded pick keeps its public reason, the causes stay in the ``Unknown`` for admins."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 from enum import StrEnum
 
+from algotrade.data.reference import companies, instruments
+from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk import paper
 from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edge
-from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow
-from algotrade.services.read.values import Unknown
+from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow, TradeText
+from algotrade.services.read.session import reference_snapshot_on, reference_snapshots
+from algotrade.services.read.values import Unknown, UnknownCode
 
 PAGE_SIZE = 50
 SKIPPED = "SKIPPED"  # the public reason of a live signal that was not traded
@@ -50,6 +54,7 @@ class Sort(StrEnum):
     SCORE = "score"
     DRAWDOWN = "max_drawdown"
     ADV = "adv_usd"
+    SYMBOL = "symbol"
 
 
 @dataclass(frozen=True)
@@ -58,7 +63,8 @@ class EdgeTradePage:
     (``basis``: its screen and holding period; None: ``unknown`` says why there is none).
     ``unknown``: why the ledger cannot be read (NOT_RUN, PRUNED, NOT_STORED) or None;
     ``oos_hidden``: a copy's out-of-sample trades are withheld, so none of them is served;
-    ``licence``: the trial licence of the rows."""
+    ``licence``: the trial licence of the rows; ``symbols_snapshot``: the
+    ``instruments/reference`` snapshot the tickers and company names are read from (ADR 0007)."""
 
     period: Period
     page: int
@@ -69,6 +75,7 @@ class EdgeTradePage:
     licence: str | None = None
     oos_hidden: bool = False
     page_size: int = PAGE_SIZE
+    symbols_snapshot: date | None = None
 
 
 def _backtest(
@@ -128,6 +135,89 @@ def _live(
     return present + missing
 
 
+REFERENCE = "instruments/reference"
+SYMBOL = "symbol"  # the sort by ticker: the tickers are read after the rows, so it sorts here
+
+
+def _gap(why: str, code: UnknownCode = UnknownCode.NO_ROW) -> Unknown:
+    return Unknown(code, table_cause(REFERENCE, why, code.value))
+
+
+Names = dict[str, tuple[str, TradeText]]
+
+
+def _snapshot_names(ctx: ReadContext, snap: date) -> Names:
+    """Every instrument's ticker and company name in the reference snapshot ``snap`` (the company
+    snapshot on or before it; the company's name, else the listing's, else ``Unknown``). The
+    snapshot is read once per publish, not once per page or per row (the key reads ``visible_seq``
+    before computing, ADR 0022)."""
+
+    def read() -> Names:
+        found = instruments(ctx.reader, snap)
+        firms = companies(ctx.reader, snap)
+        firm = (
+            {} if firms is None else dict(zip(firms["instrument_id"], firms["name"], strict=False))
+        )
+        out: Names = {}
+        for iid, symbol, listing in zip(
+            found["instrument_id"], found["symbol"], found["name"], strict=True
+        ):
+            text = (str(firm.get(iid) or "").strip()) or (str(listing or "").strip())
+            gap = TradeText(None, _gap("the snapshot has no company name"))
+            out[str(iid)] = (str(symbol), TradeText(text) if text else gap)
+        return out
+
+    return ctx.cache.get_or_compute(("ledger-names", ctx.reader.visible_seq(), snap), read)  # type: ignore[no-any-return]
+
+
+def _last_known(ctx: ReadContext, ids: set[str]) -> dict[str, tuple[str, TradeText, date]]:
+    """For each of ``ids`` the ticker of the LAST reference snapshot that held it (newest first,
+    stopping once every id is found): a delisted pick's last known ticker."""
+    found: dict[str, tuple[str, TradeText, date]] = {}
+    for snap in reversed(reference_snapshots(ctx.reader)):
+        if not ids - found.keys():
+            break
+        for iid, (symbol, company) in _snapshot_names(ctx, snap).items():
+            if iid in ids and iid not in found:
+                found[iid] = (symbol, company, snap)
+    return found
+
+
+def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
+    """``page`` with each row's ticker and company name as the reference snapshot in force at the
+    row's DECISION session had them (never today's: a name changes ticker). Each row's day maps to
+    its snapshot and each snapshot is read once, however many days or rows. A delisted pick its
+    day's snapshot lacks gets the last snapshot that held it, its last known ticker; any other
+    name no snapshot names is ``Unknown`` (never its id, ADR 0018)."""
+    stamp = {
+        d: reference_snapshot_on(ctx.reader, d) for d in {r.decision_session for r in page.rows}
+    }
+    names = {s: _snapshot_names(ctx, s) for s in {s for s in stamp.values() if s is not None}}
+    missing = {
+        r.instrument_id
+        for r in page.rows
+        if r.delisted
+        and ((snap := stamp[r.decision_session]) is None or r.instrument_id not in names[snap])
+    }
+    last = _last_known(ctx, missing) if missing else {}
+    rows = []
+    for r in page.rows:
+        snap = stamp[r.decision_session]
+        hit = names[snap].get(r.instrument_id) if snap is not None else None
+        as_of = snap
+        if hit is not None:
+            symbol, company = TradeText(hit[0]), hit[1]
+        elif r.instrument_id in last:
+            ticker, company, as_of = last[r.instrument_id]
+            symbol = TradeText(ticker)
+        else:
+            gap = _gap("no row for the name in the snapshot in force at its decision session")
+            symbol, company, as_of = TradeText(None, gap), TradeText(None, gap), None
+        rows.append(replace(r, symbol=symbol, company=company, symbol_as_of=as_of))
+    newest = max((r.symbol_as_of for r in rows if r.symbol_as_of), default=None)
+    return replace(page, rows=tuple(rows), symbols_snapshot=newest)
+
+
 def load_edge_trades(
     ctx: ReadContext,
     edge: Edge,
@@ -139,7 +229,27 @@ def load_edge_trades(
     limit: int | None = PAGE_SIZE,
 ) -> EdgeTradePage:
     """The trades of ``edge``'s verdict basis for ``period``: page ``page`` of ``limit`` rows
-    (None: every row, for the file), sorted by ``sort`` (``runs.SORTABLE``)."""
+    (None: every row, for the file), sorted by ``sort`` (``runs.SORTABLE``), each named."""
+    if sort == SYMBOL:  # sorted after naming, over the whole ledger, then paged
+        whole = _named(ctx, _unnamed(ctx, edge, period, 1, None, False, None))
+        known = [r for r in whole.rows if r.symbol.value is not None]
+        known.sort(key=lambda r: (r.symbol.value or "").casefold(), reverse=descending)
+        rows = (*known, *(r for r in whole.rows if r.symbol.value is None))  # unknown last
+        offset = 0 if limit is None else (max(page, 1) - 1) * limit
+        part = rows[offset : None if limit is None else offset + limit]
+        return replace(whole, page=max(page, 1), rows=part)
+    return _named(ctx, _unnamed(ctx, edge, period, page, sort, descending, limit))
+
+
+def _unnamed(
+    ctx: ReadContext,
+    edge: Edge,
+    period: Period,
+    page: int,
+    sort: str | None,
+    descending: bool,
+    limit: int | None,
+) -> EdgeTradePage:
     page = max(page, 1)  # a page below the first is the first, and served as such
     basis = official_basis(ctx, edge)
     if basis.key is None or basis.run is None:

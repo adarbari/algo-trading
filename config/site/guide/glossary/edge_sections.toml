@@ -35,9 +35,9 @@ see_also = ["top_vs_bottom_decile", "robustness", "decay", "haircut_sharpe", "va
 [[term]]
 id = "edge_where_worked"
 term = "Where it worked"
-short = "The result cut by time: year by year with the split marked, and the drawdown of the evidence curve."
+short = "The result cut by year, market regime and holding period, with the drawdown of the evidence curve and the cost sensitivity."
 body = """
-An average hides when an edge worked. Year by year gives one row for each calendar year. A switch shows the in-sample years, the out-of-sample years or all of them, so a single good year is seen as one. The year the split falls in is two rows, one for each side. The drawdown view draws how far the curve fell below its previous high. It lists the deepest drops with their dates, and the deepest drop and volatility of each side. An edge that earns in one year, or that fell as far out-of-sample as it ever earned, is not the edge its average describes.
+An average hides when an edge worked. Year by year gives one row for each calendar year. A switch shows the in-sample years, the out-of-sample years or all of them, so a single good year is seen as one. The year the split falls in is two rows, one for each side. The regime view splits the same picks by the market regime on the decision session. The holding-period view shows the screen at each holding period, with the verdict's own marked. The drawdown view draws how far the curve fell below its previous high. It lists the deepest drops with their dates, and the deepest drop and volatility of each side. An edge that earns in one year, or that fell as far out-of-sample as it ever earned, is not the edge its average describes.
 """
 next = "Look for a result that is spread over the years, and a drawdown that is no deeper out-of-sample than in-sample."
-see_also = ["year_by_year", "drawdown", "partial_year", "in_sample", "out_of_sample", "evidence_curve"]
+see_also = ["year_by_year", "by_regime", "by_holding_period", "cost_sensitivity", "drawdown", "partial_year", "in_sample", "out_of_sample", "evidence_curve"]

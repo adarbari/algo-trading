@@ -153,6 +153,19 @@ class Session:
     cutoff: dt.datetime | None = None
 
 
+def reference_snapshot_on(reader: StoreReader, day: dt.date) -> dt.date | None:
+    """The ``instruments/reference`` snapshot in force on ``day`` (ADR 0007's one rule: the latest
+    on or before it, the earliest before every snapshot); None: none stored. For a read of a
+    PAST day inside a page of one session (a trade's ticker at its decision session)."""
+    found = snapshot(reader, REFERENCE_TABLE, day)
+    return None if found is None else found.snapshot_date
+
+
+def reference_snapshots(reader: StoreReader) -> list[dt.date]:
+    """The dates of every stored ``instruments/reference`` snapshot, oldest first."""
+    return sorted(reader.dates(REFERENCE_TABLE))
+
+
 def session_cutoff(records: Sequence[RunRecord], day: dt.date) -> dt.datetime | None:
     """The finish time of the first published ``nightly`` record of ``day`` (None: none)."""
     done = [

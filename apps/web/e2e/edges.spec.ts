@@ -48,6 +48,7 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
     .getByRole('link', { name: 'Details' })
     .click();
   await page.getByRole('button', { name: /^Details/ }).click();
+  await page.getByRole('heading', { level: 3, name: 'Variants tried' }).scrollIntoViewIfNeeded();
   await expect(page.getByText('EXPLORATORY')).toBeVisible();
   await expect(page.getByText('99.0%')).toHaveCount(0);
   await expectAccessible(page);
@@ -73,7 +74,14 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   await expect(page.getByRole('meter', { name: 'Out-of-sample trades' })).toBeVisible();
   await expect(page.getByText('Projected: 15 Mar 2027')).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Sections of this edge' });
-  for (const name of ['Evidence', 'How sure', 'Where it worked', 'Definition', 'Details']) {
+  for (const name of [
+    'Evidence',
+    'How sure',
+    'Where it worked',
+    'Trades',
+    'Definition',
+    'Details',
+  ]) {
     await expect(nav.getByRole('link', { name })).toBeVisible();
   }
   await expect(nav.getByRole('link', { name: 'Live record' })).toHaveCount(0); // nothing recorded
@@ -99,6 +107,29 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   await expect(
     page.getByRole('img', { name: 'Evidence curve below its previous high' }),
   ).toBeVisible();
+  // The other cuts: by regime and by holding period (the basis marked), the cost strip under them.
+  await page.getByRole('tab', { name: 'Regime' }).click();
+  await expect(page.getByRole('grid', { name: 'By regime' })).toContainText('Stress');
+  await page.getByRole('tab', { name: 'Holding period' }).click();
+  await expect(page.getByRole('grid', { name: 'By holding period' })).toContainText(
+    'Verdict basis',
+  );
+  await expect(page.getByRole('region', { name: 'Lift at each round-trip cost' })).toContainText(
+    'Break-even',
+  );
+  // Trades: the ledger of the verdict's basis, a period switch and the file.
+  await nav.getByRole('link', { name: 'Trades' }).click();
+  const ledger = page.getByRole('grid', { name: 'Trade ledger' });
+  await expect(ledger).toContainText('AAA');
+  await page.getByRole('radio', { name: 'Out-of-sample' }).last().click();
+  await expect(page.getByRole('button', { name: 'CSV' })).toBeVisible();
+  // Details: the variant grid with its basis marked.
+  await nav.getByRole('link', { name: 'Details' }).click();
+  await page.getByRole('button', { name: /^Details/ }).click();
+  await page.getByRole('heading', { level: 3, name: 'Variants tried' }).scrollIntoViewIfNeeded();
+  await expect(
+    page.getByRole('grid', { name: 'Variant grid: lift in points by holding period' }),
+  ).toContainText('Verdict basis');
   await expectAccessible(page);
   expect(errors).toEqual([]);
 });

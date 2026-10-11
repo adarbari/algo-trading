@@ -6,9 +6,11 @@
  */
 import type { Edge } from '@/entities/edge';
 import { EdgeCompare, EdgeDefinition, EdgeDetails, EdgeLive } from '@/widgets/edge-detail';
+import { EdgeDiagnostics } from '@/widgets/edge-diagnostics';
 import { EdgeEvidence } from '@/widgets/edge-evidence';
 import { EdgePerformance } from '@/widgets/edge-performance';
 import { EdgeSureness } from '@/widgets/edge-sureness';
+import { EdgeTrades } from '@/widgets/edge-trades';
 
 import { EdgeSection } from './EdgeSection';
 
@@ -40,11 +42,16 @@ export function EdgeSections({ edge, hasLive }: EdgeSectionsProps) {
           <EdgeLive edgeId={edge.id} />
         </EdgeSection>
       )}
+      <EdgeSection id="edge-trades" label="Trades">
+        <EdgeTrades edgeId={edge.id} />
+      </EdgeSection>
       <EdgeSection id="edge-definition" label="Definition">
         <EdgeDefinition edge={edge} />
       </EdgeSection>
       <EdgeSection id="edge-details" label="Details" size="sm">
-        <EdgeDetails edge={edge} />
+        <EdgeDetails edge={edge}>
+          <EdgeDiagnostics edgeId={edge.id} />
+        </EdgeDetails>
       </EdgeSection>
     </>
   );
