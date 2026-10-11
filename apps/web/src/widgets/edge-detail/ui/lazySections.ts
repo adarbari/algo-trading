@@ -5,7 +5,7 @@
  */
 import { lazyPage } from '@/shared/lib/lazy';
 
-export const EdgeCompare = lazyPage(() => import('./EdgeCompare'), 'EdgeCompare');
-export const EdgeDefinition = lazyPage(() => import('./EdgeDefinition'), 'EdgeDefinition');
-export const EdgeDetails = lazyPage(() => import('./EdgeDetails'), 'EdgeDetails');
-export const EdgeLive = lazyPage(() => import('./EdgeLive'), 'EdgeLive');
+export const EdgeCompare = lazyPage(() => import('./lowerSections'), 'EdgeCompare');
+export const EdgeDefinition = lazyPage(() => import('./lowerSections'), 'EdgeDefinition');
+export const EdgeDetails = lazyPage(() => import('./lowerSections'), 'EdgeDetails');
+export const EdgeLive = lazyPage(() => import('./lowerSections'), 'EdgeLive');
