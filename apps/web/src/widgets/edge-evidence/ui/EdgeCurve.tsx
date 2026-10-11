@@ -8,7 +8,7 @@
 import { Chart, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
 
 import { UnknownNote } from '@/entities/availability';
-import { useEdgeCurve } from '@/entities/edge';
+import { EDGE_UNKNOWN_WORDS, useEdgeCurve } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
 
 import { curveChart } from '../model/curve';
@@ -46,7 +46,7 @@ export function EdgeCurve({ edgeId }: EdgeCurveProps) {
   if (curve.unknown) {
     return (
       <Panel title="Evidence curve" headingLevel={3} actions={termHelp('evidence_curve')}>
-        <UnknownNote unknown={curve.unknown} />
+        <UnknownNote unknown={curve.unknown} kindWords={EDGE_UNKNOWN_WORDS} />
       </Panel>
     );
   }
@@ -72,7 +72,13 @@ export function EdgeCurve({ edgeId }: EdgeCurveProps) {
           emptyMessage="No windows to draw"
         />
         {curve.gaps.map((gap) =>
-          gap.unknown ? <UnknownNote key={`${gap.from}:${gap.to}`} unknown={gap.unknown} /> : null,
+          gap.unknown ? (
+            <UnknownNote
+              key={`${gap.from}:${gap.to}`}
+              unknown={gap.unknown}
+              kindWords={EDGE_UNKNOWN_WORDS}
+            />
+          ) : null,
         )}
       </Stack>
     </Panel>

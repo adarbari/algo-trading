@@ -16,7 +16,7 @@ import {
 } from '@algotrade/ui';
 
 import { UnknownNote } from '@/entities/availability';
-import { useEdgeDrawdown, type DrawdownEpisode } from '@/entities/edge';
+import { EDGE_UNKNOWN_WORDS, useEdgeDrawdown, type DrawdownEpisode } from '@/entities/edge';
 
 import { episodeColumns } from '../model/columns';
 
@@ -39,7 +39,8 @@ export function EdgeDrawdown({ edgeId }: EdgeDrawdownProps) {
       />
     );
   }
-  if (drawdown.unknown) return <UnknownNote unknown={drawdown.unknown} />;
+  if (drawdown.unknown)
+    return <UnknownNote unknown={drawdown.unknown} kindWords={EDGE_UNKNOWN_WORDS} />;
   const stats: StatItem[] = [
     {
       id: 'max-is',

@@ -70,3 +70,9 @@ const MEASURE_LABELS: Record<string, string> = {
 
 /** The statistic the decay bars compare. */
 export const measureLabel = (measure: string): string => MEASURE_LABELS[measure] ?? measure;
+
+/** The words of an unknown on an edge's page, in its own subject (a result, an outcome), not an instrument's. */
+export const EDGE_UNKNOWN_WORDS = {
+  NOT_STORED: 'Not stored for this result',
+  NOT_APPLICABLE: 'Does not apply to this outcome',
+} as const;

@@ -47,6 +47,7 @@ export {
 } from './model/edges';
 export {
   barStateLabel,
+  EDGE_UNKNOWN_WORDS,
   measureLabel,
   periodLabel,
   projectionLabel,
