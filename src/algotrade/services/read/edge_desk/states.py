@@ -61,8 +61,9 @@ class LiveState:
 
 
 def is_recording(edge: Edge) -> bool:
-    """The edge has a paper record to judge: on the desk, or a site edge the site records."""
-    return edge.paper_traded or (not edge.mine and edge.status in RECORDING)
+    """The edge records paper trades: the nightly records only evidenced or live edges (a
+    follow records nothing)."""
+    return edge.status in RECORDING
 
 
 def live_edges(edges: Mapping[str, Edge]) -> dict[str, Edge]:

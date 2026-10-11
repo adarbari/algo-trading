@@ -354,6 +354,9 @@ def test_a_delisted_name_no_snapshot_held_has_its_listing_history_ticker(
     ctx = context(named(backend), "owner", reference=OCT)
     page = load_edge_trades(ctx, edge_of(ctx), Period.ALL)
     later, gone_row = page.rows  # in key order: the February decision first
-    assert (gone_row.symbol.value, gone_row.symbol_as_of) == ("GONE", date(2026, 7, 2))
+    assert (gone_row.symbol.value, gone_row.symbol_as_of) == (
+        "GONE",
+        date(2026, 10, 5),
+    )  # the listing snapshot
     assert gone_row.company.value is None and gone_row.company.unknown is not None
     assert later.symbol.value is None  # listed after its decision session: never a later ticker

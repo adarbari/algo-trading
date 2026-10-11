@@ -16,6 +16,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.unit.services.read.edge_desk.conftest import (
+    CANDIDATE,
     NEXT,
     NO_CUTOFF,
     SESSION,
@@ -58,7 +59,7 @@ def test_a_site_edge_nobody_follows_is_judged_but_a_candidate_is_not_recorded(
     assert [(s.edge_id, s.state, s.followed) for s in unfollowed.live_states] == [
         ("drift", "below", False)
     ]
-    (candidate,) = load_edge_desk(context(backend, follow=None)).live_states  # a candidate
+    (candidate,) = load_edge_desk(context(backend, follow=None, extra=CANDIDATE)).live_states
     assert (candidate.state, candidate.closed, candidate.followed) == ("not_recording", 0, False)
     assert "evidenced" in candidate.headline and candidate.state in LIVE_STATES
 
@@ -131,3 +132,12 @@ def test_below_range_names_only_the_record_owners_edges(backend: MemoryBackend) 
 def test_below_range_is_empty_while_the_edge_is_on_track(backend: MemoryBackend) -> None:
     store(backend, closed_trades(12, 8))
     assert below_range(_as_site(backend)) == ()
+
+
+def test_a_followed_candidate_reads_not_recording_a_follow_records_nothing(
+    backend: MemoryBackend,
+) -> None:
+    store(backend, closed_trades(12, 8))
+    desk = load_edge_desk(context(backend, extra=CANDIDATE))  # followed, but a candidate
+    (live,) = desk.live_states
+    assert (live.state, live.closed) == ("not_recording", 0)

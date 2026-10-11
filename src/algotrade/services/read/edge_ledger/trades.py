@@ -140,7 +140,7 @@ def _live(
     return present + missing
 
 
-PAPER_STEP = "edge-paper"  # the nightly step that records paper trades
+PAPER_STEP = "edge-signals"  # the nightly step that records paper trades
 REFERENCE = "instruments/reference"
 SYMBOL = "symbol"  # the sort by ticker: the tickers are read after the rows, so it sorts here
 
@@ -242,7 +242,7 @@ def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
         elif (r.instrument_id, r.decision_session) in listed:
             symbol = TradeText(listed[(r.instrument_id, r.decision_session)])
             company = TradeText(None, _gap("the listing history names no company"))
-            as_of = r.decision_session
+            as_of = _listing_tickers(ctx).snapshot  # the snapshot read, not the session (ADR 0036)
         elif r.instrument_id in last:
             ticker, company, as_of = last[r.instrument_id]
             symbol = TradeText(ticker)
