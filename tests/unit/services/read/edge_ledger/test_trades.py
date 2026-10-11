@@ -4,7 +4,7 @@ value `LICENCE` to a viewer without the licence (and its sort order never disclo
 copy's in-sample rows only; PRUNED and NOT_STORED told apart; live rows from the paper record as
 the session's cutoff knew them."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -279,3 +279,33 @@ def test_with_no_reference_snapshot_every_symbol_is_unknown(backend: MemoryBacke
     page = load_edge_trades(ctx, edge_of(ctx), Period.ALL)
     assert page.symbols_snapshot is None
     assert all(r.symbol.value is None and r.symbol.unknown is not None for r in page.rows)
+
+
+def test_a_ledger_of_many_decision_days_reads_each_snapshot_once(
+    backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """500 picks over 100 decision days still read the reference and company tables once per
+    distinct snapshot in force (two here), not once per day or per row."""
+    days = [
+        date(2026, 2, 2) + timedelta(days=2 * n) for n in range(100)
+    ]  # the Jan and Jun snapshots
+    big = [pick(d, "EQ:A" if k == 0 else f"EQ:K{k}", 1 + k, True) for d in days for k in range(5)]
+    write_run(backend, "site1", FROZEN, 0.6, trades=big)
+    named(backend)
+    ctx = context(backend, "owner", reference=OCT)
+    reads: list[tuple[str, date]] = []
+    real = ctx.reader.table
+
+    def counting(table: str, on: date, *args: Any, **kwargs: Any) -> Any:
+        if table.startswith("instruments/"):
+            reads.append((table, on))
+        return real(table, on, *args, **kwargs)
+
+    monkeypatch.setattr(ctx.reader, "table", counting)
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL, sort="symbol", limit=None)
+    assert page.total == 500 and len(reads) == len(set(reads))  # never the same read twice
+    assert {on for table, on in reads if table == "instruments/reference"} == {JAN, JUN}
+    assert len(reads) <= 4  # a reference and a company read per distinct snapshot
+    reads.clear()
+    load_edge_trades(ctx, edge_of(ctx), Period.ALL, sort="symbol", limit=None)
+    assert reads == []  # warm: the per-publish cache holds both snapshots

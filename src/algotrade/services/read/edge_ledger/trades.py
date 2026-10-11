@@ -21,8 +21,7 @@ from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edge
 from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow, TradeText
-from algotrade.services.read.instruments.identity import load_instruments
-from algotrade.services.read.session import reference_snapshot_on
+from algotrade.services.read.session import reference_snapshot_on, reference_snapshots
 from algotrade.services.read.values import Unknown, UnknownCode
 
 PAGE_SIZE = 50
@@ -144,55 +143,73 @@ def _gap(why: str, code: UnknownCode = UnknownCode.NO_ROW) -> Unknown:
     return Unknown(code, table_cause(REFERENCE, why, code.value))
 
 
-def _name_of(ctx: ReadContext, day: date, ids: list[str]) -> dict[str, tuple[str, TradeText]]:
-    """``ids``' ticker and company name in the reference snapshot in force on ``day`` (the one on or
-    before it: ADR 0007's one rule, the earliest standing in before every snapshot): ticker, and
-    the company's name (the company snapshot's, else the listing's; ``Unknown`` when neither)."""
-    found = instruments(ctx.reader, day, ids)
-    if found is None or found.empty:
-        return {}
-    firms = companies(ctx.reader, day, ids)
-    firm = {} if firms is None else dict(zip(firms["instrument_id"], firms["name"], strict=False))
-    out: dict[str, tuple[str, TradeText]] = {}
-    for iid, symbol, listing in zip(
-        found["instrument_id"], found["symbol"], found["name"], strict=True
-    ):
-        text = (str(firm.get(iid) or "").strip()) or (str(listing or "").strip())
-        out[str(iid)] = (
-            str(symbol),
-            TradeText(text) if text else TradeText(None, _gap("the snapshot has no company name")),
+Names = dict[str, tuple[str, TradeText]]
+
+
+def _snapshot_names(ctx: ReadContext, snap: date) -> Names:
+    """Every instrument's ticker and company name in the reference snapshot ``snap`` (the company
+    snapshot on or before it; the company's name, else the listing's, else ``Unknown``). The
+    snapshot is read once per publish, not once per page or per row (the key reads ``visible_seq``
+    before computing, ADR 0022)."""
+
+    def read() -> Names:
+        found = instruments(ctx.reader, snap)
+        firms = companies(ctx.reader, snap)
+        firm = (
+            {} if firms is None else dict(zip(firms["instrument_id"], firms["name"], strict=False))
         )
-    return out
+        out: Names = {}
+        for iid, symbol, listing in zip(
+            found["instrument_id"], found["symbol"], found["name"], strict=True
+        ):
+            text = (str(firm.get(iid) or "").strip()) or (str(listing or "").strip())
+            gap = TradeText(None, _gap("the snapshot has no company name"))
+            out[str(iid)] = (str(symbol), TradeText(text) if text else gap)
+        return out
+
+    return ctx.cache.get_or_compute(("ledger-names", ctx.reader.visible_seq(), snap), read)  # type: ignore[no-any-return]
+
+
+def _last_known(ctx: ReadContext, ids: set[str]) -> dict[str, tuple[str, TradeText, date]]:
+    """For each of ``ids`` the ticker of the LAST reference snapshot that held it (newest first,
+    stopping once every id is found): a delisted pick's last known ticker."""
+    found: dict[str, tuple[str, TradeText, date]] = {}
+    for snap in reversed(reference_snapshots(ctx.reader)):
+        if not ids - found.keys():
+            break
+        for iid, (symbol, company) in _snapshot_names(ctx, snap).items():
+            if iid in ids and iid not in found:
+                found[iid] = (symbol, company, snap)
+    return found
 
 
 def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
     """``page`` with each row's ticker and company name as the reference snapshot in force at the
-    row's DECISION session had them (never today's: a name changes ticker). A delisted pick the
-    snapshot of its day lacks falls back to the session's snapshot, its last known ticker; any
-    other name no snapshot names is ``Unknown`` (never its id, ADR 0018)."""
-    by_day: dict[date, list[str]] = {}
-    for r in page.rows:
-        by_day.setdefault(r.decision_session, []).append(r.instrument_id)
-    names: dict[date, dict[str, tuple[str, TradeText]]] = {}
-    stamp: dict[date, date | None] = {}
-    for day, ids in by_day.items():
-        stamp[day] = reference_snapshot_on(ctx.reader, day)
-        names[day] = _name_of(ctx, day, ids) if stamp[day] is not None else {}
-    last = {  # the session's snapshot, for a delisted name that day's snapshot lacks
-        i.instrument_id: i
-        for i in load_instruments(ctx, [r.instrument_id for r in page.rows if r.delisted]).values()
+    row's DECISION session had them (never today's: a name changes ticker). Each row's day maps to
+    its snapshot and each snapshot is read once, however many days or rows. A delisted pick its
+    day's snapshot lacks gets the last snapshot that held it, its last known ticker; any other
+    name no snapshot names is ``Unknown`` (never its id, ADR 0018)."""
+    stamp = {
+        d: reference_snapshot_on(ctx.reader, d) for d in {r.decision_session for r in page.rows}
     }
+    names = {s: _snapshot_names(ctx, s) for s in {s for s in stamp.values() if s is not None}}
+    missing = {
+        r.instrument_id
+        for r in page.rows
+        if r.delisted
+        and ((snap := stamp[r.decision_session]) is None or r.instrument_id not in names[snap])
+    }
+    last = _last_known(ctx, missing) if missing else {}
     rows = []
     for r in page.rows:
-        hit = names[r.decision_session].get(r.instrument_id)
-        as_of = stamp[r.decision_session]
+        snap = stamp[r.decision_session]
+        hit = names[snap].get(r.instrument_id) if snap is not None else None
+        as_of = snap
         if hit is not None:
             symbol, company = TradeText(hit[0]), hit[1]
-        elif r.delisted and r.instrument_id in last:
-            i = last[r.instrument_id]
-            symbol = TradeText(i.symbol)
-            company = TradeText(i.name) if i.name else TradeText(None, _gap("no company name"))
-            as_of = i.reference_snapshot
+        elif r.instrument_id in last:
+            ticker, company, as_of = last[r.instrument_id]
+            symbol = TradeText(ticker)
         else:
             gap = _gap("no row for the name in the snapshot in force at its decision session")
             symbol, company, as_of = TradeText(None, gap), TradeText(None, gap), None
