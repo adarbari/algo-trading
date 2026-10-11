@@ -8,7 +8,7 @@ from itertools import pairwise
 import pytest
 
 from algotrade.config.edges.document import QUALITY_BAR
-from algotrade.quant.edge_statistics import win_rate_band
+from algotrade.quant.edges.statistics import win_rate_band
 from algotrade.services.read.edge_desk.live import (
     ABOVE,
     BELOW,

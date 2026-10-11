@@ -2,7 +2,7 @@
 share of the run's random-pick draws it beats and the draws' lifts binned for the page's
 distribution. The draws are stored rows (``results/edge_eval`` role ``random``, drawn by the
 harness, ``services/evaluation/cross_section/random_picks.py``); the share is
-``quant.edge_statistics.percentile_of``, the one place the verdict's "Beats random picks"
+``quant.edges.statistics.percentile_of``, the one place the verdict's "Beats random picks"
 criterion and the page's sentence read it. Never recomputed in the browser."""
 
 from collections.abc import Sequence
@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from algotrade.quant.edge_statistics import percentile_of
+from algotrade.quant.edges.statistics import percentile_of
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.runs import EdgeRow
 

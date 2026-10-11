@@ -40,13 +40,12 @@ from algotrade.services.evaluation.cross_section.events import (
     read_events,
 )
 from algotrade.services.evaluation.cross_section.harness import (
-    MEASURED_COVERAGE,
     MIXED_SOURCE_IV,
     edge_universe,
     iv_field_of,
-    names_for,
 )
 from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
+from algotrade.services.evaluation.cross_section.measuring import MEASURED_COVERAGE, names_for
 from algotrade.services.evaluation.cross_section.picks import eligible, screen_variant
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.storage.configs.store import ConfigStore

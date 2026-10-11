@@ -1,7 +1,7 @@
 """The tells and the gate (ED6 winners study, definitions 3 and 4): pure over the session frames.
 
 Per (feature, grid session) the effect is Hedges' g of the winners over the controls
-(``g_W``; ``edge_statistics.standardised_effect``), of the winners over the losers (``g_WL``) and,
+(``g_W``; ``statistics.standardised_effect``), of the winners over the losers (``g_WL``) and,
 for the report only, of the losers over the winners' controls (``g_L``); UNKNOWN values are
 dropped and counted. A feature counts
 at S only when both groups have at least ``min_coverage`` of it stored and the two coverages differ
@@ -36,8 +36,8 @@ from algotrade.config.edges.winners import WinnersStudySettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.quant import discovery_statistics as ds
-from algotrade.quant.edge_statistics import standardised_effect
+from algotrade.quant.edges import discovery as ds
+from algotrade.quant.edges.statistics import standardised_effect
 from algotrade.services.evaluation.discovery.frame import (
     SessionFrame,
     first_partitions,

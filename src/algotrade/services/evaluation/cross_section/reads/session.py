@@ -33,7 +33,7 @@ from algotrade.services.screening.regime import session_market
 from algotrade.services.selection import fields_view
 
 if TYPE_CHECKING:
-    from algotrade.services.evaluation.cross_section.harness import Variant
+    from algotrade.services.evaluation.cross_section.measuring import Variant
 
 UNKNOWN = "UNKNOWN"
 # Not an input table a screener lacks for a session but the run's own wiring (market features

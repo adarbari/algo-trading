@@ -1,10 +1,10 @@
-"""``quant.discovery_statistics``: sign stability, rank correlation and its clusters, the
+"""``quant.edges.discovery``: sign stability, rank correlation and its clusters, the
 within-stratum permutation and the count against the null."""
 
 import numpy as np
 import pytest
 
-from algotrade.quant import discovery_statistics as ds
+from algotrade.quant.edges import discovery as ds
 
 
 def test_sign_stability_needs_enough_blocks_and_both_halves() -> None:

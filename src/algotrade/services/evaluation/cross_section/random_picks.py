@@ -11,7 +11,7 @@ change when another session is added or the run's start, end or ``as_of`` move (
 A draw's row is the pooled picks of its sessions: ``hit_rate`` against
 the session's own ``base_rate`` (every counted name), ``lift`` and ``mean_excess_picks``, the same
 measures as a screener's, so the read model can place the screener's lift among them
-(``quant.edge_statistics.percentile_of``). A draw does not read a screen, so a session a screener
+(``quant.edges.statistics.percentile_of``). A draw does not read a screen, so a session a screener
 could not be run on still has draws; the figures are over the sessions whose window closed.
 """
 
@@ -24,7 +24,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from algotrade.quant.edge_statistics import lift, random_pick_sums
+from algotrade.quant.edges.statistics import lift, random_pick_sums
 from algotrade.services.evaluation.cross_section.measures import SliceMeasure
 
 RANDOM = "random"  # the role and the variant of a random-pick row
