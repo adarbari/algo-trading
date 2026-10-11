@@ -4,14 +4,17 @@
  * cost basis, outcome); fallbacks and failures; and the latest calls beside the chosen call's
  * detail. The chosen call comes from the route (shareable); the page only lays the widgets out.
  */
-import { Grid, Heading, MasterDetail, Stack } from '@algotrade/ui';
+import { Grid, Heading, Skeleton, Stack } from '@algotrade/ui';
+import { lazy, Suspense } from 'react';
 
 import { UsageBreakdownPanel } from '@/widgets/usage-breakdown-panel';
 import { UsageBudgetPanel } from '@/widgets/usage-budget-panel';
-import { UsageCallDetail } from '@/widgets/usage-call-detail';
-import { UsageCallsPanel } from '@/widgets/usage-calls-panel';
 import { UsageReliabilityPanel } from '@/widgets/usage-reliability-panel';
 import { UsageTrendPanel } from '@/widgets/usage-trend-panel';
+
+// One lazy chunk for the calls list and its detail (each lazy import adds a dependency list to
+// the page chunk, so there is one, not one per widget).
+const CallsSection = lazy(() => import('./CallsSection'));
 
 export interface AdminLlmUsagePageProps {
   /** The chosen call (from the URL), if any. */
@@ -35,15 +38,9 @@ export function AdminLlmUsagePage({
         <UsageBreakdownPanel />
         <UsageReliabilityPanel />
       </Grid>
-      <MasterDetail
-        columns="main-aside"
-        collapse="lg"
-        master={<UsageCallsPanel selected={selected} onSelect={onSelectCall} />}
-        detail={<UsageCallDetail selected={selected} />}
-        detailKey={selected}
-        detailTitle="Call detail"
-        onDetailClose={onClearCall}
-      />
+      <Suspense fallback={<Skeleton variant="table" rows={6} columns={4} label="Loading calls…" />}>
+        <CallsSection selected={selected} onSelectCall={onSelectCall} onClearCall={onClearCall} />
+      </Suspense>
     </Stack>
   );
 }
