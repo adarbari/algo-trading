@@ -1,6 +1,7 @@
 """The schemas of the edge harness's result tables (ADR 0053, 0063, 0064): ``results/edge_eval``,
-``results/edge_series``, ``results/winners_study``, ``results/edge_paper`` and
-``results/edge_legs``. Declared here, registered in ``schemas.KNOWN``."""
+``results/edge_series``, ``results/winners_study``, ``results/edge_paper``,
+``results/edge_legs`` and ``results/edge_trades``. Declared here, registered in
+``schemas.KNOWN``."""
 
 from algotrade.storage.tables.spec import fixed, floats, strings
 
@@ -206,4 +207,46 @@ EDGE_LEGS = fixed(
         "user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant",
         "horizon_sessions",
     ),
+)  # fmt: skip
+# The edge trade ledger (ADR 0064 decision 2): one row per pick of the main edge variant's
+# implementation screeners at every horizon, excluded picks included (``status`` ``excluded``
+# with a public ``excluded_reason``); framed only by ``services/evaluation/cross_section/detail/``
+# from the run's v2 legs, written in the run's one publish with its ``edge_eval`` rows and read
+# only through ``services/read/evaluation/runs.py``, by ``run_id``. Partition ``session_date`` =
+# the run's range end, as ``edge_eval``. ``before_split``: the decision block started before the
+# run's split (the harness's own rule, never re-derived from dates). ``value`` is oriented and
+# net of the document's cost, ``gross_value`` the stored excess return before cost (return
+# outcomes), ``max_drawdown`` the window's dip, ``adv_usd_20d`` the ADV at D (null: not stored).
+# ``licence`` is the trial's (the strictest of its implied-vol field, screen and universe
+# features); ``value_licence``, ``score_licence`` and ``adv_licence`` are the licences of those
+# columns (``value`` with ``gross_value``, ``reference`` and ``touch``): a reader redacts a
+# per-name value by them, never by column name (ADR 0064 decision 10). Kept 45 days, but for the
+# runs the purge spares (``runs.ledger_keep``).
+EDGE_TRADES = fixed(
+    "results/edge_trades",
+    "results",
+    (
+        "edge_id", "user_id", "variant", "horizon_sessions", "range_from", "decision_session",
+        "instrument_id",
+    ),
+    "instrument_id string!",
+    *strings("edge_id", "user_id", "edge_variant", "variant", "role", "config_hash"),
+    *strings("run_config_hash", "benchmark", "status", "excluded_reason"),
+    *strings("licence", "value_licence", "score_licence", "adv_licence"),
+    "horizon_sessions int64!",
+    "range_from date!",
+    "range_to date",
+    "split_from date",
+    "decision_session date!",
+    "entry_session date",
+    "exit_session date",
+    "rank int64",
+    *(f"{n} bool" for n in ("hit", "delisted", "touch", "before_split", "exploratory")),
+    *floats("score", "value", "gross_value", "max_drawdown", "adv_usd_20d", "reference"),
+    runs="merge",
+    key=(
+        "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "range_from",
+        "split_from", "decision_session", "instrument_id",
+    ),
+    retention_days=45,  # owner decision D10 (2026-10-10); the purge spares the kept runs
 )  # fmt: skip

@@ -1,6 +1,6 @@
 """Write facade for market and feature data. Only apps/ingestion may import this (ADR 0005)."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -69,9 +69,10 @@ class StoreWriter(ResultWriter):
         """Bytes free on the store's volume."""
         return self._backend.tables.free_bytes()
 
-    def purge_table_before(self, table: str, cutoff: date) -> int:
-        """Delete ``table``'s partitions dated before ``cutoff`` (retention: ``purge-raw``)."""
-        return self._backend.tables.purge_before(table, cutoff)
+    def purge_table_before(self, table: str, cutoff: date, keep: Collection[date] = ()) -> int:
+        """Delete ``table``'s partitions dated before ``cutoff`` but those in ``keep``
+        (retention: ``purge-raw``)."""
+        return self._backend.tables.purge_before(table, cutoff, keep)
 
     def drop_table(self, table: str) -> int:
         """Delete every partition of a superseded table (``retire-features`` only)."""

@@ -430,8 +430,8 @@ def test_the_run_records_the_iv_field_its_source_and_licence() -> None:
     ).results
     assert (r.iv_source, r.licence) == (ibkr, "personal")  # the catalogue's, never assumed
     assert r.stats[0].pick_hits == 5  # read from IBKR's field
-    (plain,) = run(w).results  # an outcome that reads no implied vol records none
-    assert (plain.iv_source, plain.licence) == (None, None)
+    (plain,) = run(w).results  # no implied vol: the trial's licence is its features' (ADR 0064)
+    assert (plain.iv_source, plain.licence) == (None, "open")
     with pytest.raises(ConfigurationError, match="mixes sources"):
         evaluate_edge(
             w.reader, w.results, w.configs, USER, edge(), DAYS[0], DAYS[-1], AS_OF,

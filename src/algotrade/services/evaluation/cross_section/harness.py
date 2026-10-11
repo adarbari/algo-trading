@@ -58,6 +58,10 @@ from algotrade.data.outcomes import (
     stored_sessions,
 )
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.detail.licences import (
+    TrialLicences,
+    trial_licences,
+)
 from algotrade.services.evaluation.cross_section.detail.windows import (
     SeriesFacts,
     plan_exits,
@@ -121,6 +125,7 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
     reports_after,
 )
 from algotrade.services.evaluation.cross_section.sessions import (
+    Leg,
     leg_blocks,
 )
 from algotrade.services.features import catalogue
@@ -146,6 +151,18 @@ SELECTIONS = "selections"
 
 
 @dataclass(frozen=True)
+class LegDetail:
+    """One leg of a measured block (leg v2, ADR 0064): its decision session D and entry session
+    S, the block's measured first session (the side of the split it is on, as for the slices)
+    and its statistic with every pick. What the ledger is framed from."""
+
+    decision: date
+    entry: date
+    block: date
+    stat: SessionStat
+
+
+@dataclass(frozen=True)
 class VariantResult:
     variant: str
     role: str
@@ -155,7 +172,14 @@ class VariantResult:
     measures: tuple[SliceMeasure, ...]
     edge_variant: str = MAIN  # the edge's own ``[[variants]]`` id, "main" for the edge itself
     iv_source: str | None = None  # the run's iv_field when the outcome reads an implied vol
-    licence: str | None = None  # that field's catalogue licence
+    licences: TrialLicences | None = None  # the trial's and its ledger columns' (ADR 0064)
+    legs: tuple[LegDetail, ...] = ()  # the main edge variant's measured legs, for the ledger
+
+    @property
+    def licence(self) -> str | None:
+        """The trial's: the strictest of its implied-vol field, screen and universe features."""
+        return None if self.licences is None else self.licences.trial
+
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
     report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
     series: SeriesFacts | None = None  # the windows of ``stats``, the unit, the projection (0064)
@@ -335,10 +359,11 @@ def evaluate_edge(
         for horizon in scope.edge.outcome.horizon_sessions
     ]
     hashed = run_hash(edge, variants, start, end, as_of, iv_field, split, random_draws)
+    features = catalogue(configs, user.user_id)
     spec = _RandomSpec(
         split,
         random_draws,
-        expression_hash(catalogue(configs, user.user_id)),
+        expression_hash(features),
         user.user_id,
         edge.id,
         load_verdict(configs).cost_levels_bps,  # every leg counts hits at the site's cost grid
@@ -346,9 +371,13 @@ def evaluate_edge(
     stored = read_legs(reader, user.user_id, edge.id, start, end)
     earnings = any(p.scope.edge.event_class == "earnings_expected" for p in plans)  # a diagnostic
     needs = _needs(plans, variants, schedules, spec)
-    stamps = partial(_outcome_stamps, reader, as_of)
     reuse = plan_reuse(
-        reader, stored, needs, as_of, stamps, "requested" if full or earnings else None
+        reader,
+        stored,
+        needs,
+        as_of,
+        partial(_outcome_stamps, reader, as_of),
+        "requested" if full or earnings else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results: list[VariantResult] = []
@@ -422,7 +451,10 @@ def evaluate_edge(
                     measures,
                     edge_variant=scope.key,
                     iv_source=scope.iv_field if needs_iv else None,
-                    licence=licences[scope.key],
+                    licences=trial_licences(
+                        features, scope.edge, scope.universe, variant.config, licences[scope.key]
+                    ),
+                    legs=_details(kept, block_stats, found, closed) if scope.key == MAIN else (),
                     report_containment=diagnostic,
                     series=series_facts(
                         scope.edge,
@@ -469,6 +501,23 @@ def evaluate_edge(
         legs_reused=len(reuse.reused),
         legs_computed=len(stats.rows),
         legs_invalidated=dict(reuse.invalidated),
+    )
+
+
+def _details(
+    blocks: Sequence[Sequence[Leg]],
+    pooled: Sequence[SessionStat],
+    found: Mapping[date, SessionStat],
+    closed: Collection[date],
+) -> tuple[LegDetail, ...]:
+    """The closed legs of the measured blocks, each with its block's first session; a block the
+    screen could not measure (``pool_stats``: coverage) has none, as it has no statistic."""
+    return tuple(
+        LegDetail(leg.decision, leg.entry, block_stat.session, found[leg.decision])
+        for block, block_stat in zip(blocks, pooled, strict=True)
+        if not block_stat.excluded_coverage
+        for leg in block
+        if leg.entry in closed
     )
 
 

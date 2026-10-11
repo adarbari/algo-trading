@@ -369,6 +369,12 @@ per_session = false
 note = "the edge harness's stored legs (ADR 0063): per decision session, each screener's statistic, the partitions the session read and the outcome partition it joined; session_date = the decision session, runs merge per key; framed, written and read only by services/evaluation/cross_section/legs/ (a fitness test)"
 
 [[table]]
+name = "results/edge_trades"
+owner = "src/algotrade/storage/tables/result_writer.py"
+per_session = false
+note = "the edge trade ledger (ADR 0064): one row per pick of the main edge variant's implementation screeners at every horizon, excluded picks with a public reason; partition = the run's range end, runs merge per key, read by run_id; framed only by services/evaluation/cross_section/detail/ from the run's v2 legs and written in the run's one publish, read only by services/read/evaluation/runs.py; kept 45 days but for the canonical, latest and cited runs (the purge-raw task, runs.ledger_keep)"
+
+[[table]]
 name = "results/edge_paper"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false

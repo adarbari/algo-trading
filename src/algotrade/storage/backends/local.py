@@ -349,14 +349,16 @@ class LocalTables:
         shutil.rmtree(base, ignore_errors=True)
         return len(days)
 
-    def purge_before(self, table: str, cutoff: date) -> int:
+    def purge_before(self, table: str, cutoff: date, keep: Collection[date] = ()) -> int:
         """Retention (``require_retention``), committed like a run (``Commits.purge``)."""
         require_retention(table)
         base = self.root / table
+        spared = set(keep)
         days = [
             d
             for d in (sorted(base.glob("date=*")) if base.exists() else [])
-            if date.fromisoformat(d.name.removeprefix("date=")) < cutoff
+            if (day := date.fromisoformat(d.name.removeprefix("date="))) < cutoff
+            and day not in spared
         ]
         return self.commits.purge(days)
 
