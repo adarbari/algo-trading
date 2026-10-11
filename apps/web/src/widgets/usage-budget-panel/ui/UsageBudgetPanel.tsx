@@ -20,6 +20,7 @@ import { unknownText } from '@/entities/availability';
 import {
   PERCENT,
   TOKENS,
+  totalInput,
   UsagePanel,
   USD,
   WINDOW_LABEL,
@@ -41,7 +42,7 @@ function tile(w: UsageWindow): StatItem {
   const capped = w.cap?.usedShare != null && w.cap.usedShare >= 1;
   const tokens = t.unknown
     ? `tokens: ${unknownText(t.unknown)}`
-    : `${count(t.inputTokens)} in · ${count(t.outputTokens)} out`;
+    : `${count(totalInput(t) ?? 0)} in · ${count(t.outputTokens)} out`;
   return {
     id: w.key,
     label: WINDOW_LABEL[w.key] ?? w.key,

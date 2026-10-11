@@ -58,6 +58,33 @@ def attempt(provider: str, **over: Any) -> Attempt:
     return Attempt(**(base | over))
 
 
+def test_cache_tokens_of_a_priced_call_are_charged_at_the_full_input_price() -> None:
+    sink = Sink()
+    ledger = UsageLedger(settings(), sink)
+    plain = attempt("paid")  # 1M in x $1 + 0.1M out x $5 = 1.5
+    cached = attempt("paid", cache_read_tokens=400_000, cache_write_tokens=100_000)
+    ledger.record(plain)
+    ledger.record(cached)
+    ledger.record(attempt("paid", cache_read_tokens=None, cache_write_tokens=None))
+    ledger.record(attempt("cli", reported_cost_usd=0.02, cache_read_tokens=9_000_000))
+    costs = [r["cost_usd"] for r in sink.rows]
+    assert costs[1] == pytest.approx(1.5 + 0.5)  # + 0.5M cache tokens x $1
+    assert costs[1] > costs[0] and costs[2] == costs[0]  # a cached call never costs less
+    assert costs[3] == 0.02  # a reported cost stays the CLI's own figure
+    row = sink.rows[1]
+    assert (row["cache_read_tokens"], row["cache_write_tokens"]) == (400_000, 100_000)
+    assert sink.rows[2]["cache_read_tokens"] is None  # absent stays None
+
+
+def test_the_row_carries_the_call_id_prompt_version_and_call_stage() -> None:
+    sink = Sink()
+    UsageLedger(settings(), sink).record(
+        attempt("tier", call_id="abc", prompt_version="1", call_stage="repair")
+    )
+    row = sink.rows[0]
+    assert (row["call_id"], row["prompt_version"], row["call_stage"]) == ("abc", "1", "repair")
+
+
 def test_cost_is_the_price_or_the_reported_total_and_an_unknown_one_is_its_bound() -> None:
     sink = Sink()
     ledger = UsageLedger(settings(), sink)

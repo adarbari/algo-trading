@@ -12,6 +12,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.configs import resolve_rule_draft
+from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.screens import (
     MAX_TEXT,
     DroppedCriterion,
@@ -82,7 +83,9 @@ PRICE_GT = {"id": "price", "field": PRICE, "op": "gt", "value": 50, "why": "over
 def test_the_model_is_asked_as_the_drafting_user(ctx: ReadContext) -> None:
     model = Canned(proposal(ACTIVE))
     draft_screen(ctx, model, "my_screen", "active stocks")
-    assert model.tags == [CallTag("screener-draft", ALICE)]  # who decides which providers answer
+    assert model.tags == [
+        CallTag("screener-draft", ALICE, PROMPT_VERSION)
+    ]  # who decides which providers answer
 
 
 def test_the_answer_becomes_a_valid_draft(ctx: ReadContext) -> None:
@@ -272,7 +275,7 @@ def test_an_answer_that_is_not_json_is_reported_rejected_with_the_prompt(ctx: Re
     with pytest.raises(ModelUnavailableError, match="not JSON"):
         draft_screen(ctx, model, "s", "stocks near support")
     ((tag, completion, reason, user_text, chars),) = model.rejected
-    assert tag == CallTag("screener-draft", ALICE)
+    assert tag == CallTag("screener-draft", ALICE, PROMPT_VERSION)
     assert completion.text.startswith("Sure! Support")
     assert reason == "the model's answer is not JSON"
     assert user_text == model.asked[0][1] and "stocks near support" in user_text

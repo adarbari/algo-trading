@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { basisTone, callId, findCall, outcomeTone, sliceLabel, stamp } from './labels';
+import { basisTone, callId, findCall, outcomeTone, sliceLabel, stamp, totalInput } from './labels';
 import { call, callAt, usage } from './fixtures';
 
 describe('usage labels', () => {
@@ -12,6 +12,13 @@ describe('usage labels', () => {
     expect(findCall(u, 'nope')).toBeNull();
     expect(findCall(u, null)).toBeNull();
     expect(findCall(null, callId(c))).toBeNull();
+  });
+
+  it('adds the cache tokens to the regular input, and an unreported input stays unknown', () => {
+    const t = { inputTokens: 2, cacheReadTokens: 98000, cacheWriteTokens: 12000 };
+    expect(totalInput(t)).toBe(110002);
+    expect(totalInput({ ...t, cacheReadTokens: null, cacheWriteTokens: null })).toBe(2);
+    expect(totalInput({ ...t, inputTokens: null })).toBeNull();
   });
 
   it('labels a cost basis by its name and a null group as a dash', () => {

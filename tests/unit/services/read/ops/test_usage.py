@@ -217,6 +217,27 @@ def test_a_call_just_either_side_of_midnight_in_new_york_lands_in_its_day() -> N
     assert usage.windows[0].tally.calls == 1
 
 
+def test_cache_tokens_and_call_tags_are_shown_and_summed_and_old_partitions_read_null() -> None:
+    yesterday = date(2026, 10, 7)
+    meter = {"input_tokens": 2, "cache_read_tokens": 98_000, "cache_write_tokens": 12_000,
+             "call_id": "abc", "prompt_version": "1", "call_stage": "first"}  # fmt: skip
+    usage = load_llm_usage(
+        stores({yesterday: [row(yesterday, 0)], TODAY: [row(TODAY, 0, **meter), row(TODAY, 1)]}),
+        TODAY,
+    )
+    metered = next(c for c in usage.recent if c.call_id == "abc")
+    assert (metered.input_tokens, metered.cache_read_tokens, metered.cache_write_tokens) == (
+        2, 98_000, 12_000)  # fmt: skip
+    assert (metered.prompt_version, metered.call_stage) == ("1", "first")
+    plain = next(c for c in usage.recent if c.call_id is None and c.ts.date() == TODAY)
+    assert (plain.cache_read_tokens, plain.cache_write_tokens, plain.call_stage) == (None,) * 3
+    old = next(c for c in usage.recent if c.ts.date() == yesterday)
+    assert (old.cache_read_tokens, old.call_id, old.prompt_version) == (None, None, None)
+    today = usage.windows[0].tally  # regular 2 + 100, cache summed: nulls add nothing
+    assert (today.input_tokens, today.cache_read_tokens, today.cache_write_tokens) == (
+        102, 98_000, 12_000)  # fmt: skip
+
+
 def test_failures_list_the_failed_and_rejected_calls_with_their_detail() -> None:
     yesterday = date(2026, 10, 7)
     detail = {

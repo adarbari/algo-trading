@@ -42,6 +42,16 @@ It errs on the high side on purpose, so an unknown never looks like free.
 see_also = ["llm_cost_basis", "llm_budget"]
 
 [[term]]
+id = "llm_input_tokens"
+term = "Input tokens and the cache"
+short = "A call's input is the regular input plus the prompt its provider's cache read or wrote."
+body = """
+A provider can keep the start of a long prompt in a cache and serve it again cheaply. It then reports the prompt in parts: the regular input (the part not cached), the cache read (served from the cache) and the cache write (stored for next time). The whole input of a call is the three added up, and that is what the lists and totals show. The Claude Code login can report a small regular input beside a very large cache read. The regular input alone then understates what was sent.
+A part a provider did not report is shown as unknown, never as zero. For the budget, a paid call counts its cache tokens at the full input price. A cached call is never counted as cheaper than an uncached one. A Claude Code login keeps the notional cost it reported.
+"""
+see_also = ["llm_cost_basis", "llm_budget"]
+
+[[term]]
 id = "llm_budget"
 term = "Text-model budget"
 short = "The daily and monthly caps on what paid and reported text-model calls may spend."

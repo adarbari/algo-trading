@@ -7,6 +7,7 @@ import threading
 from datetime import UTC, date, datetime
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
@@ -43,6 +44,24 @@ def test_rows_are_written_stamped_with_the_exchange_date_and_committed() -> None
     assert (frame["knowledge_ts"] == frame["ts"]).all()
     assert frame["run_id"].str.startswith("llm_usage-").all()
     assert by.loc["claude", ["input_tokens", "cost_usd"]].isna().all()  # unknown, not 0
+    recorder.close()
+
+
+def test_the_metering_columns_round_trip_and_absent_ones_are_null_never_zero() -> None:
+    backend = MemoryBackend()
+    recorder = UsageRecorder(UsageWriter(backend), clock=lambda: NEXT)
+    recorder.submit(call(LATE, "claude", cache_read_tokens=98_000, cache_write_tokens=None,
+                         call_id="abc", prompt_version="1", call_stage="repair"))  # fmt: skip
+    recorder.submit(call(NEXT, "gemini"))  # a row with none of them
+    recorder.flush()
+    frame = read_llm_calls(StoreReader(backend), date(2026, 10, 2), date(2026, 10, 3))
+    assert frame is not None
+    by = frame.set_index("provider")
+    assert by.loc["claude", "cache_read_tokens"] == 98_000
+    assert pd.isna(by.loc["claude", "cache_write_tokens"])
+    assert (by.loc["claude", "call_id"], by.loc["claude", "call_stage"]) == ("abc", "repair")
+    assert by.loc["claude", "prompt_version"] == "1"
+    assert by.loc["gemini", ["cache_read_tokens", "cache_write_tokens", "call_id"]].isna().all()
     recorder.close()
 
 

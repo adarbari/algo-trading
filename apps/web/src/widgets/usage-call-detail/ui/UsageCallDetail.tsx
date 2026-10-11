@@ -4,7 +4,7 @@
  * value the log holds as null reads "unknown" with the reason beside it, never as zero. A failed
  * or rejected call also shows where it failed, the message, the prompt sent and the raw answer.
  */
-import { EmptyState, KeyValue, Stack, Text } from '@algotrade/ui';
+import { EmptyState, Heading, KeyValue, Stack, Text } from '@algotrade/ui';
 
 import { UnknownNote } from '@/entities/availability';
 import {
@@ -12,11 +12,15 @@ import {
   findCall,
   OutcomeBadge,
   stamp,
+  TERM_OF_INPUT,
   TOKENS,
+  totalInput,
   UsagePanel,
   USD,
   type UsageCall,
 } from '@/entities/llm-usage';
+
+import { termHelp } from '@/features/guide-help';
 
 import { FailureDetail } from './FailureDetail';
 
@@ -43,7 +47,25 @@ function Detail({ call }: { call: UsageCall }) {
           { id: 'model', label: 'Model', value: call.model, mono: true },
           { id: 'useCase', label: 'Use case', value: call.useCase },
           { id: 'user', label: 'User', value: call.user ?? 'unknown' },
-          { id: 'in', label: 'Input tokens', value: call.inputTokens, format: TOKENS },
+          { id: 'in', label: 'Input tokens (regular)', value: call.inputTokens, format: TOKENS },
+          {
+            id: 'cacheRead',
+            label: 'Cache read tokens',
+            value: call.cacheReadTokens,
+            format: TOKENS,
+          },
+          {
+            id: 'cacheWrite',
+            label: 'Cache write tokens',
+            value: call.cacheWriteTokens,
+            format: TOKENS,
+          },
+          {
+            id: 'inTotal',
+            label: 'Input tokens (incl. cache)',
+            value: totalInput(call),
+            format: TOKENS,
+          },
           { id: 'out', label: 'Output tokens', value: call.outputTokens, format: TOKENS },
           {
             id: 'latency',
@@ -56,8 +78,15 @@ function Detail({ call }: { call: UsageCall }) {
           { id: 'outcome', label: 'Outcome', value: <OutcomeBadge outcome={call.outcome} /> },
           { id: 'from', label: 'Fell back from', value: call.fellBackFrom ?? 'nothing' },
           { id: 'run', label: 'Written by run', value: call.runId, mono: true },
+          { id: 'callId', label: 'Call id', value: call.callId ?? 'unknown', mono: true },
+          { id: 'prompt', label: 'Prompt version', value: call.promptVersion ?? 'unknown' },
+          { id: 'callStage', label: 'Call stage', value: call.callStage ?? 'unknown' },
         ]}
       />
+      <Stack direction="row" gap={1} align="center">
+        <Heading level={3}>Token counts</Heading>
+        {termHelp(TERM_OF_INPUT)}
+      </Stack>
       {(call.stage || call.error) && <FailureDetail call={call} />}
       {call.unknown && (
         <Stack gap={1}>

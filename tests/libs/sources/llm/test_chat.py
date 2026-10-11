@@ -202,6 +202,31 @@ def test_a_count_the_provider_left_out_is_none_never_zero(
     assert (done.input_tokens, done.output_tokens) == tokens
 
 
+@pytest.mark.parametrize(
+    ("usage", "expected"),
+    [
+        # cached tokens are part of prompt_tokens: input is the rest, input + cache the whole
+        ({"prompt_tokens": 1000, "prompt_tokens_details": {"cached_tokens": 800}}, (200, 800)),
+        ({"prompt_tokens": 1000, "prompt_tokens_details": {"cached_tokens": 0}}, (1000, 0)),
+        ({"prompt_tokens": 1000, "prompt_tokens_details": {}}, (1000, None)),
+        ({"prompt_tokens": 1000, "prompt_tokens_details": None}, (1000, None)),
+        ({"prompt_tokens": 1000}, (1000, None)),
+        # a cached count above the prompt is not believed: input unknown, never a small number
+        ({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 50}}, (None, 50)),
+        ({"prompt_tokens_details": {"cached_tokens": 50}}, (None, 50)),
+    ],
+)
+def test_cached_prompt_tokens_are_split_out_of_the_input_and_absent_ones_are_none(
+    usage: dict[str, object], expected: tuple[int | None, int | None]
+) -> None:
+    body = {"choices": [{"message": {"content": "{}"}}], "usage": usage}
+    done = ChatCompletions(BASE, "m", lambda u, b: json.dumps(body).encode(), NO_WAIT).complete(
+        "s", "u"
+    )
+    assert (done.input_tokens, done.cache_read_tokens) == expected
+    assert done.cache_write_tokens is None  # no OpenAI-compatible endpoint reports a write
+
+
 def test_an_http_error_keeps_a_short_reason_and_nothing_key_like() -> None:
     body = json.dumps(
         {"error": {"message": "Invalid key sk-abcdefghijklmnop1234 for\nAIzaSyA1B2C3D4E5F6G7H8I9",

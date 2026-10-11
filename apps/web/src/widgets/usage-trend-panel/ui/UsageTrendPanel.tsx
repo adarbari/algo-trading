@@ -5,7 +5,7 @@
  */
 import { Chart, Grid } from '@algotrade/ui';
 
-import { TOKENS, UsagePanel, USD, type LlmUsage } from '@/entities/llm-usage';
+import { TOKENS, totalInput, UsagePanel, USD, type LlmUsage } from '@/entities/llm-usage';
 
 function series(usage: LlmUsage) {
   // A day whose calls reported no tokens is a gap in the token lines, never a zero.
@@ -28,7 +28,7 @@ function series(usage: LlmUsage) {
       line('reported', 'Notional (reported)', (d) => d.tally.reportedUsd),
     ],
     tokens: [
-      line('in', 'Input tokens', (d) => d.tally.inputTokens, true),
+      line('in', 'Input tokens (incl. cache)', (d) => totalInput(d.tally) ?? 0, true),
       line('out', 'Output tokens', (d) => d.tally.outputTokens, true),
     ],
   };

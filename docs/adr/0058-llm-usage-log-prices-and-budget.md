@@ -118,6 +118,31 @@ of a rejection holds the reason and the answer's length, never the answer.
 retention window applies to `usage/*`), each clipped to 2,000 / 8,000 characters. A
 retention limit is a later decision if the table grows.
 
+### Amendment 2026-10-11: cached input is metered
+
+The log under-reported input. The Claude CLI reports `usage.input_tokens` as the **uncached**
+part of the prompt only (2 for a prompt of about 110,000 tokens) and the rest as
+`cache_read_input_tokens` and `cache_creation_input_tokens`; the adapters kept the first and
+dropped the others, so `input_tokens` read as a small number for a large prompt. An
+OpenAI-compatible endpoint reports `prompt_tokens` **including** its cached part
+(`prompt_tokens_details.cached_tokens` where it says).
+
+`usage/llm_calls` gains nullable columns (older partitions read them as null; no key change):
+`cache_read_tokens` and `cache_write_tokens` (int64; null = not reported, never 0), `call_id`
+(one uuid4 hex per `FallbackTextModel.complete` call, shared by every attempt of it and its
+`rejected` row), `prompt_version` (the caller's `PROMPT_VERSION`, passed in `CallTag`) and
+`call_stage` (`CallTag.stage`: `first`, `repair`, `escalate`; named so because `stage` is the
+failure stage `provider` / `answer`). `input_tokens` keeps meaning the regular (uncached) input
+the provider reported; the chat adapter takes `cached_tokens` out of `prompt_tokens` so that
+**input + cache read + cache write is the whole prompt** for every provider (a cached count above
+the prompt's is not believed: input is null and the ledger charges its bound).
+
+**Cost is conservative.** A `price` call is charged `(input + cache read + cache write) x input
+price + output x output price`: cache tokens at the full input price (no cache price fields), so
+a cached call never costs less than before this change. A `reported` call keeps the CLI's own
+figure; an unknown cost stays the reserved upper bound. The usage page shows the whole input
+(regular + cache read + cache write) wherever it shows input tokens, with the parts on the call.
+
 ## Consequences
 - A paid provider cannot be added without its price, and a day's or month's spend stops at its
   cap by construction (the bound is reserved before the call, the counter moves before the write).

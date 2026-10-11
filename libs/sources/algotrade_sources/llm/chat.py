@@ -12,7 +12,7 @@ import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NamedTuple
 
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ModelUnavailableError
@@ -116,7 +116,11 @@ class ChatCompletions:
             else:
                 text = content_of(raw, where)
                 tokens = usage_of(raw)
-                return Completion(text, self.model, self.provider, *tokens, self.clock() - started)
+                return Completion(
+                    text, self.model, self.provider, tokens.input, tokens.output,
+                    self.clock() - started,
+                    cache_read_tokens=tokens.cache_read,
+                )  # fmt: skip
             self.pause(delay)
         raise AssertionError("unreachable")  # pragma: no cover
 
@@ -148,13 +152,30 @@ def content_of(raw: bytes, where: str) -> str:
     return content
 
 
-def usage_of(raw: bytes) -> tuple[int | None, int | None]:
-    """``(usage.prompt_tokens, usage.completion_tokens)`` of a response body that
-    ``content_of`` accepted; ``None`` for a count the provider left out (never ``0``)."""
+class Usage(NamedTuple):
+    """The token counts of one response; ``None`` for a count the provider left out."""
+
+    input: int | None  # regular (uncached) input: the prompt less what its cache served
+    output: int | None
+    cache_read: int | None
+
+
+def usage_of(raw: bytes) -> Usage:
+    """The ``usage`` of a response body that ``content_of`` accepted; ``None`` for a count the
+    provider left out (never ``0``). ``prompt_tokens`` of an OpenAI-compatible endpoint includes
+    the prompt tokens its cache served (``prompt_tokens_details.cached_tokens``), so the cached
+    ones are taken out of ``input`` and reported as ``cache_read``: input + cache read is the
+    whole prompt, as for the Claude CLI. A cached count above the prompt's is not believed: the
+    input is then unknown (the ledger charges its bound)."""
     usage = json.loads(raw).get("usage")
     if not isinstance(usage, dict):
-        return None, None
-    return _count(usage.get("prompt_tokens")), _count(usage.get("completion_tokens"))
+        return Usage(None, None, None)
+    prompt, output = _count(usage.get("prompt_tokens")), _count(usage.get("completion_tokens"))
+    details = usage.get("prompt_tokens_details")
+    cached = _count(details.get("cached_tokens")) if isinstance(details, dict) else None
+    if cached is not None and prompt is not None:
+        prompt = prompt - cached if cached <= prompt else None
+    return Usage(prompt, output, cached)
 
 
 def _count(value: Any) -> int | None:
