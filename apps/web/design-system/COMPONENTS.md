@@ -690,6 +690,22 @@ Source: `design-system/components/FilterChips`
 | `onChange` | `(id: string, value: string \| undefined) => void` | yes | Set a filter's value, or remove it (`undefined`). |
 | `onClear` | `() => void` | yes | Remove every filter in force. |
 
+### FormulaPreview
+
+FormulaPreview: the dry run of a draft formula, for the trader to review before it is added: the formula in monospace, a line for its inputs and unit, a StatStrip of how it behaved (rows checked, share with no value, range, how many pass) and a small sample table of real rows. `actions` holds the decision (Review and add / Skip). It shows numbers and names it is given; every label and sentence arrives as a prop.
+
+Source: `design-system/components/FormulaPreview`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | no | The draft feature's name, set in mono above the formula. |
+| `formula` | `string` | yes | The formula, e.g. `close / price_stats.high_52w - 1`. |
+| `inputs` | `ReactNode` | no | The inputs and the unit, one muted line ("Inputs: close, price_stats.high_52w · ratio"). |
+| `stats` | `readonly StatItem[]` | yes | The dry-run figures (rows checked, no-value rate, range, passing). |
+| `statsLabel` | `string` | yes | Accessible name of the stat strip. |
+| `sample` | `FormulaSample \| undefined` | no | A few real rows run through the formula. |
+| `actions` | `ReactNode \| undefined` | no | The decision: Review and add / Skip buttons. |
+
 ### HeatGrid
 
 HeatGrid: a rows x columns grid of status cells, e.g. ingestion completeness (datasets x sessions). Each cell is complete / partial / failed / not collected, with optional value text (`99.7`); a header row names the columns, a header column names the rows, and a Legend explains the colours. One cell can be selected (accent outline) to drill in. An ARIA grid: arrow keys move between cells, Home / End to the row ends, Ctrl+Home / Ctrl+End to the corners, Enter or Space (or a click) selects; only one cell is in the Tab order.
@@ -1378,6 +1394,17 @@ Source: `design-system/components/Tabs`
 | `label` | `string` | yes | Accessible name of the tab list, e.g. "View". |
 | `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
 | `size` | `'sm' \| 'md'` | no | Text size: `md` (default) or `sm` (dense toolbars). |
+
+### TaggedSentence
+
+TaggedSentence: a sentence the trader typed, shown as inline spans that each say how it was understood: `applied` (a stored field, solid underline), `formula` (a draft formula to review, dashed), `ask` (needs the trader's call, wavy), `gap` (not available yet, dotted) or `plain` (no tag). A tagged span carries its short label beside it as text, so the kind is never colour alone: the underline style and the label say it too. It wraps like prose, so it works at phone width. Read as one sentence by assistive technology, with each label after its words. Text and labels arrive as props; this component writes none.
+
+Source: `design-system/components/TaggedSentence`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `segments` | `readonly SentenceSegment[]` | yes | The sentence, in order; the spans concatenate to what the trader typed. |
+| `'aria-label'` | `string` | no | Accessible name of the sentence ("What was understood"). |
 
 ### TextArea
 

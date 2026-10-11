@@ -99,3 +99,16 @@ export const Dense: Story = {
 
 /** A 375 px phone frame; under a coarse pointer the control floors apply. */
 export const Narrow: Story = { ...Dense, decorators: [narrow] };
+
+/** An option picker: swap one criterion's reading ("liquid" is $10M / $50M / $100M a day). */
+export const OptionPicker: Story = {
+  args: {
+    'aria-label': 'What “liquid” means',
+    defaultValue: '50m',
+    options: [
+      { value: '10m', label: '$10M a day' },
+      { value: '50m', label: '$50M a day' },
+      { value: '100m', label: '$100M a day' },
+    ],
+  },
+};
