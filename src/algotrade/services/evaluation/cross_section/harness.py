@@ -350,8 +350,8 @@ def evaluate_edge(
         reader, stored, needs, as_of, stamps, "requested" if full or earnings else None
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
-    results: list[VariantResult] = []
-    randoms: list[RandomPicks] = []
+    results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
+    # ``projected``: the decision sessions whose exits are stored, read once per run
     reports = None  # the real report dates, read once and only for an earnings_expected edge
     starts: dict[int, int] = {}
     unclosed: dict[int, int] = {}
@@ -379,7 +379,7 @@ def evaluate_edge(
                 reports,
             )
         kept, exits = plan_exits(
-            scope.edge, plan.blocks, closed, horizon, start, projection_count(load_verdict(configs))
+            scope.edge, plan.blocks, closed, horizon, start, projected
         )  # the blocks with a closed leg (measured) and the projected exits (ADR 0064)
         for variant in variants:
             legs = stats.randoms.get((plan.key, variant.id), {})

@@ -61,3 +61,10 @@ def test_an_event_schedule_has_no_projection_and_a_calendar_one_skips_the_measur
         [],
         None,
     )
+
+
+def test_n_exits_are_stored_even_at_a_long_horizon_far_from_the_range_start() -> None:
+    exits = next_exits("every_session", 1, 60, START, None, 400)
+    assert len(exits) == 400  # 400 x 60 sessions is about 96 years: no fixed bound from START
+    late = next_exits("every_session", 1, 60, START, date(2060, 1, 1), 400)
+    assert len(late) == 400 and late[0] > date(2060, 1, 1)

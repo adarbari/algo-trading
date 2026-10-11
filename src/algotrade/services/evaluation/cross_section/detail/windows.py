@@ -22,7 +22,7 @@ from algotrade.services.evaluation.cross_section.sessions import (
 )
 
 PROJECTION_SHARE = 0.25  # the floor of the fill ratio the outlook scales by (ADR 0064, decision 7)
-MAX_YEARS = 80  # how far a schedule is extended to find its next decision sessions
+SESSIONS_PER_YEAR, MONTH_SESSIONS = 250, 21
 EXCESS_RETURN, RETURN, CUSHION, RATIO = "excess_return", "return", "cushion", "ratio"
 
 
@@ -91,17 +91,19 @@ def next_exits(
 ) -> tuple[date, ...]:
     """The exit sessions of the next ``count`` decision sessions of a calendar ``schedule``
     (anchored at the range's ``start`` as the run's own are) whose window closes after ``after``
-    (None: every one). The schedule is extended year by year until it holds enough."""
+    (None: every one). The schedule is extended as far as ``count`` decisions need."""
+    # Sessions enough for ``count`` decisions a horizon apart (a month_end one is a month at
+    # least) beyond ``after``, with a margin; the bound follows the data, never a fixed span.
+    sessions = int((count * max(horizon, MONTH_SESSIONS) + SESSIONS_PER_YEAR) * 1.3)
+    reach = ((after or start) - start).days + sessions * 366 // SESSIONS_PER_YEAR + 366
     found: list[date] = []
-    for years in (4, 12, 40, MAX_YEARS):
-        days = sessions_between(start, start + timedelta(days=366 * years))
-        found = []
-        for d in decision_sessions(schedule, days, horizon):
-            close = exit_session(entry_session(d, offset), horizon)
-            if after is None or close > after:
-                found.append(close)
-                if len(found) == count:
-                    return tuple(found)
+    days = sessions_between(start, start + timedelta(days=reach))
+    for d in decision_sessions(schedule, days, horizon):
+        close = exit_session(entry_session(d, offset), horizon)
+        if after is None or close > after:
+            found.append(close)
+            if len(found) == count:
+                break
     return tuple(found)
 
 
