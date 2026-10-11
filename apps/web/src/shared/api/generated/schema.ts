@@ -142,6 +142,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/files/edges/{edge_id}/trades.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trades Csv */
+        get: operations["trades_csv_files_edges__edge_id__trades_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/graphql": {
         parameters: {
             query?: never;
@@ -877,6 +894,12 @@ export interface components {
             /** Value */
             value: unknown;
         };
+        /**
+         * Period
+         * @description Which trades: the backtest's in-sample or out-of-sample side, the live paper record, all.
+         * @enum {string}
+         */
+        Period: "in_sample" | "out_of_sample" | "live" | "all";
         /** PreviewBody */
         PreviewBody: {
             /**
@@ -1676,6 +1699,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SavedFeature"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trades_csv_files_edges__edge_id__trades_csv_get: {
+        parameters: {
+            query?: {
+                /** @description the session to read (default: the latest); live rows */
+                date?: string | null;
+                /** @description which trades: in_sample, out_of_sample, live or all */
+                period?: components["schemas"]["Period"];
+            };
+            header?: never;
+            path: {
+                edge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

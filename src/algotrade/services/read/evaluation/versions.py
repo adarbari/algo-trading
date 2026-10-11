@@ -159,7 +159,7 @@ def verdict_level(ctx: Stores, edge_id: str) -> str | None:
     return None if edge is None else load_verdict(ctx, edge).verdict
 
 
-def _figures(row: EdgeRow) -> Figures:
+def figures_of(row: EdgeRow) -> Figures:
     return Figures(
         row.hit_rate,
         row.base_rate,
@@ -212,8 +212,8 @@ def _line(
         edge_id=edge_id,
         run_id=run.run_id,
         basis=f"{variant}, {horizon} trading days",
-        in_sample=_figures(before) if before is not None else None,
-        out_of_sample=_figures(after) if after is not None else None,
+        in_sample=figures_of(before) if before is not None else None,
+        out_of_sample=figures_of(after) if after is not None else None,
         oos_hidden=hidden,
     )
 

@@ -1,0 +1,102 @@
+# L3 site setting: the Guide glossary, edges: the trade ledger and the variant grid (ADR 0051, ADR 0064, ADR 0065). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "trade_ledger"
+term = "Trade ledger"
+short = "Every pick of the verdict's basis, one row each, with its dates, rank, outcome and the reason it was left out."
+body = """
+The ledger lists the names the basis screen picked on each decision session, at the basis holding
+period. Each row says when the pick was decided, bought and sold, its rank (1 is the best), and
+how it ended. Score is the screen's value at the decision session. Value is the outcome, net of
+the document's cost: an excess return, or the measure the edge uses. Gross value is the same
+before cost, for return outcomes only. Max drawdown is the deepest dip inside the window. ADV is
+the name's 20-day average dollar volume at the decision session, a check on whether it could be
+traded. A blank is a value not stored, never a zero. A name that was picked but could not be
+measured stays in the list as excluded, with its reason. The names that were eligible and not
+picked are not listed. Example: the 20-session ledger of an edge has one row per pick per
+session. Don't count the excluded rows as losses: they have no outcome. The CSV link downloads
+the same rows, in the same order and with the same blanks.
+"""
+next = "Filter the ledger by period, then sort by value to see the best and worst picks."
+see_also = ["trade_status", "trade_excluded_reason", "trade_period", "verdict_basis", "unavailable_licence", "out_of_sample"]
+
+[[term]]
+id = "trade_status"
+term = "Trade status"
+short = "How one pick ended: won, lost, excluded (no outcome) or open (a paper trade not settled yet)."
+body = """
+Won: the pick's outcome beat the bar the edge's outcome sets, after cost. Lost: it did not.
+Excluded: the pick was made but has no outcome the test can count; the reason says why, and the
+row is kept so nothing is hidden. Open: a live paper trade whose sell session has not come, so
+its result is not known. Only won and lost rows count toward a win rate. Example: 12 won, 8 lost
+and 3 excluded is a win rate of 60%, from 20 counted picks. Don't read an excluded row as a loss
+or an open one as a win.
+"""
+next = "Open a row's reason, or look at the live trades once they settle."
+see_also = ["trade_ledger", "trade_excluded_reason", "win_rate"]
+
+[[term]]
+id = "trade_excluded_reason"
+term = "Why a pick is excluded"
+short = "The public reason a pick has no counted outcome: no price, no value, no implied volatility or no drawdown."
+body = """
+Unmeasured: the harness could not measure the pick. Missing value: the outcome's value was not
+stored. No entry bar: the name had no price on the day it would have been bought. No implied
+volatility: an option outcome needed an implied volatility that was not stored. Missing drawdown:
+the dip inside the window could not be computed. Skipped: a live signal that was not traded. An
+excluded pick takes no part in the win rate or the mean. A long list of one reason is a data
+problem, not a verdict on the edge. Example: many no-entry-bar rows around a holiday mean
+missing prices, not bad picks.
+"""
+next = "If one reason dominates, report it: the fix is in the data."
+see_also = ["trade_ledger", "trade_status", "win_rate"]
+
+[[term]]
+id = "trade_period"
+term = "Trade period"
+short = "Which picks the ledger shows: in-sample, out-of-sample, live paper trades, or all of the backtest."
+body = """
+In-sample: picks decided before the split, the part of history the edge was tuned on.
+Out-of-sample: picks decided after it, the fair test. All: both sides of the backtest. Live: the
+paper trades the app recorded since the edge was followed, read as the session knew them, so a
+result recorded later does not change an earlier session. An edge you copied keeps its
+out-of-sample backtest picks hidden until you show them. Its live trades are forward trades, so
+they stay listed. Example: a ledger of
+400 picks may be 300 in-sample and 100 out-of-sample. Don't judge an edge from the in-sample
+rows.
+"""
+next = "Choose out-of-sample to read the picks the verdict is judged on."
+see_also = ["trade_ledger", "in_sample", "out_of_sample", "paper_trading"]
+
+[[term]]
+id = "variant_grid"
+term = "Variant grid"
+short = "Every screen and holding period the run tried, with the one the verdict rests on marked."
+body = """
+The grid is the run's trial log as rows: each screen at each holding period. A row shows its win
+rate, lift and decile spread in-sample, out-of-sample and over the whole history. It also shows
+the independent trades behind them. One row is the basis, chosen before the out-of-sample figures were read.
+Every other row's out-of-sample figures are flagged: they are one result among several tried, not
+the test the verdict rests on, so the best of them is partly luck. Example: a screen at 31
+sessions may show a higher out-of-sample lift than the basis and still not be the fair test.
+Don't switch the verdict to a flagged row. A model screener's in-sample figure is its training
+fit, flagged as such.
+"""
+next = "Compare the basis row with the others to see how much the result depends on the choice."
+see_also = ["verdict_basis", "variants_tried", "lift", "out_of_sample", "in_sample", "trades", "win_rate"]
+
+[[term]]
+id = "trade_ledger_unavailable"
+term = "Trade ledger not available"
+short = "The ledger of this run is gone or was never written: re-run the backtest to get it."
+body = """
+A ledger is kept 45 days, except for the latest run of an edge and a run an edge cites. A run
+older than that has its ledger removed, and a run from before the ledger existed never had one.
+The aggregate figures of the run are kept either way, so the verdict is unchanged. Running the
+backtest again writes a new ledger. Example: a run from September has a verdict but no rows once
+its 45 days have passed.
+"""
+next = "Re-run the backtest from the edge page to write the ledger again."
+see_also = ["trade_ledger", "unavailable_not_stored"]

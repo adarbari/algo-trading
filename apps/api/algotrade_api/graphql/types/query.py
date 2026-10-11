@@ -17,6 +17,8 @@ from strawberry.types import Info
 
 from algotrade.services.read.edge_desk import desk as edge_desk
 from algotrade.services.read.edge_desk import live as edge_live
+from algotrade.services.read.edge_ledger import trades as edge_trade_reads
+from algotrade.services.read.edge_ledger import variants as edge_variant_reads
 from algotrade.services.read.evaluation import edges as edge_reads
 from algotrade.services.read.evaluation import runs as edge_runs
 from algotrade.services.read.evaluation import versions
@@ -52,6 +54,10 @@ from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeProblem, EdgeRun
+from algotrade_api.graphql.types.evaluation.evidence import (
+    EdgeTradePage,
+    EdgeVariants,
+)
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
 from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
@@ -426,6 +432,48 @@ class Query:
         ctx = await info.context.aread(date)
         found = await off_loop(edge_live.load_edge_paper, ctx, id) if ctx is not None else None
         return EdgePaper.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The trades of the verdict's basis of the edge `edgeId` (the screen and "
+        "holding "
+        "period its verdict rests on: never chosen here), one `page` (from 1) for `period`, sorted "
+        "by the server (`descending`); `LIVE` reads the paper record as the session knew it. A "
+        "per-name value under a licence the viewer lacks is Unknown(LICENCE); a copy's "
+        "out-of-sample trades are withheld; null: no such edge"
+    )
+    async def edge_trades(
+        self,
+        info: Ctx,
+        edge_id: str,
+        period: edge_trade_reads.Period = edge_trade_reads.Period.ALL,
+        page: int = 1,
+        sort: edge_trade_reads.Sort = edge_trade_reads.Sort.DECISION,
+        descending: bool = False,
+        date: Day = None,
+    ) -> EdgeTradePage | None:
+        ctx = await info.context.aread(date)
+        found = (
+            await off_loop(
+                edge_trade_reads.load_trades_of, ctx, edge_id, period, page, sort.value, descending
+            )
+            if ctx is not None
+            else None
+        )
+        return EdgeTradePage.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The variant grid of the edge `edgeId`: every screen and holding period its "
+        "official run tried, the verdict's basis marked official and every other out-of-sample "
+        "figure flagged as not the pre-chosen test; null: no such edge"
+    )
+    async def edge_variants(self, info: Ctx, edge_id: str) -> EdgeVariants | None:
+        ctx = await info.context.astores()
+        found = (
+            await off_loop(edge_variant_reads.load_trials_of, ctx, edge_id)
+            if ctx is not None
+            else None
+        )
+        return EdgeVariants.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The sections of the result of the edge `id` (the evidence curve, drawdown, "

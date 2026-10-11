@@ -40,7 +40,7 @@ detect = [{ string_prefix = "rollups/instrument/" }, { string_prefix = "rollups/
 [[responsibility]]
 id = "edge-evidence-read"
 description = "The sections of an edge's result page beside its verdict (ADR 0064, 0065), every one about the verdict's own run and basis (the official run: a site edge's canonical run, a user's own edge's latest; the basis fixed by the verdict rule before the out-of-sample period is read, never re-chosen by a section) and read only through the run reader (a hidden copy's out-of-sample rows are withheld there): the basis's per-session series valued in the outcome's unit (a window known at its exit session; a window with no number is a gap, never zero), the evidence curve with its gaps and the live stroke from the stored paper trades (anchored on the backtest's cumulative value, settled trades as the session knew them), the drawdown, its deepest episodes and the volatility of the windows, the rolling starts, the monthly map, and the decay with its live bar; the table a lost input lost is the admin's cause only (ADR 0056); the browser derives none of it"
-owner = ["src/algotrade/services/read/edge_evidence/*"]
+owner = ["src/algotrade/services/read/edge_evidence/*", "src/algotrade/services/read/edge_ledger/*"]
 section = "docs/adr/0064-edge-evidence-series-and-trade-ledger.md#decision"
 allowed = ["apps/api/algotrade_api/graphql/*"]  # Query.edgeResult serves it
 detect = [{ call = "official_basis" }, { call = "load_basis_series" }, { call = "load_curve" }, { call = "load_drawdown" }, { call = "load_rolling_starts" }, { call = "load_monthly" }]

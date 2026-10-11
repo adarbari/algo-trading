@@ -91,16 +91,18 @@ def record_owner(edge: Edge, user_id: str) -> str:
     return user_id if edge.mine else SITE_USER
 
 
-def load_trades(ctx: ReadContext, edges: Mapping[str, Edge]) -> tuple[PaperTrade, ...]:
+def load_trades(
+    ctx: ReadContext, edges: Mapping[str, Edge], lookback: int | None = LOOKBACK_DAYS
+) -> tuple[PaperTrade, ...]:
     """Every paper trade of ``edges`` (by id; a trade of an edge the user does not see is left out,
     and so is a follower's old row of a site edge: only the record owner's rows count) signalled
     in the window up to ``ctx.session``, oldest signal first, as the rows stood at the session's
-    cutoff (``Session.cutoff``; None: not bounded)."""
+    cutoff (``Session.cutoff``; None: not bounded). ``lookback``: how many days of signal sessions
+    to read (None: every stored row, for a count that must be exact)."""
     day = ctx.session.date
     owners = {i: record_owner(e, ctx.user.user_id) for i, e in edges.items()}
-    frame = read_paper(
-        ctx.reader, owners, day - timedelta(days=LOOKBACK_DAYS), day, ctx.session.cutoff
-    )
+    since = date.min if lookback is None else day - timedelta(days=lookback)
+    frame = read_paper(ctx.reader, owners, since, day, ctx.session.cutoff)
     names = {i: e.name for i, e in edges.items()}
     records = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
     return tuple(_trade(r, day, names) for r in records)
