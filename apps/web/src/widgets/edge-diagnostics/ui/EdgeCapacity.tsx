@@ -52,7 +52,7 @@ export function EdgeCapacity({ edgeId }: EdgeCapacityProps) {
     ? [
         {
           id: 'floor',
-          label: 'Universe floor, 20-day dollar volume',
+          label: 'Capacity floor (site), 20-day dollar volume',
           value: capacity.floorUsd,
           format: { kind: 'currency-compact' },
         },

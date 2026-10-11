@@ -71,7 +71,9 @@ describe('EdgeTrades', () => {
     expect(last()).toMatchObject({ period: 'OUT_OF_SAMPLE', page: 1 }); // a new period starts at page 1
     await userEvent.click(within(screen.getByRole('grid')).getByRole('button', { name: /^Rank/ }));
     expect(last()).toMatchObject({ sort: 'RANK', page: 1 });
-    await userEvent.click(within(screen.getByRole('grid')).getByRole('button', { name: /^Name/ }));
+    await userEvent.click(
+      within(screen.getByRole('grid')).getByRole('button', { name: /^Ticker/ }),
+    );
     expect(last()).toMatchObject({ sort: 'SYMBOL', page: 1 }); // by ticker, not by instrument id
   });
 
@@ -80,6 +82,28 @@ describe('EdgeTrades', () => {
     expect(screen.getByText('csv drift ALL')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'Live' }));
     expect(screen.getByText('csv drift LIVE')).toBeInTheDocument();
+  });
+
+  it('shows the ticker and the company in separate columns', () => {
+    render(<EdgeTrades edgeId="drift" />);
+    const table = screen.getByRole('grid', { name: 'Trade ledger' });
+    expect(within(table).getByRole('button', { name: /^Ticker/ })).toBeInTheDocument();
+    expect(within(table).getByText('Company')).toBeInTheDocument();
+    expect(within(table).getByText('AAA')).toBeInTheDocument();
+  });
+
+  it('shows no rows of the previous period under a new selection while it loads', () => {
+    // A delayed read: the hook hands back the last page (placeholder data) until the new one lands.
+    hooks.useEdgeTrades.mockReturnValue(fakeQuery(TRADES_FIXTURE, { isPlaceholderData: true }));
+    const { rerender } = render(<EdgeTrades edgeId="drift" />);
+    expect(screen.queryByRole('grid', { name: 'Trade ledger' })).not.toBeInTheDocument();
+    expect(screen.queryByText('AAA')).not.toBeInTheDocument();
+    expect(screen.queryByText('3 trades')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading the trades')).toBeInTheDocument();
+    hooks.useEdgeTrades.mockReturnValue(fakeQuery(TRADES_FIXTURE));
+    rerender(<EdgeTrades edgeId="drift" />);
+    expect(screen.getByText('3 trades')).toBeInTheDocument();
+    expect(screen.getByText('AAA')).toBeInTheDocument();
   });
 
   it('says why there is no ledger, and that a copy hides its out-of-sample trades', () => {

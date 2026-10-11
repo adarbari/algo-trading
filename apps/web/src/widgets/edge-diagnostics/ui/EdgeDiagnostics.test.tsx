@@ -79,7 +79,7 @@ describe('EdgeDiagnostics', () => {
       { time: '2025-07-01', value: -0.5 },
     ]);
     expect(screen.getByText('Picks under the floor')).toBeInTheDocument();
-    expect(screen.getByText('Universe floor, 20-day dollar volume')).toBeInTheDocument();
+    expect(screen.getByText('Capacity floor (site), 20-day dollar volume')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'All' }));
     expect(screen.getByText('Hidden')).toBeInTheDocument(); // the all-period capacity is withheld
     const map = screen.getByRole('grid', { name: 'Gain or loss of the curve by month' });
@@ -99,8 +99,43 @@ describe('EdgeDiagnostics', () => {
     );
     render(<EdgeDiagnostics edgeId="momentum_12_1" />);
     expect(screen.queryByText('Picks under the floor')).not.toBeInTheDocument();
-    expect(screen.queryByText('Universe floor, 20-day dollar volume')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Capacity floor (site), 20-day dollar volume'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/position, share of the median pick's volume/)).toBeInTheDocument();
+  });
+
+  it('shows a cushion outcome as excess wins in the months, never a percent', () => {
+    hooks.useEdgeMonthly.mockReturnValue(
+      fakeQuery({
+        ...MONTHLY_FIXTURE,
+        unit: 'cushion',
+        months: [{ month: '2024-12', value: 6.97, trades: 20, period: 'in_sample' }],
+      }),
+    );
+    render(<EdgeDiagnostics edgeId="vrp" />);
+    const map = screen.getByRole('grid', { name: 'Excess wins of the curve by month' });
+    expect(within(map).getByText('+7.0')).toBeInTheDocument();
+    expect(within(map).queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it('labels each variant row by its edge variant, the screen as secondary text', () => {
+    hooks.useEdgeVariants.mockReturnValue(
+      fakeQuery({
+        ...VARIANTS_FIXTURE,
+        rows: [
+          { ...VARIANTS_FIXTURE.rows[0], edgeVariant: 'main', variant: 'vrp_iv_hv' },
+          { ...VARIANTS_FIXTURE.rows[1], edgeVariant: 'delta16', variant: 'vrp_iv_hv' },
+        ],
+      }),
+    );
+    render(<EdgeDiagnostics edgeId="vrp" />);
+    const grid = screen.getByRole('grid', {
+      name: 'Variant grid: lift in points by holding period',
+    });
+    expect(within(grid).getByText('Edge')).toBeInTheDocument();
+    expect(within(grid).getByText('delta16')).toBeInTheDocument();
+    expect(within(grid).getAllByText('vrp_iv_hv')).toHaveLength(2);
   });
 
   it('says why a section has no figures, and shows its read failed with a retry', async () => {
