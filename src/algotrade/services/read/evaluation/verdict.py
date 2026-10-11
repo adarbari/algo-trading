@@ -339,17 +339,16 @@ def _column(
     )  # fmt: skip
 
 
-def _columns(
-    c: _Candidate, t: VerdictSettings, deflated: float | None, pbo: float | None
-) -> tuple[VerdictColumn, ...]:
-    """The in-sample, out-of-sample and all columns; the deflated Sharpe and overfitting
-    probability of ``all`` are the verdict's, a side's own is normally not stored."""
+def _columns(c: _Candidate, t: VerdictSettings) -> tuple[VerdictColumn, ...]:
+    """The in-sample, out-of-sample and all columns, each with its own row's deflated Sharpe and
+    overfitting probability (stored on ``all`` only; a side's is normally not: missing, never
+    another column's)."""
     ins, oos = c.insample, c.oos
     thin = oos.sessions is None or oos.sessions < t.min_oos_trades
     return (
         _column(IN_SAMPLE, ins, ins.deflated_sharpe if ins else None, ins.pbo if ins else None),
         _column(OUT_OF_SAMPLE, oos, oos.deflated_sharpe, oos.pbo, thin),
-        _column(ALL, c.whole, deflated, pbo),
+        _column(ALL, c.whole, c.whole.deflated_sharpe, c.whole.pbo),
     )
 
 
@@ -392,7 +391,7 @@ def _judge_one(
         trials=whole.trials,
         deciles=c.insample.decile_means if c.insample else (),
         robustness=load_robustness(oos.lift, draws, c.horizon, c.variant, whole.trials),
-        columns=_columns(c, t, deflated, pbo),
+        columns=_columns(c, t),
         evidence=evidence_of(oos.sessions, whole.sessions, crit, t),
     )
 
@@ -420,7 +419,8 @@ def _years(c: _Candidate, split: date | None) -> tuple[YearRow, ...]:
     for r in c.years:
         year = r.slice_value
         mine = [(side, parts.get(f"{year}:{side}")) for side in (IN_SAMPLE, OUT_OF_SAMPLE)]
-        if split is not None and year.isdigit() and all(p for _, p in mine):
+        cut = split is not None and year.isdigit() and split.year == int(year)
+        if cut and split is not None and all(p for _, p in mine):
             first, last = date(int(year), 1, 1), date(int(year), 12, 31)
             bounds = {
                 IN_SAMPLE: (first, split - timedelta(days=1)),
@@ -432,7 +432,8 @@ def _years(c: _Candidate, split: date | None) -> tuple[YearRow, ...]:
         else:
             first = date(int(year), 1, 1) if year.isdigit() else date.min
             last = date(int(year), 12, 31) if year.isdigit() else date.min
-            out.append(_row_of(r, year, _period(year, split), first, last, False))
+            period = BOTH if any(p for _, p in mine) and not cut else _period(year, split)
+            out.append(_row_of(r, year, period, first, last, False))
     return tuple(out)
 
 
@@ -494,7 +495,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
     return judge(
         edge.id,
         rows,
-        edge.frozen_from,
+        found.run.split_from or edge.frozen_from,  # the split its year parts were cut at
         settings,
         found.run.lost_inputs,
         draws=runs.load_run_draws(ctx, found.run),

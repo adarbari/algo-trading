@@ -313,6 +313,22 @@ def test_a_year_the_split_cuts_is_two_rows_not_a_both_row() -> None:
     assert (years[0].from_date, years[0].to_date) == (date(2025, 1, 1), date(2025, 12, 31))
 
 
+def test_a_moved_split_cuts_its_own_year_and_never_inverts_the_dates() -> None:
+    rows = [*result(), *parts("2025")]
+    moved = judge("e", rows, date(2025, 7, 1), T).years  # a copy's run split on 2025-07-01
+    assert [(y.label, y.from_date, y.to_date) for y in moved] == [
+        ("2025 Jan\u2013Jun", date(2025, 1, 1), date(2025, 6, 30)),
+        ("2025 Jul\u2013Dec", date(2025, 7, 1), date(2025, 12, 31)),
+    ]
+    (y,) = verdict(rows).years  # parts stored at another split: one row, never wrong dates
+    assert (y.period, y.partial, y.from_date, y.to_date) == (
+        BOTH,
+        False,
+        date(2025, 1, 1),
+        date(2025, 12, 31),
+    )
+
+
 def test_a_run_without_year_parts_keeps_the_both_row() -> None:
     rows = [*result(), row(kind="year", slice_value="2026")]
     (y,) = verdict(rows).years
