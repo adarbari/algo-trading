@@ -6,7 +6,7 @@ paper trades used (a site edge: the canonical run; the user's own: their latest 
 out-of-sample slice, else the in-sample one while the out-of-sample is hidden, else the whole
 history: ``basis`` says which). If ``p`` held, the wins among ``n`` closed trades are binomial;
 the live win rate is ``on_track`` inside the ``live_low`` to ``live_high`` quantiles of that
-(``quant.edge_statistics.win_rate_band``), ``below`` or ``above`` outside it, ``too_early`` until
+(``quant.edges.statistics.win_rate_band``), ``below`` or ``above`` outside it, ``too_early`` until
 ``live_min_sessions`` have closed, ``no_backtest`` when the edge has no usable run (a run committed
 after the session is none). Open and skipped trades are counted apart: never a loss. The sentences
 and the bins of the picture are the server's; the browser derives nothing.
@@ -23,7 +23,7 @@ from datetime import date
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
 from algotrade.core.time.calendar import sessions_to
-from algotrade.quant.edge_statistics import win_rate_band, win_rate_pmf
+from algotrade.quant.edges.statistics import win_rate_band, win_rate_pmf
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.paper import (
     LOST,

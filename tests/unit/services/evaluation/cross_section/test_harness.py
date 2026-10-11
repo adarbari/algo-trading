@@ -15,7 +15,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section import harness
+from algotrade.services.evaluation.cross_section import harness, measuring
 from algotrade.services.evaluation.cross_section.harness import (
     BOOKKEEPING,
     RUN_INPUTS,
@@ -801,7 +801,7 @@ def test_the_result_is_the_same_whatever_the_chunk_of_sessions_held_in_memory(
     must not depend on where the chunks fall."""
     whole = run(event_world(EVENTS), event_edge(2))
     plain = run(build_world())
-    monkeypatch.setattr(harness, "CHUNK_SESSIONS", 2)
+    monkeypatch.setattr(measuring, "CHUNK_SESSIONS", 2)
     assert run(event_world(EVENTS), event_edge(2)).results == whole.results
     assert run(build_world()).results == plain.results
 
@@ -923,7 +923,7 @@ def test_the_same_run_draws_the_same_random_picks_and_the_chunking_does_not_matt
     e = edge(frozen_from="2026-09-04")
     once = run(build_world(), e).random_picks
     assert run(build_world(), e).random_picks == once
-    monkeypatch.setattr(harness, "CHUNK_SESSIONS", 1)
+    monkeypatch.setattr(measuring, "CHUNK_SESSIONS", 1)
     assert run(build_world(), e).random_picks == once
     assert run(build_world(), edge(frozen_from="2026-09-04", top_k=4)).random_picks != once
 

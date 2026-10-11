@@ -10,9 +10,9 @@ Not working (a hard failure: out-of-sample win rate not above the base rate, t, 
 probability, deflated Sharpe, or worse than the median baseline; then any criterion of
 Promising missed); Promising;
 Works (more trades, stricter thresholds, and an out-of-sample lift above at least
-``random_beat_share`` of the random-pick backtest's draws, ``quant.edge_statistics.percentile_of``;
+``random_beat_share`` of the random-pick backtest's draws, ``quant.edges.statistics.percentile_of``;
 a run with no draws is "not measured" and caps the verdict at Promising). The statistics are
-the stored rows' (``quant/edge_statistics.py``), never recomputed; the thresholds are site data
+the stored rows' (``quant/edges/statistics.py``), never recomputed; the thresholds are site data
 (``config/site/verdict.toml``); the sentences are the server's, the browser words nothing."""
 
 import statistics

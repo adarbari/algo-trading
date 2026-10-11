@@ -5,8 +5,8 @@ import math
 import numpy as np
 import pytest
 
-from algotrade.quant import edge_statistics as es
 from algotrade.quant.black_scholes import norm_cdf
+from algotrade.quant.edges import statistics as es
 
 
 def test_lift() -> None:
