@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { UnknownNote } from './UnknownNote';
 
 const stored = {
-  code: 'UNKNOWN',
+  code: 'NO_ROW',
   kind: 'NOT_STORED',
   guideTerm: 'unavailable_not_stored',
   kindText: 'not available for this instrument',
