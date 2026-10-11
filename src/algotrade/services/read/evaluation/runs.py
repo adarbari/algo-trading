@@ -399,15 +399,27 @@ LICENSED: Final = {
     "adv_licence": ("adv_usd_20d",),
 }
 LEDGER_ORDER = ["variant", "horizon_sessions", "decision_session", "rank"]
+SORTABLE: Final = (
+    "decision_session", "exit_session", "instrument_id", "rank", "status", "value", "score",
+    "max_drawdown", "adv_usd",
+)  # fmt: skip
 
-Cell = float | bool | Unknown | None
+
+@dataclass(frozen=True)
+class TradeCell:
+    """A per-name figure of a ledger row: its ``value`` (None: not stored, never 0), or why the
+    viewer may not read it (``unknown``: ``LICENCE``, the recorded licence is personal)."""
+
+    value: float | bool | None = None
+    unknown: Unknown | None = None
 
 
 @dataclass(frozen=True)
 class TradeRow:
     """One pick of a run's ledger. ``status``: ``won`` | ``lost`` | ``excluded`` (with its
     public ``excluded_reason``); a per-name value under a licence the viewer does not hold is
-    ``Unknown(LICENCE)``, one not stored is None (never 0)."""
+    ``Unknown(LICENCE)`` (a ``TradeCell``), one not stored is None (never 0). ``source``:
+    ``backtest`` (the run's ledger) or ``live`` (a paper trade of the edge's record)."""
 
     variant: str
     horizon_sessions: int
@@ -421,13 +433,14 @@ class TradeRow:
     hit: bool | None
     delisted: bool
     before_split: bool
-    score: Cell
-    value: Cell
-    gross_value: Cell
+    score: TradeCell
+    value: TradeCell
+    gross_value: TradeCell
     max_drawdown: float | None
-    adv_usd_20d: Cell
-    reference: Cell
-    touch: Cell
+    adv_usd: TradeCell  # the name's 20-day average dollar volume at the decision session
+    reference: TradeCell
+    touch: TradeCell
+    source: str = "backtest"
 
 
 @dataclass(frozen=True)
@@ -455,8 +468,10 @@ def _flag(value: Any) -> bool | None:
 
 
 def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
-    def cell(column: str, read: Any = _float) -> Cell:
-        return hidden[column] if column in hidden else read(row.get(column))
+    def cell(column: str, read: Any = _float) -> TradeCell:
+        if column in hidden:
+            return TradeCell(unknown=hidden[column])
+        return TradeCell(read(row.get(column)))
 
     reason = to_scalar(row.get("excluded_reason"))
     return TradeRow(
@@ -476,7 +491,7 @@ def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
         value=cell("value"),
         gross_value=cell("gross_value"),
         max_drawdown=_float(row.get("max_drawdown")),
-        adv_usd_20d=cell("adv_usd_20d"),
+        adv_usd=cell("adv_usd_20d"),
         reference=cell("reference"),
         touch=cell("touch", _flag),
     )
@@ -504,10 +519,14 @@ def load_run_trades(
     before_split: bool | None = None,
     offset: int = 0,
     limit: int | None = None,
+    sort: str | None = None,
+    descending: bool = False,
 ) -> RunTrades:
     """The ledger ``run`` wrote, filtered (``before_split``: the in-sample side, False the
-    out-of-sample one) and paged. A run whose out-of-sample result is hidden serves its rows
-    before the split only, whatever is asked."""
+    out-of-sample one), sorted by ``sort`` (one of ``SORTABLE``, ties in key order, a missing
+    value last) and paged. A run whose out-of-sample result is hidden serves its rows before the
+    split only, whatever is asked. A per-name value the viewer may not see sorts as missing: the
+    order never discloses it."""
     record = ctx.reader.run(run.run_id)
     count = None if record is None else record.stats.get("ledger_rows")
     if record is None or count is None:
@@ -529,9 +548,18 @@ def load_run_trades(
         keep &= frame["variant"] == variant
     if horizon is not None:
         keep &= frame["horizon_sessions"] == horizon
-    found = frame[keep].sort_values(LEDGER_ORDER, kind="stable")
-    page = found.iloc[offset : None if limit is None else offset + limit]
     holder = load_users(ctx.configs).holds(ctx.user.user_id, PERSONAL)
+    found = frame[keep].sort_values(LEDGER_ORDER, kind="stable")
+    if sort in SORTABLE:
+        column = "adv_usd_20d" if sort == "adv_usd" else sort  # the stored column of the field
+        key = found[column]
+        for licence_column, columns in LICENSED.items():
+            if column in columns and not holder and licence_column in found:
+                key = key.where(found[licence_column] != PERSONAL)
+        found = found.assign(_key=key).sort_values(
+            "_key", ascending=not descending, na_position="last", kind="stable"
+        )
+    page = found.iloc[offset : None if limit is None else offset + limit]
     rows = tuple(
         _trade(r, _redacted(r, holder, table))
         for r in ({str(k): v for k, v in row.items()} for row in page.to_dict("records"))

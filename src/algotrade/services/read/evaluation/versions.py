@@ -154,7 +154,7 @@ def verdict_level(ctx: Stores, edge_id: str) -> str | None:
     return None if edge is None else load_verdict(ctx, edge).verdict
 
 
-def _figures(row: EdgeRow) -> Figures:
+def figures_of(row: EdgeRow) -> Figures:
     return Figures(
         row.hit_rate,
         row.base_rate,
@@ -179,7 +179,7 @@ def _pick(
     return found[0] if len(found) == 1 else None
 
 
-def _basis(ctx: Stores, edge: Edge, rows: Sequence[EdgeRow]) -> verdict.BasisChoice:
+def basis_of(ctx: Stores, edge: Edge, rows: Sequence[EdgeRow]) -> verdict.BasisChoice:
     """The (screen, horizon) every line of a comparison is read at: the verdict's basis of
     ``edge``'s ``rows`` (ADR 0065: declared, else the best in-sample; never out-of-sample)."""
     settings = load_verdict_settings(ctx.configs)
@@ -207,8 +207,8 @@ def _line(
         edge_id=edge_id,
         run_id=run.run_id,
         basis=f"{variant}, {horizon} trading days",
-        in_sample=_figures(before) if before is not None else None,
-        out_of_sample=_figures(after) if after is not None else None,
+        in_sample=figures_of(before) if before is not None else None,
+        out_of_sample=figures_of(after) if after is not None else None,
         oos_hidden=hidden,
     )
 
@@ -235,7 +235,7 @@ def load_compare(ctx: Stores, edge: Edge) -> EdgeCompare | None:
     if run is None:
         return EdgeCompare(edge.id, edge.extends, hidden, "You have not run this edge yet")
     rows = runs.load_run_rows(ctx, run)
-    found = _basis(ctx, edge, rows)
+    found = basis_of(ctx, edge, rows)
     if found.key is None:
         return EdgeCompare(edge.id, edge.extends, hidden, found.reason)
     variant, horizon = found.key
@@ -246,7 +246,7 @@ def load_compare(ctx: Stores, edge: Edge) -> EdgeCompare | None:
     if parent is not None and parent[1] is not None:
         other, other_run = parent[0], parent[1]
         other_rows = runs.load_run_rows(ctx, other_run)
-        basis = _basis(ctx, other, other_rows).key
+        basis = basis_of(ctx, other, other_rows).key
         if basis is not None:
             v, h = (
                 (variant, horizon)

@@ -1225,6 +1225,17 @@
         "title": "NarrowMiss",
         "type": "object"
       },
+      "Period": {
+        "description": "Which trades: the backtest's in-sample or out-of-sample side, the live paper record, all.",
+        "enum": [
+          "in_sample",
+          "out_of_sample",
+          "live",
+          "all"
+        ],
+        "title": "Period",
+        "type": "string"
+      },
       "PreviewBody": {
         "properties": {
           "limit": {
@@ -2821,6 +2832,52 @@
         "summary": "Save User Feature",
         "tags": [
           "features"
+        ]
+      }
+    },
+    "/files/edges/{edge_id}/trades.csv": {
+      "get": {
+        "operationId": "trades_csv_files_edges__edge_id__trades_csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "which trades: in_sample, out_of_sample, live or all",
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Period",
+              "default": "all",
+              "description": "which trades: in_sample, out_of_sample, live or all"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trades Csv",
+        "tags": [
+          "files"
         ]
       }
     },

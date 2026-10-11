@@ -84,9 +84,11 @@ def write_run(
     extra: list[dict[str, Any]] | None = None,
     trigger: str | None = None,
     series: list[dict[str, Any]] | None = None,
+    trades: list[dict[str, Any]] | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
-    row for ``momo``; ``minutes`` after T."""
+    row for ``momo``; ``minutes`` after T; ``trades``: its ledger (``results/edge_trades``, its
+    row count on the record)."""
     writer = ResultWriter(backend)
     at = T + timedelta(minutes=minutes)
     done = T + timedelta(minutes=minutes if finished_minutes is None else finished_minutes)
@@ -103,6 +105,8 @@ def write_run(
         "range": [START.isoformat(), END.isoformat()], "as_of": "2026-10-01T00:00:00+00:00",
         "trials_counted": 1,
     }  # fmt: skip
+    if trades is not None:
+        stats["ledger_rows"] = len(trades)
     if trigger is not None:  # runs from before the trigger was recorded have none
         stats["trigger"] = trigger
     record = RunRecord(run_id, f"edge-eval:drift:{owner}", END, at)
@@ -111,6 +115,11 @@ def write_run(
         if series:
             frame = stamped(series, END, run_id, at, "edge-eval")
             writer.write_result("edge_series", END, run_id, frame, pending=True)
+        if trades:
+            ledger = stamped(
+                [{**t, "user_id": owner} for t in trades], END, run_id, at, "edge-eval"
+            )
+            writer.write_result("edge_trades", END, run_id, ledger, pending=True)
         writer.save_run(record.finish(done, complete=status is RunStatus.COMPLETE, stats=stats))
     if status not in (RunStatus.COMPLETE, RunStatus.PARTIAL):
         record.status = status

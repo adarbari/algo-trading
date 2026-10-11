@@ -6,6 +6,7 @@
  * the Ideas signals and an edge's live record). Never reads an exploratory run as a track record.
  */
 export { prefetchEdges, refreshEdges, useEdgeProblems, useEdges } from './api/edges';
+export { useEdgeTrades, useEdgeVariants, type TradesRequest } from './api/evidence';
 export { useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
 export { useTrackRecords } from './api/track-records';
 export {
@@ -30,6 +31,16 @@ export {
   type VerdictColumn,
   type EvidenceProgress,
 } from './model/edges';
+export type {
+  EdgeTradePage,
+  EdgeTradeRow,
+  EdgeVariant,
+  EdgeVariants,
+  EvidenceUnknown,
+  TradePeriod,
+  TradeSort,
+  VariantFigures,
+} from './model/evidence';
 export {
   rangeBins,
   rangeMarkers,

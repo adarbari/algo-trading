@@ -105,6 +105,8 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "EdgesPage",
         "EdgeDesk",  # the paper record plus the official run it is judged against
         "EdgePaper",
+        "EdgeTrades",  # the verdict basis's ledger (a run's rows) and the paper record
+        "EdgeVariantGrid",
         "IngestionCompleteness",
         "NightlyRuns",
         "QualityChecks",
