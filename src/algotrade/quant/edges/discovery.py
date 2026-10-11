@@ -2,7 +2,7 @@
 
 Pure, deterministic functions over arrays; randomness only through a ``numpy`` generator the
 caller seeds. The effect size of one feature at one session is
-``edge_statistics.standardised_effect`` (Hedges' g), not repeated here.
+``statistics.standardised_effect`` (Hedges' g), not repeated here.
 
     sign_stability         a series of per-block effects agrees in sign in enough blocks and in
                            both halves of the history
