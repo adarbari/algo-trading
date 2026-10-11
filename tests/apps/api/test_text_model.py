@@ -230,6 +230,37 @@ def test_shutdown_flushes_the_usage_ledger(api_golden: tuple[ReadStore, dict[str
     assert sink.closed
 
 
+def test_a_providers_structured_mode_reaches_its_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    monkeypatch.setenv("HOME", "/Users/o")
+    cli = CLI_CHAIN["provider"][0] | {"structured": "json_schema"}
+    doc = CLI_CHAIN | {"provider": [cli, CHAIN["provider"][1] | {"structured": "json_schema"}]}
+    model, _ = open_text_model(configs(doc))
+    assert isinstance(model, FallbackTextModel)
+    first, second = model.members[0][1], model.members[1][1]
+    assert isinstance(first, ClaudeCli) and first.structured == "json_schema"
+    assert isinstance(second, ChatCompletions) and second.structured == "json_schema"
+
+
+def test_the_chain_knows_each_providers_worst_case_as_the_deadline_validation_does(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in ("G1", "G2"):
+        monkeypatch.setenv(f"ALGOTRADE_LLM_API_KEY_{key}", "sk")
+    monkeypatch.setenv("HOME", "/Users/o")
+    cli = CLI_CHAIN["provider"][0]
+    gem = CHAIN["provider"][1]
+    doc = CLI_CHAIN | {"provider": [cli, gem | {"id": "g1"}, gem | {"id": "g2"}]}
+    doc["price"] = [CHAIN["price"][1] | {"model": gem["model"]}]
+    settings = LlmSettings.from_document(doc)
+    model, _ = open_text_model(configs(doc))
+    assert isinstance(model, FallbackTextModel)
+    needed = sum(p.worst_case_s for p in settings.providers[:-1])
+    ids = [pid for pid, _ in model.members]
+    assert sum(model.worst_s[pid] for pid in ids[:-1]) == needed  # what the deadline validates
+    assert model.worst_s == {p.id: p.worst_case_s for p in settings.providers}
+
+
 def test_only_restricts_the_chain_to_the_named_providers_and_tee_sees_the_usage_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

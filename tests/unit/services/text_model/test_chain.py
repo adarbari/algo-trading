@@ -7,8 +7,9 @@ from dataclasses import replace
 
 import pytest
 
+from algotrade.config.site.llm import ProviderSettings
 from algotrade.core.model.completion import Attempt, CallTag, Completion
-from algotrade.core.model.errors import ModelUnavailableError
+from algotrade.core.model.errors import InvalidAnswerError, ModelUnavailableError
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
 
@@ -24,7 +25,15 @@ class Member:
     def names_for(self, user: str | None) -> tuple[str, ...]:
         return self.names
 
-    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
         self.calls += 1
         if self.clock is not None:
             self.clock.now += self.cost
@@ -123,7 +132,15 @@ class Tagged(Member):
 
     tag: object = None
 
-    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
         self.tag = tag
         return super().complete(system, user, tag=tag)
 
@@ -393,3 +410,235 @@ def test_reject_never_raises_when_the_ledger_breaks_and_works_without_one() -> N
     done = Completion("t", "m", "claude")
     with_ledger(Ledger(deaf=True), Member("claude")).reject(None, done, "why", "u")
     FallbackTextModel([("claude", Member("claude"))]).reject(None, done, "why", "u")
+
+
+# ------------------------------------------------ validate, repair once, escalate (ADR 0041)
+
+
+class Scripted:
+    """A member that gives its answers in order and keeps what each call was given."""
+
+    def __init__(self, provider: str, *answers: str) -> None:
+        self.provider, self.answers = provider, list(answers)
+        self.names = (f"{provider}-model",)
+        self.seen: list[tuple[str, str | None, object]] = []  # user, stage, schema
+
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
+        self.seen.append((user, tag.stage if tag else None, schema))
+        return Completion(self.answers.pop(0), self.names[0], self.provider, 1, 2, 0.1)
+
+
+def only_good(text: str) -> None:
+    if text != "good":
+        raise InvalidAnswerError(f"{text!r} is not good")
+
+
+SCHEMA = {"type": "object"}
+TAG = CallTag("screener-draft", "abhi")
+
+
+def test_a_valid_first_answer_is_one_call_with_the_schema_passed_down() -> None:
+    cheap = Scripted("cheap", "good")
+    ledger = Ledger()
+    done = with_ledger(ledger, cheap, Scripted("strong")).complete(
+        "s", "u", tag=TAG, schema=SCHEMA, accept=only_good
+    )
+    assert done.text == "good" and done.fell_back_from is None
+    assert cheap.seen == [("u", "first", SCHEMA)]
+    assert [(a.outcome, a.call_stage) for a in ledger.attempts] == [("ok", "first")]
+
+
+def test_an_invalid_answer_is_repaired_once_by_the_same_provider() -> None:
+    cheap, strong = Scripted("cheap", "bad", "good"), Scripted("strong")
+    ledger = Ledger()
+    done = with_ledger(ledger, cheap, strong).complete("s", "u", tag=TAG, accept=only_good)
+    assert (done.provider, done.text, done.fell_back_from) == ("cheap", "good", None)
+    assert [stage for _, stage, _ in cheap.seen] == ["first", "repair"] and not strong.seen
+    repair = cheap.seen[1][0]
+    assert repair.startswith("u") and "'bad' is not good" in repair  # the question and the error
+    assert (
+        "Your answer was rejected: 'bad' is not good. Return only the corrected JSON object."
+        in repair
+    )
+    assert [a.outcome for a in ledger.attempts] == ["ok", "rejected", "ok"]
+    assert ledger.attempts[1].answer == "bad" and ledger.attempts[1].call_stage == "first"
+    assert len({a.call_id for a in ledger.attempts}) == 1
+
+
+def test_invalid_twice_escalates_to_the_next_provider_with_rejected_rows() -> None:
+    cheap, strong = Scripted("cheap", "bad", "worse"), Scripted("strong", "good")
+    ledger = Ledger()
+    done = with_ledger(ledger, cheap, strong).complete("s", "u", tag=TAG, accept=only_good)
+    assert (done.provider, done.fell_back_from) == ("strong", "cheap")
+    assert [stage for _, stage, _ in cheap.seen] == ["first", "repair"]
+    assert [stage for _, stage, _ in strong.seen] == ["escalate"]
+    assert strong.seen[0][0] == "u"  # the next provider is asked the original question afresh
+    assert [(a.provider, a.outcome, a.call_stage) for a in ledger.attempts] == [
+        ("cheap", "ok", "first"),
+        ("cheap", "rejected", "first"),
+        ("cheap", "ok", "repair"),
+        ("cheap", "rejected", "repair"),
+        ("strong", "fell_back", "escalate"),
+    ]
+    assert ledger.attempts[3].error == "'worse' is not good"
+
+
+def test_every_provider_refused_is_an_error_naming_each_cause_after_at_most_two_calls_each() -> (
+    None
+):
+    a, b = Scripted("a", "x1", "x2"), Scripted("b", "y1", "y2")
+    with pytest.raises(ModelUnavailableError) as raised:
+        chain(a, b).complete("s", "u", tag=TAG, accept=only_good)
+    message = str(raised.value)
+    assert "'x2' is not good" in message and "'y2' is not good" in message
+    assert len(a.seen) == len(b.seen) == 2
+
+
+def test_an_unavailable_provider_is_not_repaired_and_the_next_is_not_an_escalation() -> None:
+    down, strong = Member("down", ModelUnavailableError("HTTP 503")), Scripted("strong", "good")
+    done = chain(down, strong).complete("s", "u", tag=TAG, accept=only_good)
+    assert done.text == "good" and down.calls == 1
+    assert strong.seen[0][1] == "first"
+
+
+def test_no_repair_or_escalation_starts_after_the_deadline() -> None:
+    clock = Clock()
+
+    class Slow(Scripted):
+        def complete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            clock.now += 100.0
+            return super().complete(*args, **kwargs)
+
+    slow, strong = Slow("slow", "bad", "good"), Scripted("strong", "good")
+    with pytest.raises(ModelUnavailableError, match="deadline"):
+        chain(slow, strong, deadline_s=60.0, clock=clock).complete(
+            "s", "u", tag=TAG, accept=only_good
+        )
+    assert len(slow.seen) == 1 and not strong.seen
+
+
+def test_without_accept_the_answer_is_returned_as_before() -> None:
+    cheap = Scripted("cheap", "bad")
+    assert chain(cheap).complete("s", "u").text == "bad" and len(cheap.seen) == 1
+
+
+class Timed(Scripted):
+    """A scripted member whose every call takes ``took`` seconds of the injected clock."""
+
+    def __init__(self, clock: Clock, took: float, provider: str, *answers: str) -> None:
+        super().__init__(provider, *answers)
+        self.clock, self.took = clock, took
+
+    def complete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        self.clock.now += self.took
+        return super().complete(*args, **kwargs)
+
+
+def reserving(clock: Clock, *members: Scripted, worst: dict[str, float]) -> FallbackTextModel:
+    return FallbackTextModel([(m.provider, m) for m in members], 100.0, clock, worst_s=worst)
+
+
+def test_a_repair_that_would_cut_into_the_fallbacks_reserved_time_is_skipped() -> None:
+    clock = Clock()
+    a, b, c = Timed(clock, 30, "a", "bad"), Scripted("b", "good"), Scripted("c")
+    worst = {"a": 50.0, "b": 40.0, "c": 10.0}  # a's repair needs 50 s; b must keep 40 of 100
+    model = reserving(clock, a, b, c, worst=worst)
+    done = model.complete("s", "u", tag=TAG, accept=only_good)
+    assert done.provider == "b" and len(a.seen) == 1  # 30 + 50 > 100 - 40: not repaired
+    assert [s for _, s, _ in b.seen] == ["escalate"]
+
+
+def test_a_repair_runs_when_time_allows_and_the_last_member_repairs_with_no_reserve() -> None:
+    clock = Clock()
+    a = Timed(clock, 5, "a", "bad", "good")
+    assert (
+        reserving(clock, a, Scripted("b"), worst={"a": 50.0, "b": 40.0})
+        .complete("s", "u", tag=TAG, accept=only_good)
+        .text
+        == "good"
+        and len(a.seen) == 2
+    )  # 5 + 50 <= 100 - 0 (b is last)
+    clock2 = Clock()
+    down = Member("down", ModelUnavailableError("HTTP 503"))
+    last = Timed(clock2, 40, "last", "bad", "good")  # 40 + 50 <= 100: the last has no reserve
+    done = reserving(clock2, down, last, worst={"down": 1.0, "last": 50.0}).complete(
+        "s", "u", tag=TAG, accept=only_good
+    )
+    assert done.text == "good" and [s for _, s, _ in last.seen] == ["first", "repair"]
+
+
+class AdmitFirst(Ledger):
+    """Admits (and reserves 0.5 USD for) the first request only: the budget runs out after it."""
+
+    def admit(self, provider: str, prompt_chars: int) -> float | None:
+        if self.reserved and provider == "cheap":
+            return None
+        return super().admit(provider, prompt_chars)
+
+
+def test_a_repair_refused_by_the_budget_keeps_the_fallback_trail_and_settles_each_attempt() -> None:
+    cheap, free = Scripted("cheap", "bad"), Scripted("free", "good")
+    ledger = AdmitFirst()
+    done = with_ledger(ledger, cheap, free).complete("s", "u", tag=TAG, accept=only_good)
+    assert len(cheap.seen) == 1  # the repair was never asked
+    assert (done.provider, done.fell_back_from) == ("free", "cheap")
+    assert [(a.provider, a.outcome, a.call_stage) for a in ledger.attempts] == [
+        ("cheap", "ok", "first"),
+        ("cheap", "rejected", "first"),
+        ("cheap", "skipped_budget", "repair"),
+        ("free", "fell_back", "escalate"),
+    ]
+    assert ledger.reserved == [0.5, 0.0, 0.0, 0.0]  # the first attempt's reserve settled once
+
+
+def test_a_refused_answer_whose_repair_misses_the_deadline_still_falls_back_from_it() -> None:
+    clock = Clock()
+    slow = Timed(clock, 100, "slow", "bad")
+    chained = FallbackTextModel([("slow", slow), ("b", Scripted("b", "good"))], 150.0, clock)
+    chained = reserving(clock, slow, Scripted("b", "good"), worst={"slow": 80.0, "b": 1.0})
+    done = chained.complete("s", "u", tag=TAG, accept=only_good)  # 100 + 80 > 100: no repair
+    assert (done.provider, done.fell_back_from) == ("b", "slow")
+
+
+def default_chain(clock: Clock, *members: Timed) -> FallbackTextModel:
+    """The chain as llm.toml builds it with no ``deadline_s``: the sum of every worst case."""
+    providers = [ProviderSettings(m.provider, "http://x/v1", "m") for m in members]
+    worst = {p.id: p.worst_case_s for p in providers}
+    return FallbackTextModel(
+        [(m.provider, m) for m in members], sum(worst.values()), clock, worst_s=worst
+    )
+
+
+def test_a_single_provider_chain_repairs_under_the_default_deadline() -> None:
+    clock = Clock()
+    done = default_chain(clock, Timed(clock, 5, "only", "bad", "good")).complete(
+        "s", "u", tag=TAG, accept=only_good
+    )
+    assert done.text == "good"
+
+
+def test_the_first_skips_its_repair_for_the_fallback_but_the_last_repairs() -> None:
+    clock = Clock()
+    first = Timed(clock, 230, "first", "bad")  # worst case 220 s: 230 + 220 > the 440 s deadline
+    last = Timed(clock, 5, "last", "bad", "good")
+    done = default_chain(clock, first, last).complete("s", "u", tag=TAG, accept=only_good)
+    assert (done.provider, done.text, done.fell_back_from) == ("last", "good", "first")
+    assert [stage for _, stage, _ in last.seen] == ["escalate", "repair"] and len(first.seen) == 1
+
+
+def test_the_not_repaired_failure_says_why_the_answer_was_refused() -> None:
+    clock = Clock()
+    slow = Timed(clock, 100, "slow", "bad")
+    with pytest.raises(ModelUnavailableError, match=r"'bad' is not good \(not repaired, the 60 s"):
+        chain(slow, deadline_s=60.0, clock=clock).complete("s", "u", tag=TAG, accept=only_good)

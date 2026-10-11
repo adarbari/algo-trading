@@ -564,6 +564,7 @@ def build_text_model(
     retries: int = 2,
     extra: Mapping[str, Any] | None = None,
     provider: str = "default",
+    structured: str = "none",
 ) -> ChatCompletions:
     """The text model behind screener drafts (ADR 0041): an OpenAI-compatible chat client at
     ``base_url`` for ``model`` answering as the ``llm.toml`` provider ``provider``, the
@@ -573,7 +574,15 @@ def build_text_model(
     headers = {"Authorization": f"Bearer {credential}"} if credential else {}
     transport = json_post_transport(timeout=timeout_s, headers=headers)
     return ChatCompletions(
-        base_url, model, transport, pause, max_tokens, retries, extra=extra or {}, provider=provider
+        base_url,
+        model,
+        transport,
+        pause,
+        max_tokens,
+        retries,
+        extra=extra or {},
+        provider=provider,
+        structured=structured,
     )
 
 
@@ -584,9 +593,10 @@ def build_claude_cli(
     retries: int,
     env: Mapping[str, str],
     provider: str,
+    structured: str = "none",
 ) -> ClaudeCli:
     """The Claude Code provider of the text model (ADR 0041, amended 2026-10-08): ``command``
     (the absolute path of ``claude``) run headless for ``model`` under the owner's own login,
     with exactly ``env`` as the child's environment (``config.env.claude_cli_env``), answering
     as the ``llm.toml`` provider ``provider``. Built here, like every client."""
-    return ClaudeCli(command, model, env, timeout_s, retries, provider)
+    return ClaudeCli(command, model, env, timeout_s, retries, provider, structured=structured)

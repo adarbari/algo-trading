@@ -177,7 +177,8 @@ class CostTap:
 
 class Recording:
     """A ``TextModel`` that remembers the last completion its inner model returned, so a call
-    that fails after the model answered (parse, validation) still has its answer."""
+    that fails after the model answered (parse, validation) still has its answer. It drops the
+    caller's ``accept``: the golden run scores the first answer only (no repair, no escalation)."""
 
     def __init__(self, inner: TextModel) -> None:
         self._inner = inner
@@ -190,9 +191,20 @@ class Recording:
     def names_for(self, user: str | None) -> tuple[str, ...]:
         return self._inner.names_for(user)
 
-    def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: Mapping[str, Any] | None = None,
+        accept: Callable[[str], None] | None = None,
+    ) -> Completion:
+        # ``accept`` is not passed on: the run scores the FIRST answer, so an unusable one is
+        # refused by the caller after the fact (``invalid``, its text kept), never repaired
+        # or handed to the next provider by the chain.
         self.last = None
-        self.last = self._inner.complete(system, user, tag=tag)
+        self.last = self._inner.complete(system, user, tag=tag, schema=schema)
         return self.last
 
     def reject(self, *args: Any) -> None:

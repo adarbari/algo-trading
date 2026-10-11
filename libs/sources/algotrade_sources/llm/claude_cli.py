@@ -85,6 +85,7 @@ class ClaudeCli:
     retries: int = 0
     provider: str = "claude"
     runner: Runner = run_process
+    structured: str = "none"  # ``json_schema``: pass the caller's schema as ``--json-schema``
     clock: Callable[[], float] = time.monotonic
 
     @property
@@ -101,9 +102,14 @@ class ClaudeCli:
         """The chain limits who may use this provider, not the adapter."""
         return self.names
 
-    def argv(self, system: str) -> list[str]:
+    def argv(self, system: str, schema: Mapping[str, Any] | None = None) -> list[str]:
         """The command line: the lockdown flags always, the system prompt as an argument, the
-        user text on stdin."""
+        user text on stdin, the caller's schema as ``--json-schema`` (compact JSON)."""
+        wanted = (
+            ["--json-schema", json.dumps(schema, separators=(",", ":"))]
+            if schema is not None and self.structured == "json_schema"
+            else []
+        )
         return [
             self.command,
             "-p",
@@ -113,22 +119,41 @@ class ClaudeCli:
             self.model,
             "--system-prompt",
             system,
+            *wanted,
             *LOCKDOWN,
         ]
 
-    def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: Mapping[str, Any] | None = None,
+        accept: Callable[[str], None] | None = None,
+    ) -> Completion:
+        completion = self._complete(system, user, schema)
+        if accept is not None:
+            accept(completion.text)  # a lone adapter: the error propagates
+        return completion
+
+    def _complete(self, system: str, user: str, schema: Mapping[str, Any] | None) -> Completion:
         started = self.clock()
         where = f"claude-cli {self.model}"
         failure: ModelUnavailableError | None = None
         for _ in range(self.retries + 1):
             try:
-                return replace(self._once(system, user, where), latency_s=self.clock() - started)
+                return replace(
+                    self._once(system, user, where, schema), latency_s=self.clock() - started
+                )
             except ModelUnavailableError as exc:
                 failure = exc
         assert failure is not None
         raise failure
 
-    def _once(self, system: str, user: str, where: str) -> Completion:
+    def _once(
+        self, system: str, user: str, where: str, schema: Mapping[str, Any] | None = None
+    ) -> Completion:
         # One attempt, the wait for the lock and the run together, takes at most ``timeout_s``
         # (``ProviderSettings.worst_case_s`` and the chain's deadline rely on it).
         begun = self.clock()
@@ -142,16 +167,22 @@ class ClaudeCli:
             with tempfile.TemporaryDirectory(
                 prefix="algotrade-claude-", ignore_cleanup_errors=True
             ) as cwd:
-                done = self._run(system, user, Path(cwd), where, left)
+                done = self._run(system, user, Path(cwd), where, left, schema)
         finally:
             _LOCK.release()
         return self._completion(done, where)
 
     def _run(
-        self, system: str, user: str, cwd: Path, where: str, timeout: float
+        self,
+        system: str,
+        user: str,
+        cwd: Path,
+        where: str,
+        timeout: float,
+        schema: Mapping[str, Any] | None,
     ) -> "subprocess.CompletedProcess[str]":
         try:
-            return self.runner(self.argv(system), user, cwd, self.env, timeout)
+            return self.runner(self.argv(system, schema), user, cwd, self.env, timeout)
         except subprocess.TimeoutExpired as exc:
             raise ModelUnavailableError(f"{where}: timed out after {self.timeout_s:g} s") from exc
         except OSError as exc:
@@ -205,6 +236,11 @@ def _reason(result: dict[str, Any]) -> str:
 
 
 def _answer(result: dict[str, Any], where: str) -> str:
+    """The answer: with ``--json-schema`` the CLI returns the object in ``structured_output``
+    (``result`` may then be empty or prose); else ``result``."""
+    structured = result.get("structured_output")
+    if isinstance(structured, dict | list):
+        return json.dumps(structured, separators=(",", ":"))
     text = result.get("result")
     if not isinstance(text, str) or not text.strip():
         raise ModelUnavailableError(f"{where}: the answer is empty")

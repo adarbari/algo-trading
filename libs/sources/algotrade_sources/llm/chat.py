@@ -1,7 +1,9 @@
 """``ChatCompletions``: one request to an OpenAI-compatible ``/chat/completions`` endpoint
 (ADR 0041). System text and user text in, a ``Completion`` out (the assistant's text, the model
 that answered, the tokens the provider reported, how long it took), at temperature 0 and asking
-for a JSON object, so the same prompt gets the same draft (as far as the provider allows). A
+for a JSON object (or, for a provider configured ``structured = "json_schema"``, for one that
+fits the caller's schema), so the same prompt gets the same draft (as far as the provider
+allows). A
 provider that is busy (429, 500, 502, 503, 504) or unreachable is retried ``retries`` times
 with a doubling pause (``Retry-After`` wins); anything else, or the last failure, is a
 ``ModelUnavailableError`` (``core``) naming what went wrong, never the credential: the API
@@ -19,6 +21,8 @@ from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.http import HttpError, JsonTransport
 
 COMPLETIONS = "/chat/completions"
+JSON_SCHEMA = "json_schema"  # ``structured``: the provider takes a response schema
+SCHEMA_NAME = "answer"
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 DETAIL_CHARS = 120  # of an error body kept in the message (it is stored in the usage log)
 _KEYLIKE = re.compile(
@@ -60,6 +64,7 @@ class ChatCompletions:
     throttle_s: float = 20.0  # the wait after a 429 without Retry-After (a per-minute quota)
     extra: Mapping[str, Any] = field(default_factory=dict)  # provider fields sent as given
     provider: str = "default"  # the ``llm.toml`` id this client answers as
+    structured: str = "none"  # ``json_schema``: send the caller's schema as ``response_format``
     clock: Callable[[], float] = time.monotonic
 
     @property
@@ -75,8 +80,12 @@ class ChatCompletions:
     def url(self) -> str:
         return self.base_url.rstrip("/") + COMPLETIONS
 
-    def request(self, system: str, user: str) -> dict[str, Any]:
-        """The body sent (stable key order: a provider's prompt cache sees the same bytes)."""
+    def request(
+        self, system: str, user: str, schema: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """The body sent (stable key order: a provider's prompt cache sees the same bytes).
+        ``response_format`` is a JSON Schema (strict) when ``structured`` is ``json_schema`` and
+        the caller gave one, else a bare JSON object."""
         body: dict[str, Any] = {
             "model": self.model,
             "messages": [
@@ -85,14 +94,36 @@ class ChatCompletions:
             ],
             "temperature": 0,
             "max_tokens": self.max_tokens,
-            "response_format": {"type": "json_object"},
+            "response_format": self.response_format(schema),
         }
         # The configured extras follow the standard keys and never replace them.
         return body | {k: v for k, v in self.extra.items() if k not in body}
 
-    def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
+    def response_format(self, schema: Mapping[str, Any] | None) -> dict[str, Any]:
+        if schema is None or self.structured != JSON_SCHEMA:
+            return {"type": "json_object"}
+        return {
+            "type": "json_schema",
+            "json_schema": {"name": SCHEMA_NAME, "schema": schema, "strict": True},
+        }
+
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: Mapping[str, Any] | None = None,
+        accept: Callable[[str], None] | None = None,
+    ) -> Completion:
+        completion = self._complete(system, user, schema)
+        if accept is not None:
+            accept(completion.text)  # a lone adapter: the error propagates
+        return completion
+
+    def _complete(self, system: str, user: str, schema: Mapping[str, Any] | None) -> Completion:
         started = self.clock()
-        body = json.dumps(self.request(system, user), separators=(",", ":")).encode()
+        body = json.dumps(self.request(system, user, schema), separators=(",", ":")).encode()
         where = f"{self.model} at {self.base_url}"
         attempts = self.retries + 1
         for attempt in range(attempts):

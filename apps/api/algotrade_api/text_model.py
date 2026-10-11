@@ -139,7 +139,10 @@ def _chain(settings: LlmSettings, ledger: UsageLedger) -> TextModel:
         raise ConfigurationError(f"no provider has a key: set one of {names}")
     only = {p.id: frozenset(p.only_users) for p in settings.providers if p.only_users}
     only = {pid: users for pid, users in only.items() if pid in dict(members)}
-    return FallbackTextModel(members, settings.deadline_s, only_users=only, ledger=ledger)
+    worst = {p.id: p.worst_case_s for p in settings.providers if p.id in dict(members)}
+    return FallbackTextModel(
+        members, settings.deadline_s, only_users=only, ledger=ledger, worst_s=worst
+    )
 
 
 def _claude_cli(provider: ProviderSettings) -> TextModel:
@@ -150,6 +153,7 @@ def _claude_cli(provider: ProviderSettings) -> TextModel:
         provider.retries,
         claude_cli_env(),
         provider.id,
+        provider.structured,
     )
 
 
@@ -163,4 +167,5 @@ def _adapter(provider: ProviderSettings, key: str | None) -> TextModel:
         provider.retries,
         provider.request,
         provider.id,
+        provider.structured,
     )

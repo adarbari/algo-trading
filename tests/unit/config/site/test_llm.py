@@ -367,3 +367,22 @@ def test_the_budget_is_optional_typed_and_daily_cannot_exceed_monthly() -> None:
     ]:
         with pytest.raises(ConfigurationError, match=message):
             LlmSettings.from_document({"budget": doc})
+
+
+def test_structured_is_none_by_default_and_a_top_level_default_of_every_provider() -> None:
+    assert LlmSettings().providers[0].structured == "none"
+    s = LlmSettings.from_document(
+        {"structured": "json_schema", "provider": [CLI, GEMINI | {"structured": "none"}]}
+    )
+    cli, gemini = s.providers
+    assert (cli.structured, gemini.structured) == ("json_schema", "none")
+    legacy = LlmSettings.from_document({"structured": "json_schema"})
+    assert legacy.providers[0].structured == "json_schema"
+
+
+def test_structured_takes_json_schema_or_none_only_and_response_format_stays_refused() -> None:
+    for bad in ("strict", "", 1):
+        with pytest.raises(ConfigurationError, match="structured"):
+            LlmSettings.from_document({"provider": [GEMINI | {"structured": bad}]})
+    with pytest.raises(ConfigurationError, match="response_format"):
+        LlmSettings.from_document({"request": {"response_format": "text"}})

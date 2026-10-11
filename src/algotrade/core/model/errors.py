@@ -32,6 +32,13 @@ class ModelUnavailableError(AlgoTradeError):
     message says which; it never carries a credential."""
 
 
+class InvalidAnswerError(ModelUnavailableError):
+    """The text model answered, but the answer is not one the caller can use (not JSON, not the
+    asked-for shape, a draft the validator refuses; ADR 0041, amended 2026-10-11). A caller's
+    ``accept`` check raises it, and the provider chain then repairs once or tries the next
+    provider; the message is the exact error fed back to the model."""
+
+
 class RateLimitedError(AlgoTradeError):
     """The caller asked for something too often (an on-demand model call, ADR 0041): the API
     answers 429 with ``retry_after_s`` as ``Retry-After``."""
