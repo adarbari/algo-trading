@@ -21,7 +21,6 @@ export const FAIL = 'FAIL';
 const FIELDS = new Set([
   'completeness',
   'ingestionCell',
-  'chainCoverage',
   'quality',
   'verification',
   'nightlyRuns',
@@ -83,7 +82,15 @@ export async function mockAdminApi(page: Page, overrides: AdminFixtures = {}): P
               data: null,
               errors: [{ message: 'store unavailable', extensions: { code: 'INTERNAL' } }],
             }
-          : { data: { [field]: answer ?? null } },
+          : {
+              data: {
+                [field]: answer ?? null,
+                // The grid's read carries the chain coverage (one request per page load).
+                ...(field === 'completeness' && /chainCoverage/.test(operation.query ?? '')
+                  ? { chainCoverage: answers['chainCoverage'] ?? null }
+                  : {}),
+              },
+            },
     });
   });
 }

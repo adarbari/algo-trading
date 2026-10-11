@@ -121,7 +121,6 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "FigiReview",
         "LeverageReview",
         "IngestionCell",
-        "ChainCoverage",  # six sessions of chains run records
     }
 )
 # The run operations whose loader reads the clock (``load_completeness``: the last session the

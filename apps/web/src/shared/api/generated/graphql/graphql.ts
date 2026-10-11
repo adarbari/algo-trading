@@ -255,7 +255,7 @@ export type IngestionCompletenessQueryVariables = Exact<{
 }>;
 
 
-export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null };
+export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null, chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null };
 
 export type IngestionCellQueryVariables = Exact<{
   dataset: string;
@@ -264,11 +264,6 @@ export type IngestionCellQueryVariables = Exact<{
 
 
 export type IngestionCellQuery = { ingestionCell: { job: string, cell: { dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }, groups: Array<{ reason: string, count: number, examples: Array<string>, statuses: Array<string> }>, runs: Array<{ runId: string, job: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, itemsTotal: number, itemsByStatus: unknown, stats: unknown, failures: Array<{ reason: string, count: number, examples: Array<string>, statuses: Array<string> }> }> } | null };
-
-export type ChainCoverageQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type ChainCoverageQuery = { chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null };
 
 export type InstrumentFactsQueryVariables = Exact<{
   key: string;
@@ -1580,6 +1575,26 @@ export const IngestionCompletenessDocument = new TypedDocumentString(`
       runIds
     }
   }
+  chainCoverage {
+    session
+    total
+    ok
+    share
+    statuses {
+      code
+      count
+    }
+    tiers {
+      tier
+      total
+      ok
+      stale
+    }
+    chronic
+    chronicNames
+    previousChronic
+    drift
+  }
 }
     `) as unknown as TypedDocumentString<IngestionCompletenessQuery, IngestionCompletenessQueryVariables>;
 export const IngestionCellDocument = new TypedDocumentString(`
@@ -1622,30 +1637,6 @@ export const IngestionCellDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<IngestionCellQuery, IngestionCellQueryVariables>;
-export const ChainCoverageDocument = new TypedDocumentString(`
-    query ChainCoverage {
-  chainCoverage {
-    session
-    total
-    ok
-    share
-    statuses {
-      code
-      count
-    }
-    tiers {
-      tier
-      total
-      ok
-      stale
-    }
-    chronic
-    chronicNames
-    previousChronic
-    drift
-  }
-}
-    `) as unknown as TypedDocumentString<ChainCoverageQuery, ChainCoverageQueryVariables>;
 export const InstrumentFactsDocument = new TypedDocumentString(`
     query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
   session {

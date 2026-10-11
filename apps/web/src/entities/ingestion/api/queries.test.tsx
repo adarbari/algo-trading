@@ -93,7 +93,7 @@ describe('ingestion queries', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(String(GQL.mock.calls[0]?.[0])).toContain('query ChainCoverage');
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('chainCoverage');
     expect(result.current.data).toEqual({ session: '2026-10-02', share: 0.8 });
   });
 });

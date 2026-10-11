@@ -61,7 +61,7 @@ export function ChainCoveragePanel() {
     <Panel
       title="Option chain coverage"
       description={data ? formatValue(data.session, { kind: 'date', style: 'weekday' }).text : ''}
-      actions={termHelp('chain_coverage')}
+      actions={data ? termHelp('chain_coverage') : undefined}
     >
       {coverage.isPending ? (
         <Skeleton variant="rect" height="md" label="Loading chain coverage…" />
