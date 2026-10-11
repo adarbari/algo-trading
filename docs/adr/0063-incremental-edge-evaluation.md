@@ -1,6 +1,6 @@
 # ADR 0063: Incremental edge evaluation (stored legs)
 
-**Status:** accepted (2026-10-10; owner decision: the exact version, not the append-only alternative; architect-reviewed 2026-10-10). Extends
+**Status:** accepted (2026-10-10; owner decision: the exact version, not the append-only alternative; architect-reviewed 2026-10-10); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (leg v2: pick ids, ranks, scores, reasons, gross values, dips and ADV per pick, hits per cost level; the cost grid in the leg key; `LEG_VERSION` 2, one redraw of random picks). Extends
 [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (the harness, the trial log) and
 [0059](0059-edge-evaluations-on-request.md) (runs on request); writes only through `ResultWriter`
 ([0005](0005-ingestion-is-the-only-writer.md)), published atomically ([0022](0022-atomic-run-publication.md)).
