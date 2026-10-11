@@ -6,6 +6,7 @@ from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.services.read.evaluation.runs import EdgeRow, _lost
 from algotrade.services.read.evaluation.verdict import (
+    ALL,
     BOTH,
     IN_SAMPLE,
     NOT_ENOUGH,
@@ -286,3 +287,72 @@ def test_the_page_figures_are_the_in_sample_deciles_the_trials_and_the_robustnes
     assert v.robustness.summary == "Beats 60% of 100 random backtests after 3 variants tried."
     bare = verdict(result())
     assert bare.deciles == () and bare.robustness is None  # not stored: not zeros, no chart
+
+
+def parts(year: str = "2026") -> list[EdgeRow]:
+    return [
+        row(kind="year", slice_value=year),
+        row(kind="year_part", slice_value=f"{year}:in_sample", sessions=3),
+        row(kind="year_part", slice_value=f"{year}:out_of_sample", sessions=9),
+    ]
+
+
+def test_a_year_the_split_cuts_is_two_rows_not_a_both_row() -> None:
+    rows = [*result(), row(kind="year", slice_value="2025"), *parts()]
+    years = verdict(rows).years
+    assert [(y.year, y.period, y.label, y.partial) for y in years] == [
+        ("2025", IN_SAMPLE, "2025", False),
+        ("2026", IN_SAMPLE, "2026 Jan\u2013Mar", True),
+        ("2026", OUT_OF_SAMPLE, "2026 Apr\u2013Dec", True),
+    ]
+    assert BOTH not in {y.period for y in years}
+    first, second = years[1], years[2]
+    assert (first.from_date, first.to_date) == (date(2026, 1, 1), date(2026, 3, 31))
+    assert (second.from_date, second.to_date) == (SPLIT, date(2026, 12, 31))
+    assert (first.trades, second.trades) == (3, 9)
+    assert (years[0].from_date, years[0].to_date) == (date(2025, 1, 1), date(2025, 12, 31))
+
+
+def test_a_moved_split_cuts_its_own_year_and_never_inverts_the_dates() -> None:
+    rows = [*result(), *parts("2025")]
+    moved = judge("e", rows, date(2025, 7, 1), T).years  # a copy's run split on 2025-07-01
+    assert [(y.label, y.from_date, y.to_date) for y in moved] == [
+        ("2025 Jan\u2013Jun", date(2025, 1, 1), date(2025, 6, 30)),
+        ("2025 Jul\u2013Dec", date(2025, 7, 1), date(2025, 12, 31)),
+    ]
+    (y,) = verdict(rows).years  # parts stored at another split: one row, never wrong dates
+    assert (y.period, y.partial, y.from_date, y.to_date) == (
+        BOTH,
+        False,
+        date(2025, 1, 1),
+        date(2025, 12, 31),
+    )
+
+
+def test_a_run_without_year_parts_keeps_the_both_row() -> None:
+    rows = [*result(), row(kind="year", slice_value="2026")]
+    (y,) = verdict(rows).years
+    assert (y.period, y.label, y.partial) == (BOTH, "2026", False)
+
+
+def test_columns_are_in_sample_out_of_sample_and_all() -> None:
+    rows = result(
+        oos={"sessions": 12, "hit_rate": 0.7, "deflated_sharpe": None, "pbo": None},
+        whole={"deflated_sharpe": 0.9, "pbo": 0.3},
+        insample={"sessions": 40},
+    )
+    cols = verdict(rows).columns
+    assert [c.period for c in cols] == [IN_SAMPLE, OUT_OF_SAMPLE, ALL]
+    ins, oos, whole = cols
+    assert (ins.trades, oos.trades, whole.trades) == (40, 12, 70)
+    assert oos.win_rate == 0.7 and round(oos.lift_pts or 0) == 20
+    assert (whole.deflated_sharpe, whole.pbo) == (0.9, 0.3)  # the verdict's value
+    assert oos.deflated_sharpe is None and oos.pbo is None  # the side's own, not stored
+    assert (ins.thin, oos.thin, whole.thin) == (False, True, False)
+
+
+def test_columns_of_an_older_run_have_no_in_sample_figures_and_waiting_has_none() -> None:
+    rows = [r for r in result() if r.slice_kind != "in_sample"]
+    ins = verdict(rows).columns[0]
+    assert ins.period == IN_SAMPLE and ins.win_rate is None and ins.trades is None
+    assert verdict(None).columns == () and verdict(None).evidence is None

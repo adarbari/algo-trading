@@ -33,7 +33,7 @@ def test_it_warms_at_start_and_after_each_publish_or_new_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     warmed: list[tuple[date, int]] = []
-    monkeypatch.setattr(warm, "warm", lambda c: warmed.append((c.session.date, c.reader.seq)))
+    monkeypatch.setattr(warm, "warm", lambda c, _f: warmed.append((c.session.date, c.reader.seq)))
     reader, session = _Reader(), _Session(date(2026, 10, 8))
     warmer = CacheWarmer(lambda: _Ctx(session, reader))  # type: ignore[arg-type, return-value]
     assert warmer.warm_once() and not warmer.warm_once()  # nothing new: nothing read
@@ -49,7 +49,7 @@ def test_it_warms_when_a_session_becomes_complete_without_a_publish(
 ) -> None:
     """ADR 0062: the nightly's record flipping the served session saves no table."""
     warmed: list[date] = []
-    monkeypatch.setattr(warm, "warm", lambda c: warmed.append(c.session.date))
+    monkeypatch.setattr(warm, "warm", lambda c, _f: warmed.append(c.session.date))
     session = _Session(date(2026, 10, 8), newer="2026-10-09 failing")
     warmer = CacheWarmer(lambda: _Ctx(session, _Reader()))  # type: ignore[arg-type, return-value]
     assert warmer.warm_once() and not warmer.warm_once()
@@ -63,7 +63,7 @@ def test_a_failed_warm_is_logged_and_tried_again(
 ) -> None:
     calls: list[int] = []
 
-    def flaky(_ctx: Any) -> None:
+    def flaky(_ctx: Any, _frames: Any) -> None:
         calls.append(1)
         if len(calls) == 1:
             raise OSError("a store mid-publish")
@@ -103,3 +103,32 @@ def test_a_failing_step_does_not_stop_the_others(
     ctx = type("C", (), {"configs": None})()
     warm.warm(ctx)  # type: ignore[arg-type]
     assert ran == ["frames", "completeness", "episode a"] and "regime failed" in caplog.text
+
+
+def test_it_runs_the_extra_steps_after_the_screen_rows_and_before_the_market_frames(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The Builder's first preview after a publish reads the saved run and its screen's frame:
+    the screen rows first, then a step per screen (one failing does not stop the next), then
+    the minutes-long market frames; with no extra steps (a test app) none of it."""
+    ran: list[str] = []
+
+    def step(screen: str) -> Any:
+        def run() -> None:
+            if screen == "b":
+                raise ValueError("no data")
+            ran.append(f"preview {screen}")
+
+        return run
+
+    monkeypatch.setattr(warm, "screen_rows", lambda c: ran.append("rows"))
+    monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
+    monkeypatch.setattr(warm, "load_completeness", lambda c, n: None)
+    monkeypatch.setattr(warm, "load_regime", lambda c: None)
+    monkeypatch.setattr(warm, "load_episodes", lambda configs: type("E", (), {"episodes": []}))
+    ctx = type("C", (), {"configs": None})()
+    warm.warm(ctx, lambda c: [(f"preview {i}", step(i)) for i in "abc"])  # type: ignore[arg-type]
+    assert ran == ["rows", "preview a", "preview c", "frames"] and "preview b failed" in caplog.text
+    ran.clear()
+    warm.warm(ctx)  # type: ignore[arg-type]
+    assert ran == ["rows", "frames"]

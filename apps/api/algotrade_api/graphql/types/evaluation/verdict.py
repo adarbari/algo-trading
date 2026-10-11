@@ -2,12 +2,13 @@
 year-by-year rows, and ``EdgeSource`` / ``EdgeDefinition`` (what the edge page says about how
 the edge is defined): every number and sentence is the read model's, none is derived by a page."""
 
+from datetime import date
 from typing import Self
 
 import strawberry
 from strawberry.scalars import JSON
 
-from algotrade.services.read.evaluation import edges, robustness
+from algotrade.services.read.evaluation import edges, evidence, robustness
 from algotrade.services.read.evaluation import verdict as read
 
 
@@ -104,12 +105,19 @@ class VerdictCriterion:
 
 
 @strawberry.type(
-    description="One calendar year of the verdict's basis; `period`: in_sample, out_of_sample "
-    "or both (the split falls inside the year); `liftPts`: win rate minus base rate, in points"
+    description="One calendar year of the verdict's basis, or the part of it on one side of the "
+    "split (`partial`: a year the split falls in is two rows, in-sample then out-of-sample); "
+    '`label` names the row ("2026 Jan-Mar") and it spans `fromDate` to `toDate`; `period`: '
+    "in_sample, out_of_sample or both (an older run's year the split falls inside); `liftPts`: "
+    "win rate minus base rate, in points"
 )
 class VerdictYear:
     year: str
     period: str
+    label: str
+    from_date: date
+    to_date: date
+    partial: bool
     win_rate: float | None
     base_rate: float | None
     lift_pts: float | None
@@ -121,11 +129,78 @@ class VerdictYear:
         return cls(
             year=d.year,
             period=d.period,
+            label=d.label,
+            from_date=d.from_date,
+            to_date=d.to_date,
+            partial=d.partial,
             win_rate=d.win_rate,
             base_rate=d.base_rate,
             lift_pts=d.lift_pts,
             decile_spread=d.decile_spread,
             trades=d.trades,
+        )
+
+
+@strawberry.type(
+    description="The basis's figures over one `period` (in_sample, out_of_sample or all); "
+    "`liftPts`: win rate minus base rate, in points; `thin`: the out-of-sample column has "
+    "fewer trades than the verdict needs. A figure not stored is null"
+)
+class VerdictColumn:
+    period: str
+    win_rate: float | None
+    base_rate: float | None
+    lift_pts: float | None
+    trades: int | None
+    decile_spread: float | None
+    decile_t: float | None
+    sharpe: float | None
+    deflated_sharpe: float | None
+    pbo: float | None
+    thin: bool
+
+    @classmethod
+    def of(cls, d: read.VerdictColumn) -> Self:
+        return cls(
+            period=d.period,
+            win_rate=d.win_rate,
+            base_rate=d.base_rate,
+            lift_pts=d.lift_pts,
+            trades=d.trades,
+            decile_spread=d.decile_spread,
+            decile_t=d.decile_t,
+            sharpe=d.sharpe,
+            deflated_sharpe=d.deflated_sharpe,
+            pbo=d.pbo,
+            thin=d.thin,
+        )
+
+
+@strawberry.type(
+    description="How much evidence the verdict has: `oosTrades` out-of-sample against `needed` "
+    "(from there it can say Promising or Not working; `reached`: it has them), "
+    "`worksOosNeeded` the out-of-sample count Works asks, `wholeTrades` against `wholeNeeded` "
+    "the whole history's, and `checks` the criteria that say whether the result is real"
+)
+class EvidenceProgress:
+    oos_trades: int
+    needed: int
+    works_oos_needed: int
+    whole_trades: int
+    whole_needed: int
+    reached: bool
+    checks: list[VerdictCriterion]
+
+    @classmethod
+    def of(cls, d: evidence.EvidenceProgress) -> Self:
+        return cls(
+            oos_trades=d.oos_trades,
+            needed=d.needed,
+            works_oos_needed=d.works_oos_needed,
+            whole_trades=d.whole_trades,
+            whole_needed=d.whole_needed,
+            reached=d.reached,
+            checks=[VerdictCriterion.of(c) for c in d.checks],
         )
 
 
@@ -175,7 +250,9 @@ class Robustness:
     "base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; "
     "`trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth "
     "of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` "
-    "the lift among random-pick backtests"
+    "the lift among random-pick backtests; `columns` the basis's figures in-sample, "
+    "out-of-sample and over all (empty: no result yet); `evidence` the trades against what the "
+    "verdict needs"
 )
 class EdgeVerdict:
     verdict: str
@@ -199,6 +276,8 @@ class EdgeVerdict:
     trials: int | None
     deciles: list[float | None]
     robustness: Robustness | None
+    columns: list[VerdictColumn]
+    evidence: EvidenceProgress | None
 
     @classmethod
     def of(cls, d: read.EdgeVerdict) -> Self:
@@ -224,4 +303,6 @@ class EdgeVerdict:
             trials=d.trials,
             deciles=list(d.deciles),
             robustness=Robustness.of(d.robustness) if d.robustness else None,
+            columns=[VerdictColumn.of(c) for c in d.columns],
+            evidence=EvidenceProgress.of(d.evidence) if d.evidence else None,
         )

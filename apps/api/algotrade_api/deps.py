@@ -43,6 +43,7 @@ from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.edges import OnDemandEdges
 from algotrade.services.ondemand.screens import OnDemandScreens
+from algotrade.services.preview.frame import PREVIEW_FRAMES, PREVIEW_MAX_BYTES
 from algotrade.services.read.context import (
     ConfigStore,
     NotFoundError,
@@ -78,10 +79,12 @@ class ReadStore:
     user: UserContext
     kind: str = "memory"  # the storage URL scheme (file, memory): GET /health reports it
     cache: ResultCache = field(default_factory=ResultCache, compare=False, repr=False)
-    # The Builder preview's field frames (``services.preview.frame``): large, few, kept apart
-    # so page reads never evict the frame an edit re-evaluates.
+    # The Builder preview's field frames (``services.preview.frame``): large, one per screen,
+    # kept apart so page reads never evict the frame an edit re-evaluates.
     preview_cache: ResultCache = field(
-        default_factory=lambda: ResultCache(4), compare=False, repr=False
+        default_factory=lambda: ResultCache(PREVIEW_FRAMES, PREVIEW_MAX_BYTES),
+        compare=False,
+        repr=False,
     )
 
 

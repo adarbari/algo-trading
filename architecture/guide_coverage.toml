@@ -127,6 +127,10 @@ values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_m
 names = { not_measured = "not measured" }
 
 [[enum]]
+source = "graphql:VerdictYear.label"
+exempt = "free text: the row's name (the year, or its months), explained in Year by year"
+
+[[enum]]
 source = "graphql:Edge.statusReason"
 exempt = "free text the user wrote (the reason for a rejection or retirement)"
 

@@ -83,11 +83,44 @@ const EdgesPage = graphql(`
         years {
           year
           period
+          label
+          fromDate
+          toDate
+          partial
           winRate
           baseRate
           liftPts
           decileSpread
           trades
+        }
+        columns {
+          period
+          winRate
+          baseRate
+          liftPts
+          trades
+          decileSpread
+          decileT
+          sharpe
+          deflatedSharpe
+          pbo
+          thin
+        }
+        evidence {
+          oosTrades
+          needed
+          worksOosNeeded
+          wholeTrades
+          wholeNeeded
+          reached
+          checks {
+            id
+            label
+            value
+            threshold
+            status
+            level
+          }
         }
       }
       canonicalRun {

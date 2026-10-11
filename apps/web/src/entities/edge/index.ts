@@ -27,6 +27,8 @@ export {
   type EdgeVerdict,
   type VerdictCriterion,
   type VerdictYear,
+  type VerdictColumn,
+  type EvidenceProgress,
 } from './model/edges';
 export {
   rangeBins,

@@ -220,6 +220,11 @@ const nearMissColumns: DataTableColumn<ScreenRow>[] = screenColumns.map((column)
   return column;
 });
 
+/** The preview's columns with the score column emphasised, and IV/HV still tinted per cell. */
+const emphasisColumns: DataTableColumn<ScreenRow>[] = nearMissColumns.map((column) =>
+  column.id === 'score' || column.id === 'ratio' ? { ...column, emphasis: true } : column,
+);
+
 const meta = {
   title: 'Components/DataTable',
   component: DataTable,
@@ -250,6 +255,29 @@ export const NearMisses: Story = {
       defaultSort={{ columnId: 'score', direction: 'desc' }}
     />
   ),
+};
+
+/** Emphasised columns (soft accent behind header and cells); a cell's own fill still wins on its cell. */
+export const Emphasis: Story = {
+  render: () => (
+    <DataTable
+      columns={emphasisColumns}
+      rows={screenRows}
+      getRowId={(r) => r.symbol}
+      label="Preview results"
+      defaultSort={{ columnId: 'score', direction: 'desc' }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const grid = within(canvasElement).getByRole('grid');
+    await expect(grid.querySelector('[role="columnheader"][data-emphasis]')).not.toBeNull();
+  },
+};
+
+/** An emphasised column on a phone: the tint follows the column into the narrow set. */
+export const EmphasisNarrow: Story = {
+  ...Emphasis,
+  decorators: [narrow],
 };
 
 /** Explore ticker list: selection (controlled), two-line rows, toolbar and column picker. */

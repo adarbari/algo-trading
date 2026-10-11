@@ -1,0 +1,107 @@
+/* EvidenceMeter: head (label, "5 of 40"), the track (fill, milestone ticks), tick names, caption. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.label {
+  color: var(--color-text-2);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.reading {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.reason {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  text-align: end;
+}
+
+.track {
+  position: relative;
+  height: var(--space-2-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-track);
+}
+
+/* Unknown: a dashed, empty track (no fill), so it never reads as zero progress. */
+.track[data-unknown] {
+  border: var(--border-width-thin) dashed var(--color-control);
+  background: transparent;
+}
+
+.fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--pos);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+}
+
+/* A tick on the track: muted while still ahead, the strong accent once reached. */
+.tick {
+  position: absolute;
+  inset-block: calc(var(--space-0-5) * -1);
+  inset-inline-start: var(--at);
+  width: var(--border-width-thick);
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
+  transform: translateX(-50%);
+}
+
+.tick[data-reached] {
+  background: var(--color-accent-strong);
+}
+
+.names {
+  position: relative;
+  height: var(--line-height-xs);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  position: absolute;
+  inset-inline-start: var(--at);
+  white-space: nowrap;
+}
+
+.name[data-reached] {
+  color: var(--color-text-2);
+  font-weight: var(--font-weight-medium);
+}
+
+.name[data-align='center'] {
+  transform: translateX(-50%);
+}
+
+.name[data-align='end'] {
+  inset-inline: auto calc(100% - var(--at));
+  text-align: end;
+}
+
+.caption {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}

@@ -143,15 +143,23 @@ describe('EdgeDetail', () => {
     expect(screen.queryByRole('link', { name: /Daniel/ })).not.toBeInTheDocument();
   });
 
-  it('switches the year table between in-sample, out-of-sample and both', async () => {
+  it('splits the year of the split into in-sample and out-of-sample rows', async () => {
     render(<EdgeDetail id="momentum_12_1" onBack={vi.fn()} onEdit={vi.fn()} />);
     const years = () => screen.getByRole('grid', { name: 'Year by year' });
-    expect(within(years()).getByText('2026')).toBeInTheDocument();
+    const shown = (label: string) => within(years()).queryByText(label);
+    expect(shown('2025')).toBeInTheDocument();
+    expect(shown('2026 Jan–Mar')).toBeInTheDocument();
+    expect(shown('2026 Apr–Dec')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'In-sample' }));
-    expect(within(years()).getByText('2025')).toBeInTheDocument();
-    expect(within(years()).queryByText('2026')).not.toBeInTheDocument();
+    expect(shown('2025')).toBeInTheDocument();
+    expect(shown('2026 Jan–Mar')).toBeInTheDocument();
+    expect(shown('2026 Apr–Dec')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'Out-of-sample' }));
-    expect(within(years()).getByText('No years to show')).toBeInTheDocument();
+    expect(shown('No years to show')).not.toBeInTheDocument();
+    expect(shown('2026 Apr–Dec')).toBeInTheDocument();
+    expect(shown('2025')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'All' }));
+    expect(within(years()).getAllByText(/^2026 /)).toHaveLength(2);
   });
 
   it('keeps the tests and backtests in the details', async () => {

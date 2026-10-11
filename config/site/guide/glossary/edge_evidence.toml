@@ -342,13 +342,50 @@ term = "Year by year"
 short = "The result of the verdict's screen and holding period for each calendar year, with the trades behind it."
 body = """
 One row per year: win rate, base rate, lift, top vs bottom decile and trades, marked in-sample or
-out-of-sample. The year the split falls in is marked both and shows only under Both. Use it to see
+out-of-sample. A year the split falls in is two rows, one for each side (see Year cut by the
+split). The view switch shows In-sample, Out-of-sample or All, which lists every row. Use it to see
 whether the result is steady or comes from one year. A year with no trades has no result, which is
 different from a result of zero. Example: vrp_short_premium has no trades from 2011 to 2023, as
 the data it needs starts around 2024. In 2024 it won 80% against 70% on 2 trades. In 2025 it won
 70% against 71% on 8, and in 2026 73% against 71% on 5. Don't read a year with 2 trades as a result.
 """
-see_also = ["trades", "in_sample", "out_of_sample", "win_rate", "base_rate", "top_vs_bottom_decile"]
+see_also = [
+  "trades", "in_sample", "out_of_sample", "win_rate", "base_rate", "top_vs_bottom_decile",
+  "partial_year",
+]
+
+[[term]]
+id = "partial_year"
+term = "Year cut by the split"
+short = "A year the out-of-sample start falls in shows as two rows, one per side, each a part of the year."
+body = """
+The out-of-sample period starts on one date, so the year that holds it shows as two rows. The
+months before that date are in-sample; the months from it on are out-of-sample. Each row says its
+months. A trade belongs to the side of the session it was decided on, so a trade decided late in
+March settles in April and still counts in-sample. A part-year row has fewer trades than a whole
+year and its figures are never scaled up to a year. Example: with the split on 2026-04-01, 2026
+shows as 2026 Jan–Mar with 3 trades and 2026 Apr–Dec with 9. Don't add the two rows' win rates
+together; each is its own sample.
+"""
+see_also = ["year_by_year", "in_sample", "out_of_sample", "trades"]
+
+[[term]]
+id = "evidence_needed"
+term = "Evidence needed"
+short = "The out-of-sample trades an edge has against the number its verdict needs."
+body = """
+The meter counts out-of-sample trades against the minimum the verdict needs before it can say
+Promising or Not working; fewer than that is Not enough data. Works asks for more, both out of
+sample and over the whole history, and the page shows those counts too. Under it are the checks
+that say whether the result is real: the win rate against the base rate, the random picks, the
+baselines and the trade count. Evidence builds slowly, because decisions are at least one holding
+period apart, so the count grows by about one trade per holding period. Example: momentum_12_1
+decides once a month, so 12 trades take a year, and 40 need about three. Don't read a full meter
+as a good result; it only says the verdict can now judge.
+"""
+see_also = [
+  "verdict", "verdict_criteria", "out_of_sample", "trades", "win_rate", "base_rate",
+]
 
 [[term]]
 id = "edge_backtests"

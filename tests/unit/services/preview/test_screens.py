@@ -14,6 +14,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.services.configs import resolve_config
+from algotrade.services.preview import screens
 from algotrade.services.preview.screens import preview_screen
 from algotrade.services.read.context import open_context
 from algotrade.services.screening.run import run_screener
@@ -89,6 +90,39 @@ def test_changes_against_the_saved_run_of_the_session() -> None:
     )
     assert stricter.changes is not None
     assert (stricter.changes.entered, stricter.changes.left) == ([], picked)
+
+
+def test_the_saved_picks_are_read_once_per_publish(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Finding the saved run groups the session's whole partition and its rows sort it: the
+    diff against it is cached, so an edit re-evaluates without reading the run again, and a
+    publish (a screener's first run, here) is never served stale, a missing run included."""
+    reader, writer = seeded()
+    store = ReadStore(reader, configs(), UserContext(ALICE))
+    reads: list[str] = []
+    real = screens.run_rows
+    monkeypatch.setattr(screens, "run_rows", lambda *a, **k: reads.append("read") or real(*a, **k))
+    spec = {**SCREEN, "id": "big_liquid"}
+    assert preview(store, spec).changes is None  # no run yet: cached as such
+    assert preview(store, spec).changes is None
+    preset = resolve_config(configs(), "big_liquid", UserContext("site"))
+    run_screener(reader, writer, preset, DAY, now=T0)  # a publish
+    assert preview(store, spec).changes is not None
+    assert preview(store, criterion(spec, "price", value=1e9)).changes is not None  # an edit
+    assert preview(store, spec).changes is not None
+    assert reads == ["read"]  # one read for the run, however many previews
+
+
+def test_the_warmed_preview_of_a_saved_screen_is_what_its_first_preview_asks_for() -> None:
+    """The warmer reads a saved screen's frame and picks as the Builder's first preview of it
+    (the draft the page opens on, unchanged) will ask: that preview then reads nothing."""
+    reader, writer = seeded()
+    preset = resolve_config(configs(), "big_liquid", UserContext("site"))
+    run_screener(reader, writer, preset, DAY, now=T0)
+    store = ReadStore(reader, configs(), UserContext(ALICE))
+    ctx = open_context(store.reader, store.configs, store.user, DAY, store.cache)
+    screens.warm_preview(ctx, store.preview_cache, "big_liquid")
+    first = preview(store, {**SCREEN, "id": "big_liquid"})  # the saved screen, unchanged
+    assert first.cached and first.changes is not None
 
 
 def test_a_draft_with_no_saved_run_has_no_changes() -> None:

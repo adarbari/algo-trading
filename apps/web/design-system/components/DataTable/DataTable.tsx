@@ -523,6 +523,7 @@ export function DataTable<TRow extends RowData>({
                       role="columnheader"
                       data-align={align}
                       data-pinned={pinColumn(column.id)}
+                      data-emphasis={column.emphasis || undefined}
                       aria-sort={
                         canSort
                           ? sorted === 'asc'
@@ -667,6 +668,7 @@ export function DataTable<TRow extends RowData>({
                           data-align={alignOf(column)}
                           data-pinned={pinColumn(column.id)}
                           data-mono={column.mono || undefined}
+                          data-emphasis={column.emphasis || undefined}
                           data-fill={column.fill?.(row.original)}
                           data-tone={
                             column.cell
