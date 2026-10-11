@@ -442,7 +442,8 @@ RUN_FIELDS = "runId job session status startedAt durationS itemsTotal itemsBySta
 ADMIN = {
     "IngestionCompleteness": "query IngestionCompleteness($sessions: Int!) { completeness("
     "sessions: $sessions) { sessions datasets lastClosed cells { dataset session status present "
-    "expected basis runIds } } }",
+    "expected basis runIds } } chainCoverage { session total ok share statuses { code count } "
+    "tiers { tier total ok stale } chronic chronicNames medianShare previousChronic drift } }",
     "IngestionCell": "query IngestionCell($dataset: String!, $date: Date!) { ingestionCell("
     "dataset: $dataset, date: $date) { job cell { status present expected } groups { reason "
     f"count examples }} runs {{ {RUN_FIELDS} }} }} }}",

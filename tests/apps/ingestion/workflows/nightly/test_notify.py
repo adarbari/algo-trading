@@ -12,6 +12,7 @@ import pytest
 from algotrade.config.site.settings import NightlySettings
 from algotrade_ingestion.workflows.nightly import notify
 from algotrade_ingestion.workflows.nightly.notify import EmailConfig, EmailNotifier, Notice
+from tests.helpers import nightly_runs as fx
 
 ENV = {
     "ALGOTRADE_NOTIFY_EMAIL_TO": "owner@example.com, ops@example.com",
@@ -214,4 +215,17 @@ def test_a_report_that_cannot_be_built_still_notifies(tmp_path: Path) -> None:
 
     out = notify.report(summary, settings, Spy(), Broken())  # type: ignore[arg-type]
     assert seen[0].message == "PARTIAL (2026-10-02)" and seen[0].text == ""
-    assert out["warnings"][0]["detail"] == "summary report not built: OSError: store gone"
+    details = [w["detail"] for w in out["warnings"]]
+    assert "summary report not built: OSError: store gone" in details
+    assert "chain_coverage" in {w["check"] for w in out["warnings"]}  # not computed: a WARN too
+
+
+def test_chain_coverage_drift_is_a_warning_in_the_summary_even_without_notifications(
+    tmp_path: Path,
+) -> None:
+    reader, _ = fx.chain_nights(stale_today=60)
+    settings = NightlySettings(summary_path=str(tmp_path / "s.json"), notify_enabled=False)
+    summary = {"status": "COMPLETE", "sessions": ["2026-10-02"], "runs": [], "steps": {}}
+    out = notify.report(summary, settings, notify.NullNotifier(), reader)
+    assert [w["check"] for w in out["warnings"]] == ["chain_coverage"]
+    assert json.loads((tmp_path / "s.json").read_text())["warnings"] == out["warnings"]

@@ -255,7 +255,7 @@ export type IngestionCompletenessQueryVariables = Exact<{
 }>;
 
 
-export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null };
+export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null, chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null };
 
 export type IngestionCellQueryVariables = Exact<{
   dataset: string;
@@ -1646,6 +1646,26 @@ export const IngestionCompletenessDocument = new TypedDocumentString(`
       basis
       runIds
     }
+  }
+  chainCoverage {
+    session
+    total
+    ok
+    share
+    statuses {
+      code
+      count
+    }
+    tiers {
+      tier
+      total
+      ok
+      stale
+    }
+    chronic
+    chronicNames
+    previousChronic
+    drift
   }
 }
     `) as unknown as TypedDocumentString<IngestionCompletenessQuery, IngestionCompletenessQueryVariables>;
