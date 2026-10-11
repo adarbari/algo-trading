@@ -75,6 +75,38 @@ describe('with Supabase configured', () => {
     expect(auth.getSession).toHaveBeenCalledTimes(2);
   });
 
+  it('has no background refresh ticker: the one refresh is the shared session read', async () => {
+    // auth-js's ticker refreshes on its own, racing the read; with an expired token both sent the
+    // spent refresh token (e2e "an expired token is refreshed" saw two calls).
+    let refreshes = 0;
+    auth.getSession.mockImplementation(async () => {
+      refreshes += 1;
+      await Promise.resolve();
+      return { data: { session: { access_token: 'tok-2', user: { email: 'a@b.co' } } } };
+    });
+    const { accessToken } = await load(CONFIGURED);
+    await Promise.all(Array.from({ length: 8 }, () => accessToken()));
+    expect(refreshes).toBe(1);
+    expect(AuthClient.mock.calls[0]?.[0]).toMatchObject({ autoRefreshToken: false });
+  });
+
+  it('reads the session under a browser-wide lock so two tabs never refresh with the same token', async () => {
+    const held: string[] = [];
+    const request = vi.fn((name: string, _options: unknown, read: () => Promise<unknown>) => {
+      held.push(name);
+      return read();
+    });
+    vi.stubGlobal('navigator', { locks: { request } });
+    try {
+      const { accessToken } = await load(CONFIGURED);
+      await accessToken();
+      expect(held.length).toBeGreaterThan(0);
+      expect(new Set(held)).toEqual(new Set(['algotrade-session-read']));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('creates the client once, with exactly the options supabase-js used', async () => {
     const { accessToken } = await load({ url: 'https://abcd.supabase.co/', key: 'anon' });
     await accessToken();
@@ -87,7 +119,7 @@ describe('with Supabase configured', () => {
         storageKey: 'sb-abcd-auth-token',
         flowType: 'implicit',
         persistSession: true,
-        autoRefreshToken: true,
+        autoRefreshToken: false,
         detectSessionInUrl: false,
       },
     ]);
@@ -146,11 +178,30 @@ describe('with Supabase configured', () => {
     const { subscribeSession } = await load(CONFIGURED);
     const seen: unknown[] = [];
     const stop = subscribeSession((s) => seen.push(s));
+    await vi.waitFor(() => {
+      expect(auth.onAuthStateChange).toHaveBeenCalledTimes(2);
+    });
     emit('SIGNED_IN', { user: { email: 'a@b.co' } });
     emit('SIGNED_OUT', null);
     expect(seen).toEqual([{ email: 'a@b.co' }, null]);
     stop();
     expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it('registers auth listeners only after the start-up read (their initial read would refresh again)', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    auth.getSession.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const { subscribeSession } = await load(CONFIGURED);
+    const stop = subscribeSession(() => undefined);
+    const skipped = subscribeSession(() => undefined);
+    skipped();
+    await Promise.resolve();
+    expect(auth.onAuthStateChange).not.toHaveBeenCalled();
+    finish({ data: { session: null } });
+    await vi.waitFor(() => {
+      expect(auth.onAuthStateChange).toHaveBeenCalledTimes(2);
+    });
+    stop();
   });
 
   it('a SIGNED_OUT from elsewhere (another tab) tells the listeners; our own sign-out does not', async () => {
