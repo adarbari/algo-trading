@@ -2,13 +2,16 @@
 the text model off with the file's message instead of stopping the app."""
 
 import logging
+from collections.abc import Mapping
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.site.llm import LlmSettings
+from algotrade.core.model.completion import Attempt
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.ledger import UsageLedger
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -225,3 +228,17 @@ def test_shutdown_flushes_the_usage_ledger(api_golden: tuple[ReadStore, dict[str
     with TestClient(app):
         assert not sink.closed
     assert sink.closed
+
+
+def test_only_restricts_the_chain_to_the_named_providers_and_tee_sees_the_usage_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    seen: list[Mapping[str, Any]] = []
+    model, _ = open_text_model(configs(CHAIN), only=["gemini"], tee=seen.append)
+    assert isinstance(model, FallbackTextModel) and model.ledger is not None
+    assert [p for p, _ in model.members] == ["gemini"]
+    attempt = Attempt(datetime.now(UTC), "gemini", "m", "t", None, "ok", 0.1, 1, 1)
+    model.ledger.record(attempt)
+    assert seen and seen[0]["provider"] == "gemini" and seen[0]["cost_usd"] == 0.0
+    assert open_text_model(configs(CHAIN), only=["nope"])[0] is None
