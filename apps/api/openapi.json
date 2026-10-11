@@ -2858,6 +2858,25 @@
               "default": "all",
               "description": "which trades: in_sample, out_of_sample, live or all"
             }
+          },
+          {
+            "description": "the session to read (default: the latest); live rows",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the session to read (default: the latest); live rows",
+              "title": "Date"
+            }
           }
         ],
         "responses": {

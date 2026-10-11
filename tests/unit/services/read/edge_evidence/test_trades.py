@@ -4,7 +4,7 @@ value `LICENCE` to a viewer without the licence (and its sort order never disclo
 copy's in-sample rows only; PRUNED and NOT_STORED told apart; live rows from the paper record as
 the session's cutoff knew them."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from algotrade.data import StoreReader
@@ -166,3 +166,32 @@ def test_the_live_period_reads_the_paper_record_as_the_cutoff_knew_it(
 
 def test_every_public_reason_the_ledger_writes_is_one_the_guide_names() -> None:
     assert set(EXCLUDED_KINDS.values()) <= set(EXCLUDED_REASONS)  # the writer's kinds, ADR 0056
+
+
+def test_a_page_below_the_first_is_the_first(backend: MemoryBackend) -> None:
+    ctx = context(backend, "owner")
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL, page=-3, limit=2)
+    assert page.page == 1 and [r.instrument_id for r in page.rows] == ["EQ:A", "EQ:B"]
+
+
+def test_the_live_total_counts_every_settled_row_beyond_the_lookback(
+    backend: MemoryBackend,
+) -> None:
+    old = date(2024, 1, 2)  # well over 400 days before the session
+    store(backend, [trade("EQ:OLD", old, "won", sell=date(2024, 2, 1))])
+    ctx = context(backend, "me", cutoff=CUTOFF)
+    page = load_edge_trades(ctx, edge_of(ctx), Period.LIVE)
+    assert [r.instrument_id for r in page.rows] == ["EQ:OLD"] and page.total == 1
+
+
+def test_a_hidden_copys_live_trades_are_served() -> None:
+    backend = MemoryBackend()
+    write_own_run(backend)
+    store(backend, [trade("EQ:F", date(2026, 9, 1), "won", sell=date(2026, 9, 30), edge="mine",
+                          user="me")])  # fmt: skip
+    docs = {("me", "edges", "mine"): {"extends": "drift", "screeners": ["momo"]}}
+    ctx = context(backend, "me", docs, cutoff=CUTOFF)
+    edge = load_edge(ctx, "mine")
+    assert edge is not None and edge.oos_hidden
+    page = load_edge_trades(ctx, edge, Period.LIVE)
+    assert [r.instrument_id for r in page.rows] == ["EQ:F"] and not page.oos_hidden

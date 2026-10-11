@@ -5,27 +5,37 @@ withheld out-of-sample trades as the page; the caller is authenticated like ever
 ledger that cannot be read (no official run, pruned, never stored) is a 404 naming its public
 kind, never its cause."""
 
+import datetime as dt
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
+from algotrade.config.user import UserContext
+from algotrade.services.read.context import open_context
 from algotrade.services.read.edge_evidence import trades
 from algotrade.services.read.edge_evidence.trades_csv import csv_lines
 from algotrade.services.read.evaluation.edges import load_edge
-from algotrade_api.deps import Context
+from algotrade_api.deps import Caller, Store
 
 router = APIRouter(prefix="/files/edges", tags=["files"])
 
 
 @router.get("/{edge_id}/trades.csv", response_class=StreamingResponse)
 def trades_csv(
-    ctx: Context,
+    store: Store,
+    caller: Caller,
     edge_id: str,
     period: Annotated[
         trades.Period, Query(description="which trades: in_sample, out_of_sample, live or all")
     ] = trades.Period.ALL,
+    date: Annotated[
+        dt.date | None, Query(description="the session to read (default: the latest); live rows")
+    ] = None,
 ) -> StreamingResponse:
+    ctx = open_context(
+        store.reader, store.configs, UserContext(caller.user_id), date, cache=store.cache
+    )
     edge = load_edge(ctx, edge_id)
     if edge is None:
         raise HTTPException(404, f"no such edge: {edge_id}")

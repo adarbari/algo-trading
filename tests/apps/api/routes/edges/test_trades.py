@@ -7,6 +7,7 @@ authenticated like every other."""
 import csv
 import io
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 import pytest
@@ -21,6 +22,7 @@ from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.helpers.api_store import StubAuthenticator, store_over
 from tests.helpers.rollup_store import write_bars
+from tests.unit.services.read.edge_desk.conftest import store, trade
 from tests.unit.services.read.edge_evidence.conftest import LEDGER, SESSION, USERS
 from tests.unit.services.read.evaluation.conftest import DOCS, FROZEN, write_run
 
@@ -165,3 +167,15 @@ def test_the_variant_grid_marks_the_basis(make: Make) -> None:
     grid = body["data"]["edgeVariants"]
     assert grid["basis"] == "momo, 20 trading days" and grid["oosHidden"] is False
     assert grid["rows"] == [{"variant": "momo", "official": True, "notPreChosen": False}]
+
+
+def test_the_file_takes_the_pages_session_for_live_rows(make: Make) -> None:
+
+    backend = backend_with_run()
+    store(backend, [trade("EQ:L", date(2026, 9, 1), "won", sell=date(2026, 9, 30))])
+    client = make("me", Role.TRADER, backend)
+    asked = {"period": "live", "date": SESSION.isoformat()}
+    rows = list(
+        csv.DictReader(io.StringIO(client.get("/files/edges/drift/trades.csv", params=asked).text))
+    )
+    assert [r["instrument_id"] for r in rows] == ["EQ:L"] and rows[0]["source"] == "live"

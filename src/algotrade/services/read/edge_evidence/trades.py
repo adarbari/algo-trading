@@ -114,7 +114,7 @@ def _live(
     ctx: ReadContext, edge: Edge, basis: OfficialBasis, sort: str | None, descending: bool
 ) -> list[TradeRow]:
     assert basis.key is not None
-    found = paper.load_trades(ctx, {edge.id: edge})
+    found = paper.load_trades(ctx, {edge.id: edge}, lookback=None)
     rows = [
         _live_row(t)
         for t in found
@@ -141,11 +141,12 @@ def load_edge_trades(
 ) -> EdgeTradePage:
     """The trades of ``edge``'s verdict basis for ``period``: page ``page`` of ``limit`` rows
     (None: every row, for the file), sorted by ``sort`` (``runs.SORTABLE``)."""
+    page = max(page, 1)  # a page below the first is the first, and served as such
     basis = official_basis(ctx, edge)
     if basis.key is None or basis.run is None:
         return EdgeTradePage(period, page, basis.not_run, basis.reason)
     words = f"{basis.key[0]}, {basis.key[1]} trading days"
-    offset = 0 if limit is None else (max(page, 1) - 1) * limit
+    offset = 0 if limit is None else (page - 1) * limit
     if period is Period.LIVE:
         rows = _live(ctx, edge, basis, sort, descending)
         part = tuple(rows[offset : None if limit is None else offset + limit])

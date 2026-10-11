@@ -1714,6 +1714,8 @@ export interface operations {
     trades_csv_files_edges__edge_id__trades_csv_get: {
         parameters: {
             query?: {
+                /** @description the session to read (default: the latest); live rows */
+                date?: string | null;
                 /** @description which trades: in_sample, out_of_sample, live or all */
                 period?: components["schemas"]["Period"];
             };

@@ -62,7 +62,8 @@ In-sample: picks decided before the split, the part of history the edge was tune
 Out-of-sample: picks decided after it, the fair test. All: both sides of the backtest. Live: the
 paper trades the app recorded since the edge was followed, read as the session knew them, so a
 result recorded later does not change an earlier session. An edge you copied keeps its
-out-of-sample picks hidden until you show them, and the list then has none. Example: a ledger of
+out-of-sample backtest picks hidden until you show them. Its live trades are forward trades, so
+they stay listed. Example: a ledger of
 400 picks may be 300 in-sample and 100 out-of-sample. Don't judge an edge from the in-sample
 rows.
 """
