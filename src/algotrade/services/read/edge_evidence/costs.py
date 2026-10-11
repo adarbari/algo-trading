@@ -16,6 +16,7 @@ from typing import Final
 
 from algotrade.quant.edges.statistics import break_even_cost
 from algotrade.services.read.context import Stores
+from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
 from algotrade.services.read.edge_evidence.rows import BasisRows, load_basis_rows
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge
@@ -150,15 +151,13 @@ def costs_of(
     return EdgeCosts(state, basis.variant, basis.horizon, assumed, levels, periods)
 
 
-def load_edge_costs(
-    ctx: Stores, edge: Edge, variant: str | None = None, horizon: int | None = None
-) -> EdgeCosts:
-    """The cost sensitivity of ``edge``'s official result at the verdict's basis (or the screen
-    and holding period named), against the document's own cost."""
+def load_edge_costs(ctx: Stores, edge: Edge, basis: OfficialBasis | None = None) -> EdgeCosts:
+    """The cost sensitivity of ``edge``'s official result at the verdict's basis (``basis``: the
+    one the page resolved; resolved here when not given), against the document's own cost."""
     st = edge.settings
     cost = st.cost_bps if st is not None else None
     return costs_of(
-        load_basis_rows(ctx, edge, variant, horizon),
+        load_basis_rows(ctx, basis or official_basis(ctx, edge)),
         cost,
         st.cost_applies if st is not None else True,
         st.outcome_sign if st is not None else 1.0,

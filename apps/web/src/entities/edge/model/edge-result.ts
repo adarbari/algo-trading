@@ -18,3 +18,10 @@ export type EdgeMonthly = NonNullable<gqlTypes.EdgeResultMonthlyQuery['edgeResul
 export type EdgeResultDecay = NonNullable<
   NonNullable<gqlTypes.EdgeResultDecayQuery['edgeResult']>['decay']
 >;
+export type EdgeCosts = NonNullable<gqlTypes.EdgeResultCostsQuery['edgeResult']>['costs'];
+export type EdgeCapacity = NonNullable<gqlTypes.EdgeResultCapacityQuery['edgeResult']>['capacity'];
+export type EdgeRegimes = NonNullable<gqlTypes.EdgeResultRegimesQuery['edgeResult']>['regimes'];
+export type RegimeRow = EdgeRegimes['rows'][number];
+export type SliceFigure = RegimeRow['figures'][number];
+export type EdgeHorizons = NonNullable<gqlTypes.EdgeResultHorizonsQuery['edgeResult']>['horizons'];
+export type HorizonRow = EdgeHorizons['rows'][number];

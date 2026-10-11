@@ -106,7 +106,7 @@ def _fill_ratio(p: Projection) -> float | None:
     return None
 
 
-def _project(remaining: int, p: Projection | None) -> tuple[str, date | None, float | None]:
+def project(remaining: int, p: Projection | None) -> tuple[str, date | None, float | None]:
     """``(state, expected_by, fill_ratio)`` for ``remaining`` trades: the ``ceil(remaining /
     ratio)``-th stored exit."""
     ratio = None if p is None else _fill_ratio(p)
@@ -142,7 +142,7 @@ def outlook_of(
     elif schedule is not None and schedule.startswith("on_event:"):
         state, by, ratio = UNPROJECTABLE, None, None
     else:
-        state, by, ratio = _project(remaining, projection)
+        state, by, ratio = project(remaining, projection)
     return EdgeOutlook(gap.id, gap.level, sentence, have, needed, remaining, state, by, ratio)
 
 

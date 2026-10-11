@@ -167,6 +167,34 @@ export type EdgeResultDecayQueryVariables = Exact<{
 
 export type EdgeResultDecayQuery = { edgeResult: { decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null } | null };
 
+export type EdgeResultCostsQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgeResultCostsQuery = { edgeResult: { costs: { state: string, variant: string | null, horizon: number | null, assumedBp: number, levels: Array<{ period: string, bp: number, assumed: boolean, sessions: number | null, picks: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, meanExcess: number | null }>, periods: Array<{ period: string, state: string, breakEvenBp: number | null, decileSpread: number | null }> } } | null };
+
+export type EdgeResultCapacityQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgeResultCapacityQuery = { edgeResult: { capacity: { state: string, variant: string | null, horizon: number | null, floorUsd: number, periods: Array<{ period: string, state: string, picks: number | null, advMedian: number | null, advKnown: number | null, advLow: number | null }> } } | null };
+
+export type EdgeResultRegimesQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgeResultRegimesQuery = { edgeResult: { regimes: { state: string, variant: string | null, horizon: number | null, rows: Array<{ regime: string, figures: Array<{ period: string, state: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, thin: boolean }> }> } } | null };
+
+export type EdgeResultHorizonsQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EdgeResultHorizonsQuery = { edgeResult: { horizons: { state: string, variant: string | null, needed: number, rows: Array<{ horizon: number, basis: boolean, figures: Array<{ period: string, state: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, thin: boolean }>, oosBy: { state: string, needed: number, have: number | null, remaining: number | null, expectedBy: string | null, fillRatio: number | null } }> } } | null };
+
 export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -784,6 +812,110 @@ export const EdgeResultDecayDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgeResultDecayQuery, EdgeResultDecayQueryVariables>;
+export const EdgeResultCostsDocument = new TypedDocumentString(`
+    query EdgeResultCosts($id: String!) {
+  edgeResult(id: $id) {
+    costs {
+      state
+      variant
+      horizon
+      assumedBp
+      levels {
+        period
+        bp
+        assumed
+        sessions
+        picks
+        winRate
+        baseRate
+        liftPts
+        meanExcess
+      }
+      periods {
+        period
+        state
+        breakEvenBp
+        decileSpread
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultCostsQuery, EdgeResultCostsQueryVariables>;
+export const EdgeResultCapacityDocument = new TypedDocumentString(`
+    query EdgeResultCapacity($id: String!) {
+  edgeResult(id: $id) {
+    capacity {
+      state
+      variant
+      horizon
+      floorUsd
+      periods {
+        period
+        state
+        picks
+        advMedian
+        advKnown
+        advLow
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultCapacityQuery, EdgeResultCapacityQueryVariables>;
+export const EdgeResultRegimesDocument = new TypedDocumentString(`
+    query EdgeResultRegimes($id: String!) {
+  edgeResult(id: $id) {
+    regimes {
+      state
+      variant
+      horizon
+      rows {
+        regime
+        figures {
+          period
+          state
+          winRate
+          baseRate
+          liftPts
+          trades
+          thin
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultRegimesQuery, EdgeResultRegimesQueryVariables>;
+export const EdgeResultHorizonsDocument = new TypedDocumentString(`
+    query EdgeResultHorizons($id: String!) {
+  edgeResult(id: $id) {
+    horizons {
+      state
+      variant
+      needed
+      rows {
+        horizon
+        basis
+        figures {
+          period
+          state
+          winRate
+          baseRate
+          liftPts
+          trades
+          thin
+        }
+        oosBy {
+          state
+          needed
+          have
+          remaining
+          expectedBy
+          fillRatio
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeResultHorizonsQuery, EdgeResultHorizonsQueryVariables>;
 export const EdgesPageDocument = new TypedDocumentString(`
     query EdgesPage {
   edgeProblems {

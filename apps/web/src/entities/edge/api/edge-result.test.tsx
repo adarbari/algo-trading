@@ -5,7 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import { useEdgeCurve, useEdgeDecay, useEdgeDrawdown, useEdgeResultBasis } from './edge-result';
+import {
+  useEdgeCosts,
+  useEdgeCurve,
+  useEdgeDecay,
+  useEdgeDrawdown,
+  useEdgeHorizons,
+  useEdgeRegimes,
+  useEdgeResultBasis,
+} from './edge-result';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -56,5 +64,25 @@ describe('the edge result sections', () => {
     });
     expect(basis.result.current.data).toBeNull();
     expect(decay.result.current.data).toBeNull();
+  });
+
+  it('reads the regime, holding-period and cost sections as their own documents, no date', async () => {
+    GQL.mockResolvedValue({ edgeResult: { regimes: { state: 'measured', rows: [] } } });
+    const regimes = renderHook(() => useEdgeRegimes('drift'), { wrapper });
+    await waitFor(() => {
+      expect(regimes.result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgeResultRegimes');
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ id: 'drift' });
+    GQL.mockResolvedValue({ edgeResult: { horizons: { state: 'measured', rows: [] } } });
+    const horizons = renderHook(() => useEdgeHorizons('drift'), { wrapper });
+    GQL.mockResolvedValue({ edgeResult: { costs: { state: 'measured' } } });
+    const costs = renderHook(() => useEdgeCosts('drift'), { wrapper });
+    await waitFor(() => {
+      expect(horizons.result.current.isSuccess && costs.result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[1]?.[0])).toContain('query EdgeResultHorizons');
+    expect(String(GQL.mock.calls[2]?.[0])).toContain('query EdgeResultCosts');
+    expect(horizons.result.current.data?.state).toBe('measured');
   });
 });

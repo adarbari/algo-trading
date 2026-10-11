@@ -15,7 +15,15 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.edge_evidence import curve, decay, drawdown, live, rolling
+from algotrade.services.read.edge_evidence import (
+    capacity,
+    costs,
+    curve,
+    decay,
+    drawdown,
+    live,
+    rolling,
+)
 from algotrade.services.read.edge_evidence.basis import (
     BasisSummary,
     OfficialBasis,
@@ -23,9 +31,12 @@ from algotrade.services.read.edge_evidence.basis import (
     summary_of,
 )
 from algotrade.services.read.edge_evidence.series import BasisSeries, load_basis_series
+from algotrade.services.read.edge_evidence.slices import horizons, regimes
 from algotrade.services.read.evaluation import edges
 from algotrade.services.read.values import Unknown as ReadUnknown
 from algotrade_api.graphql.offload import off_loop
+from algotrade_api.graphql.types.evaluation.edge_costs import EdgeCapacity, EdgeCosts
+from algotrade_api.graphql.types.evaluation.edge_slices import EdgeHorizons, EdgeRegimes
 from algotrade_api.graphql.types.evaluation.verdict import EdgeDecay
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
@@ -384,3 +395,40 @@ class EdgeResult:
         series = await self._series()
         found = await off_loop(decay.load_decay, self.ctx, self.edge, series)
         return EdgeDecay.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="How the verdict's basis holds up under trading costs (ADR 0064): the win "
+        "rate, lift and mean excess return at each round-trip cost the harness measured, the "
+        "break-even cost and the decile spread. `state` says why there is none "
+        "(not_a_cost_outcome: the outcome is not a return)"
+    )
+    async def costs(self, info: Info) -> EdgeCosts:
+        basis = await self._basis()
+        return EdgeCosts.of(await off_loop(costs.load_edge_costs, self.ctx, self.edge, basis))
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="How much money the basis's picks can take (ADR 0064): the median 20-day "
+        "dollar volume of the counted picks and how many trade below the site's floor, per period"
+    )
+    async def capacity(self, info: Info) -> EdgeCapacity:
+        basis = await self._basis()
+        found = await off_loop(capacity.load_edge_capacity, self.ctx, self.edge, basis)
+        return EdgeCapacity.of(found)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The verdict's basis in each market regime: win rate, base rate, lift and "
+        "trades per regime, whole run only (the split's two sides are not stored)"
+    )
+    async def regimes(self, info: Info) -> EdgeRegimes:
+        basis = await self._basis()
+        return EdgeRegimes.of(await off_loop(regimes.load_regimes, self.ctx, basis))
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The verdict's screen at every holding period: in-sample, out-of-sample and "
+        "whole-history lift with trades, the basis marked, and the date each out-of-sample "
+        "count is expected to reach the verdict's bar"
+    )
+    async def horizons(self, info: Info) -> EdgeHorizons:
+        basis = await self._basis()
+        found = await off_loop(horizons.load_horizons, self.ctx, self.edge, basis)
+        return EdgeHorizons.of(found)

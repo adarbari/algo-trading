@@ -1,0 +1,43 @@
+# L3 site setting: the Guide glossary, edges: where an edge's result worked, by market regime and by holding period (ADR 0051, ADR 0064). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "by_regime"
+term = "Result by regime"
+short = "The edge's win rate, base rate and lift in each market regime: calm, caution, stress and crisis."
+body = """
+Each row is the sessions the market was in one regime. It shows the win rate, the base rate, the lift in points and the trades the harness stored for them. Calm markets and storms can treat the same picks very differently. A good whole-history lift can hide a regime where the edge loses. The figures are for the whole run. The harness does not store a regime's in-sample and out-of-sample sides apart, so those two columns read not stored, never zero. A row with few trades is thin. Example: a lift of 14 points in storms over 9 trades says little, because 9 trades can look good by luck. A regime the run never saw has no row. A copy with its out-of-sample result hidden shows no regime rows at all, because every regime holds out-of-sample sessions.
+"""
+next = "Read a thin row as a direction, and ask whether the edge needs a regime it has seen few times."
+see_also = ["regime", "lift", "win_rate", "base_rate", "slice_state", "trades"]
+
+[[term]]
+id = "by_holding_period"
+term = "By holding period"
+short = "The same screen held for different numbers of trading days: its lift in-sample, out-of-sample and over the whole history."
+body = """
+The harness measures the screen at several holding periods. Each row shows the lift in points and the trades of one period, in-sample, out-of-sample and over the whole history. The row marked as the basis is the one the verdict rests on, fixed before the out-of-sample period was read. The other rows are not the pre-chosen test: an out-of-sample figure that looks better at another holding period is one of several tries, so it does not replace the verdict. Look for the shape: an edge that holds across neighbouring periods is sturdier than one that works at a single length. Example: a lift of 4 points at 20 days, 3 at 10 and 1 at 5 is a trend that builds with time.
+"""
+next = "Prefer an edge whose lift changes gradually with the holding period."
+see_also = ["verdict_basis", "lift", "in_sample", "out_of_sample", "oos_by", "trades"]
+
+[[term]]
+id = "slice_state"
+term = "Slice state"
+short = "Why a regime or holding-period figure is missing: not stored or hidden; a measured one has its value."
+body = """
+Measured: the figure is stored and shown. Not stored: the run behind the page is older than the figure, or the period does not exist (an edge with no frozen period has no out-of-sample). It also reads not stored where the harness keeps no such split, as with a regime's two sides. The figure is blank, never zero. Hidden: the out-of-sample result of a copy is withheld until you show it, and the whole-history figures hold it too. Only the in-sample figure is shown. Thin is separate: the figure is shown, with fewer trades than the verdict needs out of sample, so it can look good or bad by chance. A blank is not a poor result.
+"""
+next = "Re-run the backtest to fill a not stored figure; show the out-of-sample result to fill a hidden one."
+see_also = ["by_regime", "by_holding_period", "out_of_sample", "in_sample", "trades"]
+
+[[term]]
+id = "oos_by"
+term = "Expected date of the count"
+short = "The date a holding period's out-of-sample trades are expected to reach the number the verdict needs."
+body = """
+The verdict needs a minimum number of out-of-sample trades before it can say Promising or Not working. For each holding period, the date is read off the exit sessions the run stored for its schedule's next decision sessions, at the share of decision sessions that were measured. Projected: the date is the exit of the trade that completes the count. Reached: the count is already met, so there is no date. Beyond the projection: the count needs more sessions than the stored list reaches. Not stored: the run is older than the projection or has no out-of-sample period. Unprojectable: the edge fires on an event and no calendar says when the next comes. Hidden: the out-of-sample result of a copy is withheld. A date is an estimate, never an input to the verdict.
+"""
+next = "Do not wait for a date; the verdict changes when a run records enough trades."
+see_also = ["outlook_projection", "verdict_outlook", "by_holding_period", "trades", "out_of_sample"]
