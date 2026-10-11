@@ -38,6 +38,14 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "sign_stability" }, { call = "correlated_clusters" }, { call = "permute_within" }, { call = "exceeds_percentile" }]
 
 [[responsibility]]
+id = "quant-edge-paths"
+description = "The shape of an edge's results over time (ADR 0064): the running sum of per-window values (a missing value is rejected, never carried as zero), the underwater series and the deepest drops of a curve, the annualised volatility of windows, wins above the base rate, the pooled lift from a start forward and sums by key (a month); pure numpy"
+owner = ["src/algotrade/quant/edges/paths.py"]
+allowed = ["src/algotrade/services/read/edge_evidence/*"]  # the result sections shape the basis's series with them
+section = "docs/adr/0064-edge-evidence-series-and-trade-ledger.md#decision"
+detect = [{ call = "top_episodes" }, { call = "annualised_vol" }, { call = "pooled_lift" }, { call = "excess_wins" }, { call = "sum_by_key" }]
+
+[[responsibility]]
 id = "quant-edge-statistics"
 description = "The statistics that judge a screener's picks (ADR 0053): lift, Hedges' g, decile spread and its t, Sharpe, the deflated Sharpe ratio, the probability of backtest overfitting (CSCV), the Harvey-Liu haircut Sharpe ratio (ADR 0064) and the usual range of a live win rate (the binomial band of the wins n paper trades would show if the backtest's win rate held)"
 owner = ["src/algotrade/quant/edges/statistics.py"]

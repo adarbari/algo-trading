@@ -131,7 +131,12 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
         run.lost_inputs,
         decoys=decoys,
         basis=verdict.choose_basis(_own(served), settings, _declared(edge), decoys),
-        facts=verdict.EdgeFacts(edge.published, edge.schedule, hidden),
+        facts=verdict.EdgeFacts(
+            edge.published,
+            edge.schedule,
+            hidden,
+            measured=lambda: runs.load_measured_sessions(ctx, run),
+        ),
     )
     if not hidden or found.verdict == verdict.WAITING:
         return found

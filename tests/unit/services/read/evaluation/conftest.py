@@ -85,6 +85,7 @@ def write_run(
     trigger: str | None = None,
     series: list[dict[str, Any]] | None = None,
     trades: list[dict[str, Any]] | None = None,
+    whole: dict[str, Any] | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T; ``trades``: its ledger (``results/edge_trades``, its
@@ -94,7 +95,7 @@ def write_run(
     done = T + timedelta(minutes=minutes if finished_minutes is None else finished_minutes)
     kind = "frozen" if split == FROZEN else "split"
     rows = [
-        row("momo", "all", 0.3, split, user_id=owner),
+        row("momo", "all", 0.3, split, user_id=owner, **(whole or {})),
         row("momo", kind, hit_rate, split, user_id=owner, exploratory=split != FROZEN),
         *(extra or []),
     ]

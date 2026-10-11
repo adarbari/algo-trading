@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
+from algotrade.core.time.calendar import is_session
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
     load_canonical_run,
@@ -13,6 +14,8 @@ from algotrade.services.read.evaluation.runs import (
     load_run_draws,
     load_run_rows,
     load_run_series,
+    measured_sessions,
+    window_weights,
 )
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -217,3 +220,83 @@ def test_a_run_from_before_the_series_has_none(backend: MemoryBackend) -> None:
     assert edge is not None
     (run,) = load_edge_runs(ctx, edge)
     assert load_run_series(ctx, run) == ()
+
+
+def _all_row_with_projection(**changes: object) -> dict[str, object]:
+    exits = [date(2026, 11, 2) + timedelta(days=i) for i in range(3)]
+    return row(
+        "momo", "all", 0.3, FROZEN, horizon_sessions=15, projected_exits=exits,
+        decisions_scheduled=10, decisions_measured=8, decisions_scheduled_oos=4,
+        decisions_measured_oos=3, **changes,
+    )  # fmt: skip
+
+
+def test_the_all_row_serves_the_projected_exits_and_the_decision_session_counts(
+    backend: MemoryBackend,
+) -> None:
+    write_run(backend, "r1", FROZEN, 0.6, extra=[_all_row_with_projection()])
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None
+    (found,) = [r for r in load_run_rows(ctx, run) if r.projected_exits]
+    assert found.projected_exits == tuple(date(2026, 11, 2) + timedelta(days=i) for i in range(3))
+    assert (found.decisions_scheduled, found.decisions_measured) == (10, 8)
+    assert (found.decisions_scheduled_oos, found.decisions_measured_oos) == (4, 3)
+    plain = [r for r in load_run_rows(ctx, run) if r.slice_kind == "frozen"]
+    assert plain[0].projected_exits == () and plain[0].decisions_scheduled is None  # never zero
+
+
+def test_a_hidden_run_withholds_the_out_of_sample_counts_and_the_exits(
+    backend: MemoryBackend,
+) -> None:
+    mine = _all_row_with_projection(slice_kind="in_sample", user_id="me")
+    write_run(backend, "c1", FROZEN, 0.6, owner="me", extra=[mine])
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = next(r for r in load_edge_runs(ctx, edge) if r.owner == "me")
+    hidden = type(run)(**{**run.__dict__, "oos_hidden": True})
+    for served in load_run_rows(ctx, hidden):
+        assert served.slice_kind == "in_sample"
+        assert served.projected_exits == () and served.decisions_scheduled_oos is None
+        assert served.decisions_measured_oos is None
+
+
+def test_measured_sessions_count_the_basis_windows_with_picks(backend: MemoryBackend) -> None:
+    days = [date(2026, 1, 2) + timedelta(days=30 * i) for i in range(4)]  # 20+ sessions apart
+    stored = [
+        series_row(days[0], FROZEN),
+        series_row(days[1], FROZEN, status="excluded_coverage", picks=None, pick_mean=None),
+        series_row(days[2], FROZEN, status="no_picks", picks=None, pick_mean=None),
+        series_row(days[3], FROZEN, picks=0),
+        series_row(days[3], FROZEN, role="baseline", variant="spy"),
+    ]
+    write_run(backend, "r1", FROZEN, 0.6, series=stored)
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None
+    assert measured_sessions(load_run_series(ctx, run)) == {("momo", 20): 1}
+
+
+def test_window_weights_are_a_tranche_portfolio_share() -> None:
+    days = [date(2026, 3, 2), date(2026, 3, 3), date(2026, 3, 4), date(2026, 4, 20)]
+    w = window_weights(days, 20)
+    assert [w[d] for d in days[:3]] == [1 / 20, 1 / 20, 1 / 20]  # the first takes the next's gap
+    assert w[days[3]] == 1.0  # 33 sessions after the previous: no overlap
+    assert window_weights(days[:1], 20) == {days[0]: 1.0}
+
+
+def test_overlapping_sessions_are_not_independent_for_the_haircut(backend: MemoryBackend) -> None:
+    days = [d for d in (date(2026, 1, 5) + timedelta(days=i) for i in range(60)) if is_session(d)]
+    write_run(backend, "r1", FROZEN, 0.6, series=[series_row(d, FROZEN) for d in days])
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None
+    found = measured_sessions(load_run_series(ctx, run))
+    assert found == {("momo", 20): round(len(days) / 20)}  # about two, not forty

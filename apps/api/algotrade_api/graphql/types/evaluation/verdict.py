@@ -179,9 +179,11 @@ class VerdictColumn:
 @strawberry.type(
     description="What would change the verdict: `criterion` (the first test not passed; "
     "`level`: the verdict it gates) in `sentence`. For a count of trades (`trades`, "
-    "`works_trades`) `have` of `needed` and `remaining` to come, and `projectionState` (why "
-    "there is no date: not_stored, unprojectable, oos_hidden; projected and beyond_projection "
-    "once a run stores the schedule's exits). Null for the other tests: a t statistic is not "
+    "`works_trades`) `have` of `needed` and `remaining` to come, and `projectionState`: "
+    "projected (`expectedBy`: the exit of the trade that completes the count, at `fillRatio` of "
+    "the decision sessions measured), beyond_projection (the count needs more sessions than the "
+    "run stored), not_stored (an older run), unprojectable (an event schedule), oos_hidden. An "
+    "estimate, never an input to the verdict. Null for the other tests: a t statistic is not "
     "projected"
 )
 class EdgeOutlook:
@@ -192,6 +194,8 @@ class EdgeOutlook:
     needed: int | None
     remaining: int | None
     projection_state: str | None
+    expected_by: date | None
+    fill_ratio: float | None
 
     @classmethod
     def of(cls, d: evidence.EdgeOutlook) -> Self:
@@ -203,6 +207,8 @@ class EdgeOutlook:
             needed=d.needed,
             remaining=d.remaining,
             projection_state=d.projection_state,
+            expected_by=d.expected_by,
+            fill_ratio=d.fill_ratio,
         )
 
 
@@ -326,11 +332,13 @@ class EdgePublished:
 
 
 @strawberry.type(
-    description="One bar of the decay: `period` (published, in_sample, out_of_sample), its "
-    "`value` (null unless `state` is measured) over `n` (the trades, or the decile sessions of a "
-    "decile spread; null for the paper's) and the `state` that says why a value is missing "
+    description="One bar of the decay: `period` (published, in_sample, out_of_sample, live: the "
+    "settled paper trades, on `Query.edgeResult.decay` only), its `value` (null unless `state` is "
+    "measured) over `n` (the trades, or the decile sessions of a decile spread, or the live "
+    "signal sessions; null for the paper's) and the `state` that says why a value is missing "
     "(not_stored, not_comparable: another holding period than the paper's, oos_hidden, "
-    "not_given: the document publishes no figure)"
+    "not_given: the document publishes no figure, not_measured_live: a decile spread cannot be "
+    "measured from the paper record)"
 )
 class DecayBar:
     period: str

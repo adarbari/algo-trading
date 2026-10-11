@@ -129,6 +129,8 @@ const EdgesPage = graphql(`
             needed
             remaining
             projectionState
+            expectedBy
+            fillRatio
           }
         }
         haircut {

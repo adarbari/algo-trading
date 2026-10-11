@@ -23,7 +23,7 @@ from algotrade_api.main import create_app
 from tests.helpers.api_store import StubAuthenticator, store_over
 from tests.helpers.rollup_store import write_bars
 from tests.unit.services.read.edge_desk.conftest import store, trade
-from tests.unit.services.read.edge_evidence.conftest import LEDGER, SESSION, USERS
+from tests.unit.services.read.edge_ledger.conftest import LEDGER, SESSION, USERS
 from tests.unit.services.read.evaluation.conftest import DOCS, FROZEN, write_run
 
 Make = Callable[..., TestClient]

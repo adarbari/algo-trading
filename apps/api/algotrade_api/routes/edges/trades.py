@@ -13,8 +13,8 @@ from fastapi.responses import StreamingResponse
 
 from algotrade.config.user import UserContext
 from algotrade.services.read.context import open_context
-from algotrade.services.read.edge_evidence import trades
-from algotrade.services.read.edge_evidence.trades_csv import csv_lines
+from algotrade.services.read.edge_ledger import trades
+from algotrade.services.read.edge_ledger.trades_csv import csv_lines
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade_api.deps import Caller, Store
 
@@ -42,8 +42,6 @@ def trades_csv(
     found = trades.load_edge_trades(ctx, edge, period, limit=None)
     if found.unknown is not None:
         raise HTTPException(404, f"no ledger to read: {found.unknown.public_reason}")
-    if found.basis is None:
-        raise HTTPException(404, f"no ledger to read: {found.reason}")
     return StreamingResponse(
         csv_lines(found.rows),
         media_type="text/csv",

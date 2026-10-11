@@ -37,12 +37,11 @@ class EdgeTrial:
 
 @dataclass(frozen=True)
 class EdgeTrials:
-    """The grid of ``edge`` (empty with ``unknown`` / ``reason`` when there is no official run);
+    """The grid of ``edge`` (empty with ``unknown`` when there is no official run);
     ``basis``: the official row's screen and holding period; ``trials``: the run's trial count
     (the haircut's M); ``oos_hidden``: no out-of-sample figure is served."""
 
     unknown: Unknown | None
-    reason: str = ""
     basis: str | None = None
     trials: int | None = None
     oos_hidden: bool = False
@@ -58,9 +57,9 @@ def load_edge_trials(ctx: Stores, edge: Edge) -> EdgeTrials:
     here)."""
     found = official_basis(ctx, edge)
     if found.run is None:
-        return EdgeTrials(found.not_run, found.reason)
+        return EdgeTrials(found.unknown)
     groups: dict[tuple[str, str, int], list[runs.EdgeRow]] = {}
-    for r in found.rows:
+    for r in runs.load_run_rows(ctx, found.run):
         if r.role != "baseline":
             groups.setdefault((r.edge_variant, r.variant, r.horizon_sessions), []).append(r)
     hidden = found.run.oos_hidden
@@ -80,7 +79,7 @@ def load_edge_trials(ctx: Stores, edge: Edge) -> EdgeTrials:
             )
         )  # fmt: skip
     words = None if found.key is None else f"{found.key[0]}, {found.key[1]} trading days"
-    return EdgeTrials(None, found.reason, words, found.run.trials_counted, hidden, tuple(out))
+    return EdgeTrials(found.unknown, words, found.run.trials_counted, hidden, tuple(out))
 
 
 def load_trials_of(ctx: Stores, edge_id: str) -> EdgeTrials | None:

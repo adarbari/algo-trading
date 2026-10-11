@@ -1,7 +1,7 @@
 """The edge verdict rule: one test per verdict and per boundary (ED8)."""
 
 from dataclasses import fields, replace
-from datetime import date
+from datetime import date, timedelta
 
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.edges import load_edge
@@ -24,7 +24,12 @@ from algotrade.services.read.evaluation.verdict import (
     load_edge_verdict,
 )
 from algotrade.storage.backends.memory import MemoryBackend
-from tests.unit.services.read.evaluation.conftest import FROZEN, stores, write_run
+from tests.unit.services.read.evaluation.conftest import (
+    FROZEN,
+    series_row,
+    stores,
+    write_run,
+)
 
 T = VerdictSettings()
 SPLIT = date(2026, 4, 1)
@@ -481,3 +486,20 @@ def test_the_in_sample_ranking_puts_a_hard_failure_below_a_candidate_without_one
         for r in rows
     ]
     assert choose_basis(rows, T).key == ("vrp", 21)  # 15 has the bigger lift but fails in-sample t
+
+
+def test_the_haircut_of_a_stored_run_counts_the_series_sessions_with_picks(
+    backend: MemoryBackend,
+) -> None:
+    days = [date(2026, 1, 2) + timedelta(days=30 * i) for i in range(5)]  # no overlap: weight 1
+    stored = [series_row(d, FROZEN) for d in days[:3]]
+    stored += [series_row(d, FROZEN, status="excluded_coverage", picks=None) for d in days[3:]]
+    write_run(
+        backend, "r1", FROZEN, 0.6, series=stored,
+        whole={"sessions": 70, "sharpe": 0.4, "trials": 5},
+    )  # fmt: skip
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    h = load_edge_verdict(ctx, edge).haircut
+    assert h is not None and (h.sessions, h.trials) == (3, 5)

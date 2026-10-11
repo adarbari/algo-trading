@@ -7,9 +7,11 @@ the session's cutoff knew them."""
 from datetime import date, datetime
 from typing import Any
 
+import pytest
+
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.cross_section.detail.trades import EXCLUDED_KINDS
-from algotrade.services.read.edge_evidence.trades import EXCLUDED_REASONS, Period, load_edge_trades
+from algotrade.services.read.edge_ledger.trades import EXCLUDED_REASONS, Period, load_edge_trades
 from algotrade.services.read.evaluation.edges import Edge, load_edge
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -17,9 +19,16 @@ from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.edge_desk.conftest import CUTOFF, KNOWN, store, trade
-from tests.unit.services.read.edge_evidence.conftest import context, pick
+from tests.unit.services.read.edge_ledger.conftest import LEDGER, context, pick
 from tests.unit.services.read.evaluation.conftest import END, FROZEN, write_run
 from tests.unit.services.read.evaluation.test_versions import MOVED, write_own_run
+
+
+@pytest.fixture
+def backend() -> MemoryBackend:
+    b = MemoryBackend()
+    write_run(b, "site1", FROZEN, 0.6, trades=LEDGER)
+    return b
 
 
 def edge_of(ctx: Any) -> Edge:

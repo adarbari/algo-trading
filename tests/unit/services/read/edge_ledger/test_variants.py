@@ -2,11 +2,11 @@
 verdict's basis marked official, every other out-of-sample figure flagged as not the pre-chosen
 test, and no out-of-sample figure at all for a hidden copy."""
 
-from algotrade.services.read.edge_evidence.variants import load_edge_trials
+from algotrade.services.read.edge_ledger.variants import load_edge_trials
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
-from tests.unit.services.read.edge_evidence.conftest import context
+from tests.unit.services.read.edge_ledger.conftest import context
 from tests.unit.services.read.evaluation.conftest import FROZEN, row, write_run
 from tests.unit.services.read.evaluation.test_versions import write_own_run
 

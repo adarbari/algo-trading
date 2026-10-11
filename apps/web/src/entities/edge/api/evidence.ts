@@ -31,7 +31,6 @@ const EdgeTrades = graphql(`
       pageSize
       total
       basis
-      reason
       licence
       oosHidden
       unknown {
@@ -118,7 +117,6 @@ const EdgeVariantGrid = graphql(`
   query EdgeVariantGrid($edgeId: String!) {
     edgeVariants(edgeId: $edgeId) {
       basis
-      reason
       trials
       oosHidden
       unknown {

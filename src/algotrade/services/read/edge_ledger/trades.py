@@ -63,7 +63,6 @@ class EdgeTradePage:
     period: Period
     page: int
     unknown: Unknown | None
-    reason: str = ""
     basis: str | None = None
     rows: tuple[TradeRow, ...] = ()
     total: int = 0
@@ -144,19 +143,19 @@ def load_edge_trades(
     page = max(page, 1)  # a page below the first is the first, and served as such
     basis = official_basis(ctx, edge)
     if basis.key is None or basis.run is None:
-        return EdgeTradePage(period, page, basis.not_run, basis.reason)
+        return EdgeTradePage(period, page, basis.unknown)
     words = f"{basis.key[0]}, {basis.key[1]} trading days"
     offset = 0 if limit is None else (page - 1) * limit
     if period is Period.LIVE:
         rows = _live(ctx, edge, basis, sort, descending)
         part = tuple(rows[offset : None if limit is None else offset + limit])
-        return EdgeTradePage(period, page, None, "", words, part, len(rows))
+        return EdgeTradePage(period, page, None, words, part, len(rows))
     hidden = basis.run.oos_hidden and period in (Period.OUT_OF_SAMPLE, Period.ALL)
     if basis.run.oos_hidden and period is Period.OUT_OF_SAMPLE:
-        return EdgeTradePage(period, page, None, "", words, oos_hidden=True)
+        return EdgeTradePage(period, page, None, words, oos_hidden=True)
     found = _backtest(ctx, basis, period, offset, limit, sort, descending)
     return EdgeTradePage(
-        period, page, found.unknown, "", words, found.rows, found.total, found.licence, hidden
+        period, page, found.unknown, words, found.rows, found.total, found.licence, hidden
     )
 
 

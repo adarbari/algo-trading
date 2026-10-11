@@ -55,7 +55,6 @@ export interface EdgeTradePage {
   pageSize: number;
   total: number;
   basis: string | null;
-  reason: string;
   licence: string | null;
   oosHidden: boolean;
   unknown: EvidenceUnknown | null;
@@ -84,7 +83,6 @@ export interface EdgeVariant {
 
 export interface EdgeVariants {
   basis: string | null;
-  reason: string;
   trials: number | null;
   oosHidden: boolean;
   unknown: EvidenceUnknown | null;

@@ -1,56 +1,89 @@
-"""The official run of an edge and the basis its verdict rests on (ADR 0065), for every evidence
-section that must show the verdict's own test.
+"""The result an edge's verdict rests on, for the sections of its page (ADR 0064, 0065): the
+OFFICIAL run (a site edge's canonical run; a user's own edge's latest run) and the basis
+``(screen, holding period)`` the verdict rule fixed on it, fixed before the out-of-sample period
+is read (``versions.basis_of``: declared, else the best in-sample). Every section of the page
+reads this one choice, so the curve, the drawdown and the decay can never be about another
+candidate than the verdict: a section never re-chooses.
 
-``official_basis`` reads what the verdict reads: a site edge's canonical run, the user's own edge's
-latest run, and the ``(screen, holding period)`` ``verdict.choose_basis`` fixes from that run's
-in-sample rows (``versions.basis_of``, the comparison's rule too). It never chooses again: a
-section that needs another screen or period is a different object (the variant grid), and a run
-the verdict has none of is ``NOT_RUN`` with the reason, never an older or exploratory one. Read
-once per request where the context keeps a scratch (``ReadContext.memo``)."""
+A hidden copy's basis is chosen from the in-sample rows it is served (``runs.load_run_rows``), so
+showing the result never moves it. No official run, or none that fixes a basis, is ``NOT_RUN``
+with the reason; the cause is the admin's."""
 
 from dataclasses import dataclass
+from datetime import date
 
-from algotrade.services.read.context import ReadContext, Stores
+from algotrade.config.edges.document import job_name
+from algotrade.services.read.availability.cause import run_cause
+from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import runs, versions
 from algotrade.services.read.evaluation.edges import Edge
-from algotrade.services.read.evaluation.runs import EdgeRow, EdgeRun
-from algotrade.services.read.values import Unknown
+from algotrade.services.read.evaluation.runs import EdgeRun
+from algotrade.services.read.values import Unknown, UnknownCode
 
 
 @dataclass(frozen=True)
 class OfficialBasis:
-    """``run``: the official run (None: ``not_run`` says why); ``key``: the basis's screen and
-    holding period (None: ``reason`` says why none can be fixed); ``rows``: the run's rows as
-    served to the viewer (a hidden copy's: in-sample only)."""
+    """The official ``run`` of ``edge`` and its basis ``key`` (screen, holding period);
+    ``split_from`` the run's split (the edge's frozen period for a run that recorded none);
+    ``hidden``: the run's out-of-sample result is withheld. ``unknown`` says why there is no run
+    or no basis (``key`` is then None)."""
 
+    edge: Edge
     run: EdgeRun | None
     key: tuple[str, int] | None
-    reason: str = ""
-    not_run: Unknown | None = None
-    rows: tuple[EdgeRow, ...] = ()
+    split_from: date | None
+    hidden: bool
+    unknown: Unknown | None = None
 
 
-def _read(ctx: Stores, edge: Edge) -> OfficialBasis:
-    if edge.mine:
-        run, not_run = versions.own_run(ctx, edge), None
-        if run is None:
-            return OfficialBasis(None, None, "You have not run this edge yet")
-    else:
-        found = runs.load_canonical_run(ctx, edge)
-        run, not_run = found.run, found.not_run
-        if run is None:
-            return OfficialBasis(None, None, "No official result yet", not_run)
-    rows = runs.load_run_rows(ctx, run)
-    choice = versions.basis_of(ctx, edge, rows)
-    return OfficialBasis(run, choice.key, choice.reason, None, rows)
+@dataclass(frozen=True)
+class BasisSummary:
+    """What a page is told of the basis: the ``run_id`` it reads, the ``variant`` (screen) and
+    ``horizon_sessions`` it rests on (None with no basis: ``unknown`` says why), the run's
+    ``split_from`` and whether its out-of-sample result is withheld (``oos_hidden``)."""
+
+    run_id: str | None
+    variant: str | None
+    horizon_sessions: int | None
+    split_from: date | None
+    oos_hidden: bool
+    unknown: Unknown | None
+
+
+def summary_of(basis: OfficialBasis) -> BasisSummary:
+    """``basis`` as served."""
+    key = basis.key
+    return BasisSummary(
+        run_id=basis.run.run_id if basis.run is not None else None,
+        variant=key[0] if key is not None else None,
+        horizon_sessions=key[1] if key is not None else None,
+        split_from=basis.split_from,
+        oos_hidden=basis.hidden,
+        unknown=basis.unknown,
+    )
 
 
 def official_basis(ctx: Stores, edge: Edge) -> OfficialBasis:
-    """The official run of ``edge`` and its verdict's basis (memoised per request)."""
-    if not isinstance(ctx, ReadContext):
-        return _read(ctx, edge)
-    key = ("official_basis", edge.id, edge.mine, ctx.user.user_id)
-    if key not in ctx.memo:
-        ctx.memo[key] = _read(ctx, edge)
-    found: OfficialBasis = ctx.memo[key]
-    return found
+    """The official run of ``edge`` and the basis of its verdict, from the rows the user is
+    served; the same run and basis ``versions.load_verdict`` judges."""
+    absent: Unknown | None
+    if edge.mine:
+        run = versions.own_run(ctx, edge)
+        absent = Unknown(
+            UnknownCode.NOT_RUN,
+            run_cause(job_name(edge.id, ctx.user.user_id), "You have not run this edge yet"),
+        )
+    else:
+        canonical = runs.load_canonical_run(ctx, edge)
+        run, absent = canonical.run, canonical.not_run
+    if run is None:
+        return OfficialBasis(edge, None, None, edge.frozen_from, edge.oos_hidden, absent)
+    choice = versions.basis_of(ctx, edge, runs.load_run_rows(ctx, run))
+    split = run.split_from or edge.frozen_from
+    if choice.key is None:
+        why = Unknown(
+            UnknownCode.NOT_RUN,
+            run_cause(job_name(edge.id, run.owner), f"{run.run_id}: {choice.reason}"),
+        )
+        return OfficialBasis(edge, run, None, split, run.oos_hidden, why)
+    return OfficialBasis(edge, run, choice.key, split, run.oos_hidden)

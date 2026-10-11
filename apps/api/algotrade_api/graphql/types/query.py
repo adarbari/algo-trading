@@ -17,8 +17,8 @@ from strawberry.types import Info
 
 from algotrade.services.read.edge_desk import desk as edge_desk
 from algotrade.services.read.edge_desk import live as edge_live
-from algotrade.services.read.edge_evidence import trades as edge_trade_reads
-from algotrade.services.read.edge_evidence import variants as edge_variant_reads
+from algotrade.services.read.edge_ledger import trades as edge_trade_reads
+from algotrade.services.read.edge_ledger import variants as edge_variant_reads
 from algotrade.services.read.evaluation import edges as edge_reads
 from algotrade.services.read.evaluation import runs as edge_runs
 from algotrade.services.read.evaluation import versions
@@ -59,6 +59,7 @@ from algotrade_api.graphql.types.evaluation.evidence import (
     EdgeVariants,
 )
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
+from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.guide.entries import GuideEntries
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
@@ -473,6 +474,17 @@ class Query:
             else None
         )
         return EdgeVariants.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The sections of the result of the edge `id` (the evidence curve, drawdown, "
+        "rolling starts, monthly map and decay), each about the verdict's own run and basis and "
+        "read only when selected. `date` resolves the session of the live stroke and bar only; "
+        "null: the user has no such edge"
+    )
+    async def edge_result(self, info: Ctx, id: str, date: Day = None) -> EdgeResult | None:
+        ctx = await info.context.aread(date)
+        found = await off_loop(edge_reads.load_edge, ctx, id) if ctx is not None else None
+        return EdgeResult.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The edge `id`; null: the user has no such edge"

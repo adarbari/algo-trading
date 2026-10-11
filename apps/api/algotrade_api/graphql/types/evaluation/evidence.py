@@ -9,7 +9,7 @@ from typing import Self
 
 import strawberry
 
-from algotrade.services.read.edge_evidence import trades, variants
+from algotrade.services.read.edge_ledger import trades, variants
 from algotrade.services.read.evaluation import runs, versions
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
@@ -109,7 +109,7 @@ class EdgeTradeRow:
     "holding period, never chosen again). `unknown`: why there is no ledger (NOT_RUN: no official "
     "run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); "
     "`oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the "
-    "trial licence of the rows; `reason`: why there is no basis"
+    "trial licence of the rows"
 )
 class EdgeTradePage:
     period: trades.Period
@@ -117,7 +117,6 @@ class EdgeTradePage:
     page_size: int
     total: int
     basis: str | None
-    reason: str
     licence: str | None
     oos_hidden: bool
     unknown: Unknown | None
@@ -131,7 +130,6 @@ class EdgeTradePage:
             page_size=d.page_size,
             total=d.total,
             basis=d.basis,
-            reason=d.reason,
             licence=d.licence,
             oos_hidden=d.oos_hidden,
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
@@ -201,7 +199,6 @@ class EdgeVariant:
 )
 class EdgeVariants:
     basis: str | None
-    reason: str
     trials: int | None
     oos_hidden: bool
     unknown: Unknown | None
@@ -211,7 +208,6 @@ class EdgeVariants:
     def of(cls, d: variants.EdgeTrials) -> Self:
         return cls(
             basis=d.basis,
-            reason=d.reason,
             trials=d.trials,
             oos_hidden=d.oos_hidden,
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
