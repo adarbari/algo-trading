@@ -64,3 +64,21 @@ def test_serving_raises_the_limit_before_uvicorn_starts(monkeypatch: pytest.Monk
     monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: order.append("serve"))
     cli.main([])
     assert order == ["limit", "serve"]
+
+
+def test_golden_run_parses_its_flags_and_exits_with_the_command_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[object] = []
+    monkeypatch.setattr(cli, "golden_run", lambda args: seen.append(args) or 7)
+    with pytest.raises(SystemExit) as stop:
+        cli.main(
+            ["golden", "run", "--cases", "a,b", "--split", "held_out", "--provider", "x",
+             "--provider", "y", "--repeat", "2", "--record", "--json", "--yes"]
+        )  # fmt: skip
+    assert stop.value.code == 7
+    ns = seen[0]
+    assert (ns.cases, ns.split, ns.provider, ns.repeat) == ("a,b", "held_out", ["x", "y"], 2)  # type: ignore[attr-defined]
+    assert (ns.record, ns.as_json, ns.yes, ns.max_calls, ns.budget_usd) == (  # type: ignore[attr-defined]
+        True, True, True, 60, 1.0,
+    )  # fmt: skip

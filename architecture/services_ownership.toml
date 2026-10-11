@@ -220,6 +220,7 @@ description = "A rule screen drafted from a sentence (ADR 0041): the prompt over
 owner = ["src/algotrade/services/drafting/*"]
 allowed = [
     "apps/api/algotrade_api/routes/drafting/*",  # the thin route calls the one use case
+    "apps/api/algotrade_api/cli.py",  # `golden run`: the owner-run live evaluation asks the same one use case
 ]
 section = "docs/adr/0041-natural-language-screener-drafts.md#decision"
 detect = [{ call = "draft_screen" }]

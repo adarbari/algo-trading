@@ -8,7 +8,9 @@ With ``ALGOTRADE_AUTH=off`` (no token, ADR 0040) it refuses a non-loopback ``--h
 writes the auto-deploy agent; ``deploy-plan`` and ``deploy-verify`` are what
 ``scripts/ops/deploy.sh`` asks (``ops/deploy.py``, ADR 0057). Serving raises the process's
 open-files soft limit to ``OPEN_FILES`` and caps the connections served at once at
-``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08)."""
+``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08).
+``algotrade-api golden run`` is the owner-run live evaluation of the drafting prompt against
+the golden set (``ops/golden.py``: it calls real models and spends money, only with ``--yes``)."""
 
 import argparse
 import json
@@ -16,16 +18,42 @@ import os
 import resource
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import uvicorn
 
-from algotrade.config.env import auth_mode, load_dotenv, port_base
+from algotrade.config.env import (
+    auth_mode,
+    config_dir,
+    data_url,
+    llm_off,
+    load_dotenv,
+    port_base,
+    user_id,
+)
+from algotrade.config.site.settings import load_llm
+from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.drafting.screens import ScreenDraft, draft_screen
+from algotrade.services.read.context import NotFoundError, ReadContext, open_context
+from algotrade.services.text_model.model import TextModel
 from algotrade_api.auth.local import require_loopback
 from algotrade_api.auth.mode import AuthMode
+from algotrade_api.deps import open_store
 from algotrade_api.ops.build import Fetch, fetch_http, running_mismatches, write_web_stamp
 from algotrade_api.ops.deploy import CHECKS, actions, holds_ingest, verify
+from algotrade_api.ops.golden import (
+    DEFAULT_BUDGET_USD,
+    DEFAULT_MAX_CALLS,
+    DEFAULT_REPEAT,
+    GOLDEN_ROOT,
+    SCREENER_ID,
+    SPLITS,
+    CostTap,
+    RunArgs,
+    run_golden,
+)
 from algotrade_api.ops.schedule import (
     DEFAULT_PORT,
     DEPLOY_LABEL,
@@ -36,6 +64,7 @@ from algotrade_api.ops.schedule import (
     api_plist,
     deploy_plist,
 )
+from algotrade_api.text_model import open_text_model
 
 APP = "algotrade_api.app:app"
 
@@ -82,7 +111,64 @@ def _parser() -> argparse.ArgumentParser:
     st = sub.add_parser("stamp-web", help="stamp a web build; say if the running API is behind it")
     st.add_argument("dist", type=Path)
     st.add_argument("--port", type=int, default=DEFAULT_PORT, dest="agent_port")
+    gd = sub.add_parser("golden", help="owner-run live evaluation of the drafting prompt")
+    gsub = gd.add_subparsers(dest="golden_command", required=True)
+    gr = gsub.add_parser("run", help="ask real models the golden cases and score the drafts")
+    gr.add_argument("--cases", default="", help="case ids, comma separated (default: all)")
+    gr.add_argument("--split", choices=SPLITS, default="all")
+    gr.add_argument("--provider", action="append", default=[], help="llm.toml provider id")
+    gr.add_argument("--repeat", type=int, default=DEFAULT_REPEAT)
+    gr.add_argument("--record", action="store_true", help="write passing raw answers for CI replay")
+    gr.add_argument("--force", action="store_true", help="--record may overwrite a file")
+    gr.add_argument("--json", action="store_true", dest="as_json")
+    gr.add_argument("--max-calls", type=int, default=DEFAULT_MAX_CALLS)
+    gr.add_argument("--budget-usd", type=float, default=DEFAULT_BUDGET_USD)
+    gr.add_argument("--user", default=None, help="user id asked as (default $ALGOTRADE_USER)")
+    gr.add_argument("--yes", action="store_true", help="spend: without it only the plan is shown")
     return parser
+
+
+def golden_run(args: argparse.Namespace) -> int:
+    """``golden run``: wire the store, the user's context and one single-provider text model per
+    provider into ``ops/golden.run_golden``; the exit code."""
+    user = args.user or user_id(DEFAULT_USER)
+    store = open_store(data_url(), config_dir(), UserContext(user))
+    models: list[TextModel] = []
+    holder: list[ReadContext] = []
+
+    def open_models(ids: Sequence[str], costs: CostTap) -> dict[str, TextModel]:
+        try:
+            holder.append(open_context(store.reader, store.configs, UserContext(user)))
+        except NotFoundError as exc:
+            raise ConfigurationError(f"the store has no session to draft over: {exc}") from exc
+        out: dict[str, TextModel] = {}
+        for pid in ids:
+            model, why = open_text_model(store.configs, data_url(), only=[pid], tee=costs.submit)
+            if model is None:
+                raise ConfigurationError(why)
+            out[pid] = model
+            models.append(model)
+        return out
+
+    def draft(model: TextModel, sentence: str) -> ScreenDraft:
+        return draft_screen(holder[0], model, SCREENER_ID, sentence)
+
+    def to_stderr(line: str) -> None:
+        print(line, file=sys.stderr)
+
+    run_args = RunArgs(
+        tuple(c for c in args.cases.split(",") if c), args.split, tuple(args.provider),
+        args.repeat, args.record, args.force, args.as_json, args.max_calls, args.budget_usd,
+        args.yes,
+    )  # fmt: skip
+    try:
+        return run_golden(
+            run_args, load_llm(store.configs), llm_off(), Path.cwd() / GOLDEN_ROOT, open_models,
+            draft, print, to_stderr if args.as_json else print,
+        )  # fmt: skip
+    finally:
+        for model in models:
+            getattr(model, "close", lambda: None)()
 
 
 def write_deploy_schedule(out: Path | None) -> dict[str, object]:
@@ -173,6 +259,8 @@ def main(argv: list[str] | None = None) -> None:
         )
         print(json.dumps(plan, indent=2))
         return
+    if args.command == "golden":
+        sys.exit(golden_run(args))
     if args.command == "deploy-plan":
         paths = changed_paths(args.since, args.to)
         if args.locks:
