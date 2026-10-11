@@ -24,6 +24,12 @@ from algotrade.strategies.screeners.rules.evaluate import ScreenMemo
 
 PREVIEW = "preview"
 MAX_MEMO = 64  # criteria (selections) whose results a frame keeps: a few edits of a few screens
+# The frame cache (``ReadStore.preview_cache``): a frame per screen (each reads its own field
+# set), so it holds one for every screen on the Screeners list, bounded by bytes as well.
+PREVIEW_FRAMES = 24
+PREVIEW_MAX_BYTES = 256 * 1024 * 1024
+ROW_BYTES = 300  # an instrument's row in the view: its dicts, beside the values
+FIELD_BYTES = 45  # one value of that row, the key's share included (measured: 7 to 44 fields)
 
 
 @dataclass(frozen=True)
@@ -35,9 +41,14 @@ class FieldFrame:
     # Criterion results over ``view`` (``evaluate_screen``'s memo): an edit to one criterion
     # re-evaluates only that one. Bounded by ``MAX_MEMO`` criteria (``memo_for``).
     memo: ScreenMemo = field(default_factory=dict, compare=False, repr=False)
+    size: int = field(default=0, compare=False, repr=False)  # about the bytes the view holds
     selections: dict[Selection, SelectionResult] = field(
         default_factory=dict, compare=False, repr=False
     )
+
+    def weight_bytes(self) -> int:
+        """About what the view holds, for the cache's byte bound (``ResultCache``)."""
+        return self.size
 
     def selected(self, selection: Selection) -> SelectionResult:
         """``selection`` over ``view`` (memoised: criteria edits keep the selection)."""
@@ -94,13 +105,21 @@ def field_frame(
 ) -> tuple[FieldFrame, bool]:
     """The frame for ``fields`` on ``session`` and whether it came from the cache. The commit
     sequence is read before reading, so a publish landing meanwhile stores the frame under
-    the older key, which no later call asks for."""
+    the older key, which no later call asks for. A frame being read (by the warmer) is waited
+    for, not read a second time (``ResultCache.get_or_compute``)."""
     wanted = tuple(sorted(set(fields)))
     key = (PREVIEW, session, wanted, features_key(definitions), reader.visible_seq())
-    hit = cache.get(key)
-    if hit is not None:
-        return hit, True
-    view, source = fields_view(reader, wanted, session, features=features)
-    built = FieldFrame(view, load_universe(reader, session), source.missing, source.pre_snapshot)
-    cache.put(key, built)
-    return built, False
+    read = False
+
+    def build() -> FieldFrame:
+        nonlocal read
+        read = True
+        view, source = fields_view(reader, wanted, session, features=features)
+        # measured with tracemalloc: 7 MB for 7 fields, 21 MB for 44, over 11 000 instruments
+        size = len(view.instruments) * (ROW_BYTES + FIELD_BYTES * len(wanted))
+        return FieldFrame(
+            view, load_universe(reader, session), source.missing, source.pre_snapshot, size=size
+        )
+
+    frame: FieldFrame = cache.get_or_compute(key, build)
+    return frame, not read

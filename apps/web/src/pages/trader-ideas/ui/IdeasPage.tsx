@@ -62,7 +62,6 @@ export function IdeasPage({
         onSearchChange={onSearchChange}
         onCompare={onCompare}
         onOpen={onOpen}
-        onOpenScreener={onOpenScreener}
         onScreeners={onScreeners}
       />
     </Stack>
