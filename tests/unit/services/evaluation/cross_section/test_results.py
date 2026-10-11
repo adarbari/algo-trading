@@ -334,3 +334,31 @@ def test_the_run_record_names_its_owner_trigger_and_job(world: World) -> None:
     other = write_edge_eval(world.results, ev, NOW + timedelta(hours=1))
     stats = world.results.load_run(other.run_id).stats  # type: ignore[union-attr]
     assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("site", "cli", None)
+
+
+def test_the_all_row_carries_the_projected_exits_and_the_decision_session_counts(
+    world: World,
+) -> None:
+    ev = evaluate(world, frozen_from=DAYS[4].isoformat())
+    frame = edge_eval_frame(ev, "r", NOW)
+    all_row = frame[frame["slice_kind"] == "all"].iloc[0]
+    exits = list(all_row["projected_exits"])
+    assert len(exits) == 400 and exits == sorted(exits)  # ceil(100 / 0.25), the default thresholds
+    assert exits[0] > DAYS[-1]  # the next decisions after the last measured window
+    assert (all_row["decisions_scheduled"], all_row["decisions_measured"]) == (4, 4)
+    assert (all_row["decisions_scheduled_oos"], all_row["decisions_measured_oos"]) == (2, 2)
+    others = frame[frame["slice_kind"] != "all"]
+    assert others["projected_exits"].isna().all() and others["decisions_scheduled"].isna().all()
+
+
+def test_a_run_without_a_split_counts_the_whole_run_and_no_out_of_sample_side(
+    world: World,
+) -> None:
+    frame = edge_eval_frame(evaluate(world), "r", NOW)
+    all_row = frame[frame["slice_kind"] == "all"].iloc[0]
+    assert all_row["decisions_scheduled"] == 4 and pd.isna(all_row["decisions_scheduled_oos"])
+
+
+def test_the_job_report_leaves_out_the_stored_projection(world: World) -> None:
+    rows = records(edge_eval_frame(evaluate(world), "r", NOW))
+    assert rows and all("projected_exits" not in r for r in rows)

@@ -16,6 +16,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN, job_name
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.evaluation.cross_section.detail import series
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
@@ -41,6 +42,19 @@ MEASURE_COLUMNS = (
 
 def _nan(value: float | None) -> float:
     return float("nan") if value is None else value
+
+
+def _projection(m: SliceMeasure, result: VariantResult | None) -> dict[str, Any]:
+    """The projected exits and the decision-session counts of a calendar schedule, on the
+    variant's ``all`` row only (ADR 0064 decision 7); null elsewhere and for an event schedule."""
+    p = result.series.projection if result and result.series and m.slice_kind == "all" else None
+    return {
+        "projected_exits": None if p is None else list(p.exits),
+        "decisions_scheduled": None if p is None else p.scheduled,
+        "decisions_measured": None if p is None else p.measured,
+        "decisions_scheduled_oos": None if p is None else p.scheduled_oos,
+        "decisions_measured_oos": None if p is None else p.measured_oos,
+    }
 
 
 def _row(
@@ -76,6 +90,7 @@ def _row(
         "range_to": evaluation.end,
         "iv_source": result.iv_source if result else None,
         "licence": result.licence if result else None,
+        **_projection(m, result),
         # Filled by an expires_otm outcome only (ADR 0053 amendment 2026-10-08).
         "reference_rate": _nan(m.reference_rate),
         "touch_rate": _nan(m.touch_rate),
@@ -112,10 +127,13 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
 
 
 def records(frame: pd.DataFrame) -> list[dict[str, Any]]:
-    """``frame``'s rows as JSON-able dicts (a missing number is None, never NaN)."""
+    """``frame``'s rows as JSON-able dicts (a missing number is None, never NaN); the projected
+    exits (a list of hundreds of dates per row) are stored, not reported."""
     return [
         {str(k): (None if pd.isna(v) else v) for k, v in row.items()}
-        for row in frame.drop(columns=["knowledge_ts", "session_date"]).to_dict("records")
+        for row in frame.drop(
+            columns=["knowledge_ts", "session_date", "projected_exits"], errors="ignore"
+        ).to_dict("records")
     ]
 
 
@@ -229,8 +247,9 @@ def write_edge_eval(
     trigger: str = "cli",
     job_id: str | None = None,
 ) -> RunRecord:
-    """Save ``evaluation``: its rows and its legs (``results/edge_legs``, ADR 0063; all visible
-    or none) and its run record, whose stats hold the trial log and who ran it (``owner``: the
+    """Save ``evaluation``: its rows, its per-session series (``results/edge_series``, ADR 0064) and
+    its legs (``results/edge_legs``, ADR 0063; all visible or none) and its run record, whose
+    stats hold the trial log and who ran it (``owner``: the
     edge's, default the rows' user; ``trigger``: ``nightly`` | ``ui`` | ``cli``; ``job_id``: the
     job that wrote it, none for a direct call).
     Returns the finished record."""
@@ -264,6 +283,9 @@ def write_edge_eval(
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
     with writer.publishing(record.run_id, now):
         writer.write_result(RESULT, evaluation.end, record.run_id, frame, pending=True)
+        rows = series.edge_series_frame(evaluation, record.run_id, now)  # this run's series (0064)
+        if not rows.empty:
+            writer.write_result(series.RESULT, evaluation.end, record.run_id, rows, pending=True)
         if evaluation.leg_rows:
             write_legs(writer, record.run_id, legs_frame(evaluation.leg_rows, record.run_id, now))
         writer.save_run(record.finish(now, complete=True, stats=stats))

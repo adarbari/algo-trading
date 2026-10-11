@@ -28,6 +28,19 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pbo_cscv" }, { string = "results/edge_eval" }]
 
 [[responsibility]]
+id = "edge-evaluation-detail"
+description = "What an edge evaluation publishes beside its measures (ADR 0064): the per-session series of the main edge variant (results/edge_series: per screener, baseline and horizon, one row per measured block of decision sessions, framed from the run's pooled legs with its entry and exit sessions from the calendar, before_split decided by the run's split, a status for every block that holds no number, the unit and licence of its values), written inside the run's one publish block with its edge_eval rows; and the projected exits of a calendar schedule (the exit sessions of its next N decision sessions, N = ceil(largest verdict count threshold / 0.25), with the scheduled and measured decision-session counts), written on the variant's all row; an event schedule writes none"
+owner = ["src/algotrade/services/evaluation/cross_section/detail/*"]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares results/edge_series's one schema
+    "src/algotrade/services/evaluation/cross_section/results.py",  # the caller: writes the frame in the run's publish block
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: the facts come from its plan's blocks
+    "src/algotrade/services/read/evaluation/runs.py",  # the one reader of a run's stored series
+]
+section = "docs/adr/0064-edge-evidence-series-and-trade-ledger.md#decision"
+detect = [{ call = "edge_series_frame" }, { call = "next_exits" }, { string = "results/edge_series" }, { string = "edge_series" }]
+
+[[responsibility]]
 id = "edge-leg-reuse"
 description = "What a screener's statistic at one session of an edge evaluation is a function of (ADR 0063): the leg key (trial, universe, implied-vol field, event class and offset, draws, the user's expression-feature definitions, the harness, leg and seed versions), which seeds the random-pick draws so a session draws the same names in every run; the legs stored in results/edge_legs (a leg, the reads log of a session and its outcome read as rows, encoded and decoded losslessly but for the draws as float32, written with the run's rows and read back with one range read); which stored legs a run reuses (the reads log of the session and the outcome read still match the store; a session is computed whole) and which it retires by tombstone; the weekly audit's comparison (legs/audit.py: a full run's legs against the stored ones, the differing legs by key)"
 owner = ["src/algotrade/services/evaluation/cross_section/legs/*"]

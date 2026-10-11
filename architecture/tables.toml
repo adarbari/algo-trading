@@ -357,6 +357,12 @@ per_session = false
 note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py"
 
 [[table]]
+name = "results/edge_series"
+owner = "src/algotrade/storage/tables/result_writer.py"
+per_session = false
+note = "the edge harness's per-session series (ADR 0064): one row per (main edge variant, screener or baseline, horizon, measured block of decision sessions) with its calendar exit session, before_split, status, counts and oriented means; run-scoped like results/edge_eval (partition = the range end, read by run_id); framed only by services/evaluation/cross_section/detail/, written inside the run's one publish block, read through services/read/evaluation/runs.py (load_run_series)"
+
+[[table]]
 name = "results/edge_legs"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false

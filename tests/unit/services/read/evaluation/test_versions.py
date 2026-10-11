@@ -4,7 +4,7 @@ figures with the reason saying so, and the comparison and the published document
 server's."""
 
 import tomllib
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -20,7 +20,15 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.helpers.stored_frames import stamped
-from tests.unit.services.read.evaluation.conftest import DOCS, END, FROZEN, START, row, write_run
+from tests.unit.services.read.evaluation.conftest import (
+    DOCS,
+    END,
+    FROZEN,
+    START,
+    row,
+    series_row,
+    write_run,
+)
 
 MOVED = date(2026, 7, 1)
 HERE = datetime(2026, 10, 3, 3, tzinfo=UTC)
@@ -104,9 +112,17 @@ def write_own_run(backend: MemoryBackend, run_id: str = "mine1", split: date = M
         "range": [START.isoformat(), END.isoformat()], "as_of": "2026-10-01T00:00:00+00:00",
         "trials_counted": 1,
     }  # fmt: skip
+    series = [  # one session before the split, one on it, one after
+        series_row(d, split, edge_id="mine", user_id="me", exploratory=True)
+        for d in (split - timedelta(days=7), split, split + timedelta(days=7))
+    ]
     writer = ResultWriter(backend)
     with writer.publishing(run_id, HERE):
         writer.write_result("edge_eval", END, run_id, frame, pending=True)
+        writer.write_result(
+            "edge_series", END, run_id, stamped(series, END, run_id, HERE, "edge-eval"),
+            pending=True,
+        )  # fmt: skip
         record = RunRecord(run_id, "edge-eval:mine:me", END, HERE)
         writer.save_run(record.finish(HERE, complete=True, stats=stats))
 
@@ -131,6 +147,22 @@ def test_an_edge_reads_its_status_bookmark_and_whether_it_is_the_users_own() -> 
     assert (copy.status_since, copy.status_reason) == (date(2026, 9, 1), "")
     assert copy.labels == ("followed_against_verdict",)
     assert not copy.oos_revealed and copy.oos_hidden
+
+
+def test_a_hidden_runs_series_keeps_only_the_sessions_before_the_split() -> None:
+    """Fitness: a hidden copy's series must not show a session on or after its split, where
+    the out-of-sample window, counts and means would show the withheld figure."""
+    backend = MemoryBackend()
+    write_own_run(backend)
+    ctx = ctx_for(backend, with_copy())
+    (run,) = runs.load_edge_runs(ctx, mine(ctx))
+    assert run.oos_hidden
+    shown = runs.load_run_series(ctx, run)
+    assert [r.decision_session for r in shown] == [MOVED - timedelta(days=7)]
+    assert all(r.before_split and r.decision_session < MOVED for r in shown)
+    revealed_ctx = ctx_for(backend, with_copy({"oos_revealed": True}))
+    (shown_run,) = runs.load_edge_runs(revealed_ctx, mine(revealed_ctx))
+    assert len(runs.load_run_series(revealed_ctx, shown_run)) == 3
 
 
 def test_an_old_follow_state_still_reads_until_the_files_are_migrated() -> None:

@@ -596,25 +596,23 @@ RULE_SCREEN_VALUES = _fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
 )
-# The edge harness's results (ADR 0053): one row per (edge, variant, horizon, slice), written
-# by ``services/evaluation/cross_section/results.py``. Partition ``session_date`` is the range's
-# end; ``key`` includes the range start, so re-running a range replaces its rows and another range
-# adds its own. ``sessions`` is the number of independent sessions beside every number.
-# ``edge_variant`` (a key column; null is read as "main", the edge itself) names the edge's own
-# ``[[variants]]`` row; ``iv_source`` / ``licence`` record the implied-vol field an outcome read
-# and its catalogue licence; ``reference_rate`` / ``touch_rate`` are filled by the expires_otm
-# outcome (ED4a), null until then. ``split_from`` (a key column; null: no split) is the first
-# session of the test slice the run used and ``exploratory`` is true when it is not the edge's
-# ``frozen_from``: a user's split writes rows under its own key, never over the site's (ED5a).
-# Rows written before the column stay under the null key (never rewritten) beside a new run's
-# dated one; a reader picks a run by ``run_id`` (ED5c), never by key. ``in_sample`` is true on
-# a model screener's slice whose sessions its score was fitted on (ED7b): never evidence.
-# ``decile_mean_01`` .. ``decile_mean_10`` (ED8): the mean outcome of each tenth of the ranked
-# eligible names, best-ranked first, averaged over the slice's sessions that had deciles; null
-# when it had none and in rows written before the columns (never zero). Rows with ``role`` =
-# ``random`` (``variant`` = ``random``, ``slice_kind`` = ``draw``, ``slice_value`` the draw's
-# number) are the random-pick backtest's draws over the out-of-sample slice: no screener, never a
-# candidate for a verdict, read only through ``services/read/evaluation/runs.py``.
+# The edge harness's results (ADR 0053): one row per (edge, variant, horizon, slice), written by
+# ``cross_section/results.py``. Partition ``session_date`` is the range's end; ``key`` includes
+# the range start, so re-running a range replaces its rows and another range adds its own.
+# ``sessions`` is the number of independent sessions beside every number. ``edge_variant`` (a key
+# column; null reads as "main") names the edge's own ``[[variants]]`` row; ``iv_source`` /
+# ``licence`` record the implied-vol field an outcome read and its catalogue licence;
+# ``reference_rate`` / ``touch_rate`` are filled by the expires_otm outcome (ED4a). ``split_from``
+# (a key column; null: no split) is the first session of the test slice and ``exploratory`` is
+# true when it is not the edge's ``frozen_from``: a user's split writes rows under its own key,
+# never over the site's (ED5a). Rows written before the column stay under the null key; a reader
+# picks a run by ``run_id`` (ED5c), never by key. ``in_sample`` is true on a model screener's
+# slice whose sessions its score was fitted on (ED7b): never evidence. ``decile_mean_01`` ..
+# ``decile_mean_10`` (ED8): the mean outcome of each tenth of the ranked eligible names,
+# best-ranked first, averaged over the slice's sessions that had deciles; null when none (never
+# zero). Rows with ``role`` = ``random`` (``slice_kind`` = ``draw``, ``slice_value`` the draw's
+# number) are the random-pick backtest's out-of-sample draws: no screener, never a verdict's
+# candidate, read only through ``services/read/evaluation/runs.py``.
 EDGE_EVAL = _fixed(
     "results/edge_eval",
     "results",
@@ -631,8 +629,11 @@ EDGE_EVAL = _fixed(
     "split_from date",
     "exploratory bool",
     "in_sample bool",
+    "projected_exits date[]",  # the next decision sessions' exits, on ``all`` rows (ADR 0064)
     *(f"{n} int64" for n in (
-        "sessions", "picks", "hits", "eligible", "base_hits", "decile_sessions", "trials",
+        "decisions_scheduled", "decisions_measured", "decisions_scheduled_oos",
+        "decisions_measured_oos", "sessions", "picks", "hits", "eligible", "base_hits",
+        "decile_sessions", "trials",
         "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
         "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
         "pre_snapshot_sessions",
@@ -647,6 +648,38 @@ EDGE_EVAL = _fixed(
     key=(
         "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "slice_kind",
         "slice_value", "range_from", "split_from",
+    ),
+)  # fmt: skip
+# The edge harness's per-session series (ADR 0064), framed by ``cross_section/detail/series.py``
+# from the run's pooled legs and published with the run's ``edge_eval`` rows (same partition, the
+# range's end; read by ``run_id``): one row per (main edge variant, screener or baseline, horizon,
+# measured block). ``exit_session`` = S + the horizon (calendar); ``before_split``: the decision
+# session is before the run's split (false without one), never re-derived by a reader; ``status``:
+# measured | excluded_coverage | lost_input (``lost_table``: an admin cause) | no_picks. Nulls, not
+# zeros, where nothing was measured; values are oriented, net of cost, in ``unit`` (excess_return
+# | return | cushion | ratio).
+EDGE_SERIES = _fixed(
+    "results/edge_series",
+    "results",
+    ("edge_id", "user_id", "variant", "horizon_sessions", "range_from", "decision_session"),
+    *_strings("edge_id", "user_id", "variant", "role", "config_hash", "run_config_hash"),
+    *_strings("edge_variant", "benchmark", "regime", "status", "lost_table", "unit", "licence"),
+    "horizon_sessions int64!",
+    "range_from date!",
+    "decision_session date!",
+    *(f"{n} date" for n in ("range_to", "split_from", "entry_session", "exit_session")),
+    "exploratory bool",
+    "before_split bool",
+    *(f"{n} int64" for n in (
+        "block_days", "picks", "pick_hits", "eligible", "base_hits", "excluded_missing",
+        "excluded_unmeasured", "excluded_score_coverage", "no_entry_bar", "no_implied_vol",
+        "outside_universe", "delisted", "unscored",
+    )),
+    *_floats("pick_mean", "base_mean", *(f"decile_mean_{i:02d}" for i in range(1, 11))),
+    runs="merge",
+    key=(
+        "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "range_from",
+        "split_from", "decision_session",
     ),
 )  # fmt: skip
 # The ED6 winners study's results (ADR 0053 amendment 2026-10-09): one run's rows, written by
@@ -772,37 +805,14 @@ _BAR_TYPES = (
 KNOWN: dict[str, TableSpec] = {
     t.name: t
     for t in (
-        UNIVERSE,
-        UNDERLYING_QUOTES,
-        OPTION_QUOTES,
-        CHAIN_STATUS,
-        INSTRUMENT_REFERENCE,
-        SYMBOL_HISTORY,
-        ID_MAP,
-        LISTING_HISTORY,
-        INDEX_MEMBERSHIP,
-        INSTRUMENT_COMPANY,
-        INSTRUMENT_SHARES,
-        INSTRUMENT_DESCRIPTION,
-        TREASURY_RATES,
-        VERIFICATION_IBKR,
-        IBKR_CONTRACTS,
-        IBKR_IV30,
-        RULE_SCREEN,
-        RULE_SCREEN_VALUES,
-        EDGE_EVAL,
-        WINNERS_STUDY,
-        EDGE_PAPER,
-        EDGE_LEGS,
-        LIVE_OPTION_QUOTES,
-        USAGE_LLM_CALLS,
-        ETF_HOLDINGS,
-        MACRO_SERIES,
-        EARNINGS_EVENTS,
-        MACRO_RELEASE_EVENTS,
-        FILING_EVENTS,
+        UNIVERSE, UNDERLYING_QUOTES, OPTION_QUOTES, CHAIN_STATUS, INSTRUMENT_REFERENCE,
+        SYMBOL_HISTORY, ID_MAP, LISTING_HISTORY, INDEX_MEMBERSHIP, INSTRUMENT_COMPANY,
+        INSTRUMENT_SHARES, INSTRUMENT_DESCRIPTION, TREASURY_RATES, VERIFICATION_IBKR,
+        IBKR_CONTRACTS, IBKR_IV30, RULE_SCREEN, RULE_SCREEN_VALUES, EDGE_EVAL, EDGE_SERIES,
+        WINNERS_STUDY, EDGE_PAPER, EDGE_LEGS, LIVE_OPTION_QUOTES, USAGE_LLM_CALLS, ETF_HOLDINGS,
+        MACRO_SERIES, EARNINGS_EVENTS, MACRO_RELEASE_EVENTS, FILING_EVENTS,
     )
-}
+}  # fmt: skip
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
 # columns beyond instrument_id (+ ts for events). Event runs are windows (a backfill, then
 # nightly -7..+30-day windows into the same session), so they merge; rollups, catalogues and

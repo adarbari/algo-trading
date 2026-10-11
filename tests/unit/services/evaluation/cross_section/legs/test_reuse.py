@@ -15,6 +15,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import next_session
 from algotrade.data import ReadRecord, dates_digest
+from algotrade.services.evaluation.cross_section.detail.series import edge_series_frame
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
 from algotrade.services.evaluation.cross_section.legs.reuse import (
     FULL,
@@ -75,8 +76,16 @@ def rows(ev: EdgeEvaluation) -> pd.DataFrame:
     return frame.sort_values(order, na_position="first").reset_index(drop=True)
 
 
+def series(ev: EdgeEvaluation) -> pd.DataFrame:
+    """The ``edge_series`` rows of a run without what only says which run wrote them."""
+    frame = edge_series_frame(ev, "r", T1).drop(columns=["knowledge_ts", "run_id"])
+    return frame.sort_values(["variant", "horizon_sessions", "decision_session"], ignore_index=True)
+
+
 def same(a: EdgeEvaluation, b: EdgeEvaluation) -> None:
     pd.testing.assert_frame_equal(rows(a), rows(b), check_exact=True)
+    pd.testing.assert_frame_equal(series(a), series(b), check_exact=True)  # ADR 0064: same series
+    assert [r.series for r in a.results] == [r.series for r in b.results]  # windows, projection
     assert [r.stats for r in a.results] == [r.stats for r in b.results]
 
 
@@ -368,6 +377,9 @@ def test_sessions_a_screener_lost_to_a_missing_table_are_reused_as_lost(
     assert (again.legs_reused, again.legs_computed) == (4, 0)
     same(first, again)
     assert dict(again.results[0].lost_sessions) == {FEATURE: 1}
+    lost = series(again).set_index("decision_session").loc[D2]  # the series says why (ADR 0064)
+    assert (lost["status"], lost["lost_table"]) == ("lost_input", FEATURE)
+    assert pd.isna(lost["pick_mean"]) and pd.isna(lost["picks"])
 
 
 def test_a_table_that_lands_after_a_session_was_lost_recomputes_it(
