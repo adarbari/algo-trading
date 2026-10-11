@@ -16,8 +16,8 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.storage.tables.edge_schemas import EDGE_PAPER
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import EDGE_PAPER
 
 # The window a paper record is read over: a window of 252 sessions closes inside it.
 LOOKBACK_DAYS = 400

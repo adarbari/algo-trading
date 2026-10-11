@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
+import pandas as pd
+
 from algotrade.config.edges.document import LEGACY_SITE_CUTOFF, LEGACY_SITE_OWNERS, job_name
 from algotrade.config.user import SITE_USER
 from algotrade.services.read.availability.cause import run_cause
@@ -23,6 +25,7 @@ from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import result_table
 
 EDGE_EVAL = "edge_eval"
+EDGE_SERIES = "edge_series"  # the per-session series of a run (ADR 0064)
 MAIN = "main"
 RANDOM = "random"  # the role of a random-pick draw (ED8), never a screener or a baseline
 DECILES = 10
@@ -95,6 +98,38 @@ class EdgeRow:
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
     decile_means: tuple[float | None, ...] = ()  # each tenth's mean outcome, best-ranked first;
     # empty when the slice had none or the run is older than the columns (never zeros)
+
+
+@dataclass(frozen=True)
+class SeriesRow:
+    """One block of decision sessions of a run's main edge variant, one screener or baseline at
+    one horizon (``results/edge_series``, ADR 0064): the window it measured (``entry_session`` to
+    ``exit_session``, from the calendar), ``before_split`` (the decision session is before the
+    run's split, decided by the harness), why it holds no number (``status``: measured |
+    excluded_coverage | lost_input | no_picks; ``lost_table`` is the admin cause of lost_input),
+    the counts and the oriented means of the picks and of every eligible name, in ``unit``, and
+    each tenth's mean. A number not stored is None."""
+
+    variant: str
+    role: str
+    horizon_sessions: int
+    decision_session: date
+    entry_session: date | None
+    exit_session: date | None
+    block_days: int | None
+    before_split: bool
+    regime: str | None
+    status: str
+    lost_table: str | None
+    unit: str | None
+    licence: str | None
+    picks: int | None
+    pick_hits: int | None
+    eligible: int | None
+    base_hits: int | None
+    pick_mean: float | None
+    base_mean: float | None
+    decile_means: tuple[float | None, ...] = ()
 
 
 def lift_points(hit_rate: float | None, base_rate: float | None) -> float | None:
@@ -245,6 +280,43 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
     )
 
 
+def _day_of(value: Any) -> date | None:
+    """A stored date (ISO text, a date or a Timestamp; null is None or NaT)."""
+    return None if pd.isna(value) else pd.Timestamp(value).date()
+
+
+def _text(value: Any) -> str | None:
+    stored = to_scalar(value)
+    return None if stored is None else str(stored)
+
+
+def _series_row(row: Mapping[str, Any]) -> SeriesRow:
+    decision = _day_of(row["decision_session"])
+    assert decision is not None  # a key column
+    return SeriesRow(
+        variant=str(row["variant"]),
+        role=str(row["role"]),
+        horizon_sessions=int(row["horizon_sessions"]),
+        decision_session=decision,
+        entry_session=_day_of(row.get("entry_session")),
+        exit_session=_day_of(row.get("exit_session")),
+        block_days=_int(row.get("block_days")),
+        before_split=to_scalar(row.get("before_split")) is True,
+        regime=_text(row.get("regime")),
+        status=str(row["status"]),
+        lost_table=_text(row.get("lost_table")),
+        unit=_text(row.get("unit")),
+        licence=_text(row.get("licence")),
+        picks=_int(row.get("picks")),
+        pick_hits=_int(row.get("pick_hits")),
+        eligible=_int(row.get("eligible")),
+        base_hits=_int(row.get("base_hits")),
+        pick_mean=_float(row.get("pick_mean")),
+        base_mean=_float(row.get("base_mean")),
+        decile_means=_deciles(row),
+    )
+
+
 def _stored(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
     frame = run_partition(ctx, result_table(EDGE_EVAL), record)
     if frame is None:
@@ -282,3 +354,19 @@ def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
     if record is None or run.oos_hidden:
         return ()
     return draws_of_record(ctx, record)
+
+
+def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
+    """The per-session series ``run`` wrote (``results/edge_series``, ADR 0064), oldest decision
+    session first; none for a run from before the table (read as not stored) or a run that
+    wrote none. A run whose out-of-sample result is hidden serves only the rows whose decision
+    session is before its split (``before_split``): a later session is out of sample, and its
+    window, counts and means would show the figure that is withheld; filtered here, in the one
+    reader, never in the browser."""
+    record = ctx.reader.run(run.run_id)
+    frame = None if record is None else run_partition(ctx, result_table(EDGE_SERIES), record)
+    if frame is None or frame.empty:
+        return ()
+    found = [_series_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records")]
+    kept = [r for r in found if r.before_split] if run.oos_hidden else found
+    return tuple(sorted(kept, key=lambda r: (r.variant, r.horizon_sessions, r.decision_session)))

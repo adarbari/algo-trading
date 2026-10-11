@@ -11,13 +11,8 @@ from algotrade.storage.runs import (
     published,
     run_session,
 )
-from algotrade.storage.tables.schemas import (
-    FORWARD_RETURNS,
-    TableSpec,
-    spec_for,
-    table_key,
-    validate_frame,
-)
+from algotrade.storage.tables.schemas import FORWARD_RETURNS, spec_for, table_key, validate_frame
+from algotrade.storage.tables.spec import Column, TableSpec
 from tests.helpers.stored_frames import stamped
 
 
@@ -70,8 +65,6 @@ def test_start_run_and_finish_decide_complete_or_partial() -> None:
 
 
 def test_column_types_are_checked() -> None:
-    from algotrade.storage.tables.schemas import Column  # noqa: PLC0415
-
     with pytest.raises(ValueError, match="unknown column type"):
         Column("x", "decimal")
 

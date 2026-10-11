@@ -13,7 +13,7 @@ TABLE = "results/edge_legs"
 NAME = "edge_legs"
 ALLOWED = (
     "src/algotrade/services/evaluation/cross_section/legs/",
-    "src/algotrade/storage/tables/schemas.py",  # declares the one schema
+    "src/algotrade/storage/tables/edge_schemas.py",  # declares the one schema
 )
 SCANNED = ("src/algotrade", "apps/api", "apps/backtest", "apps/ingestion", "libs")
 
@@ -42,7 +42,7 @@ def test_only_the_legs_folder_names_the_table() -> None:
 def test_the_scan_sees_the_store_and_the_schema() -> None:
     legs = REPO_ROOT / "src/algotrade/services/evaluation/cross_section/legs/store.py"
     assert NAME in _names(legs)
-    assert TABLE in _names(REPO_ROOT / "src/algotrade/storage/tables/schemas.py")
+    assert TABLE in _names(REPO_ROOT / "src/algotrade/storage/tables/edge_schemas.py")
 
 
 def test_the_table_is_registered_as_not_every_session() -> None:
