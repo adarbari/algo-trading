@@ -130,7 +130,6 @@ class FallbackTextModel:
     only_users: Mapping[str, frozenset[str]] = field(default_factory=dict)
     ledger: CallLedger | None = None
     worst_s: Mapping[str, float] = field(default_factory=dict)  # provider id -> worst_case_s
-    reserve_s: Mapping[str, float] = field(default_factory=dict)  # id -> the later members' sum
     now: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
 
     @property
@@ -176,9 +175,10 @@ class FallbackTextModel:
                 break
             call.later = position + 1 < len(members)
             asked, stage = user, ESCALATE if call.escalating else _stage(tag)
+            refusal: str | None = None
             for attempt in (0, 1):  # the call, then at most one repair of a refused answer
-                if attempt and (left := self._short(call, provider)) is not None:
-                    call.failures.append(f"{provider}: not repaired, {left}")
+                if attempt and (left := self._short(call, provider, members[position + 1 :])):
+                    call.failures.append(f"{provider}: {refusal} (not repaired, {left})")
                     call.escalating = True
                     call.first_failed = call.first_failed or provider  # its answer was refused
                     break
@@ -207,14 +207,20 @@ class FallbackTextModel:
     def _late(self, call: "_Call") -> bool:
         return self.clock() - call.started > self.deadline_s
 
-    def _short(self, call: "_Call", provider: str) -> str | None:
+    def _short(
+        self, call: "_Call", provider: str, later: Sequence[tuple[str, TextModel]]
+    ) -> str | None:
         """Why a repair by ``provider`` must not start, else ``None``: the deadline has passed,
-        or the repair's worst case would cut into the time reserved for the later members (the
-        fallback must keep its turn; ``reserve_s`` is 0 for the last member)."""
+        or, when members follow, the repair's worst case would cut into the time they need (the
+        worst cases of ``later`` but the last, as ``LlmSettings`` validates the deadline, so the
+        fallback keeps its turn). The last member's repair needs only the deadline not to have
+        passed."""
         spent = self.clock() - call.started
         if spent > self.deadline_s:
             return f"the {self.deadline_s:g} s deadline passed"
-        reserve = self.reserve_s.get(provider, 0.0)
+        if not later:
+            return None
+        reserve = sum(self.worst_s.get(pid, 0.0) for pid, _ in later[:-1])
         left = self.deadline_s - reserve - spent
         if self.worst_s.get(provider, 0.0) > left:
             return f"{max(left, 0.0):g} s left, the fallback needs {reserve:g} s"

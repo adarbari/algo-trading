@@ -235,7 +235,7 @@ An answer the model gives is no longer "text or unavailable":
    with the question, its refused answer and the exact error; the next provider is stage
    `escalate`. At most two calls per provider, none started after `deadline_s`. A repair is best
    effort: it is skipped when its worst case would cut into the time reserved for the later
-   non-last providers (`reserve_s`, built from `LlmSettings`; 0 for the last), so the fallback
+   non-last providers (`worst_s`, from `LlmSettings`; the last provider's repair needs only the deadline not to have passed), so the fallback
    keeps its turn and the deadline validation is unchanged.
 4. **Order is tier**: no tier concept; the `[[provider]]` order is cheap first, strong last.
 

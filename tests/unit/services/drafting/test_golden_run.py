@@ -33,6 +33,7 @@ from algotrade.services.drafting.golden_run import (
     write_recordings,
 )
 from algotrade.services.drafting.screens import ScreenDraft, criteria_of, parse_answer
+from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
 
 CATALOGUE = {"f.a", "f.b", "f.c"}
@@ -177,6 +178,25 @@ def test_the_invalid_answer_keeps_its_raw_text_for_the_report() -> None:
     _, result = run(["not json"], repeat=1)
     bad = result.results[0]
     assert bad.status == "invalid" and bad.answer == "not json" and bad.model == "m1"
+
+
+def test_a_chain_never_repairs_in_a_run_the_first_answer_is_scored_and_kept() -> None:
+    costs = CostTap()
+    inner = Scripted(["not json", GOOD], costs)
+    chained = FallbackTextModel([("p", inner)])
+
+    def with_accept(model: TextModel, sentence: str) -> ScreenDraft:
+        def accept(text: str) -> None:
+            parse_answer(text)
+
+        answer = model.complete("system", sentence, accept=accept)
+        kept, dropped = criteria_of(parse_answer(answer.text), CATALOGUE)
+        return ScreenDraft("g", {"criteria": kept}, dropped, ())
+
+    plan = plan_of([case()], repeat=1)
+    result = evaluate(plan, {"paid": chained}, with_accept, costs, budget_usd=1.0, max_calls=5)
+    bad = result.results[0]
+    assert (bad.status, bad.answer) == ("invalid", "not json") and inner.n == 1
 
 
 # ------------------------------------------------------------------------------ the caps

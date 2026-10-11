@@ -7,6 +7,7 @@ from dataclasses import replace
 
 import pytest
 
+from algotrade.config.site.llm import ProviderSettings
 from algotrade.core.model.completion import Attempt, CallTag, Completion
 from algotrade.core.model.errors import InvalidAnswerError, ModelUnavailableError
 from algotrade.services.text_model.chain import FallbackTextModel
@@ -545,11 +546,7 @@ class Timed(Scripted):
 
 
 def reserving(clock: Clock, *members: Scripted, worst: dict[str, float]) -> FallbackTextModel:
-    ids = [m.provider for m in members]
-    reserve = {p: sum(worst[x] for x in ids[n + 1 : -1]) for n, p in enumerate(ids)}
-    return FallbackTextModel(
-        [(m.provider, m) for m in members], 100.0, clock, worst_s=worst, reserve_s=reserve
-    )
+    return FallbackTextModel([(m.provider, m) for m in members], 100.0, clock, worst_s=worst)
 
 
 def test_a_repair_that_would_cut_into_the_fallbacks_reserved_time_is_skipped() -> None:
@@ -612,3 +609,36 @@ def test_a_refused_answer_whose_repair_misses_the_deadline_still_falls_back_from
     chained = reserving(clock, slow, Scripted("b", "good"), worst={"slow": 80.0, "b": 1.0})
     done = chained.complete("s", "u", tag=TAG, accept=only_good)  # 100 + 80 > 100: no repair
     assert (done.provider, done.fell_back_from) == ("b", "slow")
+
+
+def default_chain(clock: Clock, *members: Timed) -> FallbackTextModel:
+    """The chain as llm.toml builds it with no ``deadline_s``: the sum of every worst case."""
+    providers = [ProviderSettings(m.provider, "http://x/v1", "m") for m in members]
+    worst = {p.id: p.worst_case_s for p in providers}
+    return FallbackTextModel(
+        [(m.provider, m) for m in members], sum(worst.values()), clock, worst_s=worst
+    )
+
+
+def test_a_single_provider_chain_repairs_under_the_default_deadline() -> None:
+    clock = Clock()
+    done = default_chain(clock, Timed(clock, 5, "only", "bad", "good")).complete(
+        "s", "u", tag=TAG, accept=only_good
+    )
+    assert done.text == "good"
+
+
+def test_the_first_skips_its_repair_for_the_fallback_but_the_last_repairs() -> None:
+    clock = Clock()
+    first = Timed(clock, 230, "first", "bad")  # worst case 220 s: 230 + 220 > the 440 s deadline
+    last = Timed(clock, 5, "last", "bad", "good")
+    done = default_chain(clock, first, last).complete("s", "u", tag=TAG, accept=only_good)
+    assert (done.provider, done.text, done.fell_back_from) == ("last", "good", "first")
+    assert [stage for _, stage, _ in last.seen] == ["escalate", "repair"] and len(first.seen) == 1
+
+
+def test_the_not_repaired_failure_says_why_the_answer_was_refused() -> None:
+    clock = Clock()
+    slow = Timed(clock, 100, "slow", "bad")
+    with pytest.raises(ModelUnavailableError, match=r"'bad' is not good \(not repaired, the 60 s"):
+        chain(slow, deadline_s=60.0, clock=clock).complete("s", "u", tag=TAG, accept=only_good)

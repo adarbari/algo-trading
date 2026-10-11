@@ -242,7 +242,7 @@ def test_a_providers_structured_mode_reaches_its_adapter(monkeypatch: pytest.Mon
     assert isinstance(second, ChatCompletions) and second.structured == "json_schema"
 
 
-def test_the_reserved_fallback_time_is_the_validations_needed_sum(
+def test_the_chain_knows_each_providers_worst_case_as_the_deadline_validation_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for key in ("G1", "G2"):
@@ -256,9 +256,9 @@ def test_the_reserved_fallback_time_is_the_validations_needed_sum(
     model, _ = open_text_model(configs(doc))
     assert isinstance(model, FallbackTextModel)
     needed = sum(p.worst_case_s for p in settings.providers[:-1])
-    first = settings.providers[0].id
-    assert model.reserve_s[first] + model.worst_s[first] == needed
-    assert model.reserve_s["g2"] == 0.0 and model.reserve_s[first] > model.reserve_s["g1"] == 0.0
+    ids = [pid for pid, _ in model.members]
+    assert sum(model.worst_s[pid] for pid in ids[:-1]) == needed  # what the deadline validates
+    assert model.worst_s == {p.id: p.worst_case_s for p in settings.providers}
 
 
 def test_only_restricts_the_chain_to_the_named_providers_and_tee_sees_the_usage_rows(

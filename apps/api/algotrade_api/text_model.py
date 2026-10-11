@@ -140,12 +140,9 @@ def _chain(settings: LlmSettings, ledger: UsageLedger) -> TextModel:
     only = {p.id: frozenset(p.only_users) for p in settings.providers if p.only_users}
     only = {pid: users for pid, users in only.items() if pid in dict(members)}
     worst = {p.id: p.worst_case_s for p in settings.providers if p.id in dict(members)}
-    ids = [pid for pid, _ in members]
-    reserve = {pid: sum(worst[later] for later in ids[n + 1 : -1]) for n, pid in enumerate(ids)}
     return FallbackTextModel(
-        members, settings.deadline_s, only_users=only, ledger=ledger, worst_s=worst,
-        reserve_s=reserve,
-    )  # fmt: skip
+        members, settings.deadline_s, only_users=only, ledger=ledger, worst_s=worst
+    )
 
 
 def _claude_cli(provider: ProviderSettings) -> TextModel:
