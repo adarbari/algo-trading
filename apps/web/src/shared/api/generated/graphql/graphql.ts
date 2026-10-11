@@ -147,7 +147,7 @@ export type EdgeResultBasisQueryVariables = Exact<{
 }>;
 
 
-export type EdgeResultBasisQuery = { edgeResult: { basis: { runId: string | null, variant: string | null, horizonSessions: number | null, splitFrom: string | null, oosHidden: boolean, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type EdgeResultBasisQuery = { edgeResult: { basis: { runId: string | null, variant: string | null, horizonSessions: number | null, splitFrom: string | null, oosHidden: boolean, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
 
 export type EdgeResultCurveQueryVariables = Exact<{
   id: string;
@@ -155,28 +155,28 @@ export type EdgeResultCurveQueryVariables = Exact<{
 }>;
 
 
-export type EdgeResultCurveQuery = { edgeResult: { curve: { kind: string | null, unit: string | null, splitFrom: string | null, hidden: boolean, points: Array<{ decision: string, exit: string, period: string, value: number, cumulative: number, baseValue: number | null, baseCumulative: number | null, trades: number, weight: number }>, gaps: Array<{ from: string, to: string, kind: string, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, live: { state: string, since: string | null, anchor: number | null, closed: number, sessions: number, points: Array<{ sell: string, value: number, cumulative: number, trades: number }> } | null, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type EdgeResultCurveQuery = { edgeResult: { curve: { kind: string | null, unit: string | null, splitFrom: string | null, hidden: boolean, points: Array<{ decision: string, exit: string, period: string, value: number, cumulative: number, baseValue: number | null, baseCumulative: number | null, trades: number, weight: number }>, gaps: Array<{ from: string, to: string, kind: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }>, live: { state: string, since: string | null, anchor: number | null, closed: number, sessions: number, points: Array<{ sell: string, value: number, cumulative: number, trades: number }> } | null, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
 
 export type EdgeResultDrawdownQueryVariables = Exact<{
   id: string;
 }>;
 
 
-export type EdgeResultDrawdownQuery = { edgeResult: { drawdown: { unit: string | null, maxInSample: number | null, maxOutOfSample: number | null, volInSample: number | null, volOutOfSample: number | null, points: Array<{ exit: string, depth: number }>, episodes: Array<{ peak: string, trough: string, recovered: string | null, depth: number }>, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type EdgeResultDrawdownQuery = { edgeResult: { drawdown: { unit: string | null, maxInSample: number | null, maxOutOfSample: number | null, volInSample: number | null, volOutOfSample: number | null, points: Array<{ exit: string, depth: number }>, episodes: Array<{ peak: string, trough: string, recovered: string | null, depth: number }>, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
 
 export type EdgeResultRollingStartsQueryVariables = Exact<{
   id: string;
 }>;
 
 
-export type EdgeResultRollingStartsQuery = { edgeResult: { rollingStarts: { unit: string | null, starts: Array<{ start: string, trades: number, liftPts: number | null, meanExcess: number | null }>, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type EdgeResultRollingStartsQuery = { edgeResult: { rollingStarts: { unit: string | null, starts: Array<{ start: string, trades: number, liftPts: number | null, meanExcess: number | null }>, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
 
 export type EdgeResultMonthlyQueryVariables = Exact<{
   id: string;
 }>;
 
 
-export type EdgeResultMonthlyQuery = { edgeResult: { monthly: { unit: string | null, months: Array<{ month: string, value: number, trades: number, period: string }>, unknown: { kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type EdgeResultMonthlyQuery = { edgeResult: { monthly: { unit: string | null, months: Array<{ month: string, value: number, trades: number, period: string }>, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
 
 export type EdgeResultDecayQueryVariables = Exact<{
   id: string;
@@ -695,9 +695,20 @@ export const EdgeResultBasisDocument = new TypedDocumentString(`
       splitFrom
       oosHidden
       unknown {
+        code
+        reason
         kind
         guideTerm
         kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
     }
   }
@@ -727,9 +738,20 @@ export const EdgeResultCurveDocument = new TypedDocumentString(`
         to
         kind
         unknown {
+          code
+          reason
           kind
           guideTerm
           kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
         }
       }
       live {
@@ -746,9 +768,20 @@ export const EdgeResultCurveDocument = new TypedDocumentString(`
         }
       }
       unknown {
+        code
+        reason
         kind
         guideTerm
         kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
     }
   }
@@ -774,9 +807,20 @@ export const EdgeResultDrawdownDocument = new TypedDocumentString(`
       volInSample
       volOutOfSample
       unknown {
+        code
+        reason
         kind
         guideTerm
         kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
     }
   }
@@ -794,9 +838,20 @@ export const EdgeResultRollingStartsDocument = new TypedDocumentString(`
         meanExcess
       }
       unknown {
+        code
+        reason
         kind
         guideTerm
         kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
     }
   }
@@ -814,9 +869,20 @@ export const EdgeResultMonthlyDocument = new TypedDocumentString(`
         period
       }
       unknown {
+        code
+        reason
         kind
         guideTerm
         kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
       }
     }
   }
