@@ -228,3 +228,53 @@ def test_win_rate_band_is_undefined_without_trades_or_with_a_bad_quantile() -> N
     assert es.win_rate_band(0.5, 0) is None
     assert es.win_rate_band(0.5, 10, 0.9, 0.1) is None
     assert es.win_rate_band(1.0, 5) == (1.0, 1.0)
+
+
+def test_haircut_sharpe_matches_the_papers_illustration() -> None:
+    # Harvey and Liu (2015): a t-ratio of 3.0 whose p-value is adjusted to 0.05 is a t-ratio of
+    # about 2.0, a haircut of about a third. 18 trials take p = 0.0027 to 0.0486.
+    n = 100
+    h = es.haircut_sharpe(3.0 / math.sqrt(n), n, 18)
+    assert h is not None
+    assert h.t == pytest.approx(3.0)
+    assert h.p == pytest.approx(math.erfc(3.0 / math.sqrt(2.0)))  # 0.0026998
+    assert h.p_adjusted == pytest.approx(18 * h.p)
+    t_adjusted = h.sharpe * math.sqrt(n)
+    assert math.erfc(t_adjusted / math.sqrt(2.0)) == pytest.approx(h.p_adjusted)  # 0.0486
+    assert t_adjusted == pytest.approx(1.9721, abs=1e-3)
+    assert h.cut == pytest.approx(1.0 - t_adjusted / 3.0)
+    assert h.cut == pytest.approx(1.0 / 3.0, abs=0.03)
+
+
+def test_haircut_sharpe_one_trial_leaves_the_sharpe_ratio() -> None:
+    h = es.haircut_sharpe(0.3, 50, 1)
+    assert h is not None
+    assert h.cut == pytest.approx(0.0, abs=1e-6)
+    assert h.sharpe == pytest.approx(0.3, abs=1e-6)
+
+
+def test_haircut_sharpe_grows_with_trials_and_caps_at_everything() -> None:
+    cuts = [es.haircut_sharpe(0.3, 50, m) for m in (1, 10, 100, 100000)]
+    values = [c.cut for c in cuts if c is not None]
+    assert values == sorted(values)
+    assert values[-1] == 1.0  # the adjusted p-value reached 1: nothing is left
+    assert cuts[-1] is not None
+    assert cuts[-1].sharpe == 0.0
+
+
+@pytest.mark.parametrize(
+    ("sr", "n", "trials"),
+    [
+        (None, 50, 3),
+        (0.3, None, 3),
+        (0.3, 50, None),
+        (0.0, 50, 3),
+        (-0.2, 50, 3),
+        (0.3, 1, 3),
+        (0.3, 50, 0),
+    ],
+)
+def test_haircut_sharpe_is_undefined_without_a_positive_sharpe_periods_or_trials(
+    sr: float | None, n: int | None, trials: int | None
+) -> None:
+    assert es.haircut_sharpe(sr, n, trials) is None

@@ -35,6 +35,8 @@ const verdict = (over: Record<string, unknown>) => ({
   years: [],
   columns: [],
   evidence: null,
+  haircut: null,
+  decay: null,
   ...over,
 });
 
