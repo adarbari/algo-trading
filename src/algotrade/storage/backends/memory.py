@@ -168,7 +168,7 @@ class MemoryTables:
             frame = frames.get(run_id)
             if frame is None:
                 return None
-            mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame
+            mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame.copy()
             return None if mine.empty else mine.reset_index(drop=True)
 
         return pinned_read(at, lambda: self._seq, lambda: self._index_lock)

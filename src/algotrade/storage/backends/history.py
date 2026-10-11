@@ -47,7 +47,12 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from algotrade.storage.backends.arrow import concat, keep_columns, parquet_bytes
+from algotrade.storage.backends.arrow import (
+    concat,
+    keep_columns,
+    parquet_bytes,
+    row_groups_holding,
+)
 from algotrade.storage.backends.local_index import INDEX, atomic_write, read_index
 from algotrade.storage.backends.run_selection import StaleSnapshotError, pinned_read
 from algotrade.storage.locks import FileLock, held
@@ -183,7 +188,11 @@ class HistoryCopy:
                 names = parquet.schema_arrow.names
                 keep = None if columns is None else keep_columns(columns) | {DAY, POS}
                 present = [n for n in names if keep is None or n in keep]
-                groups = _row_groups(parquet, instruments)
+                groups = (
+                    list(range(parquet.metadata.num_row_groups))
+                    if instruments is None
+                    else row_groups_holding(parquet, "instrument_id", instruments)
+                )
                 data = parquet.read_row_groups(groups, columns=present)
         except (OSError, pa.ArrowInvalid) as exc:
             log.warning("history copy of %s %s skipped: %s", table, year, exc)
@@ -326,25 +335,3 @@ def _shape(data: pa.Table) -> list[tuple[str, str]]:
 
 def _each_day(low: date, high: date) -> list[date]:
     return [low + timedelta(days=i) for i in range((high - low).days + 1)]
-
-
-def _row_groups(parquet: pq.ParquetFile, instruments: Sequence[str] | None) -> list[int]:
-    """The row groups whose ``instrument_id`` range can hold one of ``instruments`` (all of
-    them for no filter, or a group without statistics)."""
-    meta = parquet.metadata
-    if instruments is None:
-        return list(range(meta.num_row_groups))
-    column = next(
-        i for i in range(meta.num_columns) if meta.schema.column(i).path == "instrument_id"
-    )
-    wanted = sorted(set(instruments))
-    chosen: list[int] = []
-    for group in range(meta.num_row_groups):
-        stats = meta.row_group(group).column(column).statistics
-        if stats is None or not stats.has_min_max:
-            chosen.append(group)
-            continue
-        low, high = stats.min, stats.max
-        if any(low <= w <= high for w in wanted):
-            chosen.append(group)
-    return chosen

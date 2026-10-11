@@ -46,6 +46,7 @@ from algotrade.storage.backends.arrow import (
     concat,
     keep_columns,
     parquet_bytes,
+    row_groups_holding,
     to_arrow,
     to_frame,
 )
@@ -391,15 +392,7 @@ def _read_run_file(path: Path, run_id: str) -> pa.Table:
     with pq.ParquetFile(path) as parquet:
         if "run_id" not in parquet.schema_arrow.names:
             return parquet.read()
-        meta = parquet.metadata
-        groups = []
-        for i in range(meta.num_row_groups):
-            group = meta.row_group(i)
-            column = next(c for c in map(group.column, range(group.num_columns))
-                          if c.path_in_schema == "run_id")  # fmt: skip
-            stats = column.statistics
-            if stats is None or not stats.has_min_max or stats.min <= run_id <= stats.max:
-                groups.append(i)
+        groups = row_groups_holding(parquet, "run_id", [run_id])
         data = parquet.read_row_groups(groups) if groups else parquet.schema_arrow.empty_table()
     return data.filter(pc.equal(data.column("run_id"), run_id))
 
