@@ -6,6 +6,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     verification.toml -> VerificationSettings (live verification vs IBKR)
     llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0041)
     phrasebook.toml -> PhrasebookSettings (trader vocabulary -> catalogue fields, ADR 0041)
+    feature_backlog.toml -> FeatureBacklogSettings (drafting/backlog.py: missing features)
     field_guide/*.toml -> FieldGuideSettings (how to read a field, thresholds, caveats, ADR 0041)
     macro.toml     -> MacroSettings     (config/site/macro.py: macro series, index levels; ADR 0048)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
@@ -33,6 +34,9 @@ from typing import Any, Protocol
 
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.coverage import DEFAULT_COVERAGE, CoverageRule, load_coverage
+from algotrade.config.site.drafting.backlog import (
+    FeatureBacklogSettings as FeatureBacklogSettings,  # noqa: PLC0414 - re-export
+)
 from algotrade.config.site.features.definitions import (
     SCALARS,
     FeatureDefinition,
@@ -850,6 +854,11 @@ def load_llm(configs: SiteDocuments) -> LlmSettings:
 def load_phrasebook(configs: SiteDocuments) -> PhrasebookSettings:
     """``phrasebook.toml`` (ADR 0041); missing: no phrases."""
     return PhrasebookSettings.from_document(site_document(configs.load, "phrasebook"))
+
+
+def load_feature_backlog(configs: SiteDocuments) -> FeatureBacklogSettings:
+    """``feature_backlog.toml`` (Describe it plan); missing: an empty backlog."""
+    return FeatureBacklogSettings.from_document(site_document(configs.load, "feature_backlog"))
 
 
 # By store identity (the store kept alive): site config changes with a release, as the site
