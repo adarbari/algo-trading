@@ -13,7 +13,7 @@ from algotrade.services.evaluation.cross_section.detail.windows import BlockWind
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
-from algotrade.storage.tables.schemas import EDGE_SERIES
+from algotrade.storage.tables.edge_schemas import EDGE_SERIES
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,

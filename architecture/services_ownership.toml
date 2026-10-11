@@ -21,7 +21,7 @@ id = "edge-evaluation"
 description = "Score an edge's screeners against stored outcomes (ADR 0053 decisions 5 to 7 and its amendment of 2026-10-08): per edge and per edge variant ([[variants]], each a trial), the decision sessions D of its schedule spaced a horizon apart (an event schedule: the event names read at D from a declared feature field, pooled into blocks of a horizon), the entry session S = D + offset (S > D) whose outcome partition is read, each screener's and baseline's picks and the eligible, base and implied-vol names at D (only what was known then; one fixed iv_field per run, its source and licence recorded), whether an outcome counts as a hit (the document's [outcome] against the stored fields; an unclosed or missing window, or no entry bar at S, excluded, never a miss), hit rate against the base rate, lift, decile spread, effect size, Sharpe, deflated Sharpe and PBO per slice (all, year, regime, frozen) with the independent sessions beside each, the trial log, and the rows of results/edge_eval; the one reader of outcomes (harness.py)"
 owner = ["src/algotrade/services/evaluation/cross_section/*"]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares results/edge_eval's one schema
+    "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_eval's one schema
     "src/algotrade/services/jobs/handlers.py",  # the edge-eval job kind (ADR 0010) runs the harness
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
@@ -32,7 +32,7 @@ id = "edge-evaluation-detail"
 description = "What an edge evaluation publishes beside its measures (ADR 0064): the per-session series of the main edge variant (results/edge_series: per screener, baseline and horizon, one row per measured block of decision sessions, framed from the run's pooled legs with its entry and exit sessions from the calendar, before_split decided by the run's split, a status for every block that holds no number, the unit and licence of its values), written inside the run's one publish block with its edge_eval rows; and the projected exits of a calendar schedule (the exit sessions of its next N decision sessions, N = ceil(largest verdict count threshold / 0.25), with the scheduled and measured decision-session counts), written on the variant's all row; an event schedule writes none"
 owner = ["src/algotrade/services/evaluation/cross_section/detail/*"]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares results/edge_series's one schema
+    "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_series's one schema
     "src/algotrade/services/evaluation/cross_section/results.py",  # the caller: writes the frame in the run's publish block
     "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: the facts come from its plan's blocks
     "src/algotrade/services/read/evaluation/runs.py",  # the one reader of a run's stored series
@@ -48,7 +48,7 @@ allowed = [
     "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: its random draws are seeded by the key
     "src/algotrade/services/evaluation/cross_section/measuring.py",  # the caller: the draws of a leg are seeded by its key
     "src/algotrade/services/jobs/handlers.py",  # the edge-eval job's audit mode publishes only the differing legs
-    "src/algotrade/storage/tables/schemas.py",  # declares results/edge_legs's one schema
+    "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_legs's one schema
 ]
 section = "docs/adr/0063-incremental-edge-evaluation.md#decision"
 detect = [{ call = "leg_key" }, { string = "results/edge_legs" }, { string = "edge_legs" }]
@@ -58,7 +58,7 @@ id = "edge-paper-trading"
 description = "The forward paper record of the edges a user follows (ADR 0053 amendment 2026-10-09): for each edge a user follows (a bookmarked site edge) or owns as a candidate or live edge (interim rule, ADR 0053 amendment 2026-10-10: the owner changes it in PR 5), at each night's session when its schedule fires (the harness's own legs, cross_section/sessions.leg_blocks: a plain schedule's decision sessions counted from the bookmark's `since` or the status's `status_since`, an event schedule's event names read at D with S = D + 1), the harness's own picks (cross_section/picks: the screener's qualified names among the edge's eligible names, best first, top_k, only what was known at the session) as open paper trades with buy and sell sessions from the trading calendar; for every open trade whose sell session has come, the stored outcome read as of now and judged by the edge's own [outcome] (cross_section/hit) as won, lost or skipped with the reason (an implied-vol outcome, expires_otm or a vol ratio, reads the vol at the signal session through harness.implied_at; never a loss or a zero for a missing result; a trade whose edge's outcome changed since is skipped); one atomic run per user per night into results/edge_paper with the run record edge-paper:<user>; idempotent per night"
 owner = ["src/algotrade/services/evaluation/forward/*"]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares results/edge_paper's one schema
+    "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_paper's one schema
     "src/algotrade/services/jobs/handlers.py",  # the edge-signals job kind (ADR 0010)
     "apps/ingestion/algotrade_ingestion/workflows/nightly/screens.py",  # the nightly step submits one job per user
     "src/algotrade/data/paper/*",  # the read of the stored record, shared with the read model

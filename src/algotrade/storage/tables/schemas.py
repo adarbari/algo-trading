@@ -16,7 +16,6 @@ the others); a ``merge`` run is a window or increment (reads union every run kno
 """
 
 from collections.abc import Iterable
-from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -24,120 +23,43 @@ import pandas as pd
 from algotrade.core.model.errors import DataValidationError
 from algotrade.core.validation.bars import ohlcv_problems
 from algotrade.core.views.series import FIELDS
+from algotrade.storage.tables.edge_schemas import (
+    EDGE_EVAL,
+    EDGE_LEGS,
+    EDGE_PAPER,
+    EDGE_SERIES,
+    WINNERS_STUDY,
+)
+from algotrade.storage.tables.spec import (
+    COMMON,
+    TableSpec,
+    columns_of,
+    fixed,
+    floats,
+    strings,
+)
 
-# Stamped into every Parquet file's metadata with the table name (storage backends). Bump it
-# when a declared type changes; readers cast older files to today's declared types.
-SCHEMA_VERSION = 1
-COMMON = ("session_date", "knowledge_ts", "source", "run_id")
-# Abstract column types; storage backends map them to physical types (Arrow, DuckDB later).
-# ``<scalar>[]`` is a list column of that scalar (ADR 0063's per-session arrays); null or empty.
-COLUMN_TYPES = frozenset(
-    {
-        "string", "float64", "float32", "int64", "bool", "date", "timestamp_utc",
-        "float64[]", "float32[]", "string[]", "date[]",
-    }
-)  # fmt: skip
-# How a partition's runs combine on read: "snapshot" (each run is the whole partition; the
-# latest known at as_of wins) or "merge" (each run is a window; the union, latest per key).
-RUN_MODES = frozenset({"snapshot", "merge"})
-
-
-@dataclass(frozen=True)
-class Column:
-    name: str
-    type: str  # one of COLUMN_TYPES
-    nullable: bool = True
-
-    def __post_init__(self) -> None:
-        if self.type not in COLUMN_TYPES:
-            raise ValueError(f"{self.name}: unknown column type {self.type!r}")
-
-
-@dataclass(frozen=True)
-class TableSpec:
-    """A table's contract. ``columns`` declares types: every column of a fixed table (others
-    are rejected on write); the common and key columns of an open-ended one (the producer
-    defines the rest). Writes cast to the declared types and fail on uncastable data.
-    ``runs`` says how a partition's runs combine on read (``RUN_MODES``); ``key``, when set,
-    is the table key (``table_key``) instead of the grain's default. ``retention_days``, when
-    set, is the default retention window: only such tables may have old partitions purged
-    (``purge_before``); every other table is history, kept forever."""
-
-    name: str
-    grain: str
-    required: tuple[str, ...]
-    open_ended: bool = False
-    columns: tuple[Column, ...] = ()
-    runs: str = "snapshot"
-    key: tuple[str, ...] = ()
-    retention_days: int | None = None
-
-    def __post_init__(self) -> None:
-        if self.runs not in RUN_MODES:
-            raise ValueError(f"{self.name}: unknown run mode {self.runs!r}")
-
-    def column(self, name: str) -> Column | None:
-        return next((c for c in self.columns if c.name == name), None)
-
-
-def _columns(*specs: str) -> tuple[Column, ...]:
-    """``"name type"`` (``type!``: not nullable) + the point-in-time columns."""
-    out = []
-    for spec in (*specs, "session_date date!", "knowledge_ts timestamp_utc!", "source string!",
-                 "run_id string!"):  # fmt: skip
-        name, kind = spec.split()
-        out.append(Column(name, kind.rstrip("!"), not kind.endswith("!")))
-    return tuple(out)
-
-
-def _fixed(
-    name: str,
-    grain: str,
-    required: tuple[str, ...],
-    *columns: str,
-    runs: str = "snapshot",
-    key: tuple[str, ...] = (),
-    retention_days: int | None = None,
-) -> TableSpec:
-    spec = TableSpec(
-        name, grain, required, columns=_columns(*columns), runs=runs, key=key,
-        retention_days=retention_days,
-    )  # fmt: skip
-    undeclared = [c for c in (*COMMON, *required, *key) if spec.column(c) is None]
-    if undeclared:
-        raise ValueError(f"{name}: required columns without a type: {undeclared}")
-    return spec
-
-
-def _strings(*names: str) -> tuple[str, ...]:
-    return tuple(f"{n} string" for n in names)
-
-
-def _floats(*names: str) -> tuple[str, ...]:
-    return tuple(f"{n} float64" for n in names)
-
-
-UNIVERSE = _fixed(
+UNIVERSE = fixed(
     "universe",
     "universe",
     ("instrument_id", "symbol", "security_type", "optionable", "status", "universe_version"),
     "instrument_id string!",
     "optionable bool",
-    *_strings("symbol", "company_name", "security_type", "asset_class", "exchange", "status"),
-    *_strings("universe_version", "last_verified", "source_crosscheck", "notes"),
+    *strings("symbol", "company_name", "security_type", "asset_class", "exchange", "status"),
+    *strings("universe_version", "last_verified", "source_crosscheck", "notes"),
     # CSV import mode keeps the master file's leverage columns as written (typed in L1).
-    *_strings("is_leveraged", "is_inverse", "leverage", "tracks"),
+    *strings("is_leveraged", "is_inverse", "leverage", "tracks"),
 )
-UNDERLYING_QUOTES = _fixed(
+UNDERLYING_QUOTES = fixed(
     "chains/underlying_quotes",
     "chain_snapshot",
     ("instrument_id", "symbol", "ts", "price", "close", "volume", "iv30"),
     "instrument_id string!",
     "ts timestamp_utc!",
-    *_strings("symbol", "security_type"),
-    *_floats("price", "open", "high", "low", "close", "prev_close", "volume", "iv30"),
+    *strings("symbol", "security_type"),
+    *floats("price", "open", "high", "low", "close", "prev_close", "volume", "iv30"),
 )
-OPTION_QUOTES = _fixed(
+OPTION_QUOTES = fixed(
     "chains/option_quotes",
     "chain_snapshot",
     (
@@ -157,32 +79,32 @@ OPTION_QUOTES = _fixed(
     "instrument_id string!",
     "ts timestamp_utc!",
     "expiry date",
-    *_strings("underlying_id", "root", "right"),
-    *_floats("strike", "bid", "ask", "bid_size", "ask_size", "last", "volume", "open_interest"),
-    *_floats("iv", "delta", "gamma", "theta", "vega", "rho", "theo"),
+    *strings("underlying_id", "root", "right"),
+    *floats("strike", "bid", "ask", "bid_size", "ask_size", "last", "volume", "open_interest"),
+    *floats("iv", "delta", "gamma", "theta", "vega", "rho", "theo"),
 )
-CHAIN_STATUS = _fixed(
+CHAIN_STATUS = fixed(
     "chains/status",
     "chain_snapshot",
     ("instrument_id", "status"),
     "instrument_id string!",
-    *_strings("symbol", "status", "tier"),
+    *strings("symbol", "status", "tier"),
 )
 
 # L1: what each instrument is (one full snapshot per date). See docs/design/phase-0.md.
-INSTRUMENT_REFERENCE = _fixed(
+INSTRUMENT_REFERENCE = fixed(
     "instruments/reference",
     "reference",
     ("instrument_id", "symbol", "asset_class", "security_type", "multiplier", "status"),
     "instrument_id string!",
-    *_strings("symbol", "name", "asset_class", "security_type", "security_type_source"),
-    *_strings("exchange", "currency", "financial_status", "status", "vendor_type"),
-    *_strings("figi", "share_class_figi", "cik", "tracks", "leverage_source"),
+    *strings("symbol", "name", "asset_class", "security_type", "security_type_source"),
+    *strings("exchange", "currency", "financial_status", "status", "vendor_type"),
+    *strings("figi", "share_class_figi", "cik", "tracks", "leverage_source"),
     # FIGI review (ADR 0018): the vendor's FIGI when the build kept a different one or the
     # FIGI is shared, and the session that was first seen.
     "vendor_figi string",
     "figi_review_since date",
-    *_floats("multiplier", "tick_size", "round_lot", "leverage"),
+    *floats("multiplier", "tick_size", "round_lot", "leverage"),
     "is_etf bool",
     "is_test_issue bool",
     "optionable bool",
@@ -196,13 +118,13 @@ INSTRUMENT_REFERENCE = _fixed(
 # L1: which symbol each FIGI used and when (the full history per snapshot date). Each build
 # only opens and closes rows, so a session's runs merge per (figi, symbol, valid_from): a
 # re-run that sees less can close a row (latest run wins) but never hide one.
-SYMBOL_HISTORY = _fixed(
+SYMBOL_HISTORY = fixed(
     "instruments/symbol_history",
     "reference",
     ("instrument_id", "ts", "figi", "symbol", "valid_from"),
     "instrument_id string!",
     "ts timestamp_utc!",
-    *_strings("figi", "symbol"),
+    *strings("figi", "symbol"),
     "valid_from date",
     "valid_to date",
     runs="merge",
@@ -212,13 +134,13 @@ SYMBOL_HISTORY = _fixed(
 # A session's runs merge per (old_id, new_id), so a run holding only its own upgrades can
 # never hide the earlier ones (2026-10-03). Keyed on the pair, not old_id alone: a reused
 # symbol id can upgrade again to another FIGI, and ``known_at`` tells the two apart.
-ID_MAP = _fixed(
+ID_MAP = fixed(
     "instruments/id_map",
     "reference",
     ("instrument_id", "ts", "old_id", "new_id", "symbol", "effective", "known_at"),
     "instrument_id string!",
     "ts timestamp_utc!",
-    *_strings("old_id", "new_id", "symbol"),
+    *strings("old_id", "new_id", "symbol"),
     "effective date",
     "known_at timestamp_utc",
     runs="merge",
@@ -230,13 +152,13 @@ ID_MAP = _fixed(
 # symbol_history match or a permaTicker); ``end_date`` is the vendor's last trading day and is
 # read only by ``data.listings.universe_asof``. knowledge_ts is the pull time (2026 for a
 # 2010 listing), so only the identity reads (resolver, universe_asof) may use it for an old S.
-LISTING_HISTORY = _fixed(
+LISTING_HISTORY = fixed(
     "instruments/listing_history",
     "reference",
     ("ticker", "start_date", "ts"),
     "instrument_id string",
     "ts timestamp_utc!",
-    *_strings("ticker", "exchange", "asset_type", "price_currency", "perma_ticker"),
+    *strings("ticker", "exchange", "asset_type", "price_currency", "perma_ticker"),
     "start_date date!",
     "end_date date",
     key=("source", "ticker", "start_date"),
@@ -247,37 +169,37 @@ LISTING_HISTORY = _fixed(
 # ``data.listings.universe_asof`` joins it to the listing alive on S. ``end_date`` is null while
 # the ticker is still a member. knowledge_ts is the pull time (2026 for a 2010 interval): an
 # identity read like the listing history, never a point-in-time fact.
-INDEX_MEMBERSHIP = _fixed(
+INDEX_MEMBERSHIP = fixed(
     "instruments/index_membership",
     "reference",
     ("index_name", "ticker", "start_date", "ts"),
     "ts timestamp_utc!",
-    *_strings("index_name", "ticker"),
+    *strings("index_name", "ticker"),
     "start_date date!",
     "end_date date",
     key=("source", "index_name", "ticker", "start_date"),
 )
 # L1: company details from SEC EDGAR, per instrument (one full snapshot per date).
-INSTRUMENT_COMPANY = _fixed(
+INSTRUMENT_COMPANY = fixed(
     "instruments/company",
     "reference",
     ("instrument_id", "symbol", "cik", "name", "sic", "sector", "fetched_on"),
     "instrument_id string!",
-    *_strings("symbol", "cik", "cik_source", "name", "entity_type", "sic", "sic_description"),
-    *_strings("sic_division", "sector", "industry", "state_of_incorporation", "fiscal_year_end"),
-    *_strings("website", "former_names", "exchanges", "tickers"),
+    *strings("symbol", "cik", "cik_source", "name", "entity_type", "sic", "sic_description"),
+    *strings("sic_division", "sector", "industry", "state_of_incorporation", "fiscal_year_end"),
+    *strings("website", "former_names", "exchanges", "tickers"),
     "fetched_on date",
 )
 # L1: a short plain-text description of what an instrument is about (ADR 0034): a stock's from
 # Massive's ticker overview, an ETF's investment objective from its SEC prospectus. Runs are
 # increments (the rows fetched or changed that run), so they merge; one row per instrument,
 # the latest wins. A row without text is a marker that the vendor was asked on ``fetched_on``.
-INSTRUMENT_DESCRIPTION = _fixed(
+INSTRUMENT_DESCRIPTION = fixed(
     "instruments/description",
     "reference",
     ("instrument_id", "description_source", "fetched_on"),
     "instrument_id string!",
-    *_strings("symbol", "description", "homepage_url", "accn"),
+    *strings("symbol", "description", "homepage_url", "accn"),
     "description_source string!",
     "total_employees int64",
     "filed date",
@@ -290,12 +212,12 @@ INSTRUMENT_DESCRIPTION = _fixed(
 # facts). Runs are increments (new facts + a ``checked`` marker per fetched CIK), so they
 # merge; a fact is identified by (instrument, concept, period start, period end, filed date):
 # a year-to-date and a quarterly fact share an end date.
-INSTRUMENT_SHARES = _fixed(
+INSTRUMENT_SHARES = fixed(
     "instruments/shares",
     "reference",
     ("instrument_id", "cik", "concept", "period_start", "fetched_on"),
     "instrument_id string!",
-    *_strings("symbol", "tag", "form", "accn", "fp", "unit"),
+    *strings("symbol", "tag", "form", "accn", "fp", "unit"),
     "cik string!",
     "concept string!",
     "period_start date",
@@ -311,14 +233,14 @@ INSTRUMENT_SHARES = _fixed(
 )
 # L1: each instrument's IBKR stock contract (ADR 0028): conid and primary exchange from IB's
 # contract lookup, one full snapshot per run (rows not refreshed are carried forward).
-IBKR_CONTRACTS = _fixed(
+IBKR_CONTRACTS = fixed(
     "instruments/ibkr_contracts",
     "reference",
     ("instrument_id", "symbol", "conid", "resolved_at"),
     "instrument_id string!",
     "symbol string!",
     "conid int64!",
-    *_strings("primary_exchange", "sec_type", "currency"),
+    *strings("primary_exchange", "sec_type", "currency"),
     "resolved_at date!",
 )
 # L2: IBKR's 30-day implied and historical vol of each underlying, one partition per session
@@ -327,13 +249,13 @@ IBKR_CONTRACTS = _fixed(
 # (the streamed value after the close). ``vol_reject``: why a vol IB sent is null (zero, or an
 # IV above 5; ``tasks/market/ibkr_iv.py``, ADR 0028), null when both were kept.
 # Licence: personal use (IBKR market data).
-IBKR_IV30 = _fixed(
+IBKR_IV30 = fixed(
     "volatility/ibkr_iv30",
     "volatility",
     ("instrument_id", "iv30_ibkr", "source_kind"),
     "instrument_id string!",
     "symbol string",
-    *_floats("iv30_ibkr", "hv30_ibkr"),
+    *floats("iv30_ibkr", "hv30_ibkr"),
     "source_kind string!",
     "vol_reject string",
     runs="merge",
@@ -342,7 +264,7 @@ IBKR_IV30 = _fixed(
 # every answer it served, one partition per session, a row per contract and time taken. Runs
 # merge (each is a few snapshots; all are kept, keyed by contract and ``ts``). Written only
 # through ``LiveWriter`` (``live/*``), never read by backtests. Licence: personal use.
-LIVE_OPTION_QUOTES = _fixed(
+LIVE_OPTION_QUOTES = fixed(
     "live/option_quotes",
     "live",
     ("instrument_id", "underlying_id", "ts", "expiry", "right", "strike"),
@@ -353,7 +275,7 @@ LIVE_OPTION_QUOTES = _fixed(
     "expiry date!",
     "right string!",
     "strike float64!",
-    *_floats("bid", "ask", "last", "close", "volume", "iv", "delta"),
+    *floats("bid", "ask", "last", "close", "volume", "iv", "delta"),
     "conid int64",
     "market_data_type int64",
     runs="merge",
@@ -367,7 +289,7 @@ LIVE_OPTION_QUOTES = _fixed(
 # subscription's notional total, ``bound`` the upper bound reserved when the cost is unknown or
 # the attempt failed, ``free`` 0 for a free provider, ``unknown`` null: a skipped attempt). Written
 # only through ``UsageWriter`` (``usage/*``); read across a date range by ``data.usage``.
-USAGE_LLM_CALLS = _fixed(
+USAGE_LLM_CALLS = fixed(
     "usage/llm_calls",
     "usage",
     ("ts", "provider", "use_case", "outcome"),
@@ -388,7 +310,7 @@ USAGE_LLM_CALLS = _fixed(
 )
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
-TREASURY_RATES = _fixed(
+TREASURY_RATES = fixed(
     "rates/treasury",
     "curve",
     ("instrument_id", "ts", "tenor", "tenor_days", "rate_par", "rate_cont"),
@@ -409,7 +331,7 @@ TREASURY_RATES = _fixed(
 # the fund (negative for shorts); ``holding_id`` is the holding's instrument when its ticker
 # resolves to a universe instrument (null otherwise, so it also marks a line as a U.S. listing);
 # ``holdings_count`` counts the issuer's positions in securities, not cash, futures or FX lines.
-ETF_HOLDINGS = _fixed(
+ETF_HOLDINGS = fixed(
     "holdings/etf",
     "holdings",
     ("instrument_id", "as_of", "rank", "holding_name", "weight", "holdings_count"),
@@ -418,10 +340,10 @@ ETF_HOLDINGS = _fixed(
     "as_of date!",
     "filed date",
     "rank int64!",
-    *_strings("holding_symbol", "holding_id"),
+    *strings("holding_symbol", "holding_id"),
     "holding_name string!",
     "weight float64!",
-    *_strings("asset_class", "sector", "identifier"),
+    *strings("asset_class", "sector", "identifier"),
     "shares float64",
     "holdings_count int64!",
     runs="merge",
@@ -462,7 +384,7 @@ EARNINGS_EVENTS = TableSpec(
     "event",
     ("instrument_id", "ts", KNOWN_FROM),
     open_ended=True,
-    columns=_columns(
+    columns=columns_of(
         "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", f"{CARRIED_FROM} date"
     ),
     runs="merge",
@@ -475,7 +397,7 @@ EARNINGS_EVENTS = TableSpec(
 # on (the session that fetched the calendar, or the release date for a past row). A rescheduled
 # release is a new key; runs merge on it, the latest version known by a session wins.
 RELEASE_STATUSES = frozenset({"scheduled", "released", "moved"})
-MACRO_RELEASE_EVENTS = _fixed(
+MACRO_RELEASE_EVENTS = fixed(
     "events/macro_release",
     "event",
     ("instrument_id", "ts", KNOWN_FROM, "release_key", "release_date", "status"),
@@ -497,7 +419,7 @@ MACRO_RELEASE_EVENTS = _fixed(
 # session of the acceptance time in America/New_York: an acceptance after the close is public
 # that evening, so it is that day's session. Runs rewrite the filings they read again, so they
 # merge on (``instrument_id``, ``accession``): a rerun is idempotent.
-FILING_EVENTS = _fixed(
+FILING_EVENTS = fixed(
     "events/filing",
     "event",
     ("instrument_id", "ts", KNOWN_FROM, "cik", "form", "accession", "filing_date", "items"),
@@ -514,7 +436,7 @@ FILING_EVENTS = _fixed(
     runs="merge",
     key=("instrument_id", "accession"),
 )
-MACRO_SERIES = _fixed(
+MACRO_SERIES = fixed(
     "macro/series",
     "reference",
     ("instrument_id", "obs_date", "vintage_date", "vintage_kind"),
@@ -533,22 +455,22 @@ VINTAGE_KINDS = frozenset({ALFRED, LAGGED})
 # Live verification (ADR 0026): our values vs another source's, one row per instrument and
 # check for a session. ``status`` is PASS / WARN / FAIL / NA; ``diff`` is in the check's
 # tolerance unit (relative or absolute, per ``note``).
-VERIFICATION_IBKR = _fixed(
+VERIFICATION_IBKR = fixed(
     "verification/ibkr",
     "verification",
     ("instrument_id", "symbol", "check", "status"),
     "instrument_id string!",
-    *_strings("symbol", "note"),
+    *strings("symbol", "note"),
     "check string!",
     "status string!",
-    *_floats("ours", "theirs", "diff", "tolerance"),
+    *floats("ours", "theirs", "diff", "tolerance"),
     key=("instrument_id", "check"),
 )
 # Rule screens (ADR 0029): one fixed schema for every rule-screen config, so pages and Ideas
 # query across screens. Many configs and users share a session's partition, so runs merge
 # on (user, config, instrument): readers take a config's rows of its latest run (``run_id``
 # from the run record), since a later run never removes rows an earlier one wrote.
-RULE_SCREEN = _fixed(
+RULE_SCREEN = fixed(
     "results/rule_screen",
     "results",
     ("instrument_id", "user_id", "config_id", "config_hash", "decision", "rank"),
@@ -561,7 +483,7 @@ RULE_SCREEN = _fixed(
     "score float64",
     "rank int64!",
     "tie_break float64",
-    *_strings("flags", "reasons", "failed", "near_missed", "missing"),
+    *strings("flags", "reasons", "failed", "near_missed", "missing"),
     "regime string",  # the session's regime label (ADR 0049); null: gate off or unknown
     "size_multiplier float64",  # the regime's size for the screener; null in runs before it
     runs="merge",
@@ -579,7 +501,7 @@ def is_display_column(mode: object) -> bool:
     return mode == DISPLAY_COLUMN_MODE
 
 
-RULE_SCREEN_VALUES = _fixed(
+RULE_SCREEN_VALUES = fixed(
     "results/rule_screen_values",
     "results",
     ("instrument_id", "user_id", "config_id", "criterion_id", "field", "mode", "outcome"),
@@ -592,206 +514,10 @@ RULE_SCREEN_VALUES = _fixed(
     "value_num float64",
     "value_str string",
     "outcome string!",
-    *_floats("distance", "normalised", "penalty"),
+    *floats("distance", "normalised", "penalty"),
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
 )
-# The edge harness's results (ADR 0053): one row per (edge, variant, horizon, slice), written by
-# ``cross_section/results.py``. Partition ``session_date`` is the range's end; ``key`` includes
-# the range start, so re-running a range replaces its rows and another range adds its own.
-# ``sessions`` is the number of independent sessions beside every number. ``edge_variant`` (a key
-# column; null reads as "main") names the edge's own ``[[variants]]`` row; ``iv_source`` /
-# ``licence`` record the implied-vol field an outcome read and its catalogue licence;
-# ``reference_rate`` / ``touch_rate`` are filled by the expires_otm outcome (ED4a). ``split_from``
-# (a key column; null: no split) is the first session of the test slice and ``exploratory`` is
-# true when it is not the edge's ``frozen_from``: a user's split writes rows under its own key,
-# never over the site's (ED5a). Rows written before the column stay under the null key; a reader
-# picks a run by ``run_id`` (ED5c), never by key. ``in_sample`` is true on a model screener's
-# slice whose sessions its score was fitted on (ED7b): never evidence. ``decile_mean_01`` ..
-# ``decile_mean_10`` (ED8): the mean outcome of each tenth of the ranked eligible names,
-# best-ranked first, averaged over the slice's sessions that had deciles; null when none (never
-# zero). Rows with ``role`` = ``random`` (``slice_kind`` = ``draw``, ``slice_value`` the draw's
-# number) are the random-pick backtest's out-of-sample draws: no screener, never a verdict's
-# candidate, read only through ``services/read/evaluation/runs.py``.
-EDGE_EVAL = _fixed(
-    "results/edge_eval",
-    "results",
-    (
-        "edge_id", "user_id", "variant", "horizon_sessions", "slice_kind", "slice_value",
-        "range_from",
-    ),
-    *_strings("edge_id", "user_id", "variant", "slice_kind", "slice_value"),
-    *_strings("role", "config_hash", "run_config_hash", "benchmark"),
-    *_strings("edge_variant", "iv_source", "licence"),
-    "horizon_sessions int64!",
-    "range_from date!",
-    "range_to date",
-    "split_from date",
-    "exploratory bool",
-    "in_sample bool",
-    "projected_exits date[]",  # the next decision sessions' exits, on ``all`` rows (ADR 0064)
-    *(f"{n} int64" for n in (
-        "decisions_scheduled", "decisions_measured", "decisions_scheduled_oos",
-        "decisions_measured_oos", "sessions", "picks", "hits", "eligible", "base_hits",
-        "decile_sessions", "trials",
-        "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
-        "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
-        "pre_snapshot_sessions",
-    )),
-    *_floats(
-        "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
-        "decile_spread", "decile_t", "effect_size", "sharpe", "deflated_sharpe", "pbo",
-        "reference_rate", "touch_rate",
-        *(f"decile_mean_{i:02d}" for i in range(1, 11)),
-    ),
-    runs="merge",
-    key=(
-        "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "slice_kind",
-        "slice_value", "range_from", "split_from",
-    ),
-)  # fmt: skip
-# The edge harness's per-session series (ADR 0064), framed by ``cross_section/detail/series.py``
-# from the run's pooled legs and published with the run's ``edge_eval`` rows (same partition, the
-# range's end; read by ``run_id``): one row per (main edge variant, screener or baseline, horizon,
-# measured block). ``exit_session`` = S + the horizon (calendar); ``before_split``: the decision
-# session is before the run's split (false without one), never re-derived by a reader; ``status``:
-# measured | excluded_coverage | lost_input (``lost_table``: an admin cause) | no_picks. Nulls, not
-# zeros, where nothing was measured; values are oriented, net of cost, in ``unit`` (excess_return
-# | return | cushion | ratio).
-EDGE_SERIES = _fixed(
-    "results/edge_series",
-    "results",
-    ("edge_id", "user_id", "variant", "horizon_sessions", "range_from", "decision_session"),
-    *_strings("edge_id", "user_id", "variant", "role", "config_hash", "run_config_hash"),
-    *_strings("edge_variant", "benchmark", "regime", "status", "lost_table", "unit", "licence"),
-    "horizon_sessions int64!",
-    "range_from date!",
-    "decision_session date!",
-    *(f"{n} date" for n in ("range_to", "split_from", "entry_session", "exit_session")),
-    "exploratory bool",
-    "before_split bool",
-    *(f"{n} int64" for n in (
-        "block_days", "picks", "pick_hits", "eligible", "base_hits", "excluded_missing",
-        "excluded_unmeasured", "excluded_score_coverage", "no_entry_bar", "no_implied_vol",
-        "outside_universe", "delisted", "unscored",
-    )),
-    *_floats("pick_mean", "base_mean", *(f"decile_mean_{i:02d}" for i in range(1, 11))),
-    runs="merge",
-    key=(
-        "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "range_from",
-        "split_from", "decision_session",
-    ),
-)  # fmt: skip
-# The ED6 winners study's results (ADR 0053 amendment 2026-10-09): one run's rows, written by
-# ``services/evaluation/discovery/persist.py``. ``row_kind`` is ``block`` (a feature's mean effect
-# over the counted grid sessions of one block), ``tell`` (a feature pooled over the blocks: sign,
-# agreeing blocks, stable, qualifies, cluster), ``proposal`` (the probit proposer's rank, never a
-# verdict) or ``exclusion`` (a feature left out, with ``reason`` and the ``sessions`` it was left
-# out of). ``block`` is -1 on every row that is not a block's; ``cluster`` -1 when none. ``blocks``
-# is the count of blocks of the run: not independent sessions, neighbouring blocks' outcome windows
-# overlap. ``run_id`` is in the key, so every run keeps its own rows; a reader picks a run by
-# ``run_id``. Partition ``session_date`` is the run's last grid session. Version 2 (W4,
-# 2026-10-09): ``g_WL`` (winners over losers) and ``g_L`` (losers over the winners' controls) on
-# block and tell rows, ``variance_like`` on tell rows; ``mean_g`` stays winners over controls.
-# The columns are nullable and a run of version 1 reads them as unknown, so older runs stay valid
-# but are never compared with version 2 (different controls, a new gate).
-WINNERS_STUDY = _fixed(
-    "results/winners_study",
-    "results",
-    ("row_kind", "feature", "block"),
-    *_strings("row_kind", "feature", "reason", "proposed_by"),
-    "block int64!",
-    *(f"{n} int64" for n in ("sessions", "sign", "agreeing_blocks", "cluster", "rank", "rows",
-                             "blocks")),
-    *(f"{n} bool" for n in ("halves_agree", "stable", "qualifies", "converged", "passed",
-                            "variance_like")),
-    *_floats("mean_g", "g_WL", "g_L", "coefficient", "gain"),
-    runs="merge",
-    key=("row_kind", "feature", "block", "run_id"),
-)  # fmt: skip
-# The forward paper record (ADR 0053 amendment 2026-10-10): one row per (user, edge, signal
-# session, name) the nightly ``edge-signals`` job made when it was tonight's pick of an evidenced
-# or live edge; ``user_id`` is the RECORD owner (``site`` for a site edge, else the user whose
-# edge it is), never a follower. Written by ``services/evaluation/forward/results.py``. Partition
-# ``session_date`` = ``signal_session`` (the decision session D), so a later run settles a trade
-# by rewriting its row in its own partition: runs merge, the latest known row wins per key and
-# ``as_of`` reads the book as it was. ``status`` is ``open`` (window not closed), ``won`` /
-# ``lost`` (the edge's own hit; ``excess_return`` the outcome's measure) or ``skipped`` with
-# ``reason`` (never a loss, never a zero); ``delisted`` marks a name measured to its last bar;
-# ``outcome_hash`` fingerprints the edge's [outcome] at the signal, so a trade is never judged by
-# a definition the user edited afterwards. ``buy_session`` is the entry session S,
-# ``sell_session`` the window's close, both from the trading calendar.
-EDGE_PAPER = _fixed(
-    "results/edge_paper",
-    "results",
-    ("user_id", "edge_id", "signal_session", "instrument_id"),
-    "instrument_id string!",
-    *_strings("user_id", "edge_id", "config_hash", "outcome_hash", "screener", "status"),
-    *_strings("reason"),
-    "signal_session date!",
-    "buy_session date",
-    "sell_session date",
-    "horizon_sessions int64",
-    "rank int64",
-    "delisted bool",
-    *_floats("excess_return"),
-    runs="merge",
-    key=("user_id", "edge_id", "signal_session", "instrument_id"),
-)  # fmt: skip
-# The edge harness's stored legs (ADR 0063): what one evaluation computed per decision session,
-# so a later run can reuse it. Written only by ``services/evaluation/cross_section/legs/``;
-# partition ``session_date`` is the decision session D (not written every session). ``row_kind``:
-# ``leg`` (one per leg key, edge variant, screener, horizon: every ``SessionStat`` field, the
-# entry session S, the trial hash, the screen's universe snapshot, the event names, the table a
-# lost session lacked, the ``as_of`` its outcome read used and, for a screener from the split on,
-# its random draws' sums as float32 lists), ``reads`` (one per (user, edge, D): every partition
-# the session read, ``read_*`` lists in step, the store's commit sequence ``inputs_seq`` at its
-# first read, the historical-identity counts) and ``outcome`` (one per (D, edge variant,
-# horizon): the entry session read, ``outcomes_as_of`` and the outcome partition's commit
-# sequence). A key column that does not apply is "" (or 0 for the horizon), never null. Runs
-# merge: a leg recomputed by a later run replaces the earlier one under the same key.
-EDGE_LEGS = _fixed(
-    "results/edge_legs",
-    "results",
-    (
-        "user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant",
-        "horizon_sessions",
-    ),
-    *_strings("user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant"),
-    *_strings("trial_hash", "regime", "lost_table"),
-    "horizon_sessions int64!",
-    "entry_session date",
-    "screen_snapshot date",
-    "outcomes_as_of timestamp_utc",
-    "pick_values float64[]",
-    "deciles float64[]",
-    "pick_reference float64[]",
-    "event_ids string[]",
-    *(f"{n} int64" for n in (
-        "pick_hits", "rest_n", "base_hits", "ranked", "unscored", "excluded_score_coverage",
-        "excluded_unclosed", "excluded_missing", "excluded_coverage", "excluded_unmeasured",
-        "unmeasured_base", "delisted", "outside_universe", "no_entry_bar", "pick_touches",
-        "no_implied_vol", "rand_picks", "rand_eligible", "rand_base_hits", "inputs_seq",
-        "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
-        "id_screened_proxy",
-    )),
-    *_floats("rest_mean", "rest_m2", "top_decile", "spread"),
-    "pre_snapshot bool",
-    "implied_stored bool",
-    "tombstone bool",  # a leg row that says its key has no leg any more (ADR 0063 amendment 7)
-    "value_sums float32[]",
-    "hit_sums float32[]",
-    "read_table string[]",
-    "read_kind string[]",
-    "read_digest string[]",
-    "read_from date[]",
-    "read_to date[]",
-    runs="merge",
-    key=(
-        "user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant",
-        "horizon_sessions",
-    ),
-)  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -799,20 +525,44 @@ _BAR_TYPES = (
     "instrument_id string!",
     "ts timestamp_utc!",
     *(f"{c} float64!" for c in FIELDS),
-    *_floats("vwap", "trades"),
+    *floats("vwap", "trades"),
 )
 
 KNOWN: dict[str, TableSpec] = {
     t.name: t
     for t in (
-        UNIVERSE, UNDERLYING_QUOTES, OPTION_QUOTES, CHAIN_STATUS, INSTRUMENT_REFERENCE,
-        SYMBOL_HISTORY, ID_MAP, LISTING_HISTORY, INDEX_MEMBERSHIP, INSTRUMENT_COMPANY,
-        INSTRUMENT_SHARES, INSTRUMENT_DESCRIPTION, TREASURY_RATES, VERIFICATION_IBKR,
-        IBKR_CONTRACTS, IBKR_IV30, RULE_SCREEN, RULE_SCREEN_VALUES, EDGE_EVAL, EDGE_SERIES,
-        WINNERS_STUDY, EDGE_PAPER, EDGE_LEGS, LIVE_OPTION_QUOTES, USAGE_LLM_CALLS, ETF_HOLDINGS,
-        MACRO_SERIES, EARNINGS_EVENTS, MACRO_RELEASE_EVENTS, FILING_EVENTS,
+        UNIVERSE,
+        UNDERLYING_QUOTES,
+        OPTION_QUOTES,
+        CHAIN_STATUS,
+        INSTRUMENT_REFERENCE,
+        SYMBOL_HISTORY,
+        ID_MAP,
+        LISTING_HISTORY,
+        INDEX_MEMBERSHIP,
+        INSTRUMENT_COMPANY,
+        INSTRUMENT_SHARES,
+        INSTRUMENT_DESCRIPTION,
+        TREASURY_RATES,
+        VERIFICATION_IBKR,
+        IBKR_CONTRACTS,
+        IBKR_IV30,
+        RULE_SCREEN,
+        RULE_SCREEN_VALUES,
+        EDGE_EVAL,
+        EDGE_SERIES,
+        WINNERS_STUDY,
+        EDGE_PAPER,
+        EDGE_LEGS,
+        LIVE_OPTION_QUOTES,
+        USAGE_LLM_CALLS,
+        ETF_HOLDINGS,
+        MACRO_SERIES,
+        EARNINGS_EVENTS,
+        MACRO_RELEASE_EVENTS,
+        FILING_EVENTS,
     )
-}  # fmt: skip
+}
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
 # columns beyond instrument_id (+ ts for events). Event runs are windows (a backfill, then
 # nightly -7..+30-day windows into the same session), so they merge; rollups, catalogues and
@@ -858,7 +608,7 @@ _OUTCOME_TYPES = (
 
 def outcomes_spec(table: str) -> TableSpec:
     """The spec of one ``outcomes/instrument/`` table (they share one schema)."""
-    return _fixed(
+    return fixed(
         table, "outcome", ("instrument_id", "ts", "horizon_sessions", "window_end", "benchmark"),
         *_OUTCOME_TYPES, runs="merge", key=("instrument_id", "horizon_sessions", "benchmark"),
     )  # fmt: skip
@@ -876,7 +626,7 @@ def spec_for(table: str) -> TableSpec:
         interval = table.removeprefix("bars/")
         if interval not in BAR_INTERVALS:
             raise DataValidationError(table, [f"unknown bar interval {interval!r}"])
-        return _fixed(table, "bar", BAR_COLUMNS, *_BAR_TYPES)
+        return fixed(table, "bar", BAR_COLUMNS, *_BAR_TYPES)
     if table.startswith(OUTCOMES_PREFIX) and len(table) > len(OUTCOMES_PREFIX):
         return outcomes_spec(table)
     for prefix, grain in OPEN_PREFIXES.items():
@@ -887,7 +637,7 @@ def spec_for(table: str) -> TableSpec:
             typed = (*keys, f"{KNOWN_FROM} date") if event else keys
             runs = "merge" if event else "snapshot"
             return TableSpec(
-                table, grain, required, open_ended=True, columns=_columns(*typed), runs=runs
+                table, grain, required, open_ended=True, columns=columns_of(*typed), runs=runs
             )
     raise DataValidationError(
         table, ["unknown table; add a TableSpec to storage/tables/schemas.py"]

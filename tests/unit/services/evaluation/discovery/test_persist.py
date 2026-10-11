@@ -16,8 +16,8 @@ from algotrade.services.evaluation.discovery.persist import (
 from algotrade.services.evaluation.discovery.results import DiscoveryResult
 from algotrade.services.evaluation.discovery.tells import find_tells
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.edge_schemas import WINNERS_STUDY
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import WINNERS_STUDY
 from tests.unit.services.evaluation.discovery.conftest import settings
 from tests.unit.services.evaluation.discovery.test_tells import frames, independent
 

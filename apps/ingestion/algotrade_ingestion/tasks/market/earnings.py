@@ -38,12 +38,8 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade.storage.tables.schemas import (
-    CARRIED_FROM,
-    COMMON,
-    EARNINGS_8K_SOURCE,
-    KNOWN_FROM,
-)
+from algotrade.storage.tables.schemas import CARRIED_FROM, EARNINGS_8K_SOURCE, KNOWN_FROM
+from algotrade.storage.tables.spec import COMMON
 from algotrade_ingestion.tasks.framework.run import FAILURES, IngestRun, TaskContext, status_label
 from algotrade_sources.framework.base import FetchRequest, Source
 

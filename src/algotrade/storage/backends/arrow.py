@@ -17,13 +17,8 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from algotrade.core.model.errors import DataValidationError
-from algotrade.storage.tables.schemas import (
-    COMMON,
-    KNOWN_FROM,
-    SCHEMA_VERSION,
-    TableSpec,
-    spec_for,
-)
+from algotrade.storage.tables.schemas import KNOWN_FROM, spec_for
+from algotrade.storage.tables.spec import COMMON, SCHEMA_VERSION, TableSpec
 
 ARROW_TYPES: dict[str, pa.DataType] = {
     "string": pa.large_string(),

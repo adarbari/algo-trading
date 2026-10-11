@@ -26,7 +26,7 @@ from algotrade.services.evaluation.cross_section.results import (
     write_edge_eval,
 )
 from algotrade.storage.backends.run_selection import merge_rows
-from algotrade.storage.tables.schemas import EDGE_EVAL
+from algotrade.storage.tables.edge_schemas import EDGE_EVAL
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,

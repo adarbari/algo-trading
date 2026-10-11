@@ -35,8 +35,8 @@ from algotrade.services.evaluation.forward.signals import (
 )
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus, start_run
+from algotrade.storage.tables.edge_schemas import EDGE_PAPER
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import EDGE_PAPER
 
 RESULT = "edge_paper"
 SOURCE = "edge-signals"
