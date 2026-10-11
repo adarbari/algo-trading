@@ -870,6 +870,19 @@ Source: `design-system/components/KeyValue`
 | `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
 | `label` | `string` | no | Accessible name for the list. |
 
+### LazySection
+
+LazySection: defers a heavy section (a chart, a table, its own data fetch) until it scrolls near the viewport. Until then it holds the section's place with a Skeleton of `minBlockSize`, so the page does not jump; the placeholder is a busy status named by `label`. Once shown the children stay (scrolling away never unmounts them). Renders the children at once where IntersectionObserver is missing (tests, old browsers).
+
+Source: `design-system/components/LazySection`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What is loading ("Evidence curve"), read by screen readers on the placeholder. |
+| `minBlockSize` | `LazySectionSize` | no | The block size the placeholder reserves (default `md`). |
+| `rootMargin` | `string` | no | How far outside the viewport the section starts to render (default `200px`). |
+| `children` | `ReactNode` | yes | The section, rendered once it is near the viewport. |
+
 ### Legend
 
 Legend: the key to a chart, bar or grid. A wrapped row of swatches, each with its label and an optional value (`OK 3,624`). Swatches are status tones (`positive` ... `info`, `empty` for "not collected"), the data series `s1`-`s6`, `accent` or `muted`; colour is never the only key, so every swatch carries its label as text.

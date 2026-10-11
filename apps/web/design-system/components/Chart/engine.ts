@@ -1,7 +1,7 @@
 /**
  * The chart engine: the ONLY module that touches lightweight-charts (TradingView, Apache-2.0;
  * the lint boundary allows the import only under components/Chart). Draws prepared series as
- * lines or an area, event markers (shape + letter per kind), a dashed 100 line when rebased,
+ * lines (solid or dashed), an area or an underwater fill (a line over a flat fill to a 0 baseline), event markers (shape + letter per kind), a dashed 100 line when rebased,
  * shaded bands behind the lines (bands.ts, a series primitive; solid or hatched), horizontal
  * reference lines with an end label, an optional volume pane and lanes (a thin pane each, drawn
  * by lanes.ts on the chart's own time scale), in the
@@ -13,6 +13,7 @@
  */
 import {
   AreaSeries,
+  BaselineSeries,
   ColorType,
   createChart,
   createSeriesMarkers,
@@ -202,13 +203,14 @@ export function drawChart(
 
   // Every line and every finite band edge stays inside the price range (they do not scale it).
   const lineYs = [
+    ...(input.series.some((s) => s.type === 'underwater') ? [0] : []),
     ...input.referenceLines.map((l) => l.value),
     ...input.valueBands.flatMap((b) =>
       [b.from, b.to].filter((v): v is number => v !== undefined && Number.isFinite(v)),
     ),
   ];
-  const drawn: ISeriesApi<'Line' | 'Area'>[] = [];
-  const firstRuns: { line: ISeriesApi<'Line' | 'Area'>; times: Set<string> }[] = [];
+  const drawn: ISeriesApi<'Line' | 'Area' | 'Baseline'>[] = [];
+  const firstRuns: { line: ISeriesApi<'Line' | 'Area' | 'Baseline'>; times: Set<string> }[] = [];
   input.series.forEach((s, index) => {
     const color = theme.series[s.tone];
     const common = {
@@ -239,16 +241,35 @@ export function drawChart(
     // The library joins a line across missing days, so each run between gaps is its own series.
     for (const run of runs(s.points)) {
       const line =
-        input.type === 'area' && input.series.length === 1
-          ? chart.addSeries(AreaSeries, {
+        s.type === 'underwater'
+          ? chart.addSeries(BaselineSeries, {
               ...common,
-              lineColor: color,
+              baseValue: { type: 'price', price: 0 },
               lineWidth: 2,
-              // A flat tint, never a gradient (design rule): the accent tint for s1, else the track.
-              topColor: s.tone === 's1' ? theme.accentSoft : theme.track,
-              bottomColor: s.tone === 's1' ? theme.accentSoft : theme.track,
+              topLineColor: color,
+              bottomLineColor: color,
+              // A flat tint under the line, never a gradient (design rule); the control grey,
+              // which reads on the plain, banded and dark surfaces alike.
+              topFillColor1: theme.control,
+              topFillColor2: theme.control,
+              bottomFillColor1: theme.control,
+              bottomFillColor2: theme.control,
             })
-          : chart.addSeries(LineSeries, { ...common, color, lineWidth: 2 });
+          : input.type === 'area' && input.series.length === 1
+            ? chart.addSeries(AreaSeries, {
+                ...common,
+                lineColor: color,
+                lineWidth: 2,
+                // A flat tint, never a gradient (design rule): the accent tint for s1, else the track.
+                topColor: s.tone === 's1' ? theme.accentSoft : theme.track,
+                bottomColor: s.tone === 's1' ? theme.accentSoft : theme.track,
+              })
+            : chart.addSeries(LineSeries, {
+                ...common,
+                color,
+                lineWidth: 2,
+                ...(s.stroke === 'dashed' ? { lineStyle: LineStyle.Dashed } : {}),
+              });
       line.setData(run);
       drawn.push(line);
       if (index === 0) firstRuns.push({ line, times: new Set(run.map((p) => p.time)) });

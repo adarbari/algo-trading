@@ -28,6 +28,16 @@ export interface ChartSeries {
   points: readonly ChartPoint[];
   /** Series colour `s1`-`s6`; defaults to the series' position. */
   tone?: Series;
+  /**
+   * `solid` (default) or `dashed` line: a record that continues another one in a different
+   * regime (the live paper record after the backtest), so it is not read as the same evidence.
+   */
+  stroke?: 'solid' | 'dashed';
+  /**
+   * `line` (default) or `underwater`: the line with a flat fill between it and a 0 baseline
+   * (drawdowns: values at or below 0). The axis always includes 0.
+   */
+  type?: 'line' | 'underwater';
 }
 
 export type ChartEventKind = 'dividend' | 'split' | 'earnings' | 'filing' | 'macro';
