@@ -1,0 +1,33 @@
+{
+  "criteria": [
+    {
+      "id": "etfs",
+      "field": "instrument.is_etf",
+      "op": "eq",
+      "value": true,
+      "mode": "hard",
+      "why": "ETFs"
+    },
+    {
+      "id": "gain",
+      "field": "rollup.price_stats@v2.ret_60d",
+      "op": "gt",
+      "value": 0.1,
+      "mode": "hard",
+      "why": "up more than 10% in 60 days"
+    },
+    {
+      "id": "liquid",
+      "field": "rollup.price_stats@v2.adv_usd_20d",
+      "op": "gte",
+      "value": 20000000,
+      "mode": "hard",
+      "why": "$20M a day"
+    }
+  ],
+  "notes": [],
+  "tie_break": {
+    "field": "rollup.price_stats@v2.ret_60d",
+    "descending": true
+  }
+}

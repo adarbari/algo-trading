@@ -1,0 +1,36 @@
+{
+  "id": "near-52w-high-rising-volume",
+  "sentence": "stocks within 5% of their 52 week high with rising volume",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "within 5% of their 52 week high",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_from_high_52w"
+        ],
+        "op": "gte",
+        "value": -0.05,
+        "tolerance": 0.0
+      },
+      {
+        "span": "rising volume",
+        "bucket": "A",
+        "fields": [
+          "feature.volume_trend_20_60"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 1.0,
+        "tolerance": 0.3
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

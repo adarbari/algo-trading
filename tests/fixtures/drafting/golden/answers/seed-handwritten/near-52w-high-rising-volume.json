@@ -1,0 +1,47 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "near_high",
+      "field": "feature.pct_from_high_52w",
+      "op": "gte",
+      "value": -0.05,
+      "mode": "soft",
+      "why": "within 5% of the 52-week high",
+      "tolerance": 0.02
+    },
+    {
+      "id": "volume",
+      "field": "feature.volume_trend_20_60",
+      "op": "gt",
+      "value": 1.0,
+      "mode": "hard",
+      "why": "rising volume: 20-day average above the 60-day"
+    }
+  ],
+  "notes": [
+    "rising volume read as the 20-day average above the 60-day average"
+  ],
+  "tie_break": {
+    "field": "feature.pct_from_high_52w",
+    "descending": true
+  }
+}

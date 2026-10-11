@@ -1,0 +1,36 @@
+{
+  "id": "above-200d-low-rsi",
+  "sentence": "stocks above their 200 day average with an RSI below 40",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "above their 200 day average",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_vs_sma_200"
+        ],
+        "op": "gt",
+        "value": 0,
+        "tolerance": 0
+      },
+      {
+        "span": "RSI below 40",
+        "bucket": "A",
+        "fields": [
+          "rollup.momentum@v1.rsi_14"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 40,
+        "tolerance": 0.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}
