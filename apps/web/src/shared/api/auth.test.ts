@@ -107,6 +107,28 @@ describe('with Supabase configured', () => {
     }
   });
 
+  it('still reads under the lock where AbortSignal.timeout does not exist (Safari 15.x)', async () => {
+    const signals: unknown[] = [];
+    const request = vi.fn(
+      (_name: string, options: { signal: unknown }, read: () => Promise<unknown>) => {
+        signals.push(options.signal);
+        return read();
+      },
+    );
+    vi.stubGlobal('navigator', { locks: { request } });
+    const original = Object.getOwnPropertyDescriptor(AbortSignal, 'timeout');
+    Object.defineProperty(AbortSignal, 'timeout', { value: undefined, configurable: true });
+    try {
+      const { accessToken } = await load(CONFIGURED);
+      await expect(accessToken()).resolves.toBe('tok-1');
+      expect(signals).toHaveLength(1);
+      expect(signals[0]).toBeInstanceOf(AbortSignal);
+    } finally {
+      if (original) Object.defineProperty(AbortSignal, 'timeout', original);
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('creates the client once, with exactly the options supabase-js used', async () => {
     const { accessToken } = await load({ url: 'https://abcd.supabase.co/', key: 'anon' });
     await accessToken();

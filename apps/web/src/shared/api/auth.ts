@@ -89,17 +89,23 @@ let reading: SessionRead | null = null;
  * stored refresh token, and the second request carries a spent token. Inside the lock the later
  * reader finds the rotated session in storage. Without Web Locks (old browsers, tests) it just runs.
  */
+/** An abort signal after 10 s; `AbortSignal.timeout` is missing on Safari 15.x, which has Web Locks. */
+function lockTimeout(): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(10_000);
+  const controller = new AbortController();
+  setTimeout(() => {
+    controller.abort(new DOMException('Timed out', 'AbortError'));
+  }, 10_000);
+  return controller.signal;
+}
+
 function acrossTabs<T>(read: () => Promise<T>): Promise<T> {
   const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
   if (!locks) return read();
   // Waiting for the lock is bounded: a tab that holds it and stalls must not freeze the others.
   return (async () => {
     try {
-      return await locks.request(
-        'algotrade-session-read',
-        { signal: AbortSignal.timeout(10_000) },
-        read,
-      );
+      return await locks.request('algotrade-session-read', { signal: lockTimeout() }, read);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return await read();
       throw error;
