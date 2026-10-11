@@ -52,12 +52,15 @@ export const variantColumns: DataTableColumn<EdgeVariant>[] = [
   {
     id: 'variant',
     header: 'Variant',
-    value: (r) => r.variant,
+    value: (r) => r.edgeVariant,
     align: 'start',
     hideable: false,
     cell: ({ row }) => (
       <Stack direction="row" gap={1} align="center" wrap>
-        <Text>{row.variant}</Text>
+        <Text>{row.edgeVariant === 'main' ? 'Edge' : row.edgeVariant}</Text>
+        <Text tone="muted" size="sm">
+          {row.variant}
+        </Text>
         {row.official && (
           <>
             <StatusBadge tone="info">Verdict basis</StatusBadge>

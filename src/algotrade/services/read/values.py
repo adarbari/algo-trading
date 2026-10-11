@@ -50,6 +50,7 @@ class UnknownCode(StrEnum):
     EXPLAINED = "EXPLAINED"  # the null is a fact: ``Unknown.reason`` says which (ADR 0046)
     PRUNED = "PRUNED"  # a run's rows the retention purge removed: re-run it (ADR 0064)
     NOT_STORED = "NOT_STORED"  # a run from before the table: never written for it (ADR 0064)
+    NOT_RECORDING = "NOT_RECORDING"  # the edge records no paper trades yet (a candidate)
 
 
 # The public kind of each code: all a trader is told (ADR 0056); the chain is ``Unknown.cause``.
@@ -66,6 +67,7 @@ KIND_OF_CODE: dict[UnknownCode, UnavailableKind] = {
     UnknownCode.EXPLAINED: UnavailableKind.NOT_APPLICABLE,
     UnknownCode.PRUNED: UnavailableKind.NOT_STORED,
     UnknownCode.NOT_STORED: UnavailableKind.NOT_STORED,
+    UnknownCode.NOT_RECORDING: UnavailableKind.NOT_RUN,
 }
 
 

@@ -11,19 +11,22 @@ Volatility is the standard deviation of
 the windows' values times the root of the independent windows a year: the windows the run
 observed a year, never more than the sessions a year allow a window of the holding period (the
 windows of an every-session schedule overlap, and counting each as independent would overstate
-it). Only a return outcome has a drawdown or a volatility: for ``cushion`` and ``ratio`` it is
-``NOT_APPLICABLE`` (there is no return to fall)."""
+it). Only a return outcome has a drawdown or a volatility: for ``cushion`` and ``ratio`` its
+``state`` is ``not_a_return`` (there is no return to fall: a state with a Guide term, not a data
+gap, so no cause chain); with no series at all it is ``not_stored`` and ``unknown`` says why."""
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Final
 
 from algotrade.quant.edges import paths
 from algotrade.quant.realized_vol import TRADING_DAYS
-from algotrade.services.read.availability.cause import feature_cause
 from algotrade.services.read.edge_evidence.series import BasisSeries, Window
 from algotrade.services.read.evaluation.verdict import IN_SAMPLE, OUT_OF_SAMPLE
-from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.services.read.values import Unknown
 
+MEASURED, NOT_STORED, NOT_A_RETURN = "measured", "not_stored", "not_a_return"
+DRAWDOWN_STATES: Final = (MEASURED, NOT_STORED, NOT_A_RETURN)
 EPISODES = 3
 DAYS_PER_YEAR = 365.25
 
@@ -52,7 +55,8 @@ class EdgeDrawdown:
     """The underwater ``points`` and the deepest ``episodes`` of the whole curve; ``max_in_sample``
     and ``max_out_of_sample`` the deepest drop of each side (positive; None: that side has no
     window, or the run has no split); ``vol_in_sample`` and ``vol_out_of_sample`` the annualised
-    volatility of the windows (None: fewer than two windows). ``unknown``: why there is none."""
+    volatility of the windows (None: fewer than two windows). ``state``: measured,
+    not_a_return (the outcome has no return) or not_stored (no series: ``unknown`` says why)."""
 
     unit: str | None
     points: tuple[UnderwaterPoint, ...] = ()
@@ -62,6 +66,7 @@ class EdgeDrawdown:
     vol_in_sample: float | None = None
     vol_out_of_sample: float | None = None
     unknown: Unknown | None = None
+    state: str = MEASURED
 
 
 def _vol(windows: list[Window], horizon: int) -> float | None:
@@ -87,12 +92,9 @@ def _max_depth(windows: list[Window]) -> float | None:
 def load_drawdown(series: BasisSeries | Unknown) -> EdgeDrawdown:
     """The drawdown and volatility of the basis ``series``."""
     if isinstance(series, Unknown):
-        return EdgeDrawdown(None, unknown=series)
+        return EdgeDrawdown(None, unknown=series, state=NOT_STORED)
     if not series.is_return:
-        why = feature_cause(
-            f"unit:{series.unit}", "this outcome has no return to fall", "NOT_A_RETURN"
-        )
-        return EdgeDrawdown(series.unit, unknown=Unknown(UnknownCode.NOT_APPLICABLE, why))
+        return EdgeDrawdown(series.unit, state=NOT_A_RETURN)
     windows = list(series.windows)
     if not windows:
         return EdgeDrawdown(series.unit)

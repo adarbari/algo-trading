@@ -100,13 +100,15 @@ short = "The market's weather for the session: Clear, Clouds building, Storm or 
 body = """
 The regime comes from two scores from 0 to 100. Macro risk measures the warning signs in the economy (the financial conditions index is one, though it moves fast). Market stress measures the fast signs in prices. Clear (CALM) is neither high, Clouds
 building (CAUTION) macro risk only, Storm (STRESS) market stress only, Severe storm (CRISIS)
-both. It is UNKNOWN when either score cannot be computed, never Clear for lack of data. To
+both. It is UNKNOWN when either score cannot be computed, never Clear for lack of data. On an
+edge's Where it worked that regime reads Unclassified, and only when a trade fell on such a
+session. To
 avoid flickering, the label is the most severe one of the last five sessions, so a regime is
 left only after five sessions below it. It can size new positions and drive the regime gate,
 both off unless turned on.
 """
 next = "Read the label as the session's backdrop, and open the regime indicators in the Guide to see which signs drove it."
-see_also = ["paused", "unknown"]
+see_also = ["paused", "unknown", "edge_where_worked"]
 
 [[term]]
 id = "score"

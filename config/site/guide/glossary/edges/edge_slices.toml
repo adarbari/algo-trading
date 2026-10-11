@@ -27,7 +27,7 @@ id = "slice_state"
 term = "Slice state"
 short = "Why a regime or holding-period figure is missing: not stored or hidden; a measured one has its value."
 body = """
-Measured: the figure is stored and shown. Not stored: the run behind the page is older than the figure, or the period does not exist (an edge with no frozen period has no out-of-sample). It also reads not stored where the harness keeps no such split, as with a regime's two sides. The figure is blank, never zero. Hidden: the out-of-sample result of a copy is withheld until you show it, and the whole-history figures hold it too. Only the in-sample figure is shown. Thin is separate: the figure is shown, with fewer trades than the verdict needs out of sample, so it can look good or bad by chance. A blank is not a poor result.
+Measured: the figure is stored and shown. Not stored: the run behind the page is older than the figure, or the period does not exist (an edge with no frozen period has no out-of-sample). It also reads not stored for the two sides of a regime or a year in a run from before the harness kept them. The figure is blank, never zero. Hidden: the out-of-sample result of a copy is withheld until you show it, and the whole-history figures hold it too. Only the in-sample figure is shown. Thin is separate: the figure is shown, with fewer trades than the verdict needs out of sample, so it can look good or bad by chance. A blank is not a poor result.
 """
 next = "Re-run the backtest to fill a not stored figure; show the out-of-sample result to fill a hidden one."
 see_also = ["by_regime", "by_holding_period", "out_of_sample", "in_sample", "trades"]
@@ -41,3 +41,23 @@ The verdict needs a minimum number of out-of-sample trades before it can say Pro
 """
 next = "Do not wait for a date; the verdict changes when a run records enough trades."
 see_also = ["outlook_projection", "verdict_outlook", "by_holding_period", "trades", "out_of_sample"]
+
+[[term]]
+id = "reference_rate"
+term = "Risk-neutral rate"
+short = "How often the option market's prices implied the short put would expire out of the money: the bar the win rate has to beat."
+body = """
+A short put wins when it expires out of the money. The option's own price implies a probability of that, called risk-neutral. The harness averages it over the picks: the risk-neutral rate. If the win rate is above it, the picks did better than the market's price said. It is the market's probability with its risk premium included. That is why it normally sits a little under the real frequency. Beating it is expected for a premium edge, so it is not proof. Example: a win rate of 77% against a risk-neutral rate of 61% is 16 points above what the price implied. Shown only for outcomes that expire out of the money. Blank means not stored, never zero.
+"""
+next = "Compare it with the base rate and the touch rate before you call the gap an edge."
+see_also = ["win_rate", "base_rate", "touch_rate", "lift"]
+
+[[term]]
+id = "touch_rate"
+term = "Touch rate"
+short = "How often the stock traded through the short put's strike on the way, even if it later recovered."
+body = """
+A short put that expires out of the money may still have been in the money on the way, which costs margin and nerve. The touch rate is the share of picks whose strike was touched before expiry. It is always at least the loss rate. Example: a win rate of 77% with a touch rate of 42% means more than four in ten of the winners spent time under water. A high touch rate with a high win rate means the edge pays only for those who can hold through the drops. Shown only for outcomes that expire out of the money. Blank means not stored, never zero.
+"""
+next = "Ask whether you could hold the position through a touch before you trust the win rate."
+see_also = ["win_rate", "reference_rate", "drawdown"]

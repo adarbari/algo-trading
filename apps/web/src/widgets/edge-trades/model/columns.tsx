@@ -69,22 +69,30 @@ export const tradeColumns = (): DataTableColumn<EdgeTradeRow>[] => [
   { id: 'exit', header: 'Close', value: (r) => r.exitSession, format: DATE },
   {
     id: 'instrument',
-    header: 'Name',
+    header: 'Ticker',
     value: (r) => r.symbol.value,
     mono: true,
     cell: ({ row, formatted }) =>
       row.symbol.value == null ? (
         <Text tone="muted">{row.symbol.unknown ? unknownWord(row.symbol.unknown) : '—'}</Text>
       ) : (
-        <Stack gap={0} align="start">
-          <Text mono>{formatted.text}</Text>
-          <Text tone="muted" size="sm">
-            {row.company.value ?? (row.company.unknown ? unknownWord(row.company.unknown) : '—')}
-          </Text>
-        </Stack>
+        <Text mono>{formatted.text}</Text>
       ),
     essential: true,
     hideable: false,
+  },
+  {
+    id: 'company',
+    header: 'Company',
+    value: (r) => r.company.value,
+    align: 'start',
+    sortable: false,
+    cell: ({ row }) =>
+      row.company.value == null ? (
+        <Text tone="muted">{row.company.unknown ? unknownWord(row.company.unknown) : '—'}</Text>
+      ) : (
+        <Text>{row.company.value}</Text>
+      ),
   },
   { id: 'rank', header: 'Rank', value: (r) => r.rank, format: { kind: 'number' } },
   {

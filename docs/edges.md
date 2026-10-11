@@ -59,7 +59,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Universe:** preset `liquid_common_stocks`
 - **Top K:** 50
 - **Screeners:** `momentum_12_1`
-- **Baselines:** none yet
+- **Baselines:** `size_small`
 - **Frozen period:** from 2026-04-01
 - **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
 - **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).

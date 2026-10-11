@@ -182,6 +182,46 @@ def test_the_capacity_of_each_period_with_the_floor_it_is_read_against() -> None
     assert by["out_of_sample"].adv_median is None and by["all"].state == capacity.NOT_STORED
 
 
+def test_a_position_is_a_share_of_the_median_picks_volume_from_site_config() -> None:
+    adv = {"pick_adv_median": 8e6, "pick_adv_known": 30, "pick_adv_low": 0, "picks": 40}
+    ctx, edge = site_world([row("momo", "in_sample", 0.5, FROZEN, **adv)])
+    found = capacity.load_edge_capacity(ctx, edge)
+    assert found.position_usd == 100_000.0  # the documented default of capacity_position_usd
+    by = {p.period: p for p in found.periods}
+    assert by["in_sample"].position_share == pytest.approx(0.0125)
+    assert by["out_of_sample"].position_share is None  # not stored: never a made-up share
+    ctx.configs._docs["site", "settings", "verdict"] = {"capacity_position_usd": 400_000}
+    again = capacity.load_edge_capacity(ctx, edge)
+    assert {p.period: p for p in again.periods}["in_sample"].position_share == pytest.approx(0.05)
+
+
+def test_the_site_floor_binds_only_when_it_is_above_the_floor_the_universe_has() -> None:
+    adv = {"pick_adv_median": 8e6, "pick_adv_known": 30, "pick_adv_low": 0, "picks": 40}
+    ctx, edge = site_world([row("momo", "in_sample", 0.5, FROZEN, **adv)])
+    found = capacity.load_edge_capacity(ctx, edge)
+    assert (found.universe_floor_usd, found.floor_binds) == (None, True)  # none to compare with
+    rule = {"field": "rollup.price_stats@v2.adv_usd_20d", "op": "gte", "value": 50_000_000}
+    where = ctx.configs._docs["site", "selections", "active"]["where"]
+    where["all"].append(rule)
+    floored = capacity.load_edge_capacity(ctx, edge)  # the $5M site floor under a $50M universe
+    assert (floored.universe_floor_usd, floored.floor_binds) == (50_000_000.0, False)
+    ctx.configs._docs["site", "settings", "verdict"] = {"capacity_adv_floor_usd": 80e6}
+    binding = capacity.load_edge_capacity(ctx, edge)
+    assert binding.floor_binds is True and binding.universe_floor_usd == 50_000_000.0
+    where["all"][-1] = {"any": [rule, {**rule, "value": 1}]}  # an OR is no floor
+    assert capacity.load_edge_capacity(ctx, edge).universe_floor_usd is None
+
+
+def test_the_universe_floor_is_read_from_the_runs_owner_not_the_viewers_own_selection() -> None:
+    adv = {"pick_adv_median": 8e6, "pick_adv_known": 30, "pick_adv_low": 0, "picks": 40}
+    ctx, edge = site_world([row("momo", "in_sample", 0.5, FROZEN, **adv)])
+    rule = {"field": "rollup.price_stats@v2.adv_usd_20d", "op": "gte", "value": 50_000_000}
+    ctx.configs._docs["site", "selections", "active"]["where"]["all"].append(rule)
+    mine = {"name": "active", "where": {"all": [{**rule, "value": 1_000_000}]}}
+    ctx.configs._docs[ctx.user.user_id, "selections", "active"] = mine  # the viewer's namesake
+    assert capacity.load_edge_capacity(ctx, edge).universe_floor_usd == 50_000_000.0
+
+
 def test_no_pick_with_a_stored_volume_is_not_stored_never_a_zero_median() -> None:
     ctx, edge = site_world([row("momo", "in_sample", 0.5, FROZEN, pick_adv_known=0, picks=12)])
     found = capacity.load_edge_capacity(ctx, edge)

@@ -2,7 +2,7 @@
  * One edge's page (the chosen edge in place of the list): the head with the verdict and what
  * would change it, then a sticky navigation and the sections in reading order, each loaded when
  * it nears the viewport: Evidence (the curve and the figures), How sure (deciles, robustness,
- * decay), Where it worked (year by year, drawdown), the Live record (once the edge has one), the
+ * decay), Where it worked (year by year, drawdown), the Live record (its state when it has none), the
  * definition and the details. The page holds the edge the list read; each section reads its own
  * numbers (ADR 0037). Every word and number comes from the server.
  */
@@ -42,12 +42,11 @@ export function EdgePage({ id, onBack, onEdit }: EdgePageProps) {
     return <ErrorState title="The edge failed to load." onRetry={() => void edges.refetch()} />;
   }
   if (!edge) return <EmptyState title={`No edge ${id}`} bordered />;
-  const hasLive = live != null && live.state !== 'no_trades';
   const sections: SectionNavItem[] = [
     { id: 'edge-evidence', label: 'Evidence' },
     { id: 'edge-sure', label: 'How sure' },
     { id: 'edge-where', label: 'Where it worked' },
-    ...(hasLive ? [{ id: 'edge-live', label: 'Live record' }] : []),
+    { id: 'edge-live', label: 'Live record' },
     { id: 'edge-trades', label: 'Trades' },
     { id: 'edge-definition', label: 'Definition' },
     { id: 'edge-details', label: 'Details' },
@@ -57,7 +56,7 @@ export function EdgePage({ id, onBack, onEdit }: EdgePageProps) {
       <EdgeHeader edge={edge} onBack={onBack} onEdit={onEdit} />
       <SectionNav items={sections} aria-label="Sections of this edge" />
       <Suspense fallback={<Skeleton variant="rect" height="lg" label="Loading the sections" />}>
-        <EdgeSections edge={edge} hasLive={hasLive} />
+        <EdgeSections edge={edge} live={live} />
       </Suspense>
     </Stack>
   );

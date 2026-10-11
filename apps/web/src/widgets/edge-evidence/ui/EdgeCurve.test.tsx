@@ -46,6 +46,20 @@ beforeEach(() => {
 });
 
 describe('EdgeCurve', () => {
+  it('offers each declared decoy as a toggle, off until chosen, and draws it then', async () => {
+    render(<EdgeCurve edgeId="momentum_12_1" />);
+    const box = screen.getByRole('checkbox', { name: 'size_small' });
+    expect(box).not.toBeChecked();
+    expect((hooks.chart.mock.calls.at(-1)?.[0] as ChartProps).series.map((s) => s.id)).toEqual([
+      'picks',
+      'base',
+      'live',
+    ]);
+    await userEvent.click(box);
+    const after = hooks.chart.mock.calls.at(-1)?.[0] as ChartProps;
+    expect(after.series.map((s) => s.id)).toContain('decoy:size_small');
+  });
+
   it('draws the curve with its series, the split and the gaps, and explains it', async () => {
     const { container } = render(<EdgeCurve edgeId="momentum_12_1" />);
     expect(screen.getByRole('heading', { level: 3, name: 'Evidence curve' })).toBeInTheDocument();

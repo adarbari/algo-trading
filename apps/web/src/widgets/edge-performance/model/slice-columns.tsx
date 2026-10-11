@@ -63,6 +63,12 @@ export const regimeColumns: DataTableColumn<RegimeView>[] = [
     value: (r) => regimeLabel(r.regime),
     align: 'start',
     hideable: false,
+    cell: ({ row }) => (
+      <Stack direction="row" gap={1} align="center">
+        <Text>{regimeLabel(row.regime)}</Text>
+        {row.regime === 'UNKNOWN' && termHelp('regime')}
+      </Stack>
+    ),
   },
   figureColumn('win', 'Win rate', (f) => f.winRate, PERCENT, true),
   figureColumn('base', 'Base rate', (f) => f.baseRate, PERCENT),

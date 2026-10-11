@@ -11,6 +11,7 @@ export interface FakeQuery<T> {
   isPending: boolean;
   isError: boolean;
   isFetching: boolean;
+  isPlaceholderData: boolean;
   isSuccess: boolean;
   refetch: () => Promise<unknown>;
 }
@@ -22,6 +23,7 @@ export function fakeQuery<T>(data: T | undefined, state: Partial<FakeQuery<T>> =
     isPending: data === undefined && !state.isError,
     isError: false,
     isFetching: false,
+    isPlaceholderData: false,
     isSuccess: data !== undefined,
     refetch: vi.fn(() => Promise.resolve()),
     ...state,

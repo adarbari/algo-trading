@@ -84,6 +84,56 @@ describe('EdgeHeader', () => {
     expect(screen.getByText('help verdict_outlook')).toBeInTheDocument();
   });
 
+  it("shows the verdict at the count on today's figures, when each count is expected and the next close", () => {
+    header();
+    expect(screen.getByText("At 40, on today's figures: Not working.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '40 out-of-sample ≈ 15 Mar 2027 · 100 trades ≈ 1 Feb 2027 · next closes 10 Nov 2026',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a test that does not apply as neutral, never a pass', () => {
+    const evidence = momentum.verdict.evidence;
+    if (!evidence) throw new Error('the fixture has evidence');
+    header({
+      ...momentum,
+      verdict: {
+        ...momentum.verdict,
+        evidence: {
+          ...evidence,
+          checks: [
+            {
+              id: 'baselines',
+              label: 'Lift against every baseline',
+              value: 'no decoys declared',
+              threshold: 'beats every baseline',
+              status: 'not_applicable',
+              level: 'promising',
+            },
+          ],
+        },
+      },
+    });
+    const checks = screen.getByRole('list', { name: 'Checks that the result is real' });
+    expect(within(checks).getByText('Does not apply')).toBeInTheDocument();
+    expect(within(checks).queryByText('Pass')).not.toBeInTheDocument();
+  });
+
+  it('says what a basis chosen among several was chosen on', () => {
+    header({
+      ...momentum,
+      verdict: {
+        ...momentum.verdict,
+        basisWhy: 'chosen on in-sample lift: 15 d +3.1 pts, 31 d +2.7 pts',
+      },
+    });
+    expect(
+      screen.getByText('chosen on in-sample lift: 15 d +3.1 pts, 31 d +2.7 pts'),
+    ).toBeInTheDocument();
+  });
+
   it('gives the reason there is no date instead of a date', () => {
     const evidence = momentum.verdict.evidence;
     if (!evidence?.outlook) throw new Error('the fixture has an outlook');

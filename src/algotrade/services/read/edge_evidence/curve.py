@@ -12,7 +12,9 @@ and the zero axis is the base: no base line. A window that holds no number is NO
 stretch would read as a zero return): the line joins its neighbours and ``gaps`` marks each span
 with the public reason (``excluded_coverage``, ``lost_input``, ``no_picks``). Only an admin sees
 which table a ``lost_input`` gap lost (``CurveGap.unknown.cause``, ADR 0056). A run with no series
-is ``NOT_STORED`` (not zero-filled), a missing run or basis ``NOT_RUN``."""
+is ``NOT_STORED`` (not zero-filled), a missing run or basis ``NOT_RUN``. ``baselines`` are the
+decoys' own curves over the same windows (each baseline the edge declares, built from the same
+stored series at the basis's holding period), so the page can toggle them against the picks."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -23,7 +25,7 @@ from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_evidence.basis import OfficialBasis
 from algotrade.services.read.edge_evidence.live import EdgeLive, load_live
-from algotrade.services.read.edge_evidence.series import BasisSeries
+from algotrade.services.read.edge_evidence.series import BasisSeries, load_baseline_series
 from algotrade.services.read.evaluation.edges import Edge
 from algotrade.services.read.evaluation.runs import SeriesRow
 from algotrade.services.read.values import Unknown, UnknownCode
@@ -65,6 +67,15 @@ class CurveGap:
 
 
 @dataclass(frozen=True)
+class CurveBaseline:
+    """One decoy's curve: the ``baseline`` it is (a screener preset the edge declares) and its
+    ``points`` by exit, in the picks' unit, with the same additive rule as the basis's."""
+
+    baseline: str
+    points: tuple[CurvePoint, ...]
+
+
+@dataclass(frozen=True)
 class EdgeCurve:
     """The curve of the basis in ``unit`` (``kind`` follows it); ``split_from`` where the
     out-of-sample side starts (None: the run has none); ``hidden``: a copy's out-of-sample result
@@ -79,6 +90,7 @@ class EdgeCurve:
     gaps: tuple[CurveGap, ...] = ()
     live: EdgeLive | None = None
     unknown: Unknown | None = None
+    baselines: tuple[CurveBaseline, ...] = ()
 
 
 def curve_points(series: BasisSeries) -> tuple[CurvePoint, ...]:
@@ -170,6 +182,11 @@ def load_curve(
     if isinstance(series, Unknown):
         return EdgeCurve(None, None, basis.split_from, basis.hidden, unknown=series)
     points = curve_points(series)
+    decoys = tuple(
+        CurveBaseline(b.key[0], pts)
+        for b in load_baseline_series(ctx, basis)
+        if (pts := curve_points(b))
+    )
     return EdgeCurve(
         kind=CUMULATIVE_EXCESS if series.is_return else EXCESS_WINS,
         unit=series.unit,
@@ -178,4 +195,5 @@ def load_curve(
         points=points,
         gaps=curve_gaps(series),
         live=load_live(ctx, edge, series, Anchor(points)),
+        baselines=decoys,
     )

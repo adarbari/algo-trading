@@ -4,7 +4,13 @@
  * as the server sent it and a loss tinted. Its own read (`edgeResult.monthly`). States: loading,
  * error, unknown, ready.
  */
-import { DataTable, ErrorState, Skeleton, type DataTableColumn } from '@algotrade/ui';
+import {
+  DataTable,
+  ErrorState,
+  Skeleton,
+  type DataTableColumn,
+  type ValueFormat,
+} from '@algotrade/ui';
 import { useMemo } from 'react';
 
 import { UnknownNote } from '@/entities/availability';
@@ -38,13 +44,23 @@ function rowsOf(months: EdgeMonthly['months']): YearRow[] {
   return [...rows.values()];
 }
 
-const columns: DataTableColumn<YearRow>[] = [
+/**
+ * A return outcome's month is a fraction (a signed percent); any other (cushion, ratio) counts
+ * wins above what the base rate predicts, a number, never a percent.
+ */
+const RETURN_UNITS = ['return', 'excess_return'];
+export const monthFormat = (unit: string | null): ValueFormat =>
+  unit === null || RETURN_UNITS.includes(unit)
+    ? { kind: 'delta', unit: 'percent', digits: 1 }
+    : { kind: 'delta', unit: 'number', digits: 1 };
+
+const columnsOf = (unit: string | null): DataTableColumn<YearRow>[] => [
   { id: 'year', header: 'Year', value: (r) => r.label, align: 'start', hideable: false },
   ...MONTHS.map((month): DataTableColumn<YearRow> => ({
     id: month.id,
     header: month.label,
     value: (r) => r.values[month.id],
-    format: { kind: 'delta', unit: 'percent', digits: 1 },
+    format: monthFormat(unit),
     width: 'xs',
     sortable: false,
     fill: (r) => ((r.values[month.id] ?? 0) < 0 ? 'negative' : undefined),
@@ -59,6 +75,7 @@ export function EdgeMonthly({ edgeId }: EdgeMonthlyProps) {
   const query = useEdgeMonthly(edgeId);
   const monthly = query.data;
   const rows = useMemo(() => rowsOf(monthly?.months ?? []), [monthly]);
+  const columns = useMemo(() => columnsOf(monthly?.unit ?? null), [monthly?.unit]);
   if (query.isPending) return <Skeleton variant="rect" label="Loading the monthly map" />;
   if (query.isError || !monthly) {
     return (
@@ -73,7 +90,11 @@ export function EdgeMonthly({ edgeId }: EdgeMonthlyProps) {
     return <UnknownNote unknown={monthly.unknown} kindWords={EDGE_UNKNOWN_WORDS} />;
   return (
     <DataTable<YearRow>
-      label="Gain or loss of the curve by month"
+      label={
+        monthly.unit !== null && !RETURN_UNITS.includes(monthly.unit)
+          ? 'Excess wins of the curve by month'
+          : 'Gain or loss of the curve by month'
+      }
       columns={columns}
       rows={rows}
       getRowId={(r) => r.id}

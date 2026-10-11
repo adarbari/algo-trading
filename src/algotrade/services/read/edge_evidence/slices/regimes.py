@@ -1,9 +1,12 @@
 """``EdgeRegimes`` (ADR 0064, "where it worked"): the verdict's basis in each market regime, one
 row per regime label with the win rate, base rate, lift and trades the harness stored for it and
-whether it is thin. The harness stores a regime over the whole run only, so a regime's
-in-sample and out-of-sample figures are ``not_stored`` (said, never derived or zero). A hidden
-copy's regime rows contain out-of-sample sessions and are withheld (``oos_hidden``). Read at the
-verdict's own basis (``edge_evidence.basis``), never re-chosen."""
+whether it is thin. The harness stores a regime over the whole run (``regime``) and on each side
+of the split (``regime_part``, ``<label>:in_sample`` / ``<label>:out_of_sample``); a side a run
+from before the parts did not store is ``not_stored`` (said, never derived or zero). A label no
+session fell in, in any period, is not a row, except the four named regimes (a Stress row with
+"No trades" is informative). A hidden copy's whole-run and out-of-sample rows contain
+out-of-sample sessions and are withheld (``oos_hidden``). Read at the verdict's own basis
+(``edge_evidence.basis``), never re-chosen."""
 
 from dataclasses import dataclass
 
@@ -24,6 +27,7 @@ from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.runs import EdgeRow
 
 REGIME = "regime"
+REGIME_PART = "regime_part"  # a regime on one side of the split: value ``<label>:<side>``
 
 
 @dataclass(frozen=True)
@@ -50,13 +54,27 @@ def _order(label: str) -> tuple[int, str]:
     return (LABELS.index(label) if label in LABELS else len(LABELS), label)
 
 
-def _figures(found: EdgeRow, min_trades: int) -> tuple[SliceFigure, ...]:
-    """The whole run's figure of a regime; the split's two sides are not stored."""
+def _figures(whole: EdgeRow, parts: dict[str, EdgeRow], min_trades: int) -> tuple[SliceFigure, ...]:
+    """The whole run's figure of a regime and its two sides' (``parts``, by side: those stored)."""
     return (
-        figure_of(ALL, found, False, min_trades),
-        figure_of(IN_SAMPLE, None, False, min_trades),
-        figure_of(OUT_OF_SAMPLE, None, False, min_trades),
+        figure_of(ALL, whole, False, min_trades),
+        figure_of(IN_SAMPLE, parts.get(IN_SAMPLE), False, min_trades),
+        figure_of(OUT_OF_SAMPLE, parts.get(OUT_OF_SAMPLE), False, min_trades),
     )
+
+
+def _hidden_figures(inside: EdgeRow | None, min_trades: int) -> tuple[SliceFigure, ...]:
+    """A hidden copy's figures: the in-sample side as stored, the rest withheld."""
+    return (
+        figure_of(ALL, None, True, min_trades),
+        figure_of(IN_SAMPLE, inside, True, min_trades),
+        figure_of(OUT_OF_SAMPLE, None, True, min_trades),
+    )
+
+
+def _empty(whole: EdgeRow, parts: dict[str, EdgeRow]) -> bool:
+    """Whether no session fell in the regime, in any period."""
+    return not whole.sessions and not any(p.sessions for p in parts.values())
 
 
 def regimes_of(basis: OfficialBasis, served: tuple[EdgeRow, ...], min_trades: int) -> EdgeRegimes:
@@ -64,8 +82,19 @@ def regimes_of(basis: OfficialBasis, served: tuple[EdgeRow, ...], min_trades: in
     if basis.key is None:
         return EdgeRegimes(NOT_STORED, None, None, ())
     variant, horizon = basis.key
-    if basis.hidden:
-        return EdgeRegimes(OOS_HIDDEN, variant, horizon, ())
+    sides: dict[str, dict[str, EdgeRow]] = {}
+    for r in served:
+        label, _, side = r.slice_value.partition(":")
+        mine = (r.edge_variant, r.slice_kind, r.variant, r.horizon_sessions)
+        if mine == (runs.MAIN, REGIME_PART, variant, horizon) and r.role != runs.BASELINE:
+            sides.setdefault(label, {})[side] = r
+    if basis.hidden:  # only the in-sample sides are served; the rest is withheld
+        hidden = tuple(
+            RegimeRow(label, _hidden_figures(parts.get(IN_SAMPLE), min_trades))
+            for label, parts in sorted(sides.items(), key=lambda kv: _order(kv[0]))
+            if IN_SAMPLE in parts and (label in LABELS or parts[IN_SAMPLE].sessions)
+        )
+        return EdgeRegimes(OOS_HIDDEN, variant, horizon, hidden)
     found = [
         r
         for r in served
@@ -74,8 +103,9 @@ def regimes_of(basis: OfficialBasis, served: tuple[EdgeRow, ...], min_trades: in
         and (r.variant, r.horizon_sessions, r.slice_kind) == (variant, horizon, REGIME)
     ]
     rows = tuple(
-        RegimeRow(r.slice_value, _figures(r, min_trades))
+        RegimeRow(r.slice_value, _figures(r, sides.get(r.slice_value, {}), min_trades))
         for r in sorted(found, key=lambda r: _order(r.slice_value))
+        if r.slice_value in LABELS or not _empty(r, sides.get(r.slice_value, {}))
     )
     return EdgeRegimes(MEASURED if rows else NOT_STORED, variant, horizon, rows)
 

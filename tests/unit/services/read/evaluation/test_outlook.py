@@ -32,7 +32,7 @@ def test_too_few_oos_trades_is_a_count_with_what_is_missing() -> None:
         40,
         28,
     )
-    assert o.sentence == "Out-of-sample trades is 12; it needs at least 40"
+    assert o.sentence == "Promising needs 40 out-of-sample trades: 12 so far, 28 to go."
     assert o.projection_state == NOT_STORED  # no run stores the schedule's exits yet
 
 
@@ -188,3 +188,70 @@ def test_the_series_is_read_only_when_there_is_a_sharpe_to_cut() -> None:
 
     judge("e", result(whole={"sharpe": None}), SPLIT, T, facts=EdgeFacts(measured=counted))
     assert calls == []
+
+
+WEEKLY = tuple(date(2027, 1, 4) + timedelta(weeks=i) for i in range(1, 60))  # Mondays, 5 sessions
+
+
+def test_the_sentence_names_the_date_and_the_cadence_of_the_stored_exits() -> None:
+    o = outlook(result(oos={"sessions": 12}, whole=stored(projected_exits=WEEKLY)))
+    assert o is not None and o.cadence_sessions == 5
+    assert o.expected_by == WEEKLY[27]
+    assert o.sentence == (
+        f"Promising needs 40 out-of-sample trades: 12 so far, 28 to go, "
+        f"about {WEEKLY[27]:%b %Y} at one trade every 5 sessions."
+    )
+    daily = outlook(result(oos={"sessions": 12}, whole=stored()))
+    assert daily is not None and daily.sentence.endswith("at one trade every session.")
+
+
+def test_both_counts_are_projected_not_only_the_first_failing_one() -> None:
+    o = outlook(result(oos={"sessions": 12}, whole={"sessions": 70, **stored()}))
+    assert o is not None and o.criterion == "trades"
+    by = {p.criterion: p for p in o.projections}
+    assert set(by) == {"trades", "works_trades"}
+    assert (by["trades"].remaining, by["trades"].expected_by) == (28, EXITS[27])
+    assert (by["works_trades"].remaining, by["works_trades"].needed) == (30, 100)
+    assert by["works_trades"].expected_by == EXITS[29] and by["works_trades"].state == PROJECTED
+    # a count already reached is not projected
+    done = outlook(
+        result(oos={"sessions": 45, "decile_t": 1.5}, whole={"sessions": 70, **stored()})
+    )
+    assert done is not None and [p.criterion for p in done.projections] == ["works_trades"]
+
+
+def test_the_next_close_is_the_first_stored_exit_after_the_run() -> None:
+    rows = result(oos={"sessions": 12}, whole=stored())
+    o = outlook(rows)
+    assert o is not None and o.next_close == EXITS[0]
+    late = outlook(rows, after=EXITS[2])
+    assert late is not None and late.next_close == EXITS[3]
+    assert outlook(rows, hidden=True).next_close is None  # type: ignore[union-attr]
+    bare = outlook(result(oos={"sessions": 12}))
+    assert bare is not None and bare.next_close is None  # not stored: never made up
+
+
+def test_at_the_count_the_verdict_on_todays_figures_with_its_reasons() -> None:
+    weak = result(oos={"sessions": 12, "decile_t": 0.4}, whole={"deflated_sharpe": 0.1})
+    o = outlook(weak)
+    assert o is not None and o.at_target is not None
+    assert (o.at_target.needed, o.at_target.level) == (40, "not_working")
+    assert o.at_target.reasons == (
+        "Top vs bottom decile t is 0.40; it needs at least 2",
+        "Deflated Sharpe is 0.10; it needs at least 0.8",
+    )
+    assert o.at_target.sentence == (
+        "At 40, on today's figures: Not working. Top vs bottom decile t is 0.40; it needs at "
+        "least 2 \u00b7 Deflated Sharpe is 0.10; it needs at least 0.8."
+    )
+    good = outlook(result(oos={"sessions": 12}))
+    assert good is not None and good.at_target is not None and good.at_target.level == "promising"
+    # the verdict itself is unchanged by what the outlook computes
+    assert verdict(weak).verdict == "not_enough_data"
+
+
+def test_a_test_that_is_not_a_count_has_no_at_target_but_still_the_dates() -> None:
+    o = outlook(result(oos={"sessions": 60, "decile_t": 1.5}, whole=stored()))
+    assert o is not None and o.at_target is None and o.criterion == "decile_t"
+    assert o.next_close == EXITS[0] and [p.criterion for p in o.projections] == ["works_trades"]
+    assert outlook(result(oos={"sessions": 12}), hidden=True).at_target is None  # type: ignore[union-attr]

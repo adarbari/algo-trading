@@ -30,6 +30,7 @@ KEYS = (
     "live_high",
     "edge_costs",
     "capacity_adv_floor_usd",
+    "capacity_position_usd",
 )
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
@@ -72,6 +73,10 @@ class VerdictSettings:
     # decision 5). Applied when the statistics are computed, not in the leg key: a changed floor
     # never recomputes a leg, only the next run's rows.
     capacity_adv_floor_usd: float = 5_000_000.0
+    # ``capacity_position_usd``: the size of the position the capacity page measures against a
+    # pick's 20-day dollar volume ("a $100,000 position is 0.07% of the median pick's volume");
+    # read when served, never stored, so changing it needs no run.
+    capacity_position_usd: float = 100_000.0
 
     @classmethod
     def from_document(
@@ -100,6 +105,7 @@ class VerdictSettings:
             live_high=t.fraction("live_high", d.live_high),
             cost_levels_bps=_cost_levels(t.table("edge_costs", ("levels_bps",)), d),
             capacity_adv_floor_usd=t.number("capacity_adv_floor_usd", d.capacity_adv_floor_usd, 1),
+            capacity_position_usd=t.number("capacity_position_usd", d.capacity_position_usd, 1),
         )
 
 

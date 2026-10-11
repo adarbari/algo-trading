@@ -118,6 +118,9 @@ export const CAPACITY_FIXTURE = {
   variant: 'main',
   horizon: 20,
   floorUsd: 5_000_000,
+  positionUsd: 100_000,
+  universeFloorUsd: null,
+  floorBinds: true,
   periods: [
     {
       period: 'in_sample',
@@ -126,6 +129,7 @@ export const CAPACITY_FIXTURE = {
       advMedian: 4.1e8,
       advKnown: 38,
       advLow: 6,
+      positionShare: 0.000244,
     },
     {
       period: 'out_of_sample',
@@ -134,6 +138,7 @@ export const CAPACITY_FIXTURE = {
       advMedian: 3.9e8,
       advKnown: 15,
       advLow: 2,
+      positionShare: 0.000256,
     },
     {
       period: 'all',
@@ -142,6 +147,7 @@ export const CAPACITY_FIXTURE = {
       advMedian: null,
       advKnown: null,
       advLow: null,
+      positionShare: null,
     },
   ],
 };

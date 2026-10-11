@@ -48,6 +48,7 @@ const EdgesPage = graphql(`
         headline
         result
         basis
+        basisWhy
         trades
         oosTrades
         winRate
@@ -105,6 +106,8 @@ const EdgesPage = graphql(`
           deflatedSharpe
           pbo
           thin
+          referenceRate
+          touchRate
         }
         evidence {
           oosTrades
@@ -131,6 +134,25 @@ const EdgesPage = graphql(`
             projectionState
             expectedBy
             fillRatio
+            cadenceSessions
+            nextClose
+            projections {
+              criterion
+              oos
+              have
+              needed
+              remaining
+              state
+              expectedBy
+              fillRatio
+              cadenceSessions
+            }
+            atTarget {
+              needed
+              level
+              reasons
+              sentence
+            }
           }
         }
         haircut {

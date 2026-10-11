@@ -2,7 +2,8 @@
  * Section 5 of an edge's page, Trades: the picks of the verdict's basis (its screen and holding
  * period, never chosen here), one page at a time. The server sorts and pages them; the page only
  * says which (an In-sample / Out-of-sample / Live / All switch, a header click, Previous / Next)
- * and hands the same rows back as a CSV file. A per-name value the viewer may not read shows as
+ * and hands the same rows back as a CSV file. Live is off for an edge that records no paper
+ * trades, with the live state's word and Guide term beside the switch (never "0 trades"). A per-name value the viewer may not read shows as
  * an unknown cell; a ledger that cannot be read (no run, pruned, never stored) says why in place
  * of the table. States: loading, error, unknown, ready.
  */
@@ -23,6 +24,8 @@ import { useMemo, useState } from 'react';
 import { UnknownNote } from '@/entities/availability';
 import {
   EDGE_UNKNOWN_WORDS,
+  recordLabel,
+  useEdgeLiveStates,
   useEdgeTrades,
   type EdgeTradeRow,
   type TradePeriod,
@@ -51,6 +54,12 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
     direction: 'asc',
   });
   const columns = useMemo(() => tradeColumns(), []);
+  const notRecording =
+    useEdgeLiveStates().data?.find((s) => s.edgeId === edgeId)?.state === 'not_recording';
+  const options = useMemo(
+    () => OPTIONS.map((o) => (o.value === 'LIVE' && notRecording ? { ...o, disabled: true } : o)),
+    [notRecording],
+  );
   const query = useEdgeTrades({
     edgeId,
     period,
@@ -82,11 +91,22 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
         <SegmentedControl
           aria-label="Filter trades"
           size="sm"
-          options={OPTIONS}
+          options={options}
           value={period}
           onValueChange={choose}
         />
-        <Text tone="muted" size="sm">{`${String(ledger.total)} trades`}</Text>
+        {notRecording && (
+          <>
+            <Text
+              tone="muted"
+              size="sm"
+            >{`Live: ${recordLabel('not_recording').toLowerCase()}`}</Text>
+            {termHelp('live_state')}
+          </>
+        )}
+        {!query.isPlaceholderData && (
+          <Text tone="muted" size="sm">{`${String(ledger.total)} trades`}</Text>
+        )}
         {ledger.symbolsSnapshot && (
           <Text tone="muted" size="sm">
             {`Tickers as of ${formatValue(ledger.symbolsSnapshot, { kind: 'date', style: 'short' }).text}`}
@@ -101,6 +121,9 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
           <Text tone="secondary">Out-of-sample trades hidden</Text>
           {termHelp('show_out_of_sample')}
         </Stack>
+      ) : query.isPlaceholderData ? (
+        // The previous selection's rows are kept while the next load: never shown under the new one.
+        <Skeleton variant="rect" label="Loading the trades" />
       ) : (
         <>
           <DataTable<EdgeTradeRow>
