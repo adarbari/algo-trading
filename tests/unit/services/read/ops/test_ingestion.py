@@ -122,3 +122,20 @@ def test_the_grid_is_kept_until_the_next_publish(
     monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
     load_completeness(ctx, 2, NOW)
     assert len(read) == 2 * once
+
+
+def test_chain_coverage_reads_the_chains_run_records_of_the_session(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    found = ingestion.load_chain_coverage(_ctx(api_golden, date(2022, 11, 23)))
+    assert found is not None and found.session == date(2022, 11, 23)
+    assert found.total > 0 and found.ok <= found.total
+    assert found.share == found.ok / found.total
+    assert sum(s.count for s in found.statuses) == found.total
+    assert found.drift == ()  # one night of history: nothing to compare with
+
+
+def test_a_session_without_a_chains_record_has_no_coverage(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    assert ingestion.load_chain_coverage(_ctx(api_golden, date(2022, 11, 21))) is None

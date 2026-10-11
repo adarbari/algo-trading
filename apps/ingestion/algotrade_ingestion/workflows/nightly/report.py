@@ -4,9 +4,9 @@
 stored run records by ``records.stored_summary``) plus the task run records of those steps
 into a ``Report``: one ``StepLine`` per step (status, duration, key counts, per-item status
 counts), failed items grouped by normalised reason with a few examples each, failed quality
-checks, screen coverage gaps, the live verification against IBKR and short "what to do"
-hints. ``render.py`` turns it into text
-and HTML; ``notify.py`` mails it.
+checks, screen coverage gaps, the option-chain coverage (OK share of the optionable names,
+chronic stale names), the live verification against IBKR and short "what to do" hints.
+``render.py`` turns it into text and HTML; ``notify.py`` mails it.
 """
 
 import re
@@ -16,7 +16,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
-from algotrade.services.run_items import failed_items, normalise, status_code
+from algotrade.services.run_items import ChainCoverage, failed_items, normalise, status_code
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly.timing import (
     ArrivalStat,
@@ -155,6 +155,7 @@ class Report:
     catch_up_waiting: tuple[str, ...] = ()  # pending sessions over the cap, for the next run
     verification: tuple[VerificationLine, ...] = ()  # the verify step per session
     coverage: tuple[CoverageLine, ...] = ()  # feature x tier coverage per session (ADR 0043)
+    chains: tuple[ChainCoverage, ...] = ()  # option-chain coverage per session, chronic names
 
     @property
     def bad_steps(self) -> tuple[StepLine, ...]:
@@ -453,10 +454,13 @@ def build_report(
     history: Sequence[Mapping[str, float]] = (),
     max_duration_s: float | None = None,
     arrivals: Sequence[ArrivalStat] = (),
+    chains: Sequence[ChainCoverage] = (),
 ) -> Report:
     """The report for one nightly run. ``records``: (session, step) -> that step's task run
     record (``""`` session for the steps after every session); ``labels``: id -> ticker;
-    ``history``: step -> seconds of earlier nightlies, newest first (the timing trend)."""
+    ``history``: step -> seconds of earlier nightlies, newest first (the timing trend);
+    ``chains``: the sessions' chain coverage (``load_report``; chronic names as instrument ids,
+    shown by ticker through ``labels``)."""
     labels = labels or {}
     lines, failures, checks, screens, rollups = [], [], [], [], []
     verification: list[VerificationLine] = []
@@ -505,6 +509,9 @@ def build_report(
         catch_up_waiting=tuple((summary.get("catch_up") or {}).get("waiting", [])),
         verification=tuple(verification),
         coverage=tuple(coverage),
+        chains=tuple(
+            replace(c, chronic_top=tuple(labels.get(k, k) for k in c.chronic_top)) for c in chains
+        ),
     )
     items = {key: len(r.items) for key, r in records.items() if r.items}
     timings = step_timings(list(_steps(summary)), report.started, report.duration_s, items, history)

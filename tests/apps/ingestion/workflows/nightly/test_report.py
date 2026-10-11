@@ -2,6 +2,7 @@
 
 from html.parser import HTMLParser
 
+from algotrade.services.run_items import ChainCoverage
 from algotrade_ingestion.workflows.nightly.render import duration, render_html, render_text
 from algotrade_ingestion.workflows.nightly.report import build_report, normalise
 from algotrade_ingestion.workflows.nightly.timing import ArrivalStat
@@ -263,3 +264,15 @@ def test_overdue_earnings_are_listed_with_their_date_and_the_source_hint() -> No
     assert "FDX (last 2026-06-23)" in render_html(report)
     assert any("has dropped this company; check the source" in h for h in report.hints)
     assert not any("coverage_<feature>" in h for h in report.hints)  # no "re-run the task"
+
+
+def test_chain_coverage_section_lists_the_session_in_text_and_html() -> None:
+    chains = ChainCoverage(
+        "2026-10-02", 105, 100, 100 / 105, (("OK", 100), ("STALE_DATA", 5)),
+        (("liquidity", 90), ("rest", 15)), 5, ("EQ:BBG000QL42S5",),
+    )  # fmt: skip
+    report = build_report(fx.summary(), fx.records(), LABELS, chains=[chains])
+    assert report.chains[0].chronic_top == ("XMAX",)  # shown by ticker
+    text = render_text(report)
+    assert "OPTION CHAIN COVERAGE" in text and "95.2% (100/105)" in text and "5: XMAX" in text
+    assert "Option chain coverage" in render_html(report)

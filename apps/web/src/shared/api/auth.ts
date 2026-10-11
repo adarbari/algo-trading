@@ -72,11 +72,34 @@ function authClient(): Auth | null {
   return client;
 }
 
+type SessionRead = ReturnType<Auth['getSession']>;
+
+let reading: SessionRead | null = null;
+
+/**
+ * One session read in flight, shared by every concurrent caller (single-flight): a page boot
+ * fires several authenticated requests at once, and with an expired token each read would start
+ * its own refresh; refresh tokens rotate, so a second refresh with the spent token can sign the
+ * user out. Callers that arrive while a read runs wait for that one.
+ */
+function readSession(auth: Auth): SessionRead {
+  // auth-js runs its own start-up recovery (and its refresh of an expired session) in
+  // `initialize()`; a `getSession()` that starts before it ends runs a second refresh with the
+  // refresh token the first one just spent. So every read waits for the start-up first.
+  reading ??= auth
+    .initialize()
+    .then(() => auth.getSession())
+    .finally(() => {
+      reading = null;
+    });
+  return reading;
+}
+
 /** The current access token, or null when signed out (or when Supabase is not configured). */
 export async function accessToken(): Promise<string | null> {
   const auth = authClient();
   if (!auth) return null;
-  const { data } = await auth.getSession();
+  const { data } = await readSession(auth);
   return data.session?.access_token ?? null;
 }
 
@@ -84,7 +107,7 @@ export async function accessToken(): Promise<string | null> {
 export async function currentSession(): Promise<AuthSession | null> {
   const auth = authClient();
   if (!auth) return null;
-  const { data } = await auth.getSession();
+  const { data } = await readSession(auth);
   return data.session ? { email: data.session.user.email } : null;
 }
 

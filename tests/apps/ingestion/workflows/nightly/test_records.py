@@ -124,3 +124,20 @@ def test_arrivals_read_the_stored_attempts() -> None:
     (stat,) = records.arrivals(StoreReader(backend))
     assert (stat.sessions, stat.bracketed, stat.p50) == (2, 2, 150.0)
     assert records.arrivals(StoreReader(MemoryBackend())) == ()
+
+
+def test_chain_coverage_and_chronic_names_come_from_the_chains_run_records() -> None:
+    reader, _ = fx.chain_nights(stale_today=0)
+    (found,) = records.chains(reader, [fx.D.isoformat()])
+    assert (found.ok, found.total, found.chronic) == (100, 105, 5)
+    assert found.chronic_top[0] == "EQ:C0" and len(found.chronic_top) == 5
+    assert records.chains(reader, ["2026-01-02"]) == ()  # no chains record: left out
+
+
+def test_chain_drift_is_a_warn_only_when_coverage_or_the_chronic_count_moves() -> None:
+    reader, _ = fx.chain_nights(stale_today=0)
+    assert records.chain_drift(reader, {"sessions": [fx.D.isoformat()]}) == []
+    reader, _ = fx.chain_nights(stale_today=60)  # 100 / 165 = 60.6% against 95.2%
+    warns = records.chain_drift(reader, {"sessions": [fx.D.isoformat()]})
+    assert {w["status"] for w in warns} == {"WARN"}
+    assert any("points below its median" in w["detail"] for w in warns)
