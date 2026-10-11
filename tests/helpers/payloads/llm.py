@@ -51,3 +51,20 @@ def gemini_answer(text: str, prompt_tokens: int = 398, completion_tokens: int = 
             },
         }
     ).encode()
+
+
+def claude_cli_structured(structured: object, result: str = "") -> str:
+    """``claude -p --output-format json --json-schema ...`` stdout, BUILT FROM THE CLI'S RESULT
+    SHAPE (``structured_output`` holds the object that fits the schema; ``result`` is empty or
+    prose), not recorded: replace with stdout recorded on the first real structured call."""
+    return json.dumps(
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "result": result,
+            "structured_output": structured,
+            "usage": {"input_tokens": 120, "output_tokens": 30},
+            "total_cost_usd": 0.0042,
+        }
+    )

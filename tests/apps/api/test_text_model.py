@@ -225,3 +225,15 @@ def test_shutdown_flushes_the_usage_ledger(api_golden: tuple[ReadStore, dict[str
     with TestClient(app):
         assert not sink.closed
     assert sink.closed
+
+
+def test_a_providers_structured_mode_reaches_its_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    monkeypatch.setenv("HOME", "/Users/o")
+    cli = CLI_CHAIN["provider"][0] | {"structured": "json_schema"}
+    doc = CLI_CHAIN | {"provider": [cli, CHAIN["provider"][1] | {"structured": "json_schema"}]}
+    model, _ = open_text_model(configs(doc))
+    assert isinstance(model, FallbackTextModel)
+    first, second = model.members[0][1], model.members[1][1]
+    assert isinstance(first, ClaudeCli) and first.structured == "json_schema"
+    assert isinstance(second, ChatCompletions) and second.structured == "json_schema"

@@ -22,6 +22,7 @@ KEYS = (
     "answer_limit",
     "retries",
     "request",
+    "structured",
     "deadline_s",
     "provider",
     "price",
@@ -42,7 +43,9 @@ PROVIDER_KEYS = (
     "request",
     "command",
     "only_users",
+    "structured",
 )
+STRUCTURED = ("none", "json_schema")  # a provider's answer-schema mode (ADR 0041, 2026-10-11)
 KINDS = ("openai", "claude-cli")
 CLAUDE_CLI = "claude-cli"
 RESERVED_REQUEST_KEYS = ("model", "messages", "temperature", "max_tokens", "response_format")
@@ -68,7 +71,10 @@ class ProviderSettings:
     runs Claude Code headless on this machine under the owner's own login instead of calling an
     endpoint: it has ``command`` (the absolute path of ``claude``; no ``base_url``), ``model``
     ("haiku", "sonnet"), ``timeout_s`` and ``retries`` (default 0), and must set ``only_users``:
-    a subscription login never answers anyone else (ADR 0041, amended 2026-10-08)."""
+    a subscription login never answers anyone else (ADR 0041, amended 2026-10-08).
+    ``structured``: ``"json_schema"`` sends the caller's answer schema (``response_format``;
+    ``--json-schema`` for the CLI), ``"none"`` (default) a bare JSON request; the answer is
+    checked locally either way. A top-level value is the default of every provider."""
 
     id: str
     base_url: str
@@ -80,6 +86,7 @@ class ProviderSettings:
     kind: str = "openai"
     command: str = ""
     only_users: tuple[str, ...] = ()
+    structured: str = "none"
 
     @property
     def worst_case_s(self) -> float:
@@ -194,6 +201,7 @@ class LlmSettings:
             answer_limit=t.integer("answer_limit", 8000, 1),
             retries=t.integer("retries", 2, 0),
             request=_request(t),
+            structured=_structured(t, "none"),
         )
         raw = t.raw("provider")
         if raw is None:
@@ -205,6 +213,7 @@ class LlmSettings:
                 shared.answer_limit,
                 shared.retries,
                 shared.request,
+                structured=shared.structured,
             )
             providers: tuple[ProviderSettings, ...] = (legacy,)
             is_legacy = True
@@ -320,6 +329,7 @@ def _providers(raw: Any, shared: ProviderSettings, where: str) -> tuple[Provider
                 t.integer("retries", shared.retries, 0),
                 _request(t) if "request" in t.names() else shared.request,
                 only_users=only,
+                structured=_structured(t, shared.structured),
             )
         )
     return tuple(out)
@@ -363,7 +373,17 @@ def _claude_cli(
         kind=CLAUDE_CLI,
         command=command,
         only_users=only,
+        structured=_structured(t, shared.structured),
     )
+
+
+def _structured(t: Table, default: str) -> str:
+    mode = t.text("structured", default)
+    if mode not in STRUCTURED:
+        raise ConfigurationError(
+            f"{t.where} structured: expected one of {list(STRUCTURED)}, got {mode!r}"
+        )
+    return mode
 
 
 def _request(t: Table) -> Mapping[str, str | float | bool]:

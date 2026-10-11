@@ -220,6 +220,22 @@ or CI could have reached a model. The socket guard does not stop a child process
 4. **Pinned** by `tests/architecture/pipeline/test_llm_off.py` (workflows, Makefile targets,
    Playwright config, and every test that builds the text model or a `ClaudeCli`).
 
+## Amended 2026-10-11: schema, validate-then-fall-through, one repair, order is tier
+An answer the model gives is no longer "text or unavailable":
+1. **Schema**: `services/drafting/answer_schema.py` holds the JSON Schema of the answer
+   (`{criteria, tie_break, notes}`, strict form). `TextModel.complete` takes an optional
+   `schema`; a provider with `structured = "json_schema"` in `llm.toml` (top level or per
+   `[[provider]]`, default `"none"`) is sent it (`response_format` json_schema, strict; the CLI's
+   `--json-schema`, answer read from `structured_output`). `response_format` stays a refused
+   `[request]` key. A provider that ignores it costs nothing: the local check always runs.
+2. **Validate, then fall through**: drafting passes `accept=` (parse, schema check, the draft
+   itself); an answer it refuses (`InvalidAnswerError`, a `ModelUnavailableError`) is recorded as
+   a `rejected` row and the chain asks the next provider, not only on "unavailable".
+3. **One repair**: before falling through, the same provider is asked once more (stage `repair`)
+   with the question, its refused answer and the exact error; the next provider is stage
+   `escalate`. At most two calls per provider, none started after `deadline_s`.
+4. **Order is tier**: no tier concept; the `[[provider]]` order is cheap first, strong last.
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

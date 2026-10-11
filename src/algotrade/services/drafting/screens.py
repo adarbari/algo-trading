@@ -3,8 +3,11 @@ caller's catalogue, the site phrasebook (``config/site/phrasebook.toml``) and th
 (``config/site/field_guide/*.toml``: thresholds and caveats per field). The model's JSON
 is parsed strictly (ids, fields, ops, modes, values, tolerances); a criterion on a field outside the
 caller's catalogue, or one the validator rejects, is dropped with the reason (never saved,
-never silently kept); the rest is validated with ``resolve_rule_draft`` as finalise does. Reads
-only the catalogue and the configs; writes nothing."""
+never silently kept); the rest is validated with ``resolve_rule_draft`` as finalise does. The
+model is asked with the answer schema (``answer_schema.py``) and the draft's own check as
+``accept``: an answer that is not JSON, does not fit the schema or is a draft the validator
+refuses is repaired once and then handed to the next provider by the chain (ADR 0041, amended
+2026-10-11). Reads only the catalogue and the configs; writes nothing."""
 
 import json
 import logging
@@ -14,10 +17,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from algotrade.config.site.settings import load_field_guide, load_phrasebook
-from algotrade.core.model.completion import CallTag, Completion
-from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
+from algotrade.core.model.completion import CallTag
+from algotrade.core.model.errors import (
+    ConfigurationError,
+    InvalidAnswerError,
+    ModelUnavailableError,
+)
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
+from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA, check_answer
 from algotrade.services.drafting.prompt import PROMPT_VERSION, system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
@@ -77,18 +85,30 @@ def draft_screen(
     system = system_prompt(infos.values(), phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
     tag = CallTag("screener-draft", ctx.user.user_id, PROMPT_VERSION)
-    completion = model.complete(system, user, tag=tag)
+    drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
+
+    def check(text: str) -> None:
+        drafted.append((text, _draft(ctx, screener_id, text, infos)))
+
+    def accept(text: str) -> None:
+        """The chain's check of an answer: a draft we can use, else ``InvalidAnswerError``."""
+        try:
+            check(text)
+        except ConfigurationError as exc:  # a draft the validator refuses
+            raise InvalidAnswerError(str(exc)) from exc
+
+    completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
     try:
-        return _draft(ctx, screener_id, completion, infos)
+        if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
+            check(completion.text)
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
+    return drafted[-1][1]
 
 
-def _draft(
-    ctx: ReadContext, screener_id: str, completion: Completion, infos: Mapping[str, Any]
-) -> ScreenDraft:
-    proposal = parse_answer(completion.text)
+def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, Any]) -> ScreenDraft:
+    proposal = parse_answer(text)
     criteria, dropped = criteria_of(proposal, set(infos))
     document: dict[str, Any] = {
         "id": screener_id,
@@ -109,9 +129,11 @@ def parse_answer(answer: str) -> Mapping[str, Any]:
     try:
         parsed = json.loads(text)
     except ValueError as exc:
-        raise ModelUnavailableError("the model's answer is not JSON") from exc
+        raise InvalidAnswerError("the model's answer is not JSON") from exc
     if not isinstance(parsed, Mapping) or not isinstance(parsed.get("criteria"), list):
-        raise ModelUnavailableError("the model's answer has no criteria list")
+        raise InvalidAnswerError("the model's answer has no criteria list")
+    if (why := check_answer(parsed)) is not None:
+        raise InvalidAnswerError(f"the model's answer does not fit the schema ({why})")
     return parsed
 
 

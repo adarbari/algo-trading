@@ -8,7 +8,7 @@ from dataclasses import replace
 import pytest
 
 from algotrade.core.model.completion import Attempt, CallTag, Completion
-from algotrade.core.model.errors import ModelUnavailableError
+from algotrade.core.model.errors import InvalidAnswerError, ModelUnavailableError
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
 
@@ -24,7 +24,15 @@ class Member:
     def names_for(self, user: str | None) -> tuple[str, ...]:
         return self.names
 
-    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
         self.calls += 1
         if self.clock is not None:
             self.clock.now += self.cost
@@ -123,7 +131,15 @@ class Tagged(Member):
 
     tag: object = None
 
-    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
         self.tag = tag
         return super().complete(system, user, tag=tag)
 
@@ -393,3 +409,124 @@ def test_reject_never_raises_when_the_ledger_breaks_and_works_without_one() -> N
     done = Completion("t", "m", "claude")
     with_ledger(Ledger(deaf=True), Member("claude")).reject(None, done, "why", "u")
     FallbackTextModel([("claude", Member("claude"))]).reject(None, done, "why", "u")
+
+
+# ------------------------------------------------ validate, repair once, escalate (ADR 0041)
+
+
+class Scripted:
+    """A member that gives its answers in order and keeps what each call was given."""
+
+    def __init__(self, provider: str, *answers: str) -> None:
+        self.provider, self.answers = provider, list(answers)
+        self.names = (f"{provider}-model",)
+        self.seen: list[tuple[str, str | None, object]] = []  # user, stage, schema
+
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
+        self.seen.append((user, tag.stage if tag else None, schema))
+        return Completion(self.answers.pop(0), self.names[0], self.provider, 1, 2, 0.1)
+
+
+def only_good(text: str) -> None:
+    if text != "good":
+        raise InvalidAnswerError(f"{text!r} is not good")
+
+
+SCHEMA = {"type": "object"}
+TAG = CallTag("screener-draft", "abhi")
+
+
+def test_a_valid_first_answer_is_one_call_with_the_schema_passed_down() -> None:
+    cheap = Scripted("cheap", "good")
+    ledger = Ledger()
+    done = with_ledger(ledger, cheap, Scripted("strong")).complete(
+        "s", "u", tag=TAG, schema=SCHEMA, accept=only_good
+    )
+    assert done.text == "good" and done.fell_back_from is None
+    assert cheap.seen == [("u", "first", SCHEMA)]
+    assert [(a.outcome, a.call_stage) for a in ledger.attempts] == [("ok", "first")]
+
+
+def test_an_invalid_answer_is_repaired_once_by_the_same_provider() -> None:
+    cheap, strong = Scripted("cheap", "bad", "good"), Scripted("strong")
+    ledger = Ledger()
+    done = with_ledger(ledger, cheap, strong).complete("s", "u", tag=TAG, accept=only_good)
+    assert (done.provider, done.text, done.fell_back_from) == ("cheap", "good", None)
+    assert [stage for _, stage, _ in cheap.seen] == ["first", "repair"] and not strong.seen
+    repair = cheap.seen[1][0]
+    assert repair.startswith("u") and "'bad' is not good" in repair  # the question and the error
+    assert (
+        "Your answer was rejected: 'bad' is not good. Return only the corrected JSON object."
+        in repair
+    )
+    assert [a.outcome for a in ledger.attempts] == ["ok", "rejected", "ok"]
+    assert ledger.attempts[1].answer == "bad" and ledger.attempts[1].call_stage == "first"
+    assert len({a.call_id for a in ledger.attempts}) == 1
+
+
+def test_invalid_twice_escalates_to_the_next_provider_with_rejected_rows() -> None:
+    cheap, strong = Scripted("cheap", "bad", "worse"), Scripted("strong", "good")
+    ledger = Ledger()
+    done = with_ledger(ledger, cheap, strong).complete("s", "u", tag=TAG, accept=only_good)
+    assert (done.provider, done.fell_back_from) == ("strong", "cheap")
+    assert [stage for _, stage, _ in cheap.seen] == ["first", "repair"]
+    assert [stage for _, stage, _ in strong.seen] == ["escalate"]
+    assert strong.seen[0][0] == "u"  # the next provider is asked the original question afresh
+    assert [(a.provider, a.outcome, a.call_stage) for a in ledger.attempts] == [
+        ("cheap", "ok", "first"),
+        ("cheap", "rejected", "first"),
+        ("cheap", "ok", "repair"),
+        ("cheap", "rejected", "repair"),
+        ("strong", "fell_back", "escalate"),
+    ]
+    assert ledger.attempts[3].error == "'worse' is not good"
+
+
+def test_every_provider_refused_is_an_error_naming_each_cause_after_at_most_two_calls_each() -> (
+    None
+):
+    a, b = Scripted("a", "x1", "x2"), Scripted("b", "y1", "y2")
+    with pytest.raises(ModelUnavailableError) as raised:
+        chain(a, b).complete("s", "u", tag=TAG, accept=only_good)
+    message = str(raised.value)
+    assert "'x2' is not good" in message and "'y2' is not good" in message
+    assert len(a.seen) == len(b.seen) == 2
+
+
+def test_an_unavailable_provider_is_not_repaired_and_the_next_is_not_an_escalation() -> None:
+    down, strong = Member("down", ModelUnavailableError("HTTP 503")), Scripted("strong", "good")
+    done = chain(down, strong).complete("s", "u", tag=TAG, accept=only_good)
+    assert done.text == "good" and down.calls == 1
+    assert strong.seen[0][1] == "first"
+
+
+def test_no_repair_or_escalation_starts_after_the_deadline() -> None:
+    clock = Clock()
+
+    class Slow(Scripted):
+        def complete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            clock.now += 100.0
+            return super().complete(*args, **kwargs)
+
+    slow, strong = Slow("slow", "bad", "good"), Scripted("strong", "good")
+    with pytest.raises(ModelUnavailableError, match="deadline"):
+        chain(slow, strong, deadline_s=60.0, clock=clock).complete(
+            "s", "u", tag=TAG, accept=only_good
+        )
+    assert len(slow.seen) == 1 and not strong.seen
+
+
+def test_without_accept_the_answer_is_returned_as_before() -> None:
+    cheap = Scripted("cheap", "bad")
+    assert chain(cheap).complete("s", "u").text == "bad" and len(cheap.seen) == 1

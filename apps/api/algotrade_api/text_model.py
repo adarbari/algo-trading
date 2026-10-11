@@ -107,6 +107,7 @@ def _claude_cli(provider: ProviderSettings) -> TextModel:
         provider.retries,
         claude_cli_env(),
         provider.id,
+        provider.structured,
     )
 
 
@@ -120,4 +121,5 @@ def _adapter(provider: ProviderSettings, key: str | None) -> TextModel:
         provider.retries,
         provider.request,
         provider.id,
+        provider.structured,
     )

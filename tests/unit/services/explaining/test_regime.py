@@ -123,7 +123,15 @@ class Chain(Canned):
         super().__init__(answer)
         self.names, self.answers = names, answers
 
-    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
         done = super().complete(system, user, tag=tag)
         return Completion(done.text, self.answers, self.answers, fell_back_from=self.names[0])
 
@@ -151,7 +159,15 @@ class Named(Canned):
         super().__init__(answer)
         self.names, self.name, self.tags = (name,), name, []  # type: ignore[var-annotated]
 
-    def complete(self, system: str, user: str, *, tag: object = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
         self.tags.append(tag)
         done = super().complete(system, user, tag=tag)
         return Completion(done.text, self.name, self.name)
