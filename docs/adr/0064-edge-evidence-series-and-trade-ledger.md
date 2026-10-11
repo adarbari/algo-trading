@@ -73,14 +73,19 @@ counts, not their ids, ranks, scores, exclusion reasons, gross values, dips or l
    published, in-sample, out-of-sample and live; a statistic not measurable live is
    `Unknown(NOT_MEASURED_LIVE)`, a horizon mismatch `Unknown(NOT_COMPARABLE)`.
 7. **Projected date.** Computed at run time by the harness, which owns schedule arithmetic: for a
-   calendar schedule it writes `projected_exits` (the exit sessions of the schedule's next
-   decision sessions over two years, per horizon) on the run's `slice_kind = all` rows. The read
+   calendar schedule it writes `projected_exits` on the run's `slice_kind = all` rows: the exit
+   sessions of the schedule's next N decision sessions per (variant, horizon), count-based, not a
+   calendar window (`vrp_short_premium`'s 40th out-of-sample exit is about 2029 at 21 sessions and
+   2031 at 31), with N = the largest trade count a verdict threshold can ask for, read at run time
+   (the max of `VerdictSettings` `min_oos_trades`, `works_oos_trades`, `works_trades`). The read
    model's outlook, for count criteria only (`trades`, `works_trades`), takes the sessions still
    needed at the measured trades per session of the last two complete years and reads that
-   session's exit from the list; thresholds stay in `verdict.toml`, so a threshold change never
-   stales a stored date. An event schedule (`on_event:`) cannot be projected:
-   `Unknown(UNPROJECTABLE)`; a hidden copy `Unknown(OOS_HIDDEN)`; a non-count criterion has none.
-   Labelled an estimate; never an input to a verdict.
+   session's exit from the list; thresholds stay in `verdict.toml`, so a changed threshold never
+   stales a stored value. A threshold raised above what the run stored reads as the projection
+   state `BEYOND_PROJECTION` (with its Guide term) until the next run; an event schedule
+   (`on_event:`) cannot be projected: `Unknown(UNPROJECTABLE)`; a hidden copy
+   `Unknown(OOS_HIDDEN)`; a non-count criterion has none. Labelled an estimate; never an input to
+   a verdict.
 8. **Haircut Sharpe.** Robustness shows the Harvey-Liu haircut (Holm, M = the trial log's trials;
    the Bonferroni bound when the peers' t-statistics are not stored) beside the trial count, from
    stored `sharpe`, `sessions`, `trials`; the deflated Sharpe stays the verdict criterion.
