@@ -20,6 +20,11 @@ import {
   eventMarkers,
   aaplVolume,
   cautionBand,
+  edgeBacktest,
+  edgeBands,
+  edgeBase,
+  edgeDrawdown,
+  edgeLive,
   msft,
   sampleBands,
   sampleLanes,
@@ -150,6 +155,41 @@ describe('chart bands', () => {
     expect(describeChart('AAPL', chart, { rebase: false, format: { kind: 'currency' } })).toContain(
       '3 shaded periods',
     );
+  });
+});
+
+describe('Chart evidence curve and drawdown', () => {
+  it('passes the dashed stroke and the underwater type to the engine and keys the dashed series', async () => {
+    const { container } = render(
+      <Chart
+        label="Evidence"
+        series={[edgeBacktest, edgeLive, edgeBase]}
+        bands={edgeBands}
+        format={{ kind: 'number', digits: 1 }}
+      />,
+    );
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    const drawn = lastInput().series;
+    expect(drawn.map((s) => s.stroke ?? 'solid')).toEqual(['solid', 'dashed', 'solid']);
+    expect(lastInput().bands.map((b) => b.label)).toEqual(['In-sample', 'Out-of-sample']);
+    expect(container.querySelector('[data-dashed]')).not.toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('draws a drawdown as an underwater series and lists it in the table view', async () => {
+    const { container } = render(
+      <Chart label="Drawdown" series={[edgeDrawdown]} format={{ kind: 'number', digits: 1 }} />,
+    );
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().series[0]?.type).toBe('underwater');
+    expect(edgeDrawdown.points.every((p) => (p.value ?? 0) <= 0)).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'View as table' }));
+    expect(screen.getByRole('grid')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });
 

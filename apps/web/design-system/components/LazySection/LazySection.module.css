@@ -1,0 +1,20 @@
+/* LazySection: the placeholder reserves the section's height so the page does not jump. */
+.placeholder {
+  min-block-size: var(--space-10);
+}
+
+.placeholder[data-size='sm'] {
+  min-block-size: calc(var(--space-10) * 2);
+}
+
+.placeholder[data-size='md'] {
+  min-block-size: calc(var(--space-10) * 4);
+}
+
+.placeholder[data-size='lg'] {
+  min-block-size: var(--size-sidebar);
+}
+
+.placeholder[data-size='xl'] {
+  min-block-size: calc(var(--space-10) * 12);
+}

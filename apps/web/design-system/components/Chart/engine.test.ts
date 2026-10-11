@@ -40,6 +40,7 @@ const fake = vi.hoisted(() => {
 });
 vi.mock('lightweight-charts', () => ({
   AreaSeries: 'Area',
+  BaselineSeries: 'Baseline',
   LineSeries: 'Line',
   HistogramSeries: 'Histogram',
   ColorType: { Solid: 'solid' },
@@ -76,6 +77,30 @@ const draw = (days = 100) =>
 beforeEach(() => {
   vi.clearAllMocks();
   fake.setRange(null);
+});
+
+describe('drawChart series kinds', () => {
+  it('draws a dashed stroke as a dashed line and an underwater series as a baseline at 0', () => {
+    const chart = prepare(
+      [
+        { ...aapl, stroke: 'dashed' },
+        { id: 'dd', label: 'Drawdown', type: 'underwater', points: aapl.points.slice(-20) },
+      ],
+      { range: 'All', rebase: false },
+    );
+    drawChart(
+      document.createElement('div'),
+      { ...input(20), series: chart.series },
+      readTheme(document.body),
+      () => {},
+    );
+    const calls = fake.chart.addSeries.mock.calls as unknown as [string, Record<string, unknown>][];
+    expect(calls[0]?.[0]).toBe('Line');
+    expect(calls[0]?.[1]).toMatchObject({ lineStyle: 2 });
+    const baseline = calls.find(([kind]) => kind === 'Baseline');
+    expect(baseline?.[1]).toMatchObject({ baseValue: { type: 'price', price: 0 } });
+    expect(calls.filter(([kind]) => kind === 'Line').slice(1)).toHaveLength(0);
+  });
 });
 
 describe('drawChart', () => {
