@@ -23,7 +23,7 @@ import {
 import type { CompareRow } from '@/features/edge-compare';
 
 export const yearColumns: DataTableColumn<VerdictYear>[] = [
-  { id: 'year', header: 'Period', value: (y) => y.year, align: 'start', hideable: false },
+  { id: 'year', header: 'Period', value: (y) => y.label, align: 'start', hideable: false },
   {
     id: 'win',
     header: 'Win rate',
