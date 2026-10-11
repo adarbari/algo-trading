@@ -12,6 +12,7 @@ from algotrade.config.edges.loading import edge_problems, load_all_edges, load_e
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import field_catalog
+from algotrade.services.evaluation.cross_section.events import EVENT_FIELDS
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import document
@@ -306,6 +307,19 @@ def test_every_open_shipped_edge_answers_the_whole_quality_bar() -> None:
         if not answer.strip()
     ]
     assert not unanswered, f"answer every quality-bar question (docs/edges-plan.md): {unanswered}"
+
+
+def test_every_open_shipped_event_edge_triggers_on_a_class_the_harness_can_read() -> None:
+    """An open edge's ``on_event`` class has a declared field to read its names from: a
+    placeholder class (russell_reconstitution on the S&P 500's index_change, 2026-10-10) stays
+    blocked until its class and source exist."""
+    unreadable = [
+        f"{e.id}: {e.event_class}"
+        for e in load_edges(SHIPPED)
+        if e.status not in CLOSED and e.event_class is not None
+        if e.event_class not in EVENT_FIELDS
+    ]
+    assert not unreadable, f"an open event edge needs its class in EVENT_FIELDS: {unreadable}"
 
 
 def test_every_shipped_inline_universe_names_catalogue_fields() -> None:
