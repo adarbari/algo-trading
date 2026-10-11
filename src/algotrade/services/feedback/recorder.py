@@ -32,7 +32,7 @@ BATCH = 100  # rows per run at most
 KEY = ["draft_session_id", "event_id", "event"]  # as the table's key (schemas.py)
 COLUMNS = (
     "event_id", "draft_session_id", "ts", "user", "doc_kind", "doc_id", "event", "call_ids",
-    "catalogue_version", "prompt_version", "draft_hash", "saved_hash", "sentence", "payload",
+    "catalogue_version", "prompt_version", "draft_hash", "saved_hash", "sentence", "payload", "seq",
 )  # fmt: skip
 
 __all__ = ["FeedbackRecorder", "FeedbackSink", "open_recorder"]
@@ -68,6 +68,7 @@ class FeedbackRecorder(BatchRecorder[Mapping[str, Any]]):
 def _frame(rows: list[Mapping[str, Any]]) -> pd.DataFrame:
     """The stamped frame of ``rows``: a column a row lacks is null."""
     frame = pd.DataFrame([{c: r.get(c) for c in COLUMNS} for r in rows], columns=list(COLUMNS))
+    frame["seq"] = frame["seq"].astype("Int64")
     ts = pd.to_datetime(frame["ts"], utc=True)
     return frame.assign(
         ts=ts,

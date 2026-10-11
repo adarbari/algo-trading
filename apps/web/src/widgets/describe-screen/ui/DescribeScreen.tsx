@@ -22,6 +22,8 @@ export function DescribeScreen() {
         screenerId={builder.id}
         document={builder.document}
         onDraft={builder.loadDocument}
+        draftSessionId={builder.draftSessionId}
+        onSession={builder.setDraftSessionId}
         renderFieldHelp={(field) =>
           known.has(field) ? <GuideHelp entry={{ kind: 'field', id: field }} /> : null
         }

@@ -151,7 +151,12 @@ def test_a_draft_returns_a_session_id_and_records_its_two_events(
     returned = sink.rows[1]
     assert returned["sentence"] == "over $5" and returned["doc_id"] == "my_screen"
     assert returned["draft_hash"] and returned["catalogue_version"] and returned["prompt_version"]
-    assert '"dropped":[{"field":"rollup.nope@v1.iv_rank","id":"iv_rank"}]' in returned["payload"]
+    payload = json.loads(returned["payload"])
+    assert (
+        payload["dropped"][0]["field"] == "rollup.nope@v1.iv_rank"
+        and payload["dropped"][0]["reason"]
+    )
+    assert payload["draft_criteria"]["criteria"]["price"]["value"] == 5 and returned["seq"] == 1
 
 
 def test_a_draft_that_fails_leaves_only_its_request(
@@ -167,3 +172,22 @@ def test_an_app_without_feedback_still_drafts(api_golden: tuple[ReadStore, dict[
     client = app_with(api_golden[0], Canned(ANSWER))  # no sink: the default records nothing
     body = client.post("/screeners/s/draft-from-text", json={"text": "over $5"}).json()
     assert body["draft_session_id"]
+
+
+def test_a_description_with_the_previous_session_id_stays_in_the_session(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    client = app_with(api_golden[0], Canned(ANSWER), sink)
+    path = "/screeners/my_screen/draft-from-text"
+    one = client.post(path, json={"text": "over $5"}).json()["draft_session_id"]
+    edit = {"id": "my_screen", "criteria": {"price": {"field": PRICE, "op": "gt", "value": 9}}}
+    two = client.post(path, json={"text": "liquid", "document": edit, "draft_session_id": one})
+    assert two.json()["draft_session_id"] == one
+    other = client.post(path, json={"text": "x", "draft_session_id": "someone-elses"})
+    assert other.json()["draft_session_id"] not in (one, "someone-elses")
+    asked = [
+        r for r in sink.rows if r["event"] == "draft_requested" and r["draft_session_id"] == one
+    ]
+    assert [r["seq"] for r in asked] == [1, 2]
+    assert json.loads(asked[1]["payload"])["current_criteria"]["criteria"]["price"]["value"] == 9

@@ -20,6 +20,14 @@ export interface DescribeFormProps {
   document: ScreenDocument;
   /** The draft the model proposed: load it into the Builder as an unsaved edit. */
   onDraft: (document: Readonly<Record<string, unknown>>) => void;
+  /**
+   * The feedback session of this screen (ADR 0066): the id of the last answer, sent with the
+   * next sentence; the owner (the Builder) clears it on save and when another screen opens, and
+   * the same id goes with the save.
+   */
+  draftSessionId?: string | null;
+  /** The answer's session id, to keep for the next sentence and the save. */
+  onSession?: (draftSessionId: string | null) => void;
   /** The help for a field the draft names (null for a field the Guide does not know). */
   renderFieldHelp?: (field: string) => ReactNode;
 }
@@ -44,6 +52,8 @@ export function DescribeForm({
   screenerId,
   document,
   onDraft,
+  draftSessionId = null,
+  onSession,
   renderFieldHelp,
 }: DescribeFormProps) {
   const [text, setText] = useState('');
@@ -53,10 +63,11 @@ export function DescribeForm({
   const submit = () => {
     if (!canSubmit) return;
     draft.mutate(
-      { text: text.trim(), document },
+      { text: text.trim(), document, draftSessionId },
       {
         onSuccess: (answer) => {
           setResult(answer);
+          onSession?.(answer.draft_session_id ?? null);
           onDraft(answer.document);
         },
       },

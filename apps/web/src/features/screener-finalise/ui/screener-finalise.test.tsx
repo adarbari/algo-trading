@@ -52,6 +52,28 @@ describe('FinaliseButton', () => {
     expect(order).toEqual(['save', 'finalise']);
   });
 
+  it('sends the Describe-it session and says when the version is written', async () => {
+    POST.mockResolvedValue(ok({ screener_id: 'my', version: 3, hash: 'h' }));
+    const onFinalised = vi.fn();
+    wrap(
+      <FinaliseButton
+        screenerId="my"
+        version={3}
+        prepare={() => Promise.resolve()}
+        draftSessionId="sess-1"
+        onFinalised={onFinalised}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Finalize v3' }));
+    await waitFor(() => {
+      expect(onFinalised).toHaveBeenCalled();
+    });
+    expect(POST).toHaveBeenCalledWith('/screeners/{screener_id}/finalise', {
+      params: { path: { screener_id: 'my' } },
+      body: { draft_session_id: 'sess-1' },
+    });
+  });
+
   it('does not finalize when the save fails, and says why when finalising fails', async () => {
     const { rerender } = wrap(
       <FinaliseButton

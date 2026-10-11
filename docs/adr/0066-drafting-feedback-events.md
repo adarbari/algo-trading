@@ -28,7 +28,7 @@ ADR 0007 (`ts` = the event, `session_date` = its **exchange calendar date**, `kn
 (`screen` | `edge`), `doc_id`, `event`, `call_ids` (comma-delimited `usage/llm_calls.call_id`),
 `catalogue_version` (a hash of the sorted catalogue names), `prompt_version`, `draft_hash` (the
 draft the model returned), `saved_hash`, `sentence` (<= 1,000 characters) and `payload` (a small JSON
-string, replaced by a valid "clipped" object past 4,000 characters). Nullable apart from the event's
+string, replaced by a valid "truncated" object past 32,000 characters; see the amendment below). Nullable apart from the event's
 identity; older partitions read missing columns as null (the usage log's lesson, 0058). Runs merge;
 the key is `draft_session_id, event_id, event`, so two events of one session never collapse and one
 event submitted twice is one row.
@@ -68,6 +68,42 @@ the golden set (`tests/fixtures/drafting/golden/`, reviewed by the owner); a cur
 own text, kept in git. The nulling and an owner-run erase command for one user are a later change (an
 owner-run command in the ingestion CLI, as every rewrite of stored data is); until then the rows are
 append-only and `docs/hosting.md`'s store backups apply.
+
+## Amendment (2026-10-12): the whole iteration of a screen
+
+The first cut recorded a diff per draft, so the final criteria and the chain of descriptions could
+not be read back. Owner requirement (2026-10-12): for an original sentence, the golden case is the
+final criteria the user ended up with after editing the filter; if they change the description
+several times, all of the descriptions are stored.
+
+- **A session is one screen's iteration.** `POST .../draft-from-text` takes an optional
+  `draft_session_id`: the previous answer's. The API continues that session when the id is the same
+  user's, for the same screener, and the screen was not saved since (`DraftMemory`); an unknown,
+  foreign, other-screen or already saved id starts a new session. `seq` (a new nullable `int64`
+  column) is the 1-based ordinal of the draft request in its session; save events carry the `seq`
+  of the draft they saved. The browser keeps the last id per screener in the Builder and sends it
+  with the next sentence, the save and the finalise (the save never carried it before); it clears
+  it when the version is written or another screener opens.
+- **The criteria in force are stored, not only a diff.** `draft_requested.payload.current_criteria`
+  is the Builder's criteria table (with its tie-break / rank) sent with the request: the trader's
+  edits between descriptions. `draft_returned.payload.draft_criteria` is the model's criteria after
+  validation, with `dropped` (id, field, reason) and `notes`. `draft_saved` and `screen_finalised`
+  carry `saved_criteria`, the stored document's criteria table with its tie-break / rank. Each
+  snapshot is cut at 8,000 characters of JSON into `{"truncated": true, "chars": n, "head": ...}`
+  and the whole payload at 32,000: never a failed request.
+- **A golden case** is `(all sentences of one session in order, with the criteria in force at each
+  (`current_criteria` of its request), the final saved criteria (`saved_criteria` of the session's
+  last `draft_saved` / `screen_finalised`))`. A session with no save is abandoned and unlabelled.
+  For a curated case `source_event` is the session's final event id. The public-repo paraphrase
+  rule applies to every sentence of the chain: the repository is public, so a curated case holds
+  paraphrased sentences, never the trader's own words.
+- **Personal data in these rows.** Personal: the typed sentences (`sentence`, which may name
+  holdings, strategies or people, and the `dropped` reasons that quote them), the user id (`user`),
+  and the saved, requested and returned criteria (`*_criteria`), which are the user's strategy.
+  Not personal: the event name, `seq`, the hashes, the catalogue and prompt versions, the call ids
+  (they point into the usage log, which holds the same text under its own rules), the exchange date
+  and the screener id when it is a site preset's. Retention, viewer scoping and the owner's
+  erase command apply to all the personal columns, the payload included.
 
 ## Consequences
 - The golden set grows from real sentences, with the model's answer and what the trader kept.

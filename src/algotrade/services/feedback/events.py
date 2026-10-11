@@ -27,7 +27,8 @@ EVENTS = (
 )  # fmt: skip
 DOC_KINDS = ("screen", "edge")
 MAX_SENTENCE = 1000  # characters of the trader's sentence kept
-MAX_PAYLOAD = 4000  # characters of the payload's JSON kept
+MAX_VALUE = 8000  # characters of one criteria snapshot's JSON kept (``bounded``)
+MAX_PAYLOAD = 32000  # characters of the whole payload's JSON kept: room for three snapshots
 CALL_IDS_SEP = ","
 
 log = logging.getLogger(__name__)
@@ -55,20 +56,33 @@ def document_hash(document: Mapping[str, Any]) -> str:
 
 
 def new_session_id() -> str:
-    """A fresh ``draft_session_id``: one per draft the model returns."""
+    """A fresh ``draft_session_id``: one per screen being drafted, kept by the caller across its
+    successive descriptions until the screen is saved."""
     return uuid.uuid4().hex
+
+
+def _cut(text: str, limit: int) -> dict[str, Any]:
+    """The small valid object that stands for JSON ``text`` over ``limit``: ``truncated``, its
+    length and its head."""
+    return {"truncated": True, "chars": len(text), "head": clip(text, limit // 2)}
+
+
+def bounded(value: Any, limit: int = MAX_VALUE) -> Any:
+    """``value`` (JSON-ready) as it is when its JSON fits ``limit`` characters, else
+    ``{"truncated": true, "chars": n, "head": ...}``: a snapshot never fails a request."""
+    text = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+    return value if len(text) <= limit else _cut(text, limit)
 
 
 def payload_text(payload: Mapping[str, Any] | None) -> str | None:
     """``payload`` as compact JSON; one over ``MAX_PAYLOAD`` characters is replaced by a small
-    valid object that says it was cut (its head, ``clipped``)."""
+    valid object that says it was cut (``truncated``, its head)."""
     if not payload:
         return None
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     if len(text) <= MAX_PAYLOAD:
         return text
-    head = clip(text, MAX_PAYLOAD // 2)
-    return json.dumps({"clipped": True, "chars": len(text), "head": head})
+    return json.dumps(_cut(text, MAX_PAYLOAD))
 
 
 def row_of(
@@ -85,6 +99,7 @@ def row_of(
     draft_hash: str | None = None,
     saved_hash: str | None = None,
     sentence: str | None = None,
+    seq: int | None = None,
     payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The row of one event (the point-in-time columns are stamped by the recorder). The
@@ -108,6 +123,7 @@ def row_of(
         "draft_hash": draft_hash,
         "saved_hash": saved_hash,
         "sentence": clip(sentence, MAX_SENTENCE) if sentence is not None else None,
+        "seq": seq,
         "payload": payload_text(payload),
     }
 

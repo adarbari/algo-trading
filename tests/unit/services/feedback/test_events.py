@@ -12,7 +12,9 @@ from algotrade.services.feedback.events import (
     EVENTS,
     MAX_PAYLOAD,
     MAX_SENTENCE,
+    MAX_VALUE,
     NoFeedback,
+    bounded,
     catalogue_version,
     document_hash,
     emit,
@@ -63,7 +65,7 @@ def test_a_big_payload_stays_valid_json_and_says_it_was_cut() -> None:
     big = payload_text({"diff": "y" * 10 * MAX_PAYLOAD})
     assert big is not None and len(big) < MAX_PAYLOAD
     cut = json.loads(big)
-    assert cut["clipped"] is True and cut["chars"] > MAX_PAYLOAD
+    assert cut["truncated"] is True and cut["chars"] > MAX_PAYLOAD
     assert payload_text({}) is None and payload_text(None) is None
 
 
@@ -84,3 +86,11 @@ def test_emit_submits_and_never_raises() -> None:
     assert emit(sink, "bogus", "s1", "abhi", "screen", "mine") is False  # a bad row is dropped
     assert emit(NoFeedback(), events.DRAFT_SAVED, "s", "u", "screen", "d") is False
     assert len(sink.rows) == 1
+
+
+def test_a_snapshot_is_kept_whole_up_to_eight_thousand_characters_then_flagged() -> None:
+    small = {"criteria": {"a": 1}}
+    assert bounded(small) == small
+    cut = bounded({"criteria": "z" * (MAX_VALUE + 1)})
+    assert cut["truncated"] is True and cut["chars"] > MAX_VALUE and len(cut["head"]) <= MAX_VALUE
+    assert row_of("draft_requested", "s", "u", "screen", "d", seq=2)["seq"] == 2

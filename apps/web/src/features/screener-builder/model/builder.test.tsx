@@ -107,6 +107,14 @@ function Probe() {
       >
         discard
       </Button>
+      <Button
+        onClick={() => {
+          b.setDraftSessionId('sess-1');
+        }}
+      >
+        describe
+      </Button>
+      <Text>{`session ${b.draftSessionId ?? 'none'}`}</Text>
     </>
   );
 }
@@ -190,6 +198,29 @@ describe('ScreenerBuilderProvider', () => {
     await waitFor(() => {
       expect(screen.getByText(/dirty false/)).toBeInTheDocument();
     });
+  });
+
+  it('sends the Describe-it session with the save, and has none for another screener', async () => {
+    const view = setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    await userEvent.click(screen.getByRole('button', { name: 'describe' }));
+    expect(screen.getByText('session sess-1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'edit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      expect(PUT).toHaveBeenCalledTimes(1);
+    });
+    expect(PUT.mock.calls[0]?.[1]).toMatchObject({ body: { draft_session_id: 'sess-1' } });
+    view.rerender(
+      <ToastProvider>
+        <TestQueryProvider>
+          <ScreenerBuilderProvider id="other">
+            <Probe />
+          </ScreenerBuilderProvider>
+        </TestQueryProvider>
+      </ToastProvider>,
+    );
+    expect(await screen.findByText('session none')).toBeInTheDocument();
   });
 
   it('switches an inherited criterion off instead of deleting it', async () => {

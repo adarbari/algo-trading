@@ -242,3 +242,31 @@ def test_a_failing_sink_does_not_fail_the_save(writer_client: TestClient) -> Non
     c.app.state.feedback = Down()  # type: ignore[attr-defined]
     ok = c.put("/screeners/mine/draft", json={"document": OWN, "draft_session_id": "whatever"})
     assert ok.status_code == 200
+
+
+def test_a_whole_iteration_reads_back_from_the_rows_and_a_save_closes_the_session(
+    writer_client: TestClient,
+) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    price = {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 12}
+    hand = OWN | {"criteria": {"price": price}}  # the trader edits between descriptions
+    again = c.post(
+        "/screeners/mine/draft-from-text",
+        json={"text": "and liquid", "document": hand, "draft_session_id": session},
+    ).json()["draft_session_id"]
+    assert again == session
+    final = OWN | {"criteria": {"price": price | {"value": 15}}}
+    c.put("/screeners/mine/draft", json={"document": final, "draft_session_id": session})
+    rows = [r for r in sink.rows if r["draft_session_id"] == session]
+    asked = [(r["seq"], r["sentence"]) for r in rows if r["event"] == "draft_requested"]
+    assert asked == [(1, "price over $5"), (2, "and liquid")]
+    sent = json.loads(next(r for r in rows if r["seq"] == 2)["payload"])["current_criteria"]
+    assert sent["criteria"]["price"]["value"] == 12
+    saved = json.loads(rows[-1]["payload"])["saved_criteria"]["criteria"]
+    assert rows[-1]["event"] == "draft_saved" and saved["price"]["value"] == 15
+    later = c.post(
+        "/screeners/mine/draft-from-text",
+        json={"text": "another", "draft_session_id": session},
+    ).json()["draft_session_id"]
+    assert later != session  # saved: a later description is a new session

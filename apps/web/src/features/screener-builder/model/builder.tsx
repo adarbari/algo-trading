@@ -69,6 +69,13 @@ export interface ScreenerBuilder {
   setTieBreak: (field: string | null, order: 'asc' | 'desc') => void;
   /** Replace the working document with one drafted elsewhere (a sentence, ADR 0041): an unsaved edit. */
   loadDocument: (document: Readonly<Record<string, unknown>>) => void;
+  /**
+   * The Describe-it feedback session of this screen (ADR 0066): the id of the last draft the
+   * model returned, sent with the next sentence and with the save; null for a hand-built screen,
+   * and after the screen was finalised or another screener opened.
+   */
+  draftSessionId: string | null;
+  setDraftSessionId: (draftSessionId: string | null) => void;
   save: () => Promise<void>;
   discard: () => Promise<void>;
   saving: boolean;
@@ -114,6 +121,9 @@ function useSource(id: string) {
 export function ScreenerBuilderProvider({ id, children }: { id: string; children: ReactNode }) {
   const { detail, source, waiting, failed, hasDraft, asPreset } = useSource(id);
   const [edited, setEdited] = useState<ScreenDocument | null>(null);
+  // Keyed by screener, so opening another one starts without a session.
+  const [session, setSession] = useState<{ id: string; draftSessionId: string } | null>(null);
+  const draftSessionId = session?.id === id ? session.draftSessionId : null;
   const save = useSaveDraft(id);
   const discard = useDiscardDraft(id);
   const copy = useCopyOwnPreset(id);
@@ -145,7 +155,7 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   };
   const saved = async () => {
     await copying.current;
-    if (edited) await save.mutateAsync(edited);
+    if (edited) await save.mutateAsync({ document: edited, draftSessionId });
     setEdited(null);
   };
 
@@ -184,6 +194,10 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     },
     loadDocument: (next) => {
       edit(toDocument(next, id));
+    },
+    draftSessionId,
+    setDraftSessionId: (next) => {
+      setSession(next ? { id, draftSessionId: next } : null);
     },
     save: saved,
     discard: async () => {
