@@ -1,5 +1,6 @@
 """The edge verdict rule: one test per verdict and per boundary (ED8)."""
 
+from dataclasses import fields, replace
 from datetime import date
 
 from algotrade.config.edges.verdict import VerdictSettings
@@ -15,7 +16,10 @@ from algotrade.services.read.evaluation.verdict import (
     PROMISING,
     WAITING,
     WORKS,
+    BasisChoice,
+    Declared,
     EdgeVerdict,
+    choose_basis,
     judge,
     load_edge_verdict,
 )
@@ -173,11 +177,12 @@ def test_a_criterion_not_stored_never_passes() -> None:
     assert v.verdict == NOT_ENOUGH and "baseline" in v.rationale
 
 
-def test_the_best_candidate_is_the_verdict_and_names_its_screen() -> None:
+def test_the_candidate_best_in_sample_is_the_verdict_and_names_its_screen() -> None:
     rows = [
         *result(),
-        row(variant="other", kind="frozen", hit_rate=0.45),
+        row(variant="other", kind="frozen", hit_rate=0.90),  # better out of sample: not read
         row(variant="other", kind="all"),
+        row(variant="other", kind="in_sample", hit_rate=0.55),
     ]
     v = verdict(rows)
     assert v.verdict == PROMISING and v.basis == "scr, 20 trading days"
@@ -356,3 +361,123 @@ def test_columns_of_an_older_run_have_no_in_sample_figures_and_waiting_has_none(
     ins = verdict(rows).columns[0]
     assert ins.period == IN_SAMPLE and ins.win_rate is None and ins.trades is None
     assert verdict(None).columns == () and verdict(None).evidence is None
+
+
+# --- the basis is fixed before the frozen period is read (ADR 0065) ------------------------
+
+# every slice whose figures cover the frozen period
+OOS_KINDS = ("frozen", "split", "year", "year_part", "regime", "all")
+
+
+def grid(insample: dict[int, float], oos: dict[int, float], variant: str = "vrp") -> list[EdgeRow]:
+    """One screen at several horizons: in-sample and out-of-sample win rates against a 0.50 base
+    rate (lift points = (rate - 0.50) * 100), enough trades for a verdict, one baseline each."""
+    rows: list[EdgeRow] = []
+    for h in sorted(insample):
+        rows += [
+            row(variant, kind="in_sample", horizon_sessions=h, hit_rate=insample[h]),
+            row(variant, kind="frozen", horizon_sessions=h, hit_rate=oos[h]),
+            row(variant, kind="all", horizon_sessions=h, sessions=70),
+            row(variant, kind="year", horizon_sessions=h, slice_value="2026", hit_rate=oos[h]),
+            row(variant, kind="year_part", horizon_sessions=h, slice_value="2026:out_of_sample"),
+            row("b0", role="baseline", kind="frozen", horizon_sessions=h, lift=1.0),
+            row("b0", role="baseline", kind="in_sample", horizon_sessions=h, lift=1.0),
+        ]
+    return rows
+
+
+def test_vrp_rests_on_the_horizon_best_in_sample_not_the_best_out_of_sample() -> None:
+    # vrp_short_premium's run: in-sample +1.2 pts at 21 sessions, -1.5 at 15, -0.1 at 31; the
+    # 31-session horizon has the best out-of-sample figure and was the basis before ADR 0065.
+    rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
+    assert choose_basis(rows, T) == BasisChoice(("vrp", 21))
+    v = verdict(rows)
+    assert v.basis == "vrp, 21 trading days"
+    assert v.win_rate == 0.52  # every figure is the basis's, not the best out-of-sample one
+    assert {c.win_rate for c in v.columns if c.period == IN_SAMPLE} == {0.512}
+
+
+def _scrambled(r: EdgeRow, k: int) -> EdgeRow:
+    """``r`` with every figure changed (numbers scaled and shifted, None to a number, a number
+    to None every other ``k``): only the row's identity is kept."""
+    keep = {"edge_variant", "variant", "role", "horizon_sessions", "slice_kind", "slice_value"}
+    changes: dict[str, object] = {}
+    for f in fields(r):
+        value = getattr(r, f.name)
+        if f.name in keep or isinstance(value, (bool, str)):
+            continue
+        if isinstance(value, tuple):
+            changes[f.name] = tuple(-3.0 * k for _ in value) or (float(k),)
+        elif value is None:
+            changes[f.name] = 0.5 * k
+        else:
+            changes[f.name] = None if k % 2 else value * -5 + k
+    return replace(r, **changes)  # type: ignore[arg-type]
+
+
+def test_the_basis_is_invariant_to_any_change_of_the_out_of_sample_rows() -> None:
+    rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
+    rows += [
+        row("vrp", kind="regime", horizon_sessions=h, slice_value="calm") for h in (15, 21, 31)
+    ]
+    chosen = choose_basis(rows, T)
+    assert chosen == BasisChoice(("vrp", 21))
+    for k in range(1, 5):  # every figure of every row that reads the frozen period, pbo and DSR too
+        changed = [_scrambled(r, k) if r.slice_kind in OOS_KINDS else r for r in rows]
+        assert changed != rows
+        assert choose_basis(changed, T) == chosen
+    dropped = [r for r in rows if r.slice_kind not in OOS_KINDS or r.slice_kind == "all"]
+    assert choose_basis(dropped, T) == chosen
+    named_by_in_sample = [r for r in rows if r.slice_kind == "in_sample" or r.role == "baseline"]
+    assert choose_basis(named_by_in_sample, T) == chosen
+    assert verdict(named_by_in_sample).basis == "vrp, 21 trading days"  # waiting, same basis
+
+
+def test_a_model_screener_in_sample_fit_never_ranks_it_only_promoted_makes_it_the_basis() -> None:
+    rules = grid({21: 0.512}, {21: 0.52})
+    fitted = [  # the model's in-sample row is its training fit (in_sample=True): a huge lift
+        replace(r, in_sample=r.slice_kind == "in_sample")
+        for r in grid({21: 0.95}, {21: 0.90}, variant="model")
+        if r.role != "baseline"
+    ]
+    assert choose_basis([*rules, *fitted], T).key == ("vrp", 21)
+    assert choose_basis([*rules, *fitted], T, Declared(screener="model")).key == ("model", 21)
+    alone = choose_basis(fitted + [r for r in rules if r.role == "baseline"], T)
+    assert alone.key == ("model", 21)  # the only candidate: nothing is ranked
+
+
+def test_a_declared_horizon_and_screener_fix_the_basis_whatever_the_figures() -> None:
+    rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
+    assert choose_basis(rows, T, Declared(horizon=15)) == BasisChoice(("vrp", 15))
+    assert verdict(rows, declared=Declared(horizon=15)).basis == "vrp, 15 trading days"
+    two = [*rows, *grid({21: 0.70}, {21: 0.40}, variant="model")]
+    assert choose_basis(two, T).key == ("model", 21)  # in-sample best across screens
+    assert choose_basis(two, T, Declared(screener="vrp")).key == ("vrp", 21)
+    assert choose_basis(two, T, Declared("vrp", 31)).key == ("vrp", 31)
+
+
+def test_a_declared_basis_the_result_does_not_have_is_waiting_and_named() -> None:
+    rows = grid({21: 0.512}, {21: 0.52})
+    v = verdict(rows, declared=Declared("vrp", 31))
+    assert v.verdict == WAITING and "vrp, 31 trading days" in v.rationale
+
+
+def test_an_older_run_without_in_sample_rows_is_waiting_unless_one_candidate() -> None:
+    rows = [
+        r for r in grid({15: 0.485, 21: 0.512}, {15: 0.53, 21: 0.6}) if r.slice_kind != "in_sample"
+    ]
+    v = verdict(rows)
+    assert v.verdict == WAITING and "in-sample" in v.rationale and v.basis is None
+    single = [r for r in grid({21: 0.512}, {21: 0.6}) if r.slice_kind != "in_sample"]
+    assert verdict(single).basis == "vrp, 21 trading days"  # nothing to choose: no figure read
+    declared = verdict(rows, declared=Declared(horizon=21))
+    assert declared.basis == "vrp, 21 trading days" and declared.verdict != WAITING
+
+
+def test_the_in_sample_ranking_puts_a_hard_failure_below_a_candidate_without_one() -> None:
+    rows = grid({15: 0.60, 21: 0.55}, {15: 0.6, 21: 0.6})
+    rows = [
+        replace(r, decile_t=-1.0) if r.slice_kind == "in_sample" and r.horizon_sessions == 15 else r
+        for r in rows
+    ]
+    assert choose_basis(rows, T).key == ("vrp", 21)  # 15 has the bigger lift but fails in-sample t

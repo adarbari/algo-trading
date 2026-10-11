@@ -9,7 +9,7 @@ written before the schemas were typed (``string`` vs ``large_string``, all-null 
 """
 
 import io
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 
 import pandas as pd
 import pyarrow as pa
@@ -125,3 +125,21 @@ def parquet_bytes(data: pa.Table, row_group_size: int = ROW_GROUP_SIZE) -> bytes
 def to_frame(data: pa.Table) -> pd.DataFrame:
     frame: pd.DataFrame = data.to_pandas()
     return frame
+
+
+def row_groups_holding(parquet: pq.ParquetFile, column: str, values: Collection[str]) -> list[int]:
+    """The row groups of ``parquet`` whose ``column`` min / max statistics can hold one of
+    ``values`` (a group without statistics is kept): the others need not be decoded."""
+    meta = parquet.metadata
+    index = next(i for i in range(meta.num_columns) if meta.schema.column(i).path == column)
+    wanted = sorted(set(values))
+    chosen: list[int] = []
+    for group in range(meta.num_row_groups):
+        stats = meta.row_group(group).column(index).statistics
+        if (
+            stats is None
+            or not stats.has_min_max
+            or any(stats.min <= w <= stats.max for w in wanted)
+        ):
+            chosen.append(group)
+    return chosen

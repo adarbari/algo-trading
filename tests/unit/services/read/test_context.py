@@ -6,6 +6,7 @@ import sys
 import threading
 from datetime import UTC, date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -372,3 +373,15 @@ def test_the_session_is_resolved_again_when_a_nightly_record_is_saved() -> None:
     nightly(date(2026, 10, 2), RunStatus.COMPLETE)  # same publish state, a new record
     flipped = open_context(reader, MemoryConfigStore({}), USER, None, cache).session
     assert (flipped.date, flipped.newer) == (date(2026, 10, 2), None)
+
+
+def test_run_partition_reads_its_run_when_another_ties_on_knowledge_and_sorts_higher() -> None:
+    backend = MemoryBackend()
+    table = "rollups/instrument/a@v1"
+    for run, instrument in (("r1", "EQ:A"), ("r9", "EQ:B")):  # same knowledge_ts: r9 is latest
+        rows = stamped([{"instrument_id": instrument, "value": 1.0}], D2, run)
+        backend.tables.write(table, D2, run, rows)
+    ctx = SimpleNamespace(reader=StoreReader(backend))
+    record = RunRecord("r1", "job", D2, datetime(2026, 10, 2, tzinfo=UTC))
+    found = context.run_partition(ctx, table, record)  # type: ignore[arg-type]
+    assert found is not None and list(found["instrument_id"]) == ["EQ:A"]

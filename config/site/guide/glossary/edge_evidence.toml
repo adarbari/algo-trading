@@ -7,8 +7,8 @@ id = "verdict"
 term = "Verdict"
 short = "What the official result says about an edge: Works, Promising, Not working, Not enough data or Waiting on data."
 body = """
-One fixed rule judges the edge's official result, on its best screen and holding period (the
-page says which). Works: strong out-of-sample evidence on many trades. Promising: every
+One fixed rule judges the edge's official result, on one screen and holding period chosen before
+the out-of-sample figures are read (the basis; the page says which). Works: strong out-of-sample evidence on many trades. Promising: every
 Promising test passes, but not yet every Works test. Not working: enough trades, and a test
 fails clearly. Not enough data: too few out-of-sample trades, or a figure the rule needs is not
 measured. Waiting on data: no official result yet, or the run could not read an input. The
@@ -18,8 +18,25 @@ read a badge as an instruction to act.
 """
 see_also = [
   "verdict_works", "verdict_promising", "verdict_not_working", "verdict_not_enough_data",
-  "verdict_waiting_on_data", "verdict_criteria", "official_result", "edge_status",
+  "verdict_waiting_on_data", "verdict_criteria", "verdict_basis", "official_result", "edge_status",
 ]
+
+[[term]]
+id = "verdict_basis"
+term = "Verdict basis"
+short = "The one screen and holding period a verdict rests on, fixed before its out-of-sample figures are read."
+body = """
+An edge can be tested with several screens at several holding periods. The verdict judges one of
+them, the basis. The edge document can declare it; otherwise it is the one that ranks best on
+in-sample figures alone. The out-of-sample figures never take part in the choice. Why: pick the
+best of several out-of-sample results and you pick partly on luck, so the winner looks better
+than it will trade. Example: vrp_short_premium was tested at 15, 21 and 31 trading days. In
+sample, 21 days lifted the win rate by 1.2 points, 15 days by -1.5 and 31 days by -0.1. So the
+verdict rests on 21 days (+5.0 points out of sample), not on 31 days (+7.6 points out of sample,
+the best of three). Every figure on the page is the basis's. Don't compare the other holding
+periods' out-of-sample figures with the verdict's: they were not the test chosen in advance.
+"""
+see_also = ["verdict", "in_sample", "out_of_sample", "win_rate", "variants_tried"]
 
 [[term]]
 id = "official_result"
@@ -252,8 +269,9 @@ id = "verdict_waiting_on_data"
 term = "Verdict: Waiting on data"
 short = "There is no official result yet, or the run could not read an input it needs."
 body = """
-Shown when the edge has no official result, because nobody has run it at its out-of-sample start,
-or when the run lost inputs for its best variant. The reason line says which, and Backtests lists
+Shown when the edge has no official result, because nobody has run it at its out-of-sample start.
+Also shown when the run lost inputs for the verdict's basis, or when an older run has no in-sample
+figures to choose a basis on. The reason line says which, and Backtests lists
 what the run could not read. It is not bad news about the idea: nothing has been judged. If an
 input was lost, the reason names it, and a run made after the data is stored can read it. Don't
 read an edge in this state as failed.

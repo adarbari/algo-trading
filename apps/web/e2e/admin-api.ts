@@ -1,6 +1,6 @@
 /**
  * A mocked admin API for end-to-end tests: Playwright answers the Admin GraphQL reads
- * (`POST /api/graphql`: completeness, ingestionCell, quality, verification, nightlyRuns, run,
+ * (`POST /api/graphql`: completeness, ingestionCell, chainCoverage, quality, verification, nightlyRuns, run,
  * runItems, figiReview, leverageReview, llmUsage, harnessRuns, harnessRun) from fixture JSON shaped from real responses
  * (admin-ingestion.fixtures.json), keyed by the operation's Query field, or `field:<key>` for
  * a field read by key (`ingestionCell:<dataset>/<date>`, `run:<id>`, `runItems:<id>`). A field
@@ -82,7 +82,15 @@ export async function mockAdminApi(page: Page, overrides: AdminFixtures = {}): P
               data: null,
               errors: [{ message: 'store unavailable', extensions: { code: 'INTERNAL' } }],
             }
-          : { data: { [field]: answer ?? null } },
+          : {
+              data: {
+                [field]: answer ?? null,
+                // The grid's read carries the chain coverage (one request per page load).
+                ...(field === 'completeness' && /chainCoverage/.test(operation.query ?? '')
+                  ? { chainCoverage: answers['chainCoverage'] ?? null }
+                  : {}),
+              },
+            },
     });
   });
 }

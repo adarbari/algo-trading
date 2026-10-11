@@ -111,6 +111,10 @@ class Edge:
     replaces: str | None = None
     oos_hidden: bool = False
     settings: EdgeSettings | None = None
+    # The basis the document fixes for the verdict (ADR 0065): ``[implementation]`` promoted
+    # and horizon (None: not declared; a user's edge never declares one).
+    promoted: str | None = None
+    basis_horizon: int | None = None
     # Interim, until the surfaces speak status (ADR 0053 amendment 2026-10-10): the old state
     # words the GraphQL type still serves, derived (``following`` when bookmarked, else
     # ``researching``; ``since`` the bookmark's; ``state_reason`` the status's).
@@ -230,6 +234,8 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         replaces=e.audit.replaces,
         oos_hidden=mine and not e.audit.oos_revealed,
         settings=_settings(e, own if mine else None),
+        promoted=e.promoted,
+        basis_horizon=e.basis_horizon,
     )
 
 

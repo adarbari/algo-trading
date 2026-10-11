@@ -222,6 +222,23 @@ def _coverage_rows(report: Report) -> list[list[str]]:
     return rows
 
 
+def _chain_rows(report: Report) -> list[list[str]]:
+    """One row per session: coverage, status counts, fetch tiers, chronic stale names."""
+    return [
+        [
+            c.session,
+            f"{c.share:.1%} ({c.ok:,}/{c.total:,})",
+            _pairs(c.statuses),
+            _pairs(c.tiers),
+            f"{c.chronic:,}" + (f": {', '.join(c.chronic_top)}" if c.chronic_top else ""),
+        ]
+        for c in report.chains
+    ]
+
+
+CHAINS_HEAD = ["Session", "Coverage (OK / optionable)", "By status", "Fetch tiers", "Chronic stale"]
+
+
 def _lines(texts: Iterable[str]) -> str:
     return "\n".join(texts)
 
@@ -264,6 +281,9 @@ def render_text(report: Report) -> str:
     if report.coverage:
         out += ["", "COVERAGE (share of the applicable names with a value; change vs previous)", ""]
         out += _table(COVERAGE_HEAD, _coverage_rows(report))
+    if report.chains:
+        out += ["", "OPTION CHAIN COVERAGE (chronic: STALE_DATA in 3 of the last 5 sessions)", ""]
+        out += _table(CHAINS_HEAD, _chain_rows(report))
     if report.verification:
         out += ["", "VERIFICATION VS IBKR", ""]
         for v in report.verification:
@@ -412,6 +432,8 @@ def render_html(report: Report) -> str:
             h2.format("Coverage"),
             _html_table(COVERAGE_HEAD, _coverage_rows(report)),
         ]
+    if report.chains:
+        parts += [h2.format("Option chain coverage"), _html_table(CHAINS_HEAD, _chain_rows(report))]
     if report.verification:
         rows = [
             [v.session, v.status, _verification_summary(v).split(": ", 1)[-1], _lines(v.examples)]

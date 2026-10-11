@@ -121,6 +121,39 @@ type CellDetail {
   runs: [RunDetail!]!
 }
 
+"""
+Option-chain coverage of the session: `ok` of `total` optionable underlyings fetched OK (`share`), by status and tier; `chronic` the names stale in 3 of the last 5 sessions (`chronicNames` the most persistent); `medianShare` the median share of the five sessions before and `previousChronic` the count the session before (null: not enough history); `drift` what moved beyond the warning limits
+"""
+type ChainCoverage {
+  session: Date!
+  total: Int!
+  ok: Int!
+  share: Float!
+  statuses: [ChainStatusCount!]!
+  tiers: [ChainTier!]!
+  chronic: Int!
+  chronicNames: [String!]!
+  medianShare: Float
+  previousChronic: Int
+  drift: [String!]!
+}
+
+"""A chain status code and how many underlyings had it"""
+type ChainStatusCount {
+  code: String!
+  count: Int!
+}
+
+"""
+The chains of one tier (`core` or `rest`) of the session: fetched OK and stale
+"""
+type ChainTier {
+  tier: String!
+  total: Int!
+  ok: Int!
+  stale: Int!
+}
+
 """How many tickers of a run are `new` or `dropped`"""
 type ChangeCount {
   change: String!
@@ -1921,6 +1954,16 @@ type Query {
   One completeness cell, `dataset` on the session `date`, with the reasons behind it; null: a dataset the grid does not list
   """
   ingestionCell(dataset: String!, date: Date!): CellDetail
+
+  """
+  Option-chain coverage of the session (OK share of the optionable underlyings, by status and tier, the chronically stale names, drift); null: the session has no chains run
+  """
+  chainCoverage(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): ChainCoverage
 
   """
   Listings marked for FIGI review (the universe build's list on or before the session, else its reference snapshot); null: nothing stored
