@@ -85,7 +85,15 @@ class Scripted:
     def names_for(self, user: str | None) -> tuple[str, ...]:
         return self.names
 
-    def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Completion:
         step = self.script[min(self.n, len(self.script) - 1)]
         self.n += 1
         if isinstance(step, Exception):
