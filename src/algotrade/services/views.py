@@ -9,7 +9,7 @@ from algotrade.core.views.feature_view import FeatureValue, FeatureView
 from algotrade.data import StoreReader
 from algotrade.services.features import read_expressions
 from algotrade.services.read.values import to_scalar as to_value
-from algotrade.storage.tables.schemas import COMMON
+from algotrade.storage.tables.spec import COMMON
 
 __all__ = ["feature_view", "to_value"]
 

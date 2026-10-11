@@ -16,7 +16,7 @@ from algotrade.services.evaluation.forward.results import MISSED, paper_owners, 
 from algotrade.services.evaluation.forward.settle import outcome_hash
 from algotrade.services.evaluation.forward.signals import advance
 from algotrade.storage.configs.files import MemoryConfigStore
-from algotrade.storage.tables.schemas import EDGE_PAPER
+from algotrade.storage.tables.edge_schemas import EDGE_PAPER
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,

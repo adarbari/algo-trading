@@ -11,7 +11,8 @@ from pathlib import Path
 import pytest
 
 from algotrade.data.resolver import SymbolResolver
-from algotrade.storage.tables.schemas import COMMON, KNOWN_FROM, spec_for, validate_frame
+from algotrade.storage.tables.schemas import KNOWN_FROM, spec_for, validate_frame
+from algotrade.storage.tables.spec import COMMON
 from algotrade_ingestion.tasks.framework.run import stamp
 from algotrade_sources.fixtures.files import GoldenFiles
 from algotrade_sources.fixtures.source import GoldenCsvSource

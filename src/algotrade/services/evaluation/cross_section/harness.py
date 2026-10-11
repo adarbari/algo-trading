@@ -58,6 +58,12 @@ from algotrade.data.outcomes import (
     stored_sessions,
 )
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.detail.windows import (
+    SeriesFacts,
+    plan_exits,
+    projection_count,
+    series_facts,
+)
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.historical import (
     HistoricalCaveat,
@@ -132,7 +138,7 @@ RUN_INPUTS = (
 BOOKKEEPING = (
     "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
     "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
-    "audit", "owner",
+    "audit", "owner", "published",
 )  # fmt: skip
 # The one fixed implied-vol field of a run is never a field mixing sources by name or by rule.
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
@@ -152,6 +158,7 @@ class VariantResult:
     licence: str | None = None  # that field's catalogue licence
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
     report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
+    series: SeriesFacts | None = None  # the windows of ``stats``, the unit, the projection (0064)
 
 
 @dataclass(frozen=True)
@@ -372,6 +379,9 @@ def evaluate_edge(
                 horizon,
                 reports,
             )
+        kept, exits = plan_exits(
+            scope.edge, plan.blocks, closed, horizon, start, projection_count(load_verdict(configs))
+        )  # the blocks with a closed leg (measured) and the projected exits (ADR 0064)
         for variant in variants:
             legs = stats.randoms.get((plan.key, variant.id), {})
             pooled = [
@@ -392,8 +402,7 @@ def evaluate_edge(
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
-                for block in plan.blocks
-                if any(leg.entry in closed for leg in block)
+                for block in kept
             )
             measures = tuple(
                 slice_measures(
@@ -415,6 +424,16 @@ def evaluate_edge(
                     iv_source=scope.iv_field if needs_iv else None,
                     licence=licences[scope.key],
                     report_containment=diagnostic,
+                    series=series_facts(
+                        scope.edge,
+                        kept,
+                        closed,
+                        horizon,
+                        block_stats,
+                        stats.lost.get((plan.key, variant.id), {}),
+                        split,
+                        exits,
+                    ),
                     lost_sessions=dict(
                         Counter(stats.lost.get((plan.key, variant.id), {}).values())
                     ),

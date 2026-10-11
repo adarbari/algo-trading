@@ -75,3 +75,14 @@ url = "https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Mo
 [[sources]]
 title = "Quantpedia, Momentum Factor Effect in Stocks (strategy page)"
 url = "https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/"
+
+# The literature's figure (ADR 0064): Jegadeesh and Titman's winners minus losers, percent a
+# month, equal-weighted deciles of NYSE and AMEX stocks, 1965-1989, before costs (Table I,
+# Panel A). It is their 12-month formation and 3-month hold with no skip month; this edge is 12-1
+# held one month, so read the bars as the size to expect, not as a like-for-like comparison.
+[published]
+measure = "decile_spread"
+value = 0.0131
+horizon_sessions = 20
+sample = 25
+source = 0

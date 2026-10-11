@@ -7,8 +7,8 @@ import pandas as pd
 
 from algotrade.data.paper import PAPER_COLUMNS, read_paper, read_stored
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.edge_schemas import EDGE_PAPER
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import EDGE_PAPER
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
 

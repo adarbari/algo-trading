@@ -61,6 +61,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Screeners:** `momentum_12_1`
 - **Baselines:** none yet
 - **Frozen period:** from 2026-04-01
+- **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
 - **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
 
 **Quality bar**
@@ -261,6 +262,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Top K:** all qualified names
 - **Screeners:** none yet
 - **Baselines:** none yet
+- **Published:** mean excess 5.00% over 20 sessions (Chang, Y.-C., Hong, H. and Liskovich, I., Regression Discontinuity and the Price Effects of Stock Market Indexing, Review of Financial Studies, 2015, 17 years)
 - **Notes:** The schedule is a placeholder: index_change is the S&P 500 only; ED6 adds a Russell membership source and its event class.
 
 **Quality bar**

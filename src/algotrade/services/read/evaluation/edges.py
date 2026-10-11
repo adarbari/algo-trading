@@ -33,6 +33,20 @@ class EdgeSource:
 
 
 @dataclass(frozen=True)
+class EdgePublished:
+    """The figure the literature reports for the edge (``[published]``): ``measure``
+    (``mean_excess``, ``decile_spread`` or ``lift_pts``) equal to ``value`` over
+    ``horizon_sessions``, from ``source`` (title and link), over ``sample`` years (None: not
+    stated)."""
+
+    measure: str
+    value: float
+    horizon_sessions: int
+    source: EdgeSource
+    sample: int | None = None
+
+
+@dataclass(frozen=True)
 class EdgeDefinition:
     """The parts of "how the edge is defined", as sentences (the browser words nothing):
     picks (when it fires, how many), trade (entry, holding periods, costs, what a win is),
@@ -100,6 +114,7 @@ class Edge:
     rejection_reason: str
     sources: tuple[EdgeSource, ...]
     definition: EdgeDefinition
+    published: EdgePublished | None = None
     followed: bool = False
     followed_since: date | None = None
     status_since: date | None = None
@@ -220,6 +235,7 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         rejection_reason=e.rejection_reason,
         sources=tuple(EdgeSource(x.title, x.url) for x in e.sources),
         definition=EdgeDefinition(_picks(e), _trade(e.outcome), _compare(e), _test(e)),
+        published=_published(e),
         state="following" if e.followed else "researching",
         since=e.follow.since,
         state_reason=e.audit.status_reason,
@@ -236,6 +252,16 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         settings=_settings(e, own if mine else None),
         promoted=e.promoted,
         basis_horizon=e.basis_horizon,
+    )
+
+
+def _published(e: document.Edge) -> EdgePublished | None:
+    p = e.published
+    if p is None:
+        return None
+    src = e.sources[p.source]
+    return EdgePublished(
+        p.measure, p.value, p.horizon_sessions, EdgeSource(src.title, src.url), p.sample
     )
 
 

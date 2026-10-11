@@ -28,7 +28,7 @@ from algotrade.data.reference import IBKR_CONTRACTS, UNIVERSE_TABLE, snapshot
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.storage.runs import RunRecord, RunStatus, done_sessions
-from algotrade.storage.tables.schemas import SCHEMA_VERSION
+from algotrade.storage.tables.spec import SCHEMA_VERSION
 
 BARS = "bars/1d"
 NIGHTLY = "nightly"  # the job name of the nightly workflow's per-session run records

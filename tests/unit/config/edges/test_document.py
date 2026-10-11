@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import QUALITY_BAR, STATUSES, Edge, parse_edge
+from algotrade.config.edges.document import QUALITY_BAR, STATUSES, Edge, Published, parse_edge
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
@@ -419,3 +419,51 @@ def test_edge_lifecycle_has_one_vocabulary() -> None:
     assert set(BOOKMARK_LABELS) <= set(AUDIT_LABELS)
     assert not set(STATUSES) & set(AUDIT_LABELS)
     assert not {"following", "trial", "followed"} & set(STATUSES)
+
+
+def test_the_published_table_is_optional_typed_and_checked_against_the_document() -> None:
+    assert parse().published is None
+    found = parse(
+        outcome={
+            "kind": "excess_return",
+            "horizon_sessions": [20, 60],
+            "benchmark": "SPY",
+            "start_offset_sessions": 1,
+        },
+        sources=[{"title": "A"}, {"title": "B"}],
+        published={
+            "measure": "decile_spread",
+            "value": 0.0131,
+            "horizon_sessions": 60,
+            "source": 1,
+            "sample": 25,
+        },
+    ).published
+    assert found == Published("decile_spread", 0.0131, 60, 1, 25)
+    no_sample = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
+    assert parse(published=no_sample).published == Published("lift_pts", 4.0, 20, 0, None)
+
+
+@pytest.mark.parametrize(
+    ("published", "match"),
+    [
+        ({"measure": "sharpe", "value": 1, "horizon_sessions": 20, "source": 0}, "measure"),
+        ({"value": 1, "horizon_sessions": 20, "source": 0}, "measure: required"),
+        ({"measure": "lift_pts", "horizon_sessions": 20, "source": 0}, "value: required"),
+        ({"measure": "lift_pts", "value": 1, "source": 0}, "horizon_sessions: required"),
+        ({"measure": "lift_pts", "value": 1, "horizon_sessions": 20}, "source: required"),
+        ({"measure": "lift_pts", "value": 1, "horizon_sessions": 7, "source": 0}, "not one of"),
+        ({"measure": "lift_pts", "value": 1, "horizon_sessions": 20, "source": 9}, "not an index"),
+        (
+            {"measure": "lift_pts", "value": 1, "horizon_sessions": 20, "source": 0, "sample": 0},
+            "sample",
+        ),
+        (
+            {"measure": "lift_pts", "value": 1, "horizon_sessions": 20, "source": 0, "x": 1},
+            "unknown keys",
+        ),
+    ],
+)
+def test_a_published_table_fails_closed(published: dict[str, Any], match: str) -> None:
+    with pytest.raises(ConfigurationError, match=match):
+        parse(published=published)

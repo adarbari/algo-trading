@@ -121,6 +121,45 @@ const EdgesPage = graphql(`
             status
             level
           }
+          outlook {
+            criterion
+            level
+            sentence
+            have
+            needed
+            remaining
+            projectionState
+          }
+        }
+        haircut {
+          sharpe
+          haircutSharpe
+          cut
+          trials
+          sessions
+          method
+          summary
+        }
+        decay {
+          measure
+          unit
+          basisHorizon
+          published {
+            measure
+            value
+            horizonSessions
+            source {
+              title
+              url
+            }
+            sample
+          }
+          bars {
+            period
+            value
+            n
+            state
+          }
         }
       }
       canonicalRun {
