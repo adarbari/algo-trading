@@ -40,6 +40,7 @@ from algotrade.core.model.errors import ConfigurationError, ModelUnavailableErro
 from algotrade.services.authoring.scope import ConfigWriter, author, open_writer
 from algotrade.services.explaining.cache import TextCache
 from algotrade.services.explaining.limits import RateLimiter
+from algotrade.services.feedback.events import FeedbackSink
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.edges import OnDemandEdges
 from algotrade.services.ondemand.screens import OnDemandScreens
@@ -58,6 +59,7 @@ from algotrade.services.read.context import (
 from algotrade.services.text_model.model import TextModel
 from algotrade_api.auth.mode import AuthConfig
 from algotrade_api.auth.protocol import Authenticator, ForbiddenError, UnauthenticatedError
+from algotrade_api.feedback import DraftMemory
 
 DEV_ORIGINS = (
     "http://localhost:5173",  # the web app's dev server (Vite)
@@ -297,6 +299,21 @@ def get_text_model(request: Request) -> TextModel:
 
 
 TextModelDep = Annotated[TextModel, Depends(get_text_model)]
+
+
+def get_feedback(request: Request) -> FeedbackSink:
+    """Where the Describe-it feedback events go (``create_app`` set it up, ADR 0066; a sink
+    that records nothing in tests and the OpenAPI export)."""
+    return cast(FeedbackSink, request.app.state.feedback)
+
+
+def get_drafts(request: Request) -> DraftMemory:
+    """The drafts the model returned, remembered for the save that follows (ADR 0066)."""
+    return cast(DraftMemory, request.app.state.drafts)
+
+
+Feedback = Annotated[FeedbackSink, Depends(get_feedback)]
+Drafts = Annotated[DraftMemory, Depends(get_drafts)]
 
 
 def get_explain_cache(request: Request) -> TextCache:

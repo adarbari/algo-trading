@@ -28,3 +28,8 @@ class ScreenDraft(Schema):
     document: dict[str, Any] = Field(description="the draft for the Builder (never saved here)")
     dropped: list[DroppedCriterion] = Field(description="proposed criteria the draft does not keep")
     notes: list[str] = Field(description="what the model could not map or assumed")
+    draft_session_id: str | None = Field(
+        None,
+        description="ties this draft to the screen later saved from it (ADR 0066); send it back "
+        "with the save; null when feedback is not recorded",
+    )

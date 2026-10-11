@@ -55,10 +55,25 @@ class Down:
         raise ModelUnavailableError("llama at http://localhost:11434/v1: HTTP 429 slow down")
 
 
-def app_with(store: ReadStore, model: Any) -> TestClient:
+class Keep:
+    """A feedback sink that keeps the rows (ADR 0066)."""
+
+    def __init__(self) -> None:
+        self.rows: list[dict[str, Any]] = []
+
+    def submit(self, row: Any) -> bool:
+        self.rows.append(dict(row))
+        return True
+
+
+def app_with(store: ReadStore, model: Any, sink: Any = None) -> TestClient:
     return TestClient(
         create_app(
-            ApiSettings("memory://", "config"), store, text_model=model, authenticator=as_user()
+            ApiSettings("memory://", "config"),
+            store,
+            text_model=model,
+            authenticator=as_user(),
+            feedback=sink,
         )
     )
 
@@ -122,3 +137,33 @@ def test_a_model_that_cannot_answer_is_a_503(
         "/screeners/s/draft-from-text", json={"text": "stocks over $5"}
     )
     assert response.status_code == 503 and "HTTP 429" in response.json()["detail"]
+
+
+def test_a_draft_returns_a_session_id_and_records_its_two_events(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    client = app_with(api_golden[0], Canned(ANSWER), sink)
+    body = client.post("/screeners/my_screen/draft-from-text", json={"text": "over $5"}).json()
+    session = body["draft_session_id"]
+    assert session and [r["event"] for r in sink.rows] == ["draft_requested", "draft_returned"]
+    assert {r["draft_session_id"] for r in sink.rows} == {session}
+    returned = sink.rows[1]
+    assert returned["sentence"] == "over $5" and returned["doc_id"] == "my_screen"
+    assert returned["draft_hash"] and returned["catalogue_version"] and returned["prompt_version"]
+    assert '"dropped":[{"field":"rollup.nope@v1.iv_rank","id":"iv_rank"}]' in returned["payload"]
+
+
+def test_a_draft_that_fails_leaves_only_its_request(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    client = app_with(api_golden[0], Down(), sink)
+    assert client.post("/screeners/s/draft-from-text", json={"text": "x"}).status_code == 503
+    assert [r["event"] for r in sink.rows] == ["draft_requested"]
+
+
+def test_an_app_without_feedback_still_drafts(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    client = app_with(api_golden[0], Canned(ANSWER))  # no sink: the default records nothing
+    body = client.post("/screeners/s/draft-from-text", json={"text": "over $5"}).json()
+    assert body["draft_session_id"]
