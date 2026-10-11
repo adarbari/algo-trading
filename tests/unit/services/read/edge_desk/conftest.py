@@ -22,6 +22,8 @@ FOLLOWED = date(2026, 9, 1)
 SESSION = date(2026, 10, 5)  # a Monday; the next session is Oct 6
 NEXT = date(2026, 10, 6)
 KNOWN = datetime(2026, 10, 3, tzinfo=UTC)
+CUTOFF = datetime(2026, 10, 5, 22, tzinfo=UTC)  # when the session's nightly first completed
+NO_CUTOFF = None  # a session whose nightly has not completed
 FOLLOW = {"state": "following", "since": FOLLOWED}
 
 
@@ -72,12 +74,13 @@ def context(
     day: date = SESSION,
     follow: dict[str, Any] | None = FOLLOW,
     extra: dict[tuple[str, str, str], dict[str, Any]] | None = None,
+    cutoff: datetime | None = CUTOFF,
 ) -> ReadContext:
     docs = dict(DOCS) | (extra or {})
     if follow is not None:
         docs[("me", "edges", "drift")] = {"follow": follow}
     stores = open_stores(StoreReader(backend), MemoryConfigStore(docs), UserContext("me"))
-    session = Session(day, None, True, None, None, False, (), ())
+    session = Session(day, None, True, None, None, False, (), (), cutoff=cutoff)
     return ReadContext(
         stores.reader, stores.configs, stores.user, session, stores.features, stores.cache
     )

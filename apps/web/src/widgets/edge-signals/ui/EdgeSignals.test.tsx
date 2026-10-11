@@ -6,14 +6,18 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { EdgeSignals } from './EdgeSignals';
 
-const hooks = vi.hoisted(() => ({ useEdgeDesk: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useEdgeDesk: vi.fn(), useEdgeLiveStates: vi.fn() }));
 vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEdgeDesk: hooks.useEdgeDesk,
+  useEdgeLiveStates: hooks.useEdgeLiveStates,
 }));
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text> };
+  return {
+    GuideHelp: ({ entry }: { entry: { id: string } }) => <Text>{`help ${entry.id}`}</Text>,
+    termHelp: (id: string) => <Text>{`help ${id}`}</Text>,
+  };
 });
 
 stubElementSize();
@@ -47,6 +51,8 @@ const DESK = {
 
 beforeEach(() => {
   hooks.useEdgeDesk.mockReset();
+  hooks.useEdgeLiveStates.mockReset();
+  hooks.useEdgeLiveStates.mockReturnValue(fakeQuery([]));
 });
 
 const handlers = () => ({ onOpen: vi.fn(), onOpenEdge: vi.fn(), onOpenEdges: vi.fn() });
@@ -108,5 +114,40 @@ describe('EdgeSignals', () => {
     render(<EdgeSignals {...handlers()} />);
     expect(screen.getByText('Nothing to buy next session')).toBeVisible();
     expect(screen.getByText('Nothing to sell next session')).toBeVisible();
+  });
+
+  it('warns for every edge below its usual range, followed or the site, with its sentence', async () => {
+    const states = [
+      { edgeId: 'drift', name: 'Drift', state: 'below', closed: 20, winRate: 0.2, followed: true },
+      {
+        edgeId: 'site2',
+        name: 'Site two',
+        state: 'below',
+        closed: 30,
+        winRate: 0.3,
+        followed: false,
+      },
+      { edgeId: 'ok', name: 'Fine', state: 'on_track', closed: 20, winRate: 0.6, followed: true },
+    ].map((s) => ({ ...s, headline: `${s.name}: 4 of 20 closed trades won.` }));
+    hooks.useEdgeLiveStates.mockReturnValue(fakeQuery(states));
+    hooks.useEdgeDesk.mockReturnValue(fakeQuery({ ...DESK, buys: [], sells: [], followed: [] }));
+    const h = handlers();
+    const { container } = render(<EdgeSignals {...h} />);
+    expect(screen.getByText('Drift: below range')).toBeVisible();
+    expect(screen.getByText('Site two: below range')).toBeVisible();
+    expect(screen.getByText('Drift: 4 of 20 closed trades won.')).toBeVisible();
+    expect(screen.queryByText(/Fine: below/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('help live_state')).toHaveLength(2);
+    await userEvent
+      .setup()
+      .click(screen.getAllByRole('button', { name: 'Open edge' }).at(1) as HTMLElement);
+    expect(h.onOpenEdge).toHaveBeenCalledWith('site2');
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows no banner while every edge is on track', () => {
+    hooks.useEdgeDesk.mockReturnValue(fakeQuery(DESK));
+    render(<EdgeSignals {...handlers()} />);
+    expect(screen.queryByRole('button', { name: 'Open edge' })).not.toBeInTheDocument();
   });
 });

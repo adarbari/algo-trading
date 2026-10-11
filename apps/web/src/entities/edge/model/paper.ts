@@ -38,6 +38,7 @@ export interface Desk {
   buys: DeskTrade[];
   sells: DeskTrade[];
   followed: FollowedEdge[];
+  liveStates: LiveState[];
 }
 
 export interface PaperRecord {
@@ -84,13 +85,25 @@ export interface EdgePaper {
   forward: ForwardTest | null;
 }
 
+/** One edge's live state for the session (`EdgeDesk.liveStates`): the live record's state, its settled trades and the server's sentence. */
+export interface LiveState {
+  edgeId: string;
+  name: string;
+  state: string;
+  closed: number;
+  winRate: number | null;
+  headline: string;
+  followed: boolean;
+}
+
 const RECORD_LABELS: Record<string, string> = {
   on_track: 'On track',
-  below: 'Below the usual range',
-  above: 'Above the usual range',
-  too_early: 'Too early to judge',
+  below: 'Below range',
+  above: 'Above range',
+  too_early: 'Too few settled trades',
   no_backtest: 'No backtest to compare',
-  no_trades: 'No trades yet',
+  no_trades: 'No live record',
+  not_settled: 'Not yet settled',
 };
 
 const RECORD_TONES: Record<string, StatusTone> = {
@@ -100,6 +113,7 @@ const RECORD_TONES: Record<string, StatusTone> = {
   too_early: 'neutral',
   no_backtest: 'neutral',
   no_trades: 'neutral',
+  not_settled: 'neutral',
 };
 
 export const recordLabel = (state: string): string => RECORD_LABELS[state] ?? state;

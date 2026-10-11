@@ -7,11 +7,16 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { EdgeList } from './EdgeList';
 
-const hooks = vi.hoisted(() => ({ useEdges: vi.fn(), useEdgeProblems: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  useEdges: vi.fn(),
+  useEdgeProblems: vi.fn(),
+  useEdgeLiveStates: vi.fn(),
+}));
 vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEdges: hooks.useEdges,
   useEdgeProblems: hooks.useEdgeProblems,
+  useEdgeLiveStates: hooks.useEdgeLiveStates,
 }));
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
@@ -26,6 +31,19 @@ stubElementSize();
 beforeEach(() => {
   hooks.useEdges.mockReturnValue(fakeQuery(EDGES_FIXTURE.edges));
   hooks.useEdgeProblems.mockReturnValue(fakeQuery(EDGES_FIXTURE.edgeProblems));
+  hooks.useEdgeLiveStates.mockReturnValue(
+    fakeQuery([
+      {
+        edgeId: 'earnings_drift',
+        name: 'Earnings drift',
+        state: 'below',
+        closed: 20,
+        winRate: 0.2,
+        headline: '4 of 20 closed trades won.',
+        followed: false,
+      },
+    ]),
+  );
 });
 
 describe('EdgeList', () => {
@@ -43,11 +61,14 @@ describe('EdgeList', () => {
     expect(within(momentum).getByText('Candidate')).toBeInTheDocument();
     const drift = within(table).getByRole('row', { name: /Earnings drift/ });
     expect(within(drift).getByText('screens: pead, pead_volume · site edge')).toBeInTheDocument();
+    expect(within(drift).getByText('Below range')).toBeInTheDocument(); // its live state
+    expect(within(momentum).queryByText('Below range')).not.toBeInTheDocument(); // none recorded
     const waiting = within(table).getByRole('row', { name: /S&P 500 index changes/ });
     expect(within(waiting).getByText('no screen yet · site edge')).toBeInTheDocument();
     expect(within(waiting).getByText('Rejected')).toBeInTheDocument();
     for (const id of [
       'verdict',
+      'live_state',
       'edge_state',
       'trades',
       'out_of_sample',

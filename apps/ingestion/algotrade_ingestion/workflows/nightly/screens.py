@@ -15,9 +15,11 @@ expressions).
 The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the owner's tonight picks of
 its evidenced or live edges (a follower's bookmark trades nothing) and settles the open paper
 trades whose outcome is stored
-(``services/evaluation/forward``). It needs ``screens`` (settlement leaves a trade open when its
-outcome is not stored) and is not critical: a failed job is a warning naming the user, never a
-hold on the session or a later one.
+(``services/evaluation/forward``). When an edge the owner records is below its usual range (the
+read model's live state, ADR 0064 decision 9) the step adds one WARN line naming it and keeps the
+names in its result: nothing is pushed or sent. It needs ``screens`` (settlement leaves a trade
+open when its outcome is not stored) and is not critical: a failed job is a warning naming the
+user, never a hold on the session or a later one.
 
 The ``edge-eval`` step (``edge_eval_jobs``) runs one ``edge-eval`` job per open edge (not
 rejected or blocked, with screeners or baselines) as the edge's owner over the stored outcome
@@ -28,24 +30,30 @@ that week yet). It needs ``outcomes`` and ``screens`` and is not critical: a job
 COMPLETE fails the step, a warning naming the edge, never a hold on the session or a later one.
 """
 
+import logging
 from collections.abc import Callable
 from contextlib import nullcontext
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
 from algotrade.config.edges.document import CLOSED, Edge, job_name
 from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.user import UserContext
+from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.services.configs import nightly_screeners
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.forward.results import paper_owners
 from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
 from algotrade.services.jobs.exclusive import EdgeEvalBusyError, claim_edge_eval
+from algotrade.services.read.context import open_context
+from algotrade.services.read.edge_desk.states import below_range
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.interfaces import Backend
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
+
+LOG = logging.getLogger(__name__)
 
 type ScreenStep = Callable[[date], Outcome]
 
@@ -95,11 +103,26 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
     return run
 
 
+def _below_range(
+    reader: StoreReader, configs: ConfigStore, owner: UserContext, session: date
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    """The edges ``owner`` records that are below their usual range on ``session`` (the read
+    model's live state) and the WARN checks of a state that could not be read: logged and
+    recorded on the run record, never swallowed and never a reason to fail the step."""
+    try:
+        found = below_range(open_context(reader, configs, owner, session), datetime.now(UTC))
+    except AlgoTradeError as error:
+        LOG.warning("live state of %s on %s not read: %s", owner.user_id, session, error)
+        detail = f"live state of {owner.user_id} not read: {error}"
+        return [], [{"name": "edge_live_state", "status": "WARN", "detail": detail}]
+    return [{"user": owner.user_id, "edge": s.edge_id, "headline": s.headline} for s in found], []
+
+
 def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> ScreenStep:
     """The edge-signals step (a job per record owner), submitting through ``jobs``."""
 
     def run(session: date) -> Outcome:
-        summaries, short = [], []
+        summaries, short, below, warnings = [], [], [], []
         for user in paper_owners(reader, configs, session):
             job = jobs.run("edge-signals", {"session": session.isoformat()}, user, force=True)
             summaries.append(
@@ -109,12 +132,20 @@ def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> S
             )
             if job.status is not JobStatus.COMPLETE:
                 short.append(f"{user.user_id} {job.status.value}")
-        result = {"signals": summaries}
+            elif reader is not None:
+                lines, failed = _below_range(reader, configs, user, session)
+                below += lines
+                warnings += failed
+        result: dict[str, Any] = {"signals": summaries}
+        if below:
+            result["below_range"] = below
+            named = ", ".join(sorted({b["edge"] for b in below}))
+            detail = f"below the usual range: {named}"
+            warnings.append({"name": "edge_below_range", "status": "WARN", "detail": detail})
         if short:
-            return Outcome(
-                StepStatus.FAILED, result, f"edge signals not complete: {', '.join(short)}"
-            )
-        return Outcome(StepStatus.SUCCEEDED, result, None)
+            reason = f"edge signals not complete: {', '.join(short)}"
+            return Outcome(StepStatus.FAILED, result, reason, warnings)
+        return Outcome(StepStatus.SUCCEEDED, result, None, warnings)
 
     return run
 

@@ -24,6 +24,7 @@ from algotrade.services.read.edge_desk.paper import (
     record_owner,
     with_instruments,
 )
+from algotrade.services.read.edge_desk.states import LiveState, live_edges, load_live_states
 from algotrade.services.read.evaluation.edges import load_edges
 from algotrade.storage.runs import RunStatus
 
@@ -92,6 +93,7 @@ class EdgeDesk:
     buys: tuple[PaperTrade, ...]
     sells: tuple[PaperTrade, ...]
     followed: tuple[FollowedEdge, ...]
+    live_states: tuple[LiveState, ...] = ()
 
 
 def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
@@ -100,10 +102,15 @@ def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
     edges = {e.id: e for e in load_edges(ctx)}
     followed = [e for e in edges.values() if e.paper_traded]
     nxt = next_session(day)
-    if not followed:
+    judged = live_edges(edges)
+    if not judged:
         return EdgeDesk(day, nxt, (), (), ())
+    all_trades = load_trades(ctx, judged)
+    states = load_live_states(ctx, judged, all_trades)
+    if not followed:
+        return EdgeDesk(day, nxt, (), (), (), states)
     on_desk = {e.id for e in followed}
-    trades = tuple(t for t in load_trades(ctx, edges) if t.edge_id in on_desk)
+    trades = tuple(t for t in all_trades if t.edge_id in on_desk)
     settings = load_verdict(ctx.configs)
     buys = with_instruments(ctx, tuple(t for t in trades if t.signal_session == day))
     sells = with_instruments(
@@ -120,4 +127,4 @@ def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
         )
         for e in followed
     )  # fmt: skip
-    return EdgeDesk(day, nxt, buys, sells, records)
+    return EdgeDesk(day, nxt, buys, sells, records, states)

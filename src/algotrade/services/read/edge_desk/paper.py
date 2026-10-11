@@ -9,7 +9,12 @@ history from today's edge documents would rewrite the record when the user edits
 in time by business dates, not by when a row was written: a trade signalled after the session is
 not read, and one whose sell session is after the session is OPEN whatever a later night recorded
 (its result was not known yet). A trade that is open, settled or skipped is shown as the record
-says for the session; a number not known (an open trade's return) is None, never zero."""
+says for the session; a number not known (an open trade's return) is None, never zero.
+
+Knowledge too (ADR 0064 decision 9): a session that finished is read as its nightly left it. A row
+a later night wrote or rewrote (``knowledge_ts`` after the moment the session's workflow first
+completed, ADR 0062) is not read, so the latest row per trade at the cutoff is the record: a
+settlement recorded afterwards cannot change a past session's live state."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -89,10 +94,13 @@ def record_owner(edge: Edge, user_id: str) -> str:
 def load_trades(ctx: ReadContext, edges: Mapping[str, Edge]) -> tuple[PaperTrade, ...]:
     """Every paper trade of ``edges`` (by id; a trade of an edge the user does not see is left out,
     and so is a follower's old row of a site edge: only the record owner's rows count) signalled
-    in the window up to ``ctx.session``, oldest signal first."""
+    in the window up to ``ctx.session``, oldest signal first, as the rows stood at the session's
+    cutoff (``Session.cutoff``; None: not bounded)."""
     day = ctx.session.date
     owners = {i: record_owner(e, ctx.user.user_id) for i, e in edges.items()}
-    frame = read_paper(ctx.reader, owners, day - timedelta(days=LOOKBACK_DAYS), day)
+    frame = read_paper(
+        ctx.reader, owners, day - timedelta(days=LOOKBACK_DAYS), day, ctx.session.cutoff
+    )
     names = {i: e.name for i, e in edges.items()}
     records = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
     return tuple(_trade(r, day, names) for r in records)
