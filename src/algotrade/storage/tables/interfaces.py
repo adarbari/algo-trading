@@ -145,9 +145,10 @@ class TableStore(Protocol):
         deleted."""
         ...
 
-    def purge_before(self, table: str, cutoff: date) -> int:
-        """Delete the committed partitions of ``table`` dated before ``cutoff`` (every run):
-        retention for tables that are not kept forever (``live/*``); -> partitions deleted."""
+    def purge_before(self, table: str, cutoff: date, keep: Collection[date] = ()) -> int:
+        """Delete the committed partitions of ``table`` dated before ``cutoff`` (every run) but
+        those dated in ``keep``: retention for tables that are not kept forever (``live/*``,
+        the edge ledger, whose kept runs' partitions are spared); -> partitions deleted."""
         ...
 
 

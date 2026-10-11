@@ -223,12 +223,15 @@ class MemoryTables:
                 del self._frames[frame_key]
             return len(keys)
 
-    def purge_before(self, table: str, cutoff: date) -> int:
+    def purge_before(self, table: str, cutoff: date, keep: Collection[date] = ()) -> int:
         require_retention(table)
+        spared = set(keep)
         with self._index_lock:
             busy = {k for writes in self._pending.values() for k in writes}
             keys = [
-                k for k in self._partitions if k[0] == table and k[1] < cutoff and k not in busy
+                k
+                for k in self._partitions
+                if k[0] == table and k[1] < cutoff and k not in busy and k[1] not in spared
             ]
             for key in keys:
                 del self._partitions[key]

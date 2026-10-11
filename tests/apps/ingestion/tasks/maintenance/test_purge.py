@@ -1,5 +1,6 @@
 """``purge-raw``: raw responses kept per source (its section's ``raw_retention_days``, else
-the global window; ``--keep-days`` overrides all), staging and uncommitted writes by age."""
+the global window; ``--keep-days`` overrides all), staging and uncommitted writes by age, and the
+edge trade ledger after 45 days but for the runs the run reader keeps (ADR 0064)."""
 
 from dataclasses import replace
 from datetime import date, timedelta
@@ -13,12 +14,16 @@ from algotrade.data import StoreReader
 from algotrade.data.chains import LIVE_OPTION_QUOTES
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.tables.edge_schemas import EDGE_TRADES
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance.purge import purge, raw_keep_days
 from algotrade_sources.framework.registry import RAW_SECTIONS
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped
+from tests.unit.services.read.evaluation.conftest import DOCS
+from tests.unit.services.read.evaluation.test_ledger import ROWS, write_ledger
 
 SESSION = date(2026, 10, 30)
 SETTINGS = SourcesSettings.from_document(
@@ -85,3 +90,29 @@ def test_purge_keeps_live_option_quotes_seven_days(kind: str, tmp_path: Path) ->
     assert reader.dates(LIVE_OPTION_QUOTES) == [SESSION - timedelta(a) for a in (7, 6, 1)]
     assert reader.dates("catalog/demo") == [other]  # only live/option_quotes is purged
     assert purge(ctx(writer), SESSION).stats["live_partitions_removed"] == 0
+
+
+def test_purge_keeps_the_ledger_45_days_and_the_kept_runs_partitions() -> None:
+    """Runs finished on 2026-10-02 (``T``): 45 days later only the range ends before the cutoff
+    are candidates, and of those the canonical and latest run's partition is spared."""
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    session = date(2026, 12, 15)  # cutoff 2026-10-31: every run finished before it
+    old, kept, recent = date(2026, 9, 1), date(2026, 9, 15), date(2026, 12, 5)
+    write_ledger(backend, "old", ROWS, end=old, minutes=1)  # superseded by "latest"
+    write_ledger(backend, "recent", ROWS, end=recent, split=None, minutes=2)
+    write_ledger(backend, "latest", ROWS, end=kept, minutes=3)  # canonical and latest
+    assert purge(ctx(writer), session).stats["ledger_partitions_removed"] is None  # no configs
+    with_configs = replace(ctx(writer), configs=MemoryConfigStore(DOCS))
+    assert purge(with_configs, session).stats["ledger_partitions_removed"] == 1
+    assert reader.dates(EDGE_TRADES.name) == [kept, recent]
+
+
+def test_purge_spares_a_run_finished_within_the_window_whatever_its_range_end() -> None:
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    write_ledger(backend, "old", ROWS, end=date(2026, 6, 1), minutes=1)  # finished 2026-10-02
+    write_ledger(backend, "latest", ROWS, end=date(2026, 7, 1), minutes=3)
+    with_configs = replace(ctx(writer), configs=MemoryConfigStore(DOCS))
+    assert purge(with_configs, SESSION).stats["ledger_partitions_removed"] == 0
+    assert reader.dates(EDGE_TRADES.name) == [date(2026, 6, 1), date(2026, 7, 1)]

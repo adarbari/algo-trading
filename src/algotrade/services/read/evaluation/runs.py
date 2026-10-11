@@ -6,23 +6,34 @@ in its partition (``context.run_partition``: only that run's rows, never another
 same range end). Every run discloses its ``run_id``, range, ``split_from``, ``knowledge_ts`` and
 ``as_of``; a run whose split is not the edge's ``frozen_from`` is ``exploratory``. The
 canonical run of an edge is the latest committed run of the site user whose split is its
-``frozen_from``: none is ``NOT_RUN`` with the reason, never an older or exploratory run."""
+``frozen_from``: none is ``NOT_RUN`` with the reason, never an older or exploratory run.
+
+A run's trade ledger (``results/edge_trades``, ADR 0064) is read here too (``load_run_trades``),
+the one reader: a hidden run's rows before its split only, per-name values under a licence the
+viewer does not hold as ``Unknown(LICENCE)``, and a ledger the retention purge removed
+(``Unknown(PRUNED)``) told apart from one the run never wrote (``Unknown(NOT_STORED)``), each with
+its admin cause (ADR 0056). ``ledger_keep`` says which partitions the
+purge spares: those of each edge's canonical run, latest run per user and cited run."""
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from itertools import pairwise
-from typing import Any
+from typing import Any, Final
 
 import pandas as pd
 
 from algotrade.config.edges.document import LEGACY_SITE_CUTOFF, LEGACY_SITE_OWNERS, job_name
+from algotrade.config.edges.loading import load_all_edges
+from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.core.time.calendar import sessions_to
-from algotrade.services.read.availability.cause import run_cause
+from algotrade.data import StoreReader
+from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, run_partition
 from algotrade.services.read.evaluation.edges import Edge, load_edges
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
+from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import result_table
 
@@ -170,6 +181,7 @@ def _run(
     session = ctx.session.date if isinstance(ctx, ReadContext) else None
     split = _day(stats.get("split_from"))
     start = (stats.get("range") or [None])[0]
+    exploratory = _exploratory(stats, frozen_from)
     return EdgeRun(
         run_id=record.run_id,
         edge_id=edge.id,
@@ -178,7 +190,7 @@ def _run(
         range_from=_day(start),
         range_to=record.session_date,
         split_from=split,
-        exploratory=split != frozen_from or bool(stats.get("exploratory")),
+        exploratory=exploratory,
         knowledge_ts=committed,
         as_of=stats.get("as_of"),
         trials_counted=stats.get("trials_counted"),
@@ -188,6 +200,11 @@ def _run(
         legacy_owner=legacy_owner,
         trigger=stats.get("trigger"),
     )
+
+
+def _exploratory(stats: Mapping[str, Any], frozen_from: date | None) -> bool:
+    """A run whose split is not the edge's ``frozen_from``, or that says it is exploratory."""
+    return _day(stats.get("split_from")) != frozen_from or bool(stats.get("exploratory"))
 
 
 def _lost(stats: Mapping[str, Any]) -> tuple[str, ...]:
@@ -448,3 +465,188 @@ def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], i
     """``measured_sessions`` of ``run``'s series; None when it stored none (an older run)."""
     series = load_run_series(ctx, run)
     return measured_sessions(series) if series else None
+
+
+# ---------------------------------------------------------------------------- the trade ledger
+LEDGER = "edge_trades"
+PERSONAL = "personal"
+# The per-name columns each recorded column licence covers (ADR 0064 decision 10).
+LICENSED: Final = {
+    "value_licence": ("value", "gross_value", "reference", "touch"),
+    "score_licence": ("score",),
+    "adv_licence": ("adv_usd_20d",),
+}
+LEDGER_ORDER = ["variant", "horizon_sessions", "decision_session", "rank"]
+
+Cell = float | bool | Unknown | None
+
+
+@dataclass(frozen=True)
+class TradeRow:
+    """One pick of a run's ledger. ``status``: ``won`` | ``lost`` | ``excluded`` (with its
+    public ``excluded_reason``); a per-name value under a licence the viewer does not hold is
+    ``Unknown(LICENCE)``, one not stored is None (never 0)."""
+
+    variant: str
+    horizon_sessions: int
+    decision_session: date
+    entry_session: date | None
+    exit_session: date | None
+    instrument_id: str
+    rank: int | None
+    status: str
+    excluded_reason: str | None
+    hit: bool | None
+    delisted: bool
+    before_split: bool
+    score: Cell
+    value: Cell
+    gross_value: Cell
+    max_drawdown: float | None
+    adv_usd_20d: Cell
+    reference: Cell
+    touch: Cell
+
+
+@dataclass(frozen=True)
+class RunTrades:
+    """One page of a run's ledger (``offset`` .. ``offset + limit`` of ``total`` rows matching
+    the filters, by variant, horizon, decision session and rank). ``unknown``: why there is no
+    ledger to read: ``PRUNED`` (the run wrote rows the retention purge has removed: re-run the
+    backtest) or ``NOT_STORED`` (a run from before the ledger); None when it is read (a run that
+    wrote no row has none). ``licence``: the trial licence of its rows."""
+
+    unknown: Unknown | None
+    rows: tuple[TradeRow, ...] = ()
+    total: int = 0
+    licence: str | None = None
+
+
+def _date(value: Any) -> date | None:
+    stored = to_scalar(value)
+    return date.fromisoformat(str(stored)[:10]) if stored is not None else None
+
+
+def _flag(value: Any) -> bool | None:
+    stored = to_scalar(value)
+    return None if stored is None else bool(stored)
+
+
+def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
+    def cell(column: str, read: Any = _float) -> Cell:
+        return hidden[column] if column in hidden else read(row.get(column))
+
+    reason = to_scalar(row.get("excluded_reason"))
+    return TradeRow(
+        variant=str(row["variant"]),
+        horizon_sessions=int(row["horizon_sessions"]),
+        decision_session=_date(row["decision_session"]) or date.min,
+        entry_session=_date(row.get("entry_session")),
+        exit_session=_date(row.get("exit_session")),
+        instrument_id=str(row["instrument_id"]),
+        rank=_int(row.get("rank")),
+        status=str(row["status"]),
+        excluded_reason=None if reason is None else str(reason),
+        hit=_flag(row.get("hit")),
+        delisted=_flag(row.get("delisted")) is True,
+        before_split=_flag(row.get("before_split")) is True,
+        score=cell("score"),
+        value=cell("value"),
+        gross_value=cell("gross_value"),
+        max_drawdown=_float(row.get("max_drawdown")),
+        adv_usd_20d=cell("adv_usd_20d"),
+        reference=cell("reference"),
+        touch=cell("touch", _flag),
+    )
+
+
+def _redacted(row: Mapping[str, Any], holder: bool, table: str) -> dict[str, Unknown]:
+    """The per-name columns of ``row`` the viewer may not see: those whose recorded licence is
+    personal, unless the viewer holds it (decided by the recorded licence, never by name)."""
+    if holder:
+        return {}
+    out: dict[str, Unknown] = {}
+    for licence_column, columns in LICENSED.items():
+        if to_scalar(row.get(licence_column)) == PERSONAL:
+            why = table_cause(table, f"{licence_column} is personal", "LICENCE")
+            out.update(dict.fromkeys(columns, Unknown(UnknownCode.LICENCE, why)))
+    return out
+
+
+def load_run_trades(
+    ctx: Stores,
+    run: EdgeRun,
+    *,
+    variant: str | None = None,
+    horizon: int | None = None,
+    before_split: bool | None = None,
+    offset: int = 0,
+    limit: int | None = None,
+) -> RunTrades:
+    """The ledger ``run`` wrote, filtered (``before_split``: the in-sample side, False the
+    out-of-sample one) and paged. A run whose out-of-sample result is hidden serves its rows
+    before the split only, whatever is asked."""
+    record = ctx.reader.run(run.run_id)
+    count = None if record is None else record.stats.get("ledger_rows")
+    if record is None or count is None:
+        why = f"run {run.run_id} is older than the trade ledger: re-run the backtest"
+        return RunTrades(Unknown(UnknownCode.NOT_STORED, run_cause(run.run_id, why)))
+    table = result_table(LEDGER)
+    frame = run_partition(ctx, table, record)
+    if frame is None or frame.empty:
+        if not count:
+            return RunTrades(None)
+        why = f"the ledger of run {run.run_id} was purged after its retention: re-run the backtest"
+        return RunTrades(Unknown(UnknownCode.PRUNED, table_cause(table, why, "PRUNED")))
+    keep = pd.Series(True, index=frame.index)
+    if run.oos_hidden or before_split is True:
+        keep &= frame["before_split"].fillna(False).astype(bool)
+    elif before_split is False:
+        keep &= ~frame["before_split"].fillna(False).astype(bool)
+    if variant is not None:
+        keep &= frame["variant"] == variant
+    if horizon is not None:
+        keep &= frame["horizon_sessions"] == horizon
+    found = frame[keep].sort_values(LEDGER_ORDER, kind="stable")
+    page = found.iloc[offset : None if limit is None else offset + limit]
+    holder = load_users(ctx.configs).holds(ctx.user.user_id, PERSONAL)
+    rows = tuple(
+        _trade(r, _redacted(r, holder, table))
+        for r in ({str(k): v for k, v in row.items()} for row in page.to_dict("records"))
+    )
+    licences = {str(v) for v in found["licence"].dropna()} if "licence" in found else set()
+    licence = PERSONAL if PERSONAL in licences else (licences.pop() if licences else None)
+    return RunTrades(None, rows, len(found), licence)
+
+
+def ledger_keep(reader: StoreReader, configs: ConfigStore, since: date) -> frozenset[date]:
+    """The ``results/edge_trades`` partitions the retention purge spares (ADR 0064 decision 2):
+    those of every run that finished on or after ``since`` (the retention cutoff: a partition is
+    dated by its run's range end, so an old range run yesterday is still recent), of every edge's
+    canonical run (the latest committed site run at its frozen split), of the latest committed run
+    of each edge and user (the declared users and those with config files) and of every run an
+    edge's ``[evidence]`` cites."""
+    declared = [u.user_id for u in load_users(configs).users]
+    users = list(dict.fromkeys([SITE_USER, *declared, *configs.users()]))
+    keep: set[date] = set()
+    for edge in load_all_edges(configs):
+        for user in users:
+            done = sorted(
+                (r for r in reader.runs(job_name(edge.id, user)) if r.status is RunStatus.COMPLETE),
+                key=lambda r: r.finished_at or r.started_at,
+                reverse=True,
+            )
+            keep.update(
+                r.session_date for r in done if (r.finished_at or r.started_at).date() >= since
+            )
+            if done:
+                keep.add(done[0].session_date)
+            if user == SITE_USER and edge.frozen_from is not None:
+                canon = next((r for r in done if not _exploratory(r.stats, edge.frozen_from)), None)
+                if canon is not None:
+                    keep.add(canon.session_date)
+        if edge.evidence is not None:
+            cited = reader.run(edge.evidence.run_id)
+            if cited is not None:
+                keep.add(cited.session_date)
+    return frozenset(keep)
