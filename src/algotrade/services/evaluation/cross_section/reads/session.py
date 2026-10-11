@@ -1,8 +1,8 @@
 """The reads of the edge harness that are made once per decision session, whatever the horizon or
 the edge variant (ADR 0053, ADR 0063): ``SessionReads`` caches each screener's run, the regime
-label, the eligible names per universe, the implied vol and the scored outcomes until a chunk of
-sessions is released; ``implied_at`` reads the implied vol of names at one session, for the
-harness and the paper record alike."""
+label, the eligible names per universe, the implied vol, the ADV and the scored outcomes until a
+chunk of sessions is released; ``implied_at`` reads the implied vol of names at one session, for
+the harness and the paper record alike."""
 
 from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from algotrade.services.evaluation.cross_section.measuring import Variant
 
 UNKNOWN = "UNKNOWN"
+ADV_FIELD = "rollup.price_stats@v2.adv_usd_20d"  # a pick's liquidity at D (leg v2, ADR 0064)
 # Not an input table a screener lacks for a session but the run's own wiring (market features
 # not loaded, no universe or reference snapshot): always an error, never a lost session.
 WIRING_DATASETS = (
@@ -64,6 +65,7 @@ class SessionReads:
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}  # (universe repr, D)
         self._labels: dict[date, str] = {}
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
+        self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
         self._outcomes: dict[tuple[str, int, date], pd.DataFrame] = {}
         self._snapshots: set[date] = set()
         self._identity = IdentityTally()
@@ -142,6 +144,7 @@ class SessionReads:
         self._eligible.clear()
         self._labels.clear()
         self._implied.clear()
+        self._adv.clear()
         self._outcomes.clear()
 
     def label(self, day: date) -> str:
@@ -156,6 +159,15 @@ class SessionReads:
         if key not in self._implied:
             self._implied[key] = implied_at(self._reader, field_name, ids, day)
         return self._implied[key]
+
+    def adv(self, ids: frozenset[str], day: date) -> dict[str, float | None]:
+        """``adv_usd_20d`` of ``ids`` at D (None: not stored, never 0), read once per eligible
+        set and session through the recording reader, so a restated liquidity partition
+        invalidates the legs that read it (ADR 0063 decision 2, ADR 0064 decision 4)."""
+        key = (ids, day)
+        if key not in self._adv:
+            self._adv[key] = numbers_at(self._reader, ADV_FIELD, ids, day)
+        return self._adv[key]
 
     def outcomes(
         self, scope: str, horizon: int, day: date, score: Callable[[], pd.DataFrame]
@@ -174,6 +186,14 @@ def implied_at(
     """The implied vol ``field_name`` of ``ids`` read at the decision session ``day`` (None: not
     stored): what an ``expires_otm`` strike or a vol ratio is measured from, for the harness and
     the paper record alike."""
+    return numbers_at(reader, field_name, ids, day)
+
+
+def numbers_at(
+    reader: StoreReader, field_name: str, ids: Iterable[str], day: date
+) -> dict[str, float | None]:
+    """The numeric field ``field_name`` of ``ids`` read at ``day`` (None: not stored or not a
+    number)."""
     wanted = sorted(ids)
     view, _ = fields_view(reader, (field_name,), day, wanted, historical=True)
     values = {i: view.get(i, field_name) for i in wanted}

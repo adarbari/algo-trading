@@ -35,6 +35,7 @@ ARROW_TYPES: dict[str, pa.DataType] = {
     "timestamp_utc": pa.timestamp("us", tz="UTC"),
     "float64[]": pa.list_(pa.float64()),
     "float32[]": pa.list_(pa.float32()),
+    "int64[]": pa.list_(pa.int64()),
     "string[]": pa.list_(pa.large_string()),
     "date[]": pa.list_(pa.date32()),
 }

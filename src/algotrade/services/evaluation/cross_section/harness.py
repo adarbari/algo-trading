@@ -45,6 +45,7 @@ from algotrade.config.edges.document import (
     Edge,
     job_name,
 )
+from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
 from algotrade.config.user import SITE_USER, UserContext
@@ -332,6 +333,7 @@ def evaluate_edge(
         expression_hash(catalogue(configs, user.user_id)),
         user.user_id,
         edge.id,
+        load_verdict(configs).cost_levels_bps,  # every leg counts hits at the site's cost grid
     )
     stored = read_legs(reader, user.user_id, edge.id, start, end)
     earnings = any(p.scope.edge.event_class == "earnings_expected" for p in plans)  # a diagnostic

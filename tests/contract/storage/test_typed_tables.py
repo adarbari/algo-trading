@@ -218,12 +218,14 @@ LISTS = "test/lists"
 def test_list_columns_round_trip_on_every_backend(
     backend: Backend, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``float64[]``, ``float32[]``, ``string[]`` and ``date[]`` (ADR 0063): stored as Arrow
-    lists of the scalar type, empty and null lists kept, other element types cast."""
+    """``float64[]``, ``float32[]``, ``int64[]``, ``string[]`` and ``date[]`` (ADR 0063, leg v2
+    of ADR 0064): stored as Arrow lists of the scalar type, empty and null lists and null
+    elements kept (never 0), other element types cast."""
     columns = (
         Column("instrument_id", "string", False),
         Column("f64", "float64[]"),
         Column("f32", "float32[]"),
+        Column("i64", "int64[]"),
         Column("ids", "string[]"),
         Column("days", "date[]"),
         Column("session_date", "date", False),
@@ -234,16 +236,21 @@ def test_list_columns_round_trip_on_every_backend(
     spec = TableSpec(LISTS, "test", ("instrument_id",), columns=columns)
     monkeypatch.setitem(KNOWN, LISTS, spec)
     rows = [
-        {"instrument_id": "a", "f64": [0.1, 0.2], "f32": [0.5, 1.5], "ids": ["x", "y"],
-         "days": [D1, D2]},
-        {"instrument_id": "b", "f64": [], "f32": np.array([2.0]), "ids": [], "days": []},
-        {"instrument_id": "c", "f64": None, "f32": None, "ids": None, "days": None},
+        {"instrument_id": "a", "f64": [0.1, None], "f32": [0.5, 1.5], "i64": [1, None, 3],
+         "ids": ["x", "y"], "days": [D1, D2]},
+        {"instrument_id": "b", "f64": [], "f32": np.array([2.0]), "i64": [], "ids": [],
+         "days": []},
+        {"instrument_id": "c", "f64": None, "f32": None, "i64": None, "ids": None, "days": None},
     ]  # fmt: skip
     StoreWriter(backend).write_table(LISTS, D1, "r1", stamped(rows, D1, "r1"))
     got = backend.tables.read(LISTS, D1)
     assert got is not None
     by_id = {r["instrument_id"]: r for r in got.to_dict("records")}
-    assert list(by_id["a"]["f64"]) == [0.1, 0.2] and list(by_id["a"]["ids"]) == ["x", "y"]
+    assert list(by_id["a"]["ids"]) == ["x", "y"]
+    first, missing = list(by_id["a"]["f64"])
+    assert first == 0.1 and (missing is None or np.isnan(missing))  # a null element, never 0
+    ranks = list(by_id["a"]["i64"])
+    assert ranks[0] == 1 and ranks[2] == 3 and (ranks[1] is None or pd.isna(ranks[1]))
     assert list(by_id["a"]["days"]) == [D1, D2]
     assert list(by_id["a"]["f32"]) == [0.5, 1.5]
     assert list(by_id["b"]["f32"]) == [2.0] and len(by_id["b"]["ids"]) == 0

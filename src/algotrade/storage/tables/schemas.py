@@ -30,11 +30,12 @@ from algotrade.core.views.series import FIELDS
 SCHEMA_VERSION = 1
 COMMON = ("session_date", "knowledge_ts", "source", "run_id")
 # Abstract column types; storage backends map them to physical types (Arrow, DuckDB later).
-# ``<scalar>[]`` is a list column of that scalar (ADR 0063's per-session arrays); null or empty.
+# ``<scalar>[]`` is a list column of that scalar (ADR 0063's per-session arrays, ADR 0064's per-pick
+# ones); the list null or empty, an element null (never 0).
 COLUMN_TYPES = frozenset(
     {
         "string", "float64", "float32", "int64", "bool", "date", "timestamp_utc",
-        "float64[]", "float32[]", "string[]", "date[]",
+        "float64[]", "float32[]", "int64[]", "string[]", "date[]",
     }
 )  # fmt: skip
 # How a partition's runs combine on read: "snapshot" (each run is the whole partition; the
@@ -716,7 +717,9 @@ EDGE_PAPER = _fixed(
 # first read, the historical-identity counts) and ``outcome`` (one per (D, edge variant,
 # horizon): the entry session read, ``outcomes_as_of`` and the outcome partition's commit
 # sequence). A key column that does not apply is "" (or 0 for the horizon), never null. Runs
-# merge: a leg recomputed by a later run replaces the earlier one under the same key.
+# merge: a leg recomputed by a later run replaces the earlier one under the same key. Leg v2
+# (ADR 0064): every pick as ``pick_*`` lists aligned to ``pick_ids`` (``legs/rows.py``) and the
+# hits at each level of the site's cost grid (``base_hits_at``, ``pick_hits_at``); null in v1 rows.
 EDGE_LEGS = _fixed(
     "results/edge_legs",
     "results",
@@ -734,6 +737,9 @@ EDGE_LEGS = _fixed(
     "deciles float64[]",
     "pick_reference float64[]",
     "event_ids string[]",
+    *(f"{n} float64[]" for n in ("pick_scores", "pick_gross", "pick_mdd", "pick_adv", "pick_refs")),
+    *(f"{n} int64[]" for n in ("pick_ranks", "pick_flags", "base_hits_at", "pick_hits_at")),
+    *(f"{n} string[]" for n in ("pick_ids", "pick_reasons")),
     *(f"{n} int64" for n in (
         "pick_hits", "rest_n", "base_hits", "ranked", "unscored", "excluded_score_coverage",
         "excluded_unclosed", "excluded_missing", "excluded_coverage", "excluded_unmeasured",

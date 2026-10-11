@@ -26,3 +26,6 @@ forward_sessions = 20    # a new version's forward test lasts this many sessions
 live_min_sessions = 10     # closed signal sessions (the picks of one night are correlated: the unit) before judging
 live_low = 0.10          # the usual range of the live win rate: these quantiles of the wins ...
 live_high = 0.90         # ... n signal sessions would show if the backtest's win rate held
+
+[edge_costs]               # ADR 0064: the round-trip costs (bp) a return edge is also measured at,
+levels_bps = [0, 15, 30, 50] # beside its own cost_bps; in the leg key (a change recomputes every leg)

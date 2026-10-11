@@ -6,10 +6,15 @@ horizon 0), never null.
 row of a frame read from the store (lists are arrays, nulls are None or NaN there). A leg round
 trips exactly but for the random draws' sums, stored as float32 (about 4 GB per edge otherwise):
 the harness measures every leg through ``decode_leg(encode_leg(...))``, so a run that computes a
-leg and a run that reads it hold the same numbers."""
+leg and a run that reads it hold the same numbers.
+
+Leg v2 (ADR 0064 decision 4) stores every pick as ``pick_*`` lists aligned to ``pick_ids`` (a
+value not known is a null element, never 0); a counted pick's value is not stored twice: the
+counted picks (reason ``""``) are, in order, ``pick_values``. ``pick_flags`` packs a pick's
+booleans (``HIT``, ``DELISTED``, ``TOUCH``; the touch is known when its reference is)."""
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -19,7 +24,7 @@ import pandas as pd
 
 from algotrade.data import ReadRecord
 from algotrade.data.listings.identity import PROXY, TODAY_FLAG
-from algotrade.services.evaluation.cross_section.measures import SessionStat
+from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
 from algotrade.services.evaluation.cross_section.random_picks import RandomStat
 
 LEG = "leg"
@@ -27,6 +32,7 @@ READS = "reads"
 OUTCOME = "outcome"
 NO_KEY = ""  # a key column that does not apply to a row kind
 IDENTITY = (("flag", TODAY_FLAG), ("proxy", PROXY))  # ``id_<kind>_<column>``: the paths
+HIT, DELISTED, TOUCH = 1, 2, 4  # bits of ``pick_flags``
 
 
 @dataclass(frozen=True)
@@ -123,6 +129,69 @@ def _floats(value: Any) -> tuple[float, ...]:
     return () if _null(value) else tuple(float(v) for v in value)
 
 
+def _ints(value: Any) -> tuple[int, ...]:
+    return () if _null(value) else tuple(int(v) for v in value)
+
+
+def _maybe(value: Any) -> float | None:
+    return None if _null(value) else float(value)
+
+
+def _flags(pick: Pick) -> int:
+    return (
+        (HIT if pick.hit else 0) | (DELISTED if pick.delisted else 0) | (TOUCH if pick.touch else 0)
+    )
+
+
+def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any]]:
+    """A leg's picks as the ``pick_*`` list columns, aligned to ``pick_ids``."""
+    return {
+        "pick_ids": [p.instrument_id for p in picks],
+        "pick_ranks": [p.rank for p in picks],
+        "pick_reasons": [p.reason for p in picks],
+        "pick_scores": [p.score for p in picks],
+        "pick_gross": [p.gross for p in picks],
+        "pick_mdd": [p.drawdown for p in picks],
+        "pick_adv": [p.adv for p in picks],
+        "pick_refs": [p.reference for p in picks],
+        "pick_flags": [_flags(p) for p in picks],
+    }
+
+
+def decode_picks(row: Mapping[str, Any], values: Sequence[float]) -> tuple[Pick, ...]:
+    """The picks of a leg row (none for a v1 row); ``values``: its ``pick_values``, the counted
+    picks' in order. A row whose counted picks do not match them is corrupt: ValueError."""
+    ids = _list(row.get("pick_ids"))
+    if not ids:
+        return ()
+    ranks, reasons = _list(row.get("pick_ranks")), _list(row.get("pick_reasons"))
+    scores, gross, mdd = (_list(row.get(c)) for c in ("pick_scores", "pick_gross", "pick_mdd"))
+    adv, refs, flags = (_list(row.get(c)) for c in ("pick_adv", "pick_refs", "pick_flags"))
+    if sum(1 for r in reasons if r == "") != len(values):
+        raise ValueError(f"leg {row.get('leg_key')}: counted picks do not match pick_values")
+    counted = iter(values)
+    out = []
+    for at, instrument in enumerate(ids):
+        bits, reason, ref = int(flags[at]), str(reasons[at]), _maybe(refs[at])
+        out.append(
+            Pick(
+                instrument_id=str(instrument),
+                rank=int(ranks[at]),
+                reason=reason,
+                value=next(counted) if reason == "" else None,
+                hit=bool(bits & HIT),
+                delisted=bool(bits & DELISTED),
+                score=_maybe(scores[at]),
+                gross=_maybe(gross[at]),
+                drawdown=_maybe(mdd[at]),
+                adv=_maybe(adv[at]),
+                reference=ref,
+                touch=None if ref is None else bool(bits & TOUCH),
+            )
+        )
+    return tuple(out)
+
+
 def _base(
     kind: str,
     user_id: str,
@@ -180,6 +249,9 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         pick_touches=s.pick_touches,
         no_implied_vol=s.no_implied_vol,
         implied_stored=s.implied_stored,
+        base_hits_at=list(s.base_hits_at),
+        pick_hits_at=list(s.pick_hits_at),
+        **encode_picks(s.picks),
     )
     if r is not None:
         row.update(
@@ -207,10 +279,11 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
     day = _day(row["session_date"])
     rand = _int(row.get("rand_picks"))
     events: Any = row.get("event_ids")
+    values = _floats(row.get("pick_values"))
     stat = SessionStat(
         session=day,
         regime=str(row["regime"]),
-        pick_values=_floats(row.get("pick_values")),
+        pick_values=values,
         pick_hits=int(row["pick_hits"]),
         rest=(int(row["rest_n"]), float(row["rest_mean"]), float(row["rest_m2"])),
         base_hits=int(row["base_hits"]),
@@ -233,6 +306,9 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         pick_touches=int(row["pick_touches"]),
         no_implied_vol=int(row["no_implied_vol"]),
         implied_stored=bool(row["implied_stored"]),
+        picks=decode_picks(row, values),
+        base_hits_at=_ints(row.get("base_hits_at")),
+        pick_hits_at=_ints(row.get("pick_hits_at")),
     )
     drawn = None
     if rand is not None:
