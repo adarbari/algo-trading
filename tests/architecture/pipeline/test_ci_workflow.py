@@ -160,13 +160,31 @@ def test_the_screenshot_workflow_uses_ci_image_and_runs_only_on_the_label() -> N
     condition = " ".join(doc["jobs"]["update"]["if"].split())
     assert "github.event.label.name == 'update-screenshots'" in condition
     assert "head.repo.full_name == github.repository" in condition, "never on forks"
-    assert doc["permissions"] == {"contents": "write", "pull-requests": "write"}
+    assert doc["permissions"] == {
+        "contents": "write",
+        "pull-requests": "write",
+        "actions": "write",
+    }
     run = "\n".join(str(s.get("run", "")) for s in doc["jobs"]["update"]["steps"])
     for needle in (
         "npm ci",
         "npm run storybook:build",
         "npm run visual -- --update-snapshots --fully-parallel",
         "github-actions[bot]",
-        "--remove-label update-screenshots",
     ):
         assert needle in run, needle
+
+
+def test_the_screenshot_label_and_ci_dispatch_run_outside_the_playwright_container() -> None:
+    """The Playwright image has no `gh` (the label step failed with exit 127 on #514 and #524),
+    so the label removal and the CI dispatch live in a job on a plain runner."""
+    doc = yaml.safe_load(SCREENSHOTS.read_text())
+    assert "container" not in doc["jobs"]["finish"], "gh is not in the Playwright image"
+    assert doc["jobs"]["finish"]["needs"] == "update"
+    assert "always()" in doc["jobs"]["finish"]["if"]
+    steps = "\n".join(str(s.get("run", "")) for s in doc["jobs"]["finish"]["steps"])
+    assert "--remove-label update-screenshots" in steps
+    assert "gh workflow run ci.yml" in steps
+    inside = "\n".join(str(s.get("run", "")) for s in doc["jobs"]["update"]["steps"])
+    assert "gh " not in inside.replace("github-actions", ""), "no gh call inside the container"
+    assert "for attempt in 1 2 3" in inside and "git rebase" in inside, "rebase-safe push"
