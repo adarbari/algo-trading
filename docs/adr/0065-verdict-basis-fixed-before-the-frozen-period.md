@@ -30,7 +30,7 @@ Every panel planned to lead with the basis (curve, decay, ledger) would inherit 
    not above zero, decile t, below the median baseline) below the rest, then orders by lift.
    Ties go to the first by screen, then horizon. A model screener's in-sample row is its training
    fit (`EdgeRow.in_sample`) and is never ranked: a model is the basis only when `promoted` (or
-   when it is the one candidate). No `frozen`, `split`, `year`, `year_part` or `all` figure is read.
+   when it is the one candidate). No `frozen`, `split`, `year`, `year_part`, `regime`, `regime_part` or `all` figure is read.
 2. **Everything comes from the basis.** The verdict, the criteria, the columns, the evidence, the
    years and every figure are the basis's. The other candidates are not judged for the headline
    (the variant grid may show them, labelled as not the pre-chosen test). A basis that lost

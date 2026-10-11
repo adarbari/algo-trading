@@ -161,8 +161,9 @@ def _sum_levels(counts: Sequence[tuple[int, ...]]) -> tuple[int, ...]:
 @dataclass(frozen=True)
 class Slice:
     """A set of sessions reported on its own: ``kind`` ("all", "year", "year_part" (a year cut
-    by the split: value ``<year>:in_sample`` / ``<year>:out_of_sample``), "regime", "in_sample",
-    "frozen")."""
+    by the split: value ``<year>:in_sample`` / ``<year>:out_of_sample``), "regime", "regime_part"
+    (a regime label cut the same way: ``<label>:in_sample`` / ``<label>:out_of_sample``),
+    "in_sample", "frozen")."""
 
     kind: str
     value: str
@@ -424,8 +425,8 @@ def cost_measures(
 
 def edge_slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
     """The slices of a variant's sessions: all, each year (a year the split falls in also as its
-    two ``year_part`` sides) and regime label, and with a split the in-sample and frozen (or
-    exploratory) sides."""
+    two ``year_part`` sides) and regime label (with a split also as its two ``regime_part``
+    sides), and with a split the in-sample and frozen (or exploratory) sides."""
     slices = [Slice("all", "all", _always)]
     for year in sorted({s.session.year for s in stats}):
         slices.append(Slice("year", str(year), partial(_in_year, year)))
@@ -439,6 +440,13 @@ def edge_slices(stats: Sequence[SessionStat], split: date | None, exploratory: b
             )
     for label in sorted({s.regime for s in stats}):
         slices.append(Slice("regime", label, partial(_in_regime, label)))
+        if split is not None:  # the label cut by the split, on the decision session's side
+            slices.append(
+                Slice("regime_part", f"{label}:in_sample", partial(_regime_before, label, split))
+            )
+            slices.append(
+                Slice("regime_part", f"{label}:out_of_sample", partial(_regime_since, label, split))
+            )
     if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
         slices.append(Slice("in_sample", "in_sample", partial(_before, split)))  # ED8: the IS side
         kind = "split" if exploratory else "frozen"
@@ -464,6 +472,14 @@ def _year_since(year: int, day: date, stat: SessionStat) -> bool:
 
 def _in_regime(label: str, stat: SessionStat) -> bool:
     return stat.regime == label
+
+
+def _regime_before(label: str, day: date, stat: SessionStat) -> bool:
+    return _in_regime(label, stat) and _before(day, stat)
+
+
+def _regime_since(label: str, day: date, stat: SessionStat) -> bool:
+    return _in_regime(label, stat) and _since(day, stat)
 
 
 def _before(day: date, stat: SessionStat) -> bool:

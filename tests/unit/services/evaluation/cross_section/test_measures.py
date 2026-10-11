@@ -178,6 +178,30 @@ def test_a_split_on_a_year_start_or_none_makes_no_year_part() -> None:
     assert _year_parts(None) == {}
 
 
+def test_a_split_cuts_each_regime_label_into_two_regime_part_slices() -> None:
+    stats = [
+        stat(date(2026, 3, 30), (0.01,), (0.0,), 1, regime="CALM"),
+        stat(date(2026, 3, 31), (0.01,), (0.0,), 1, regime="STRESS"),
+        stat(date(2026, 4, 1), (0.01,), (0.0,), 1, regime="CALM"),
+        stat(date(2026, 4, 2), (0.01,), (0.0,), 1, regime="CALM"),
+    ]
+    split = date(2026, 4, 1)
+    parts = {
+        s.value: [x.session.day for x in stats if s.keep(x)]
+        for s in edge_slices(stats, split, exploratory=False)
+        if s.kind == "regime_part"
+    }
+    assert parts == {
+        "CALM:in_sample": [30],
+        "CALM:out_of_sample": [1, 2],
+        "STRESS:in_sample": [31],
+        "STRESS:out_of_sample": [],
+    }
+    whole = [s for s in edge_slices(stats, split, False) if s.kind == "regime"]
+    assert [s.value for s in whole] == ["CALM", "STRESS"]  # the whole-run rows stay
+    assert not [s for s in edge_slices(stats, None, False) if s.kind == "regime_part"]
+
+
 def test_a_block_pools_its_days_picks_in_order_and_sums_hits_per_cost_level() -> None:
     """Leg v2 (ADR 0064): an event block keeps every day's picks, the first day's first, and adds
     the hits at each cost level; a day without levels (not a return) leaves the block without."""
