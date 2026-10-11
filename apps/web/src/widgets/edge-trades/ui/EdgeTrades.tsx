@@ -104,7 +104,9 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
             {termHelp('live_state')}
           </>
         )}
-        <Text tone="muted" size="sm">{`${String(ledger.total)} trades`}</Text>
+        {!query.isPlaceholderData && (
+          <Text tone="muted" size="sm">{`${String(ledger.total)} trades`}</Text>
+        )}
         {ledger.symbolsSnapshot && (
           <Text tone="muted" size="sm">
             {`Tickers as of ${formatValue(ledger.symbolsSnapshot, { kind: 'date', style: 'short' }).text}`}
@@ -119,6 +121,9 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
           <Text tone="secondary">Out-of-sample trades hidden</Text>
           {termHelp('show_out_of_sample')}
         </Stack>
+      ) : query.isPlaceholderData ? (
+        // The previous selection's rows are kept while the next load: never shown under the new one.
+        <Skeleton variant="rect" label="Loading the trades" />
       ) : (
         <>
           <DataTable<EdgeTradeRow>
