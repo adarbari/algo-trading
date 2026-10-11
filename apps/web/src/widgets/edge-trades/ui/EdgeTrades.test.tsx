@@ -48,7 +48,9 @@ describe('EdgeTrades', () => {
   it('shows a page of the ledger with the unknown cells in words, not as numbers', async () => {
     const { container } = render(<EdgeTrades edgeId="drift" />);
     const table = screen.getByRole('grid', { name: 'Trade ledger' });
-    expect(within(table).getByText('US-AAA')).toBeInTheDocument();
+    expect(within(table).getByText('AAA')).toBeInTheDocument();
+    expect(within(table).queryByText('US-AAA')).not.toBeInTheDocument(); // a ticker, never the id
+    expect(within(table).queryByText('US-BBB')).not.toBeInTheDocument(); // unnamed: Unknown, not the id
     expect(within(table).getByText('Licensed')).toBeInTheDocument(); // a personal-licence score
     expect(within(table).getAllByText('Not stored').length).toBeGreaterThan(0);
     expect(within(table).getByText('Excluded')).toBeInTheDocument();

@@ -217,6 +217,7 @@ const TRADES = {
   basis: 'main at 20 sessions',
   licence: null,
   oosHidden: false,
+  symbolsSnapshot: '2026-10-01',
   unknown: null,
   rows: [
     ['2026-05-04', 'US-AAA', 'won', 0.031],
@@ -228,6 +229,8 @@ const TRADES = {
     entrySession: decisionSession,
     exitSession: decisionSession,
     instrumentId,
+    symbol: { value: String(instrumentId).replace('US-', ''), unknown: null },
+    company: { value: null },
     rank: 1,
     status,
     excludedReason: null,

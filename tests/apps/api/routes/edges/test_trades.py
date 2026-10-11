@@ -30,7 +30,10 @@ Make = Callable[..., TestClient]
 GRAPH = """query T($id: String!, $period: TradePeriod!, $sort: TradeSort!, $desc: Boolean!) {
   edgeTrades(edgeId: $id, period: $period, sort: $sort, descending: $desc) {
     basis total oosHidden unknown { code kind }
-    rows { instrumentId status excludedReason score { value unknown { kind } } value { value } }
+    rows {
+      instrumentId symbol { value unknown { kind } } status excludedReason
+      score { value unknown { kind } } value { value }
+    }
   }
 }"""
 
@@ -90,6 +93,9 @@ def test_the_csv_has_the_rows_the_graph_serves(
     for f, g in zip(from_file, from_graph, strict=True):
         unknown = g["score"]["unknown"]
         assert f["score"] == (unknown["kind"] if unknown else str(g["score"]["value"] or ""))
+        # the store has no reference snapshot: the ticker is Unknown in both, never the id
+        assert g["symbol"]["value"] is None and f["symbol"] == g["symbol"]["unknown"]["kind"]
+        assert f["symbol"] != f["instrument_id"]
 
 
 def test_a_personal_score_is_its_public_kind_in_the_file_for_anyone_but_the_holder(

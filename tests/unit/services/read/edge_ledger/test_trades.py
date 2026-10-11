@@ -17,6 +17,8 @@ from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.result_writer import ResultWriter
+from algotrade.storage.tables.writers import StoreWriter
+from tests.helpers.rollup_store import write_rows
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.edge_desk.conftest import CUTOFF, KNOWN, store, trade
 from tests.unit.services.read.edge_ledger.conftest import LEDGER, context, pick
@@ -204,3 +206,33 @@ def test_a_hidden_copys_live_trades_are_served() -> None:
     assert edge is not None and edge.oos_hidden
     page = load_edge_trades(ctx, edge, Period.LIVE)
     assert [r.instrument_id for r in page.rows] == ["EQ:F"] and not page.oos_hidden
+
+
+def named(backend: MemoryBackend) -> MemoryBackend:
+    """``backend`` with a reference snapshot naming EQ:A and EQ:B (not C or D)."""
+    rows = [
+        {"instrument_id": i, "symbol": t, "name": f"{t} Inc", "asset_class": "EQ",
+         "security_type": "COMMON_STOCK", "exchange": "NYSE", "multiplier": 1.0,
+         "status": "ACTIVE", "is_etf": False, "optionable": True}
+        for i, t in (("EQ:A", "AAA"), ("EQ:B", "BBB"))
+    ]  # fmt: skip
+    write_rows(StoreWriter(backend), "instruments/reference", date(2026, 10, 1), rows)
+    return backend
+
+
+def test_a_trade_names_its_instrument_from_the_reference_snapshot(backend: MemoryBackend) -> None:
+    ctx = context(named(backend), "owner", reference=date(2026, 10, 1))
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL)
+    first, _, third, _ = page.rows
+    assert (first.symbol.value, first.company.value) == ("AAA", "AAA Inc")
+    assert page.symbols_snapshot == date(2026, 10, 1)  # the snapshot the tickers came from
+    # a name the snapshot lacks is Unknown, never its id
+    assert third.symbol.value is None and third.symbol.unknown is not None
+    assert third.symbol.unknown.code is UnknownCode.NO_ROW
+
+
+def test_with_no_reference_snapshot_every_symbol_is_unknown(backend: MemoryBackend) -> None:
+    ctx = context(backend, "owner")
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL)
+    assert page.symbols_snapshot is None
+    assert all(r.symbol.value is None and r.symbol.unknown is not None for r in page.rows)

@@ -32,6 +32,7 @@ const EdgeTrades = graphql(`
       basis
       licence
       oosHidden
+      symbolsSnapshot
       unknown {
         code
         kind
@@ -45,6 +46,18 @@ const EdgeTrades = graphql(`
         entrySession
         exitSession
         instrumentId
+        symbol {
+          value
+          unknown {
+            code
+            kind
+            guideTerm
+            kindText
+          }
+        }
+        company {
+          value
+        }
         rank
         status
         excludedReason

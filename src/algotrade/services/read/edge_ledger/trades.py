@@ -9,16 +9,19 @@ the edge's paper record (``edge_desk.paper.load_trades``: the rows as the sessio
 them, never re-derived). The GraphQL page and the CSV file both call it, so they cannot differ;
 an excluded pick keeps its public reason, the causes stay in the ``Unknown`` for admins."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 from enum import StrEnum
 
+from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk import paper
 from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edge
-from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow
-from algotrade.services.read.values import Unknown
+from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow, TradeText
+from algotrade.services.read.instruments.identity import load_instruments
+from algotrade.services.read.values import Unknown, UnknownCode
 
 PAGE_SIZE = 50
 SKIPPED = "SKIPPED"  # the public reason of a live signal that was not traded
@@ -58,7 +61,8 @@ class EdgeTradePage:
     (``basis``: its screen and holding period; None: ``unknown`` says why there is none).
     ``unknown``: why the ledger cannot be read (NOT_RUN, PRUNED, NOT_STORED) or None;
     ``oos_hidden``: a copy's out-of-sample trades are withheld, so none of them is served;
-    ``licence``: the trial licence of the rows."""
+    ``licence``: the trial licence of the rows; ``symbols_snapshot``: the
+    ``instruments/reference`` snapshot the tickers and company names are read from (ADR 0007)."""
 
     period: Period
     page: int
@@ -69,6 +73,7 @@ class EdgeTradePage:
     licence: str | None = None
     oos_hidden: bool = False
     page_size: int = PAGE_SIZE
+    symbols_snapshot: date | None = None
 
 
 def _backtest(
@@ -128,6 +133,27 @@ def _live(
     return present + missing
 
 
+def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
+    """``page`` with each row's ticker and company name from the session's reference snapshot; a
+    name the snapshot lacks is ``Unknown`` (never its id, ADR 0018)."""
+    found = load_instruments(ctx, [r.instrument_id for r in page.rows])
+    gap = Unknown(
+        UnknownCode.NO_ROW,
+        table_cause("instruments/reference", "no row for the name in the snapshot", "NO_ROW"),
+    )
+    rows = tuple(
+        replace(
+            r,
+            symbol=TradeText(i.symbol)
+            if (i := found.get(r.instrument_id))
+            else TradeText(None, gap),
+            company=TradeText(i.name or None) if i else TradeText(None, gap),
+        )
+        for r in page.rows
+    )
+    return replace(page, rows=rows, symbols_snapshot=ctx.session.reference_snapshot)
+
+
 def load_edge_trades(
     ctx: ReadContext,
     edge: Edge,
@@ -139,7 +165,19 @@ def load_edge_trades(
     limit: int | None = PAGE_SIZE,
 ) -> EdgeTradePage:
     """The trades of ``edge``'s verdict basis for ``period``: page ``page`` of ``limit`` rows
-    (None: every row, for the file), sorted by ``sort`` (``runs.SORTABLE``)."""
+    (None: every row, for the file), sorted by ``sort`` (``runs.SORTABLE``), each named."""
+    return _named(ctx, _unnamed(ctx, edge, period, page, sort, descending, limit))
+
+
+def _unnamed(
+    ctx: ReadContext,
+    edge: Edge,
+    period: Period,
+    page: int,
+    sort: str | None,
+    descending: bool,
+    limit: int | None,
+) -> EdgeTradePage:
     page = max(page, 1)  # a page below the first is the first, and served as such
     basis = official_basis(ctx, edge)
     if basis.key is None or basis.run is None:

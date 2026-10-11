@@ -70,8 +70,21 @@ export const tradeColumns = (): DataTableColumn<EdgeTradeRow>[] => [
   {
     id: 'instrument',
     header: 'Name',
-    value: (r) => r.instrumentId,
+    value: (r) => r.symbol.value,
     mono: true,
+    cell: ({ row, formatted }) =>
+      row.symbol.value == null ? (
+        <Text tone="muted">{row.symbol.unknown ? unknownWord(row.symbol.unknown) : '—'}</Text>
+      ) : (
+        <Stack gap={0} align="start">
+          <Text mono>{formatted.text}</Text>
+          {row.company.value && (
+            <Text tone="muted" size="sm">
+              {row.company.value}
+            </Text>
+          )}
+        </Stack>
+      ),
     essential: true,
     hideable: false,
   },

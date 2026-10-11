@@ -23,6 +23,11 @@ export interface TradeNumber {
   unknown: EvidenceUnknown | null;
 }
 
+export interface TradeText {
+  value: string | null;
+  unknown: EvidenceUnknown | null;
+}
+
 export interface TradeFlag {
   value: boolean | null;
   unknown: EvidenceUnknown | null;
@@ -35,6 +40,8 @@ export interface EdgeTradeRow {
   entrySession: string | null;
   exitSession: string | null;
   instrumentId: string;
+  symbol: TradeText;
+  company: { value: string | null };
   rank: number | null;
   status: string;
   excludedReason: string | null;
@@ -59,6 +66,7 @@ export interface EdgeTradePage {
   basis: string | null;
   licence: string | null;
   oosHidden: boolean;
+  symbolsSnapshot: string | null;
   unknown: EvidenceUnknown | null;
   rows: EdgeTradeRow[];
 }

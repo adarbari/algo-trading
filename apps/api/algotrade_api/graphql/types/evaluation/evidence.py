@@ -38,6 +38,19 @@ class TradeNumber:
         return cls(value=None if d.value is None else float(d.value), unknown=unknown)
 
 
+@strawberry.type(
+    description="A per-name text (a ticker, a company name): `value`, or why it is not known "
+    "(`unknown`: the name is not in the reference snapshot); never the instrument id"
+)
+class TradeText:
+    value: str | None
+    unknown: Unknown | None
+
+    @classmethod
+    def of(cls, d: runs.TradeText) -> Self:
+        return cls(value=d.value, unknown=Unknown.of(d.unknown) if d.unknown is not None else None)
+
+
 @strawberry.type(description="A per-name yes / no, as `TradeNumber`")
 class TradeFlag:
     value: bool | None
@@ -63,6 +76,8 @@ class EdgeTradeRow:
     entry_session: dt.date | None
     exit_session: dt.date | None
     instrument_id: str
+    symbol: TradeText
+    company: TradeText
     rank: int | None
     status: str
     excluded_reason: str | None
@@ -87,6 +102,8 @@ class EdgeTradeRow:
             entry_session=d.entry_session,
             exit_session=d.exit_session,
             instrument_id=d.instrument_id,
+            symbol=TradeText.of(d.symbol),
+            company=TradeText.of(d.company),
             rank=d.rank,
             status=d.status,
             excluded_reason=d.excluded_reason,
@@ -109,7 +126,7 @@ class EdgeTradeRow:
     "holding period, never chosen again). `unknown`: why there is no ledger (NOT_RUN: no official "
     "run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); "
     "`oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the "
-    "trial licence of the rows"
+    "trial licence of the rows; `symbolsSnapshot`: the reference snapshot the tickers come from"
 )
 class EdgeTradePage:
     period: trades.Period
@@ -119,6 +136,7 @@ class EdgeTradePage:
     basis: str | None
     licence: str | None
     oos_hidden: bool
+    symbols_snapshot: dt.date | None
     unknown: Unknown | None
     rows: list[EdgeTradeRow]
 
@@ -132,6 +150,7 @@ class EdgeTradePage:
             basis=d.basis,
             licence=d.licence,
             oos_hidden=d.oos_hidden,
+            symbols_snapshot=d.symbols_snapshot,
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
             rows=[EdgeTradeRow.of(r) for r in d.rows],
         )

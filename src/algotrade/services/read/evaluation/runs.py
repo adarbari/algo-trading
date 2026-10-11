@@ -510,6 +510,15 @@ class TradeCell:
 
 
 @dataclass(frozen=True)
+class TradeText:
+    """A per-name text of a ledger row (a ticker, a company name): its ``value``, or why it is
+    not known (``unknown``): the name is not in the reference snapshot the session reads."""
+
+    value: str | None = None
+    unknown: Unknown | None = None
+
+
+@dataclass(frozen=True)
 class TradeRow:
     """One pick of a run's ledger. ``status``: ``won`` | ``lost`` | ``excluded`` (with its
     public ``excluded_reason``); a per-name value under a licence the viewer does not hold is
@@ -536,6 +545,8 @@ class TradeRow:
     reference: TradeCell
     touch: TradeCell
     source: str = "backtest"
+    symbol: TradeText = TradeText()  # filled by the ledger read from the reference snapshot
+    company: TradeText = TradeText()
 
 
 @dataclass(frozen=True)

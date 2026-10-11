@@ -755,7 +755,7 @@ type EdgeSource {
 }
 
 """
-One page of the trades of the edge's verdict basis (`basis`: its screen and holding period, never chosen again). `unknown`: why there is no ledger (NOT_RUN: no official run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); `oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the trial licence of the rows
+One page of the trades of the edge's verdict basis (`basis`: its screen and holding period, never chosen again). `unknown`: why there is no ledger (NOT_RUN: no official run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); `oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the trial licence of the rows; `symbolsSnapshot`: the reference snapshot the tickers come from
 """
 type EdgeTradePage {
   period: TradePeriod!
@@ -765,6 +765,7 @@ type EdgeTradePage {
   basis: String
   licence: String
   oosHidden: Boolean!
+  symbolsSnapshot: Date
   unknown: Unknown
   rows: [EdgeTradeRow!]!
 }
@@ -779,6 +780,8 @@ type EdgeTradeRow {
   entrySession: Date
   exitSession: Date
   instrumentId: String!
+  symbol: TradeText!
+  company: TradeText!
   rank: Int
   status: String!
   excludedReason: String
@@ -2997,6 +3000,14 @@ enum TradeSort {
   SCORE
   DRAWDOWN
   ADV
+}
+
+"""
+A per-name text (a ticker, a company name): `value`, or why it is not known (`unknown`: the name is not in the reference snapshot); never the instrument id
+"""
+type TradeText {
+  value: String
+  unknown: Unknown
 }
 
 """

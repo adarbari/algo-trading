@@ -120,7 +120,7 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   // Trades: the ledger of the verdict's basis, a period switch and the file.
   await nav.getByRole('link', { name: 'Trades' }).click();
   const ledger = page.getByRole('grid', { name: 'Trade ledger' });
-  await expect(ledger).toContainText('US-AAA');
+  await expect(ledger).toContainText('AAA');
   await page.getByRole('radio', { name: 'Out-of-sample' }).last().click();
   await expect(page.getByRole('button', { name: 'CSV' })).toBeVisible();
   // Details: the variant grid with its basis marked.

@@ -183,6 +183,8 @@ const trade = (over: Record<string, unknown>) => ({
   entrySession: '2026-04-07',
   exitSession: '2026-05-05',
   instrumentId: 'US-AAA',
+  symbol: { value: 'AAA', unknown: null },
+  company: { value: 'AAA Inc' },
   rank: 3,
   status: 'won',
   excludedReason: null,
@@ -209,11 +211,14 @@ export const TRADES_FIXTURE = {
   basis: 'main at 20 sessions',
   licence: null,
   oosHidden: false,
+  symbolsSnapshot: '2026-10-01',
   unknown: null,
   rows: [
     trade({}),
     trade({
       instrumentId: 'US-BBB',
+      symbol: { value: null, unknown: evidenceUnknown('NOT_STORED', 'NO_ROW') },
+      company: { value: null },
       status: 'excluded',
       excludedReason: 'NO_ENTRY_BAR',
       hit: null,
