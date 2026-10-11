@@ -49,7 +49,12 @@ export function ChartLegend({ chart, bandKey }: { chart: PreparedChart; bandKey:
         swatch="line"
         size="xs"
         label="Series"
-        items={chart.series.map((s) => ({ id: s.id, label: s.label, tone: s.tone }))}
+        items={chart.series.map((s) => ({
+          id: s.id,
+          label: s.label,
+          tone: s.tone,
+          ...(s.stroke === 'dashed' ? { dashed: true } : {}),
+        }))}
       />
       {bandKey && bands.length > 0 && (
         <Legend
