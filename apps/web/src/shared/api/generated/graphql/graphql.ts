@@ -81,6 +81,25 @@ export type SignalState =
   | 'NEVER_FIRED'
   | 'UNKNOWN';
 
+/** Which trades: IN_SAMPLE and OUT_OF_SAMPLE sides of the backtest, ALL of the backtest, or LIVE (the paper record) */
+export type TradePeriod =
+  | 'ALL'
+  | 'IN_SAMPLE'
+  | 'LIVE'
+  | 'OUT_OF_SAMPLE';
+
+/** The column a page of trades is sorted by */
+export type TradeSort =
+  | 'ADV'
+  | 'DECISION'
+  | 'DRAWDOWN'
+  | 'EXIT'
+  | 'INSTRUMENT'
+  | 'RANK'
+  | 'SCORE'
+  | 'STATUS'
+  | 'VALUE';
+
 /** Why a gap is there, in public words */
 export type UnavailableKind =
   | 'ILLIQUID'
@@ -199,6 +218,24 @@ export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
+
+export type EdgeTradesQueryVariables = Exact<{
+  edgeId: string;
+  period: TradePeriod;
+  page: number;
+  sort: TradeSort;
+  descending: boolean;
+}>;
+
+
+export type EdgeTradesQuery = { edgeTrades: { period: TradePeriod, page: number, pageSize: number, total: number, basis: string | null, licence: string | null, oosHidden: boolean, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ variant: string, horizonSessions: number, decisionSession: string, entrySession: string | null, exitSession: string | null, instrumentId: string, rank: number | null, status: string, excludedReason: string | null, hit: boolean | null, delisted: boolean, beforeSplit: boolean, source: string, maxDrawdown: number | null, score: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, value: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, grossValue: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, advUsd: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, reference: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, touch: { value: boolean | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }> } | null };
+
+export type EdgeVariantGridQueryVariables = Exact<{
+  edgeId: string;
+}>;
+
+
+export type EdgeVariantGridQuery = { edgeVariants: { basis: string | null, trials: number | null, oosHidden: boolean, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ edgeVariant: string, variant: string, horizonSessions: number, official: boolean, notPreChosen: boolean, modelFit: boolean, inSample: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null, outOfSample: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null, all: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null }> } | null };
 
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1088,6 +1125,145 @@ export const EdgesPageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+export const EdgeTradesDocument = new TypedDocumentString(`
+    query EdgeTrades($edgeId: String!, $period: TradePeriod!, $page: Int!, $sort: TradeSort!, $descending: Boolean!) {
+  edgeTrades(
+    edgeId: $edgeId
+    period: $period
+    page: $page
+    sort: $sort
+    descending: $descending
+  ) {
+    period
+    page
+    pageSize
+    total
+    basis
+    licence
+    oosHidden
+    unknown {
+      code
+      kind
+      guideTerm
+      kindText
+    }
+    rows {
+      variant
+      horizonSessions
+      decisionSession
+      entrySession
+      exitSession
+      instrumentId
+      rank
+      status
+      excludedReason
+      hit
+      delisted
+      beforeSplit
+      source
+      score {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+      value {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+      grossValue {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+      maxDrawdown
+      advUsd {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+      reference {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+      touch {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeTradesQuery, EdgeTradesQueryVariables>;
+export const EdgeVariantGridDocument = new TypedDocumentString(`
+    query EdgeVariantGrid($edgeId: String!) {
+  edgeVariants(edgeId: $edgeId) {
+    basis
+    trials
+    oosHidden
+    unknown {
+      code
+      kind
+      guideTerm
+      kindText
+    }
+    rows {
+      edgeVariant
+      variant
+      horizonSessions
+      inSample {
+        winRate
+        baseRate
+        liftPts
+        decileSpread
+        trades
+      }
+      outOfSample {
+        winRate
+        baseRate
+        liftPts
+        decileSpread
+        trades
+      }
+      all {
+        winRate
+        baseRate
+        liftPts
+        decileSpread
+        trades
+      }
+      official
+      notPreChosen
+      modelFit
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeVariantGridQuery, EdgeVariantGridQueryVariables>;
 export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
     query ScreenerTrackRecords {
   edges {

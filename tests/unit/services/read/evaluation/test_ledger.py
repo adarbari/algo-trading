@@ -96,9 +96,9 @@ def test_a_page_of_the_ledger_in_key_order(backend: MemoryBackend) -> None:
     found = load_run_trades(ctx, canonical(ctx))
     assert (found.unknown, found.total, found.licence) == (None, 3, "personal")
     assert [r.instrument_id for r in found.rows] == ["EQ:A", "EQ:B", "EQ:C"]
-    assert found.rows[0].score == 3.0  # the licence holder sees the personal score
+    assert found.rows[0].score.value == 3.0  # the licence holder sees the personal score
     gone = found.rows[2]
-    assert (gone.status, gone.excluded_reason, gone.value, gone.hit) == (
+    assert (gone.status, gone.excluded_reason, gone.value.value, gone.hit) == (
         "excluded", "NO_ENTRY_BAR", None, None
     )  # fmt: skip
     page = load_run_trades(ctx, canonical(ctx), offset=1, limit=1)
@@ -111,9 +111,11 @@ def test_a_personal_value_is_licence_to_anyone_but_the_holder(backend: MemoryBac
     write_ledger(backend, "r1", ROWS)
     ctx = viewer(backend, "me")
     first, second, _ = load_run_trades(ctx, canonical(ctx)).rows
-    assert isinstance(first.score, Unknown) and first.score.code is UnknownCode.LICENCE
-    assert first.value == 0.02 and first.adv_usd_20d == 1e7  # their licences are open
-    assert second.score == 3.0  # the recorded licence decides, row by row
+    assert (
+        isinstance(first.score.unknown, Unknown) and first.score.unknown.code is UnknownCode.LICENCE
+    )
+    assert first.value.value == 0.02 and first.adv_usd.value == 1e7  # their licences are open
+    assert second.score.value == 3.0  # the recorded licence decides, row by row
 
 
 def test_a_hidden_copys_ledger_is_its_rows_before_the_split(backend: MemoryBackend) -> None:

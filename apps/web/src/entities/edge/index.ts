@@ -8,6 +8,7 @@
  * capacity, regimes and horizons, one read each). Never reads an exploratory run as a track record.
  */
 export { prefetchEdges, refreshEdges, useEdgeProblems, useEdges } from './api/edges';
+export { useEdgeTrades, useEdgeVariants, type TradesRequest } from './api/evidence';
 export {
   useEdgeCapacity,
   useEdgeCosts,
@@ -44,6 +45,16 @@ export {
   type VerdictColumn,
   type EvidenceProgress,
 } from './model/edges';
+export type {
+  EdgeTradePage,
+  EdgeTradeRow,
+  EdgeVariant,
+  EdgeVariants,
+  EvidenceUnknown,
+  TradePeriod,
+  TradeSort,
+  VariantFigures,
+} from './model/evidence';
 export type {
   CurveGap,
   CurvePoint,
