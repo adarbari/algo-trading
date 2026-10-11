@@ -56,6 +56,8 @@ describe('EdgeTrades', () => {
     expect(within(table).getByText('Excluded')).toBeInTheDocument();
     expect(within(table).getByText('No entry bar')).toBeInTheDocument(); // the public reason
     expect(screen.getByText('3 trades')).toBeInTheDocument();
+    expect(screen.getByText(/^Tickers as of /)).toBeInTheDocument(); // the snapshot they came from
+    expect(within(table).getAllByText('Unknown').length).toBeGreaterThan(0); // a name with no company: its reason, not blank
     expect(screen.getByText('help trade_ledger')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
@@ -69,6 +71,8 @@ describe('EdgeTrades', () => {
     expect(last()).toMatchObject({ period: 'OUT_OF_SAMPLE', page: 1 }); // a new period starts at page 1
     await userEvent.click(within(screen.getByRole('grid')).getByRole('button', { name: /^Rank/ }));
     expect(last()).toMatchObject({ sort: 'RANK', page: 1 });
+    await userEvent.click(within(screen.getByRole('grid')).getByRole('button', { name: /^Name/ }));
+    expect(last()).toMatchObject({ sort: 'SYMBOL', page: 1 }); // by ticker, not by instrument id
   });
 
   it('hands the period shown to the CSV button', async () => {

@@ -9,7 +9,16 @@ import type { gqlTypes } from '@/shared/api';
 export type TradePeriod = 'IN_SAMPLE' | 'OUT_OF_SAMPLE' | 'LIVE' | 'ALL';
 
 export type TradeSort =
-  'DECISION' | 'EXIT' | 'INSTRUMENT' | 'RANK' | 'STATUS' | 'VALUE' | 'SCORE' | 'DRAWDOWN' | 'ADV';
+  | 'DECISION'
+  | 'EXIT'
+  | 'INSTRUMENT'
+  | 'SYMBOL'
+  | 'RANK'
+  | 'STATUS'
+  | 'VALUE'
+  | 'SCORE'
+  | 'DRAWDOWN'
+  | 'ADV';
 
 export interface EvidenceUnknown {
   code: gqlTypes.UnknownCode;
@@ -41,7 +50,8 @@ export interface EdgeTradeRow {
   exitSession: string | null;
   instrumentId: string;
   symbol: TradeText;
-  company: { value: string | null };
+  company: TradeText;
+  symbolAsOf: string | null;
   rank: number | null;
   status: string;
   excludedReason: string | null;

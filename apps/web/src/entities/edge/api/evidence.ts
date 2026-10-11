@@ -57,7 +57,14 @@ const EdgeTrades = graphql(`
         }
         company {
           value
+          unknown {
+            code
+            kind
+            guideTerm
+            kindText
+          }
         }
+        symbolAsOf
         rank
         status
         excludedReason

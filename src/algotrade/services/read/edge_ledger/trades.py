@@ -13,6 +13,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
 
+from algotrade.data.reference import companies, instruments
 from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk import paper
@@ -21,6 +22,7 @@ from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edge
 from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow, TradeText
 from algotrade.services.read.instruments.identity import load_instruments
+from algotrade.services.read.session import reference_snapshot_on
 from algotrade.services.read.values import Unknown, UnknownCode
 
 PAGE_SIZE = 50
@@ -53,6 +55,7 @@ class Sort(StrEnum):
     SCORE = "score"
     DRAWDOWN = "max_drawdown"
     ADV = "adv_usd"
+    SYMBOL = "symbol"
 
 
 @dataclass(frozen=True)
@@ -133,25 +136,69 @@ def _live(
     return present + missing
 
 
-def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
-    """``page`` with each row's ticker and company name from the session's reference snapshot; a
-    name the snapshot lacks is ``Unknown`` (never its id, ADR 0018)."""
-    found = load_instruments(ctx, [r.instrument_id for r in page.rows])
-    gap = Unknown(
-        UnknownCode.NO_ROW,
-        table_cause("instruments/reference", "no row for the name in the snapshot", "NO_ROW"),
-    )
-    rows = tuple(
-        replace(
-            r,
-            symbol=TradeText(i.symbol)
-            if (i := found.get(r.instrument_id))
-            else TradeText(None, gap),
-            company=TradeText(i.name or None) if i else TradeText(None, gap),
+REFERENCE = "instruments/reference"
+SYMBOL = "symbol"  # the sort by ticker: the tickers are read after the rows, so it sorts here
+
+
+def _gap(why: str, code: UnknownCode = UnknownCode.NO_ROW) -> Unknown:
+    return Unknown(code, table_cause(REFERENCE, why, code.value))
+
+
+def _name_of(ctx: ReadContext, day: date, ids: list[str]) -> dict[str, tuple[str, TradeText]]:
+    """``ids``' ticker and company name in the reference snapshot in force on ``day`` (the one on or
+    before it: ADR 0007's one rule, the earliest standing in before every snapshot): ticker, and
+    the company's name (the company snapshot's, else the listing's; ``Unknown`` when neither)."""
+    found = instruments(ctx.reader, day, ids)
+    if found is None or found.empty:
+        return {}
+    firms = companies(ctx.reader, day, ids)
+    firm = {} if firms is None else dict(zip(firms["instrument_id"], firms["name"], strict=False))
+    out: dict[str, tuple[str, TradeText]] = {}
+    for iid, symbol, listing in zip(
+        found["instrument_id"], found["symbol"], found["name"], strict=True
+    ):
+        text = (str(firm.get(iid) or "").strip()) or (str(listing or "").strip())
+        out[str(iid)] = (
+            str(symbol),
+            TradeText(text) if text else TradeText(None, _gap("the snapshot has no company name")),
         )
-        for r in page.rows
-    )
-    return replace(page, rows=rows, symbols_snapshot=ctx.session.reference_snapshot)
+    return out
+
+
+def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
+    """``page`` with each row's ticker and company name as the reference snapshot in force at the
+    row's DECISION session had them (never today's: a name changes ticker). A delisted pick the
+    snapshot of its day lacks falls back to the session's snapshot, its last known ticker; any
+    other name no snapshot names is ``Unknown`` (never its id, ADR 0018)."""
+    by_day: dict[date, list[str]] = {}
+    for r in page.rows:
+        by_day.setdefault(r.decision_session, []).append(r.instrument_id)
+    names: dict[date, dict[str, tuple[str, TradeText]]] = {}
+    stamp: dict[date, date | None] = {}
+    for day, ids in by_day.items():
+        stamp[day] = reference_snapshot_on(ctx.reader, day)
+        names[day] = _name_of(ctx, day, ids) if stamp[day] is not None else {}
+    last = {  # the session's snapshot, for a delisted name that day's snapshot lacks
+        i.instrument_id: i
+        for i in load_instruments(ctx, [r.instrument_id for r in page.rows if r.delisted]).values()
+    }
+    rows = []
+    for r in page.rows:
+        hit = names[r.decision_session].get(r.instrument_id)
+        as_of = stamp[r.decision_session]
+        if hit is not None:
+            symbol, company = TradeText(hit[0]), hit[1]
+        elif r.delisted and r.instrument_id in last:
+            i = last[r.instrument_id]
+            symbol = TradeText(i.symbol)
+            company = TradeText(i.name) if i.name else TradeText(None, _gap("no company name"))
+            as_of = i.reference_snapshot
+        else:
+            gap = _gap("no row for the name in the snapshot in force at its decision session")
+            symbol, company, as_of = TradeText(None, gap), TradeText(None, gap), None
+        rows.append(replace(r, symbol=symbol, company=company, symbol_as_of=as_of))
+    newest = max((r.symbol_as_of for r in rows if r.symbol_as_of), default=None)
+    return replace(page, rows=tuple(rows), symbols_snapshot=newest)
 
 
 def load_edge_trades(
@@ -166,6 +213,14 @@ def load_edge_trades(
 ) -> EdgeTradePage:
     """The trades of ``edge``'s verdict basis for ``period``: page ``page`` of ``limit`` rows
     (None: every row, for the file), sorted by ``sort`` (``runs.SORTABLE``), each named."""
+    if sort == SYMBOL:  # sorted after naming, over the whole ledger, then paged
+        whole = _named(ctx, _unnamed(ctx, edge, period, 1, None, False, None))
+        known = [r for r in whole.rows if r.symbol.value is not None]
+        known.sort(key=lambda r: (r.symbol.value or "").casefold(), reverse=descending)
+        rows = (*known, *(r for r in whole.rows if r.symbol.value is None))  # unknown last
+        offset = 0 if limit is None else (max(page, 1) - 1) * limit
+        part = rows[offset : None if limit is None else offset + limit]
+        return replace(whole, page=max(page, 1), rows=part)
     return _named(ctx, _unnamed(ctx, edge, period, page, sort, descending, limit))
 
 

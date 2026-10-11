@@ -27,7 +27,7 @@ import { termHelp } from '@/features/guide-help';
 export const SORT_OF: Record<string, TradeSort> = {
   decision: 'DECISION',
   exit: 'EXIT',
-  instrument: 'INSTRUMENT',
+  instrument: 'SYMBOL',
   rank: 'RANK',
   status: 'STATUS',
   value: 'VALUE',
@@ -78,11 +78,9 @@ export const tradeColumns = (): DataTableColumn<EdgeTradeRow>[] => [
       ) : (
         <Stack gap={0} align="start">
           <Text mono>{formatted.text}</Text>
-          {row.company.value && (
-            <Text tone="muted" size="sm">
-              {row.company.value}
-            </Text>
-          )}
+          <Text tone="muted" size="sm">
+            {row.company.value ?? (row.company.unknown ? unknownWord(row.company.unknown) : '—')}
+          </Text>
         </Stack>
       ),
     essential: true,

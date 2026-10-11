@@ -547,6 +547,7 @@ class TradeRow:
     source: str = "backtest"
     symbol: TradeText = TradeText()  # filled by the ledger read from the reference snapshot
     company: TradeText = TradeText()
+    symbol_as_of: date | None = None  # the reference snapshot the ticker was read from
 
 
 @dataclass(frozen=True)

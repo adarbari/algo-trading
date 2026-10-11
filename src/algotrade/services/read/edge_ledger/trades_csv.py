@@ -14,8 +14,8 @@ from algotrade.services.read.evaluation.runs import TradeCell, TradeRow, TradeTe
 
 COLUMNS = (
     "source", "variant", "horizon_sessions", "decision_session", "entry_session", "exit_session",
-    "instrument_id", "symbol", "company", "rank", "status", "excluded_reason", "hit", "delisted",
-    "before_split",
+    "instrument_id", "symbol", "company", "symbol_as_of", "rank", "status", "excluded_reason",
+    "hit", "delisted", "before_split",
     "score", "value", "gross_value", "max_drawdown", "adv_usd", "reference", "touch",
 )  # fmt: skip
 

@@ -9,6 +9,7 @@
 import {
   Button,
   DataTable,
+  formatValue,
   ErrorState,
   SegmentedControl,
   Skeleton,
@@ -86,6 +87,11 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
           onValueChange={choose}
         />
         <Text tone="muted" size="sm">{`${String(ledger.total)} trades`}</Text>
+        {ledger.symbolsSnapshot && (
+          <Text tone="muted" size="sm">
+            {`Tickers as of ${formatValue(ledger.symbolsSnapshot, { kind: 'date', style: 'short' }).text}`}
+          </Text>
+        )}
         <TradesCsvButton edgeId={edgeId} period={period} />
       </Stack>
       {ledger.unknown ? (

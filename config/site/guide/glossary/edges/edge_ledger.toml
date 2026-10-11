@@ -9,7 +9,7 @@ short = "Every pick of the verdict's basis, one row each, with its dates, rank, 
 body = """
 The ledger lists the names the basis screen picked on each decision session, at the basis holding
 period. Each row says when the pick was decided, bought and sold, its rank (1 is the best), and
-how it ended. Score is the screen's value at the decision session. Value is the outcome, net of
+how it ended. The name is the ticker it had at the decision session, from the reference snapshot in force that day, because a company can change its ticker. The date of that snapshot is shown. A delisted pick shows its last known ticker. A name no snapshot knows reads Unknown, never its id. Score is the screen's value at the decision session. Value is the outcome, net of
 the document's cost: an excess return, or the measure the edge uses. Gross value is the same
 before cost, for return outcomes only. Max drawdown is the deepest dip inside the window. ADV is
 the name's 20-day average dollar volume at the decision session, a check on whether it could be
@@ -19,7 +19,7 @@ picked are not listed. Example: the 20-session ledger of an edge has one row per
 session. Don't count the excluded rows as losses: they have no outcome. The CSV link downloads
 the same rows, in the same order and with the same blanks.
 """
-next = "Filter the ledger by period, then sort by value to see the best and worst picks."
+next = "Filter the ledger by period, then sort by value, or by ticker, to see the best and worst picks."
 see_also = ["trade_status", "trade_excluded_reason", "trade_period", "verdict_basis", "unavailable_licence", "out_of_sample"]
 
 [[term]]
