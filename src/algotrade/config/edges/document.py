@@ -42,8 +42,12 @@ and the key.
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
     notes             optional: a proxy, an open decision
-    [implementation]  optional: ``promoted``, the one of ``screeners`` that implements the edge
-                      for use (ED7c), and ``[[implementation.compared]]``: the frozen-slice
+    [implementation]  optional: ``horizon``, the one of the main outcome's horizon_sessions the
+                      verdict rests on (ADR 0065: declared only where the thesis fixes one; else
+                      the basis is the best candidate in-sample); ``promoted``, the one of
+                      ``screeners`` that implements the edge
+                      for use (ED7c) and the verdict's screen, and ``[[implementation.compared]]``
+                      (only beside ``promoted``): the frozen-slice
                       numbers of the cited run it rests on (``horizon``, ``screener``, ``lift``,
                       ``decile_spread``, ``sessions``, ``decile_sessions``; the model and every
                       rule screener at every horizon). A reader honours ``promoted`` only when
@@ -126,7 +130,7 @@ OUTCOME_KEYS = (
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
 EVIDENCE_KEYS = ("run_id", "split_from")
-IMPLEMENTATION_KEYS = ("promoted", "compared")
+IMPLEMENTATION_KEYS = ("promoted", "horizon", "compared")
 COMPARED_KEYS = ("horizon", "screener", "lift", "decile_spread", "sessions", "decile_sessions")
 EVIDENCE_STATUSES = ("evidenced", "live", "retired")
 _SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
@@ -220,6 +224,7 @@ class Edge:
     evidence: Evidence | None = None
     promoted: str | None = None  # the screener that implements the edge for use (ED7c)
     compared: tuple[Compared, ...] = ()  # the numbers the promotion rests on
+    basis_horizon: int | None = None  # the horizon the verdict rests on (ADR 0065)
     extends: str | None = None  # a user's copy: the edge it is layered over
     follow: Follow = field(default_factory=Follow)  # the user's bookmark of a site edge
     audit: Audit = field(default_factory=Audit)  # the server's bookkeeping of an own edge
@@ -310,6 +315,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         evidence=_evidence(t),
         promoted=_promoted(t),
         compared=_compared(t),
+        basis_horizon=_basis_horizon(t, outcome),
         extends=_extends(t, edge_id),
         follow=parse_follow(doc, where),
         audit=parse_audit(doc, where),
@@ -614,10 +620,31 @@ def _compared(t: Table) -> tuple[Compared, ...]:
 
 
 def _promoted(t: Table) -> str | None:
+    """The promoted screener; required beside ``compared`` and in a table that declares no
+    ``horizon`` (an empty ``[implementation]`` declares nothing)."""
     if t.raw("implementation") is None:
         return None
     sub = t.table("implementation", IMPLEMENTATION_KEYS)
-    return validate_id("screener", sub.text("promoted", "") or _missing(sub, "promoted"))
+    text = sub.text("promoted", "")
+    if not text and "horizon" in sub.names() and "compared" not in sub.names():
+        return None
+    return validate_id("screener", text or _missing(sub, "promoted"))
+
+
+def _basis_horizon(t: Table, outcome: Outcome) -> int | None:
+    """``[implementation] horizon``: one of the outcome's horizons (ADR 0065), else None."""
+    if t.raw("implementation") is None:
+        return None
+    sub = t.table("implementation", IMPLEMENTATION_KEYS)
+    if "horizon" not in sub.names():
+        return None
+    horizon = sub.integer("horizon", 0, 1)
+    if horizon not in outcome.horizon_sessions:
+        raise ConfigurationError(
+            f"{sub.where} horizon: {horizon} is not one of the outcome's horizon_sessions "
+            f"{list(outcome.horizon_sessions)}"
+        )
+    return horizon
 
 
 def _ids(t: Table, key: str) -> tuple[str, ...]:

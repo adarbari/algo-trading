@@ -1,6 +1,6 @@
 # ADR 0053: Edges: hypotheses with evidence, an outcomes grain and one point-in-time harness
 
-**Status:** accepted (2026-10-07; owner decisions 2026-10-06 and 2026-10-07; the plan and items
+**Status:** accepted, amended by [0065](0065-verdict-basis-fixed-before-the-frozen-period.md) (the verdict's basis) (2026-10-07; owner decisions 2026-10-06 and 2026-10-07; the plan and items
 are [edges-plan.md](../edges-plan.md), the long form is the owner's PRD "Winners-Derived Screener:
 Product Requirements"; the open decisions below are the owner's before the item that needs each).
 Extends [0005](0005-ingestion-is-the-only-writer.md) (ingestion writes the outcomes),

@@ -84,3 +84,8 @@ url = "https://doi.org/10.1016/j.jacceco.2014.06.001"
 [[sources]]
 title = "Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993"
 url = "https://doi.org/10.1111/j.1540-6261.1993.tb04702.x"
+
+# The verdict's basis (ADR 0065): the thesis holds the trade 20 sessions (capacity_costs: "one
+# trade per report held 20 sessions"); the 60-session horizon is reported, never the verdict.
+[implementation]
+horizon = 20

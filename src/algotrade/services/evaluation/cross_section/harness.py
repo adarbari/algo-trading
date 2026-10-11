@@ -145,7 +145,8 @@ RUN_INPUTS = (
 )  # fmt: skip
 BOOKKEEPING = (
     "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
-    "rejection_reason", "evidence", "promoted", "compared", "extends", "follow", "audit", "owner",
+    "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
+    "audit", "owner",
 )  # fmt: skip
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
