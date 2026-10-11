@@ -181,7 +181,15 @@ class Answer:
     def names_for(self, user: str | None) -> tuple[str, ...]:
         return self.names
 
-    def complete(self, system: str, user: str, *, tag: object = None) -> Any:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: object = None,
+    ) -> Any:
         criteria = [{"id": "price", "field": "rollup.price_stats@v2.close", "op": "gt", "value": 5}]
         return Completion(json.dumps({"criteria": criteria}), "m", "canned", call_id="call-1")
 

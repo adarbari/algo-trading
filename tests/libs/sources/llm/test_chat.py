@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from algotrade.core.model.errors import ModelUnavailableError
+from algotrade.core.model.errors import InvalidAnswerError, ModelUnavailableError
 from algotrade_sources.framework.http import HttpError, pause
 from algotrade_sources.framework.registry import build_text_model
 from algotrade_sources.llm.chat import DETAIL_CHARS, ChatCompletions, content_of, error_detail
@@ -242,3 +242,52 @@ def test_an_http_error_keeps_a_short_reason_and_nothing_key_like() -> None:
     assert "HTTP 401 Invalid key [redacted] for [redacted]" in message
     assert "sk-abc" not in message and "AIza" not in message and "xxx" not in message
     assert len(error_detail(b"y " * 500)) == DETAIL_CHARS
+
+
+SCHEMA = {"type": "object", "properties": {"criteria": {"type": "array"}}}
+
+
+def sent_body(client: ChatCompletions) -> dict[str, object]:
+    return json.loads(json.dumps(client.request("s", "u", SCHEMA)))
+
+
+def test_response_format_is_the_strict_schema_only_when_the_provider_is_configured_for_it() -> None:
+    def transport(url: str, body: bytes) -> bytes:
+        return anthropic_answer('{"criteria": []}')
+
+    plain = ChatCompletions(BASE, "m", transport, NO_WAIT)
+    assert sent_body(plain)["response_format"] == {
+        "type": "json_object"
+    }  # a provider that ignores it
+    on = ChatCompletions(BASE, "m", transport, NO_WAIT, structured="json_schema")
+    assert sent_body(on)["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {"name": "answer", "schema": SCHEMA, "strict": True},
+    }
+    assert on.request("s", "u")["response_format"] == {"type": "json_object"}  # no schema asked
+
+
+def test_the_schema_travels_in_the_request_body_and_a_lone_adapter_runs_the_check() -> None:
+    sent: list[bytes] = []
+
+    def transport(url: str, body: bytes) -> bytes:
+        sent.append(body)
+        return gemini_answer("not json at all")
+
+    client = ChatCompletions(BASE, "m", transport, NO_WAIT, structured="json_schema")
+    client.complete("s", "u", schema=SCHEMA)
+    assert json.loads(sent[0])["response_format"]["json_schema"]["schema"] == SCHEMA
+
+    def accept(text: str) -> None:
+        raise InvalidAnswerError("not JSON")
+
+    with pytest.raises(InvalidAnswerError):
+        client.complete("s", "u", schema=SCHEMA, accept=accept)
+
+
+def test_the_registry_builds_it_with_the_structured_mode() -> None:
+    built = build_text_model(BASE, "m", 1.0, 1, None, structured="json_schema")
+    assert (
+        built.structured == "json_schema"
+        and build_text_model(BASE, "m", 1.0, 1, None).structured == "none"
+    )

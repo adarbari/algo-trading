@@ -43,6 +43,26 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # every provider's worst case added up, and a value that would cut off the fallback is refused.
 # A machine's llm.local.toml can hold the [[provider]] tables (and `enabled = true`).
 #
+# The order IS the tier order (ADR 0041, amended 2026-10-11): put the cheap model first and the
+# strong one last. An answer the app cannot use (not JSON, not the asked-for shape, a draft the
+# validator refuses) is repaired once by the same provider (one more call that shows it the
+# error); if that fails too the next provider answers. A call makes at most two requests per
+# provider, none after `deadline_s`. `structured = "json_schema"` (top level, or per provider)
+# sends the answer's JSON Schema to a provider that supports it (Gemini, OpenAI-style
+# endpoints, the Claude CLI); the default "none" asks for a JSON object. The answer is checked
+# locally either way.
+#
+# [[provider]]                       # cheap first
+# id = "gemini"
+# base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+# model = "gemini-2.5-flash"
+# # structured = "json_schema"     # (verify with a recorded answer before enabling)
+#
+# [[provider]]                       # strong on failure
+# id = "claude"
+# base_url = "https://api.anthropic.com/v1"
+# model = "claude-sonnet-4-5"
+#
 # enabled = true
 #
 # [[provider]]

@@ -148,6 +148,12 @@ CLI) row written before this amendment (`call_stage` null: its cache was never s
 tally counts those in `callsWithoutTotalInput` instead of summing them. A chat row from before
 is complete: its `prompt_tokens` already included the cache.
 
+## Amended 2026-10-11: the stages are set by the chain
+`call_stage` takes `first`, `repair` and `escalate` (ADR 0041, amended 2026-10-11): the chain
+tags the retry of a refused answer `repair` and the first call to the next provider after a
+refused answer `escalate`. Each attempt is still its own priced row; a refused answer also gets
+its `rejected` row (no cost), all under one `call_id`.
+
 ## Consequences
 - A paid provider cannot be added without its price, and a day's or month's spend stops at its
   cap by construction (the bound is reserved before the call, the counter moves before the write).

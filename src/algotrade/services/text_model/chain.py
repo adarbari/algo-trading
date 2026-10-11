@@ -15,7 +15,13 @@ An optional ``CallLedger`` (ADR 0058) sees every attempt, the failed ones too, a
 a call or skip the members that spend when the budget is used up; it never raises into the
 chain (a bug in recording must not stop an answer). A failed attempt is recorded with its
 message, the prompt and its length; ``reject`` records, as a second row, an answer the caller
-could not use (outcome ``rejected``, no cost: the ``ok`` row already carries it)."""
+could not use (outcome ``rejected``, no cost: the ``ok`` row already carries it).
+The order of the members is the tier order: cheap first, strong last. With the caller's
+``accept`` (ADR 0041, amended 2026-10-11) an answer it refuses (``ModelUnavailableError``,
+usually ``InvalidAnswerError``) is recorded as ``rejected``, the same member is asked once more
+(``repair``: the question, the refused answer and the exact error), and if that is refused too
+the next member is asked (``escalate``): at most two calls per member, none started after
+``deadline_s``. ``schema`` is passed to the members, which send it only when configured to."""
 
 import logging
 import re
@@ -24,7 +30,7 @@ import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from algotrade.core.model.completion import (
     ANSWER,
@@ -46,6 +52,32 @@ from algotrade.services.text_model.model import TextModel
 
 log = logging.getLogger(__name__)
 _REFUSED = re.compile(r"HTTP 4(?!08|29)\d\d")  # a client error the adapter does not retry
+REPAIR, ESCALATE = "repair", "escalate"  # ``CallTag.stage`` of a retry and of the next provider
+
+
+def _stage(tag: CallTag | None) -> str:
+    return tag.stage if tag is not None else "first"
+
+
+def _refusal(accept: Callable[[str], None] | None, text: str) -> str | None:
+    """Why the caller refuses ``text`` (its ``accept`` raised ``ModelUnavailableError``), else
+    ``None``. Any other error in ``accept`` is a bug and propagates."""
+    if accept is None:
+        return None
+    try:
+        accept(text)
+    except ModelUnavailableError as exc:
+        return str(exc)
+    return None
+
+
+def repair_prompt(user: str, answer: str, error: str) -> str:
+    """The user text of a repair call: the original question, the refused answer and the exact
+    error, asking for the corrected JSON only."""
+    return (
+        f"{user}\n\nYour previous answer:\n{clip(answer, MAX_ANSWER)}\n\n"
+        f"Your answer was rejected: {error}. Return only the corrected JSON object."
+    )
 
 
 class CallLedger(Protocol):
@@ -68,6 +100,25 @@ class CallLedger(Protocol):
         ...
 
 
+@dataclass
+class _Call:
+    """What one ``complete`` carries across its members: the question, the clock, its id shared
+    by every attempt and rejection, the causes so far, the first member that failed or was
+    refused (``fell_back_from``), whether a refused answer makes the next member an escalation,
+    and whether a member follows (for the log)."""
+
+    system: str
+    user: str
+    tag: CallTag | None
+    schema: Mapping[str, Any] | None
+    started: float
+    call_id: str
+    failures: list[str] = field(default_factory=list)
+    first_failed: str | None = None
+    escalating: bool = False
+    later: bool = False
+
+
 @dataclass(frozen=True)
 class FallbackTextModel:
     """``members``: ``(provider id, model)`` in the order tried; ``only_users``: provider id ->
@@ -78,6 +129,7 @@ class FallbackTextModel:
     clock: Callable[[], float] = field(default=time.monotonic)
     only_users: Mapping[str, frozenset[str]] = field(default_factory=dict)
     ledger: CallLedger | None = None
+    worst_s: Mapping[str, float] = field(default_factory=dict)  # provider id -> worst_case_s
     now: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
 
     @property
@@ -96,70 +148,130 @@ class FallbackTextModel:
             for name in model.names
         )
 
-    def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
-        started = self.clock()
-        call_id = uuid.uuid4().hex  # shared by every attempt of this call and its rejection
-        chars = len(system) + len(user)
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: Mapping[str, Any] | None = None,
+        accept: Callable[[str], None] | None = None,
+    ) -> Completion:
+        call = _Call(system, user, tag, schema, self.clock(), uuid.uuid4().hex)
         asking = tag.user if tag is not None else None
-        failures: list[str] = []
-        first_failed: str | None = None
         members = [(p, m) for p, m in self.members if self.allowed(p, asking)]
         if not members:
             raise ModelUnavailableError("no text model may answer this user")
         if self.ledger is not None and self._refuses():
             for provider, model in members:
-                self._note(tag, call_id, provider, model, SKIPPED_BUDGET)
+                self._note(tag, call.call_id, provider, model, SKIPPED_BUDGET)
             raise ModelUnavailableError("the text-model budget is spent (llm.toml [budget])")
         for position, (provider, model) in enumerate(members):
-            if position and self.clock() - started > self.deadline_s:
+            if position and self._late(call):
                 skipped = [pid for pid, _ in members[position:]]
-                failures.append(f"not tried, the {self.deadline_s:g} s deadline passed: {skipped}")
-                break
-            reserved = self._admit(provider, chars)
-            if reserved is None:
-                self._note(tag, call_id, provider, model, SKIPPED_BUDGET)
-                failures.append(f"{provider}: skipped, the budget is spent")
-                continue
-            began = self.clock()
-            try:
-                completion = model.complete(system, user, tag=tag)
-            except ModelUnavailableError as exc:
-                self._note(
-                    tag, call_id, provider, model, FAILED, reserved, took=self.clock() - began,
-                    error=str(exc), stage=PROVIDER, user_text=user, chars=chars,
-                )  # fmt: skip
-                failures.append(f"{provider}: {exc}")
-                first_failed = first_failed or provider
-                later = position + 1 < len(members)
-                # a refusal that retrying cannot fix (bad key, unknown model) needs the owner
-                refused = _REFUSED.search(str(exc)) is not None
-                log.log(
-                    logging.ERROR if refused else logging.WARNING,
-                    "text model %s failed%s: %s",
-                    provider,
-                    ", falling back" if later else "",
-                    exc,
+                call.failures.append(
+                    f"not tried, the {self.deadline_s:g} s deadline passed: {skipped}"
                 )
-                continue
-            except Exception as exc:  # a bug propagates, but what it may have cost is settled first
-                self._note(
-                    tag, call_id, provider, model, FAILED, reserved, took=self.clock() - began,
-                    error=f"{type(exc).__name__}: {exc}", stage=PROVIDER, user_text=user,
-                    chars=chars,
-                )  # fmt: skip
-                raise
+                break
+            call.later = position + 1 < len(members)
+            asked, stage = user, ESCALATE if call.escalating else _stage(tag)
+            refusal: str | None = None
+            for attempt in (0, 1):  # the call, then at most one repair of a refused answer
+                if attempt and (left := self._short(call, provider, members[position + 1 :])):
+                    call.failures.append(f"{provider}: {refusal} (not repaired, {left})")
+                    call.escalating = True
+                    call.first_failed = call.first_failed or provider  # its answer was refused
+                    break
+                called = tag if tag is None else replace(tag, stage=REPAIR if attempt else stage)
+                completion = self._ask(call, provider, model, asked, called)
+                if completion is None:  # failed or skipped: the next provider
+                    if attempt == 1:  # the repair never happened: the first answer was refused
+                        call.escalating = True
+                        call.first_failed = call.first_failed or provider
+                    break
+                refusal = _refusal(accept, completion.text)
+                if refusal is None:
+                    return replace(
+                        completion,
+                        latency_s=self.clock() - call.started,
+                        fell_back_from=call.first_failed,
+                    )
+                self.reject(called, completion, refusal, asked, len(system) + len(asked))
+                if attempt == 0:
+                    asked = repair_prompt(user, completion.text, refusal)
+                    continue
+                call.failures.append(f"{provider}: {refusal} (after one repair)")
+                call.first_failed, call.escalating = call.first_failed or provider, True
+        raise ModelUnavailableError("no text model could answer: " + "; ".join(call.failures))
+
+    def _late(self, call: "_Call") -> bool:
+        return self.clock() - call.started > self.deadline_s
+
+    def _short(
+        self, call: "_Call", provider: str, later: Sequence[tuple[str, TextModel]]
+    ) -> str | None:
+        """Why a repair by ``provider`` must not start, else ``None``: the deadline has passed,
+        or, when members follow, the repair's worst case would cut into the time they need (the
+        worst cases of ``later`` but the last, as ``LlmSettings`` validates the deadline, so the
+        fallback keeps its turn). The last member's repair needs only the deadline not to have
+        passed."""
+        spent = self.clock() - call.started
+        if spent > self.deadline_s:
+            return f"the {self.deadline_s:g} s deadline passed"
+        if not later:
+            return None
+        reserve = sum(self.worst_s.get(pid, 0.0) for pid, _ in later[:-1])
+        left = self.deadline_s - reserve - spent
+        if self.worst_s.get(provider, 0.0) > left:
+            return f"{max(left, 0.0):g} s left, the fallback needs {reserve:g} s"
+        return None
+
+    def _ask(
+        self, call: "_Call", provider: str, model: TextModel, asked: str, called: CallTag | None
+    ) -> Completion | None:
+        """One request to ``provider`` (recorded as an attempt): its answer, or ``None`` when it
+        was skipped (budget) or failed (``ModelUnavailableError``; the cause is noted in
+        ``call``). Any other error propagates after what it may have cost is settled."""
+        chars = len(call.system) + len(asked)
+        reserved = self._admit(provider, chars)
+        if reserved is None:
+            self._note(called, call.call_id, provider, model, SKIPPED_BUDGET)
+            call.failures.append(f"{provider}: skipped, the budget is spent")
+            return None
+        began = self.clock()
+        try:
+            completion = model.complete(call.system, asked, tag=called, schema=call.schema)
+        except ModelUnavailableError as exc:
             self._note(
-                tag, call_id, provider, model, FELL_BACK if first_failed else OK, reserved,
-                took=self.clock() - began, answer=completion, fell_back_from=first_failed,
-                chars=chars,
+                called, call.call_id, provider, model, FAILED, reserved,
+                took=self.clock() - began, error=str(exc), stage=PROVIDER,
+                user_text=asked, chars=chars,
             )  # fmt: skip
-            return replace(
-                completion,
-                latency_s=self.clock() - started,
-                fell_back_from=first_failed,
-                call_id=call_id,
+            call.failures.append(f"{provider}: {exc}")
+            call.first_failed = call.first_failed or provider
+            # a refusal that retrying cannot fix (bad key, unknown model) needs the owner
+            refused = _REFUSED.search(str(exc)) is not None
+            log.log(
+                logging.ERROR if refused else logging.WARNING,
+                "text model %s failed%s: %s",
+                provider,
+                ", falling back" if call.later else "",
+                exc,
             )
-        raise ModelUnavailableError("no text model could answer: " + "; ".join(failures))
+            return None
+        except Exception as exc:  # a bug propagates, what it may have cost is settled
+            self._note(
+                called, call.call_id, provider, model, FAILED, reserved,
+                took=self.clock() - began, error=f"{type(exc).__name__}: {exc}",
+                stage=PROVIDER, user_text=asked, chars=chars,
+            )  # fmt: skip
+            raise
+        self._note(
+            called, call.call_id, provider, model, FELL_BACK if call.first_failed else OK,
+            reserved, took=self.clock() - began, answer=completion,
+            fell_back_from=call.first_failed, chars=chars,
+        )  # fmt: skip
+        return replace(completion, call_id=call.call_id)
 
     def reject(
         self,

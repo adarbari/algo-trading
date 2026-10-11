@@ -7,7 +7,8 @@ are the models that may answer, in the order tried (what a cache of their answer
 ``names_for(user)`` the ones that may answer that user (a provider can be limited to some)."""
 
 import logging
-from typing import Protocol
+from collections.abc import Callable, Mapping
+from typing import Any, Protocol
 
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ModelUnavailableError
@@ -30,10 +31,23 @@ class TextModel(Protocol):
         """``names`` limited to the models ``user`` may be answered by (``None``: no one's)."""
         ...
 
-    def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: CallTag | None = None,
+        schema: Mapping[str, Any] | None = None,
+        accept: Callable[[str], None] | None = None,
+    ) -> Completion:
         """The model's answer for ``system`` (the task and its facts) and ``user`` (the
         question), asked as ``tag`` (who and why); raises ``ModelUnavailableError`` when it
-        cannot answer now."""
+        cannot answer now. ``schema``: the JSON Schema the answer should fit, sent to a provider
+        configured to take one (``structured = "json_schema"``) and ignored by the others, so the
+        caller still checks the answer. ``accept``: the caller's check of the answer text; it
+        raises ``ModelUnavailableError`` (``InvalidAnswerError``) for one it cannot use. A chain
+        then repairs once and falls through to its next provider; a single adapter lets the error
+        propagate."""
         ...
 
 
