@@ -70,7 +70,7 @@ test('the Failures view lists a rejected answer and its detail shows the raw ans
     "the model's answer is not JSON",
   );
   await page.getByText('2026-10-08 14:30:00 UTC').click();
-  await expect(page.getByRole('textbox', { name: 'Raw model answer' })).toContainText(
+  await expect(page.getByRole('region', { name: 'Raw model answer' })).toContainText(
     'Support lines are not in the catalogue',
   );
   await expectAccessible(page);

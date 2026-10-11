@@ -71,9 +71,9 @@ export function sliceLabel(by: string, key: string | null | undefined): string {
 /** A stored timestamp as the log's UTC time. */
 export const stamp = (ts: string) => `${ts.replace('T', ' ').slice(0, 19)} UTC`;
 
-/** A stored call's identity: the key the recorder merges on (`ts`, `provider`, `use_case`). */
+/** A stored call's identity: the key the recorder merges on. */
 export function callId(call: UsageCall): string {
-  return `${call.ts}~${call.provider}~${call.useCase}`;
+  return `${call.ts}~${call.provider}~${call.useCase}~${call.user ?? ''}~${call.outcome}`;
 }
 
 export function findCall(usage: LlmUsage | null | undefined, id: string | null): UsageCall | null {

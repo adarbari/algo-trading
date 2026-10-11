@@ -29,6 +29,7 @@ TABLE = "usage/llm_calls"
 JOB = "llm_usage"
 SOURCE = "text_model"
 BATCH = 100  # rows per run at most
+KEY = ["ts", "provider", "use_case", "user", "outcome"]  # as the table's key (schemas.py)
 COLUMNS = (
     "ts", "provider", "model", "use_case", "user", "input_tokens", "output_tokens", "latency_s",
     "cost_usd", "cost_basis", "outcome", "fell_back_from", "error", "stage", "sentence", "answer",
@@ -61,7 +62,7 @@ class UsageRecorder(BatchRecorder[Mapping[str, Any]]):
         return self._put(row)
 
     def _write(self, items: list[Mapping[str, Any]], now: datetime) -> None:
-        frame = _frame(items).drop_duplicates(["ts", "provider", "use_case"], keep="last")
+        frame = _frame(items).drop_duplicates(KEY, keep="last")
         run_id = self.run_id(frame["session_date"].max(), now)
         with self._writer.publishing(run_id, now):
             for session, part in frame.groupby("session_date", sort=True):

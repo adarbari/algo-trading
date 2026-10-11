@@ -294,3 +294,25 @@ def test_an_answer_with_no_criteria_list_is_rejected_and_a_usable_one_is_not(
 def test_a_model_that_cannot_report_a_rejection_is_unaffected(ctx: ReadContext) -> None:
     with pytest.raises(ModelUnavailableError, match="not JSON"):
         draft_screen(ctx, Canned("nope"), "s", "anything")  # no ``reject``: ignored
+
+
+def test_a_draft_the_validator_refuses_is_reported_rejected_and_still_raises(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise ConfigurationError("s.rank: unknown tie_break")
+
+    monkeypatch.setattr("algotrade.services.drafting.screens.validated", refuse)
+    model = Rejecting(proposal())
+    with pytest.raises(ConfigurationError, match="unknown tie_break"):
+        draft_screen(ctx, model, "s", "anything")
+    assert [r[2] for r in model.rejected] == ["s.rank: unknown tie_break"]
+
+
+def test_a_reject_that_breaks_never_masks_the_draft_error(ctx: ReadContext) -> None:
+    class Breaking(Rejecting):
+        def reject(self, *args: Any) -> None:  # type: ignore[override]
+            raise RuntimeError("ledger down")
+
+    with pytest.raises(ModelUnavailableError, match="not JSON"):
+        draft_screen(ctx, Breaking("nope"), "s", "anything")

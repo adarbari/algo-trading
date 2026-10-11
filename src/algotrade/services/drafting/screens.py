@@ -80,7 +80,7 @@ def draft_screen(
     completion = model.complete(system, user, tag=tag)
     try:
         return _draft(ctx, screener_id, completion, infos)
-    except ModelUnavailableError as exc:  # an answer the provider gave and we cannot use
+    except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
 

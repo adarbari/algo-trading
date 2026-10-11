@@ -258,3 +258,25 @@ def test_failures_list_the_failed_and_rejected_calls_with_their_detail() -> None
     assert (old.error, old.stage, old.sentence, old.answer, old.prompt_chars) == (None,) * 5
     assert usage.reliability.rejected == 1 and usage.reliability.failed == 1
     assert usage.windows[0].tally.spent_usd == 0.25 + 0.1  # a rejected row adds nothing
+
+
+def test_a_rejected_row_is_no_call_of_its_own_in_the_counts() -> None:
+    usage = load_llm_usage(
+        stores(
+            {
+                TODAY: [
+                    row(TODAY, 0),
+                    row(TODAY, 1, outcome="rejected", cost_usd=None, cost_basis="unknown",
+                        input_tokens=None, output_tokens=None, stage="answer", error="not JSON"),
+                ]
+            }
+        ),
+        TODAY,
+    )  # fmt: skip
+    today = usage.windows[0].tally
+    assert (today.calls, today.calls_without_tokens, today.unknown) == (1, 0, None)
+    assert (usage.reliability.attempts, usage.reliability.ok) == (1, 1)
+    assert usage.reliability.rejected == 1 and usage.reliability.failure_rate == 0.0
+    outcomes = next(b for b in usage.breakdowns if b.by == "outcome")
+    assert [r.key for r in outcomes.rows] == ["ok"]
+    assert len(usage.failures) == 1  # still listed, with its detail

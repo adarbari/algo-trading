@@ -1405,7 +1405,7 @@ Source: `design-system/components/TextArea`
 
 ### TextBlock
 
-TextBlock: a block of raw text shown as written (a model's answer, an error message, a log excerpt): monospace, line breaks and spaces kept, long lines wrapped, and a height cap past which it scrolls. The block is a read-only text box that takes the keyboard focus so it can be scrolled without a mouse; `label` names it for a screen reader. Never for text a reader is meant to read as prose (Text) or for a value in a row (Mono).
+TextBlock: a block of raw text shown as written (a model's answer, an error message, a log excerpt): monospace, line breaks and spaces kept, long lines wrapped, and a height cap past which it scrolls. The block is a labelled region that takes the keyboard focus so it can be scrolled without a mouse; `label` names it for a screen reader. Never for text a reader is meant to read as prose (Text) or for a value in a row (Mono).
 
 Source: `design-system/components/TextBlock`
 

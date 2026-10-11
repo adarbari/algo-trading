@@ -6,12 +6,16 @@ raises ``ModelUnavailableError`` (``core``); its message never carries a credent
 are the models that may answer, in the order tried (what a cache of their answers is keyed by);
 ``names_for(user)`` the ones that may answer that user (a provider can be limited to some)."""
 
+import logging
 from typing import Protocol
 
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ModelUnavailableError
 
 __all__ = ["CallTag", "Completion", "ModelUnavailableError", "TextModel", "reject_answer"]
+
+
+log = logging.getLogger(__name__)
 
 
 class TextModel(Protocol):
@@ -47,5 +51,9 @@ def reject_answer(
     answer (ADR 0058). A model without ``reject`` (an adapter used alone, a test fake) ignores
     it. Never raises."""
     reject = getattr(model, "reject", None)
-    if reject is not None:
+    if reject is None:
+        return
+    try:
         reject(tag, completion, reason, user_text, prompt_chars)
+    except Exception:  # recording a rejection must never mask the error being raised
+        log.exception("the text model could not record a rejected answer")

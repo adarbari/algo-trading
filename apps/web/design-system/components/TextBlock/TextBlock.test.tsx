@@ -7,7 +7,7 @@ import { TextBlock } from './TextBlock';
 describe('TextBlock', () => {
   it('shows the text as given under its name and can be focused to scroll', () => {
     render(<TextBlock label="Raw model answer" text={'Sure!\n  indented'} />);
-    const block = screen.getByRole('textbox', { name: 'Raw model answer' });
+    const block = screen.getByRole('region', { name: 'Raw model answer' });
     expect(block).toHaveTextContent('Sure! indented');
     expect(block.textContent).toBe('Sure!\n  indented');
     expect(block).toHaveAttribute('tabindex', '0');
@@ -15,7 +15,7 @@ describe('TextBlock', () => {
 
   it('says so when there is no text', () => {
     render(<TextBlock label="Raw model answer" text={null} empty="No answer kept" />);
-    expect(screen.getByRole('textbox', { name: 'Raw model answer' })).toHaveTextContent(
+    expect(screen.getByRole('region', { name: 'Raw model answer' })).toHaveTextContent(
       'No answer kept',
     );
   });

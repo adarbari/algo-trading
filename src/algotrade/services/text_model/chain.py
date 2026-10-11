@@ -169,9 +169,9 @@ class FallbackTextModel:
         """The caller could not use ``completion`` (``reason``): log it, with the raw answer and
         ``user_text`` (the prompt), as a ``rejected`` row of the provider that gave it. The ``ok``
         row already carries the cost, so this one has none. Never raises."""
-        log.warning(
-            "text model %s answer rejected (%s), %d chars: %s",
-            completion.provider, reason, len(completion.text), clip(completion.text, MAX_ANSWER),
+        log.warning(  # the answer itself is in the usage table, not in this log
+            "text model %s answer rejected (%s), %d chars",
+            completion.provider, clip(reason, MAX_SENTENCE), len(completion.text),
         )  # fmt: skip
         if self.ledger is None:
             return

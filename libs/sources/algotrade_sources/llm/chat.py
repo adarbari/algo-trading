@@ -8,6 +8,7 @@ with a doubling pause (``Retry-After`` wins); anything else, or the last failure
 answers 503 with it."""
 
 import json
+import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -19,6 +20,27 @@ from algotrade_sources.framework.http import HttpError, JsonTransport
 
 COMPLETIONS = "/chat/completions"
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+DETAIL_CHARS = 120  # of an error body kept in the message (it is stored in the usage log)
+_KEYLIKE = re.compile(
+    r"(?i)\b(?:bearer\s+\S+|(?:sk|pk|gsk|ghp|xox[a-z]?)[-_]\S+|AIza\S+)|[A-Za-z0-9_.\-]{16,}"
+)
+
+
+def error_detail(body: bytes) -> str:
+    """The short reason in an HTTP error ``body``: ``error.message`` of a JSON body (else the
+    text), one line, anything key-like replaced, at most ``DETAIL_CHARS`` (the message is kept
+    in the usage log, so it carries no credential and no pages of provider text)."""
+    text = body.decode("utf-8", "replace").strip()
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        parsed = None
+    error = parsed.get("error") if isinstance(parsed, dict) else None
+    if isinstance(error, dict) and isinstance(error.get("message"), str):
+        text = error["message"]
+    elif isinstance(error, str):
+        text = error
+    return _KEYLIKE.sub("[redacted]", " ".join(text.split()))[:DETAIL_CHARS]
 
 
 @dataclass(frozen=True)
@@ -79,7 +101,7 @@ class ChatCompletions:
             try:
                 raw = self.transport(self.url, body)
             except HttpError as exc:
-                detail = exc.body.decode("utf-8", "replace").strip()[:200]
+                detail = error_detail(exc.body)
                 if exc.status not in RETRY_STATUSES or last:
                     tried = tried if exc.status in RETRY_STATUSES else ""
                     raise ModelUnavailableError(

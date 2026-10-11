@@ -1,7 +1,7 @@
 /**
  * TextBlock: a block of raw text shown as written (a model's answer, an error message, a log
  * excerpt): monospace, line breaks and spaces kept, long lines wrapped, and a height cap past
- * which it scrolls. The block is a read-only text box that takes the keyboard focus so it can be
+ * which it scrolls. The block is a labelled region that takes the keyboard focus so it can be
  * scrolled without a mouse; `label` names it for a screen reader. Never for text a reader is meant to read as prose
  * (Text) or for a value in a row (Mono).
  */
@@ -23,10 +23,9 @@ export function TextBlock({ text, label, size = 'md', empty = 'nothing' }: TextB
   return (
     <div
       className={styles.block}
-      role="textbox"
-      aria-readonly="true"
-      aria-multiline="true"
+      role="region"
       aria-label={label}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be keyboard-reachable
       tabIndex={0}
       data-size={size}
       data-empty={present ? undefined : true}

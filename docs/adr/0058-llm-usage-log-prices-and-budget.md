@@ -103,9 +103,20 @@ well-formed answer (`services/drafting/screens.py`, `services/explaining/regime.
 `reject_answer`, which reaches `FallbackTextModel.reject`: it writes a **second** row, outcome
 `rejected` (a new `OUTCOMES` value), same provider, model, use case and user, `cost_usd` null
 and basis `unknown`, so the `ok` row still carries the cost once and the budget never counts
-it twice. The Admin read adds `failures` (the newest failed and rejected calls) and
-`reliability.rejected`; the failure detail is admin-only like the rest of the page (the
-messages carry no credential: the adapters never quote stderr or keys).
+it twice; the row's key is (`ts`, `provider`, `use_case`, `user`, `outcome`), so an `ok` row and
+its `rejected` row never collide. The Admin read adds `failures` (the newest failed and
+rejected calls) and `reliability.rejected`, which is shown on its own: a rejected row is no
+call and no attempt, so `calls`, `attempts` and the rates leave it out. The failure detail is
+admin-only like the rest of the page. What is stored is the user's own prompt and the model's
+own text, so it can hold whatever a trader typed. Messages: the Claude Code adapter never
+quotes stderr; the HTTP adapter keeps only the status and the provider's `error.message`, one
+line of at most 120 characters with key-like tokens replaced, so a message is not guaranteed
+free of every secret but carries no header and no pages of provider text. The ledger log line
+of a rejection holds the reason and the answer's length, never the answer.
+
+**Retention.** Stored prompts and answers are kept as long as the table is (indefinitely: no
+retention window applies to `usage/*`), each clipped to 2,000 / 8,000 characters. A
+retention limit is a later decision if the table grows.
 
 ## Consequences
 - A paid provider cannot be added without its price, and a day's or month's spend stops at its

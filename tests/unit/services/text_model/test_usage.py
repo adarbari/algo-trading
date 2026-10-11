@@ -105,3 +105,21 @@ def test_failure_columns_are_stored_and_other_rows_hold_null() -> None:
     assert by.loc["claude", "prompt_chars"] == 1234
     assert by.loc["gemini", ["error", "stage", "sentence", "answer", "prompt_chars"]].isna().all()
     recorder.close()
+
+
+def test_an_ok_row_and_its_rejected_row_with_the_same_time_are_both_stored() -> None:
+    backend = MemoryBackend()
+    recorder = UsageRecorder(UsageWriter(backend), clock=lambda: NEXT)
+    rejected = call(NEXT, outcome="rejected", cost_usd=None, cost_basis="unknown", stage="answer")
+    recorder.submit(call(NEXT))
+    recorder.submit(rejected)
+    recorder.submit(call(NEXT, user="bea"))  # another user, same instant
+    recorder.flush()
+    recorder.submit(rejected | {"error": "again"})  # a later batch: same key, the latest wins
+    recorder.flush()
+    frame = read_llm_calls(StoreReader(backend), date(2026, 10, 3), date(2026, 10, 3))
+    assert frame is not None
+    assert sorted(zip(frame["user"], frame["outcome"], strict=True)) == [
+        ("abhi", "ok"), ("abhi", "rejected"), ("bea", "ok")]  # fmt: skip
+    assert frame.set_index("outcome").loc["rejected", "error"] == "again"
+    recorder.close()

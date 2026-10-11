@@ -315,7 +315,7 @@ USAGE_LLM_CALLS = fixed(
     "answer string",
     "prompt_chars int64",
     runs="merge",
-    key=("ts", "provider", "use_case"),
+    key=("ts", "provider", "use_case", "user", "outcome"),
 )
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.

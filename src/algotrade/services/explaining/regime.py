@@ -13,7 +13,12 @@ from algotrade.core.model.errors import ConfigurationError, ModelUnavailableErro
 from algotrade.services.explaining.answer import Explanation, ask, verify
 from algotrade.services.explaining.cache import TextCache, cache_key
 from algotrade.services.explaining.limits import RateLimiter
-from algotrade.services.explaining.prompt import WHAT_IS_HAPPENING, regime_facts
+from algotrade.services.explaining.prompt import (
+    WHAT_IS_HAPPENING,
+    regime_facts,
+    system_prompt,
+    user_prompt,
+)
 from algotrade.services.read.context import NotFoundError, ReadContext
 from algotrade.services.read.regime.regime import RegimeLabel, load_regime
 from algotrade.services.text_model.model import TextModel, reject_answer
@@ -67,13 +72,15 @@ def explain_regime(
     limiter.take(user, "regime explanations")
     tag = CallTag("regime-explain", user)
     answer = ask(model, facts, asked, tag)
+    chars = len(system_prompt(facts)) + len(user_prompt(asked))
     try:
         explanation = verify(answer.text, facts)
     except ModelUnavailableError as exc:  # an answer the provider gave and we cannot use
-        reject_answer(model, tag, answer, str(exc), asked)
+        reject_answer(model, tag, answer, str(exc), user_prompt(asked), chars)
         raise
     if not explanation.checked:
-        reject_answer(model, tag, answer, explanation.note or "the answer was not verified", asked)
+        reason = explanation.note or "the answer was not verified"
+        reject_answer(model, tag, answer, reason, user_prompt(asked), chars)
     if explanation.checked:
         cache.put(cache_key(regime, asked, answer.model), answer.text)
     return Explained(explanation, False)

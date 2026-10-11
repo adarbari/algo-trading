@@ -368,7 +368,8 @@ def test_reject_records_the_unusable_answer_as_a_second_row_and_logs_it(
     assert (rejected.sentence, rejected.answer, rejected.prompt_chars) == (
         "typed", "Sure! not json", 6)  # fmt: skip
     assert rejected.input_tokens is None and rejected.reported_cost_usd is None
-    assert "Sure! not json" in caplog.text and "not JSON" in caplog.text
+    assert "not JSON" in caplog.text and "14 chars" in caplog.text
+    assert "Sure! not json" not in caplog.text  # the answer is in the usage table, not the log
 
 
 def test_reject_never_raises_when_the_ledger_breaks_and_works_without_one() -> None:

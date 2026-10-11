@@ -35,6 +35,7 @@ WEEK = 7
 RECENT = 50
 OUTCOMES = ("ok", "fell_back", "failed", "skipped_budget", "rejected")
 SKIPPED = "skipped_budget"
+REJECTED = "rejected"
 FAILURES = ("failed", "rejected")  # the outcomes the failures list holds
 COLUMNS = (
     "ts", "day", "provider", "model", "use_case", "user", "input_tokens", "output_tokens",
@@ -115,8 +116,8 @@ class DayPoint:
 class Reliability:
     """Attempts of the 30 days and how they ended; a rate is None when there are no attempts.
     ``fallback_rate`` is ``fell_back`` / attempts, ``failure_rate`` ``failed`` / attempts;
-    ``rejected`` counts the answers a caller could not use (a second row of an ``ok`` attempt,
-    so ``attempts`` counts it too)."""
+    ``rejected`` counts the answers a caller could not use: a second row of an ``ok`` attempt,
+    shown on its own and left out of ``attempts`` and the rates."""
 
     attempts: int
     ok: int
@@ -255,6 +256,7 @@ def _tokens(frame: pd.DataFrame, column: str) -> int:
 
 
 def _tally(frame: pd.DataFrame) -> Tally:
+    frame = frame[frame["outcome"] != REJECTED]  # its ok row is the call: never counted twice
     made = frame[frame["outcome"] != SKIPPED]  # a skipped attempt asked nothing: no tokens due
     without = int(made["input_tokens"].isna().sum())
     unknown = None
@@ -278,6 +280,7 @@ def _tally(frame: pd.DataFrame) -> Tally:
 
 
 def _breakdowns(frame: pd.DataFrame) -> tuple[Breakdown, ...]:
+    frame = frame[frame["outcome"] != REJECTED]  # a rejected row is no call of its own
     total = _cost(frame, *SPENDING)
     out = [Breakdown("model", _slices(frame, ["model", "provider"], total))]
     out += [Breakdown(c, _slices(frame, [c], total)) for c in BY]
@@ -302,8 +305,8 @@ def _slices(frame: pd.DataFrame, columns: list[str], total: float) -> tuple[Slic
 
 
 def _reliability(frame: pd.DataFrame) -> Reliability:
-    n = len(frame)
     count = {o: int((frame["outcome"] == o).sum()) for o in OUTCOMES}
+    n = len(frame) - count[REJECTED]  # a rejected row is a second row of an ok attempt
     return Reliability(
         n, count["ok"], count["fell_back"], count["failed"], count[SKIPPED], count["rejected"],
         count["fell_back"] / n if n else None, count["failed"] / n if n else None,

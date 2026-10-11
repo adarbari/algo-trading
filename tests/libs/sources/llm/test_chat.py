@@ -9,7 +9,7 @@ import pytest
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.http import HttpError, pause
 from algotrade_sources.framework.registry import build_text_model
-from algotrade_sources.llm.chat import ChatCompletions, content_of
+from algotrade_sources.llm.chat import DETAIL_CHARS, ChatCompletions, content_of, error_detail
 from tests.helpers.payloads.llm import anthropic_answer, gemini_answer
 
 BASE = "https://api.groq.com/openai/v1"
@@ -200,3 +200,20 @@ def test_a_count_the_provider_left_out_is_none_never_zero(
         "s", "u"
     )
     assert (done.input_tokens, done.output_tokens) == tokens
+
+
+def test_an_http_error_keeps_a_short_reason_and_nothing_key_like() -> None:
+    body = json.dumps(
+        {"error": {"message": "Invalid key sk-abcdefghijklmnop1234 for\nAIzaSyA1B2C3D4E5F6G7H8I9",
+                   "details": ["x" * 500]}}
+    ).encode()  # fmt: skip
+
+    def refused(url: str, body_: bytes) -> bytes:
+        raise HttpError(401, None, body)
+
+    with pytest.raises(ModelUnavailableError) as exc:
+        ChatCompletions(BASE, "llama", refused, NO_WAIT).complete("s", "u")
+    message = str(exc.value)
+    assert "HTTP 401 Invalid key [redacted] for [redacted]" in message
+    assert "sk-abc" not in message and "AIza" not in message and "xxx" not in message
+    assert len(error_detail(b"y " * 500)) == DETAIL_CHARS
