@@ -8,7 +8,7 @@ from typing import Self
 import strawberry
 from strawberry.scalars import JSON
 
-from algotrade.services.read.evaluation import edges, evidence, robustness
+from algotrade.services.read.evaluation import decay, edges, evidence, robustness
 from algotrade.services.read.evaluation import verdict as read
 
 
@@ -177,6 +177,36 @@ class VerdictColumn:
 
 
 @strawberry.type(
+    description="What would change the verdict: `criterion` (the first test not passed; "
+    "`level`: the verdict it gates) in `sentence`. For a count of trades (`trades`, "
+    "`works_trades`) `have` of `needed` and `remaining` to come, and `projectionState` (why "
+    "there is no date: not_stored, unprojectable, oos_hidden; projected and beyond_projection "
+    "once a run stores the schedule's exits). Null for the other tests: a t statistic is not "
+    "projected"
+)
+class EdgeOutlook:
+    criterion: str
+    level: str
+    sentence: str
+    have: int | None
+    needed: int | None
+    remaining: int | None
+    projection_state: str | None
+
+    @classmethod
+    def of(cls, d: evidence.EdgeOutlook) -> Self:
+        return cls(
+            criterion=d.criterion,
+            level=d.level,
+            sentence=d.sentence,
+            have=d.have,
+            needed=d.needed,
+            remaining=d.remaining,
+            projection_state=d.projection_state,
+        )
+
+
+@strawberry.type(
     description="How much evidence the verdict has: `oosTrades` out-of-sample against `needed` "
     "(from there it can say Promising or Not working; `reached`: it has them), "
     "`worksOosNeeded` the out-of-sample count Works asks, `wholeTrades` against `wholeNeeded` "
@@ -190,6 +220,7 @@ class EvidenceProgress:
     whole_needed: int
     reached: bool
     checks: list[VerdictCriterion]
+    outlook: EdgeOutlook | None
 
     @classmethod
     def of(cls, d: evidence.EvidenceProgress) -> Self:
@@ -201,6 +232,7 @@ class EvidenceProgress:
             whole_needed=d.whole_needed,
             reached=d.reached,
             checks=[VerdictCriterion.of(c) for c in d.checks],
+            outlook=EdgeOutlook.of(d.outlook) if d.outlook else None,
         )
 
 
@@ -242,6 +274,99 @@ class Robustness:
 
 
 @strawberry.type(
+    description="The Sharpe ratio after the multiple-testing haircut (Harvey and Liu): the "
+    "stored `sharpe` (per trade, not annualised) over `sessions` trades is `haircutSharpe` once "
+    "`trials` variants tried are counted, `cut` (0 to 1) the share lost; `method` names the "
+    "adjustment (bonferroni: Holm's value for the best of the trials) and `summary` is the "
+    "sentence. Null: not stored, or the Sharpe ratio is not above zero"
+)
+class EdgeHaircut:
+    sharpe: float
+    haircut_sharpe: float
+    cut: float
+    trials: int
+    sessions: int
+    method: str
+    summary: str
+
+    @classmethod
+    def of(cls, d: robustness.EdgeHaircut) -> Self:
+        return cls(
+            sharpe=d.sharpe,
+            haircut_sharpe=d.haircut_sharpe,
+            cut=d.cut,
+            trials=d.trials,
+            sessions=d.sessions,
+            method=d.method,
+            summary=d.summary,
+        )
+
+
+@strawberry.type(
+    description="The figure the literature reports for the edge: `measure` (mean_excess, "
+    "decile_spread or lift_pts) equal to `value` over `horizonSessions`, from `source` over "
+    "`sample` years (null: not stated)"
+)
+class EdgePublished:
+    measure: str
+    value: float
+    horizon_sessions: int
+    source: EdgeSource
+    sample: int | None
+
+    @classmethod
+    def of(cls, d: edges.EdgePublished) -> Self:
+        return cls(
+            measure=d.measure,
+            value=d.value,
+            horizon_sessions=d.horizon_sessions,
+            source=EdgeSource.of(d.source),
+            sample=d.sample,
+        )
+
+
+@strawberry.type(
+    description="One bar of the decay: `period` (published, in_sample, out_of_sample), its "
+    "`value` (null unless `state` is measured) over `n` (the trades, or the decile sessions of a "
+    "decile spread; null for the paper's) and the `state` that says why a value is missing "
+    "(not_stored, not_comparable: another holding period than the paper's, oos_hidden)"
+)
+class DecayBar:
+    period: str
+    value: float | None
+    n: int | None
+    state: str
+
+    @classmethod
+    def of(cls, d: decay.DecayBar) -> Self:
+        return cls(period=d.period, value=d.value, n=d.n, state=d.state)
+
+
+@strawberry.type(
+    description="The decay of one statistic: the paper's figure (`published`) against the "
+    "harness's in-sample and out-of-sample ones (`bars`, in that order after the paper's) at the "
+    "verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). Null: "
+    "the edge's document publishes no figure"
+)
+class EdgeDecay:
+    measure: str
+    unit: str
+    published: EdgePublished
+    basis_horizon: int
+    bars: list[DecayBar]
+
+    @classmethod
+    def of(cls, d: decay.EdgeDecay) -> Self:
+        return cls(
+            measure=d.measure,
+            unit=d.unit,
+            published=EdgePublished.of(d.published),
+            basis_horizon=d.basis_horizon,
+            bars=[DecayBar.of(b) for b in d.bars],
+        )
+
+
+@strawberry.type(
     description="An edge's verdict, judged on its official result (the canonical run): "
     "`verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` "
     "the first failing criterion in words; `headline` the page's sentence and `result` the "
@@ -252,7 +377,8 @@ class Robustness:
     "of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` "
     "the lift among random-pick backtests; `columns` the basis's figures in-sample, "
     "out-of-sample and over all (empty: no result yet); `evidence` the trades against what the "
-    "verdict needs"
+    "verdict needs; `haircut` the basis's Sharpe ratio after the variants tried; `decay` the "
+    "paper's figure against the in- and out-of-sample ones"
 )
 class EdgeVerdict:
     verdict: str
@@ -278,6 +404,8 @@ class EdgeVerdict:
     robustness: Robustness | None
     columns: list[VerdictColumn]
     evidence: EvidenceProgress | None
+    haircut: EdgeHaircut | None
+    decay: EdgeDecay | None
 
     @classmethod
     def of(cls, d: read.EdgeVerdict) -> Self:
@@ -305,4 +433,6 @@ class EdgeVerdict:
             robustness=Robustness.of(d.robustness) if d.robustness else None,
             columns=[VerdictColumn.of(c) for c in d.columns],
             evidence=EvidenceProgress.of(d.evidence) if d.evidence else None,
+            haircut=EdgeHaircut.of(d.haircut) if d.haircut else None,
+            decay=EdgeDecay.of(d.decay) if d.decay else None,
         )

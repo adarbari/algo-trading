@@ -85,7 +85,22 @@ url = "https://doi.org/10.1016/j.jacceco.2014.06.001"
 title = "Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993"
 url = "https://doi.org/10.1111/j.1540-6261.1993.tb04702.x"
 
+[[sources]]
+title = "Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies 33(5), 2020"
+url = "https://www.nber.org/papers/w23394"
+
 # The verdict's basis (ADR 0065): the thesis holds the trade 20 sessions (capacity_costs: "one
 # trade per report held 20 sessions"); the 60-session horizon is reported, never the verdict.
 [implementation]
 horizon = 20
+
+# The nearest published figure, not this edge's own rule (nothing published conditions
+# momentum on a just-completed report): the high-minus-low decile of the abnormal return around
+# earnings announcements, 0.30% a month, value-weighted, 1967-2014 (section 3.3). Medium
+# confidence: read it as the size to expect, not as a claim about this edge.
+[published]
+measure = "decile_spread"
+value = 0.0030
+horizon_sessions = 20
+sample = 48
+source = 8

@@ -61,6 +61,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Screeners:** `momentum_12_1`
 - **Baselines:** none yet
 - **Frozen period:** from 2026-04-01
+- **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
 - **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
 
 **Quality bar**
@@ -94,6 +95,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Screeners:** `momentum_12_1`
 - **Baselines:** `size_small`
 - **Frozen period:** from 2026-04-01
+- **Published:** decile spread 0.30% over 20 sessions (Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies 33(5), 2020, 48 years)
 - **Notes:** Found by the harness 2026-10-08 in the small_cap_earnings_drift run (momentum baseline among event names: decile spread +13.1%, t 2.84, 9 decile sessions; frozen +8.3%, 4 sessions). One universe snapshot (2026-10-02) serves all history. The decoy (plain momentum_12_1 on all liquid names on the same sessions) is not a variant: a variant overrides only the outcome and the universe, never `base`, so it would still pick among event names; the plain-momentum comparison stays the edge_momentum_12_1 document's own run (month-end sessions), left to a later PR.
 
 **Quality bar**
@@ -118,6 +120,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies 29(1), 2016 <https://doi.org/10.1093/rfs/hhv063>
 - Chordia, T., Subrahmanyam, A. and Tong, Q., Have Capital Market Anomalies Attenuated in the Recent Era of High Liquidity and Trading Activity?, Journal of Accounting and Economics 58(1), 2014 <https://doi.org/10.1016/j.jacceco.2014.06.001>
 - Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers, Journal of Finance 48(1), 1993 <https://doi.org/10.1111/j.1540-6261.1993.tb04702.x>
+- Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies 33(5), 2020 <https://www.nber.org/papers/w23394>
 
 ## Small-cap post-earnings drift (`small_cap_earnings_drift`)
 
@@ -130,6 +133,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Screeners:** `pead_small_cap`
 - **Baselines:** `momentum_12_1`, `size_small`
 - **Frozen period:** from 2026-04-01
+- **Published:** decile spread 3.55% over 60 sessions (Brandt, M., Kishore, R., Santa-Clara, P. and Venkatachalam, M., Earnings Announcements are Full of Surprises, working paper, 2008, 18 years)
 - **Notes:** Surprise = the excess return over SPY from the close before the report to the close after it (Brandt et al. 2008), earnings_reaction@v1 from events/earnings read by known_from. E is the report date (the group's definition), the window close(E-1) -> close(E+1). Long only. The $2B cap was decided 2026-10-08 (ED4 decisions); the harness reports the micro (under $300M) and small ($300M to $2B) buckets as variants, each a trial of the deflated Sharpe ratio. The large-cap control (from $10B) runs the same screener, whose own cap criterion (under $2B) leaves it no picks: only its base rate (event names of large caps) and the baselines are informative, the screener's row is empty by construction. A long-short variant is not expressible: a variant overrides only the outcome and the universe, and an outcome has no short leg (the harness would need a new kind); left to a later PR.
 
 **Quality bar**
@@ -229,6 +233,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Top K:** all qualified names
 - **Screeners:** none yet
 - **Baselines:** none yet
+- **Published:** mean excess 0.80% over 20 sessions (Greenwood, R. and Sammon, M., The Disappearing Index Effect, 2022, 11 years)
 
 **Quality bar**
 
@@ -261,6 +266,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Top K:** all qualified names
 - **Screeners:** none yet
 - **Baselines:** none yet
+- **Published:** mean excess 5.00% over 20 sessions (Chang, Y.-C., Hong, H. and Liskovich, I., Regression Discontinuity and the Price Effects of Stock Market Indexing, Review of Financial Studies, 2015, 17 years)
 - **Notes:** The schedule is a placeholder: index_change is the S&P 500 only; ED6 adds a Russell membership source and its event class.
 
 **Quality bar**

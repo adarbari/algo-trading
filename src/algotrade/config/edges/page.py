@@ -67,6 +67,8 @@ def _section(e: Edge) -> list[str]:
     ]
     if e.frozen_from:
         lines.append(f"- **Frozen period:** from {e.frozen_from.isoformat()}")
+    if e.published:
+        lines.append(f"- **Published:** {_published(e)}")
     if e.notes:
         lines.append(f"- **Notes:** {e.notes}")
     lines += ["", "**Quality bar**", ""]
@@ -77,6 +79,17 @@ def _section(e: Edge) -> list[str]:
     lines += ["", "**Sources**", ""]
     lines += [f"- {s.title}" + (f" <{s.url}>" if s.url else "") for s in e.sources]
     return lines
+
+
+def _published(e: Edge) -> str:
+    p = e.published
+    assert p is not None
+    shown = f"{p.value:g} points" if p.measure == "lift_pts" else f"{p.value * 100:.2f}%"
+    years = f", {p.sample} years" if p.sample else ""
+    return (
+        f"{p.measure.replace('_', ' ')} {shown} over {p.horizon_sessions} sessions "
+        f"({e.sources[p.source].title}{years})"
+    )
 
 
 def _outcome(o: Outcome, event: bool) -> str:

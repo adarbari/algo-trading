@@ -75,3 +75,13 @@ url = "https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Mo
 [[sources]]
 title = "Quantpedia, Momentum Factor Effect in Stocks (strategy page)"
 url = "https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/"
+
+# The literature's figure (ADR 0064): winners minus losers, percent a month, equal-weighted
+# deciles of NYSE and AMEX stocks, 1965-1989, 12-month formation and 3-month holding, before
+# costs (Table I, Panel A). The decay panel sets it beside the harness's decile spread.
+[published]
+measure = "decile_spread"
+value = 0.0131
+horizon_sessions = 20
+sample = 25
+source = 0

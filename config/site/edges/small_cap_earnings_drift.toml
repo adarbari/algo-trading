@@ -116,3 +116,13 @@ url = "https://doi.org/10.1561/104.00000122"
 [[sources]]
 title = "Quantpedia, Post-Earnings Announcement Effect (strategy page)"
 url = "https://quantpedia.com/strategies/post-earnings-announcement-effect/"
+
+# The literature's figure (ADR 0064): top minus bottom quintile of the announcement return,
+# 3.55% over 60 trading days from day 2, all caps, price over 5 dollars, 1987-2004, before
+# costs (Table 7, quoted by Quantpedia). Medium confidence: the paper itself was not opened.
+[published]
+measure = "decile_spread"
+value = 0.0355
+horizon_sessions = 60
+sample = 18
+source = 1
