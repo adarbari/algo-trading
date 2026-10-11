@@ -3,13 +3,17 @@ start and after every publish (polled every ``WARM_EVERY_S``), reads into the sh
 cache what every caller shares: the market tables' whole history (``warm_market_frames``), so
 the regime page's charts slice a cached frame instead of reading 14 000 partitions on a
 request (20 s a table cold), and the status strip's one-session completeness grid and the
-session's regime that every page shows (3 to 5 s on the first page after a publish), and
-the signal timing of every reference episode (the regime page's History).
+session's regime that every page shows (3 to 5 s on the first page after a publish), the
+session's stored screen rows that every screener page and the Builder's preview read (1.6 s on
+the first one after a publish), the Builder's first preview of every screen on the Screeners
+list (its field frame and the picks of its saved run), and the signal timing of every
+reference episode (the regime page's History).
 The read runs in the read pool (``off_loop``) like any request's, taking one of its threads;
 a failing step is logged and the others still run; the next publish tries again."""
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable, Hashable
 from functools import partial
 
@@ -19,6 +23,7 @@ from algotrade.services.read.market.history import warm_market_frames
 from algotrade.services.read.ops.ingestion import load_completeness
 from algotrade.services.read.regime.regime import load_regime
 from algotrade.services.read.regime.timeline import load_episode_signals
+from algotrade.services.read.screens.runs import screen_rows
 from algotrade_api.graphql.offload import off_loop
 
 WARM_EVERY_S = 60.0
@@ -26,9 +31,24 @@ WARM_EVERY_S = 60.0
 log = logging.getLogger(__name__)
 
 
-def warm(ctx: ReadContext) -> None:
-    """Read what every page shares for ``ctx``'s session and published state."""
-    steps: list[tuple[str, Callable[[], object]]] = [
+type Step = tuple[str, Callable[[], object]]
+type ExtraSteps = Callable[[ReadContext], list[Step]]
+
+
+def warm(ctx: ReadContext, extra: ExtraSteps | None = None) -> None:
+    """Read what every page shares for ``ctx``'s session and published state, then the steps
+    ``extra`` names for it (the Builder's first preview of each screen: the API wires them in,
+    this layer reads only the read model)."""
+    steps: list[Step] = [
+        # first: a second, not the market frames' minutes, stands between a publish and it
+        ("screen rows", lambda: screen_rows(ctx)),  # the screener pages' and the preview's runs
+    ]
+    if extra is not None:
+        try:
+            steps.extend(extra(ctx))  # a second or two each
+        except Exception:
+            log.exception("warming the read cache: the extra steps failed")
+    steps += [
         ("market frames", lambda: warm_market_frames(ctx)),
         ("completeness", lambda: load_completeness(ctx, 1)),  # the status strip's grid
         ("regime", lambda: load_regime(ctx)),
@@ -41,10 +61,13 @@ def warm(ctx: ReadContext) -> None:
     except Exception:
         log.exception("warming the read cache: the episodes failed")
     for name, step in steps:  # one failing step does not stop (or repeat) the others
+        started = time.monotonic()
         try:
             step()
         except Exception:
             log.exception("warming the read cache: %s failed", name)
+        else:
+            log.info("warmed %s in %.1f s", name, time.monotonic() - started)
 
 
 class CacheWarmer:
@@ -52,8 +75,14 @@ class CacheWarmer:
     published state is new;
     ``run`` polls until cancelled (the app's lifespan starts and cancels it)."""
 
-    def __init__(self, open_ctx: Callable[[], ReadContext], every_s: float = WARM_EVERY_S):
+    def __init__(
+        self,
+        open_ctx: Callable[[], ReadContext],
+        every_s: float = WARM_EVERY_S,
+        extra: ExtraSteps | None = None,
+    ):
         self._open_ctx = open_ctx
+        self._extra = extra
         self._every_s = every_s
         self._warmed: Hashable | None = None
 
@@ -65,7 +94,7 @@ class CacheWarmer:
         state = (ctx.session.date, ctx.session.newer, ctx.reader.visible_seq())
         if state == self._warmed:
             return False
-        warm(ctx)
+        warm(ctx, self._extra)
         self._warmed = state
         return True
 

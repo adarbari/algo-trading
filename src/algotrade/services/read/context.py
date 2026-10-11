@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -71,6 +71,14 @@ NUMBER_BYTES = 24  # a boxed float or int
 DICT_BASE_BYTES = 64  # an empty-ish dict
 DICT_ENTRY_BYTES = 40  # one key/value entry of a dict, its hash table share included
 MAX_CACHE_BYTES = 400 * 1024 * 1024  # the frames a cache holds, together (the hosted API's RSS)
+
+
+@runtime_checkable
+class Weighted(Protocol):
+    """A cached object that knows about what it holds (a frame of Python dicts, which
+    ``weigh`` cannot walk cheaply): the cache bounds it by that count."""
+
+    def weight_bytes(self) -> int: ...
 
 
 def weigh(value: Any) -> int:
@@ -151,7 +159,7 @@ class ResultCache:
             return self._items[key]
 
     def put(self, key: Hashable, value: Any) -> None:
-        weight = weigh(value)
+        weight = value.weight_bytes() if isinstance(value, Weighted) else weigh(value)
         with self._lock:
             self._held -= self._weights.pop(key, 0)
             self._items[key] = value
