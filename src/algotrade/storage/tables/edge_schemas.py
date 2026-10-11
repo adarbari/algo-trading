@@ -214,9 +214,12 @@ EDGE_LEGS = fixed(
 # from the run's v2 legs, written in the run's one publish with its ``edge_eval`` rows and read
 # only through ``services/read/evaluation/runs.py``, by ``run_id``. Partition ``session_date`` =
 # the run's range end, as ``edge_eval``. ``before_split``: the decision block started before the
-# run's split (the harness's own rule, never re-derived from dates). ``value`` is oriented and
-# net of the document's cost, ``gross_value`` the stored excess return before cost (return
-# outcomes), ``max_drawdown`` the window's dip, ``adv_usd_20d`` the ADV at D (null: not stored).
+# run's split (the harness's own rule, never re-derived from dates). ``score`` is the score at D:
+# the value stored for D now (screens read with ``as_of = None``, ADR 0063; a later restatement
+# of D's inputs is accepted, ADR 0064), not necessarily as first published. ``value`` is
+# oriented and net of the document's cost, ``gross_value`` the stored excess return before cost
+# (return outcomes), ``max_drawdown`` the window's dip, ``adv_usd_20d`` the ADV at D (null: not
+# stored).
 # ``licence`` is the trial's (the strictest of its implied-vol field, screen and universe
 # features); ``value_licence``, ``score_licence`` and ``adv_licence`` are the licences of those
 # columns (``value`` with ``gross_value``, ``reference`` and ``touch``): a reader redacts a

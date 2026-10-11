@@ -12,9 +12,6 @@ from algotrade.data import StoreReader
 from algotrade.services.read.context import open_stores
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.services.read.evaluation.runs import (
-    NOT_STORED,
-    PRUNED,
-    STORED,
     EdgeRun,
     ledger_keep,
     load_canonical_run,
@@ -97,7 +94,7 @@ def test_a_page_of_the_ledger_in_key_order(backend: MemoryBackend) -> None:
     write_ledger(backend, "r1", ROWS)
     ctx = viewer(backend, "owner")
     found = load_run_trades(ctx, canonical(ctx))
-    assert (found.state, found.total, found.licence) == (STORED, 3, "personal")
+    assert (found.unknown, found.total, found.licence) == (None, 3, "personal")
     assert [r.instrument_id for r in found.rows] == ["EQ:A", "EQ:B", "EQ:C"]
     assert found.rows[0].score == 3.0  # the licence holder sees the personal score
     gone = found.rows[2]
@@ -130,11 +127,16 @@ def test_a_hidden_copys_ledger_is_its_rows_before_the_split(backend: MemoryBacke
 def test_a_pruned_ledger_and_a_run_from_before_it_are_told_apart(backend: MemoryBackend) -> None:
     write_ledger(backend, "old", None)
     ctx = stores(backend)
-    assert load_run_trades(ctx, canonical(ctx)).state == NOT_STORED
+    old = load_run_trades(ctx, canonical(ctx)).unknown
+    assert old is not None and old.code is UnknownCode.NOT_STORED  # ADR 0056: with its cause
+    assert old.cause.links and "old" in old.cause.links[0].message
     write_ledger(backend, "pruned", [], minutes=5, count=12)
-    assert load_run_trades(ctx, canonical(ctx)).state == PRUNED
+    pruned = load_run_trades(ctx, canonical(ctx)).unknown
+    assert pruned is not None and pruned.code is UnknownCode.PRUNED
+    assert "re-run" in pruned.cause.links[0].message
     write_ledger(backend, "none", [], minutes=9)
-    assert load_run_trades(ctx, canonical(ctx)).state == STORED  # it wrote no rows
+    empty = load_run_trades(ctx, canonical(ctx))
+    assert (empty.unknown, empty.rows, empty.total) == (None, (), 0)  # it wrote no rows
 
 
 def test_the_purge_spares_the_canonical_latest_and_cited_runs(backend: MemoryBackend) -> None:
@@ -146,8 +148,13 @@ def test_the_purge_spares_the_canonical_latest_and_cited_runs(backend: MemoryBac
     write_ledger(backend, "mine", ROWS, owner="me", end=days[4], minutes=5)
     cited = {**DOCS[("site", "edges", "drift")], "status": "evidenced",
              "evidence": {"run_id": "cited", "split_from": FROZEN}}  # fmt: skip
+    users = {"user": [{"id": "site", "role": "admin"}, {"id": "me", "role": "trader"}]}
     configs = MemoryConfigStore({**DOCS, ("site", "edges", "drift"): cited,
-                                 ("me", "settings", "x"): {}})  # fmt: skip
-    keep = ledger_keep(StoreReader(backend), configs)
-    assert keep == {days[0], days[2], days[3], days[4]}  # "old" is none of them
+                                 ("site", "settings", "users"): users})  # fmt: skip
+    since = (T + timedelta(days=1)).date()  # every run here finished before it
+    keep = ledger_keep(StoreReader(backend), configs, since)
+    # "old" is none of them; "mine" is kept though "me" has no config folder (users.toml)
+    assert keep == {days[0], days[2], days[3], days[4]}
+    # a run that finished within the retention window is kept, whatever its range end
+    assert days[1] in ledger_keep(StoreReader(backend), configs, T.date())
     assert EDGE_TRADES.retention_days == 45

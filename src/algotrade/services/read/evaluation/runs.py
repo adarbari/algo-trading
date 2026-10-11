@@ -10,8 +10,9 @@ canonical run of an edge is the latest committed run of the site user whose spli
 
 A run's trade ledger (``results/edge_trades``, ADR 0064) is read here too (``load_run_trades``),
 the one reader: a hidden run's rows before its split only, per-name values under a licence the
-viewer does not hold as ``LICENCE``, and a ledger the retention purge removed (``PRUNED``) told
-apart from one the run never wrote (``NOT_STORED``). ``ledger_keep`` says which partitions the
+viewer does not hold as ``Unknown(LICENCE)``, and a ledger the retention purge removed
+(``Unknown(PRUNED)``) told apart from one the run never wrote (``Unknown(NOT_STORED)``), each with
+its admin cause (ADR 0056). ``ledger_keep`` says which partitions the
 purge spares: those of each edge's canonical run, latest run per user and cited run."""
 
 from collections.abc import Mapping
@@ -22,7 +23,7 @@ from typing import Any, Final
 import pandas as pd
 
 from algotrade.config.edges.document import LEGACY_SITE_CUTOFF, LEGACY_SITE_OWNERS, job_name
-from algotrade.config.edges.loading import UserDocuments, load_all_edges
+from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.data import StoreReader
@@ -30,6 +31,7 @@ from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, run_partition
 from algotrade.services.read.evaluation.edges import Edge, load_edges
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
+from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import result_table
 
@@ -389,8 +391,6 @@ def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
 
 # ---------------------------------------------------------------------------- the trade ledger
 LEDGER = "edge_trades"
-STORED, PRUNED, NOT_STORED = "STORED", "PRUNED", "NOT_STORED"
-LEDGER_STATES: Final = (STORED, PRUNED, NOT_STORED)
 PERSONAL = "personal"
 # The per-name columns each recorded column licence covers (ADR 0064 decision 10).
 LICENSED: Final = {
@@ -433,11 +433,12 @@ class TradeRow:
 @dataclass(frozen=True)
 class RunTrades:
     """One page of a run's ledger (``offset`` .. ``offset + limit`` of ``total`` rows matching
-    the filters, by variant, horizon, decision session and rank). ``state``: ``STORED``,
-    ``PRUNED`` (the run wrote rows the retention purge has removed: re-run the backtest) or
-    ``NOT_STORED`` (a run from before the ledger); ``licence``: the trial licence of its rows."""
+    the filters, by variant, horizon, decision session and rank). ``unknown``: why there is no
+    ledger to read: ``PRUNED`` (the run wrote rows the retention purge has removed: re-run the
+    backtest) or ``NOT_STORED`` (a run from before the ledger); None when it is read (a run that
+    wrote no row has none). ``licence``: the trial licence of its rows."""
 
-    state: str
+    unknown: Unknown | None
     rows: tuple[TradeRow, ...] = ()
     total: int = 0
     licence: str | None = None
@@ -510,11 +511,15 @@ def load_run_trades(
     record = ctx.reader.run(run.run_id)
     count = None if record is None else record.stats.get("ledger_rows")
     if record is None or count is None:
-        return RunTrades(NOT_STORED)
+        why = f"run {run.run_id} is older than the trade ledger: re-run the backtest"
+        return RunTrades(Unknown(UnknownCode.NOT_STORED, run_cause(run.run_id, why)))
     table = result_table(LEDGER)
     frame = run_partition(ctx, table, record)
     if frame is None or frame.empty:
-        return RunTrades(PRUNED if count else STORED)
+        if not count:
+            return RunTrades(None)
+        why = f"the ledger of run {run.run_id} was purged after its retention: re-run the backtest"
+        return RunTrades(Unknown(UnknownCode.PRUNED, table_cause(table, why, "PRUNED")))
     keep = pd.Series(True, index=frame.index)
     if run.oos_hidden or before_split is True:
         keep &= frame["before_split"].fillna(False).astype(bool)
@@ -533,15 +538,18 @@ def load_run_trades(
     )
     licences = {str(v) for v in found["licence"].dropna()} if "licence" in found else set()
     licence = PERSONAL if PERSONAL in licences else (licences.pop() if licences else None)
-    return RunTrades(STORED, rows, len(found), licence)
+    return RunTrades(None, rows, len(found), licence)
 
 
-def ledger_keep(reader: StoreReader, configs: UserDocuments) -> frozenset[date]:
+def ledger_keep(reader: StoreReader, configs: ConfigStore, since: date) -> frozenset[date]:
     """The ``results/edge_trades`` partitions the retention purge spares (ADR 0064 decision 2):
-    those of every edge's canonical run (the latest committed site run at its frozen split), of
-    the latest committed run of each edge and user, and of every run an edge's ``[evidence]``
-    cites. Every edge of every user is looked at, the site's and each user's own."""
-    users = list(dict.fromkeys([SITE_USER, *configs.users()]))
+    those of every run that finished on or after ``since`` (the retention cutoff: a partition is
+    dated by its run's range end, so an old range run yesterday is still recent), of every edge's
+    canonical run (the latest committed site run at its frozen split), of the latest committed run
+    of each edge and user (the declared users and those with config files) and of every run an
+    edge's ``[evidence]`` cites."""
+    declared = [u.user_id for u in load_users(configs).users]
+    users = list(dict.fromkeys([SITE_USER, *declared, *configs.users()]))
     keep: set[date] = set()
     for edge in load_all_edges(configs):
         for user in users:
@@ -549,6 +557,9 @@ def ledger_keep(reader: StoreReader, configs: UserDocuments) -> frozenset[date]:
                 (r for r in reader.runs(job_name(edge.id, user)) if r.status is RunStatus.COMPLETE),
                 key=lambda r: r.finished_at or r.started_at,
                 reverse=True,
+            )
+            keep.update(
+                r.session_date for r in done if (r.finished_at or r.started_at).date() >= since
             )
             if done:
                 keep.add(done[0].session_date)

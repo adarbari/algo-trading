@@ -156,6 +156,12 @@ def test_licences_are_held_only_by_the_users_who_list_them() -> None:
         )
 
 
+def test_the_single_user_install_holds_the_personal_licence() -> None:
+    """Without users.toml, ``local`` is the owner: their own personal-licence values show."""
+    users = UsersSettings.from_document(None)
+    assert users.holds("local", "personal") and not users.holds("site", "personal")
+
+
 def test_the_committed_registry_gives_the_personal_licence_to_the_owner_only() -> None:
     doc = tomllib.loads(Path("config/site/users.toml").read_text())
     users = UsersSettings.from_document(doc)

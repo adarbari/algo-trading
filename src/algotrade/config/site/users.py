@@ -73,7 +73,7 @@ class UserRecord:
 
 
 DEFAULT_USERS: tuple[UserRecord, ...] = (
-    UserRecord(DEFAULT_USER, Role.ADMIN, "Local user"),
+    UserRecord(DEFAULT_USER, Role.ADMIN, "Local user", licences=("personal",)),  # the owner
     UserRecord(SITE_USER, Role.ADMIN, "Scheduled site screens"),
 )
 

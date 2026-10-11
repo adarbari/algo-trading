@@ -90,5 +90,5 @@ def _purge_ledger(ctx: TaskContext, session: date) -> int | None:
     if ctx.configs is None:
         return None
     cutoff = session - timedelta(require_retention(EDGE_TRADES.name))
-    keep = ledger_keep(ctx.reader, ctx.configs)
+    keep = ledger_keep(ctx.reader, ctx.configs, cutoff)
     return ctx.writer.purge_table_before(EDGE_TRADES.name, cutoff, keep)
