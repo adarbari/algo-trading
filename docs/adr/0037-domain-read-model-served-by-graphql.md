@@ -3,7 +3,7 @@
 **Status:** accepted (2026-10-05; owner decision). Amends [0024](0024-api.md) (thin routes over
 `services.explore` become thin GraphQL types over `services.read`; `services.explore` is
 deleted at the end) and [0025](0025-frontend-architecture.md) rule 4 (the generated client
-has two generators). Spec: [docs/api/read-model.md](../api/read-model.md). Implemented over
+has two generators); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (one file GET, the edge ledger CSV). Spec: [docs/api/read-model.md](../api/read-model.md). Implemented over
 read-model PRs 2-10; PR 1 records it and builds the harness.
 
 ## Context
@@ -39,6 +39,8 @@ one could pick a different session (ADR 0036).
    jobs, an admin any, a site job (a preset's shared run) everyone; anyone else's job is 404, like
    an unknown id. It replaces the per-kind polls `GET /screens/{id}/run/{job_id}` (0033) and
    `GET /edges/{id}/evaluate/{job_id}` (0059): `max_get_routes` goes from 5 to 4.
+   Amended by [0064](0064-edge-evidence-series-and-trade-ledger.md): the edge ledger's CSV file, `GET /files/edges/{edge_id}/trades.csv`
+   (same loader as `Query.edgeTrades`): `max_get_routes` goes from 4 to 5.
 5. **Migration in ten PRs** (the spec's plan), each green and shippable; `services/explore` is
    deleted in the last.
 
