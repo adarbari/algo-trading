@@ -1,0 +1,33 @@
+{
+  "id": "pe-and-revenue-growth",
+  "sentence": "stocks with a P/E under 15 and revenue growth over 10% a year",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "P/E under 15",
+        "bucket": "A",
+        "fields": [
+          "feature.pe_ratio"
+        ],
+        "op": "lt",
+        "value": 15,
+        "tolerance": 0.0
+      },
+      {
+        "span": "revenue growth over 10% a year",
+        "bucket": "A",
+        "fields": [
+          "feature.revenue_growth_yoy"
+        ],
+        "op": "gt",
+        "value": 0.1,
+        "tolerance": 0.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

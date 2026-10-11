@@ -155,6 +155,11 @@ fields = ["instrument.security_type", "instrument.optionable", "instrument.statu
 hint = "stocks: security_type in [COMMON_STOCK, ADR]; ETFs: security_type in [ETF]; optionable: optionable eq true; always status eq ACTIVE"
 
 [[phrase]]
+say = ["rising volume", "volume building", "increasing volume", "volume picking up", "growing volume"]
+fields = ["feature.volume_trend_20_60", "rollup.volume@v1.volume_ratio_5d_20d"]
+hint = "volume_trend_20_60 gt 1.0 (gte 1.2 for a clear build), soft with tolerance 0.1; or volume_ratio_5d_20d gte 1.2 for the week against the month; pair with feature.volume_bias eq ACCUMULATION for the direction of the volume"
+
+[[phrase]]
 say = ["volume drying up", "quiet volume", "volume contraction", "dried-up volume", "tight and quiet"]
 fields = ["feature.volume_dry_up", "rollup.volume@v1.volume_ratio_5d_20d"]
 hint = "volume_dry_up eq true (the last 5 sessions under 60% of the 20-session average); or volume_ratio_5d_20d lte 0.6 soft with tolerance 0.1 to rank how dry; pair with feature.range_20d_pct lte for a tight base"

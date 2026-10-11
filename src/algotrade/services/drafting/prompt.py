@@ -7,7 +7,12 @@ the usual criterion per intent, the caveats, and the situations that fool severa
 only entries over this catalogue's fields, sources left out) and the sentence. Rendered with no
 timestamps or ids, so the same catalogue, phrasebook and guide give the same bytes (a provider's
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
-or credentials."""
+or credentials.
+
+``system_prompt`` renders all of that (~110k tokens over the site catalogue); the draft sends
+``sliced_system_prompt`` (``PROMPT_VERSION`` 2): the task, the examples and an index of every
+field (name, type, unit) as a prefix no sentence changes, then in detail only the fields
+``retrieval.select_slice`` picks for the sentence (9-12k tokens), then the caller's own features."""
 
 import json
 from collections.abc import Iterable, Mapping
@@ -20,7 +25,10 @@ from algotrade.config.site.field_guide import (
     Situation,
 )
 from algotrade.config.site.llm import Phrase
+from algotrade.services.drafting.retrieval import select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
+
+PROMPT_VERSION = "2"  # the prompt's shape: v2 = field index + per-sentence slice (was: all of it)
 
 TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored
@@ -43,7 +51,9 @@ Each criterion is an object with:
 
 Rules:
 - Use only catalogue fields. Never invent a field: when the sentence asks for something the
-  catalogue does not have, leave it out and say so in "notes".
+  catalogue does not have, leave it out and say so in "notes". The field index lists every
+  field you may use; some are then described in detail. A field with no detail is still valid:
+  pick it by its name when it is what the sentence asks for.
 - Percentages become fractions for a field whose unit is a fraction (50% -> 0.5); a field
   whose unit is percent takes 50. Dollar amounts are plain numbers (50M -> 50000000).
 - "stocks" means instrument.security_type in ["COMMON_STOCK", "ADR"]; "ETFs" means ["ETF"];
@@ -55,10 +65,10 @@ Rules:
   first); otherwise "tie_break" is null.
 - When current criteria are given, keep every one the sentence does not change and answer
   with the complete new list.
-- The phrasebook after the catalogue says which fields a trader's words mean and how to
+- The phrasebook (when given) says which fields a trader's words mean and how to
   use them (the gate, a confirmation, a score; typical thresholds). Follow it; prefer its
   thresholds to your own; say in "notes" when you had to choose one.
-- The field guide after the phrasebook says how to read a field, the usual criterion for
+- The field guide (when given) says how to read a field, the usual criterion for
   each intent (op, value, mode, tolerance) and when the reading lies. Take thresholds from
   it, never from memory. When a caveat or a situation names a field to check, add that
   criterion (soft or score, so it lists rather than rejects) and say why in "notes".
@@ -310,6 +320,92 @@ def system_prompt(
             out += "\n".join(entries) + "\n"
         situations = [
             line for s in guide.situations if (line := situation_line(s, names)) is not None
+        ]
+        if situations:
+            out += (
+                "\nSituations that fool a threshold (situation | signs | affects | what to do):\n"
+            )
+            out += "\n".join(situations) + "\n"
+    if own:
+        out += "\nYour own features (name | type | unit | description | values):\n"
+        out += "\n".join(catalogue_line(info) for info in own) + "\n"
+    return out
+
+
+INDEX_HEADER = (
+    "Field index (every field you may use: name | type | unit). Detail for the fields most "
+    "likely to matter follows it; a field with no detail is still valid:"
+)
+CAVEAT_CHARS = 200
+
+
+def index_line(info: FeatureInfo) -> str:
+    """One field of the index: ``name | type | unit``."""
+    return f"{info.name} | {info.dtype} | {info.unit or '-'}"
+
+
+def slice_guide_line(entry: FieldGuideEntry, catalogue: set[str]) -> str | None:
+    """A field guide entry trimmed for the slice: ``name | use: ... | caveat: <the first one,
+    its first sentence>``. None when the field is not in this catalogue."""
+    if entry.name not in catalogue:
+        return None
+    uses = "use: " + "; ".join(use_text(u) for u in entry.uses) if entry.uses else "use: -"
+    parts = [entry.name, uses]
+    if entry.caveats:
+        first = " ".join(entry.caveats[0].split())
+        first = first.split(". ")[0].rstrip(".")
+        if len(first) > CAVEAT_CHARS:
+            first = first[: CAVEAT_CHARS - 1].rstrip() + "…"
+        parts.append(f"caveat: {first}")
+    return " | ".join(parts)
+
+
+def prefix_text(catalogue: Iterable[FeatureInfo]) -> str:
+    """The part of the sliced prompt that no sentence changes: the task, the examples and the
+    index of every SITE field (sorted by name)."""
+    site = sorted((i for i in catalogue if i.scope == "site"), key=lambda i: i.name)
+    index = "\n".join(index_line(i) for i in site)
+    return f"{TASK}\n{examples_text()}\n{INDEX_HEADER}\n{index}\n"
+
+
+def sliced_system_prompt(
+    catalogue: Iterable[FeatureInfo],
+    sentence: str,
+    phrasebook: Iterable[Phrase] = (),
+    guide: FieldGuideSettings | None = None,
+) -> str:
+    """The prompt for one sentence (ADR 0041, plan "Token and latency budget"): ``prefix_text``
+    (byte-identical across sentences), then the slice ``select_slice`` picks (catalogue lines,
+    trimmed guide entries, the phrasebook entries the sentence says, the situations over the
+    slice), then the caller's own features in full (``scope != "site"``, sorted; most users have
+    none). The sentence itself is in the user prompt."""
+    infos = list(catalogue)
+    names = {info.name for info in infos}
+    chosen = select_slice(sentence, infos, phrasebook, guide)
+    picked = set(chosen.fields)
+    detail = [i for i in sorted(infos, key=lambda i: i.name) if i.name in picked]
+    detail = [i for i in detail if i.scope == "site"]
+    own = sorted((i for i in infos if i.scope != "site"), key=lambda i: i.name)
+    out = prefix_text(infos)
+    out += "\nDetail (name | type | unit | description | values):\n"
+    out += "\n".join(catalogue_line(i) for i in detail) + "\n"
+    phrases = [line for p in chosen.phrases if (line := phrase_line(p, names)) is not None]
+    if phrases:
+        out += "\nPhrasebook (what the trader says | fields | how to use them):\n"
+        out += "\n".join(phrases) + "\n"
+    if guide is not None:
+        entries = [
+            line
+            for e in guide.fields
+            if e.name in picked and (line := slice_guide_line(e, names)) is not None
+        ]
+        if entries:
+            out += "\nField guide (field | the criterion per intent | main caveat):\n"
+            out += "\n".join(entries) + "\n"
+        situations = [
+            line
+            for s in guide.situations
+            if picked.intersection(s.affects) and (line := situation_line(s, names)) is not None
         ]
         if situations:
             out += (

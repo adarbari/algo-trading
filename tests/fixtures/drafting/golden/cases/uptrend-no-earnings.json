@@ -1,0 +1,33 @@
+{
+  "id": "uptrend-no-earnings",
+  "sentence": "stocks in an uptrend with earnings more than 10 sessions away",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "in an uptrend",
+        "bucket": "A",
+        "fields": [
+          "feature.trend_state"
+        ],
+        "op": "eq",
+        "value": "UPTREND",
+        "tolerance": 0.0
+      },
+      {
+        "span": "earnings more than 10 sessions away",
+        "bucket": "A",
+        "fields": [
+          "rollup.earnings@v1.days_to_earnings"
+        ],
+        "op": "gt",
+        "value": 10,
+        "tolerance": 0.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

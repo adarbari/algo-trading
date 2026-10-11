@@ -17,10 +17,14 @@ from algotrade.config.site.settings import load_field_guide, load_phrasebook
 from algotrade.services.configs import field_catalog
 from algotrade.services.drafting.prompt import (
     EXAMPLES,
+    PROMPT_VERSION,
     catalogue_line,
     guide_line,
+    index_line,
     phrase_line,
     situation_line,
+    slice_guide_line,
+    sliced_system_prompt,
     system_prompt,
     use_text,
     user_prompt,
@@ -197,3 +201,25 @@ def test_users_share_the_site_prefix_and_own_features_come_last() -> None:
     # every catalogue field appears exactly once as a catalogue line
     for i in (*site, mine):
         assert first.count("\n" + catalogue_line(i) + "\n") == 1
+
+
+def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
+    assert PROMPT_VERSION == "2"
+    names = {"rollup.b@v1.x"}
+    assert (
+        index_line(info("instrument.a", "str", unit="category")) == "instrument.a | str | category"
+    )
+    assert slice_guide_line(RSI, names) == (
+        "rollup.b@v1.x | use: oversold: lt 30 soft tolerance 5.0 (with a trend); "
+        'liquid: gte 50000000.0 soft tolerance {"relative": 0.2} on_miss LIQUIDITY_RISK; '
+        'known: not_null hard; high: eq "HIGH" hard | caveat: pinned by a deal'
+    )  # no "reads", the first caveat only
+    assert slice_guide_line(ELSEWHERE, names) is None
+    infos = [info("rollup.b@v1.x"), info("feature.other"), info("feature.c", description="rsi")]
+    guide = FieldGuideSettings((RSI,), (DEAL, NOWHERE))
+    text = sliced_system_prompt(infos, "oversold b names", (), guide)
+    assert text.index("Field index") < text.index("Detail (") < text.index("Field guide (")
+    index = text.split("Detail (")[0]
+    assert all(f"{i.name} | float | -" in index for i in infos)  # every field is indexed
+    assert "feature.other | float | - | x" not in text  # but only the slice has detail
+    assert "pending takeover" in text and "Phrasebook (" not in text

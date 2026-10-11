@@ -1,10 +1,11 @@
-"""``draft_screen``: a sentence to a draft rule screen (ADR 0041). The prompt is the task, the
-caller's catalogue, the site phrasebook (``config/site/phrasebook.toml``) and the site field guide
-(``config/site/field_guide/*.toml``: thresholds and caveats per field). The model's JSON
-is parsed strictly (ids, fields, ops, modes, values, tolerances); a criterion on a field outside the
-caller's catalogue, or one the validator rejects, is dropped with the reason (never saved,
-never silently kept); the rest is validated with ``resolve_rule_draft`` as finalise does. Reads
-only the catalogue and the configs; writes nothing."""
+"""``draft_screen``: a sentence to a draft rule screen (ADR 0041). The prompt is the task, an
+index of the caller's catalogue and, for the sentence's slice of it (``retrieval``), the
+fields in detail, the site phrasebook (``config/site/phrasebook.toml``) entries and the site
+field guide (``config/site/field_guide/*.toml``: thresholds and caveats per field). The
+model's JSON is parsed strictly (ids, fields, ops, modes, values, tolerances); a criterion on
+a field outside the caller's catalogue, or one the validator rejects, is dropped with the
+reason (never saved, never silently kept); the rest is validated with ``resolve_rule_draft``
+as finalise does. Reads only the catalogue and the configs; writes nothing."""
 
 import json
 import logging
@@ -18,7 +19,7 @@ from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.drafting.prompt import system_prompt, user_prompt
+from algotrade.services.drafting.prompt import sliced_system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.services.text_model.model import TextModel, reject_answer
@@ -74,7 +75,7 @@ def draft_screen(
     infos = feature_infos(ctx.features)
     phrasebook = load_phrasebook(ctx.configs).phrases
     guide = load_field_guide(ctx.configs)
-    system = system_prompt(infos.values(), phrasebook, guide)
+    system = sliced_system_prompt(infos.values(), sentence, phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
     tag = CallTag("screener-draft", ctx.user.user_id)
     completion = model.complete(system, user, tag=tag)
