@@ -1,22 +1,26 @@
 """``slice_measures``: per-slice numbers pooled from per-session stats, by hand. Counts are
 explicit; a statistic that is undefined is None (one session has no sd), never a made-up zero."""
 
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, timedelta
 
 import numpy as np
 import pytest
 
-from algotrade.quant.edges.statistics import break_even_cost, moments
+from algotrade.quant.edges.statistics import break_even_cost, deflated_sharpe, moments, sharpe
 from algotrade.services.evaluation.cross_section.measures import (
     CostGrid,
     Pick,
     SessionStat,
     Slice,
+    SliceMeasure,
     cost_measures,
     decile_means,
+    deflate,
     edge_slices,
     pool_stats,
     slice_measures,
+    trial_value,
 )
 
 ALL = Slice("all", "all", lambda _: True)
@@ -333,3 +337,128 @@ def test_a_below_outcomes_oriented_mean_moves_the_other_way_with_cost() -> None:
     for bp in (0, 20, 50):
         got = break_even_cost(rows[f"all:{bp}"].mean_excess_picks, bp, -1.0)
         assert got == pytest.approx(break_even_cost(own, DOC_BP, -1.0))
+
+
+# Trial statistics of an outcome that is not a return (ADR 0064 amendment 2026-10-11)
+
+
+def wins_stat(day: date, cushions: tuple[float, ...], hits: int, base_hits: int) -> SessionStat:
+    """A cushion session: the picks' cushions, ``hits`` of them won; 10 eligible names."""
+    rest = tuple(0.5 for _ in range(10 - len(cushions)))
+    return stat(day, cushions, rest, hits, base_hits=base_hits)
+
+
+DAYS = [date(2026, 1, 5) + timedelta(days=7 * i) for i in range(40)]
+
+
+def _cushions(shift: int = 0) -> list[SessionStat]:
+    """Big, steady cushions (a cushion Sharpe near 10) whose wins only sometimes beat the base."""
+    return [
+        wins_stat(d, (2.0 + 0.01 * ((i + shift) % 3), 2.1), 1 + (i + shift) % 2, 6)
+        for i, d in enumerate(DAYS)
+    ]
+
+
+def test_a_win_rate_outcomes_sharpe_is_of_the_excess_wins_never_the_cushion() -> None:
+    stats = _cushions()
+    (m,) = slice_measures(stats, [ALL], wins=True)
+    excess = [s.pick_hits / len(s.pick_values) - s.base_hits / s.eligible for s in stats]
+    assert m.sharpe == pytest.approx(sharpe(excess))
+    assert m.sharpe < 1  # the cushion's would be about 10: a cushion is not P&L
+    (returns,) = slice_measures(stats, [ALL])  # a return outcome keeps the picks' mean
+    assert returns.sharpe == pytest.approx(sharpe([s.pick_mean for s in stats]))
+
+
+def test_a_session_with_no_counted_pick_has_no_excess_wins() -> None:
+    empty = stat(date(2026, 1, 5), (), (0.1, 0.2), 0, base_hits=1)
+    assert empty.excess_wins is None and trial_value(empty, True) is None
+    one = wins_stat(date(2026, 1, 5), (1.0, 2.0), 1, 4)
+    assert trial_value(one, True) == pytest.approx(0.5 - 0.4)
+    assert trial_value(one, False) == pytest.approx(1.5)
+
+
+@dataclass(frozen=True)
+class Trial:
+    """The ``Scored`` side of a harness result."""
+
+    name: str
+    role: str
+    unit: str | None
+    stats: tuple[SessionStat, ...]
+    measures: tuple[SliceMeasure, ...]
+    horizon: int = 15
+
+    @property
+    def wins(self) -> bool:
+        return self.unit in ("cushion", "ratio")
+
+
+def trial(
+    name: str, stats: list[SessionStat], role: str = "screener", unit: str = "cushion"
+) -> Trial:
+    wins = unit in ("cushion", "ratio")
+    return Trial(name, role, unit, tuple(stats), tuple(slice_measures(stats, [ALL], wins=wins)))
+
+
+def _ratio_stats() -> list[SessionStat]:
+    """A ratio outcome whose oriented values are large and negative (a Sharpe of about -6)."""
+    return [
+        stat(d, (-3.0 - 0.5 * (i % 2),), (-3.0,) * 9, i % 2, base_hits=5)
+        for i, d in enumerate(DAYS)
+    ]
+
+
+def _by_name(results: list[Trial]) -> dict[str, SliceMeasure]:
+    return {r.name: r.measures[0] for r in results}
+
+
+def test_the_dsr_peers_are_the_screeners_of_the_horizon_and_unit_only() -> None:
+    """An extreme baseline, a screener of another unit or of another horizon does not move a
+    screener's deflated Sharpe or PBO: they are not trials of the same hypothesis."""
+    own = [trial("a", _cushions()), trial("b", _cushions(1))]
+    alone = _by_name(deflate(own, 126))
+    extreme = [
+        trial("decoy", [wins_stat(d, (9.0, 9.0), 2, 0) for d in DAYS], role="baseline"),
+        trial("ratio", _ratio_stats(), unit="ratio"),
+        replace_horizon(trial("long", [wins_stat(d, (5.0, 5.0), 2, 1) for d in DAYS]), 30),
+    ]
+    mixed = _by_name(deflate([*own, *extreme], 126))
+    for name in ("a", "b"):
+        assert mixed[name].deflated_sharpe == pytest.approx(alone[name].deflated_sharpe)
+        assert mixed[name].pbo == alone[name].pbo
+        assert mixed[name].trials == 126
+
+
+def test_a_win_rate_trial_is_deflated_on_its_excess_wins() -> None:
+    a, b = _cushions(), _cushions(1)
+    got = _by_name(deflate([trial("a", a), trial("b", b)], 126))
+    excess = [s.excess_wins for s in a]
+    peers = [sharpe([s.excess_wins for s in x]) for x in (a, b)]
+    want = deflated_sharpe(excess, 126, float(np.var(peers, ddof=1)))
+    assert got["a"].deflated_sharpe == pytest.approx(want)
+    cushion = deflated_sharpe([s.pick_mean for s in a], 126, float(np.var(peers, ddof=1)))
+    assert got["a"].deflated_sharpe != pytest.approx(cushion)  # never the cushion's series
+
+
+def test_a_baseline_is_deflated_against_the_screeners_and_a_lone_screener_has_no_pbo() -> None:
+    base = trial("decoy", _cushions(2), role="baseline")
+    one = _by_name(deflate([trial("a", _cushions()), base], 10))
+    assert one["a"].pbo is None and one["decoy"].pbo is None  # one trial: nothing to compare
+    want = deflated_sharpe([s.excess_wins for s in _cushions(2)], 10, 1 / (len(DAYS) - 1))
+    assert one["decoy"].deflated_sharpe == pytest.approx(want)
+
+
+def test_a_lone_trial_is_deflated_by_the_trial_count_against_the_nulls_sharpe_variance() -> None:
+    """Fewer than two peers: V = 1 / (T - 1), so SR0 > 0 and 126 trials still deflate (with
+    V = 0 the deflated Sharpe would be the undeflated probabilistic Sharpe ratio)."""
+    values = [s.excess_wins for s in _cushions()]
+    (got,) = deflate([trial("a", _cushions())], 126)
+    want = deflated_sharpe(values, 126, 1 / (len(values) - 1))
+    assert got.measures[0].deflated_sharpe == pytest.approx(want)
+    undeflated = deflated_sharpe(values, 126, 0.0)
+    assert want is not None and undeflated is not None and want < undeflated
+    assert got.measures[0].pbo is None  # a lone trial has no PBO, never one against a baseline
+
+
+def replace_horizon(t: Trial, horizon: int) -> Trial:
+    return Trial(t.name, t.role, t.unit, t.stats, t.measures, horizon)

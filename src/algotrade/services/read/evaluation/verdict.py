@@ -200,6 +200,7 @@ class _Candidate:
     baselines: tuple[EdgeRow, ...]
     years: tuple[EdgeRow, ...]
     year_parts: tuple[EdgeRow, ...] = ()  # a year cut by the split, as ``<year>:<side>`` rows
+    lone: bool = False  # the only screener of the run at its holding period: no PBO peers
 
 
 def _by_year(row: EdgeRow) -> str:
@@ -225,6 +226,14 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
         )
         years = tuple(sorted((r for r in mine if r.slice_kind == "year"), key=_by_year))
         parts = tuple(sorted((r for r in mine if r.slice_kind == "year_part"), key=_by_year))
+        trials = {
+            (r.edge_variant, r.variant)
+            for r in rows
+            if r.role not in (runs.BASELINE, runs.RANDOM)
+            and r.slice_kind == "all"
+            and r.horizon_sessions == horizon
+            and not r.exploratory
+        }
         found.append(
             _Candidate(
                 variant,
@@ -235,6 +244,7 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
                 base,
                 years,
                 parts,
+                len(trials) == 1,
             )
         )
     return found
@@ -261,6 +271,18 @@ def _random(c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow]) -> tupl
     return f"beats {_pct(share)} of {n} random picks", share >= t.random_beat_share
 
 
+ONE_TRIAL = "one variant tried"  # the value of a PBO criterion that does not apply
+
+
+def _overfit(id: str, pbo: float | None, bound: float, level: str, alone: bool) -> VerdictCriterion:
+    """A PBO criterion: not applicable for a lone trial (ADR 0064 amendment 2026-10-11: PBO
+    compares the edge's alternatives, never its baselines), else at most ``bound``."""
+    label, threshold = "Chance the result is overfitting", f"at most {bound:g}"
+    if alone:
+        return _not_applicable(id, label, ONE_TRIAL, threshold, level)
+    return _crit(id, label, _num(pbo), threshold, _at_most(pbo, bound), level)
+
+
 def _criteria(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
@@ -269,6 +291,7 @@ def _criteria(
     oos_pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     in_pts = runs.lift_points(c.insample.hit_rate, c.insample.base_rate) if c.insample else None
     pbo = whole.pbo if whole.pbo is not None else oos.pbo
+    alone = c.lone and pbo is None  # a lone trial has nothing to overfit among: not applicable
     dsr = whole.deflated_sharpe if whole.deflated_sharpe is not None else oos.deflated_sharpe
     lifts = [b.lift for b in c.baselines if b.lift is not None]
     spreads = [b.decile_spread for b in c.baselines if b.decile_spread is not None]
@@ -326,8 +349,7 @@ def _criteria(
               "above the base rate", win_ok, PROMISING),
         _crit("decile_t", "Top vs bottom decile t", _num(oos.decile_t),
               f"at least {t.promising_t:g}", _at_least(oos.decile_t, t.promising_t), PROMISING),
-        _crit("pbo", "Chance the result is overfitting", _num(pbo),
-              f"at most {t.max_pbo:g}", _at_most(pbo, t.max_pbo), PROMISING),
+        _overfit("pbo", pbo, t.max_pbo, PROMISING, alone),
         _crit("dsr", "Deflated Sharpe", _num(dsr), f"at least {t.promising_dsr:g}",
               _at_least(dsr, t.promising_dsr), PROMISING),
         against_all,
@@ -340,8 +362,7 @@ def _criteria(
               f"at least {t.works_t:g}", _at_least(oos.decile_t, t.works_t), WORKS),
         _crit("works_dsr", "Deflated Sharpe", _num(dsr), f"at least {t.works_dsr:g}",
               _at_least(dsr, t.works_dsr), WORKS),
-        _crit("works_pbo", "Chance the result is overfitting", _num(pbo),
-              f"at most {t.works_max_pbo:g}", _at_most(pbo, t.works_max_pbo), WORKS),
+        _overfit("works_pbo", pbo, t.works_max_pbo, WORKS, alone),
         spread_all,
         _crit("random", "Beats random picks", random_value,
               f"beats at least {_pct(t.random_beat_share)} of them", random_beaten, WORKS),
@@ -429,6 +450,14 @@ class EdgeFacts:
     hidden: bool = False
     after: date | None = None
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
+    wins: bool = False  # the outcome is not a return: the Sharpe ratio is of the excess wins
+
+
+def counts_wins(edge: Edge) -> bool:
+    """Whether the edge's trial statistics (Sharpe, deflated Sharpe, PBO, haircut) are of the
+    session's excess wins: its outcome is not a return (a cushion or a ratio; ADR 0064 amendment
+    2026-10-11). An edge with no resolved settings is read as a return."""
+    return edge.settings is not None and not edge.settings.cost_applies
 
 
 def projection_of(whole: EdgeRow) -> Projection:
@@ -447,10 +476,10 @@ def _haircut(c: _Candidate, facts: EdgeFacts) -> EdgeHaircut | None:
     (``measured``); the stored count when the run has no series."""
     whole = c.whole
     if whole.sharpe is None or facts.measured is None:
-        return load_haircut(whole.sharpe, whole.sessions, whole.trials)
+        return load_haircut(whole.sharpe, whole.sessions, whole.trials, facts.wins)
     counted = facts.measured()
     n = whole.sessions if counted is None else counted.get((c.variant, c.horizon), 0)
-    return load_haircut(whole.sharpe, n, whole.trials)
+    return load_haircut(whole.sharpe, n, whole.trials, facts.wins)
 
 
 def _at_target(
@@ -783,6 +812,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             edge.schedule,
             after=run.range_to,
             measured=lambda: runs.load_measured_sessions(ctx, run),
+            wins=counts_wins(edge),
         ),
         range_to=run.range_to,
     )

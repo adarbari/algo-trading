@@ -43,7 +43,8 @@ class Robustness:
 @dataclass(frozen=True)
 class EdgeHaircut:
     """The Sharpe ratio after the multiple-testing haircut (Harvey and Liu, ADR 0064 decision 8):
-    the stored ``sharpe`` (per trade, not annualised) over ``sessions`` trades becomes
+    the stored ``sharpe`` (per decision session, not annualised; of the excess wins for an outcome
+    that is not a return, ADR 0064 amendment 2026-10-11) over ``sessions`` sessions becomes
     ``haircut_sharpe`` once ``trials`` variants tried are counted, ``cut`` (0 to 1) the share
     lost; ``method`` names the adjustment and ``summary`` is the server's sentence."""
 
@@ -60,10 +61,12 @@ BONFERRONI = "bonferroni"  # Holm's value for the best of the trials; the peers'
 
 
 def load_haircut(
-    sharpe: float | None, sessions: int | None, trials: int | None
+    sharpe: float | None, sessions: int | None, trials: int | None, wins: bool = False
 ) -> EdgeHaircut | None:
-    """The haircut of the basis's ``sharpe`` over ``sessions`` trades after ``trials`` variants;
-    None when any is not stored or the Sharpe ratio is not above zero."""
+    """The haircut of the basis's ``sharpe`` over ``sessions`` decision sessions after ``trials``
+    variants; None when any is not stored or the Sharpe ratio is not above zero. ``wins``: the
+    outcome is not a return, so the Sharpe ratio is of the win rate above the base rate, and the
+    sentence says so."""
     h = haircut_sharpe(sharpe, sessions, trials)
     if h is None or sharpe is None or sessions is None or trials is None:
         return None
@@ -75,7 +78,9 @@ def load_haircut(
         sessions=sessions,
         method=BONFERRONI,
         summary=(
-            f"A Sharpe ratio of {sharpe:.2f} per trade falls to {h.sharpe:.2f} after "
+            f"A Sharpe ratio of {sharpe:.2f} per decision session"
+            f"{', of the win rate above the base rate,' if wins else ''} "
+            f"falls to {h.sharpe:.2f} after "
             f"{trials:,} variant{'' if trials == 1 else 's'} tried, a haircut of "
             f"{h.cut * 100:.0f}%."
         ),

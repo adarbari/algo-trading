@@ -326,6 +326,7 @@ links = [
   { kind = "term", id = "official_result" },
   { kind = "term", id = "variants_tried" },
   { kind = "term", id = "overfitting_probability" },
+  { kind = "term", id = "not_a_return" },
   { kind = "term", id = "edge_definition" },
   { kind = "term", id = "edge_persistence" },
 ]
@@ -384,8 +385,9 @@ Open Details for the evidence behind the badge. What the verdict tests lists eve
 value, what it needs and pass, fail or not measured. Backtests lists the runs, with the official
 result marked, and the figures add the Sharpe ratio, the deflated Sharpe and the overfitting
 probability. Example: vrp_short_premium fails 3 of the 7 Promising tests, passes 3 and does not
-measure one. Its Sharpe ratio of 1.74 looks strong, but the deflated Sharpe is 0.00 after 126
-variants tried: the best of that many tries shows a Sharpe like that by luck.
+measure one. Its Sharpe ratio is of its win rate above the base rate, since a cushion is not a
+return. The deflated Sharpe weighs it against 126 variants tried: the best of that many tries
+looks good by luck.
 """
 
 [[page.section]]
@@ -404,7 +406,7 @@ title = "Putting the example together"
 body = """
 Read the example as a chain. A lift of +8 points on 3 trades is noise. The in-sample lift was
 about zero. The deciles are flat and their t is negative, so the ranking carries no information.
-The deflated Sharpe of 0.00 says the Sharpe of 1.74 is what the best of 126 tries shows by luck.
+The deflated Sharpe asks whether the Sharpe ratio beats the best of 126 tries by luck.
 It beats 91% of random backtests, not 95%. Together they say the evidence is too thin to trust.
 More out-of-sample sessions settle it, not a different date. Don't change an edge and
 rerun it until the numbers look good: that is how a lucky result is made.

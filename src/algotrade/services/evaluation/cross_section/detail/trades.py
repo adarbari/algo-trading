@@ -28,14 +28,13 @@ from algotrade.services.evaluation.cross_section.hit import (
     NO_IMPLIED_VOL,
     UNMEASURED,
 )
-from algotrade.services.evaluation.cross_section.measures import Pick
+from algotrade.services.evaluation.cross_section.measures import SCREENER, Pick
 from algotrade.services.evaluation.cross_section.measuring import NO_ENTRY_BAR
 from algotrade.services.evaluation.cross_section.reporting.report_containment import window_end
 from algotrade.storage.tables.edge_schemas import EDGE_TRADES
 
 RESULT = EDGE_TRADES.name.removeprefix("results/")
 SOURCE = "edge-eval"
-SCREENER = "screener"  # the ledger lists the implementations, never a baseline
 WON, LOST, EXCLUDED = "won", "lost", "excluded"
 STATUSES = (WON, LOST, EXCLUDED)
 # The harness's reason for a pick it did not count -> its public kind (ADR 0064, ADR 0056).
@@ -106,7 +105,7 @@ def trades_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> pd.D
     rows = [
         _row(evaluation, r, leg, pick)
         for r in evaluation.results
-        if r.edge_variant == MAIN and r.role == SCREENER
+        if r.edge_variant == MAIN and r.role == SCREENER  # implementations, never a baseline
         for leg in r.legs
         for pick in leg.stat.picks
     ]

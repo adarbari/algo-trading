@@ -136,6 +136,7 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
             edge.schedule,
             hidden,
             measured=lambda: runs.load_measured_sessions(ctx, run),
+            wins=verdict.counts_wins(edge),
         ),
     )
     if not hidden or found.verdict == verdict.WAITING:
