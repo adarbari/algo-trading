@@ -237,3 +237,22 @@ def test_a_providers_structured_mode_reaches_its_adapter(monkeypatch: pytest.Mon
     first, second = model.members[0][1], model.members[1][1]
     assert isinstance(first, ClaudeCli) and first.structured == "json_schema"
     assert isinstance(second, ChatCompletions) and second.structured == "json_schema"
+
+
+def test_the_reserved_fallback_time_is_the_validations_needed_sum(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in ("G1", "G2"):
+        monkeypatch.setenv(f"ALGOTRADE_LLM_API_KEY_{key}", "sk")
+    monkeypatch.setenv("HOME", "/Users/o")
+    cli = CLI_CHAIN["provider"][0]
+    gem = CHAIN["provider"][1]
+    doc = CLI_CHAIN | {"provider": [cli, gem | {"id": "g1"}, gem | {"id": "g2"}]}
+    doc["price"] = [CHAIN["price"][1] | {"model": gem["model"]}]
+    settings = LlmSettings.from_document(doc)
+    model, _ = open_text_model(configs(doc))
+    assert isinstance(model, FallbackTextModel)
+    needed = sum(p.worst_case_s for p in settings.providers[:-1])
+    first = settings.providers[0].id
+    assert model.reserve_s[first] + model.worst_s[first] == needed
+    assert model.reserve_s["g2"] == 0.0 and model.reserve_s[first] > model.reserve_s["g1"] == 0.0

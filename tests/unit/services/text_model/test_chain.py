@@ -530,3 +530,52 @@ def test_no_repair_or_escalation_starts_after_the_deadline() -> None:
 def test_without_accept_the_answer_is_returned_as_before() -> None:
     cheap = Scripted("cheap", "bad")
     assert chain(cheap).complete("s", "u").text == "bad" and len(cheap.seen) == 1
+
+
+class Timed(Scripted):
+    """A scripted member whose every call takes ``took`` seconds of the injected clock."""
+
+    def __init__(self, clock: Clock, took: float, provider: str, *answers: str) -> None:
+        super().__init__(provider, *answers)
+        self.clock, self.took = clock, took
+
+    def complete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        self.clock.now += self.took
+        return super().complete(*args, **kwargs)
+
+
+def reserving(clock: Clock, *members: Scripted, worst: dict[str, float]) -> FallbackTextModel:
+    ids = [m.provider for m in members]
+    reserve = {p: sum(worst[x] for x in ids[n + 1 : -1]) for n, p in enumerate(ids)}
+    return FallbackTextModel(
+        [(m.provider, m) for m in members], 100.0, clock, worst_s=worst, reserve_s=reserve
+    )
+
+
+def test_a_repair_that_would_cut_into_the_fallbacks_reserved_time_is_skipped() -> None:
+    clock = Clock()
+    a, b, c = Timed(clock, 30, "a", "bad"), Scripted("b", "good"), Scripted("c")
+    worst = {"a": 50.0, "b": 40.0, "c": 10.0}  # a's repair needs 50 s; b must keep 40 of 100
+    model = reserving(clock, a, b, c, worst=worst)
+    done = model.complete("s", "u", tag=TAG, accept=only_good)
+    assert done.provider == "b" and len(a.seen) == 1  # 30 + 50 > 100 - 40: not repaired
+    assert [s for _, s, _ in b.seen] == ["escalate"]
+
+
+def test_a_repair_runs_when_time_allows_and_the_last_member_repairs_with_no_reserve() -> None:
+    clock = Clock()
+    a = Timed(clock, 5, "a", "bad", "good")
+    assert (
+        reserving(clock, a, Scripted("b"), worst={"a": 50.0, "b": 40.0})
+        .complete("s", "u", tag=TAG, accept=only_good)
+        .text
+        == "good"
+        and len(a.seen) == 2
+    )  # 5 + 50 <= 100 - 0 (b is last)
+    clock2 = Clock()
+    down = Member("down", ModelUnavailableError("HTTP 503"))
+    last = Timed(clock2, 40, "last", "bad", "good")  # 40 + 50 <= 100: the last has no reserve
+    done = reserving(clock2, down, last, worst={"down": 1.0, "last": 50.0}).complete(
+        "s", "u", tag=TAG, accept=only_good
+    )
+    assert done.text == "good" and [s for _, s, _ in last.seen] == ["first", "repair"]

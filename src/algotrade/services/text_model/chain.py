@@ -129,6 +129,8 @@ class FallbackTextModel:
     clock: Callable[[], float] = field(default=time.monotonic)
     only_users: Mapping[str, frozenset[str]] = field(default_factory=dict)
     ledger: CallLedger | None = None
+    worst_s: Mapping[str, float] = field(default_factory=dict)  # provider id -> worst_case_s
+    reserve_s: Mapping[str, float] = field(default_factory=dict)  # id -> the later members' sum
     now: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
 
     @property
@@ -175,9 +177,8 @@ class FallbackTextModel:
             call.later = position + 1 < len(members)
             asked, stage = user, ESCALATE if call.escalating else _stage(tag)
             for attempt in (0, 1):  # the call, then at most one repair of a refused answer
-                if attempt and self._late(call):
-                    why = f"not repaired, the {self.deadline_s:g} s deadline passed"
-                    call.failures.append(f"{provider}: {why}")
+                if attempt and (left := self._short(call, provider)) is not None:
+                    call.failures.append(f"{provider}: not repaired, {left}")
                     call.escalating = True
                     break
                 called = tag if tag is None else replace(tag, stage=REPAIR if attempt else stage)
@@ -202,6 +203,19 @@ class FallbackTextModel:
 
     def _late(self, call: "_Call") -> bool:
         return self.clock() - call.started > self.deadline_s
+
+    def _short(self, call: "_Call", provider: str) -> str | None:
+        """Why a repair by ``provider`` must not start, else ``None``: the deadline has passed,
+        or the repair's worst case would cut into the time reserved for the later members (the
+        fallback must keep its turn; ``reserve_s`` is 0 for the last member)."""
+        spent = self.clock() - call.started
+        if spent > self.deadline_s:
+            return f"the {self.deadline_s:g} s deadline passed"
+        reserve = self.reserve_s.get(provider, 0.0)
+        left = self.deadline_s - reserve - spent
+        if self.worst_s.get(provider, 0.0) > left:
+            return f"{max(left, 0.0):g} s left, the fallback needs {reserve:g} s"
+        return None
 
     def _ask(
         self, call: "_Call", provider: str, model: TextModel, asked: str, called: CallTag | None

@@ -233,7 +233,10 @@ An answer the model gives is no longer "text or unavailable":
    a `rejected` row and the chain asks the next provider, not only on "unavailable".
 3. **One repair**: before falling through, the same provider is asked once more (stage `repair`)
    with the question, its refused answer and the exact error; the next provider is stage
-   `escalate`. At most two calls per provider, none started after `deadline_s`.
+   `escalate`. At most two calls per provider, none started after `deadline_s`. A repair is best
+   effort: it is skipped when its worst case would cut into the time reserved for the later
+   non-last providers (`reserve_s`, built from `LlmSettings`; 0 for the last), so the fallback
+   keeps its turn and the deadline validation is unchanged.
 4. **Order is tier**: no tier concept; the `[[provider]]` order is cheap first, strong last.
 
 ## Consequences
