@@ -87,18 +87,20 @@ def feature_type(dtype: str, categories: Sequence[str] = ()) -> Type:
     return Type(kind)
 
 
-def _bind(node: Node, params: Mapping[str, object]) -> Node:
+def bind_params(node: Node, params: Mapping[str, object]) -> Node:
     """``node`` with each parameter reference replaced by its value."""
     if isinstance(node, Ref) and node.name in params:
         return Literal(params[node.name], node.pos)  # type: ignore[arg-type]
     if isinstance(node, Unary):
-        return Unary(node.op, _bind(node.operand, params), node.pos)
+        return Unary(node.op, bind_params(node.operand, params), node.pos)
     if isinstance(node, Binary):
-        return Binary(node.op, _bind(node.left, params), _bind(node.right, params), node.pos)
+        return Binary(
+            node.op, bind_params(node.left, params), bind_params(node.right, params), node.pos
+        )
     if isinstance(node, Call):
         if node.func == "exists":
             return node
-        return Call(node.func, tuple(_bind(a, params) for a in node.args), node.pos)
+        return Call(node.func, tuple(bind_params(a, params) for a in node.args), node.pos)
     return node
 
 
@@ -151,7 +153,7 @@ def _parse(d: FeatureDefinition, taken: Mapping[str, str]) -> tuple[Node, list[R
     unused = sorted(set(d.params) - used)
     if unused:
         raise ExpressionError(d.where, None, f"params {unused} are not used in expr")
-    node = _bind(node, d.params)
+    node = bind_params(node, d.params)
     refs, exists = _names(node)
     return node, refs, exists
 
