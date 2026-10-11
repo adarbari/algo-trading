@@ -1,7 +1,7 @@
 {
   "bundle": {
     "entry_gzip_bytes": 24800,
-    "entry_closure_gzip_bytes": 203800,
+    "entry_closure_gzip_bytes": 195700,
     "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
       "src/pages/admin-harness-runs/index.ts": 32000,
@@ -9,7 +9,6 @@
       "src/pages/admin-llm-usage/index.ts": 49270,
       "src/pages/guide/index.ts": 57490,
       "src/pages/login/index.ts": 1800,
-      "src/pages/screener-builder/index.ts": 70580,
       "src/pages/screener-results/index.ts": 70560,
       "src/pages/trader-calendar/index.ts": 12900,
       "src/pages/trader-edges/index.ts": 47100,

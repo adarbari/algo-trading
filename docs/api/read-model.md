@@ -346,6 +346,12 @@ hundreds of concurrent requests, no hacks, and no UX trade-off that costs the cu
   `DataLoader`, validation extensions). Mounted at `POST /graphql` (GET off; GraphiQL only when
   `ApiSettings.debug`). Ariadne (schema-first: SDL that mypy cannot see) and graphene (weak
   typing) rejected.
+- **Web documents ship per module**: write operations with the generated `graphql()` tag as
+  before (a template literal without `${}`); at build, the `perModuleDocuments` plugin in
+  `apps/web/vite.config.ts` rewrites each call to a pure `new TypedDocumentString(...)` of the
+  same text, so a document lives in the chunk of the module that writes it and the generated
+  `gql.ts` map of every operation stays out of the entry bundle (the preset's Babel / SWC plugins
+  do not run under Vite 8). Keep the literal a plain template; the bundle budgets catch a regression.
 - **Where**: `apps/api/algotrade_api/graphql/`: `schema.py` (schema + router factory),
   `context.py` (`get_context` -> `ReadContext` via `services.read.context.open_context`),
   `scalars.py`, `errors.py`, `loaders.py`, and `types/<area>/<object>.py` (one per domain object, by area as the read model: `instruments/`, `screens/`; `types/` holds `query.py` and `session.py`).

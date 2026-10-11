@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
+import type { Plugin } from 'vite';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 // Unit test files listed as `skipped` in quarantine.json do not run (docs/ci.md "Flaky specs").
@@ -24,8 +25,41 @@ const base = process.env['ALGOTRADE_PORT_BASE'];
 const port = (offset: number, fallback: number): number =>
   base === undefined ? fallback : Number(base) + offset;
 
+const DOCUMENT_CLASS = fileURLToPath(
+  new URL('./src/shared/api/generated/graphql/graphql.ts', import.meta.url),
+);
+const GRAPHQL_CALL = /\bgraphql\(\s*(`(?:[^`$]|\$(?!\{))*`)\s*\)/g;
+
+/**
+ * Each operation ships with the module that writes it. The client preset's `graphql()` looks a
+ * document up in a map of every operation (gql.ts), which puts all of them in whichever chunk
+ * imports it (the entry). The official Babel / SWC plugins that remove the map do not run under
+ * Vite 8's oxc transform, so this does the same rewrite: `graphql(`...`)` becomes a pure
+ * `new TypedDocumentString(`...`)` of the same text. The generated typings still type the call.
+ */
+function perModuleDocuments(): Plugin {
+  return {
+    name: 'algotrade:graphql-per-module-documents',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/\.tsx?$/.test(id) || id.includes('/generated/') || id.includes('node_modules')) {
+        return null;
+      }
+      if (!code.includes('graphql(')) return null;
+      const out = code.replace(GRAPHQL_CALL, (_m, literal: string) => {
+        return `/*#__PURE__*/ new __TypedDocumentString(${literal})`;
+      });
+      if (out === code) return null;
+      return {
+        code: `import { TypedDocumentString as __TypedDocumentString } from ${JSON.stringify(DOCUMENT_CLASS)};\n${out}`,
+        map: null,
+      };
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [perModuleDocuments(), react()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
@@ -40,6 +74,9 @@ export default defineConfig({
     // dist/.vite/manifest.json: the bundle budgets (scripts/check-bundle-budgets.ts) read it.
     manifest: true,
     rolldownOptions: {
+      // The generated document constants (graphql.ts) are unused once perModuleDocuments inlines
+      // them: a pure constructor lets the bundler drop them.
+      treeshake: { manualPureFunctions: ['TypedDocumentString'] },
       output: {
         // Vendor code in its own long-lived chunks: it changes far less than the app, so a deploy
         // leaves the browser's cached copy valid (the phone downloads only the app chunks again).
