@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.core.model.completion import Completion
+from algotrade_api.feedback import Remembered
 
 ALICE = {"X-Act-For": "alice"}  # an admin writing for another declared user
 
@@ -212,7 +213,19 @@ def test_describe_it_events_follow_the_draft_to_the_saved_screen(writer_client: 
     done = c.post("/screeners/mine/finalise", json={"draft_session_id": session}).json()
     last = sink.rows[-1]
     assert last["event"] == "screen_finalised" and last["saved_hash"] == done["hash"]
-    assert last["sentence"] == "price over $5" and last["user"] == "local"
+    assert last["sentence"] is None and last["user"] == "local"
+    assert '"actor":"local"' in last["payload"]
+
+
+def test_an_admin_acting_for_a_trader_is_named_as_the_actor(writer_client: TestClient) -> None:
+    c = writer_client
+    sink = Keep()
+    c.app.state.feedback = sink  # type: ignore[attr-defined]
+    c.app.state.drafts.put("s9", Remembered("alice", "mine", OWN, "h", "x", (), None, None))  # type: ignore[attr-defined]
+    body = {"document": OWN, "draft_session_id": "s9"}
+    assert c.put("/screeners/mine/draft", json=body, headers=ALICE).status_code == 200
+    (row,) = sink.rows
+    assert row["user"] == "alice" and '"actor":"local"' in row["payload"]
 
 
 def test_a_hand_built_screen_and_a_failed_write_record_nothing(writer_client: TestClient) -> None:

@@ -86,7 +86,7 @@ Table `feedback/drafting_events` (new ADR; the API's sixth write; recorder in `s
 `saved_hash`, the sentence (<= 1000 chars) and a small payload. Edits are derived, not logged: at save the
 server diffs the last returned draft against the saved document; choices and skips travel in the save
 request body. Written only after the config write succeeded; a dropped event never fails a save. Traders
-see only their own rows. Raw sentences are kept 12 months, then nulled unless curated.
+see only their own rows. Raw sentences are kept 12 months, then nulled unless curated (a row is curated when a golden case's `source_event` lists its `event_id`; the retain and erase commands, which must also cover `usage/llm_calls` failure rows and backups, are later PRs and nothing is nulled until then); the repo is public, so a golden case from a real sentence is never copied verbatim into git (the owner paraphrases or redacts at `golden curate`; `golden candidates` prints to the owner's terminal only).
 
 Golden pipeline: an owner-run `golden candidates` builds cases (sentence, catalogue version, final saved
 criteria): saved unchanged is a positive, saved with edits a correction, abandoned unlabelled;

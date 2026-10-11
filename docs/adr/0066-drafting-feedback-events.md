@@ -63,11 +63,25 @@ formulas and screens traders accepted, across users.** No GraphQL field exists y
 that shows these rows comes with the golden pipeline.
 
 ### Retention
-The raw sentence and the payload are kept 12 months and then nulled unless the row was curated into
-the golden set (`tests/fixtures/drafting/golden/`, reviewed by the owner); a curated case is the owner's
-own text, kept in git. The nulling and an owner-run erase command for one user are a later change (an
-owner-run command in the ingestion CLI, as every rewrite of stored data is); until then the rows are
-append-only and `docs/hosting.md`'s store backups apply.
+The raw `sentence` and the `payload` are kept 12 months and then nulled unless the row is **curated**.
+A row is curated when its `event_id` is listed in the `source_event` field of a golden case
+(`tests/fixtures/drafting/golden/`); no column marks it. The later owner-run `feedback retain` command
+reads those ids and nulls the rest. **The retain command and an erase command (all rows of one user)
+are later PRs; until they exist nothing is nulled or erased and the rows are append-only.** Erasure
+must also cover `usage/llm_calls` failure rows (they hold the prompt, hence the sentence: the
+`sentence` / `answer` columns of ADR 0058's 2026-10-11 amendment) and the store backups
+(`docs/hosting.md`).
+
+### Golden cases and the public repository
+The repository is public. A golden case built from a real trader's sentence is **never copied verbatim
+into git**: `golden curate` requires the owner's paraphrase or redaction of the sentence, and
+`golden candidates` prints sentences only to the owner's terminal.
+
+### Who edited
+Rows are filed under the user whose screen it is; when an admin acts for a trader (`X-Act-For`) the
+save events carry the caller in the payload (`actor`). The save and finalise rows carry no sentence (the
+`draft_returned` row holds it once). A save of a draft this process does not remember is recorded once
+per (session, user, content).
 
 ## Consequences
 - The golden set grows from real sentences, with the model's answer and what the trader kept.

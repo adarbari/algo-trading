@@ -10,7 +10,7 @@ from fastapi import APIRouter
 
 from algotrade.services.authoring import presets, screens
 from algotrade_api import feedback
-from algotrade_api.deps import Drafts, Feedback, User, Writer
+from algotrade_api.deps import Caller, Drafts, Feedback, User, Writer
 from algotrade_api.schemas.authoring.screeners import (
     CopyBody,
     Draft,
@@ -32,11 +32,19 @@ def delete_screener(writer: Writer, user: User, screener_id: str) -> None:
 
 @router.put("/{screener_id}/draft")
 def save_draft(
-    writer: Writer, user: User, sink: Feedback, drafts: Drafts, screener_id: str, body: DraftBody
+    writer: Writer,
+    user: User,
+    caller: Caller,
+    sink: Feedback,
+    drafts: Drafts,
+    screener_id: str,
+    body: DraftBody,
 ) -> Draft:
     stored = screens.save_draft(writer, user, screener_id, body.document)
     # after the write succeeded; a draft that came from Describe it is recorded (ADR 0066)
-    feedback.record_draft_saved(sink, drafts, body.draft_session_id, user, screener_id, stored)
+    feedback.record_draft_saved(
+        sink, drafts, body.draft_session_id, user, screener_id, stored, caller.user_id
+    )
     return Draft(screener_id=screener_id, document=stored)
 
 
@@ -49,6 +57,7 @@ def discard_draft(writer: Writer, user: User, screener_id: str) -> None:
 def finalise(
     writer: Writer,
     user: User,
+    caller: Caller,
     sink: Feedback,
     drafts: Drafts,
     screener_id: str,
@@ -57,7 +66,9 @@ def finalise(
     session_id = body.draft_session_id if body else None
     draft = _draft_of(writer, user, screener_id) if session_id else None
     done = screens.finalise(writer, user, screener_id)
-    feedback.record_finalised(sink, drafts, session_id, user, screener_id, draft, done.hash)
+    feedback.record_finalised(
+        sink, drafts, session_id, user, screener_id, draft, done.hash, caller.user_id
+    )
     return Finalised.model_validate(done)
 
 

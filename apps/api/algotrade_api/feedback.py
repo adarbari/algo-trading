@@ -48,6 +48,7 @@ class DraftMemory:
     def __init__(self, size: int = MEMORY) -> None:
         self._size = size
         self._items: OrderedDict[str, Remembered] = OrderedDict()
+        self._unknown: OrderedDict[tuple[str, str, str], None] = OrderedDict()
         self._lock = threading.Lock()
 
     def put(self, session_id: str, item: Remembered) -> None:
@@ -66,6 +67,18 @@ class DraftMemory:
                 return None
             self._items.move_to_end(session_id)
             return item
+
+    def unknown_seen(self, session_id: str, user: str, content_hash: str) -> bool:
+        """Note a save of a draft this process does not remember; ``True`` when this very save
+        was noted before (an autosave of an unchanged document records nothing more)."""
+        key = (session_id, user, content_hash)
+        with self._lock:
+            seen = key in self._unknown
+            self._unknown[key] = None
+            self._unknown.move_to_end(key)
+            while len(self._unknown) > self._size:
+                self._unknown.popitem(last=False)
+            return seen
 
     def saved(self, session_id: str, user: str, doc_id: str, content_hash: str) -> bool:
         """Note a save of ``content_hash`` for a session that is ``user``'s and ``doc_id``'s;
@@ -145,6 +158,7 @@ def _saved(
     screener_id: str,
     document: Mapping[str, Any],
     saved_hash: str | None,
+    actor: str,
 ) -> None:
     """The save events share one shape: the diff against the remembered draft, its hashes."""
     if not session_id:
@@ -158,7 +172,13 @@ def _saved(
             and not memory.saved(session_id, user, screener_id, content)
         ):
             return  # an autosave of the draft already recorded
-        payload: dict[str, Any] = {"content_hash": content}
+        if (
+            draft is None
+            and event == events.DRAFT_SAVED
+            and memory.unknown_seen(session_id, user, content)
+        ):
+            return  # an autosave of a draft this process does not remember, already recorded
+        payload: dict[str, Any] = {"content_hash": content, "actor": actor}  # who edited
         if draft is None:
             payload["draft_unknown"] = True  # not remembered here, or not this user's: no diff
             session_id = ""  # never under a session id that is not theirs
@@ -171,7 +191,6 @@ def _saved(
             prompt_version=draft.prompt_version if draft else None,
             draft_hash=draft.draft_hash if draft else None,
             saved_hash=saved_hash or content,
-            sentence=draft.sentence if draft else None,
             payload=payload,
         )  # fmt: skip
     except Exception:
@@ -185,9 +204,11 @@ def record_draft_saved(
     user: str,
     screener_id: str,
     document: Mapping[str, Any],
+    actor: str,
 ) -> None:
-    """``draft_saved``: call after the draft was stored; ``document`` is what was stored."""
-    _saved(sink, memory, events.DRAFT_SAVED, session_id, user, screener_id, document, None)
+    """``draft_saved``: call after the draft was stored; ``document`` is what was stored;
+    ``actor`` is who made the request (rows are filed under ``user``, whose screen it is)."""
+    _saved(sink, memory, events.DRAFT_SAVED, session_id, user, screener_id, document, None, actor)
 
 
 def record_finalised(
@@ -198,12 +219,14 @@ def record_finalised(
     screener_id: str,
     document: Mapping[str, Any] | None,
     finalised_hash: str,
+    actor: str,
 ) -> None:
     """``screen_finalised``: call after the version was written; ``document`` the draft that
-    became it (``None``: unreadable, nothing is recorded), ``finalised_hash`` ``Finalised.hash``."""
+    became it (``None``: unreadable, nothing is recorded), ``finalised_hash`` ``Finalised.hash``;
+    ``actor`` the caller (an admin may act for a user)."""
     if document is None:
         return
     _saved(
         sink, memory, events.SCREEN_FINALISED, session_id, user, screener_id, document,
-        finalised_hash,
+        finalised_hash, actor,
     )  # fmt: skip
