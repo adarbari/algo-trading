@@ -45,6 +45,7 @@ from algotrade.config.edges.document import (
     Edge,
     job_name,
 )
+from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
 from algotrade.config.user import SITE_USER, UserContext
@@ -57,6 +58,12 @@ from algotrade.data.outcomes import (
     stored_sessions,
 )
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.detail.windows import (
+    SeriesFacts,
+    plan_exits,
+    projection_count,
+    series_facts,
+)
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.historical import (
     HistoricalCaveat,
@@ -151,6 +158,7 @@ class VariantResult:
     licence: str | None = None  # that field's catalogue licence
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
     report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
+    series: SeriesFacts | None = None  # the windows of ``stats``, the unit, the projection (0064)
 
 
 @dataclass(frozen=True)
@@ -342,8 +350,8 @@ def evaluate_edge(
         reader, stored, needs, as_of, stamps, "requested" if full or earnings else None
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
-    results: list[VariantResult] = []
-    randoms: list[RandomPicks] = []
+    results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
+    # ``projected``: the decision sessions whose exits are stored, read once per run
     reports = None  # the real report dates, read once and only for an earnings_expected edge
     starts: dict[int, int] = {}
     unclosed: dict[int, int] = {}
@@ -370,6 +378,9 @@ def evaluate_edge(
                 horizon,
                 reports,
             )
+        kept, exits = plan_exits(
+            scope.edge, plan.blocks, closed, horizon, start, projected
+        )  # the blocks with a closed leg (measured) and the projected exits (ADR 0064)
         for variant in variants:
             legs = stats.randoms.get((plan.key, variant.id), {})
             pooled = [
@@ -390,8 +401,7 @@ def evaluate_edge(
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
-                for block in plan.blocks
-                if any(leg.entry in closed for leg in block)
+                for block in kept
             )
             measures = tuple(
                 slice_measures(
@@ -413,6 +423,16 @@ def evaluate_edge(
                     iv_source=scope.iv_field if needs_iv else None,
                     licence=licences[scope.key],
                     report_containment=diagnostic,
+                    series=series_facts(
+                        scope.edge,
+                        kept,
+                        closed,
+                        horizon,
+                        block_stats,
+                        stats.lost.get((plan.key, variant.id), {}),
+                        split,
+                        exits,
+                    ),
                     lost_sessions=dict(
                         Counter(stats.lost.get((plan.key, variant.id), {}).values())
                     ),

@@ -11,8 +11,9 @@ import pandas as pd
 
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.cross_section.legs.rows import StoredLegs, decode_frame
+from algotrade.storage.tables.edge_schemas import EDGE_LEGS
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import EDGE_LEGS, result_table
+from algotrade.storage.tables.schemas import result_table
 
 RESULT = "edge_legs"
 TABLE = result_table(RESULT)

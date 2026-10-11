@@ -22,7 +22,7 @@ from algotrade.services.read.availability.cause import (
     Cause,
     UnavailableKind,
 )
-from algotrade.storage.tables.schemas import COMMON
+from algotrade.storage.tables.spec import COMMON
 
 __all__ = [
     "KIND_OF_CODE",

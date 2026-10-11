@@ -12,8 +12,8 @@ import pandas as pd
 
 from algotrade.services.evaluation.discovery.results import DiscoveryResult
 from algotrade.storage.runs import RunRecord, start_run
+from algotrade.storage.tables.edge_schemas import WINNERS_STUDY
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import WINNERS_STUDY
 
 RESULT = "winners_study"
 SOURCE = "winners-study"
