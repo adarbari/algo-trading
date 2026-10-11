@@ -82,8 +82,8 @@ several times, all of the descriptions are stored.
   user's, for the same screener, and the screen was not finalised since (`DraftMemory`); an unknown,
   foreign, other-screen or finalised id starts a new session. A save does not end the session
   (describe, save, describe, finalise is one session); finalising does, and so does discarding the
-  draft (owner decision to confirm: a discarded screen is abandoned, so the browser drops its id and
-  the next description starts a new session). `seq` comes from stored state (the last draft
+  draft in the browser (it drops its id, so the next description starts a new session; the server
+  is not told, see the golden case below). `seq` comes from stored state (the last draft
   returned plus one), so a request that failed does not advance it. `seq` (a new nullable `int64`
   column) is the 1-based ordinal of the draft request in its session; save events carry the `seq`
   of the draft they saved. The browser keeps the last id per screener in the Builder and sends it
@@ -102,11 +102,16 @@ several times, all of the descriptions are stored.
   unknown id is filed under session `""` (never under an id that is not the user's); both record
   the id the client claimed as `payload.claimed_session_id`. `services/feedback/chains.py` links a
   row to the claimed session only when that session's rows have the same `user` and `doc_id`.
-- **Two tabs on one screen** share its session and the last writer wins; each save is diffed and
-  hashed against that session's own last draft.
+- **Two tabs on one screen**: a tab that holds the session id continues it; a second tab that
+  starts with no id opens its own session. A save is diffed and hashed against the draft of the
+  session it names, and the last finalise of the screen is the one that counts for its chain.
 - **A golden case** is `(all sentences of one session in order, with the criteria in force at each
-  (`current_criteria` of its request), the final saved criteria (`saved_criteria` of the session's
-  last `draft_saved` / `screen_finalised`))`. A session with no save, or one discarded, is abandoned and unlabelled.
+  (`current_criteria` of its request), the final criteria (`saved_criteria` of the session's last
+  `screen_finalised`))`. **Only a session that ends in `screen_finalised` is labelled.** A
+  `draft_saved` with no later finalise is a working draft, unlabelled, as is a session never saved:
+  the rows cannot tell a discarded screen from one still being worked on, so no claim is made
+  from a save alone. A linked chain is ordered by `ts`, not `seq` (which restarts at 1 when a
+  restarted session is relinked); `chains.golden_candidates` is the one place this is decided.
   For a curated case `source_event` is the session's final event id. The public-repo paraphrase
   rule applies to every sentence of the chain: the repository is public, so a curated case holds
   paraphrased sentences, never the trader's own words.
