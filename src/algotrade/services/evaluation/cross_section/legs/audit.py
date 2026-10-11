@@ -44,7 +44,12 @@ def _same(a: Any, b: Any) -> bool:
         return _null(a) and _null(b)
     if isinstance(a, (list, tuple, np.ndarray)) or isinstance(b, (list, tuple, np.ndarray)):
         left, right = np.asarray(a), np.asarray(b)
-        return left.shape == right.shape and bool(np.array_equal(left, right, equal_nan=True))
+        if left.shape != right.shape:
+            return False
+        if left.dtype.kind in "fiu" and right.dtype.kind in "fiu":
+            return bool(np.array_equal(left, right, equal_nan=True))
+        # strings, or numbers with null elements (leg v2's pick lists): element by element
+        return all(_same(x, y) for x, y in zip(left.tolist(), right.tolist(), strict=True))
     return bool(a == b)
 
 

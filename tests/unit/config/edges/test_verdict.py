@@ -16,6 +16,21 @@ def test_defaults_are_the_owners_thresholds() -> None:
     assert (d.not_working_dsr, d.promising_dsr, d.works_dsr) == (0.5, 0.8, 0.95)
     assert (d.max_pbo, d.works_max_pbo, d.oos_lift_share) == (0.5, 0.2, 0.5)
     assert (d.forward_sessions, d.live_min_sessions, d.live_low, d.live_high) == (20, 10, 0.1, 0.9)
+    assert d.cost_levels_bps == (0.0, 15.0, 30.0, 50.0)  # ADR 0064 (owner 2026-10-10)
+
+
+@pytest.mark.parametrize("levels", [[15, 0], [0, 0], [-5], ["10"], [True], 10])
+def test_the_cost_grid_is_distinct_non_negative_and_ascending(levels: object) -> None:
+    with pytest.raises(ConfigurationError, match="levels_bps"):
+        VerdictSettings.from_document({"edge_costs": {"levels_bps": levels}})
+
+
+def test_the_cost_grid_reads_from_its_table() -> None:
+    doc = {"edge_costs": {"levels_bps": [0, 10.5]}}
+    assert VerdictSettings.from_document(doc).cost_levels_bps == (0.0, 10.5)
+    assert VerdictSettings.from_document({"edge_costs": {}}).cost_levels_bps == (0, 15, 30, 50)
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        VerdictSettings.from_document({"edge_costs": {"floor": 1}})
 
 
 def test_a_document_overrides_and_an_unknown_key_fails() -> None:

@@ -71,6 +71,27 @@ def test_implied_and_outcomes_are_computed_once_until_release(
     assert len(scored) == 3
 
 
+def test_adv_is_read_once_per_names_and_session_until_release(
+    world: World, monkeypatch: Any
+) -> None:
+    """Leg v2 (ADR 0064): a pick's ADV at D, through the recording reader like every read."""
+    calls: list[tuple[str, date]] = []
+
+    def fake(reader: Any, field: str, ids: Any, day: date) -> dict[str, float | None]:
+        calls.append((field, day))
+        return dict.fromkeys(ids)
+
+    monkeypatch.setattr(session_reads, "numbers_at", fake)
+    session = SessionReads(world.reader, "label")
+    ids = frozenset({"a", "b"})
+    assert session.adv(ids, DAYS[0]) == {"a": None, "b": None}  # not stored: None, never 0
+    session.adv(ids, DAYS[0])
+    assert calls == [(session_reads.ADV_FIELD, DAYS[0])]
+    session.release()
+    session.adv(ids, DAYS[0])
+    assert len(calls) == 2
+
+
 def test_a_horizon_with_nothing_stored_in_its_span_fails_while_another_is_read() -> None:
     w = build_world()
     scope = _Scope("main", edge(), parse_selection(ACTIVE, "active"), "feature.x")

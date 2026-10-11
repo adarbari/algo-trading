@@ -300,7 +300,7 @@ purpose = "the reuse of a screener's per-session statistics between edge evaluat
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reads"
-purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 0063): each screener's run, the regime label, the eligible names per universe, the implied vol and the scored outcomes, cached until a chunk of sessions is released (session.py), and the implied vol of names at a session (implied_at, also the paper record's)"
+purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 0063): each screener's run, the regime label, the eligible names per universe, the implied vol, the picks' ADV at D and the scored outcomes, cached until a chunk of sessions is released (session.py), and the implied vol of names at a session (implied_at, also the paper record's)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reporting"
