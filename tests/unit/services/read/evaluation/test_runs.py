@@ -300,3 +300,18 @@ def test_overlapping_sessions_are_not_independent_for_the_haircut(backend: Memor
     assert run is not None
     found = measured_sessions(load_run_series(ctx, run))
     assert found == {("momo", 20): round(len(days) / 20)}  # about two, not forty
+
+
+def test_the_touch_and_reference_rates_are_read_and_none_when_not_stored_never_zero(
+    backend: MemoryBackend,
+) -> None:
+    extra = [row("momo", "in_sample", 0.5, FROZEN, reference_rate=0.63, touch_rate=0.54)]
+    write_run(backend, "r1", FROZEN, 0.6, extra=extra)
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None
+    by = {r.slice_kind: r for r in load_run_rows(ctx, run) if r.variant == "momo"}
+    assert (by["in_sample"].reference_rate, by["in_sample"].touch_rate) == (0.63, 0.54)
+    assert by["frozen"].reference_rate is None and by["frozen"].touch_rate is None

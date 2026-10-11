@@ -261,3 +261,34 @@ def test_a_non_return_live_stroke_is_wins_above_the_series_base_rate_at_the_same
     assert live is not None and len(live.points) == 1  # no base rate at 07-02: no point
     assert live.points[0].value == pytest.approx(3 - 4 * 0.5)
     assert live.sessions == 2 and live.closed == 5
+
+
+def test_a_declared_decoys_own_curve_is_served_from_its_series_rows(backend: MemoryBackend) -> None:
+    rows = [series_row(d, FROZEN, pick_mean=0.01 * (i + 1)) for i, d in enumerate(DAYS)]
+    decoy = [
+        series_row(d, FROZEN, variant="size_small", role="baseline", pick_mean=0.002) for d in DAYS
+    ]
+    other_horizon = [series_row(DAYS[0], FROZEN, variant="size_small", role="baseline",
+                                horizon_sessions=5, pick_mean=0.9)]  # fmt: skip
+    stored_run(backend, rows + decoy + other_horizon)
+    c = curve_of(read(backend))
+    assert [p.cumulative for p in c.points][:2] == [0.01, 0.03]  # the picks' line is unchanged
+    (line,) = c.baselines
+    assert line.baseline == "size_small"
+    assert [round(p.cumulative, 6) for p in line.points] == [0.002 * (i + 1) for i in range(8)]
+    assert [p.exit for p in line.points] == [p.exit for p in c.points]  # at the exit
+
+
+def test_a_run_with_no_decoy_rows_has_no_baseline_lines_and_a_gap_is_not_a_zero(
+    backend: MemoryBackend,
+) -> None:
+    stored_run(backend, [series_row(d, FROZEN, pick_mean=0.01) for d in DAYS])
+    assert curve_of(read(backend)).baselines == ()
+    empty = [
+        series_row(d, FROZEN, variant="size_small", role="baseline", status="no_picks",
+                   picks=None, pick_mean=None)
+        for d in DAYS
+    ]  # fmt: skip
+    b = MemoryBackend()
+    stored_run(b, [series_row(d, FROZEN, pick_mean=0.01) for d in DAYS] + empty)
+    assert curve_of(read(b)).baselines == ()  # no window with a number: no line, never zeros

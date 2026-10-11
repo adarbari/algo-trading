@@ -14,7 +14,17 @@ against the 40 needed reads "28 trades to come", and a date when the schedule al
 does not predict the verdict: more trades can move a test either way.
 """
 next = "Read the outlook together with the criteria list, where every test shows its value and threshold."
-see_also = ["verdict", "verdict_criteria", "outlook_projection", "trades", "out_of_sample"]
+see_also = ["verdict", "verdict_criteria", "outlook_projection", "outlook_at_target", "trades", "out_of_sample"]
+
+[[term]]
+id = "outlook_at_target"
+term = "At the count, on today's figures"
+short = "The verdict the edge would have if it already had the trades it needs and nothing else changed."
+body = """
+When the missing test is a count of trades, the outlook also shows what the verdict would read at that count, using the figures stored today. It takes the other tests as they are: the win rate, the decile t, the deflated Sharpe and the rest. If one of them already fails clearly, the verdict at the count is Not working, and it lists which. It is the answer to "is waiting worth it?". It is not a forecast: more trades move every figure, so a weak figure on 12 trades can recover, and a strong one can fade. Next close is the date the next trade completes, read from the stored exit sessions.
+"""
+next = "If the verdict at the count is Not working, look at the failing test now rather than waiting."
+see_also = ["verdict_outlook", "outlook_projection", "verdict_criteria", "trades", "win_rate", "deflated_sharpe"]
 
 [[term]]
 id = "outlook_projection"

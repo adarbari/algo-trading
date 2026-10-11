@@ -84,6 +84,7 @@ const SLICE_STATE_LABELS: Record<string, string> = {
   not_stored: 'Not stored',
   oos_hidden: 'Hidden',
   not_a_cost_outcome: 'Not a cost outcome',
+  not_a_return: 'Not a return',
 };
 
 /** What a result section's figure without a value says (the state's words; also cost and capacity states). */
@@ -105,6 +106,7 @@ const REGIME_LABELS: Record<string, string> = {
   CAUTION: 'Caution',
   STRESS: 'Stress',
   CRISIS: 'Crisis',
+  UNKNOWN: 'Unclassified',
 };
 
 /** A market regime's label in words. */

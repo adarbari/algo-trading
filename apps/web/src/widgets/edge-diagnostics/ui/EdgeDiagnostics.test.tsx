@@ -90,6 +90,21 @@ describe('EdgeDiagnostics', () => {
     }
   });
 
+  it('sizes a position against the median pick and shows the floor row only when it binds', () => {
+    const { unmount } = render(<EdgeDiagnostics edgeId="momentum_12_1" />);
+    expect(screen.getByText(/position, share of the median pick's volume/)).toBeInTheDocument();
+    unmount();
+    hooks.useEdgeCapacity.mockReturnValue(
+      fakeQuery({ ...CAPACITY_FIXTURE, floorBinds: false, universeFloorUsd: 50_000_000 }),
+    );
+    render(<EdgeDiagnostics edgeId="momentum_12_1" />);
+    expect(screen.queryByText('Picks under the floor')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Capacity floor (site), 20-day dollar volume'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/position, share of the median pick's volume/)).toBeInTheDocument();
+  });
+
   it('shows a cushion outcome as excess wins in the months, never a percent', () => {
     hooks.useEdgeMonthly.mockReturnValue(
       fakeQuery({

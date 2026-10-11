@@ -9,7 +9,7 @@ import { useMemo } from 'react';
 import type { EdgeVerdict } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
 
-import { figureColumns, FIGURES } from '../model/figures';
+import { figureColumns, figureRows } from '../model/figures';
 
 export interface EdgeFiguresProps {
   verdict: EdgeVerdict;
@@ -17,6 +17,7 @@ export interface EdgeFiguresProps {
 
 export function EdgeFigures({ verdict }: EdgeFiguresProps) {
   const columns = useMemo(() => figureColumns(verdict.columns), [verdict.columns]);
+  const rows = useMemo(() => figureRows(verdict.columns), [verdict.columns]);
   return (
     <Panel
       title="Figures"
@@ -29,7 +30,7 @@ export function EdgeFigures({ verdict }: EdgeFiguresProps) {
       <DataTable
         label="In-sample, out-of-sample and all figures"
         columns={columns}
-        rows={FIGURES}
+        rows={rows}
         getRowId={(row) => row.id}
         emptyMessage="No figures"
       />

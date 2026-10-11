@@ -49,6 +49,9 @@ COST = (
 )
 
 
+SIDE_PARTS = ("year_part", "regime_part")  # a slice on one side of the split: ``<value>:<side>``
+
+
 @dataclass(frozen=True)
 class EdgeRun:
     """One committed evaluation run. ``owner``: whose run (the user's id, or ``site``);
@@ -126,6 +129,11 @@ class EdgeRow:
     pick_adv_median: float | None = None  # capacity (ADR 0064): the picks' median 20-day dollar
     pick_adv_known: int | None = None  # volume, how many have one, how many are below the
     pick_adv_low: int | None = None  # site's floor; None in a run from before the columns
+    # expires_otm outcomes only (a short put that ends out of the money): the picks' mean
+    # risk-neutral probability of it, and the share whose strike was touched on the way; None
+    # for any other outcome or a run from before the columns (never 0)
+    reference_rate: float | None = None
+    touch_rate: float | None = None
 
 
 @dataclass(frozen=True)
@@ -326,6 +334,8 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         pick_adv_median=_float(row.get("pick_adv_median")),
         pick_adv_known=_int(row.get("pick_adv_known")),
         pick_adv_low=_int(row.get("pick_adv_low")),
+        reference_rate=_float(row.get("reference_rate")),
+        touch_rate=_float(row.get("touch_rate")),
     )
 
 
@@ -411,10 +421,14 @@ def _without_oos_counts(row: EdgeRow) -> EdgeRow:
 
 
 def _in_sample_only(row: EdgeRow) -> bool:
-    """Whether a row holds in-sample sessions only: the ``in_sample`` slice or its cost rows."""
-    return row.slice_kind == IN_SAMPLE or (
-        row.slice_kind == COST and row.slice_value.startswith(f"{IN_SAMPLE}:")
-    )
+    """Whether a row holds in-sample sessions only: the ``in_sample`` slice, its cost rows
+    (``in_sample:<bp>``) and the in-sample side of a split year or regime (``year_part`` /
+    ``regime_part``, ``<value>:in_sample``)."""
+    if row.slice_kind == IN_SAMPLE:
+        return True
+    if row.slice_kind == COST:
+        return row.slice_value.startswith(f"{IN_SAMPLE}:")
+    return row.slice_kind in SIDE_PARTS and row.slice_value.endswith(f":{IN_SAMPLE}")
 
 
 def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:

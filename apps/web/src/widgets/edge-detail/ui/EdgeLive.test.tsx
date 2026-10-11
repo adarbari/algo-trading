@@ -140,4 +140,22 @@ describe('EdgeLive', () => {
     rerender(<EdgeLive edgeId="drift" />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('says an edge records no paper trades, in place of an absent section', async () => {
+    hooks.useEdgePaper.mockReturnValue(fakeQuery(null));
+    const live = {
+      edgeId: 'drift',
+      name: 'Drift',
+      state: 'not_recording',
+      closed: 0,
+      winRate: null,
+      headline: 'No paper trades are recorded: they start when it is evidenced.',
+      followed: false,
+    };
+    const { container } = render(<EdgeLive edgeId="drift" live={live} />);
+    expect(screen.getByText('Not recording')).toBeVisible();
+    expect(screen.getByText(/they start when it is evidenced/)).toBeVisible();
+    expect(screen.getByText('help live_state')).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
 });

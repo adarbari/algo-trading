@@ -1,10 +1,10 @@
 /**
  * Everything below an edge's verdict, in one chunk (the page lazy-loads it once): Evidence, How
- * sure, Where it worked, the comparison of a copy, the live record (once the edge has one), the
+ * sure, Where it worked, the comparison of a copy, the live record (or why it has none), the
  * definition and the details. Each section is a `LazySection`, so it renders and reads its data
  * when it nears the viewport; their ids are what the page's navigation scrolls to.
  */
-import type { Edge } from '@/entities/edge';
+import type { Edge, LiveState } from '@/entities/edge';
 import { EdgeCompare, EdgeDefinition, EdgeDetails, EdgeLive } from '@/widgets/edge-detail';
 import { EdgeDiagnostics } from '@/widgets/edge-diagnostics';
 import { EdgeEvidence } from '@/widgets/edge-evidence';
@@ -16,11 +16,11 @@ import { EdgeSection } from './EdgeSection';
 
 export interface EdgeSectionsProps {
   edge: Edge;
-  /** The edge has a live record: its section is shown. */
-  hasLive: boolean;
+  /** The edge's live state for the session (its section always shows: a record or why none). */
+  live: LiveState | undefined;
 }
 
-export function EdgeSections({ edge, hasLive }: EdgeSectionsProps) {
+export function EdgeSections({ edge, live }: EdgeSectionsProps) {
   return (
     <>
       <EdgeSection id="edge-evidence" label="Evidence" size="xl">
@@ -37,11 +37,9 @@ export function EdgeSections({ edge, hasLive }: EdgeSectionsProps) {
           <EdgeCompare edgeId={edge.id} />
         </EdgeSection>
       )}
-      {hasLive && (
-        <EdgeSection id="edge-live" label="Live record">
-          <EdgeLive edgeId={edge.id} />
-        </EdgeSection>
-      )}
+      <EdgeSection id="edge-live" label="Live record">
+        <EdgeLive edgeId={edge.id} live={live} />
+      </EdgeSection>
       <EdgeSection id="edge-trades" label="Trades">
         <EdgeTrades edgeId={edge.id} />
       </EdgeSection>

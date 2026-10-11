@@ -5,13 +5,14 @@
  * spans with no number in a lane. A gap in the data says why through the Guide; a copy's
  * withheld out-of-sample result says so. States: loading, error, unknown, hidden, ready.
  */
-import { Chart, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
+import { Chart, Checkbox, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
+import { useState } from 'react';
 
 import { UnknownNote } from '@/entities/availability';
 import { EDGE_UNKNOWN_WORDS, useEdgeCurve } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
 
-import { curveChart } from '../model/curve';
+import { curveChart, decoyNames } from '../model/curve';
 
 export interface EdgeCurveProps {
   edgeId: string;
@@ -19,6 +20,7 @@ export interface EdgeCurveProps {
 
 export function EdgeCurve({ edgeId }: EdgeCurveProps) {
   const query = useEdgeCurve(edgeId);
+  const [shown, setShown] = useState<readonly string[]>([]);
   const curve = query.data;
   if (query.isPending) {
     return (
@@ -50,7 +52,8 @@ export function EdgeCurve({ edgeId }: EdgeCurveProps) {
       </Panel>
     );
   }
-  const chart = curveChart(curve);
+  const chart = curveChart(curve, shown);
+  const decoys = decoyNames(curve);
   return (
     <Panel title="Evidence curve" headingLevel={3} actions={termHelp('evidence_curve')}>
       <Stack gap={2}>
@@ -63,6 +66,21 @@ export function EdgeCurve({ edgeId }: EdgeCurveProps) {
         <Text size="xs" tone="muted">
           {curve.kind === 'excess_wins' ? 'Excess wins, cumulative' : 'Excess return, cumulative'}
         </Text>
+        {decoys.length > 0 && (
+          <Stack as="ul" direction="row" gap={3} align="center" wrap aria-label="Decoys to draw">
+            {decoys.map((name) => (
+              <Stack as="li" key={name}>
+                <Checkbox
+                  label={name}
+                  checked={shown.includes(name)}
+                  onCheckedChange={(on) => {
+                    setShown((now) => (on ? [...now, name] : now.filter((n) => n !== name)));
+                  }}
+                />
+              </Stack>
+            ))}
+          </Stack>
+        )}
         <Chart
           label="Evidence curve of the picks against the universe"
           series={chart.series}

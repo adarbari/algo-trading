@@ -275,13 +275,42 @@ def test_a_zero_lift_candidate_is_ranked_above_a_missing_one() -> None:
     assert verdict(rows).basis == "scr, 20 trading days"
 
 
-def test_no_declared_baselines_do_not_block_promising_and_say_so() -> None:
+def test_no_declared_baselines_is_not_applicable_never_a_pass_and_the_level_is_unchanged() -> None:
     v = verdict(result(baselines=()), decoys=False)
     assert v.verdict == PROMISING
-    decoy = next(c for c in v.criteria if c.id == "baselines")
-    assert (decoy.status, decoy.value) == ("pass", "no decoys declared")
-    # a declared baseline with no stored row stays not measured
+    by = {c.id: c for c in v.criteria}
+    for cid in ("baselines", "works_spread"):
+        assert (by[cid].status, by[cid].value) == ("not_applicable", "no decoys declared")
+    assert v.rationale.startswith("Trades, and out-of-sample trades")  # the gap is not the decoys
+    # with decoys the same rows judge as before: a declared baseline with no stored row is not
+    # measured, and a decoy that is beaten passes
     assert verdict(result(baselines=())).verdict == NOT_ENOUGH
+    beaten = {c.id: c.status for c in verdict(result()).criteria}
+    assert beaten["baselines"] == "pass"
+    # the level is the same with and without the decoy criteria's pass
+    assert verdict(result(baselines=(0.5,)), decoys=False).verdict == verdict(result()).verdict
+
+
+def test_no_decoys_never_block_works() -> None:
+    strong = result(
+        oos={"decile_t": 3.0, "decile_spread": 0.9},
+        whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
+        baselines=(),
+    )
+    v = verdict(strong, draws=draws(100), decoys=False)
+    assert v.verdict == WORKS
+    assert {c.status for c in v.criteria if c.id in ("baselines", "works_spread")} == {
+        "not_applicable"
+    }
+
+
+def test_a_basis_chosen_among_several_says_what_it_was_chosen_on() -> None:
+    rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
+    choice = choose_basis(rows, T)
+    assert choice.why == "chosen on in-sample lift: 21 d +1.2 pts, 31 d -0.1 pts, 15 d -1.5 pts"
+    assert verdict(rows).basis_why == choice.why
+    assert choose_basis(rows, T, Declared(horizon=15)).why == ""  # declared: nothing to explain
+    assert verdict(result()).basis_why == ""  # the one candidate
 
 
 def test_the_page_figures_are_the_in_sample_deciles_the_trials_and_the_robustness() -> None:
@@ -321,6 +350,19 @@ def test_a_year_the_split_cuts_is_two_rows_not_a_both_row() -> None:
     assert (second.from_date, second.to_date) == (SPLIT, date(2026, 12, 31))
     assert (first.trades, second.trades) == (3, 9)
     assert (years[0].from_date, years[0].to_date) == (date(2025, 1, 1), date(2025, 12, 31))
+
+
+def test_years_before_the_screens_first_session_are_not_rows_and_the_split_ends_at_the_run() -> (
+    None
+):
+    empty = [row(kind="year", slice_value=str(y), sessions=0) for y in range(2010, 2024)]
+    rows = [*result(), *empty, row(kind="year", slice_value="2025"), *parts()]
+    years = judge("e", rows, SPLIT, T, range_to=date(2026, 10, 9)).years
+    assert [y.label for y in years] == ["2025", "2026 Jan\u2013Mar", "2026 Apr\u2013Oct"]
+    assert years[-1].to_date == date(2026, 10, 9)
+    # a year after the last with sessions goes too
+    tail = [*rows, row(kind="year", slice_value="2027", sessions=0)]
+    assert [y.year for y in judge("e", tail, SPLIT, T).years][-1] == "2026"
 
 
 def test_a_moved_split_cuts_its_own_year_and_never_inverts_the_dates() -> None:
@@ -395,7 +437,7 @@ def test_vrp_rests_on_the_horizon_best_in_sample_not_the_best_out_of_sample() ->
     # vrp_short_premium's run: in-sample +1.2 pts at 21 sessions, -1.5 at 15, -0.1 at 31; the
     # 31-session horizon has the best out-of-sample figure and was the basis before ADR 0065.
     rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
-    assert choose_basis(rows, T) == BasisChoice(("vrp", 21))
+    assert choose_basis(rows, T).key == ("vrp", 21)
     v = verdict(rows)
     assert v.basis == "vrp, 21 trading days"
     assert v.win_rate == 0.52  # every figure is the basis's, not the best out-of-sample one
@@ -426,7 +468,7 @@ def test_the_basis_is_invariant_to_any_change_of_the_out_of_sample_rows() -> Non
         row("vrp", kind="regime", horizon_sessions=h, slice_value="calm") for h in (15, 21, 31)
     ]
     chosen = choose_basis(rows, T)
-    assert chosen == BasisChoice(("vrp", 21))
+    assert chosen.key == ("vrp", 21)
     for k in range(1, 5):  # every figure of every row that reads the frozen period, pbo and DSR too
         changed = [_scrambled(r, k) if r.slice_kind in OOS_KINDS else r for r in rows]
         assert changed != rows
@@ -503,6 +545,14 @@ def test_the_haircut_of_a_stored_run_counts_the_series_sessions_with_picks(
     assert edge is not None
     h = load_edge_verdict(ctx, edge).haircut
     assert h is not None and (h.sessions, h.trials) == (3, 5)
+
+
+def test_the_figures_columns_carry_the_touch_and_risk_neutral_rates_when_stored() -> None:
+    rows = result(oos={"reference_rate": 0.61, "touch_rate": 0.42}, insample={"touch_rate": 0.54})
+    by = {c.period: c for c in verdict(rows).columns}
+    assert (by["out_of_sample"].reference_rate, by["out_of_sample"].touch_rate) == (0.61, 0.42)
+    assert (by["in_sample"].reference_rate, by["in_sample"].touch_rate) == (None, 0.54)
+    assert by["all"].touch_rate is None  # not stored: never a zero
 
 
 def test_a_lone_trial_has_no_overfitting_test_and_can_still_reach_promising() -> None:

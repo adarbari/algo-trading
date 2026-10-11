@@ -2,8 +2,9 @@
  * What a followed edge has done on paper, under its backtest (ADR 0053 amendment 2026-10-09): the
  * live record against the backtest's usual range (the sentence, the counts and the picture of
  * where the live win rate falls), a new version's forward test beside the edge it would replace,
- * and the paper trades. Shown once the edge has paper trades or a forward test; every figure,
- * sentence and bar is the server's, for the session.
+ * and the paper trades. Shown once the edge has paper trades or a forward test; an edge with
+ * none says why in its place (the server's live state: not recording, no live record, not yet
+ * settled), never an absent section. Every figure, sentence and bar is the server's.
  */
 import {
   Banner,
@@ -25,6 +26,7 @@ import {
   recordTone,
   useEdgePaper,
   type ForwardTest,
+  type LiveState,
   type PaperRecord,
 } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
@@ -54,11 +56,23 @@ const forwardItems = (f: ForwardTest): StatItem[] => [
 export interface EdgeLiveProps {
   /** The edge's id. */
   edgeId: string;
+  /** The edge's live state for the session, said when it has no record to show. */
+  live?: LiveState | undefined;
 }
 
-export function EdgeLive({ edgeId }: EdgeLiveProps) {
+export function EdgeLive({ edgeId, live }: EdgeLiveProps) {
   const paper = useEdgePaper(edgeId).data;
-  if (!hasLiveRecord(paper)) return null;
+  if (!hasLiveRecord(paper)) {
+    if (!live) return null;
+    return (
+      <Panel title="Live record" actions={termHelp('live_state')}>
+        <Stack direction="row" gap={2} align="center" wrap>
+          <StatusBadge tone={recordTone(live.state)}>{recordLabel(live.state)}</StatusBadge>
+          <Text size="sm">{live.headline}</Text>
+        </Stack>
+      </Panel>
+    );
+  }
   const record = paper.record;
   return (
     <Stack gap={4}>

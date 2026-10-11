@@ -127,6 +127,12 @@ values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_m
 names = { not_measured = "not measured", not_applicable = "does not apply" }
 
 [[enum]]
+source = "graphql:CountProjection.state"
+values_from = "python:algotrade.services.read.evaluation.evidence:PROJECTION_STATES"
+values = { projected = "term:outlook_projection", not_stored = "term:outlook_projection", beyond_projection = "term:outlook_projection", unprojectable = "term:outlook_projection", oos_hidden = "term:outlook_projection" }
+names = { oos_hidden = "hidden", beyond_projection = "beyond the projection" }
+
+[[enum]]
 source = "graphql:EdgeOutlook.projectionState"
 values_from = "python:algotrade.services.read.evaluation.evidence:PROJECTION_STATES"
 values = { projected = "term:outlook_projection", not_stored = "term:outlook_projection", beyond_projection = "term:outlook_projection", unprojectable = "term:outlook_projection", oos_hidden = "term:outlook_projection" }
@@ -157,14 +163,14 @@ names = { oos_hidden = "hidden" }
 [[enum]]
 source = "graphql:LiveRecord.state"
 values_from = "python:algotrade.services.read.edge_desk.states:LIVE_STATES"
-values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state", not_settled = "term:live_state" }
-names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record", not_settled = "not yet settled" }
+values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state", not_settled = "term:live_state", not_recording = "term:live_state" }
+names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record", not_settled = "not yet settled", not_recording = "not recording" }
 
 [[enum]]
 source = "graphql:EdgeLiveState.state"
 values_from = "python:algotrade.services.read.edge_desk.states:LIVE_STATES"
-values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state", not_settled = "term:live_state" }
-names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record", not_settled = "not yet settled" }
+values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state", not_settled = "term:live_state", not_recording = "term:live_state" }
+names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record", not_settled = "not yet settled", not_recording = "not recording" }
 
 [[enum]]
 source = "graphql:EdgeTradeRow.status"
@@ -179,6 +185,12 @@ names = { IN_SAMPLE = "in-sample", OUT_OF_SAMPLE = "out-of-sample", LIVE = "live
 [[enum]]
 source = "graphql:TradeSort"
 exempt = "the column a page of trades sorts by: a control, named by the column header"
+[[enum]]
+source = "graphql:EdgeDrawdown.state"
+values_from = "python:algotrade.services.read.edge_evidence.drawdown:DRAWDOWN_STATES"
+values = { measured = "term:drawdown", not_stored = "term:cost_state", not_a_return = "term:not_a_return" }
+names = { not_a_return = "not a return" }
+
 [[enum]]
 source = "graphql:EdgeCosts.state"
 values_from = "python:algotrade.services.read.edge_evidence.costs:COST_STATES"

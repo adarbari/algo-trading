@@ -127,14 +127,34 @@ def load_basis_series(ctx: Stores, basis: OfficialBasis) -> BasisSeries | Unknow
         job = f"edge-eval:{basis.run.edge_id}:{basis.run.owner}"
         why = f"{basis.run.run_id} stored no per-session series for {basis.key[0]}: re-run it"
         return Unknown(UnknownCode.NO_ROW, run_cause(job, why))
+    return _series_of(mine, basis.key, basis.split_from, basis.hidden)
+
+
+def _series_of(
+    mine: list[SeriesRow], key: tuple[str, int], split: date | None, hidden: bool
+) -> BasisSeries:
+    """The windows and gaps of one screener's (or baseline's) rows at one horizon."""
     unit = _unit(mine)
-    weights = runs.window_weights((r.decision_session for r in mine), basis.key[1])
+    weights = runs.window_weights((r.decision_session for r in mine), key[1])
     windows = [
-        w
-        for r in mine
-        if (w := _window(r, unit, basis.split_from, weights[r.decision_session])) is not None
+        w for r in mine if (w := _window(r, unit, split, weights[r.decision_session])) is not None
     ]
     windows.sort(key=lambda w: (w.exit, w.row.decision_session))
     used = {id(w.row) for w in windows}
     gaps = tuple(r for r in mine if id(r) not in used)
-    return BasisSeries(basis.key, unit, basis.split_from, basis.hidden, tuple(windows), gaps)
+    return BasisSeries(key, unit, split, hidden, tuple(windows), gaps)
+
+
+def load_baseline_series(ctx: Stores, basis: OfficialBasis) -> tuple[BasisSeries, ...]:
+    """The series of each baseline (decoy) the run measured at the basis's holding period, by
+    baseline name (the same reader as the basis's own, so a hidden copy's out-of-sample rows are
+    withheld here too); none when the run has no basis or stored none."""
+    if basis.run is None or basis.key is None:
+        return ()
+    by: dict[str, list[SeriesRow]] = {}
+    for r in runs.load_run_series(ctx, basis.run):
+        if r.role == runs.BASELINE and r.horizon_sessions == basis.key[1]:
+            by.setdefault(r.variant, []).append(r)
+    return tuple(
+        _series_of(by[v], (v, basis.key[1]), basis.split_from, basis.hidden) for v in sorted(by)
+    )
