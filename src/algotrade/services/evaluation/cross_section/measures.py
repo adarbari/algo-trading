@@ -206,6 +206,12 @@ class SliceMeasure:
     in_sample: bool = field(default=False)  # a model screener's fit saw sessions of this slice
     decile_means: tuple[float, ...] = field(default=())  # mean of each tenth, over the sessions
     # that had deciles (BUCKETS values), best-ranked first; () when the slice had none
+    # Capacity (ADR 0064 decision 5), over the slice's counted picks: the median 20-day dollar
+    # volume of those whose is known, how many are known and how many are below the site floor
+    # (``adv_floor``); None where it is not measured (a cost row, a random draw).
+    pick_adv_median: float | None = field(default=None)
+    pick_adv_known: int | None = field(default=None)
+    pick_adv_low: int | None = field(default=None)
 
 
 def decile_means(values_in_rank_order: Sequence[float]) -> tuple[float, ...]:
@@ -230,8 +236,26 @@ def _pooled(chunks: Sequence[Sequence[float]]) -> np.ndarray:
     return np.array([v for chunk in chunks for v in chunk], dtype=np.float64)
 
 
-def _measure(sl: Slice, kept: Sequence[SessionStat], in_sample: bool = False) -> SliceMeasure:
+def _capacity(
+    rows: Sequence[SessionStat], floor: float | None
+) -> tuple[float | None, int | None, int | None]:
+    """``(median, known, low)`` of the ADR 0064 capacity columns over the counted picks of
+    ``rows``; all None without a ``floor`` (capacity not asked for)."""
+    if floor is None:
+        return None, None, None
+    known = [p.adv for r in rows for p in r.picks if not p.reason and p.adv is not None]
+    median = float(np.median(known)) if known else None
+    return median, len(known), sum(1 for a in known if a < floor)
+
+
+def _measure(
+    sl: Slice,
+    kept: Sequence[SessionStat],
+    in_sample: bool = False,
+    adv_floor: float | None = None,
+) -> SliceMeasure:
     rows = [r for r in kept if not r.excluded_coverage]
+    adv_median, adv_known, adv_low = _capacity(rows, adv_floor)
     picks = sum(len(r.pick_values) for r in rows)
     hits = sum(r.pick_hits for r in rows)
     eligible = sum(r.eligible for r in rows)
@@ -276,7 +300,90 @@ def _measure(sl: Slice, kept: Sequence[SessionStat], in_sample: bool = False) ->
         pre_snapshot_sessions=sum(1 for r in rows if r.pre_snapshot),
         reference_rate=_mean(float(sum(sum(r.pick_reference) for r in rows)), n_ref),
         touch_rate=_mean(sum(r.pick_touches for r in rows), n_ref),
+        pick_adv_median=adv_median,
+        pick_adv_known=adv_known,
+        pick_adv_low=adv_low,
     )
+
+
+COST = "cost"  # slice kind of a cost row; its value is ``<period>:<bp>``
+COST_PERIODS = ("all", "in_sample", "frozen", "split")  # the slice kinds a cost row is cut for
+
+
+@dataclass(frozen=True)
+class CostGrid:
+    """The costs a return edge is measured at: ``document_bp`` (its own ``cost_bps``, which the
+    stored values are net of; None counts as 0) and ``levels`` (the site grid, in bp, in the
+    order the legs' ``*_hits_at`` count them)."""
+
+    document_bp: float | None
+    levels: tuple[float, ...]
+
+    @property
+    def own(self) -> float:
+        return self.document_bp or 0.0
+
+
+def _level_hits(rows: Sequence[SessionStat], index: int) -> tuple[int, int] | None:
+    """``(pick hits, base hits)`` at grid level ``index`` over ``rows``; None when a session did
+    not count that level (a leg from before the grid): never a guess."""
+    if any(len(r.pick_hits_at) <= index or len(r.base_hits_at) <= index for r in rows):
+        return None
+    return sum(r.pick_hits_at[index] for r in rows), sum(r.base_hits_at[index] for r in rows)
+
+
+def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) -> list[SliceMeasure]:
+    """The cost rows of period ``m`` (ADR 0064 decision 5): per cost level, the document's own
+    and each of the grid, the hit rate, base rate, lift and mean excess return net of that cost.
+    The means are exact: cost is linear in the mean, so the gross mean is the stored net one plus
+    the document's cost. The decile spread is cost-invariant (both tenths pay the same cost), so
+    a cost row leaves it unset and the reader serves the period's own. Capacity is not a cost
+    figure: unset here."""
+    measured = [r for r in rows if not r.excluded_coverage]
+    found: dict[float, tuple[int, int]] = {costs.own: (m.hits, m.base_hits)}
+    for index, bp in enumerate(costs.levels):
+        counted = _level_hits(measured, index)
+        if counted is not None and bp != costs.own:
+            found[bp] = counted
+    out = []
+    for bp in sorted(found):
+        hits, base_hits = found[bp]
+        hit_rate, base_rate = _mean(hits, m.picks), _mean(base_hits, m.eligible)
+        out.append(
+            replace(
+                m,
+                top_decile_mean=None,
+                decile_spread=None,  # cost-invariant: the period's own row says it
+                decile_t=None,
+                decile_sessions=0,
+                effect_size=None,
+                sharpe=None,
+                deflated_sharpe=None,
+                trials=None,
+                pbo=None,
+                decile_means=(),
+                reference_rate=None,
+                touch_rate=None,
+                pick_adv_median=None,
+                pick_adv_known=None,
+                pick_adv_low=None,
+                slice_kind=COST,
+                slice_value=f"{m.slice_kind}:{bp:g}",
+                hits=hits,
+                base_hits=base_hits,
+                hit_rate=hit_rate,
+                base_rate=base_rate,
+                lift=lift(hit_rate, base_rate),
+                mean_excess_picks=_net(m.mean_excess_picks, costs.own, bp),
+                bh_mean=_net(m.bh_mean, costs.own, bp),
+            )
+        )
+    return out
+
+
+def _net(mean: float | None, own_bp: float, bp: float) -> float | None:
+    """``mean`` (net of ``own_bp``) as it would be net of ``bp``."""
+    return None if mean is None else mean + (own_bp - bp) / 1e4
 
 
 def slice_measures(
@@ -284,16 +391,34 @@ def slice_measures(
     slices: Sequence[Slice],
     model: bool = False,
     frozen_from: date | None = None,
+    adv_floor: float | None = None,
 ) -> list[SliceMeasure]:
     """One ``SliceMeasure`` per slice, in the slices' order, over the stats it keeps. A ``model``
     screener's score was fitted on sessions before ``frozen_from`` (a fitness test): a slice that
-    keeps one of them is IN_SAMPLE, whatever its kind (no ``frozen_from``: every slice is)."""
+    keeps one of them is IN_SAMPLE, whatever its kind (no ``frozen_from``: every slice is).
+    ``adv_floor``: the site's capacity floor for the capacity columns (none: not measured)."""
     out = []
     for sl in slices:
         kept = [r for r in rows if sl.keep(r)]
         seen = model and (frozen_from is None or any(r.session < frozen_from for r in kept))
-        out.append(_measure(sl, kept, seen))
+        out.append(_measure(sl, kept, seen, adv_floor))
     return out
+
+
+def cost_measures(
+    rows: Sequence[SessionStat],
+    slices: Sequence[Slice],
+    measures: Sequence[SliceMeasure],
+    costs: CostGrid,
+) -> list[SliceMeasure]:
+    """The cost rows of a return edge (``slice_kind`` ``cost``), for the all, in-sample and
+    frozen (or split) periods among ``slices`` (``measures`` its ``slice_measures``)."""
+    return [
+        row
+        for sl, m in zip(slices, measures, strict=True)
+        if sl.kind in COST_PERIODS
+        for row in _cost_rows(m, [r for r in rows if sl.keep(r)], costs)
+    ]
 
 
 def edge_slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:

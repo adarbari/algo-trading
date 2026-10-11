@@ -23,6 +23,12 @@ from algotrade.storage.tables.spec import fixed, floats, strings
 # ``random`` (``variant`` = ``random``, ``slice_kind`` = ``draw``, ``slice_value`` the draw's
 # number) are the random-pick backtest's draws over the out-of-sample slice: no screener, never a
 # candidate for a verdict, read only through ``services/read/evaluation/runs.py``.
+# ADR 0064 decision 5: rows with ``slice_kind`` = ``cost`` (``slice_value`` = ``<period>:<bp>``,
+# period all / in_sample / frozen / split) carry a return edge's figures at one round-trip cost;
+# none for an outcome that is not a return. ``pick_adv_median`` / ``pick_adv_known`` /
+# ``pick_adv_low``: the median 20-day dollar volume of the slice's counted picks, how many have
+# one and how many are below the site's ``capacity_adv_floor_usd``; null in rows written before
+# the columns and on cost and random rows.
 EDGE_EVAL = fixed(
     "results/edge_eval",
     "results",
@@ -46,12 +52,12 @@ EDGE_EVAL = fixed(
         "decile_sessions", "trials",
         "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
         "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
-        "pre_snapshot_sessions",
+        "pre_snapshot_sessions", "pick_adv_known", "pick_adv_low",
     )),
     *floats(
         "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
         "decile_spread", "decile_t", "effect_size", "sharpe", "deflated_sharpe", "pbo",
-        "reference_rate", "touch_rate",
+        "reference_rate", "touch_rate", "pick_adv_median",
         *(f"decile_mean_{i:02d}" for i in range(1, 11)),
     ),
     runs="merge",

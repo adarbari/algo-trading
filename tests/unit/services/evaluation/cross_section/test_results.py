@@ -59,7 +59,7 @@ def test_rows_and_a_run_record_with_the_trial_log(world: World) -> None:
     ev = evaluate(world)
     record = write_edge_eval(world.results, ev, NOW)
     stored = world.reader.table("results/edge_eval", DAYS[-1])
-    assert stored is not None and len(stored) == len(ev.results[0].measures)
+    assert stored is not None and len(stored) == len(ev.results[0].measures + ev.results[0].costs)
     all_row = stored[stored["slice_kind"] == "all"].iloc[0]
     assert (all_row["edge_id"], all_row["variant"], all_row["horizon_sessions"]) == (
         "drift",

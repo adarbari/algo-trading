@@ -30,6 +30,9 @@ MAIN = "main"
 RANDOM = "random"  # the role of a random-pick draw (ED8), never a screener or a baseline
 DECILES = 10
 IN_SAMPLE = "in_sample"  # the slice before the split
+COST = (
+    "cost"  # a return edge's figures at one round-trip cost; ``slice_value`` is ``<period>:<bp>``
+)
 
 
 @dataclass(frozen=True)
@@ -98,6 +101,9 @@ class EdgeRow:
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
     decile_means: tuple[float | None, ...] = ()  # each tenth's mean outcome, best-ranked first;
     # empty when the slice had none or the run is older than the columns (never zeros)
+    pick_adv_median: float | None = None  # capacity (ADR 0064): the picks' median 20-day dollar
+    pick_adv_known: int | None = None  # volume, how many have one, how many are below the
+    pick_adv_low: int | None = None  # site's floor; None in a run from before the columns
 
 
 @dataclass(frozen=True)
@@ -277,6 +283,9 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         decile_sessions=_int(row.get("decile_sessions")),
         in_sample=to_scalar(row.get("in_sample")) is True,
         decile_means=_deciles(row),
+        pick_adv_median=_float(row.get("pick_adv_median")),
+        pick_adv_known=_int(row.get("pick_adv_known")),
+        pick_adv_low=_int(row.get("pick_adv_low")),
     )
 
 
@@ -341,10 +350,18 @@ def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
     """The rows ``run`` wrote, as it left them; none when its partition holds none of its own.
     A run whose out-of-sample result is hidden serves its ``in_sample`` rows only: the whole
     history, the years and the regimes all contain out-of-sample sessions, so they are withheld
-    here, in the one reader, not in the browser."""
+    here, in the one reader, not in the browser. A cost row is cut by period (ADR 0064 decision
+    3): the ``in_sample:`` ones stay, by the harness's period, never by a date."""
     record = ctx.reader.run(run.run_id)
     found = rows_of_record(ctx, record) if record is not None else ()
-    return tuple(r for r in found if r.slice_kind == IN_SAMPLE) if run.oos_hidden else found
+    return tuple(r for r in found if _in_sample_only(r)) if run.oos_hidden else found
+
+
+def _in_sample_only(row: EdgeRow) -> bool:
+    """Whether a row holds in-sample sessions only: the ``in_sample`` slice or its cost rows."""
+    return row.slice_kind == IN_SAMPLE or (
+        row.slice_kind == COST and row.slice_value.startswith(f"{IN_SAMPLE}:")
+    )
 
 
 def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:

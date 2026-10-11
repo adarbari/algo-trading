@@ -76,6 +76,13 @@ def lift(hit_rate: float | None, base_rate: float | None) -> float | None:
 type Moments = tuple[int, float, float]  # n, mean, m2 (sum of squared deviations from the mean)
 
 
+def break_even_cost(mean_net: float | None, cost_bp: float) -> float | None:
+    """The round-trip cost (bp) at which the picks' mean excess return is zero: the gross mean in
+    basis points. Exact, the cost being linear in the mean: ``mean_net`` was measured net of
+    ``cost_bp``, so the gross is ``mean_net + cost_bp / 1e4``. None without a mean."""
+    return None if mean_net is None else mean_net * 1e4 + cost_bp
+
+
 def moments(values: ArrayLike) -> Moments:
     """``(n, mean, m2)`` of the finite values, ``m2`` the sum of squared deviations about the
     mean (the numerically stable running form of the sum and sum of squares)."""

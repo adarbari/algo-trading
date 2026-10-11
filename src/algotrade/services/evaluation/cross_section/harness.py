@@ -70,6 +70,7 @@ from algotrade.services.evaluation.cross_section.historical import (
 )
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
+    is_return,
     needs_implied_vol,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
@@ -90,8 +91,10 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
 )
 from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.measures import (
+    CostGrid,
     SessionStat,
     SliceMeasure,
+    cost_measures,
     deflate,
     edge_slices,
     pool_stats,
@@ -159,6 +162,24 @@ class VariantResult:
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
     report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
     series: SeriesFacts | None = None  # the windows of ``stats``, the unit, the projection (0064)
+    costs: tuple[SliceMeasure, ...] = ()  # cost rows of a return outcome (ADR 0064 decision 5)
+
+
+def _slice_rows(
+    stats: tuple[SessionStat, ...],
+    split: date | None,
+    exploratory: bool,
+    model: bool,
+    frozen_from: date | None,
+    costs: CostGrid | None,
+    adv_floor: float,
+) -> tuple[tuple[SliceMeasure, ...], tuple[SliceMeasure, ...]]:
+    """One variant's slice rows and, for a return outcome (``costs``), its cost rows (ADR 0064
+    decision 5: none for an outcome that is not a return)."""
+    slices = edge_slices(stats, split, exploratory)
+    measures = slice_measures(stats, slices, model, frozen_from, adv_floor)
+    costed = cost_measures(stats, slices, measures, costs) if costs is not None else []
+    return tuple(measures), tuple(costed)
 
 
 @dataclass(frozen=True)
@@ -334,6 +355,7 @@ def evaluate_edge(
         for scope in scopes
         for horizon in scope.edge.outcome.horizon_sessions
     ]
+    verdict = load_verdict(configs)
     hashed = run_hash(edge, variants, start, end, as_of, iv_field, split, random_draws)
     spec = _RandomSpec(
         split,
@@ -341,7 +363,7 @@ def evaluate_edge(
         expression_hash(catalogue(configs, user.user_id)),
         user.user_id,
         edge.id,
-        load_verdict(configs).cost_levels_bps,  # every leg counts hits at the site's cost grid
+        verdict.cost_levels_bps,  # every leg counts hits at the site's cost grid
     )
     stored = read_legs(reader, user.user_id, edge.id, start, end)
     earnings = any(p.scope.edge.event_class == "earnings_expected" for p in plans)  # a diagnostic
@@ -404,13 +426,16 @@ def evaluate_edge(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
                 for block in kept
             )
-            measures = tuple(
-                slice_measures(
-                    block_stats,
-                    edge_slices(block_stats, split, exploratory),
-                    variant.config.config.impl == MODEL_IMPL,
-                    edge.frozen_from,
-                )
+            measures, costed = _slice_rows(
+                block_stats,
+                split,
+                exploratory,
+                variant.config.config.impl == MODEL_IMPL,
+                edge.frozen_from,
+                CostGrid(scope.edge.outcome.cost_bps, spec.costs)
+                if is_return(scope.edge)
+                else None,
+                verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
             )
             results.append(
                 VariantResult(
@@ -434,6 +459,7 @@ def evaluate_edge(
                         split,
                         exits,
                     ),
+                    costs=costed,
                     lost_sessions=dict(
                         Counter(stats.lost.get((plan.key, variant.id), {}).values())
                     ),

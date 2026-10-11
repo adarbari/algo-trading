@@ -29,6 +29,7 @@ KEYS = (
     "live_low",
     "live_high",
     "edge_costs",
+    "capacity_adv_floor_usd",
 )
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
@@ -66,6 +67,11 @@ class VerdictSettings:
     # at, beside its document's own ``cost_bps`` (ADR 0064 decision 5). The harness counts hits
     # at each level in every leg, so the grid is in the leg key: a changed grid recomputes legs.
     cost_levels_bps: tuple[float, ...] = COST_LEVELS
+    # ``capacity_adv_floor_usd``: a pick whose 20-day average dollar volume at the decision session
+    # is below this is "low liquidity" in the capacity columns of ``results/edge_eval`` (ADR 0064
+    # decision 5). Applied when the statistics are computed, not in the leg key: a changed floor
+    # never recomputes a leg, only the next run's rows.
+    capacity_adv_floor_usd: float = 5_000_000.0
 
     @classmethod
     def from_document(
@@ -93,6 +99,7 @@ class VerdictSettings:
             live_low=t.fraction("live_low", d.live_low),
             live_high=t.fraction("live_high", d.live_high),
             cost_levels_bps=_cost_levels(t.table("edge_costs", ("levels_bps",)), d),
+            capacity_adv_floor_usd=t.number("capacity_adv_floor_usd", d.capacity_adv_floor_usd, 1),
         )
 
 
