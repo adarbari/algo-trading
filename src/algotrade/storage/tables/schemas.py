@@ -28,6 +28,7 @@ from algotrade.storage.tables.edge_schemas import (
     EDGE_LEGS,
     EDGE_PAPER,
     EDGE_SERIES,
+    EDGE_TRADES,
     WINNERS_STUDY,
 )
 from algotrade.storage.tables.spec import (
@@ -554,6 +555,7 @@ KNOWN: dict[str, TableSpec] = {
         WINNERS_STUDY,
         EDGE_PAPER,
         EDGE_LEGS,
+        EDGE_TRADES,
         LIVE_OPTION_QUOTES,
         USAGE_LLM_CALLS,
         ETF_HOLDINGS,
