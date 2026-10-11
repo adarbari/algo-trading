@@ -1,0 +1,27 @@
+{
+  "id": "ibkr-iv-rank-60",
+  "sentence": "IBKR IV rank > 60",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "IBKR IV rank > 60",
+        "bucket": "A",
+        "fields": [
+          "rollup.ibkr_iv@v1.iv_rank_252d_ibkr",
+          "feature.iv_rank"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.6,
+        "tolerance": 0.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

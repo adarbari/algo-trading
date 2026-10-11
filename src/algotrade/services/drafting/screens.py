@@ -1,19 +1,20 @@
-"""``draft_screen``: a sentence to a draft rule screen (ADR 0041). The prompt is the task, the
-caller's catalogue, the site phrasebook (``config/site/phrasebook.toml``) and the site field guide
-(``config/site/field_guide/*.toml``: thresholds and caveats per field). The model's JSON
-is parsed strictly (ids, fields, ops, modes, values, tolerances); a criterion on a field outside the
-caller's catalogue, or one the validator rejects, is dropped with the reason (never saved,
-never silently kept); the rest is validated with ``resolve_rule_draft`` as finalise does. The
-model is asked with the answer schema (``answer_schema.py``) and the draft's own check as
-``accept``: an answer that is not JSON, does not fit the schema or is a draft the validator
-refuses is repaired once and then handed to the next provider by the chain (ADR 0041, amended
-2026-10-11). Reads only the catalogue and the configs; writes nothing."""
+"""``draft_screen``: a sentence to a draft rule screen (ADR 0041). The prompt is the task, an
+index of the caller's catalogue and, for the sentence's slice of it (``retrieval``), the
+fields in detail, the site phrasebook (``config/site/phrasebook.toml``) entries and the site
+field guide (``config/site/field_guide/*.toml``: thresholds and caveats per field). The
+model's JSON is parsed strictly (ids, fields, ops, modes, values, tolerances); a criterion on
+a field outside the caller's catalogue, or one the validator rejects, is dropped with the
+reason (never saved, never silently kept); the rest is validated with ``resolve_rule_draft``
+as finalise does. The model is asked with the answer schema (``answer_schema.py``) and the
+draft's own check as ``accept``: an answer that is not JSON, has no criteria list or is a draft
+the validator refuses is repaired once and then handed to the next provider by the chain
+(ADR 0041, amended 2026-10-11). Reads only the catalogue and the configs; writes nothing."""
 
 import json
 import logging
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from algotrade.config.site.settings import load_field_guide, load_phrasebook
@@ -26,7 +27,7 @@ from algotrade.core.model.errors import (
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
 from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA, check_answer, check_criterion
-from algotrade.services.drafting.prompt import PROMPT_VERSION, system_prompt, user_prompt
+from algotrade.services.drafting.prompt import PROMPT_VERSION, sliced_system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.services.text_model.model import TextModel, reject_answer
@@ -61,6 +62,7 @@ class ScreenDraft:
     document: dict[str, Any]
     dropped: tuple[DroppedCriterion, ...]
     notes: tuple[str, ...]
+    call_id: str | None = None  # the text-model call that made it (usage/llm_calls, ADR 0066)
 
 
 def draft_screen(
@@ -82,7 +84,7 @@ def draft_screen(
     infos = feature_infos(ctx.features)
     phrasebook = load_phrasebook(ctx.configs).phrases
     guide = load_field_guide(ctx.configs)
-    system = system_prompt(infos.values(), phrasebook, guide)
+    system = sliced_system_prompt(infos.values(), sentence, phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
     tag = CallTag("screener-draft", ctx.user.user_id, PROMPT_VERSION)
     drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
@@ -104,7 +106,7 @@ def draft_screen(
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
-    return drafted[-1][1]
+    return replace(drafted[-1][1], call_id=completion.call_id)  # one id: every attempt of the call
 
 
 def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, Any]) -> ScreenDraft:

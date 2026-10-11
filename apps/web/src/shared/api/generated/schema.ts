@@ -533,6 +533,11 @@ export interface components {
             document: {
                 [key: string]: unknown;
             };
+            /**
+             * Draft Session Id
+             * @description the id a draft-from-text answer returned, when this screen came from it (ADR 0066); a hand-built screen sends none
+             */
+            draft_session_id?: string | null;
         };
         /** DraftFromTextBody */
         DraftFromTextBody: {
@@ -651,6 +656,14 @@ export interface components {
              * @description what the inputs' tables with no partition for the session leave out
              */
             unavailable?: components["schemas"]["Unavailable"][];
+        };
+        /** FinaliseBody */
+        FinaliseBody: {
+            /**
+             * Draft Session Id
+             * @description the id a draft-from-text answer returned, when this screen came from it (ADR 0066); a hand-built screen sends none
+             */
+            draft_session_id?: string | null;
         };
         /** Finalised */
         Finalised: {
@@ -1181,6 +1194,11 @@ export interface components {
             document: {
                 [key: string]: unknown;
             };
+            /**
+             * Draft Session Id
+             * @description ties this draft to the screen later saved from it (ADR 0066); send it back with the save; null when feedback is not recorded
+             */
+            draft_session_id?: string | null;
             /**
              * Dropped
              * @description proposed criteria the draft does not keep
@@ -2150,7 +2168,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["FinaliseBody"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -1,11 +1,14 @@
 """``/screeners/{id}``: copy, draft, finalise, rebase and delete (ADR 0029), each write read
 back through GraphQL (``screenDetail``, ``screenVersions``, ``myScreens``: the API's user)."""
 
+import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+
+from algotrade.core.model.completion import Completion
 
 ALICE = {"X-Act-For": "alice"}  # an admin writing for another declared user
 
@@ -153,3 +156,89 @@ def test_a_trader_writes_for_themselves_only(trader_client: TestClient, root: Pa
     assert not (root / "users" / "alice").exists()
     named = c.put("/screeners/mine/draft", headers={"X-Act-For": "bob"}, json={"document": OWN})
     assert named.status_code == 200  # naming oneself is allowed
+
+
+class Keep:
+    """A feedback sink that keeps the rows (ADR 0066)."""
+
+    def __init__(self) -> None:
+        self.rows: list[dict[str, Any]] = []
+
+    def submit(self, row: Any) -> bool:
+        self.rows.append(dict(row))
+        return True
+
+    @property
+    def names(self) -> list[str]:
+        return [r["event"] for r in self.rows]
+
+
+class Answer:
+    """A text model that answers one canned draft."""
+
+    names = ("canned",)
+
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(self, system: str, user: str, *, tag: object = None) -> Any:
+        criteria = [{"id": "price", "field": "rollup.price_stats@v2.close", "op": "gt", "value": 5}]
+        return Completion(json.dumps({"criteria": criteria}), "m", "canned", call_id="call-1")
+
+
+def _describe_it(c: TestClient) -> tuple[Keep, str]:
+    """``c`` with a canned model and a keeping sink, one sentence drafted: (sink, session id)."""
+    sink = Keep()
+    c.app.state.feedback, c.app.state.text_model = sink, Answer()  # type: ignore[attr-defined]
+    drafted = c.post("/screeners/mine/draft-from-text", json={"text": "price over $5"})
+    assert drafted.status_code == 200, drafted.text
+    return sink, drafted.json()["draft_session_id"]
+
+
+def test_describe_it_events_follow_the_draft_to_the_saved_screen(writer_client: TestClient) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    assert sink.names == ["draft_requested", "draft_returned"] and session
+    assert {r["draft_session_id"] for r in sink.rows} == {session}
+    assert sink.rows[1]["call_ids"] == "call-1" and sink.rows[1]["draft_hash"]
+    price = {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 12}
+    edited = OWN | {"criteria": {"price": price}}
+    saved = c.put("/screeners/mine/draft", json={"document": edited, "draft_session_id": session})
+    assert saved.status_code == 200
+    assert sink.names[-1] == "draft_saved"
+    assert (
+        '"changed":[{' in sink.rows[-1]["payload"]
+    )  # 5 became 12: the diff, derived on the server
+    done = c.post("/screeners/mine/finalise", json={"draft_session_id": session}).json()
+    last = sink.rows[-1]
+    assert last["event"] == "screen_finalised" and last["saved_hash"] == done["hash"]
+    assert last["sentence"] == "price over $5" and last["user"] == "local"
+
+
+def test_a_hand_built_screen_and_a_failed_write_record_nothing(writer_client: TestClient) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    before = len(sink.rows)
+    assert c.put("/screeners/hand/draft", json={"document": OWN}).status_code == 200  # no id
+    assert c.post("/screeners/hand/finalise").json()["version"] == 1  # no body: still fine
+    assert len(sink.rows) == before
+    bad = OWN | {"selection": "nope"}  # fails closed at finalise: the write did not happen
+    c.put("/screeners/mine/draft", json={"document": bad, "draft_session_id": session})
+    after_save = len(sink.rows)
+    assert c.post("/screeners/mine/finalise", json={"draft_session_id": session}).status_code == 400
+    assert len(sink.rows) == after_save  # no screen_finalised for a refused finalise
+    c.delete("/screeners/mine")  # the screen goes: a later save of its id is a conflict, 409
+    refused = c.put("/screeners/mine/draft", json={"document": OWN, "draft_session_id": session})
+    assert refused.status_code == 409 and len(sink.rows) == after_save
+
+
+def test_a_failing_sink_does_not_fail_the_save(writer_client: TestClient) -> None:
+    c = writer_client
+
+    class Down:
+        def submit(self, row: Any) -> bool:
+            raise RuntimeError("down")
+
+    c.app.state.feedback = Down()  # type: ignore[attr-defined]
+    ok = c.put("/screeners/mine/draft", json={"document": OWN, "draft_session_id": "whatever"})
+    assert ok.status_code == 200

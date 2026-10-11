@@ -419,6 +419,11 @@ owner = "src/algotrade/services/text_model/usage.py"
 note = "the API's fifth write (ADR 0058): one row per text-model provider attempt, plus a `rejected` row for an answer the caller refused (failures keep error, stage, prompt and raw answer, clipped; null elsewhere; metering, ADR 0058 amended 2026-10-11: `cache_read_tokens`, `cache_write_tokens`, `call_id`, `prompt_version`, `call_stage`, null on older partitions); read across a date range by data/usage"
 
 [[table]]
+name = "feedback/drafting_events"
+owner = "src/algotrade/services/feedback/recorder.py"
+note = "the API's sixth write (ADR 0066): one row per Describe-it event (draft requested / returned, choice, formula accepted / skipped, draft saved, screen finalised, edge revised) with the session id, the call ids, the hashes, the trader's sentence (clipped; personal data) and a small payload (a save's diff); read across a date range by data/feedback, only through the read model's loader (a trader sees their own rows)"
+
+[[table]]
 name = "verification/ibkr"
 owner = "apps/ingestion/algotrade_ingestion/tasks/verification/verify.py"
 

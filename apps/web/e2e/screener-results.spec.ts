@@ -22,6 +22,18 @@ function collectErrors(page: Page): string[] {
 
 const grid = (page: Page) => page.getByRole('grid', { name: 'Screener results' });
 
+/**
+ * Focus the grid once the run's rows are in. The grid is focusable while the results load (placeholder
+ * rows, `aria-busy`), and the table drops a key pressed with no rows, so a key sent early is lost:
+ * wait for the loaded rows first, never a fixed sleep.
+ */
+async function focusLoadedGrid(page: Page): Promise<void> {
+  await expect(grid(page)).not.toHaveAttribute('aria-busy', 'true');
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
+  await grid(page).focus();
+  await expect(grid(page)).toBeFocused();
+}
+
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
@@ -137,7 +149,7 @@ test('the row under review has its detail and chart beside the table, moved with
   await expect(detail).toContainText('new since the previous run');
   await expect(detail).toContainText('Passed');
   await expect(page.getByRole('region', { name: /AAPL · price/ })).toBeVisible();
-  await grid(page).focus();
+  await focusLoadedGrid(page);
   await page.keyboard.press('j'); // the focused grid starts on the first row; j moves on
   await expect(page.getByRole('region', { name: 'SOXS', exact: true })).toContainText('Near miss');
   await page.keyboard.press('k');
@@ -147,7 +159,7 @@ test('the row under review has its detail and chart beside the table, moved with
 test('c adds to the compare set, x hides a row for now, Enter opens Explore', async ({ page }) => {
   await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
-  await grid(page).focus();
+  await focusLoadedGrid(page);
   await page.keyboard.press('c'); // AAPL
   await page.keyboard.press('j');
   await page.keyboard.press('c'); // SOXS
@@ -164,7 +176,7 @@ test('c adds to the compare set, x hides a row for now, Enter opens Explore', as
 test('Enter on the row under review opens it in Explore', async ({ page }) => {
   await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
-  await grid(page).focus();
+  await focusLoadedGrid(page);
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/explore\?.*focus=AAPL/);
 });

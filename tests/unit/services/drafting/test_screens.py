@@ -468,3 +468,13 @@ def test_a_criterion_that_breaks_the_schema_is_dropped_with_its_reason_not_the_a
     assert [(d.id, "not the criterion shape" in d.reason) for d in draft.dropped] == [
         ("tol", True), ("obj", True)]  # fmt: skip
     assert "tolerance" in draft.dropped[0].reason and "value" in draft.dropped[1].reason
+
+
+def test_a_draft_carries_the_one_call_id_of_every_attempt_repair_and_escalation_included(
+    ctx: ReadContext,
+) -> None:
+    ledger = Ledger()
+    model = chained(ledger, Scripted("cheap", NOT_JSON, NOT_JSON), Scripted("strong", GOOD))
+    draft = draft_screen(ctx, model, "s", "over $50")
+    ids = {a.call_id for a in ledger.attempts}
+    assert len(ledger.attempts) == 5 and ids == {draft.call_id} and draft.call_id

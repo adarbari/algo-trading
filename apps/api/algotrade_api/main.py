@@ -34,6 +34,7 @@ from algotrade.core.model.errors import (
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
 from algotrade.services.explaining.cache import open_text_cache
 from algotrade.services.explaining.limits import RateLimiter
+from algotrade.services.feedback.events import FeedbackSink
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.edges import OnDemandEdges, open_ondemand_edges
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
@@ -59,6 +60,7 @@ from algotrade_api.auth.local import LocalAuthenticator
 from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
+from algotrade_api.feedback import DraftMemory, feedback_sink
 from algotrade_api.graphql.offload import OverloadedError
 from algotrade_api.graphql.response_cache import CountWrites, WriteEpoch, served_token
 from algotrade_api.graphql.schema import graphql_router, sdl
@@ -136,6 +138,14 @@ async def _stop(task: asyncio.Task[None]) -> None:
         await task
 
 
+def _flush(*recorders: object) -> None:
+    """Write what each background recorder has queued and stop it (those that have a ``close``)."""
+    for recorder in recorders:
+        close = getattr(recorder, "close", None)
+        if close is not None:
+            close()
+
+
 def create_app(
     settings: ApiSettings,
     store: ReadStore | None = None,
@@ -145,6 +155,7 @@ def create_app(
     ondemand_edges: OnDemandEdges | None = None,
     authenticator: Authenticator | None = None,
     text_model: TextModel | None = None,
+    feedback: FeedbackSink | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
@@ -154,7 +165,8 @@ def create_app(
     400). ``authenticator``: who is calling (default: ``settings.auth`` over the store's user
     registry; ADR 0040). ``text_model``: the text model behind screener drafts (default: the
     one ``config/site/llm.toml`` enables when ``settings.live``, else off: a request answers
-    503; ADR 0041)."""
+    503; ADR 0041). ``feedback``: where the Describe-it events go (default: the recorder of
+    ``feedback/drafting_events`` when ``settings.live``, else none; ADR 0066)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -164,9 +176,7 @@ def create_app(
         if warming is not None:
             await _stop(warming)
         app.state.live.close()
-        close = getattr(app.state.text_model, "close", None)
-        if close is not None:
-            close()  # flush the queued usage rows
+        _flush(app.state.text_model, app.state.feedback)  # the queued usage rows, feedback events
         for runner in (app.state.ondemand, app.state.ondemand_edges):
             if runner is not None:
                 runner.close()
@@ -208,6 +218,8 @@ def create_app(
     if text_model is None and settings.live:
         text_model, text_model_off = open_text_model(app.state.store.configs, settings.data_url)
     app.state.text_model, app.state.text_model_off = text_model, text_model_off
+    app.state.feedback = feedback_sink(feedback, settings.live, settings.data_url)  # ADR 0066
+    app.state.drafts = DraftMemory()
     app.state.explain_cache = open_text_cache(settings.data_url)  # ADR 0041 (amended): derived
     app.state.explain_limiter = RateLimiter()
     # Compress what is big (the bundle, GraphQL answers): the app is served over a remote link.

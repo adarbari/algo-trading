@@ -235,9 +235,15 @@ An answer the model gives is no longer "text or unavailable":
    with the question, its refused answer and the exact error; the next provider is stage
    `escalate`. At most two calls per provider, none started after `deadline_s`. A repair is best
    effort: it is skipped when its worst case would cut into the time reserved for the later
-   non-last providers (`worst_s`, from `LlmSettings`; the last provider's repair needs only the deadline not to have passed), so the fallback
-   keeps its turn and the deadline validation is unchanged.
+   non-last providers (`worst_s`, from `LlmSettings`; the last provider's repair needs only the deadline not
+   to have passed), so the fallback keeps its turn and the deadline validation is unchanged.
 4. **Order is tier**: no tier concept; the `[[provider]]` order is cheap first, strong last.
+
+## Amended 2026-10-11: the prompt is a field index plus a per-sentence slice
+
+The system prompt carries an index of every catalogue field (`name | type | unit`) and, in detail, only
+the slice `services/drafting/retrieval.py` picks for the sentence (`PROMPT_VERSION` 2; ~12-14k tokens, was
+~110k). A field with no detail is still valid; the golden set's recall test guards against a false "missing".
 
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a

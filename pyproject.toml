@@ -314,9 +314,11 @@ source_modules = ["algotrade.services.drafting"]
 forbidden_modules = [
     "algotrade.storage.tables.writers",
     "algotrade.storage.tables.result_writer",
+    "algotrade.storage.tables.feedback_writer",
     "algotrade.storage.configs.writer",
     "algotrade.services.jobs",
     "algotrade.services.authoring",
+    "algotrade.services.feedback",
     "algotrade.services.ondemand",
     "algotrade.services.screening",
     "algotrade_sources",
@@ -438,6 +440,28 @@ source_modules = ["algotrade", "algotrade_api", "algotrade_ingestion", "algotrad
 forbidden_modules = ["algotrade.storage.tables.usage_writer"]
 ignore_imports = ["algotrade.services.text_model.usage -> algotrade.storage.tables.usage_writer"]
 allow_indirect_imports = true  # the API reaches it only through services.text_model
+
+# ---- ADR 0066: the Describe-it feedback writes only feedback/* tables, only through the feedback writer.
+
+[[tool.importlinter.contracts]]
+name = "Drafting feedback writes only feedback/* tables: no market-data writer, no jobs (ADR 0066)"
+type = "forbidden"
+source_modules = ["algotrade.services.feedback"]
+forbidden_modules = ["algotrade.storage.tables.writers", "algotrade.services.jobs"]
+
+[[tool.importlinter.contracts]]
+name = "Only the drafting-feedback recorder imports the feedback writer (ADR 0066)"
+type = "forbidden"
+source_modules = ["algotrade", "algotrade_api", "algotrade_ingestion", "algotrade_backtest"]
+forbidden_modules = ["algotrade.storage.tables.feedback_writer"]
+ignore_imports = ["algotrade.services.feedback.recorder -> algotrade.storage.tables.feedback_writer"]
+allow_indirect_imports = true  # the API reaches it only through services.feedback
+
+[[tool.importlinter.contracts]]
+name = "Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"
+type = "protected"
+protected_modules = ["algotrade.data.feedback"]
+allowed_importers = ["algotrade.services.read.ops.feedback"]
 
 # ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
 # (no `pending_contract` remains in architecture/*_ownership.toml; a fitness test keeps it so).
@@ -667,9 +691,9 @@ source_modules = ["algotrade.config.site"]
 forbidden_modules = ["algotrade.config.strategy"]
 
 [[tool.importlinter.contracts]]
-name = "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"
+name = "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)"
 type = "independence"
-modules = ["algotrade.services.backtests", "algotrade.services.screening", "algotrade.services.authoring", "algotrade.services.drafting", "algotrade.services.explaining", "algotrade.services.events"]
+modules = ["algotrade.services.backtests", "algotrade.services.screening", "algotrade.services.authoring", "algotrade.services.drafting", "algotrade.services.explaining", "algotrade.services.events", "algotrade.services.feedback"]
 
 # ---- ADR 0029: user configs are written only through services.authoring (the API calls it).
 [[tool.importlinter.contracts]]

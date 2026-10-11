@@ -1,0 +1,33 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "iv_hv",
+      "field": "feature.iv_hv_ratio",
+      "op": "gt",
+      "value": 1.3,
+      "mode": "hard",
+      "why": "implied volatility more than 1.3 times realised volatility"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

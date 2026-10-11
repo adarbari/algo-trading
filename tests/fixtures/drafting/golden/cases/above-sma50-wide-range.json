@@ -1,0 +1,36 @@
+{
+  "id": "above-sma50-wide-range",
+  "sentence": "stocks trading above their 50 day average with a typical daily range over 3%",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "above their 50 day average",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_vs_sma_50"
+        ],
+        "op": "gt",
+        "value": 0,
+        "tolerance": 0.0
+      },
+      {
+        "span": "daily range over 3%",
+        "bucket": "A",
+        "fields": [
+          "feature.atr_pct"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.03,
+        "tolerance": 0.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

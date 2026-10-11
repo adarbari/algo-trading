@@ -17,6 +17,22 @@ section = "docs/adr/0029-rule-screener.md#versioned-configs"
 detect = [{ call = "add_version" }, { call = "save_features" }]
 
 [[responsibility]]
+id = "drafting-feedback"
+description = "The events of a Describe-it session (ADR 0066): requested, returned, choices and formulas, saved, finalised, built as rows (clipped sentence, hashed documents, the server-side diff of a save against the draft the model returned) and recorded in the background to feedback/drafting_events (only through FeedbackWriter, atomic per run, a full queue or a failing write drops the event and never fails a request); read back across a date range through data.feedback, only by the read model's loader that filters by viewer"
+owner = [
+    "src/algotrade/services/feedback/*",
+    "src/algotrade/storage/tables/feedback_writer.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/data/feedback/*",  # the read of the recorded events
+    "src/algotrade/services/read/ops/feedback.py",  # the viewer-scoped loader
+    "apps/api/algotrade_api/feedback.py",  # emits the events around the draft and save routes
+]
+section = "docs/adr/0066-drafting-feedback-events.md#decision"
+detect = [{ string = "feedback/drafting_events" }, { call = "FeedbackWriter" }, { call = "FeedbackRecorder" }]
+
+[[responsibility]]
 id = "edge-evaluation"
 description = "Score an edge's screeners against stored outcomes (ADR 0053 decisions 5 to 7 and its amendment of 2026-10-08): per edge and per edge variant ([[variants]], each a trial), the decision sessions D of its schedule spaced a horizon apart (an event schedule: the event names read at D from a declared feature field, pooled into blocks of a horizon), the entry session S = D + offset (S > D) whose outcome partition is read, each screener's and baseline's picks and the eligible, base and implied-vol names at D (only what was known then; one fixed iv_field per run, its source and licence recorded), whether an outcome counts as a hit (the document's [outcome] against the stored fields; an unclosed or missing window, or no entry bar at S, excluded, never a miss), hit rate against the base rate, lift, decile spread, effect size, Sharpe, deflated Sharpe and PBO per slice (all, year, regime, frozen) with the independent sessions beside each, the trial log, and the rows of results/edge_eval; the one reader of outcomes (harness.py)"
 owner = ["src/algotrade/services/evaluation/cross_section/*"]

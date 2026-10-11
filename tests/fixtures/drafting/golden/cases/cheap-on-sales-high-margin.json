@@ -1,0 +1,36 @@
+{
+  "id": "cheap-on-sales-high-margin",
+  "sentence": "cheap on sales, net margin > 20%",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "cheap on sales",
+        "bucket": "A",
+        "fields": [
+          "feature.ps_ratio"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 2.0,
+        "tolerance": 1.0
+      },
+      {
+        "span": "net margin > 20%",
+        "bucket": "A",
+        "fields": [
+          "feature.net_margin"
+        ],
+        "op": "gt",
+        "value": 0.2,
+        "tolerance": 0.0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}
