@@ -1,12 +1,14 @@
 /** Test fixtures: a server `LlmUsage` as the operation selects it (a normal month, over a cap, empty). */
 import type { LlmUsage, UsageCall, UsageTally } from './types';
 
+/** A tally; its whole input is the regular input unless given (no cache in the fixture). */
 export const tally = (over: Partial<UsageTally> = {}): UsageTally => ({
   calls: 0,
   inputTokens: 0,
   outputTokens: 0,
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
+  callsWithoutTotalInput: 0,
   callsWithoutTokens: 0,
   spentUsd: 0,
   billedUsd: 0,
@@ -15,6 +17,7 @@ export const tally = (over: Partial<UsageTally> = {}): UsageTally => ({
   freeCalls: 0,
   unknown: null,
   ...over,
+  totalInputTokens: over.totalInputTokens ?? over.inputTokens ?? 0,
 });
 
 export const call = (over: Partial<UsageCall> = {}): UsageCall => ({
@@ -27,6 +30,7 @@ export const call = (over: Partial<UsageCall> = {}): UsageCall => ({
   outputTokens: 300,
   cacheReadTokens: null,
   cacheWriteTokens: null,
+  totalInputTokens: 1200,
   latencyS: 1.8,
   costUsd: 0.0027,
   costBasis: 'price',

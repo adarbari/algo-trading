@@ -3,6 +3,7 @@ reserved upper bound, never $0), the budget (reserve before asking, settle after
 cannot pass a cap), the roll-over at midnight and month end in New York, and fail-closed for a
 provider that spends when the store cannot be read; a free provider always answers."""
 
+import json
 import threading
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -12,6 +13,7 @@ import pytest
 from algotrade.config.site.llm import LlmSettings
 from algotrade.core.model.completion import Attempt
 from algotrade.services.text_model.ledger import UsageLedger
+from algotrade_sources.llm.chat import usage_of
 
 DAY = datetime(2026, 10, 8, 15, tzinfo=UTC)
 CHARS = 300  # a prompt: 100 tokens at the assumed 3 characters each
@@ -74,6 +76,44 @@ def test_cache_tokens_of_a_priced_call_are_charged_at_the_full_input_price() -> 
     row = sink.rows[1]
     assert (row["cache_read_tokens"], row["cache_write_tokens"]) == (400_000, 100_000)
     assert sink.rows[2]["cache_read_tokens"] is None  # absent stays None
+
+
+def test_an_unknown_input_with_a_cache_count_is_charged_the_bound_never_the_cache_alone() -> None:
+    sink = Sink()
+    UsageLedger(settings(), sink).record(
+        attempt("paid", input_tokens=None, cache_read_tokens=500), PAID_BOUND
+    )
+    assert (sink.rows[0]["cost_usd"], sink.rows[0]["cost_basis"]) == (PAID_BOUND, "bound")
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        {"prompt_tokens": 1000, "completion_tokens": 10},
+        {"prompt_tokens": 1000, "completion_tokens": 10,
+         "prompt_tokens_details": {"cached_tokens": 800}},
+        {"prompt_tokens": 1000, "completion_tokens": 10,
+         "prompt_tokens_details": {"cached_tokens": 5000}},  # more than the prompt
+        {"prompt_tokens": 1000, "completion_tokens": 10, "prompt_tokens_details": {}},
+        {"prompt_tokens": 1000, "completion_tokens": 10, "prompt_tokens_details": None},
+    ],
+)  # fmt: skip
+def test_a_chat_usage_is_never_charged_less_than_its_prompt_at_the_input_price(
+    usage: dict[str, Any],
+) -> None:
+    seen = usage_of(json.dumps({"usage": usage}).encode())
+    sink = Sink()
+    UsageLedger(settings(), sink).record(
+        attempt(
+            "paid",
+            input_tokens=seen.input,
+            output_tokens=seen.output,
+            cache_read_tokens=seen.cache_read,
+        )
+    )
+    prompt_price = usage["prompt_tokens"] * 1.0 / 1e6  # the $1 per million of the "paid" price
+    assert sink.rows[0]["cost_usd"] >= prompt_price
+    assert sink.rows[0]["cost_basis"] == "price"
 
 
 def test_the_row_carries_the_call_id_prompt_version_and_call_stage() -> None:

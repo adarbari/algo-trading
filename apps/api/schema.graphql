@@ -3147,7 +3147,7 @@ type UsageBudget {
 }
 
 """
-One stored attempt; `unknownFields` names the values stored null (tokens a provider did not report, a cost not known), `unknown` says why. A failed or rejected call (Admin only, like the whole read) also carries `stage` (provider: the attempt raised; answer: the provider answered and the caller refused it), `error`, the prompt sent (`sentence`, clipped), the raw `answer` (clipped) and `promptChars`. `cacheReadTokens` / `cacheWriteTokens` (null: not reported) are the cached prompt beside `inputTokens` (the regular input); `callId` ties the attempts of one call, `promptVersion` and `callStage` (first, repair, escalate) are the caller's tags
+One stored attempt; `unknownFields` names the values stored null (tokens a provider did not report, a cost not known), `unknown` says why. A failed or rejected call (Admin only, like the whole read) also carries `stage` (provider: the attempt raised; answer: the provider answered and the caller refused it), `error`, the prompt sent (`sentence`, clipped), the raw `answer` (clipped) and `promptChars`. `cacheReadTokens` / `cacheWriteTokens` (null: not reported) are the cached prompt beside `inputTokens` (the regular input); `totalInputTokens` the whole input (null when not known: a Claude Code login call recorded before the cache was stored); `callId` ties the attempts of one call, `promptVersion` and `callStage` (first, repair, escalate) are the caller's tags
 """
 type UsageCall {
   ts: DateTime!
@@ -3170,6 +3170,7 @@ type UsageCall {
   promptChars: Int
   cacheReadTokens: Int
   cacheWriteTokens: Int
+  totalInputTokens: Int
   callId: String
   promptVersion: String
   callStage: String
@@ -3217,7 +3218,7 @@ type UsageSlice {
 }
 
 """
-The calls of a slice: tokens summed over the calls that reported them (`callsWithoutTokens` the others; `unknown` set when none did), `spentUsd` what counts against the budget = `billedUsd` (priced) + `reportedUsd` (the notional seat cost of a Claude Code login, not a bill) + `boundUsd` (an upper bound charged for an unknown cost). `inputTokens` is the regular (uncached) input; the whole input is `inputTokens` + `cacheReadTokens` + `cacheWriteTokens`
+The calls of a slice: tokens summed over the calls that reported them (`callsWithoutTokens` the others; `unknown` set when none did), `spentUsd` what counts against the budget = `billedUsd` (priced) + `reportedUsd` (the notional seat cost of a Claude Code login, not a bill) + `boundUsd` (an upper bound charged for an unknown cost). `inputTokens` is the regular (uncached) input; the whole input is `inputTokens` + `cacheReadTokens` + `cacheWriteTokens`, summed as `totalInputTokens` over the calls whose whole input is known (`callsWithoutTotalInput` the others: a Claude Code login call recorded before the cache was stored)
 """
 type UsageTally {
   calls: Int!
@@ -3225,6 +3226,8 @@ type UsageTally {
   outputTokens: Int!
   cacheReadTokens: Int!
   cacheWriteTokens: Int!
+  totalInputTokens: Int!
+  callsWithoutTotalInput: Int!
   callsWithoutTokens: Int!
   spentUsd: Float!
   billedUsd: Float!

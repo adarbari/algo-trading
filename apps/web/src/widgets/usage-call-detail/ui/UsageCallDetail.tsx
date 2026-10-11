@@ -14,7 +14,6 @@ import {
   stamp,
   TERM_OF_INPUT,
   TOKENS,
-  totalInput,
   UsagePanel,
   USD,
   type UsageCall,
@@ -63,7 +62,7 @@ function Detail({ call }: { call: UsageCall }) {
           {
             id: 'inTotal',
             label: 'Input tokens (incl. cache)',
-            value: totalInput(call),
+            value: call.totalInputTokens,
             format: TOKENS,
           },
           { id: 'out', label: 'Output tokens', value: call.outputTokens, format: TOKENS },

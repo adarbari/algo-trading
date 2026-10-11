@@ -16,7 +16,9 @@ from algotrade_api.graphql.types.instruments.feature import Unknown
     "against the budget = `billedUsd` (priced) + `reportedUsd` (the notional seat cost of a "
     "Claude Code login, not a bill) + `boundUsd` (an upper bound charged for an unknown cost). "
     "`inputTokens` is the regular (uncached) input; the whole input is `inputTokens` + "
-    "`cacheReadTokens` + `cacheWriteTokens`"
+    "`cacheReadTokens` + `cacheWriteTokens`, summed as `totalInputTokens` over the calls whose "
+    "whole input is known (`callsWithoutTotalInput` the others: a Claude Code login call "
+    "recorded before the cache was stored)"
 )
 class UsageTally:
     calls: int
@@ -24,6 +26,8 @@ class UsageTally:
     output_tokens: int
     cache_read_tokens: int
     cache_write_tokens: int
+    total_input_tokens: int
+    calls_without_total_input: int
     calls_without_tokens: int
     spent_usd: float
     billed_usd: float
@@ -40,6 +44,8 @@ class UsageTally:
             output_tokens=d.output_tokens,
             cache_read_tokens=d.cache_read_tokens,
             cache_write_tokens=d.cache_write_tokens,
+            total_input_tokens=d.total_input_tokens,
+            calls_without_total_input=d.calls_without_total_input,
             calls_without_tokens=d.calls_without_tokens,
             spent_usd=d.spent_usd,
             billed_usd=d.billed_usd,
@@ -159,7 +165,9 @@ class UsageReliability:
     "answer: the provider answered and the caller refused it), `error`, the prompt sent "
     "(`sentence`, clipped), the raw `answer` (clipped) and `promptChars`. `cacheReadTokens` / "
     "`cacheWriteTokens` (null: not reported) are the cached prompt beside `inputTokens` (the "
-    "regular input); `callId` ties the attempts of one call, `promptVersion` and `callStage` "
+    "regular input); `totalInputTokens` the whole input (null when not known: a Claude "
+    "Code login call recorded before the cache was stored); `callId` ties the attempts of one "
+    "call, `promptVersion` and `callStage` "
     "(first, repair, escalate) are the caller's tags"
 )
 class UsageCall:
@@ -183,6 +191,7 @@ class UsageCall:
     prompt_chars: int | None
     cache_read_tokens: int | None
     cache_write_tokens: int | None
+    total_input_tokens: int | None
     call_id: str | None
     prompt_version: str | None
     call_stage: str | None
@@ -212,6 +221,7 @@ class UsageCall:
             prompt_chars=d.prompt_chars,
             cache_read_tokens=d.cache_read_tokens,
             cache_write_tokens=d.cache_write_tokens,
+            total_input_tokens=d.total_input_tokens,
             call_id=d.call_id,
             prompt_version=d.prompt_version,
             call_stage=d.call_stage,

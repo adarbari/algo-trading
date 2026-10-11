@@ -426,7 +426,7 @@ export type LlmUsageQueryVariables = Exact<{
 }>;
 
 
-export type LlmUsageQuery = { llmUsage: { today: string, recorded: boolean, budget: { dailyUsd: number | null, monthlyUsd: number | null, over: string | null, reportedCallUsd: number | null, error: string | null }, windows: Array<{ key: string, start: string, end: string, cap: { kind: string, limitUsd: number | null, usedShare: number | null } | null, tally: { calls: number, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number, freeCalls: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, breakdowns: Array<{ by: string, rows: Array<{ key: string | null, provider: string | null, costShare: number | null, tally: { calls: number, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number } }> }>, daily: Array<{ day: string, tally: { calls: number, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, spentUsd: number, reportedUsd: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, reliability: { attempts: number, ok: number, fellBack: number, failed: number, skippedBudget: number, rejected: number, fallbackRate: number | null, failureRate: number | null }, recent: Array<{ ts: string, provider: string, model: string, useCase: string, user: string | null, inputTokens: number | null, outputTokens: number | null, cacheReadTokens: number | null, cacheWriteTokens: number | null, latencyS: number | null, costUsd: number | null, costBasis: string, outcome: string, fellBackFrom: string | null, runId: string, error: string | null, stage: string | null, sentence: string | null, answer: string | null, promptChars: number | null, callId: string | null, promptVersion: string | null, callStage: string | null, unknownFields: Array<string>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }>, failures: Array<{ ts: string, provider: string, model: string, useCase: string, user: string | null, inputTokens: number | null, outputTokens: number | null, cacheReadTokens: number | null, cacheWriteTokens: number | null, latencyS: number | null, costUsd: number | null, costBasis: string, outcome: string, fellBackFrom: string | null, runId: string, error: string | null, stage: string | null, sentence: string | null, answer: string | null, promptChars: number | null, callId: string | null, promptVersion: string | null, callStage: string | null, unknownFields: Array<string>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }> } | null };
+export type LlmUsageQuery = { llmUsage: { today: string, recorded: boolean, budget: { dailyUsd: number | null, monthlyUsd: number | null, over: string | null, reportedCallUsd: number | null, error: string | null }, windows: Array<{ key: string, start: string, end: string, cap: { kind: string, limitUsd: number | null, usedShare: number | null } | null, tally: { calls: number, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, totalInputTokens: number, callsWithoutTotalInput: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number, freeCalls: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, breakdowns: Array<{ by: string, rows: Array<{ key: string | null, provider: string | null, costShare: number | null, tally: { calls: number, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, totalInputTokens: number, callsWithoutTotalInput: number, callsWithoutTokens: number, spentUsd: number, billedUsd: number, reportedUsd: number, boundUsd: number } }> }>, daily: Array<{ day: string, tally: { calls: number, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, totalInputTokens: number, spentUsd: number, reportedUsd: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }>, reliability: { attempts: number, ok: number, fellBack: number, failed: number, skippedBudget: number, rejected: number, fallbackRate: number | null, failureRate: number | null }, recent: Array<{ ts: string, provider: string, model: string, useCase: string, user: string | null, inputTokens: number | null, outputTokens: number | null, cacheReadTokens: number | null, cacheWriteTokens: number | null, totalInputTokens: number | null, latencyS: number | null, costUsd: number | null, costBasis: string, outcome: string, fellBackFrom: string | null, runId: string, error: string | null, stage: string | null, sentence: string | null, answer: string | null, promptChars: number | null, callId: string | null, promptVersion: string | null, callStage: string | null, unknownFields: Array<string>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }>, failures: Array<{ ts: string, provider: string, model: string, useCase: string, user: string | null, inputTokens: number | null, outputTokens: number | null, cacheReadTokens: number | null, cacheWriteTokens: number | null, totalInputTokens: number | null, latencyS: number | null, costUsd: number | null, costBasis: string, outcome: string, fellBackFrom: string | null, runId: string, error: string | null, stage: string | null, sentence: string | null, answer: string | null, promptChars: number | null, callId: string | null, promptVersion: string | null, callStage: string | null, unknownFields: Array<string>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }> } | null };
 
 export type SessionDateQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2521,6 +2521,8 @@ export const LlmUsageDocument = new TypedDocumentString(`
         outputTokens
         cacheReadTokens
         cacheWriteTokens
+        totalInputTokens
+        callsWithoutTotalInput
         callsWithoutTokens
         spentUsd
         billedUsd
@@ -2547,6 +2549,8 @@ export const LlmUsageDocument = new TypedDocumentString(`
           outputTokens
           cacheReadTokens
           cacheWriteTokens
+          totalInputTokens
+          callsWithoutTotalInput
           callsWithoutTokens
           spentUsd
           billedUsd
@@ -2563,6 +2567,7 @@ export const LlmUsageDocument = new TypedDocumentString(`
         outputTokens
         cacheReadTokens
         cacheWriteTokens
+        totalInputTokens
         spentUsd
         reportedUsd
         unknown {
@@ -2593,6 +2598,7 @@ export const LlmUsageDocument = new TypedDocumentString(`
       outputTokens
       cacheReadTokens
       cacheWriteTokens
+      totalInputTokens
       latencyS
       costUsd
       costBasis
@@ -2634,6 +2640,7 @@ export const LlmUsageDocument = new TypedDocumentString(`
       outputTokens
       cacheReadTokens
       cacheWriteTokens
+      totalInputTokens
       latencyS
       costUsd
       costBasis

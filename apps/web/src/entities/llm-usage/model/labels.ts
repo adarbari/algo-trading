@@ -74,21 +74,6 @@ export const stamp = (ts: string) => `${ts.replace('T', ' ').slice(0, 19)} UTC`;
 /** The Guide glossary term that explains input tokens and the cache. */
 export const TERM_OF_INPUT = 'llm_input_tokens';
 
-/**
- * The whole input of a call or a slice: the regular input plus the prompt the provider's cache
- * served (read) or stored (write). A cache count not reported adds nothing; an input not
- * reported is unknown (null), never a small number.
- */
-export function totalInput(t: {
-  inputTokens: number | null;
-  cacheReadTokens: number | null;
-  cacheWriteTokens: number | null;
-}): number | null {
-  return t.inputTokens === null
-    ? null
-    : t.inputTokens + (t.cacheReadTokens ?? 0) + (t.cacheWriteTokens ?? 0);
-}
-
 /** A stored call's identity: the key the recorder merges on. */
 export function callId(call: UsageCall): string {
   return `${call.ts}~${call.provider}~${call.useCase}~${call.user ?? ''}~${call.outcome}`;

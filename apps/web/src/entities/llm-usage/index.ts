@@ -23,7 +23,6 @@ export {
   TERM_OF_REJECTED,
   TERM_OF_STAGE,
   TOKENS,
-  totalInput,
   USD,
   WINDOW_LABEL,
 } from './model/labels';

@@ -135,13 +135,18 @@ OpenAI-compatible endpoint reports `prompt_tokens` **including** its cached part
 failure stage `provider` / `answer`). `input_tokens` keeps meaning the regular (uncached) input
 the provider reported; the chat adapter takes `cached_tokens` out of `prompt_tokens` so that
 **input + cache read + cache write is the whole prompt** for every provider (a cached count above
-the prompt's is not believed: input is null and the ledger charges its bound).
+the prompt's is not believed: input stays `prompt_tokens`, cache read is null, so the charge
+never falls below prompt x price).
 
 **Cost is conservative.** A `price` call is charged `(input + cache read + cache write) x input
 price + output x output price`: cache tokens at the full input price (no cache price fields), so
 a cached call never costs less than before this change. A `reported` call keeps the CLI's own
 figure; an unknown cost stays the reserved upper bound. The usage page shows the whole input
-(regular + cache read + cache write) wherever it shows input tokens, with the parts on the call.
+wherever it shows input tokens, with the parts on the call. The server serves it as
+`totalInputTokens` (ADR 0038: the browser sums nothing); it is null for a `reported` (Claude
+CLI) row written before this amendment (`call_stage` null: its cache was never stored), and a
+tally counts those in `callsWithoutTotalInput` instead of summing them. A chat row from before
+is complete: its `prompt_tokens` already included the cache.
 
 ## Consequences
 - A paid provider cannot be added without its price, and a day's or month's spend stops at its

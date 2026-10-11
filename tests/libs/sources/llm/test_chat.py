@@ -211,8 +211,8 @@ def test_a_count_the_provider_left_out_is_none_never_zero(
         ({"prompt_tokens": 1000, "prompt_tokens_details": {}}, (1000, None)),
         ({"prompt_tokens": 1000, "prompt_tokens_details": None}, (1000, None)),
         ({"prompt_tokens": 1000}, (1000, None)),
-        # a cached count above the prompt is not believed: input unknown, never a small number
-        ({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 50}}, (None, 50)),
+        # a cached count above the prompt is not believed: the input stays the whole prompt
+        ({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 50}}, (10, None)),
         ({"prompt_tokens_details": {"cached_tokens": 50}}, (None, 50)),
     ],
 )

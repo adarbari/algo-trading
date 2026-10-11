@@ -238,6 +238,32 @@ def test_cache_tokens_and_call_tags_are_shown_and_summed_and_old_partitions_read
         102, 98_000, 12_000)  # fmt: skip
 
 
+def test_a_login_call_from_before_the_cache_was_stored_has_an_unknown_whole_input() -> None:
+    yesterday = date(2026, 10, 7)
+    login = {"provider": "cli", "cost_basis": "reported", "input_tokens": 2}
+    stored = {**login, "call_stage": "first", "cache_read_tokens": 98_000}
+    usage = load_llm_usage(
+        stores(
+            {
+                yesterday: [row(yesterday, 0, **login)],  # an old login row: cache never stored
+                TODAY: [row(TODAY, 0, **stored), row(TODAY, 1, **login)],
+                date(2026, 10, 6): [row(date(2026, 10, 6), 0, input_tokens=300)],  # old chat row
+            }
+        ),
+        TODAY,
+    )
+    totals = {(c.ts.date(), c.provider, c.total_input_tokens) for c in usage.recent}
+    assert totals == {
+        (date(2026, 10, 6), "claude", 300),  # chat: prompt_tokens already held the cache
+        (yesterday, "cli", None),
+        (TODAY, "cli", 98_002),
+        (TODAY, "cli", None),
+    }
+    week = usage.windows[1].tally  # the two unknown login calls are counted, not summed
+    assert week.total_input_tokens == 98_002 + 300 and week.calls_without_total_input == 2
+    assert usage.windows[0].tally.calls_without_total_input == 1
+
+
 def test_failures_list_the_failed_and_rejected_calls_with_their_detail() -> None:
     yesterday = date(2026, 10, 7)
     detail = {

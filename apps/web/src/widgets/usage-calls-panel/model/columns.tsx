@@ -7,7 +7,6 @@ import {
   STAGE_LABEL,
   stamp,
   TOKENS,
-  totalInput,
   USD,
   type UsageCall,
 } from '@/entities/llm-usage';
@@ -22,7 +21,7 @@ export const CALL_COLUMNS: DataTableColumn<UsageCall>[] = [
     id: 'input',
     header: 'Input tokens (incl. cache)',
     description: 'regular input + cache read + cache write',
-    value: (c) => totalInput(c),
+    value: (c) => c.totalInputTokens,
     format: TOKENS,
     align: 'end',
   },

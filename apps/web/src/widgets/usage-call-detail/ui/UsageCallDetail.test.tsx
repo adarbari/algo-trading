@@ -67,6 +67,7 @@ describe('UsageCallDetail', () => {
       inputTokens: 2,
       cacheReadTokens: 98000,
       cacheWriteTokens: 12000,
+      totalInputTokens: 110002,
       callId: 'abc123',
       promptVersion: '1',
       callStage: 'repair',
@@ -84,6 +85,19 @@ describe('UsageCallDetail', () => {
     expect(document.body).toHaveTextContent('110,002'); // 2 + 98,000 + 12,000
     expect(document.body).toHaveTextContent('abc123');
     expect(document.body).toHaveTextContent('repair');
+  });
+
+  it('shows a whole input the server says is not known as unknown, not as the small regular count', async () => {
+    const old = call({ inputTokens: 2, totalInputTokens: null, costBasis: 'reported' });
+    const base = usageFixture();
+    vi.mocked(gql).mockResolvedValue({ llmUsage: { ...base, recent: [old, ...base.recent] } });
+    render(
+      <TestQueryProvider>
+        <UsageCallDetail selected={callId(old)} />
+      </TestQueryProvider>,
+    );
+    const label = await screen.findByText('Input tokens (incl. cache)');
+    expect(label.parentElement?.parentElement).toHaveTextContent('Input tokens (incl. cache)—');
   });
 
   it('shows a cache count the log holds as null as unknown, not as zero', async () => {

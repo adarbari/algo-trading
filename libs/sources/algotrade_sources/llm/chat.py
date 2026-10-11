@@ -166,7 +166,8 @@ def usage_of(raw: bytes) -> Usage:
     the prompt tokens its cache served (``prompt_tokens_details.cached_tokens``), so the cached
     ones are taken out of ``input`` and reported as ``cache_read``: input + cache read is the
     whole prompt, as for the Claude CLI. A cached count above the prompt's is not believed: the
-    input is then unknown (the ledger charges its bound)."""
+    input stays ``prompt_tokens`` (so the priced cost never falls below prompt x price) and the
+    cache read is ``None``."""
     usage = json.loads(raw).get("usage")
     if not isinstance(usage, dict):
         return Usage(None, None, None)
@@ -174,7 +175,10 @@ def usage_of(raw: bytes) -> Usage:
     details = usage.get("prompt_tokens_details")
     cached = _count(details.get("cached_tokens")) if isinstance(details, dict) else None
     if cached is not None and prompt is not None:
-        prompt = prompt - cached if cached <= prompt else None
+        if cached <= prompt:
+            prompt -= cached
+        else:
+            cached = None
     return Usage(prompt, output, cached)
 
 
