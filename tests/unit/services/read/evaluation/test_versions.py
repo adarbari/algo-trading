@@ -91,6 +91,16 @@ def write_own_run(
             slice_value="2026:out_of_sample",
         ),
         row(
+            "momo",
+            "regime_part",
+            0.66,
+            split,
+            edge_id="mine",
+            user_id="me",
+            exploratory=True,
+            slice_value="CALM:out_of_sample",
+        ),
+        row(
             "decoy",
             "in_sample",
             0.40,
@@ -187,13 +197,13 @@ def test_a_hidden_runs_rows_are_the_in_sample_slice_only() -> None:
     (run,) = runs.load_edge_runs(ctx, mine(ctx))
     assert run.oos_hidden
     shown = runs.load_run_rows(ctx, run)
-    # no frozen / split / all / year / year_part rows
+    # no frozen / split / all / year / year_part / regime_part rows
     assert {r.slice_kind for r in shown} == {"in_sample"}
     assert all(r.hit_rate != 0.80 for r in shown)  # the withheld figure is nowhere
     revealed_ctx = ctx_for(backend, with_copy({"oos_revealed": True}))
     (shown_run,) = runs.load_edge_runs(revealed_ctx, mine(revealed_ctx))
     assert not shown_run.oos_hidden
-    assert {"split", "all", "year", "year_part"} <= {
+    assert {"split", "all", "year", "year_part", "regime_part"} <= {
         r.slice_kind for r in runs.load_run_rows(revealed_ctx, shown_run)
     }
 
