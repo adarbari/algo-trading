@@ -5,6 +5,8 @@ belongs to someone else, a bounded memory and a sink that fails."""
 from collections.abc import Mapping
 from typing import Any
 
+import pytest
+
 from algotrade_api import feedback
 from algotrade_api.feedback import DraftMemory, Remembered
 
@@ -27,6 +29,14 @@ class Raises:
         raise RuntimeError("down")
 
 
+FEATURES = object()  # stands for ``ctx.features``; ``feature_infos`` is patched below
+
+
+@pytest.fixture(autouse=True)
+def catalogue(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(feedback, "feature_infos", lambda fs: {"a": 1, "b": 2})
+
+
 P = {"field": "rollup.price@v1.close", "op": "gt", "value": 5}
 DOC = {"id": "mine", "criteria": {"price": P}}
 
@@ -34,7 +44,7 @@ DOC = {"id": "mine", "criteria": {"price": P}}
 def returned(sink: Any, memory: DraftMemory, session: str = "s1", user: str = "abhi") -> None:
     feedback.record_returned(
         sink, memory, session, user, "mine", "over $5", DOC, [{"id": "x", "field": "f"}],
-        ("c1",), ["a", "b"], "1",
+        ("c1",), FEATURES, "1",
     )  # fmt: skip
 
 
@@ -77,7 +87,7 @@ def test_someone_elses_session_or_another_screen_is_not_diffed() -> None:
     final = sink.rows[-1]
     assert final["event"] == "screen_finalised" and final["saved_hash"] == "h"
     assert '"draft_unknown":true' in str(final["payload"]) and final["sentence"] is None
-    assert final["user"] == "bob"  # never alice's sentence under bob's row
+    assert final["user"] == "bob" and final["draft_session_id"] == ""  # never alice's session
 
 
 def test_the_memory_is_bounded_and_least_recently_used_goes_first() -> None:
@@ -97,3 +107,31 @@ def test_a_failing_sink_never_raises_into_the_request() -> None:
     returned(Raises(), memory)
     feedback.record_draft_saved(Raises(), memory, "s1", "abhi", "mine", DOC)
     feedback.record_finalised(Raises(), memory, "s1", "abhi", "mine", DOC, "h")
+
+
+def test_a_save_for_a_session_this_process_does_not_remember_is_recorded_as_unknown() -> None:
+    sink = Keep()
+    feedback.record_draft_saved(sink, DraftMemory(), "gone", "abhi", "mine", DOC)  # a restart
+    (row,) = sink.rows
+    assert row["event"] == "draft_saved" and '"draft_unknown":true' in str(row["payload"])
+
+
+def test_bobs_save_under_alices_session_id_leaves_her_session_untouched() -> None:
+    sink, memory = Keep(), DraftMemory()
+    returned(sink, memory, user="alice")
+    feedback.record_draft_saved(sink, memory, "s1", "bob", "mine", DOC)
+    assert memory.get("s1", "alice", "mine").last_saved is None  # type: ignore[union-attr]
+    assert not any(r["user"] == "bob" and r["draft_session_id"] == "s1" for r in sink.rows)
+    assert sink.rows[-1]["draft_session_id"] == ""
+    assert memory.saved("s1", "bob", "mine", "h") is True  # not hers to dedupe: untouched
+    assert memory.get("s1", "alice", "mine").last_saved is None  # type: ignore[union-attr]
+
+
+def test_a_catalogue_that_cannot_be_read_does_not_fail_the_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def broken(fs: Any) -> Any:
+        raise RuntimeError("catalogue down")
+
+    monkeypatch.setattr(feedback, "feature_infos", broken)
+    returned(Keep(), DraftMemory())  # swallowed inside the guard

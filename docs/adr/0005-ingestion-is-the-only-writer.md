@@ -1,7 +1,7 @@
 # ADR 0005: Ingestion is the only writer of market and feature data
 
 **Status:** accepted (2026-10-02); amended 2026-10-03 by ADR 0027 (vendor SDKs, credentials
-handling and source adapters now live in the shared package `libs/sources`, `algotrade_sources`); amended by ADR 0028 (the API's one write: its live-quote log, `live/option_quotes`); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (job-written `results/edge_series` and `results/edge_trades`)
+handling and source adapters now live in the shared package `libs/sources`, `algotrade_sources`); amended by ADR 0028 (the API's one write: its live-quote log, `live/option_quotes`); amended by [0058](0058-llm-usage-log-prices-and-budget.md) (the API's text-model usage log, `usage/llm_calls`); amended by [0066](0066-drafting-feedback-events.md) (the API's Describe-it feedback events, `feedback/drafting_events`); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (job-written `results/edge_series` and `results/edge_trades`)
 
 ## Context
 If several apps write data, nobody owns its quality and backtests stop being reproducible.

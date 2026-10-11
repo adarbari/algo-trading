@@ -8,7 +8,6 @@ from fastapi import APIRouter
 
 from algotrade.services.drafting import screens
 from algotrade.services.drafting.prompt import PROMPT_VERSION
-from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade_api import feedback
 from algotrade_api.deps import Context, Drafts, Feedback, TextModelDep
 from algotrade_api.schemas.drafting.screeners import DraftFromTextBody, ScreenDraft
@@ -31,7 +30,7 @@ def draft_from_text(
     feedback.record_returned(
         sink, drafts, session_id, user, screener_id, body.text, result.document,
         [{"id": d.id, "field": d.field} for d in result.dropped],
-        (result.call_id,) if result.call_id else (), list(feature_infos(ctx.features)),
+        (result.call_id,) if result.call_id else (), ctx.features,
         PROMPT_VERSION,
     )  # fmt: skip
     return ScreenDraft.model_validate(result).model_copy(update={"draft_session_id": session_id})

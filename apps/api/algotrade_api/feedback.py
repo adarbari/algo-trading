@@ -19,6 +19,7 @@ from algotrade.services.feedback import events
 from algotrade.services.feedback.diff import criteria_diff
 from algotrade.services.feedback.events import FeedbackSink, NoFeedback
 from algotrade.services.feedback.recorder import open_recorder
+from algotrade.services.read.instruments.catalogue import feature_infos
 
 log = logging.getLogger(__name__)
 MEMORY = 512  # drafts remembered at most (the least recently used goes first)
@@ -66,12 +67,15 @@ class DraftMemory:
             self._items.move_to_end(session_id)
             return item
 
-    def saved(self, session_id: str, content_hash: str) -> bool:
-        """Note a save of ``content_hash``; ``False`` when it is the one already noted (an
-        autosave of an unchanged draft records nothing more) or the session is not remembered."""
+    def saved(self, session_id: str, user: str, doc_id: str, content_hash: str) -> bool:
+        """Note a save of ``content_hash`` for a session that is ``user``'s and ``doc_id``'s;
+        ``False`` when it is the one already noted (an autosave of an unchanged draft). A
+        session that is not remembered or not theirs is left untouched: ``True``."""
         with self._lock:
             item = self._items.get(session_id)
-            if item is None or item.last_saved == content_hash:
+            if item is None or item.user != user or item.doc_id != doc_id:
+                return True
+            if item.last_saved == content_hash:
                 return False
             self._items[session_id] = replace(item, last_saved=content_hash)
             return True
@@ -106,12 +110,12 @@ def record_returned(
     document: Mapping[str, Any],
     dropped: Sequence[Mapping[str, str]],
     call_ids: Sequence[str],
-    catalogue_names: Sequence[str],
+    features: Any,
     prompt_version: str,
 ) -> None:
     """``draft_returned`` and the draft remembered for the save that follows."""
     try:
-        version = events.catalogue_version(catalogue_names)
+        version = events.catalogue_version(list(feature_infos(features)))  # the caller's fields
         draft_hash = events.document_hash(document)
         memory.put(
             session_id,
@@ -147,12 +151,17 @@ def _saved(
         return  # a hand-built screen: nothing to learn from
     try:
         content = events.document_hash(document)
-        if event == events.DRAFT_SAVED and not memory.saved(session_id, content):
-            return
         draft = memory.get(session_id, user, screener_id)
+        if (
+            event == events.DRAFT_SAVED
+            and draft is not None
+            and not memory.saved(session_id, user, screener_id, content)
+        ):
+            return  # an autosave of the draft already recorded
         payload: dict[str, Any] = {"content_hash": content}
         if draft is None:
-            payload["draft_unknown"] = True  # not remembered here: no diff to give
+            payload["draft_unknown"] = True  # not remembered here, or not this user's: no diff
+            session_id = ""  # never under a session id that is not theirs
         else:
             payload["diff"] = criteria_diff(draft.document, document)
         events.emit(
