@@ -218,6 +218,30 @@ class LocalTables:
         )
         return None if data is None else select_instruments(to_frame(data), instruments)
 
+    def read_run(
+        self, table: str, session_date: date, run_id: str, own_run: str | None = None
+    ) -> pd.DataFrame | None:
+        directory = self._dir(table, session_date)
+
+        def at(upto: int) -> pa.Table | None:
+            entries = visible_entries(read_index(directory), upto)
+            own = self._own(table, session_date, own_run)
+            if own_run is not None and own is not None:
+                entries[own_run] = own
+            entry = entries.get(run_id)
+            if entry is None:
+                return None
+            try:
+                return _read_run_file(directory / run_file(run_id, entry), run_id)
+            except FileNotFoundError as gone:  # a commit replaced the version
+                raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
+
+        data = pinned_read(at, self.commits.published, self.commits.no_commits)
+        if data is None:
+            return None
+        frame = to_frame(concat(table, [data]))
+        return None if frame.empty else frame.reset_index(drop=True)
+
     def read_range(
         self,
         table: str,
@@ -359,6 +383,25 @@ def _read_file(
         return data
     ids = data.column("instrument_id")
     return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
+
+
+def _read_run_file(path: Path, run_id: str) -> pa.Table:
+    """One version file's rows stamped ``run_id``: the row groups whose ``run_id`` statistics
+    cannot hold it are skipped (not decoded), then the rest is filtered exactly."""
+    with pq.ParquetFile(path) as parquet:
+        if "run_id" not in parquet.schema_arrow.names:
+            return parquet.read()
+        meta = parquet.metadata
+        groups = []
+        for i in range(meta.num_row_groups):
+            group = meta.row_group(i)
+            column = next(c for c in map(group.column, range(group.num_columns))
+                          if c.path_in_schema == "run_id")  # fmt: skip
+            stats = column.statistics
+            if stats is None or not stats.has_min_max or stats.min <= run_id <= stats.max:
+                groups.append(i)
+        data = parquet.read_row_groups(groups) if groups else parquet.schema_arrow.empty_table()
+    return data.filter(pc.equal(data.column("run_id"), run_id))
 
 
 class LocalRaw:

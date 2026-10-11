@@ -160,6 +160,19 @@ class MemoryTables:
             lambda: self._index_lock,
         )
 
+    def read_run(
+        self, table: str, session_date: date, run_id: str, own_run: str | None = None
+    ) -> pd.DataFrame | None:
+        def at(upto: int) -> pd.DataFrame | None:
+            _, frames = self._view((table, session_date), own_run, upto)
+            frame = frames.get(run_id)
+            if frame is None:
+                return None
+            mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame
+            return None if mine.empty else mine.reset_index(drop=True)
+
+        return pinned_read(at, lambda: self._seq, lambda: self._index_lock)
+
     def read_range(
         self,
         table: str,
