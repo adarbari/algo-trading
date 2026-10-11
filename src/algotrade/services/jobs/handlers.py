@@ -16,12 +16,23 @@ from typing import Any
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.winners import load_winners
 from algotrade.config.site.settings import load_sources
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
+from algotrade.data import StoreReader
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.features.site import site_features
 from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section.harness import edge_universe, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import (
+    EdgeEvaluation,
+    edge_universe,
+    evaluate_edge,
+)
+from algotrade.services.evaluation.cross_section.legs.audit import (
+    LegDifference,
+    differing_legs,
+    keep_differing,
+)
+from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.random_picks import DEFAULT_DRAWS, RANDOM
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
@@ -110,6 +121,15 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     }
 
 
+def _edge_eval_mode(params: Mapping[str, Any]) -> str:
+    mode = params.get("mode") or "incremental"
+    if mode not in ("incremental", "full", "audit"):
+        raise ConfigurationError(
+            f"unknown edge-eval mode {mode!r}; known: incremental, full, audit"
+        )
+    return str(mode)
+
+
 def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``edge`` (id), ``start``, ``end`` (ISO dates), optional ``as_of`` (ISO instant:
     the outcomes known by then; default now), ``iv_field`` (the one implied-vol field of the run;
@@ -117,7 +137,11 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     edge's ``frozen_from``; a split other than ``frozen_from`` is exploratory), ``extra_baselines``
     (screener ids scored as baselines besides the edge's own: the golden evaluation's, never a
     real edge document's), ``random_draws`` (random picks per out-of-sample session; default
-    1,000). The harness's rows land in ``results/edge_eval``."""
+    1,000), ``trigger`` (``nightly`` | ``ui`` | ``cli``, recorded in the run's stats; default
+    ``cli``), ``mode`` (``incremental``, the default: reuse the stored legs still valid, or
+    ``full``: compute every leg, or ``audit``: a full run publishing only the legs that differ from
+    the stored ones, then failing naming them; ADR 0063). The harness's rows land in
+    ``results/edge_eval``."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -137,8 +161,24 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
         split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
         random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
+        full=_edge_eval_mode(params) != "incremental",  # an audit recomputes every leg
     )
-    record = write_edge_eval(ctx.resources["writer"], evaluation, now)
+    # ``mode`` ``audit`` (the nightly's run on a week's first session, ADR 0063): the run above is
+    # the full recompute; only the legs that differ from the stored ones are published, and the
+    # job then FAILS naming them.
+    differing: list[LegDifference] = []
+    if params.get("mode") == "audit":
+        evaluation, differing = _audited(ctx.resources["reader"], evaluation)
+    record = write_edge_eval(
+        ctx.resources["writer"],
+        evaluation,
+        now,
+        owner=edge.owner,
+        trigger=params.get("trigger") or "cli",
+        job_id=ctx.job_id,
+    )
+    if differing:
+        raise AlgoTradeError(_audit_failure(edge.id, differing))
     rows = edge_eval_frame(evaluation, record.run_id, now)
     return {
         "edge": evaluation.edge_id,
@@ -148,6 +188,12 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "split_from": evaluation.split_from.isoformat() if evaluation.split_from else None,
         "exploratory": evaluation.exploratory,
         "trials": evaluation.trials,
+        "mode": evaluation.mode,
+        "legs": {
+            "reused": evaluation.legs_reused,
+            "computed": evaluation.legs_computed,
+            "invalidated": dict(evaluation.legs_invalidated),
+        },
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
         "survivorship": {str(h): list(v) for h, v in survivorship(evaluation).items()},
         "historical_identity": historical_identity(evaluation),
@@ -160,9 +206,37 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     }
 
 
+AUDIT_NAMED = 20  # the differing legs a failed audit names
+
+
+def _audited(
+    reader: StoreReader, evaluation: EdgeEvaluation
+) -> tuple[EdgeEvaluation, list[LegDifference]]:
+    """The full run ``evaluation`` with only the rows of its differing legs left to publish, and
+    those legs (``legs/audit.py``)."""
+    stored = read_legs(
+        reader, evaluation.user_id, evaluation.edge_id, evaluation.start, evaluation.end
+    )
+    differing = differing_legs(
+        evaluation.leg_rows, stored.legs, evaluation.user_id, evaluation.edge_id
+    )
+    kept = keep_differing(evaluation.leg_rows, differing)
+    return replace(evaluation, mode="audit", leg_rows=kept), differing
+
+
+def _audit_failure(edge_id: str, differing: list[LegDifference]) -> str:
+    named = "; ".join(d.describe() for d in differing[:AUDIT_NAMED])
+    more = f" (and {len(differing) - AUDIT_NAMED} more)" if len(differing) > AUDIT_NAMED else ""
+    return (
+        f"audit of {edge_id}: {len(differing)} stored leg(s) differ from a full recompute and "
+        f"were rewritten: {named}{more}"
+    )
+
+
 def edge_signals_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
-    """params: ``session`` (ISO date: tonight's). The user's followed edges' picks at it and the
-    open paper trades their outcomes close, published atomically into ``results/edge_paper``."""
+    """params: ``session`` (ISO date: tonight's); the job's user is the RECORD owner (``site`` or
+    a user). The picks at it of the owner's evidenced or live edges and the open paper trades its
+    rows hold whose outcomes close, published atomically into ``results/edge_paper``."""
     night, record = run_night(
         ctx.resources["reader"],
         ctx.resources["writer"],

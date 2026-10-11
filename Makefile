@@ -171,7 +171,7 @@ golden-store:    ## (re)load the golden CSVs into the fixture store, then its ro
 
 evaluate: golden-store  ## strategy scorecard vs committed baseline, the golden edge line, then the regime scorecard
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --report scorecard.md
-	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) $(GOLDEN_BASELINES) --baseline benchmarks/baseline.json
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --full --edge $(GOLDEN_EDGE) $(GOLDEN_BASELINES) --baseline benchmarks/baseline.json
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) regime-scorecard
 
 regime-scorecard:  ## the regime episode scorecard over the configured store (ALGOTRADE_DATA_URL)
@@ -179,7 +179,7 @@ regime-scorecard:  ## the regime episode scorecard over the configured store (AL
 
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
-	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --edge $(GOLDEN_EDGE) $(GOLDEN_BASELINES) --baseline benchmarks/baseline.json --update-baseline
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate-edges --full --edge $(GOLDEN_EDGE) $(GOLDEN_BASELINES) --baseline benchmarks/baseline.json --update-baseline
 
 # ----------------------------------------------------------------------------- web (apps/web, ADR 0025)
 # Node 24 + npm (npm workspaces: apps/web and its design-system package); lockfile apps/web/package-lock.json.

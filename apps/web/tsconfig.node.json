@@ -15,7 +15,8 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": [
     "vite.config.ts",
@@ -25,6 +26,7 @@
     "playwright.real.config.ts",
     "playwright.perf.config.ts",
     "scripts",
+    "vite-plugins",
     "e2e",
     "real",
     "visual"

@@ -244,7 +244,9 @@ def _forward(
         and mine.win_rate < theirs.win_rate
     )
     can = sessions >= settings.forward_sessions and mine.closed > 0 and not behind
-    if sessions < settings.forward_sessions:
+    if mine.closed == 0 and not mine.open and not mine.skipped:
+        words = "No paper trades: a candidate is not recorded."
+    elif sessions < settings.forward_sessions:
         words = (
             f"{sessions} of {settings.forward_sessions} sessions of the forward test have passed."
         )
@@ -263,7 +265,7 @@ def load_edge_paper(ctx: ReadContext, edge_id: str) -> EdgePaper | None:
     edge = edges.get(edge_id)
     if edge is None:
         return None
-    trades = load_trades(ctx, {i: e.name for i, e in edges.items()})
+    trades = load_trades(ctx, edges)
     settings = load_verdict(ctx.configs)
     own = [t for t in trades if t.edge_id == edge.id]
     ordered = sorted(own, key=lambda t: (t.signal_session, -t.rank), reverse=True)

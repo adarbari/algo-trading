@@ -18,6 +18,12 @@ class StoreWriter(ResultWriter):
         self.raw = backend.raw
         self.staging = backend.staging
 
+    @property
+    def backend(self) -> Backend:
+        """The store itself, for what needs its locks (the nightly's edge-evaluation claim).
+        On ingestion's writer only: a ``ResultWriter`` (API, backtests) never hands it out."""
+        return self._backend
+
     def write_table(
         self,
         table: str,

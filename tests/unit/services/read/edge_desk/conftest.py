@@ -27,9 +27,10 @@ FOLLOW = {"state": "following", "since": FOLLOWED}
 
 def trade(
     iid: str, signal: date, status: str = "open", sell: date = NEXT, rank: int = 1,
-    edge: str = "drift", user: str = "me", **changes: Any,
+    edge: str = "drift", user: str = "site", **changes: Any,
 ) -> dict[str, Any]:  # fmt: skip
-    """One stored paper trade row (the ``results/edge_paper`` columns)."""
+    """One stored paper trade row (the ``results/edge_paper`` columns): by default the site's
+    record of the site edge ``drift``; ``user="me"`` is the record of an edge of the user's own."""
     return {
         "user_id": user, "edge_id": edge, "signal_session": signal, "instrument_id": iid,
         "config_hash": "h", "outcome_hash": "o", "screener": "momo", "status": status,

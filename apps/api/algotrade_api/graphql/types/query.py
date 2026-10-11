@@ -405,9 +405,10 @@ class Query:
         return [EdgeProblem.of(p) for p in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The Ideas signals of the edges the user follows for the session: what to "
-        "buy (the paper trades signalled on it), what to sell next session and each followed "
-        "edge's live record. Null: nothing stored"
+        description="The Ideas signals of the edges the user follows or owns for the session: what "
+        "to buy (the paper trades signalled on it), what to sell next session and each edge's "
+        "live record. Paper trades follow the edge's owner: a followed site edge shows the one "
+        "site record every follower sees, an own edge the user's own. Null: nothing stored"
     )
     async def edge_desk(self, info: Ctx, date: Day = None) -> EdgeDesk | None:
         ctx = await info.context.aread(date)
@@ -415,9 +416,10 @@ class Query:
         return EdgeDesk.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The paper record of the edge `id` as the session knew it: the live record "
-        "against the backtest's usual range, the trades and, for a trial, the forward test; "
-        "null: no such edge or nothing stored"
+        description="The paper record of the edge `id` as the session knew it, the owner's: the "
+        "site's for a site edge (the same for every follower), the user's for their own edge. "
+        "The live record against the backtest's usual range, the trades and, for a trial, the "
+        "forward test; null: no such edge or nothing stored"
     )
     async def edge_paper(self, info: Ctx, id: str, date: Day = None) -> EdgePaper | None:
         ctx = await info.context.aread(date)

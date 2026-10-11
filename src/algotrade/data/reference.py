@@ -59,11 +59,10 @@ def snapshot(reader: StoreReader, table: str, on: date | None = None) -> Snapsho
     """Latest snapshot on or before ``on`` (any, when ``on`` is None), else the earliest.
 
     ``None`` only when the table has no partition at all."""
-    dates = reader.dates(table)
-    if not dates:
-        return None
-    before = [d for d in dates if on is None or d <= on]
-    return Snapshot(table, before[-1] if before else dates[0], on)
+    found = reader.latest_date(table, on)  # a recording reader logs only the dates <= ``on``
+    if found is None:
+        found = reader.earliest_date(table)  # before every snapshot: the earliest stands in
+    return None if found is None else Snapshot(table, found, on)
 
 
 def read_snapshot(

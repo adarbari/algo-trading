@@ -78,7 +78,7 @@ detect = [{ call = "build_history" }, { call = "HistoryCopy" }]
 
 [[responsibility]]
 id = "locking"
-description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock (services/jobs)"
+description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock and the one-evaluation-per-owner edge-eval claim every caller takes (services/jobs)"
 owner = ["src/algotrade/storage/locks.py", "src/algotrade/services/jobs/exclusive.py"]
 allowed = ["libs/sources/algotrade_sources/framework/limiter.py"]  # sources never import storage (R4): the limiter flocks its own state file
 section = "docs/adr/0019-ownership-and-boundaries.md#r2-storage-is-generic"
@@ -119,7 +119,11 @@ detect = [
 id = "partition-stamps"
 description = "The commit-sequence stamp of each committed partition in a range (TableStore.partition_seq: the highest sequence of any run in its index, 0 for a direct write, pending ignored) and the per-day log of the reads a computation made (RecordingReader, with the sequence at its first read): what lets a reader tell the partitions it read have not changed (ADR 0063)"
 owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/readers.py"]
-allowed = ["src/algotrade/storage/tables/interfaces.py"]  # declares partition_seq on TableStore
+allowed = [
+    "src/algotrade/storage/tables/interfaces.py",  # declares partition_seq on TableStore
+    "src/algotrade/data/outcomes/reading.py",  # the outcome partitions' stamps, for the harness's legs
+    "src/algotrade/services/evaluation/cross_section/legs/reuse.py",  # checks a stored leg's reads against the partitions' stamps
+]
 section = "docs/adr/0022-atomic-run-publication.md#decision"
 detect = [{ call = "partition_seq" }, { call = "RecordingReader" }]
 

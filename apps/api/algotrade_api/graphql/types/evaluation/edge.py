@@ -90,7 +90,9 @@ class EdgeRow:
     "after the request's session (false without one), `lostInputs` what the run could not read "
     "(a screener's missing table and the sessions lost); `oosHidden`: the run is a copy's whose "
     "out-of-sample result is withheld until the user shows it, so `rows` serves the in-sample "
-    "rows only"
+    "rows only; `legacyOwner`: a site run recorded under an older owner (`local`), read as the "
+    "site's; `trigger`: what started the run (`nightly`, `ui` or `cli`), null for a run from "
+    "before it was recorded"
 )
 class EdgeRun:
     run_id: str
@@ -107,6 +109,8 @@ class EdgeRun:
     after_session: bool
     lost_inputs: list[str]
     oos_hidden: bool
+    legacy_owner: str | None
+    trigger: str | None
     run: strawberry.Private[runs.EdgeRun]
     ctx: strawberry.Private[Stores]
 
@@ -127,6 +131,8 @@ class EdgeRun:
             after_session=d.after_session,
             lost_inputs=list(d.lost_inputs),
             oos_hidden=d.oos_hidden,
+            legacy_owner=d.legacy_owner,
+            trigger=d.trigger,
             run=d,
             ctx=ctx,
         )

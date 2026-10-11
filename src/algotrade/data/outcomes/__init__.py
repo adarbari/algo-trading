@@ -6,6 +6,8 @@ strategy, feature or page read can see the future because nothing it may import 
 from algotrade.data.outcomes.reading import (
     OUTCOME_FIELDS,
     missing_outcomes,
+    outcome_known,
+    outcome_seqs,
     read_outcomes,
     read_stored,
     select_outcomes,
@@ -15,6 +17,8 @@ from algotrade.data.outcomes.reading import (
 __all__ = [
     "OUTCOME_FIELDS",
     "missing_outcomes",
+    "outcome_known",
+    "outcome_seqs",
     "read_outcomes",
     "read_stored",
     "select_outcomes",

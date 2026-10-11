@@ -38,6 +38,7 @@ from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
 from algotrade.services.evaluation.training.render import merge_scorers
 from algotrade.services.features import check_user_features
 from algotrade.services.jobs import JobStatus, run_job
+from algotrade.services.jobs.exclusive import EdgeEvalBusyError, run_edge_eval_claimed
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -233,7 +234,8 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     ``--from``..``--to`` (default: the stored outcome sessions), outcomes known as of
     ``--as-of`` (default now), the test slice from
     ``--split-from`` (else each edge's ``frozen_from``; another split than the site edge's is
-    exploratory). Rows land in ``results/edge_eval``;
+    exploratory); ``--full`` computes every leg, else the stored legs still valid are reused
+    (ADR 0063). Rows land in ``results/edge_eval``;
     a report with the survivorship line is printed (and written to ``--report``).
     With ``--baseline`` the measures are compared with the ``edges`` section of that file (exit 1
     on a difference); ``--update-baseline`` (from ``make baseline``) rewrites that section."""
@@ -265,11 +267,17 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
         params = {
             "edge": edge.id, "start": start.isoformat(), "end": end.isoformat(),
             "as_of": as_of.isoformat(), "iv_field": args.iv_field,
-            "extra_baselines": list(args.extra_baseline),
+            "extra_baselines": list(args.extra_baseline), "trigger": "cli",
             "split_from": args.split_from.isoformat() if args.split_from else None,
+            "mode": "full" if args.full else "incremental",
         }  # fmt: skip
         owner = UserContext(edge.owner)
-        job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "edge-eval", params, owner)
+        try:
+            job = run_edge_eval_claimed(backend, resources, params, owner)
+        except EdgeEvalBusyError as busy:
+            print(f"error: {edge.id} ({edge.owner}): {busy}", file=sys.stderr)
+            failed = True
+            continue
         if job.status is JobStatus.FAILED:
             print(f"error: {edge.id} ({edge.owner}): {job.error}", file=sys.stderr)
             failed = True

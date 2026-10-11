@@ -139,6 +139,12 @@ source = "graphql:Edge.statusReason"
 exempt = "free text the user wrote (why an edge was rejected or retired)"
 
 [[enum]]
+source = "graphql:EdgeRun.trigger"
+values_from = "python:algotrade.services.evaluation.cross_section.results:TRIGGERS"
+values = { nightly = "term:run_trigger", ui = "term:run_trigger", cli = "term:run_trigger" }
+names = { nightly = "nightly", ui = "ui", cli = "cli" }
+
+[[enum]]
 source = "graphql:AheadEvent.label"
 exempt = "free text: a short label for the event, composed from its data"
 

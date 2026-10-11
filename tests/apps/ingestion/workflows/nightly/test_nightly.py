@@ -26,6 +26,7 @@ from algotrade_ingestion.tasks.maintenance.quality import Check, check_macro
 from algotrade_ingestion.workflows.nightly import nightly as nightly_module
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import (
+    EDGE_EVAL,
     EDGE_SIGNALS,
     FINALLY,
     NIGHTLY,
@@ -49,7 +50,9 @@ from tests.helpers.stored_frames import (
 D = date(2026, 10, 2)
 D1 = date(2026, 10, 1)
 AFTER_CLOSE = datetime(2026, 10, 2, 23, tzinfo=UTC)  # 19:00 New York: D has closed
-TASK_STEPS = [s.name for s in (*NIGHTLY, *FINALLY) if s.name not in (SCREENS, EDGE_SIGNALS)]
+TASK_STEPS = [
+    s.name for s in (*NIGHTLY, *FINALLY) if s.name not in (SCREENS, EDGE_SIGNALS, EDGE_EVAL)
+]
 
 
 class Calls:
@@ -883,8 +886,8 @@ def test_notifies_on_failure_and_always_writes_the_summary(
     # The notice carries the full report (the email body): subject, text and HTML.
     (note,) = notifier.notices
     assert (
-        note.subject == f"[algotrade] {D} nightly: FAILED · 8 steps with failures"
-    )  # bar-quality, outcomes, edge-signals and history-copy need bars
+        note.subject == f"[algotrade] {D} nightly: FAILED · 9 steps with failures"
+    )  # bar-quality, outcomes, edge-signals, edge-eval and history-copy need bars
     assert "bars FAILED: RuntimeError: bars broke" in note.text
     assert note.html.startswith("<!doctype html>") and "bars broke" in note.html
     assert summary["started_at"] <= summary["finished_at"]

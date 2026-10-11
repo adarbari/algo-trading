@@ -264,3 +264,7 @@ kind = "segment"
 [[web_dir]]
 path = "apps/web/visual"
 purpose = "Playwright screenshot + axe suite over every design-system story, light and dark"
+
+[[web_dir]]
+path = "apps/web/vite-plugins"
+purpose = "Vite build plugins (graphql-documents: each GraphQL operation ships with the module that writes it, out of the entry bundle)"

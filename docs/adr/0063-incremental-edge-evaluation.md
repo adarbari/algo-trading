@@ -1,7 +1,6 @@
 # ADR 0063: Incremental edge evaluation (stored legs)
 
-**Status:** proposed (2026-10-10; architect-reviewed 2026-10-10, fixes folded in; owner decision
-pending: exact invalidation vs the append-only alternative). Extends
+**Status:** accepted (2026-10-10; owner decision: the exact version, not the append-only alternative; architect-reviewed 2026-10-10). Extends
 [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (the harness, the trial log) and
 [0059](0059-edge-evaluations-on-request.md) (runs on request); writes only through `ResultWriter`
 ([0005](0005-ingestion-is-the-only-writer.md)), published atomically ([0022](0022-atomic-run-publication.md)).
@@ -21,7 +20,7 @@ per (edge variant, variant, horizon, decision session D) and, for a screener out
 `RandomStat`. Everything a result row holds is a pure function of these legs plus the run's
 split (`measures.slice_measures`, `pool_stats`, `_deflate`, `_pbo`, `random_measures`).
 
-## Decision (proposed)
+## Decision
 1. **A leg is stored.** New result table `results/edge_legs` (ResultWriter only; the API's and
    the CLI's job, never ingestion's): one row per (user_id, edge_id, edge_variant, variant,
    trial hash, horizon, decision session D) with the leg's `SessionStat` fields, entry session
@@ -83,7 +82,7 @@ split (`measures.slice_measures`, `pool_stats`, `_deflate`, `_pbo`, `random_meas
    table in `architecture/tables.toml` with its reader restricted to `cross_section`; an ownership
    entry `edge-leg-reuse`.
 
-## Alternative (owner decision)
+## Alternative (rejected 2026-10-10)
 Append-only nightly: store legs, never invalidate, and let the weekly full run replace them.
 Under 60 s with no new storage method, but a restated feature or a rewritten outcome reaches the
 results only at the next weekly run (up to a week stale). The design above is the smallest exact
@@ -98,7 +97,6 @@ one; the alternative is cheaper to build.
   makes (a read outside it is a staleness bug, caught by the weekly audit).
 - Random-pick rows before `SEED_VERSION` 3 are not comparable draw for draw with later ones; the
   verdict reads only the latest run.
-- Until this is accepted, the hot-spot fixes of the same PR are what the nightly gets.
 
 ## Acceptance
 - Contract test: for the golden `cross_section` store, incremental after a full run at the same
@@ -142,3 +140,16 @@ one; the alternative is cheaper to build.
    compaction or history-copy step is expected.
 9. **Code changes.** A change to a screener's or the harness's Python code that changes a leg
    bumps `LEG_VERSION`; a missed bump is caught only by the weekly audit.
+10. **Reuse as built (PR 4).** `legs/reuse.py` decides per leg; the first reason that fails is
+    counted in the run record (`entry`, `events`, `inputs`, `outcomes`, `draws`, and `session` for
+    a leg that was fine but shares its session with one that was not). A `rows` read records the
+    partition dates it returned (`digest`; none for a read filtered by instruments or `as_of`, which
+    cannot tell an empty partition from none), so a purged partition is noticed beside a committed
+    one. An event edge's names (read over the whole range on every run) are compared with the
+    leg's stored `event_ids`. `results/edge_legs` gains a `tombstone` column: a leg row whose
+    latest version says the key has no leg. Legs are retired when their key is not the edge's any
+    more, and, at a session whose reads log the run rewrote, when the run did not compute them
+    again; legs at other sessions are left alone (a run over another range or a shifted schedule
+    grid never deletes what it does not rewrite). An `earnings_expected` edge is always FULL: its
+    report-containment diagnostic reads the names with an entry bar of every window. `--full` and
+    the job's `mode = "full"` skip reuse; `make evaluate` (the golden gate) passes `--full`.

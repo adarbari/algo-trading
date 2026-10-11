@@ -118,16 +118,15 @@ class Edge:
     since: date | None = None
     state_reason: str = ""
 
-    # Interim, until the paper rule is rewritten: what the desk still trades.
-
     @property
     def paper_traded(self) -> bool:
-        """The edge trades on paper: a followed site edge, or an own candidate or live edge."""
-        return self.followed or (self.mine and self.status in ("candidate", "live"))
+        """The edge is on the desk: a bookmarked site edge (its paper trades are the site's, one
+        shared record) or the user's own evidenced or live edge (recorded for them)."""
+        return self.followed or (self.mine and self.status in loading.RECORDING)
 
     @property
     def paper_since(self) -> date | None:
-        """The session its paper trading counts from."""
+        """The session the user's interest began: the bookmark's, else the status's."""
         return self.followed_since if self.followed else self.status_since
 
 

@@ -390,7 +390,7 @@ type EdgeRow {
 }
 
 """
-A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one), `lostInputs` what the run could not read (a screener's missing table and the sessions lost); `oosHidden`: the run is a copy's whose out-of-sample result is withheld until the user shows it, so `rows` serves the in-sample rows only
+A committed evaluation run of an edge, read as the run left it: `owner` whose run, `rangeFrom` / `rangeTo` the sessions covered, `splitFrom` the split its frozen slice was measured at, `exploratory` (its split is not the edge's frozenFrom: never a track record), `knowledgeTs` when it committed, `asOf` the data version it read, `afterSession` it committed after the request's session (false without one), `lostInputs` what the run could not read (a screener's missing table and the sessions lost); `oosHidden`: the run is a copy's whose out-of-sample result is withheld until the user shows it, so `rows` serves the in-sample rows only; `legacyOwner`: a site run recorded under an older owner (`local`), read as the site's; `trigger`: what started the run (`nightly`, `ui` or `cli`), null for a run from before it was recorded
 """
 type EdgeRun {
   runId: String!
@@ -407,6 +407,8 @@ type EdgeRun {
   afterSession: Boolean!
   lostInputs: [String!]!
   oosHidden: Boolean!
+  legacyOwner: String
+  trigger: String
 
   """
   The rows the run wrote, one per variant, horizon and slice; empty: the run's partition holds none
@@ -680,7 +682,7 @@ type Fill {
 }
 
 """
-An edge the user follows (or tries as a new version) and its record. `tonight` is what the nightly did for it on the session, so an empty buy list says why: signalled, no_picks (due, the screen qualified none), not_due, skipped (due but could not be signalled: `tonightReason`) or not_run (no nightly run for the session); `missed` the due sessions since the previous night that nobody signalled
+An edge the user follows (or tries as a new version) and its record. `tonight` is what the nightly did for it on the session, so an empty buy list says why: signalled, no_picks (due, the screen qualified none), not_due, skipped (due but could not be signalled: `tonightReason`), not_recording (the nightly ran but the edge is not evidenced or live) or not_run (no nightly run for the session); `missed` the due sessions since the previous night that nobody signalled
 """
 type FollowedEdge {
   edgeId: String!
@@ -1838,7 +1840,7 @@ type Query {
   edgeProblems: [EdgeProblem!]!
 
   """
-  The Ideas signals of the edges the user follows for the session: what to buy (the paper trades signalled on it), what to sell next session and each followed edge's live record. Null: nothing stored
+  The Ideas signals of the edges the user follows or owns for the session: what to buy (the paper trades signalled on it), what to sell next session and each edge's live record. Paper trades follow the edge's owner: a followed site edge shows the one site record every follower sees, an own edge the user's own. Null: nothing stored
   """
   edgeDesk(
     """
@@ -1848,7 +1850,7 @@ type Query {
   ): EdgeDesk
 
   """
-  The paper record of the edge `id` as the session knew it: the live record against the backtest's usual range, the trades and, for a trial, the forward test; null: no such edge or nothing stored
+  The paper record of the edge `id` as the session knew it, the owner's: the site's for a site edge (the same for every follower), the user's for their own edge. The live record against the backtest's usual range, the trades and, for a trial, the forward test; null: no such edge or nothing stored
   """
   edgePaper(
     id: String!

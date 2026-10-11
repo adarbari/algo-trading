@@ -458,7 +458,8 @@ to 14) on the existing documents, with one new grain still to come.
    90th percentile of the wins `n` closed trades would show if the official win rate held
    (`quant.edge_statistics.win_rate_band`, thresholds `live_min_sessions`, `live_low`, `live_high` in
    `config/site/verdict.toml`), and a trial's forward test beside the edge it would replace.
-   The web follow and builder UI is still to come; it lands with its own tests.
+   The web follow and builder UI is still to come; it lands with its own tests. (Which edges
+   record, and for whom, is superseded by item 6 of the 2026-10-10 amendment.)
 
 ## Amendment (2026-10-09, ADR 0061): the grain is `forward_returns@v2`
 A window that needs a bar `bar-quality` flagged is `outcome_status = UNMEASURED` with
@@ -497,8 +498,22 @@ for one thing is removed.
    trial to candidate; on a site edge following and trial keep a bookmark, rejected and retired
    are archived), and `scripts/migrate_edge_follows.py (--user U | --all) [--dry-run]` rewrites
    the files, idempotently and atomically. Both go once every file is migrated (PR 5).
-6. **Paper trades, interim rule.** A followed site edge, or an own candidate or live edge,
-   trades on paper, so the same edges trade as before; PR 5 changes the rule by owner decision.
+6. **Paper trades follow the edge's owner (replaces the follow-based rule of the 2026-10-09
+   amendment, item 7; owner decision 2026-10-10).** An edge records while its status is
+   `evidenced` or `live` (`config.edges.loading.RECORDING`); a user cannot set `evidenced`, so
+   their own edge records from `live`. The record's owner is `site` for a site edge, else the
+   user whose edge it is: `results/edge_paper` and its key are unchanged, `user_id` now means the
+   record owner (no migration), and the nightly runs one `edge-signals` job per record owner
+   (`site` first), under that owner's context, so a follower's own presets and universes never
+   change the shared record. Following is a bookmark and creates no paper trade; every follower
+   of a site edge reads the one `site` record ("tonight", "missed", the trades), and a user's own
+   edge record is read only by that user (`data.paper.read_paper(reader, owners)` maps each edge
+   to its record owner). A record starts on the first night its job sees the edge recording
+   (never backfilled to the status's date); `missed` fills only gaps between nights of edges the
+   previous night recorded; a `retired` or `rejected` edge takes no new picks and its open
+   trades still settle. A follower's rows written while followers traded are never rewritten
+   into `site`: the follower's job only settles them until none is open, and readers leave them
+   out of the shared record.
 7. **Run identity.** `run_hash` hashes `asdict(edge)`, which now includes the owner, status,
    bookmark and audit: every edge's run hash changes once, and moving a status or following
    changes the hash of that user's next run of the edge (it seeds the random-pick draws, so

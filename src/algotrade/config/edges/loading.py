@@ -48,6 +48,9 @@ SELECTIONS = "selections"
 SITE_DECIDES = ("rejection_reason", "evidence", "implementation")  # a user's edge never has these
 DRAFT_STATUS = "researching"
 USER_STATUSES = ("researching", "candidate", "live", "retired", "rejected")  # a user sets these
+# The statuses an edge takes new paper picks in, for its OWNER's record (ADR 0053 amendment
+# 2026-10-10: a user cannot set ``evidenced``, so their own edge records from ``live``).
+RECORDING = ("evidenced", "live")
 MAX_CHAIN = 8  # a copy of a copy of ...: deeper is a mistake (and a cycle is refused earlier)
 
 

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 
+import { perModuleDocuments } from './vite-plugins/graphql-documents.ts';
+
 // Unit test files listed as `skipped` in quarantine.json do not run (docs/ci.md "Flaky specs").
 const quarantine = JSON.parse(
   readFileSync(new URL('./quarantine.json', import.meta.url), 'utf8'),
@@ -15,6 +17,7 @@ const UNIT_INCLUDE = ['src/**/*.test.{ts,tsx}', 'design-system/**/*.test.{ts,tsx
 const INTEGRATION_INCLUDE = [
   'src/{pages,widgets,features}/**/*.test.{ts,tsx}',
   'scripts/**/*.test.ts',
+  'vite-plugins/**/*.test.ts',
 ];
 const INTEGRATION_TEST_TIMEOUT_MS = 20_000;
 
@@ -25,7 +28,7 @@ const port = (offset: number, fallback: number): number =>
   base === undefined ? fallback : Number(base) + offset;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [perModuleDocuments(), react()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
@@ -40,6 +43,9 @@ export default defineConfig({
     // dist/.vite/manifest.json: the bundle budgets (scripts/check-bundle-budgets.ts) read it.
     manifest: true,
     rolldownOptions: {
+      // The generated document constants (graphql.ts) are unused once perModuleDocuments inlines
+      // them: a pure constructor lets the bundler drop them.
+      treeshake: { manualPureFunctions: ['TypedDocumentString'] },
       output: {
         // Vendor code in its own long-lived chunks: it changes far less than the app, so a deploy
         // leaves the browser's cached copy valid (the phone downloads only the app chunks again).
@@ -93,6 +99,8 @@ export default defineConfig({
       'src/**/*.test.{ts,tsx}',
       'design-system/**/*.test.{ts,tsx}',
       'scripts/**/*.test.ts',
+      'vite-plugins/**/*.test.ts',
+      'build/**/*.test.ts',
       'lint-rules/**/*.test.js',
     ],
     exclude: [...configDefaults.exclude, ...quarantinedUnitFiles],

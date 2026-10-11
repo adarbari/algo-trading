@@ -676,17 +676,18 @@ WINNERS_STUDY = _fixed(
     runs="merge",
     key=("row_kind", "feature", "block", "run_id"),
 )  # fmt: skip
-# The forward paper record (ADR 0053 amendment 2026-10-09): one row per (user, edge, signal
-# session, name) the nightly ``edge-signals`` job made when it was tonight's pick of a followed
-# edge, written by ``services/evaluation/forward/results.py``. Partition ``session_date`` =
-# ``signal_session`` (the decision session D), so a later run settles a trade by rewriting its
-# row in its own partition: runs merge, the latest known row wins per key and ``as_of`` reads the
-# book as it was. ``status`` is ``open`` (window not closed), ``won`` / ``lost`` (the edge's own
-# hit; ``excess_return`` the outcome's measure) or ``skipped`` with ``reason`` (never a loss,
-# never a zero); ``delisted`` marks a name measured to its last bar; ``outcome_hash``
-# fingerprints the edge's [outcome] at the signal, so a trade is never judged by a definition the
-# user edited afterwards. ``buy_session`` is the entry session S, ``sell_session`` the window's
-# close, both from the trading calendar.
+# The forward paper record (ADR 0053 amendment 2026-10-10): one row per (user, edge, signal
+# session, name) the nightly ``edge-signals`` job made when it was tonight's pick of an evidenced
+# or live edge; ``user_id`` is the RECORD owner (``site`` for a site edge, else the user whose
+# edge it is), never a follower. Written by ``services/evaluation/forward/results.py``. Partition
+# ``session_date`` = ``signal_session`` (the decision session D), so a later run settles a trade
+# by rewriting its row in its own partition: runs merge, the latest known row wins per key and
+# ``as_of`` reads the book as it was. ``status`` is ``open`` (window not closed), ``won`` /
+# ``lost`` (the edge's own hit; ``excess_return`` the outcome's measure) or ``skipped`` with
+# ``reason`` (never a loss, never a zero); ``delisted`` marks a name measured to its last bar;
+# ``outcome_hash`` fingerprints the edge's [outcome] at the signal, so a trade is never judged by
+# a definition the user edited afterwards. ``buy_session`` is the entry session S,
+# ``sell_session`` the window's close, both from the trading calendar.
 EDGE_PAPER = _fixed(
     "results/edge_paper",
     "results",
@@ -703,6 +704,60 @@ EDGE_PAPER = _fixed(
     *_floats("excess_return"),
     runs="merge",
     key=("user_id", "edge_id", "signal_session", "instrument_id"),
+)  # fmt: skip
+# The edge harness's stored legs (ADR 0063): what one evaluation computed per decision session,
+# so a later run can reuse it. Written only by ``services/evaluation/cross_section/legs/``;
+# partition ``session_date`` is the decision session D (not written every session). ``row_kind``:
+# ``leg`` (one per leg key, edge variant, screener, horizon: every ``SessionStat`` field, the
+# entry session S, the trial hash, the screen's universe snapshot, the event names, the table a
+# lost session lacked, the ``as_of`` its outcome read used and, for a screener from the split on,
+# its random draws' sums as float32 lists), ``reads`` (one per (user, edge, D): every partition
+# the session read, ``read_*`` lists in step, the store's commit sequence ``inputs_seq`` at its
+# first read, the historical-identity counts) and ``outcome`` (one per (D, edge variant,
+# horizon): the entry session read, ``outcomes_as_of`` and the outcome partition's commit
+# sequence). A key column that does not apply is "" (or 0 for the horizon), never null. Runs
+# merge: a leg recomputed by a later run replaces the earlier one under the same key.
+EDGE_LEGS = _fixed(
+    "results/edge_legs",
+    "results",
+    (
+        "user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant",
+        "horizon_sessions",
+    ),
+    *_strings("user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant"),
+    *_strings("trial_hash", "regime", "lost_table"),
+    "horizon_sessions int64!",
+    "entry_session date",
+    "screen_snapshot date",
+    "outcomes_as_of timestamp_utc",
+    "pick_values float64[]",
+    "deciles float64[]",
+    "pick_reference float64[]",
+    "event_ids string[]",
+    *(f"{n} int64" for n in (
+        "pick_hits", "rest_n", "base_hits", "ranked", "unscored", "excluded_score_coverage",
+        "excluded_unclosed", "excluded_missing", "excluded_coverage", "excluded_unmeasured",
+        "unmeasured_base", "delisted", "outside_universe", "no_entry_bar", "pick_touches",
+        "no_implied_vol", "rand_picks", "rand_eligible", "rand_base_hits", "inputs_seq",
+        "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
+        "id_screened_proxy",
+    )),
+    *_floats("rest_mean", "rest_m2", "top_decile", "spread"),
+    "pre_snapshot bool",
+    "implied_stored bool",
+    "tombstone bool",  # a leg row that says its key has no leg any more (ADR 0063 amendment 7)
+    "value_sums float32[]",
+    "hit_sums float32[]",
+    "read_table string[]",
+    "read_kind string[]",
+    "read_digest string[]",
+    "read_from date[]",
+    "read_to date[]",
+    runs="merge",
+    key=(
+        "user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant",
+        "horizon_sessions",
+    ),
 )  # fmt: skip
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
@@ -738,6 +793,7 @@ KNOWN: dict[str, TableSpec] = {
         EDGE_EVAL,
         WINNERS_STUDY,
         EDGE_PAPER,
+        EDGE_LEGS,
         LIVE_OPTION_QUOTES,
         USAGE_LLM_CALLS,
         ETF_HOLDINGS,

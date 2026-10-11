@@ -1,9 +1,12 @@
-"""Tonight's paper picks of one followed edge (ADR 0053 amendment 2026-10-09).
+"""Tonight's paper picks of one edge, for its owner's record (ADR 0053 amendment 2026-10-10).
 
-An edge the user follows (a bookmarked site edge) or has as a ``candidate`` or ``live`` edge of
-their own signals at a session when its schedule fires there, counted from the session the
-bookmark or the status began (``paper_since``; an interim rule until the paper record is
-rewritten, ADR 0053 amendment 2026-10-10):
+Paper trades follow the edge's OWNER, never a follower: a site edge records once, as ``site``,
+and an own edge for its user; following is a bookmark and trades nothing. An edge records while
+its status is ``evidenced`` or ``live`` (``RECORDING``); a ``candidate`` or ``researching`` edge
+has no paper trades, and a ``retired`` or ``rejected`` one takes no new picks (its open trades
+still settle, ``results.run_night``). The record of an edge starts on the first night the job
+sees it recording (``since``, passed in by ``results``: never backfilled to the status's date),
+and from there:
 the same decision sessions the backtest uses (``cross_section/sessions.decision_sessions``,
 spaced a horizon apart), and the picks are the harness's own (``cross_section/picks``: the
 screener's qualified names among the edge's eligible names, best first, the first ``top_k``),
@@ -19,7 +22,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.loading import SITE
+from algotrade.config.edges.loading import RECORDING
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import (
@@ -48,7 +51,6 @@ from algotrade.services.evaluation.cross_section.picks import eligible, screen_v
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.storage.configs.store import ConfigStore
 
-PAPER_STATUSES = ("candidate", "live")  # of the user's own edge
 # Sessions an event schedule reads back to dedupe names. The dedupe is a chain (a name counted
 # at X blocks the next DEDUPE_SESSIONS), so the bound is exact unless one name matches three or
 # more times within this many sessions (a moved report date): then the first match may lie
@@ -88,21 +90,8 @@ def advance(day: date, sessions: int) -> date:
 
 
 def paper_traded(edge: Edge) -> bool:
-    """The user follows the (site) edge, or has their own edge as a candidate or live."""
-    return edge.followed or (edge.owner != SITE and edge.status in PAPER_STATUSES)
-
-
-def paper_state(edge: Edge) -> bool:
-    """The edge has paper history to settle: followed, or an own edge that has left ``researching``
-    (a retired one still has open trades)."""
-    return edge.followed or (
-        edge.owner != SITE and edge.status != "researching" and edge.audit.status_since is not None
-    )
-
-
-def paper_since(edge: Edge) -> date | None:
-    """The session the edge's paper trading counts from: the bookmark's, else the status's."""
-    return edge.follow.since if edge.followed else edge.audit.status_since
+    """The edge takes new paper picks for its owner's record: ``evidenced`` or ``live``."""
+    return edge.status in RECORDING
 
 
 def legs_between(
@@ -110,17 +99,17 @@ def legs_between(
     configs: ConfigStore,
     user: UserContext,
     edge: Edge,
+    since: date,
     first: date,
     last: date,
 ) -> tuple[list[Leg], EventSchedule | None]:
     """The harness's own legs (``sessions.leg_blocks``) of ``edge`` with a decision session in
-    ``first..last``, counted from the session its state began (the session itself when the state
-    has no date), and, for an event schedule, the event names by decision session. A plain
+    ``first..last``, counted from ``since`` (the first night the owner's record saw the edge
+    recording), and, for an event schedule, the event names by decision session. A plain
     schedule is spaced a horizon apart from ``since``; an event schedule fires on every session
     where a name has the event, read at that session alone (``events.read_events``) with the
     once-per-name dedupe looking ``EVENT_LOOKBACK`` sessions back, so a paper trade is the leg
     the backtest would have taken."""
-    since = paper_since(edge) or last
     if since > last:
         return [], None
     horizon = edge.outcome.horizon_sessions[0]
@@ -151,14 +140,21 @@ def _not_possible(edge: Edge) -> str | None:
 
 
 def edge_signals(
-    reader: StoreReader, configs: ConfigStore, user: UserContext, edge: Edge, session: date
+    reader: StoreReader,
+    configs: ConfigStore,
+    user: UserContext,
+    edge: Edge,
+    since: date,
+    session: date,
 ) -> EdgeSignals:
-    """``edge``'s paper picks at ``session`` (none when its schedule does not fire there)."""
+    """``edge``'s paper picks at ``session`` (none when its schedule does not fire there), the
+    record counted from ``since``. ``user`` is the record owner's context (the ``site`` user's for
+    a site edge): its presets and universes are the ones read, never a follower's."""
     horizon = edge.outcome.horizon_sessions[0]
     if (why := _not_possible(edge)) is not None:
         return EdgeSignals(edge.id, session, None, None, horizon, (), why)
     try:
-        legs, events = legs_between(reader, configs, user, edge, session, session)
+        legs, events = legs_between(reader, configs, user, edge, since, session, session)
     except MissingDataError as missing:
         day = missing.day if isinstance(missing, EventDayMissingError) else session
         return EdgeSignals(
