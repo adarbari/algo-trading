@@ -176,3 +176,44 @@ export const sampleLanes: ChartLane[] = [
     ],
   },
 ];
+
+/** Cumulative excess of a screener's picks over the universe: backtest to 1 Sep 2026, then the live paper record. Sample data. */
+const EDGE_LIVE_START = '2026-09-01';
+const edgeCurve = walk(31, 140, 0.0008, 0.02);
+export const edgeBacktest: ChartSeries = {
+  id: 'picks',
+  label: 'Picks vs universe',
+  points: edgeCurve.filter((p) => p.time < EDGE_LIVE_START),
+};
+/** The paper record continues the backtest line (it starts on the backtest's last day) in a dashed stroke. */
+export const edgeLive: ChartSeries = {
+  id: 'paper',
+  label: 'Paper',
+  stroke: 'dashed',
+  points: edgeCurve.filter((p) => p.time >= (edgeBacktest.points.at(-1)?.time ?? EDGE_LIVE_START)),
+};
+export const edgeBase: ChartSeries = {
+  id: 'base',
+  label: 'Universe base rate',
+  tone: 's5',
+  points: DAYS.map((time, i) => ({ time, value: 100 + i * 0.03 })),
+};
+/** The split of the evidence: before 1 Apr 2026 is in-sample, after it out-of-sample. */
+export const edgeBands: ChartBand[] = [
+  { start: '2024-09-30', end: '2026-03-31', tone: 'neutral', label: 'In-sample' },
+  { start: '2026-04-01', end: '2026-10-02', tone: 'accent', label: 'Out-of-sample' },
+];
+
+/** Drawdown of the picks curve: 0 at a new high, negative below it (never above 0). */
+export const edgeDrawdown: ChartSeries = (() => {
+  let peak = -Infinity;
+  return {
+    id: 'drawdown',
+    label: 'Drawdown',
+    type: 'underwater' as const,
+    points: edgeCurve.map((p) => {
+      peak = Math.max(peak, p.value ?? peak);
+      return { time: p.time, value: Math.round(((p.value ?? peak) / peak - 1) * 1000) / 10 };
+    }),
+  };
+})();

@@ -20,6 +20,8 @@ export interface LegendItem {
   tone: DataTone;
   /** Shown after the label (a count or share), tabular. */
   value?: ReactNode;
+  /** A `line` swatch drawn dashed (a series continued in another regime). */
+  dashed?: boolean;
 }
 
 export interface LegendProps {
@@ -48,6 +50,7 @@ export function Legend({ items, swatch = 'solid', label = 'Legend', size = 'sm' 
             className={`${styles.swatch} ${tones.tone}`}
             data-swatch={swatch}
             data-tone={item.tone}
+            data-dashed={item.dashed === true || undefined}
             aria-hidden="true"
           >
             {swatch === 'hatch' && (
