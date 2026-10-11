@@ -2,7 +2,7 @@
 drafting prompt. The guard is RECALL over the golden set: a field a case expects that exists in
 the catalogue is always in the slice, so a missed field never becomes a false "missing". Also the
 token budget (<= 15k estimated tokens, chars / 4), the byte-identical prefix, determinism, own
-features, and the phrasebook short-cut."""
+features, joined tokens and numbers."""
 
 import pytest
 
@@ -202,3 +202,13 @@ def test_a_brief_field_has_no_caveats_and_a_full_one_keeps_its_checks(site) -> N
     assert briefs and all("caveat:" not in lines[n] for n in briefs)
     full = [n for n in lines if n not in chosen.brief and "caveat:" in lines[n]]
     assert full  # the sentence's own fields keep theirs
+
+
+def test_a_number_after_a_comparison_word_names_no_field() -> None:
+    vocab = {"above", "sma", "iv", "high"}
+    assert words_of("above 20", vocab) == ["above"]
+    assert words_of("over 20 and high 52", {"over", "high"}) == ["over", "and", "high", "52"]
+    sma20, other = info("feature.pct_vs_sma_20"), info("rollup.a@v1.ret_20d")
+    # "above 20" must not pull in the fields named for 20; "sma 20" must
+    assert not select_slice("price above 20", [sma20, other]).fields
+    assert sma20.name in select_slice("sma 20 rising", [sma20, other]).fields

@@ -17,7 +17,6 @@ from dataclasses import dataclass
 
 from algotrade.config.site.field_guide import FieldGuideSettings
 from algotrade.config.site.llm import Phrase
-from algotrade.services.drafting.synonyms import FAMILIES
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
 MAX_FIELDS = 25  # fields picked by words and cross references (phrasebook fields come on top)
@@ -117,15 +116,12 @@ STOP_WORDS = frozenset(
 )
 
 
-def _expansions() -> dict[str, tuple[str, ...]]:
-    out: dict[str, set[str]] = {}
-    for family in FAMILIES:
-        for word in family:
-            out.setdefault(word, set()).update(w for w in family if w != word)
-    return {w: tuple(sorted(x)) for w, x in out.items()}
-
-
-SYNONYMS: Mapping[str, tuple[str, ...]] = _expansions()
+_COMPARISON = frozenset(
+    (
+        "above", "below", "over", "under", "at", "than",
+        "greater", "less", "least", "most", "between", "within",
+    )
+)  # fmt: skip
 _WORD = re.compile(r"[a-z0-9]+")
 _PIECE = re.compile(r"[a-z]+|\d+")
 _UNIT = re.compile(r"(\d+)[\s-]*(day|days|d|week|weeks|w|session|sessions)\b")
@@ -145,9 +141,9 @@ def stem(word: str) -> str:
 
 def words_of(text: str, vocab: Collection[str] = ()) -> list[str]:
     """Lower-case words of ``text``, letters and digits split apart (``SMA50`` -> sma, 50), a
-    number with a day / week unit joined (``200 day`` -> ``200d``), stemmed, each with its
-    synonym family. A bare number is kept when it is joined to or follows a word of ``vocab``
-    (the words of field names: ``IV 30`` finds ``iv30``) and always after a unit."""
+    number with a day / week unit joined (``200 day`` -> ``200d``), and stemmed. A bare number is
+    kept when it follows a word of ``vocab`` (field-name words: ``IV 30`` finds ``iv30``) that is
+    not a comparison (``above 20`` names no field) and always after a unit."""
     lowered = text.lower()
     out: list[str] = []
     for m in _UNIT.finditer(lowered):
@@ -157,10 +153,10 @@ def words_of(text: str, vocab: Collection[str] = ()) -> list[str]:
     previous = ""
     for piece in _PIECE.findall(lowered):
         if piece.isdigit():
-            if stem(previous) in vocab:
+            if stem(previous) in vocab and previous not in _COMPARISON:
                 out.append(piece)
         else:
-            out += [stem(piece), *(stem(x) for x in SYNONYMS.get(piece, ()))]
+            out.append(stem(piece))
         previous = piece
     return out
 

@@ -126,6 +126,10 @@ statuses, pending formula, needs your call) ships its Guide entry in the same PR
 
 PRs 1 and 6 touch `usage.py` and the ledger that #514 changed: start after #514 merges.
 
+Follow-up (owner question, not built): should index-only fields show their enum values? The model otherwise
+guesses a value and the validator drops a wrong guess; adding them to the prefix would exceed the 15k budget at
+the largest case, so measure it in the live golden run first.
+
 ## Risks
 
 Retrieval misses showing as false "missing" (keep the full field index in the prefix; replay test);

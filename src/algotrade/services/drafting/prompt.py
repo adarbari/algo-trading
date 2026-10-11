@@ -9,10 +9,10 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-``system_prompt`` renders all of that (~110k tokens over the site catalogue); the draft sends
-``sliced_system_prompt`` (``PROMPT_VERSION`` 2): the task, the examples and an index of every
-field (name, type, unit) as a prefix no sentence changes, then in detail only the fields
-``retrieval.select_slice`` picks for the sentence (9-12k tokens), then the caller's own features."""
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 2): the task, the examples and an
+index of every field (name, type, unit) as a prefix no sentence changes, then in detail only the
+fields ``retrieval.select_slice`` picks for the sentence (~11-14k tokens, was ~110k for the
+whole catalogue, phrasebook and guide), then the caller's own features."""
 
 import json
 import re
@@ -271,67 +271,12 @@ def use_text(use: GuideUse) -> str:
     return f"{text} ({use.note})" if use.note else text
 
 
-def guide_line(entry: FieldGuideEntry, catalogue: set[str]) -> str | None:
-    """One field guide entry: ``name | reads | use: ...; ... | caveats: ... ``; None when the
-    field is not in this catalogue. Sources stay out of the prompt."""
-    if entry.name not in catalogue:
-        return None
-    parts = [entry.name, entry.reads]
-    parts.append("use: " + "; ".join(use_text(u) for u in entry.uses) if entry.uses else "use: -")
-    parts.append("caveats: " + " ".join(entry.caveats) if entry.caveats else "caveats: -")
-    return " | ".join(parts)
-
-
 def situation_line(situation: Situation, catalogue: set[str]) -> str | None:
     """One situation with the affected fields this catalogue has (None: it has none)."""
     affects = [f for f in situation.affects if f in catalogue]
     if not affects:
         return None
     return f"{situation.name} | {situation.signs} | affects: {', '.join(affects)} | {situation.do}"
-
-
-def system_prompt(
-    catalogue: Iterable[FeatureInfo],
-    phrasebook: Iterable[Phrase] = (),
-    guide: FieldGuideSettings | None = None,
-) -> str:
-    """The prompt as a byte-stable prefix across users and sentences: the task with its
-    examples, the SITE catalogue (sorted by name), the phrasebook (file order; entries with
-    none of the catalogue's fields left out), the field guide (file order; entries and
-    situations over the catalogue's fields only), then last the caller's own features
-    (``scope != "site"``, sorted by name; empty for most users). Phrasebook, guide and
-    situation entries are filtered against the union of both, so an entry naming a user
-    feature still shows."""
-    infos = list(catalogue)
-    names = {info.name for info in infos}
-    site = sorted((i for i in infos if i.scope == "site"), key=lambda i: i.name)
-    own = sorted((i for i in infos if i.scope != "site"), key=lambda i: i.name)
-    lines = "\n".join(catalogue_line(info) for info in site)
-    phrases = [line for p in phrasebook if (line := phrase_line(p, names)) is not None]
-    out = (
-        f"{TASK}\n{examples_text()}\n"
-        f"Catalogue (name | type | unit | description | values):\n{lines}\n"
-    )
-    if phrases:
-        out += "\nPhrasebook (what the trader says | fields | how to use them):\n"
-        out += "\n".join(phrases) + "\n"
-    if guide is not None:
-        entries = [line for e in guide.fields if (line := guide_line(e, names)) is not None]
-        if entries:
-            out += "\nField guide (field | how to read it | the criterion per intent | caveats):\n"
-            out += "\n".join(entries) + "\n"
-        situations = [
-            line for s in guide.situations if (line := situation_line(s, names)) is not None
-        ]
-        if situations:
-            out += (
-                "\nSituations that fool a threshold (situation | signs | affects | what to do):\n"
-            )
-            out += "\n".join(situations) + "\n"
-    if own:
-        out += "\nYour own features (name | type | unit | description | values):\n"
-        out += "\n".join(catalogue_line(info) for info in own) + "\n"
-    return out
 
 
 INDEX_HEADER = (
@@ -347,16 +292,26 @@ def index_line(info: FeatureInfo) -> str:
 
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 _NULL_RULE = re.compile(r"\b(null|unknown)\b", re.IGNORECASE)
+# A sentence that says how to use the field (a name may be given without its section prefix).
+_HOW_TO = re.compile(
+    r"\b(use|never|do not|don't|soft|hard|score|gate|check|pair|rank)\b", re.IGNORECASE
+)
 
 
 def caveat_sentences(entry: FieldGuideEntry, catalogue: set[str]) -> list[str]:
     """The caveat text a slice keeps, in file order: the first sentence of the first caveat,
-    then every sentence that names a catalogue field (what to check) or states the null rule."""
+    then every sentence that names a catalogue field (what to check), states the null rule or
+    says how to use the field (use, never, soft, hard, score, gate, check, pair, rank)."""
     keep: list[str] = []
     for n, caveat in enumerate(entry.caveats):
         for k, sentence in enumerate(_SENTENCE.split(" ".join(caveat.split()))):
             named = any(m in catalogue for m in FIELD_REF.findall(sentence))
-            wanted = (n == 0 and k == 0) or named or _NULL_RULE.search(sentence)
+            wanted = (
+                (n == 0 and k == 0)
+                or named
+                or _NULL_RULE.search(sentence)
+                or _HOW_TO.search(sentence)
+            )
             if wanted and sentence not in keep:
                 keep.append(sentence)
     return keep
