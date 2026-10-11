@@ -35,7 +35,7 @@ path = "apps/web/.storybook"
 purpose = "Storybook config: the design-system catalogue (main) and the theme/density decorator (preview)"
 
 [[web_dir]]
-path = "apps/web/build"
+path = "apps/web/vite-plugins"
 purpose = "Vite build plugins (graphql-documents: each GraphQL operation ships with the module that writes it, out of the entry bundle)"
 
 [[web_dir]]

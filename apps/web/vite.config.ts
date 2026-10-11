@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 
-import { perModuleDocuments } from './build/graphql-documents.ts';
+import { perModuleDocuments } from './vite-plugins/graphql-documents.ts';
 
 // Unit test files listed as `skipped` in quarantine.json do not run (docs/ci.md "Flaky specs").
 const quarantine = JSON.parse(
@@ -17,6 +17,7 @@ const UNIT_INCLUDE = ['src/**/*.test.{ts,tsx}', 'design-system/**/*.test.{ts,tsx
 const INTEGRATION_INCLUDE = [
   'src/{pages,widgets,features}/**/*.test.{ts,tsx}',
   'scripts/**/*.test.ts',
+  'vite-plugins/**/*.test.ts',
 ];
 const INTEGRATION_TEST_TIMEOUT_MS = 20_000;
 
@@ -98,6 +99,7 @@ export default defineConfig({
       'src/**/*.test.{ts,tsx}',
       'design-system/**/*.test.{ts,tsx}',
       'scripts/**/*.test.ts',
+      'vite-plugins/**/*.test.ts',
       'build/**/*.test.ts',
       'lint-rules/**/*.test.js',
     ],

@@ -348,7 +348,7 @@ hundreds of concurrent requests, no hacks, and no UX trade-off that costs the cu
   typing) rejected.
 - **Web documents ship per module**: write operations with the generated `graphql()` tag as
   before (a template literal without `${}`); at build, the `perModuleDocuments` plugin
-  (`apps/web/build/graphql-documents.ts`) rewrites each call to a pure `new TypedDocumentString(...)` of the
+  (`apps/web/vite-plugins/graphql-documents.ts`) rewrites each call to a pure `new TypedDocumentString(...)` of the
   same text, so a document lives in the chunk of the module that writes it and the generated
   `gql.ts` map of every operation stays out of the entry bundle (the preset's Babel / SWC plugins
   do not run under Vite 8). Keep the literal a plain template without fragments: a `${}`, a non-literal argument or a
