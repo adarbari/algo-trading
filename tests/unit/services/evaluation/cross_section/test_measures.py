@@ -293,3 +293,19 @@ def test_pooling_event_days_keeps_the_hits_per_level_and_the_picks() -> None:
     a, b = costed(date(2026, 1, 5), adv=(1e6,)), costed(date(2026, 1, 6), adv=(2e6,))
     block = pool_stats([a, b])
     assert block.pick_hits_at == (2, 2, 2) and len(block.picks) == 2
+
+
+def test_a_below_outcomes_oriented_mean_moves_the_other_way_with_cost() -> None:
+    """Stored values are ``sign * (gross - cost)``: at a higher cost a ``below`` mean rises, and
+    the break-even read from any level is the same gross in basis points."""
+    day = costed(date(2026, 1, 5))
+    sl = [Slice("all", "all", lambda _: True)]
+    base = slice_measures([day], sl)
+    rows = {m.slice_value: m for m in cost_measures([day], sl, base, CostGrid(DOC_BP, GRID, -1.0))}
+    own = rows["all:20"].mean_excess_picks
+    assert own is not None
+    assert rows["all:50"].mean_excess_picks == pytest.approx(own + 30 / 1e4)  # sign * (20 - 50)
+    assert rows["all:0"].mean_excess_picks == pytest.approx(own - 20 / 1e4)
+    for bp in (0, 20, 50):
+        got = break_even_cost(rows[f"all:{bp}"].mean_excess_picks, bp, -1.0)
+        assert got == pytest.approx(break_even_cost(own, DOC_BP, -1.0))

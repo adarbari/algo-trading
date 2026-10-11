@@ -3,10 +3,13 @@ cost per period, read from the stored ``cost`` rows of the official run at the v
 an outcome that is not a return says so; a hidden copy shows only its in-sample period and the
 withheld figures are nowhere."""
 
+from dataclasses import replace
 from typing import Any
 
 import pytest
 
+from algotrade.config.edges.document import Outcome
+from algotrade.quant.edges.statistics import break_even_cost
 from algotrade.services.read.edge_evidence import capacity, costs
 from algotrade.services.read.edge_evidence.rows import load_basis_rows
 from algotrade.services.read.evaluation.edges import load_edge
@@ -92,14 +95,29 @@ def test_the_documents_own_cost_is_marked_and_break_even_is_exact_from_any_level
     # whichever level it is read from, the break-even is the gross mean in basis points
     for bp in (0, 15, 20, 50):
         row_ = next(r for r in basis.rows if r.slice_value == f"all:{bp}")
-        assert costs.break_even_cost(row_.mean_excess_picks, bp) == pytest.approx(GROSS * 1e4)
+        assert break_even_cost(row_.mean_excess_picks, bp) == pytest.approx(GROSS * 1e4)
 
 
-def test_an_outcome_that_is_not_a_return_has_no_cost_rows_and_says_so() -> None:
-    plain = [row("momo", "in_sample", 0.5, FROZEN, pick_adv_known=10, pick_adv_median=1e7)]
-    ctx, edge = site_world(plain)
-    found = costs.load_edge_costs(ctx, edge)
-    assert found.state == costs.NOT_A_COST_OUTCOME and found.levels == ()
+def test_an_outcome_that_is_not_a_return_says_so_from_the_document_whatever_rows_exist() -> None:
+    ctx, edge = site_world(cost_rows("all"))  # even a stray cost row does not make it a return
+    assert edge.settings is not None and edge.settings.cost_applies  # excess_return: a return
+    other = replace(edge, settings=replace(edge.settings, cost_applies=False))
+    found = costs.load_edge_costs(ctx, other)
+    assert found.state == costs.NOT_A_COST_OUTCOME and found.levels == () and found.periods == ()
+
+
+def test_the_documents_outcome_decides_whether_a_cost_applies_and_its_orientation() -> None:
+    plain = Outcome("excess_return", (20,), "SPY")
+    below = Outcome("hit_target", (20,), "SPY", measure="excess_return", direction="below")
+    ratio = Outcome("hit_target", (20,), "none", measure="realised_to_implied_vol")
+    assert (plain.is_return, plain.sign, below.is_return, below.sign) == (True, 1.0, True, -1.0)
+    assert not ratio.is_return and not Outcome("expires_otm", (20,), "none").is_return
+
+
+def test_break_even_undoes_a_below_outcomes_orientation() -> None:
+    """Stored mean = sign * (gross - cost): gross 1.25%, 20 bp cost, direction below."""
+    assert break_even_cost(-(0.0125 - 0.0020), 20, -1.0) == pytest.approx(125.0)
+    assert break_even_cost(0.0125 - 0.0020, 20) == pytest.approx(125.0)
 
 
 def test_a_run_from_before_the_cost_rows_is_not_stored_never_not_a_cost_outcome() -> None:

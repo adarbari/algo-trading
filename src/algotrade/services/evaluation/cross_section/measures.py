@@ -318,6 +318,7 @@ class CostGrid:
 
     document_bp: float | None
     levels: tuple[float, ...]
+    sign: float = 1.0  # the outcome's orientation: the stored values are ``sign * (gross - cost)``
 
     @property
     def own(self) -> float:
@@ -335,10 +336,10 @@ def _level_hits(rows: Sequence[SessionStat], index: int) -> tuple[int, int] | No
 def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) -> list[SliceMeasure]:
     """The cost rows of period ``m`` (ADR 0064 decision 5): per cost level, the document's own
     and each of the grid, the hit rate, base rate, lift and mean excess return net of that cost.
-    The means are exact: cost is linear in the mean, so the gross mean is the stored net one plus
-    the document's cost. The decile spread is cost-invariant (both tenths pay the same cost), so
-    a cost row leaves it unset and the reader serves the period's own. Capacity is not a cost
-    figure: unset here."""
+    The means are exact: cost is linear in the mean (the stored values are
+    ``sign * (gross - cost)``). The decile spread is cost-invariant (both tenths pay the same
+    cost), so a cost row leaves it unset and the reader serves the period's own. Capacity is not
+    a cost figure: unset here."""
     measured = [r for r in rows if not r.excluded_coverage]
     found: dict[float, tuple[int, int]] = {costs.own: (m.hits, m.base_hits)}
     for index, bp in enumerate(costs.levels):
@@ -374,16 +375,16 @@ def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) ->
                 hit_rate=hit_rate,
                 base_rate=base_rate,
                 lift=lift(hit_rate, base_rate),
-                mean_excess_picks=_net(m.mean_excess_picks, costs.own, bp),
-                bh_mean=_net(m.bh_mean, costs.own, bp),
+                mean_excess_picks=_net(m.mean_excess_picks, costs.own, bp, costs.sign),
+                bh_mean=_net(m.bh_mean, costs.own, bp, costs.sign),
             )
         )
     return out
 
 
-def _net(mean: float | None, own_bp: float, bp: float) -> float | None:
-    """``mean`` (net of ``own_bp``) as it would be net of ``bp``."""
-    return None if mean is None else mean + (own_bp - bp) / 1e4
+def _net(mean: float | None, own_bp: float, bp: float, sign: float) -> float | None:
+    """``mean`` (oriented, net of ``own_bp``) as it would be net of ``bp``."""
+    return None if mean is None else mean + sign * (own_bp - bp) / 1e4
 
 
 def slice_measures(

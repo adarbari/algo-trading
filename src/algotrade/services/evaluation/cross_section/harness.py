@@ -461,7 +461,7 @@ def evaluate_edge(
                 exploratory,
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
-                CostGrid(scope.edge.outcome.cost_bps, spec.costs)
+                CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
                 if is_return(scope.edge)
                 else None,
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key

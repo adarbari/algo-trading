@@ -12,6 +12,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import DataValidationError
 from algotrade.data import dates_digest
+from algotrade.quant.edges.statistics import break_even_cost
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
 from algotrade.services.evaluation.cross_section.legs.rows import (
     decode_leg,
@@ -462,7 +463,7 @@ def test_a_changed_capacity_floor_recomputes_no_leg() -> None:
 
 
 def test_a_cost_row_is_written_by_a_full_and_an_incremental_run_alike() -> None:
-    w = build_world()
+    w = with_adv(build_world())  # the capacity columns go through the leg round trip too
     first = run_costs(w)
     write_edge_eval(w.results, first, NOW)
     again = run_costs(w)
@@ -475,3 +476,18 @@ def test_a_cost_row_is_written_by_a_full_and_an_incremental_run_alike() -> None:
 
     assert (frame(first)["slice_kind"] == "cost").any()
     pd.testing.assert_frame_equal(frame(first), frame(again), check_exact=True)
+    assert frame(first)["pick_adv_known"].iloc[0] > 0  # stored ADV is in the compared frames
+
+
+def test_a_below_edges_cost_rows_follow_its_orientation_and_break_even_is_one_gross() -> None:
+    outcome = {
+        "kind": "hit_target", "measure": "excess_return", "direction": "below", "target": 0.0,
+        "horizon_sessions": [2], "benchmark": "SPY", "start_offset_sessions": 1, "cost_bps": 20,
+    }  # fmt: skip
+    ev = run_costs(build_world(), outcome=outcome)
+    rows = costed(ev)
+    assert not rows.empty
+    means = [rows.loc[f"all:{bp}", "mean_excess_picks"] for bp in (0, 15, 20, 30, 50)]
+    assert means == sorted(means)  # sign * (gross - cost): a higher cost raises a below mean
+    found = {break_even_cost(m, bp, -1.0) for m, bp in zip(means, (0, 15, 20, 30, 50), strict=True)}
+    assert max(found) - min(found) < 1e-6

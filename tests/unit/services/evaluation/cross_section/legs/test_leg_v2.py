@@ -145,7 +145,9 @@ def test_a_changed_cost_grid_is_a_new_leg_key(stored: World) -> None:
 
 def test_an_outcome_that_is_not_a_return_counts_no_cost_levels() -> None:
     otm = SimpleNamespace(
-        outcome=SimpleNamespace(kind="hit_target", measure="realised_to_implied_vol")
+        outcome=SimpleNamespace(
+            kind="hit_target", measure="realised_to_implied_vol", is_return=False
+        )
     )
     scope = SimpleNamespace(edge=otm, key="main")
     found = measuring._hits_at(

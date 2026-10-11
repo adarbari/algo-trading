@@ -107,7 +107,11 @@ def _level(period: str, bp: float, row: EdgeRow, assumed: float) -> CostLevel:
 
 
 def _period(
-    period: str, found: Sequence[tuple[float, EdgeRow]], rows: Sequence[EdgeRow], hidden: bool
+    period: str,
+    found: Sequence[tuple[float, EdgeRow]],
+    rows: Sequence[EdgeRow],
+    hidden: bool,
+    sign: float,
 ) -> CostPeriod:
     if hidden and period != IN_SAMPLE:
         return CostPeriod(period, OOS_HIDDEN, None, None)
@@ -117,15 +121,19 @@ def _period(
     spread = next(
         (r.decile_spread for r in rows if STORED_PERIOD.get(r.slice_kind) == period), None
     )
-    return CostPeriod(period, MEASURED, break_even_cost(row.mean_excess_picks, bp), spread)
+    return CostPeriod(period, MEASURED, break_even_cost(row.mean_excess_picks, bp, sign), spread)
 
 
-def costs_of(basis: BasisRows, assumed_bp: float | None) -> EdgeCosts:
+def costs_of(
+    basis: BasisRows, assumed_bp: float | None, cost_applies: bool = True, sign: float = 1.0
+) -> EdgeCosts:
     """The cost sensitivity of ``basis`` (None ``assumed_bp``: the document sets no cost, 0).
-    With no cost row the state is ``not_a_cost_outcome`` when the run stored its capacity columns
-    (the same run writes both: it wrote no cost row because the outcome is not a return), else
-    ``not_stored`` (a run from before the columns, or no rows)."""
+    ``cost_applies``: the edge document's outcome is a return (``Outcome.is_return``); when it is
+    not, the state is ``not_a_cost_outcome`` whatever rows exist. ``sign``: the outcome's
+    orientation (``Outcome.sign``), which the break-even undoes."""
     assumed = assumed_bp or 0.0
+    if not cost_applies:
+        return EdgeCosts(NOT_A_COST_OUTCOME, basis.variant, basis.horizon, assumed, (), ())
     plain = [r for r in basis.rows if r.slice_kind != runs.COST]
     cost_rows = [
         (split, r)
@@ -137,13 +145,8 @@ def costs_of(basis: BasisRows, assumed_bp: float | None) -> EdgeCosts:
         for p in PERIODS
     }
     levels = tuple(_level(p, bp, r, assumed) for p in PERIODS for bp, r in by_period[p])
-    periods = tuple(_period(p, by_period[p], plain, basis.hidden) for p in PERIODS)
-    if cost_rows:
-        state = MEASURED
-    elif any(r.pick_adv_known is not None for r in plain):  # written by a run that has cost rows
-        state = NOT_A_COST_OUTCOME
-    else:
-        state = NOT_STORED
+    periods = tuple(_period(p, by_period[p], plain, basis.hidden, sign) for p in PERIODS)
+    state = MEASURED if cost_rows else NOT_STORED  # a run from before the cost rows, or no rows
     return EdgeCosts(state, basis.variant, basis.horizon, assumed, levels, periods)
 
 
@@ -152,5 +155,11 @@ def load_edge_costs(
 ) -> EdgeCosts:
     """The cost sensitivity of ``edge``'s official result at the verdict's basis (or the screen
     and holding period named), against the document's own cost."""
-    cost = edge.settings.cost_bps if edge.settings is not None else None
-    return costs_of(load_basis_rows(ctx, edge, variant, horizon), cost)
+    st = edge.settings
+    cost = st.cost_bps if st is not None else None
+    return costs_of(
+        load_basis_rows(ctx, edge, variant, horizon),
+        cost,
+        st.cost_applies if st is not None else True,
+        st.outcome_sign if st is not None else 1.0,
+    )
