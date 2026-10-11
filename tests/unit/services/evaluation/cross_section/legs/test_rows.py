@@ -37,9 +37,9 @@ from algotrade.services.evaluation.cross_section.measures import Pick, SessionSt
 from algotrade.services.evaluation.cross_section.random_picks import RandomStat
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.edge_schemas import EDGE_LEGS
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import EDGE_LEGS
 
 D = date(2026, 9, 1)
 S = date(2026, 9, 2)

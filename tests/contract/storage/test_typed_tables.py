@@ -19,7 +19,8 @@ from algotrade.storage.backends.arrow import ROW_GROUP_SIZE, TABLE_KEY, VERSION_
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.interfaces import Backend
-from algotrade.storage.tables.schemas import KNOWN, SCHEMA_VERSION, Column, TableSpec, spec_for
+from algotrade.storage.tables.schemas import KNOWN, spec_for
+from algotrade.storage.tables.spec import SCHEMA_VERSION, Column, TableSpec
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
 

@@ -2,7 +2,7 @@
 frozen split, an exploratory or null-split run is never canonical, no such run is NOT_RUN with
 the reason, and a run's rows are its own even when another run shares the partition."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -12,6 +12,7 @@ from algotrade.services.read.evaluation.runs import (
     load_edge_runs,
     load_run_draws,
     load_run_rows,
+    load_run_series,
 )
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -19,6 +20,7 @@ from algotrade.storage.runs import RunStatus
 from tests.unit.services.read.evaluation.conftest import (
     FROZEN,
     row,
+    series_row,
     session_ctx,
     stores,
     write_run,
@@ -188,3 +190,30 @@ def test_a_legacy_run_at_another_split_is_not_canonical(backend: MemoryBackend) 
     edge = load_edge(ctx, "drift")
     assert edge is not None
     assert load_canonical_run(ctx, edge).run is None
+
+
+def test_a_runs_series_is_its_own_rows_in_decision_order(backend: MemoryBackend) -> None:
+    days = [date(2026, 3, 2) + timedelta(days=7 * i) for i in range(4)]
+    write_run(backend, "r1", FROZEN, 0.6, series=[series_row(d, FROZEN) for d in reversed(days)])
+    write_run(backend, "r2", FROZEN, 0.7, minutes=10, series=[series_row(days[0], FROZEN)])
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    first = next(r for r in load_edge_runs(ctx, edge) if r.run_id == "r1")
+    found = load_run_series(ctx, first)
+    assert [r.decision_session for r in found] == days
+    top = found[0]
+    assert (top.variant, top.unit, top.status, top.picks, top.before_split) == (
+        "momo", "excess_return", "measured", 5, True,
+    )  # fmt: skip
+    assert top.exit_session == days[0] + timedelta(days=29) and top.pick_mean == 0.02
+    assert top.lost_table is None and top.decile_means == ()
+
+
+def test_a_run_from_before_the_series_has_none(backend: MemoryBackend) -> None:
+    write_run(backend, "old", FROZEN, 0.6)
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    (run,) = load_edge_runs(ctx, edge)
+    assert load_run_series(ctx, run) == ()

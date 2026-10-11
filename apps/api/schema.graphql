@@ -232,6 +232,16 @@ scalar Date
 """Date with time (isoformat)"""
 scalar DateTime
 
+"""
+One bar of the decay: `period` (published, in_sample, out_of_sample), its `value` (null unless `state` is measured) over `n` (the trades, or the decile sessions of a decile spread; null for the paper's) and the `state` that says why a value is missing (not_stored, not_comparable: another holding period than the paper's, oos_hidden, not_given: the document publishes no figure)
+"""
+type DecayBar {
+  period: String!
+  value: Float
+  n: Int
+  state: String!
+}
+
 """How many rows of a run got one decision"""
 type DecisionCount {
   decision: String!
@@ -315,6 +325,17 @@ type EdgeCompare {
 }
 
 """
+The decay of one statistic: the paper's figure (`published`) against the harness's in-sample and out-of-sample ones (`bars`, in that order after the paper's) at the verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). `published` is null when the edge's document gives no figure (the paper's bar is then not_given and `measure` is lift_pts)
+"""
+type EdgeDecay {
+  measure: String!
+  unit: String!
+  published: EdgePublished
+  basisHorizon: Int!
+  bars: [DecayBar!]!
+}
+
+"""
 How the edge is defined, as sentences: `picks` (when it fires, how many), `trade` (entry, holding periods, costs, what a win is), `compare` (universe and baselines) and `test` (where the out-of-sample period starts)
 """
 type EdgeDefinition {
@@ -344,6 +365,32 @@ type EdgeEvidence {
 }
 
 """
+The Sharpe ratio after the multiple-testing haircut (Harvey and Liu): the stored `sharpe` (per trade, not annualised) over `sessions` trades is `haircutSharpe` once `trials` variants tried are counted, `cut` (0 to 1) the share lost; `method` names the adjustment (bonferroni: Holm's value for the best of the trials) and `summary` is the sentence. Null: not stored, or the Sharpe ratio is not above zero
+"""
+type EdgeHaircut {
+  sharpe: Float!
+  haircutSharpe: Float!
+  cut: Float!
+  trials: Int!
+  sessions: Int!
+  method: String!
+  summary: String!
+}
+
+"""
+What would change the verdict: `criterion` (the first test not passed; `level`: the verdict it gates) in `sentence`. For a count of trades (`trades`, `works_trades`) `have` of `needed` and `remaining` to come, and `projectionState` (why there is no date: not_stored, unprojectable, oos_hidden; projected and beyond_projection once a run stores the schedule's exits). Null for the other tests: a t statistic is not projected
+"""
+type EdgeOutlook {
+  criterion: String!
+  level: String!
+  sentence: String!
+  have: Int
+  needed: Int
+  remaining: Int
+  projectionState: String
+}
+
+"""
 One edge's paper record as the session knew it: the live record, the trades (newest signal first) and, for a trial, the forward test
 """
 type EdgePaper {
@@ -359,6 +406,17 @@ One of the user's own edge files that does not load (or loads only in part), wit
 type EdgeProblem {
   edgeId: String!
   reason: String!
+}
+
+"""
+The figure the literature reports for the edge: `measure` (mean_excess, decile_spread or lift_pts) equal to `value` over `horizonSessions`, from `source` over `sample` years (null: not stated)
+"""
+type EdgePublished {
+  measure: String!
+  value: Float!
+  horizonSessions: Int!
+  source: EdgeSource!
+  sample: Int
 }
 
 """
@@ -437,7 +495,7 @@ type EdgeSource {
 }
 
 """
-An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests; `columns` the basis's figures in-sample, out-of-sample and over all (empty: no result yet); `evidence` the trades against what the verdict needs
+An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests; `columns` the basis's figures in-sample, out-of-sample and over all (empty: no result yet); `evidence` the trades against what the verdict needs; `haircut` the basis's Sharpe ratio after the variants tried; `decay` the paper's figure against the in- and out-of-sample ones
 """
 type EdgeVerdict {
   verdict: String!
@@ -463,6 +521,8 @@ type EdgeVerdict {
   robustness: Robustness
   columns: [VerdictColumn!]!
   evidence: EvidenceProgress
+  haircut: EdgeHaircut
+  decay: EdgeDecay
 }
 
 """
@@ -550,6 +610,7 @@ type EvidenceProgress {
   wholeNeeded: Int!
   reached: Boolean!
   checks: [VerdictCriterion!]!
+  outlook: EdgeOutlook
 }
 
 """

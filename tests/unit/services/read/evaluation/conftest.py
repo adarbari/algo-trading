@@ -57,6 +57,20 @@ def row(
     return {**out, **changes}
 
 
+def series_row(day: date, split: date | None, **changes: Any) -> dict[str, Any]:
+    """One ``edge_series`` row of ``momo`` at decision session ``day`` (a 20-session window)."""
+    out = {
+        "edge_id": "drift", "user_id": "site", "variant": "momo", "role": "screener",
+        "edge_variant": None, "horizon_sessions": 20, "range_from": START, "range_to": END,
+        "split_from": split, "decision_session": day, "entry_session": day + timedelta(days=1),
+        "exit_session": day + timedelta(days=29), "block_days": 1,
+        "before_split": split is not None and day < split, "regime": "CALM",
+        "status": "measured", "unit": "excess_return", "picks": 5, "eligible": 20,
+        "pick_mean": 0.02, "base_mean": 0.01,
+    }  # fmt: skip
+    return {**out, **changes}
+
+
 def write_run(
     backend: MemoryBackend,
     run_id: str,
@@ -69,6 +83,7 @@ def write_run(
     finished_minutes: int | None = None,
     extra: list[dict[str, Any]] | None = None,
     trigger: str | None = None,
+    series: list[dict[str, Any]] | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T."""
@@ -93,6 +108,9 @@ def write_run(
     record = RunRecord(run_id, f"edge-eval:drift:{owner}", END, at)
     with writer.publishing(run_id, done):
         writer.write_result("edge_eval", END, run_id, frame, pending=True)
+        if series:
+            frame = stamped(series, END, run_id, at, "edge-eval")
+            writer.write_result("edge_series", END, run_id, frame, pending=True)
         writer.save_run(record.finish(done, complete=status is RunStatus.COMPLETE, stats=stats))
     if status not in (RunStatus.COMPLETE, RunStatus.PARTIAL):
         record.status = status
