@@ -64,9 +64,11 @@ from algotrade.services.evaluation.cross_section.detail.licences import (
 )
 from algotrade.services.evaluation.cross_section.detail.windows import (
     SeriesFacts,
+    counts_wins,
     plan_exits,
     projection_count,
     series_facts,
+    unit_of,
 )
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.historical import (
@@ -183,6 +185,16 @@ class VariantResult:
         """The trial's: the strictest of its implied-vol field, screen and universe features."""
         return None if self.licences is None else self.licences.trial
 
+    @property
+    def unit(self) -> str | None:
+        """What the values measure (``series.unit``); None when no series was built."""
+        return None if self.series is None else self.series.unit
+
+    @property
+    def wins(self) -> bool:
+        """The trial statistics read the excess wins: the values are not returns."""
+        return counts_wins(self.unit)
+
     lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
     report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
     series: SeriesFacts | None = None  # the windows of ``stats``, the unit, the projection (0064)
@@ -197,11 +209,13 @@ def _slice_rows(
     frozen_from: date | None,
     costs: CostGrid | None,
     adv_floor: float,
+    wins: bool = False,
 ) -> tuple[tuple[SliceMeasure, ...], tuple[SliceMeasure, ...]]:
     """One variant's slice rows and, for a return outcome (``costs``), its cost rows (ADR 0064
-    decision 5: none for an outcome that is not a return)."""
+    decision 5: none for an outcome that is not a return). ``wins``: the Sharpe ratio is of the
+    excess wins (``measures.trial_value``)."""
     slices = edge_slices(stats, split, exploratory)
-    measures = slice_measures(stats, slices, model, frozen_from, adv_floor)
+    measures = slice_measures(stats, slices, model, frozen_from, adv_floor, wins)
     costed = cost_measures(stats, slices, measures, costs) if costs is not None else []
     return tuple(measures), tuple(costed)
 
@@ -465,6 +479,7 @@ def evaluate_edge(
                 if is_return(scope.edge)
                 else None,
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
+                counts_wins(unit_of(scope.edge)),
             )
             results.append(
                 VariantResult(

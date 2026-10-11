@@ -2,6 +2,7 @@
 
 import math
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,7 +13,7 @@ from algotrade.services.read.evaluation.evidence import (
     PROJECTED,
     UNPROJECTABLE,
 )
-from algotrade.services.read.evaluation.verdict import EdgeFacts, judge
+from algotrade.services.read.evaluation.verdict import EdgeFacts, counts_wins, judge
 from tests.unit.services.read.evaluation.test_verdict import SPLIT, T, draws, result, verdict
 
 
@@ -151,7 +152,26 @@ def test_the_haircut_is_the_stored_sharpe_after_the_variants_tried() -> None:
     words = (
         f"falls to {h.haircut_sharpe:.2f} after 5 variants tried, a haircut of {h.cut * 100:.0f}%."
     )
-    assert h.summary == f"A Sharpe ratio of 0.40 per trade {words}"
+    assert h.summary == f"A Sharpe ratio of 0.40 per decision session {words}"
+
+
+def test_a_win_rate_outcomes_haircut_says_its_sharpe_is_of_the_win_rate_above_the_base() -> None:
+    """ADR 0064 amendment 2026-10-11: a cushion or ratio outcome's stored Sharpe ratio is of the
+    session's excess wins, per decision session, and the sentence says which series it is."""
+    rows = result(whole={"sessions": 70, "sharpe": 0.4, "trials": 5})
+    h = judge("e", rows, SPLIT, T, facts=EdgeFacts(wins=True)).haircut
+    assert h is not None and h.summary.startswith(
+        "A Sharpe ratio of 0.40 per decision session, of the win rate above the base rate, falls to"
+    )
+    assert "per trade" not in h.summary
+
+
+@pytest.mark.parametrize(("applies", "wins"), [(True, False), (False, True), (None, False)])
+def test_an_edge_counts_wins_when_its_outcome_is_not_a_return(
+    applies: bool | None, wins: bool
+) -> None:
+    settings = None if applies is None else SimpleNamespace(cost_applies=applies)
+    assert counts_wins(SimpleNamespace(settings=settings)) is wins  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("over", [{"sharpe": None}, {"trials": None}, {"sharpe": -0.1}])

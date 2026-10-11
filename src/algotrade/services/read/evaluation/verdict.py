@@ -391,6 +391,14 @@ class EdgeFacts:
     schedule: str | None = None
     hidden: bool = False
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
+    wins: bool = False  # the outcome is not a return: the Sharpe ratio is of the excess wins
+
+
+def counts_wins(edge: Edge) -> bool:
+    """Whether the edge's trial statistics (Sharpe, deflated Sharpe, PBO, haircut) are of the
+    session's excess wins: its outcome is not a return (a cushion or a ratio; ADR 0064 amendment
+    2026-10-11). An edge with no resolved settings is read as a return."""
+    return edge.settings is not None and not edge.settings.cost_applies
 
 
 def projection_of(whole: EdgeRow) -> Projection:
@@ -409,10 +417,10 @@ def _haircut(c: _Candidate, facts: EdgeFacts) -> EdgeHaircut | None:
     (``measured``); the stored count when the run has no series."""
     whole = c.whole
     if whole.sharpe is None or facts.measured is None:
-        return load_haircut(whole.sharpe, whole.sessions, whole.trials)
+        return load_haircut(whole.sharpe, whole.sessions, whole.trials, facts.wins)
     counted = facts.measured()
     n = whole.sessions if counted is None else counted.get((c.variant, c.horizon), 0)
-    return load_haircut(whole.sharpe, n, whole.trials)
+    return load_haircut(whole.sharpe, n, whole.trials, facts.wins)
 
 
 def _judge_one(
@@ -684,5 +692,6 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             edge.published,
             edge.schedule,
             measured=lambda: runs.load_measured_sessions(ctx, run),
+            wins=counts_wins(edge),
         ),
     )

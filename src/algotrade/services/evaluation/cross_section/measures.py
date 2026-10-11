@@ -7,6 +7,10 @@ number of independent ``sessions`` beside every number (an event schedule's bloc
 is one session: ``pool_stats``). Values are *oriented* (higher is
 better: ``hit.apply_outcome``): the returns of an ``excess_return`` edge, the negated ratio of
 a ``below`` one. Every count is explicit; nothing is dropped silently by a statistic.
+
+The trial statistics (Sharpe, deflated Sharpe, PBO) read one value per session: the picks' mean
+for a return outcome, the session's excess wins (win rate minus base rate) for an outcome whose
+value is not a return, a cushion or a ratio (ADR 0064 amendment 2026-10-11: ``trial_value``).
 """
 
 from collections.abc import Callable, Sequence
@@ -107,6 +111,21 @@ class SessionStat:
     def pick_mean(self) -> float | None:
         return float(np.mean(self.pick_values)) if self.pick_values else None
 
+    @property
+    def excess_wins(self) -> float | None:
+        """The session's win rate minus its base rate (fractions); None without a counted pick."""
+        if not self.pick_values:
+            return None
+        return self.pick_hits / len(self.pick_values) - self.base_hits / self.eligible
+
+
+def trial_value(stat: SessionStat, wins: bool) -> float | None:
+    """The one value of a session the trial statistics read (ADR 0064 amendment 2026-10-11): the
+    excess wins when ``wins`` (the outcome is not a return: a cushion is not P&L, and what such an
+    edge claims is that its picks win more often than the names they were picked from), else the
+    picks' mean return."""
+    return stat.excess_wins if wins else stat.pick_mean
+
 
 def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
     """The block of event days (one decision session each) as one statistic at its first
@@ -189,7 +208,7 @@ class SliceMeasure:
     decile_t: float | None
     decile_sessions: int
     effect_size: float | None
-    sharpe: float | None  # of the per-session mean of the picks, not annualised
+    sharpe: float | None  # per decision session, not annualised, of ``trial_value``
     unscored: int
     excluded_score_coverage: int  # sessions with picks counted but no deciles: too few scores
     excluded_unclosed: int
@@ -254,6 +273,7 @@ def _measure(
     kept: Sequence[SessionStat],
     in_sample: bool = False,
     adv_floor: float | None = None,
+    wins: bool = False,
 ) -> SliceMeasure:
     rows = [r for r in kept if not r.excluded_coverage]
     adv_median, adv_known, adv_low = _capacity(rows, adv_floor)
@@ -268,7 +288,7 @@ def _measure(
     spreads = [r.spread for r in rows if r.spread is not None]
     tops = [r.top_decile for r in rows if r.top_decile is not None]
     spread_mean, _, spread_t, spread_n = spread_summary(spreads)
-    means = [m for m in (r.pick_mean for r in rows) if m is not None]
+    means = [m for m in (trial_value(r, wins) for r in rows) if m is not None]
     return SliceMeasure(
         slice_kind=sl.kind,
         slice_value=sl.value,
@@ -394,16 +414,18 @@ def slice_measures(
     model: bool = False,
     frozen_from: date | None = None,
     adv_floor: float | None = None,
+    wins: bool = False,
 ) -> list[SliceMeasure]:
     """One ``SliceMeasure`` per slice, in the slices' order, over the stats it keeps. A ``model``
     screener's score was fitted on sessions before ``frozen_from`` (a fitness test): a slice that
     keeps one of them is IN_SAMPLE, whatever its kind (no ``frozen_from``: every slice is).
-    ``adv_floor``: the site's capacity floor for the capacity columns (none: not measured)."""
+    ``adv_floor``: the site's capacity floor for the capacity columns (none: not measured);
+    ``wins``: the outcome is not a return, so the Sharpe ratio is of the excess wins."""
     out = []
     for sl in slices:
         kept = [r for r in rows if sl.keep(r)]
         seen = model and (frozen_from is None or any(r.session < frozen_from for r in kept))
-        out.append(_measure(sl, kept, seen, adv_floor))
+        out.append(_measure(sl, kept, seen, adv_floor, wins))
     return out
 
 
@@ -490,12 +512,22 @@ def _since(day: date, stat: SessionStat) -> bool:
     return stat.session >= day
 
 
+SCREENER = "screener"  # the role of a trial; a baseline is a comparison, never a trial
+
+
 class Scored(Protocol):
     """What the trial statistics read of one variant's result at one horizon (the harness's
-    ``VariantResult``)."""
+    ``VariantResult``): ``unit`` what its values measure, ``wins`` whether the trial statistics
+    read the excess wins (``trial_value``)."""
 
     @property
     def horizon(self) -> int: ...
+    @property
+    def role(self) -> str: ...
+    @property
+    def unit(self) -> str | None: ...
+    @property
+    def wins(self) -> bool: ...
     @property
     def stats(self) -> tuple["SessionStat", ...]: ...
     @property
@@ -503,45 +535,48 @@ class Scored(Protocol):
 
 
 def deflate[R: Scored](results: list[R], trials: int) -> list[R]:
-    """The deflated Sharpe ratio, the trial count and PBO on each variant's "all" rows. The
-    Sharpe variance across trials is taken within a horizon (windows of other lengths are not
-    the same kind of trial)."""
-    by_horizon: dict[int, list[R]] = {}
+    """The deflated Sharpe ratio, the trial count and PBO on each variant's "all" rows. The peers
+    whose Sharpe variance and PBO they read are the screeners at the same horizon whose values
+    are in the same unit (ADR 0064 amendment 2026-10-11): a window of another length, a value in
+    another unit or a baseline (a comparison, not a trial of the hypothesis) is not the same kind
+    of trial. A baseline is deflated against the screeners of its horizon and unit."""
+    groups: dict[tuple[int, str | None], list[R]] = {}
     for r in results:
-        by_horizon.setdefault(r.horizon, []).append(r)
+        groups.setdefault((r.horizon, r.unit), []).append(r)
     variance, overfit = {}, {}
-    for horizon, peers in by_horizon.items():
+    for key, members in groups.items():
+        peers = [p for p in members if p.role == SCREENER]
         sharpes = [p.measures[0].sharpe for p in peers if p.measures[0].sharpe is not None]
-        variance[horizon] = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
-        overfit[horizon] = pbo(peers)
+        variance[key] = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
+        overfit[key] = pbo(peers)
     out = []
     for r in results:
-        means = [m for m in (s.pick_mean for s in r.stats) if m is not None]
-        dsr = deflated_sharpe(means, trials, variance[r.horizon]) if means else None
-        deflated = replace(
-            r.measures[0], deflated_sharpe=dsr, trials=trials, pbo=overfit[r.horizon]
-        )
+        key = (r.horizon, r.unit)
+        values = [v for v in (trial_value(s, r.wins) for s in r.stats) if v is not None]
+        dsr = deflated_sharpe(values, trials, variance[key]) if values else None
+        deflated = replace(r.measures[0], deflated_sharpe=dsr, trials=trials, pbo=overfit[key])
         out.append(replace(r, measures=(deflated, *r.measures[1:])))  # type: ignore[type-var]
     return out
 
 
 def pbo(peers: Sequence[Scored]) -> float | None:
     """PBO over the sessions every variant held something at: a session where one held nothing
-    is left out, never filled in."""
+    is left out, never filled in. The peers share a unit, so one reads the series all do."""
     if len(peers) < 2:
         return None
     days = sorted({s.session for p in peers for s in p.stats})
-    means = [_means(p) for p in peers]
+    means = [_values(p) for p in peers]
     matrix = np.array([[m.get(d, float("nan")) for m in means] for d in days], dtype=np.float64)
     matrix = matrix.reshape(len(days), len(peers))
     return pbo_cscv(matrix[~np.isnan(matrix).any(axis=1)], PBO_SPLITS)
 
 
-def _means(result: Scored) -> dict[date, float]:
-    """A variant's pick mean per session it held something at (the first stat of a session
-    with a mean wins)."""
-    means: dict[date, float] = {}
+def _values(result: Scored) -> dict[date, float]:
+    """A variant's ``trial_value`` per session it held something at (the first stat of a
+    session with a value wins)."""
+    values: dict[date, float] = {}
     for s in result.stats:
-        if s.pick_mean is not None:
-            means.setdefault(s.session, s.pick_mean)
-    return means
+        value = trial_value(s, result.wins)
+        if value is not None:
+            values.setdefault(s.session, value)
+    return values

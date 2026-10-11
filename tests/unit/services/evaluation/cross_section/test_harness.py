@@ -217,7 +217,7 @@ def test_baselines_are_variants_and_probability_of_overfitting_needs_enough_sess
     assert ev.trials == 2
     best, worst = (r.measures[0] for r in ev.results)
     assert best.hit_rate == 1.0 and worst.hit_rate == 0.0
-    assert best.pbo == worst.pbo is not None  # one number per edge and horizon
+    assert best.pbo is None and worst.pbo is None  # a baseline is not a PBO peer
     assert best.deflated_sharpe is not None
 
 

@@ -128,6 +128,27 @@ change). With no cutoff the live state is not judged: `EdgeLiveState.state = not
 ("not yet settled for this session", Guide term `live_state`), and no later settlement is read for
 it. The nightly `edge-signals` step runs before its session completes, so it reads as of now.
 
+### Amendment (2026-10-11): trial statistics of an outcome that is not a return
+The Sharpe ratio, the deflated Sharpe, PBO's per-session series and the haircut (decision 8) read
+one value per decision session (`measures.trial_value`). For a return outcome (`excess_return`,
+`return`) it is the picks' mean, as before. For an outcome whose oriented value is not a return
+(`cushion`: `expires_otm`; `ratio`: a `hit_target` on a vol ratio) it is the session's EXCESS WINS:
+the picks' win rate minus the session's base rate (`pick_hits / picks - base_hits / eligible`),
+never the value itself. Why: a cushion is a distance to a strike, not P&L, so its mean over its
+spread is no Sharpe ratio of anything a trader earns; it is large and steady (vrp_short_premium:
+1.52 on 33 sessions), so Bonferroni over 126 trials cut nothing and, beside other-unit peers, the
+deflated Sharpe fell to about 1e-131. What such an edge claims is that its picks win more often
+than the names they were picked from, and the excess wins is that claim per session (the evidence
+series already values these windows the same way). The peers of the deflated Sharpe's variance
+and of PBO are the screeners at the same horizon whose values are in the same unit
+(`deflate`): a baseline is a comparison, not a trial of the hypothesis, and a variant in another
+unit is a different scale; a baseline is still deflated against those screeners. The verdict's
+thresholds are unchanged: the deflated Sharpe and PBO are probabilities, free of the series'
+scale. The Sharpe ratio is per decision session, not per trade and not annualised. Legs already
+hold every session's hits and base hits, so `LEG_VERSION` is unchanged; stored `edge_eval`
+values change only when an edge is re-run (`edge_eval` stores no unit: the read model takes it
+from the edge document's outcome, `verdict.counts_wins`).
+
 ## Alternatives rejected
 - **Series as `edge_eval` row kinds** (`slice_kind = session`): every verdict and list read
   would load the whole run's rows (about 150k for `vrp_short_premium` on every page).

@@ -74,6 +74,12 @@ def unit_of(edge: Edge) -> str:
     return RATIO
 
 
+def counts_wins(unit: str | None) -> bool:
+    """Whether the trial statistics of a value in ``unit`` read the session's excess wins, not the
+    value (ADR 0064 amendment 2026-10-11): a cushion or a ratio is not a return."""
+    return unit in (CUSHION, RATIO)
+
+
 def exit_session(entry: date, horizon: int) -> date:
     """The close of the window that starts at ``entry``: ``horizon`` sessions later."""
     return entry_session(entry, horizon)
