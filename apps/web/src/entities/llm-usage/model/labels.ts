@@ -71,6 +71,9 @@ export function sliceLabel(by: string, key: string | null | undefined): string {
 /** A stored timestamp as the log's UTC time. */
 export const stamp = (ts: string) => `${ts.replace('T', ' ').slice(0, 19)} UTC`;
 
+/** The Guide glossary term that explains input tokens and the cache. */
+export const TERM_OF_INPUT = 'llm_input_tokens';
+
 /** A stored call's identity: the key the recorder merges on. */
 export function callId(call: UsageCall): string {
   return `${call.ts}~${call.provider}~${call.useCase}~${call.user ?? ''}~${call.outcome}`;

@@ -41,7 +41,7 @@ function tile(w: UsageWindow): StatItem {
   const capped = w.cap?.usedShare != null && w.cap.usedShare >= 1;
   const tokens = t.unknown
     ? `tokens: ${unknownText(t.unknown)}`
-    : `${count(t.inputTokens)} in · ${count(t.outputTokens)} out`;
+    : `${count(t.totalInputTokens)} in · ${count(t.outputTokens)} out`;
   return {
     id: w.key,
     label: WINDOW_LABEL[w.key] ?? w.key,
@@ -52,6 +52,12 @@ function tile(w: UsageWindow): StatItem {
         <Text size="sm" tone="muted">{`${count(t.calls)} calls · ${tokens}`}</Text>
         {t.reportedUsd > 0 && (
           <Text size="sm" tone="muted">{`of which ${usd(t.reportedUsd)} notional (reported)`}</Text>
+        )}
+        {t.callsWithoutTotalInput > 0 && !t.unknown && (
+          <Text
+            size="sm"
+            tone="muted"
+          >{`${count(t.callsWithoutTotalInput)} calls: whole input not known`}</Text>
         )}
         {t.callsWithoutTokens > 0 && !t.unknown && (
           <Text

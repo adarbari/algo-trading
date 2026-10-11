@@ -19,8 +19,9 @@ export const CALL_COLUMNS: DataTableColumn<UsageCall>[] = [
   { id: 'user', header: 'User', value: (c) => c.user },
   {
     id: 'input',
-    header: 'Input tokens',
-    value: (c) => c.inputTokens,
+    header: 'Input tokens (incl. cache)',
+    description: 'regular input + cache read + cache write',
+    value: (c) => c.totalInputTokens,
     format: TOKENS,
     align: 'end',
   },

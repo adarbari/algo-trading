@@ -3,6 +3,7 @@ reserved upper bound, never $0), the budget (reserve before asking, settle after
 cannot pass a cap), the roll-over at midnight and month end in New York, and fail-closed for a
 provider that spends when the store cannot be read; a free provider always answers."""
 
+import json
 import threading
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -12,6 +13,7 @@ import pytest
 from algotrade.config.site.llm import LlmSettings
 from algotrade.core.model.completion import Attempt
 from algotrade.services.text_model.ledger import UsageLedger
+from algotrade_sources.llm.chat import usage_of
 
 DAY = datetime(2026, 10, 8, 15, tzinfo=UTC)
 CHARS = 300  # a prompt: 100 tokens at the assumed 3 characters each
@@ -56,6 +58,71 @@ def attempt(provider: str, **over: Any) -> Attempt:
                             "user": "a", "outcome": "ok", "latency_s": 0.2,
                             "input_tokens": 1_000_000, "output_tokens": 100_000}  # fmt: skip
     return Attempt(**(base | over))
+
+
+def test_cache_tokens_of_a_priced_call_are_charged_at_the_full_input_price() -> None:
+    sink = Sink()
+    ledger = UsageLedger(settings(), sink)
+    plain = attempt("paid")  # 1M in x $1 + 0.1M out x $5 = 1.5
+    cached = attempt("paid", cache_read_tokens=400_000, cache_write_tokens=100_000)
+    ledger.record(plain)
+    ledger.record(cached)
+    ledger.record(attempt("paid", cache_read_tokens=None, cache_write_tokens=None))
+    ledger.record(attempt("cli", reported_cost_usd=0.02, cache_read_tokens=9_000_000))
+    costs = [r["cost_usd"] for r in sink.rows]
+    assert costs[1] == pytest.approx(1.5 + 0.5)  # + 0.5M cache tokens x $1
+    assert costs[1] > costs[0] and costs[2] == costs[0]  # a cached call never costs less
+    assert costs[3] == 0.02  # a reported cost stays the CLI's own figure
+    row = sink.rows[1]
+    assert (row["cache_read_tokens"], row["cache_write_tokens"]) == (400_000, 100_000)
+    assert sink.rows[2]["cache_read_tokens"] is None  # absent stays None
+
+
+def test_an_unknown_input_with_a_cache_count_is_charged_the_bound_never_the_cache_alone() -> None:
+    sink = Sink()
+    UsageLedger(settings(), sink).record(
+        attempt("paid", input_tokens=None, cache_read_tokens=500), PAID_BOUND
+    )
+    assert (sink.rows[0]["cost_usd"], sink.rows[0]["cost_basis"]) == (PAID_BOUND, "bound")
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        {"prompt_tokens": 1000, "completion_tokens": 10},
+        {"prompt_tokens": 1000, "completion_tokens": 10,
+         "prompt_tokens_details": {"cached_tokens": 800}},
+        {"prompt_tokens": 1000, "completion_tokens": 10,
+         "prompt_tokens_details": {"cached_tokens": 5000}},  # more than the prompt
+        {"prompt_tokens": 1000, "completion_tokens": 10, "prompt_tokens_details": {}},
+        {"prompt_tokens": 1000, "completion_tokens": 10, "prompt_tokens_details": None},
+    ],
+)  # fmt: skip
+def test_a_chat_usage_is_never_charged_less_than_its_prompt_at_the_input_price(
+    usage: dict[str, Any],
+) -> None:
+    seen = usage_of(json.dumps({"usage": usage}).encode())
+    sink = Sink()
+    UsageLedger(settings(), sink).record(
+        attempt(
+            "paid",
+            input_tokens=seen.input,
+            output_tokens=seen.output,
+            cache_read_tokens=seen.cache_read,
+        )
+    )
+    prompt_price = usage["prompt_tokens"] * 1.0 / 1e6  # the $1 per million of the "paid" price
+    assert sink.rows[0]["cost_usd"] >= prompt_price
+    assert sink.rows[0]["cost_basis"] == "price"
+
+
+def test_the_row_carries_the_call_id_prompt_version_and_call_stage() -> None:
+    sink = Sink()
+    UsageLedger(settings(), sink).record(
+        attempt("tier", call_id="abc", prompt_version="1", call_stage="repair")
+    )
+    row = sink.rows[0]
+    assert (row["call_id"], row["prompt_version"], row["call_stage"]) == ("abc", "1", "repair")
 
 
 def test_cost_is_the_price_or_the_reported_total_and_an_unknown_one_is_its_bound() -> None:

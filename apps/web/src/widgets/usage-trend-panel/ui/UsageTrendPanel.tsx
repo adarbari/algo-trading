@@ -28,7 +28,7 @@ function series(usage: LlmUsage) {
       line('reported', 'Notional (reported)', (d) => d.tally.reportedUsd),
     ],
     tokens: [
-      line('in', 'Input tokens', (d) => d.tally.inputTokens, true),
+      line('in', 'Input tokens (incl. cache)', (d) => d.tally.totalInputTokens, true),
       line('out', 'Output tokens', (d) => d.tally.outputTokens, true),
     ],
   };

@@ -106,6 +106,29 @@ def test_the_json_result_gives_text_tokens_and_the_notional_cost() -> None:
     assert (done.input_tokens, done.output_tokens, done.cost_usd) == (120, 30, 0.0042)
 
 
+def test_the_cache_tokens_are_read_from_the_usage_and_input_stays_the_uncached_count() -> None:
+    # recorded shape: 2 uncached input tokens beside a ~110k-token cached prompt (ADR 0058)
+    usage = {
+        "input_tokens": 2,
+        "output_tokens": 30,
+        "cache_read_input_tokens": 98_000,
+        "cache_creation_input_tokens": 12_000,
+    }
+    done = client(Runner(json.dumps(OK | {"usage": usage}))).complete("s", "u")
+    assert (done.input_tokens, done.cache_read_tokens, done.cache_write_tokens) == (
+        2,
+        98_000,
+        12_000,
+    )
+
+
+def test_cache_tokens_the_cli_did_not_report_are_none_never_zero() -> None:
+    done = client(Runner(json.dumps(OK))).complete("s", "u")
+    assert (done.input_tokens, done.cache_read_tokens, done.cache_write_tokens) == (120, None, None)
+    bad = OK | {"usage": {"input_tokens": 1, "cache_read_input_tokens": "9"}}
+    assert client(Runner(json.dumps(bad))).complete("s", "u").cache_read_tokens is None
+
+
 def test_a_result_without_usage_or_cost_has_none_never_zero() -> None:
     done = client(Runner(json.dumps({"is_error": False, "result": "hi"}))).complete("s", "u")
     assert (done.text, done.input_tokens, done.output_tokens, done.cost_usd) == (
