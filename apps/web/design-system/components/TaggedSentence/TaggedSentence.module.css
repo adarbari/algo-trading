@@ -1,0 +1,62 @@
+/*
+ * TaggedSentence: prose with inline tagged spans. The kind is the underline style (solid,
+ * dashed, wavy, dotted) plus the text label; the tint only reinforces it.
+ */
+.sentence {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  overflow-wrap: anywhere;
+}
+
+.span {
+  --tag-color: var(--color-neutral);
+}
+
+.span[data-kind='applied'] {
+  --tag-color: var(--color-positive);
+}
+
+.span[data-kind='formula'] {
+  --tag-color: var(--color-accent-strong);
+}
+
+.span[data-kind='ask'] {
+  --tag-color: var(--color-warning);
+}
+
+.span[data-kind='gap'] {
+  --tag-color: var(--color-muted);
+}
+
+.words {
+  text-decoration-color: var(--tag-color);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--border-width-thick);
+  text-underline-offset: var(--space-0-5);
+}
+
+.span[data-kind='applied'] .words {
+  text-decoration-style: solid;
+}
+
+.span[data-kind='formula'] .words {
+  text-decoration-style: dashed;
+}
+
+.span[data-kind='ask'] .words {
+  text-decoration-style: wavy;
+}
+
+.span[data-kind='gap'] .words {
+  text-decoration-style: dotted;
+}
+
+.label {
+  color: var(--tag-color);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
+}

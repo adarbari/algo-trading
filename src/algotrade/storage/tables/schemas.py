@@ -291,7 +291,11 @@ LIVE_OPTION_QUOTES = fixed(
 # the attempt failed, ``free`` 0 for a free provider, ``unknown`` null: a skipped attempt or a
 # ``rejected`` one). A failure also carries ``error``, ``stage`` (``provider`` / ``answer``), the
 # prompt (``sentence``, clipped), the raw ``answer`` (clipped) and ``prompt_chars``: null on
-# every other row and on partitions written before they existed. Written
+# every other row and on partitions written before they existed. Metering (ADR 0058 amended
+# 2026-10-11): ``input_tokens`` is the regular (uncached) input as reported, ``cache_read_tokens``
+# / ``cache_write_tokens`` the cached prompt (null: not reported), ``call_id`` ties the attempts
+# of one call and its ``rejected`` row, ``prompt_version`` and ``call_stage`` (``first`` /
+# ``repair`` / ``escalate``) are the caller's tags; null on older partitions. Written
 # only through ``UsageWriter`` (``usage/*``); read across a date range by ``data.usage``.
 USAGE_LLM_CALLS = fixed(
     "usage/llm_calls",
@@ -314,6 +318,11 @@ USAGE_LLM_CALLS = fixed(
     "sentence string",
     "answer string",
     "prompt_chars int64",
+    "cache_read_tokens int64",
+    "cache_write_tokens int64",
+    "call_id string",
+    "prompt_version string",
+    "call_stage string",
     runs="merge",
     key=("ts", "provider", "use_case", "user", "outcome"),
 )

@@ -20,6 +20,7 @@ could not use (outcome ``rejected``, no cost: the ``ok`` row already carries it)
 import logging
 import re
 import time
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
@@ -97,6 +98,7 @@ class FallbackTextModel:
 
     def complete(self, system: str, user: str, *, tag: CallTag | None = None) -> Completion:
         started = self.clock()
+        call_id = uuid.uuid4().hex  # shared by every attempt of this call and its rejection
         chars = len(system) + len(user)
         asking = tag.user if tag is not None else None
         failures: list[str] = []
@@ -106,7 +108,7 @@ class FallbackTextModel:
             raise ModelUnavailableError("no text model may answer this user")
         if self.ledger is not None and self._refuses():
             for provider, model in members:
-                self._note(tag, provider, model, SKIPPED_BUDGET)
+                self._note(tag, call_id, provider, model, SKIPPED_BUDGET)
             raise ModelUnavailableError("the text-model budget is spent (llm.toml [budget])")
         for position, (provider, model) in enumerate(members):
             if position and self.clock() - started > self.deadline_s:
@@ -115,7 +117,7 @@ class FallbackTextModel:
                 break
             reserved = self._admit(provider, chars)
             if reserved is None:
-                self._note(tag, provider, model, SKIPPED_BUDGET)
+                self._note(tag, call_id, provider, model, SKIPPED_BUDGET)
                 failures.append(f"{provider}: skipped, the budget is spent")
                 continue
             began = self.clock()
@@ -123,7 +125,7 @@ class FallbackTextModel:
                 completion = model.complete(system, user, tag=tag)
             except ModelUnavailableError as exc:
                 self._note(
-                    tag, provider, model, FAILED, reserved, took=self.clock() - began,
+                    tag, call_id, provider, model, FAILED, reserved, took=self.clock() - began,
                     error=str(exc), stage=PROVIDER, user_text=user, chars=chars,
                 )  # fmt: skip
                 failures.append(f"{provider}: {exc}")
@@ -141,13 +143,13 @@ class FallbackTextModel:
                 continue
             except Exception as exc:  # a bug propagates, but what it may have cost is settled first
                 self._note(
-                    tag, provider, model, FAILED, reserved, took=self.clock() - began,
+                    tag, call_id, provider, model, FAILED, reserved, took=self.clock() - began,
                     error=f"{type(exc).__name__}: {exc}", stage=PROVIDER, user_text=user,
                     chars=chars,
                 )  # fmt: skip
                 raise
             self._note(
-                tag, provider, model, FELL_BACK if first_failed else OK, reserved,
+                tag, call_id, provider, model, FELL_BACK if first_failed else OK, reserved,
                 took=self.clock() - began, answer=completion, fell_back_from=first_failed,
                 chars=chars,
             )  # fmt: skip
@@ -155,6 +157,7 @@ class FallbackTextModel:
                 completion,
                 latency_s=self.clock() - started,
                 fell_back_from=first_failed,
+                call_id=call_id,
             )
         raise ModelUnavailableError("no text model could answer: " + "; ".join(failures))
 
@@ -189,6 +192,9 @@ class FallbackTextModel:
                     sentence=clip(user_text, MAX_SENTENCE),
                     answer=clip(completion.text, MAX_ANSWER),
                     prompt_chars=prompt_chars,
+                    call_id=completion.call_id,
+                    prompt_version=tag.prompt_version if tag is not None else None,
+                    call_stage=tag.stage if tag is not None else "first",
                 ),
             )
         except Exception:
@@ -229,6 +235,7 @@ class FallbackTextModel:
     def _note(
         self,
         tag: CallTag | None,
+        call_id: str,
         provider: str,
         model: TextModel,
         outcome: str,
@@ -256,6 +263,11 @@ class FallbackTextModel:
                     input_tokens=answer.input_tokens if answer is not None else None,
                     output_tokens=answer.output_tokens if answer is not None else None,
                     reported_cost_usd=answer.cost_usd if answer is not None else None,
+                    cache_read_tokens=answer.cache_read_tokens if answer is not None else None,
+                    cache_write_tokens=answer.cache_write_tokens if answer is not None else None,
+                    call_id=call_id,
+                    prompt_version=tag.prompt_version if tag is not None else None,
+                    call_stage=tag.stage if tag is not None else "first",
                     fell_back_from=fell_back_from,
                     error=None if error is None else clip(error, MAX_SENTENCE),
                     stage=stage,

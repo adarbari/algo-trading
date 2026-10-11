@@ -14,6 +14,7 @@ from algotrade.services.explaining.answer import Explanation, ask, verify
 from algotrade.services.explaining.cache import TextCache, cache_key
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.explaining.prompt import (
+    PROMPT_VERSION,
     WHAT_IS_HAPPENING,
     regime_facts,
     system_prompt,
@@ -70,7 +71,7 @@ def explain_regime(
             if explanation.checked:
                 return Explained(explanation, True)
     limiter.take(user, "regime explanations")
-    tag = CallTag("regime-explain", user)
+    tag = CallTag("regime-explain", user, str(PROMPT_VERSION))
     answer = ask(model, facts, asked, tag)
     chars = len(system_prompt(facts)) + len(user_prompt(asked))
     try:

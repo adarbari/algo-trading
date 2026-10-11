@@ -19,6 +19,7 @@ export {
   stamp,
   STAGE_LABEL,
   TERM_OF_BASIS,
+  TERM_OF_INPUT,
   TERM_OF_REJECTED,
   TERM_OF_STAGE,
   TOKENS,

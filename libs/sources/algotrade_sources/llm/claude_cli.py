@@ -171,6 +171,8 @@ class ClaudeCli:
             _count(usage.get("input_tokens")),
             _count(usage.get("output_tokens")),
             0.0,
+            cache_read_tokens=_count(usage.get("cache_read_input_tokens")),
+            cache_write_tokens=_count(usage.get("cache_creation_input_tokens")),
             cost_usd=float(cost)
             if isinstance(cost, int | float) and not isinstance(cost, bool)
             else None,

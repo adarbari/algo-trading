@@ -22,6 +22,8 @@ from algotrade.config.site.field_guide import (
 from algotrade.config.site.llm import Phrase
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
+PROMPT_VERSION = "1"  # bump with any change to the prompt: the usage log records it (ADR 0058)
+
 TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored
 fields. Answer with ONE JSON object and nothing else (no prose, no code fence).

@@ -34,6 +34,10 @@ const LlmUsageQuery = graphql(`
           calls
           inputTokens
           outputTokens
+          cacheReadTokens
+          cacheWriteTokens
+          totalInputTokens
+          callsWithoutTotalInput
           callsWithoutTokens
           spentUsd
           billedUsd
@@ -58,6 +62,10 @@ const LlmUsageQuery = graphql(`
             calls
             inputTokens
             outputTokens
+            cacheReadTokens
+            cacheWriteTokens
+            totalInputTokens
+            callsWithoutTotalInput
             callsWithoutTokens
             spentUsd
             billedUsd
@@ -72,6 +80,9 @@ const LlmUsageQuery = graphql(`
           calls
           inputTokens
           outputTokens
+          cacheReadTokens
+          cacheWriteTokens
+          totalInputTokens
           spentUsd
           reportedUsd
           unknown {
@@ -100,6 +111,9 @@ const LlmUsageQuery = graphql(`
         user
         inputTokens
         outputTokens
+        cacheReadTokens
+        cacheWriteTokens
+        totalInputTokens
         latencyS
         costUsd
         costBasis
@@ -111,6 +125,9 @@ const LlmUsageQuery = graphql(`
         sentence
         answer
         promptChars
+        callId
+        promptVersion
+        callStage
         unknownFields
         unknown {
           code
@@ -136,6 +153,9 @@ const LlmUsageQuery = graphql(`
         user
         inputTokens
         outputTokens
+        cacheReadTokens
+        cacheWriteTokens
+        totalInputTokens
         latencyS
         costUsd
         costBasis
@@ -147,6 +167,9 @@ const LlmUsageQuery = graphql(`
         sentence
         answer
         promptChars
+        callId
+        promptVersion
+        callStage
         unknownFields
         unknown {
           code
