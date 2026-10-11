@@ -24,8 +24,9 @@ counts, not their ids, ranks, scores, exclusion reasons, gross values, dips or l
    One row per (main edge variant, implementation screener or baseline, horizon, decision
    session D or event block); no `[[variants]]`, no random draws. Columns: `role`, config hashes,
    `decision_session`, `entry_session`, `exit_session` (S + h sessions, from the calendar: the
-   curve's x, so no point shows a return before it closed), `block_days`, `in_sample` (written by
-   the harness by the same rule as the slices; never re-derived from dates by a reader),
+   curve's x, so no point shows a return before it closed), `block_days`, `before_split` (the decision
+   session is before the run's split; written by the harness, never re-derived from dates by a
+   reader; not `edge_eval.in_sample`, which means a scorer was fitted on the slice),
    `exploratory`, `regime`, `status` (`measured` | `excluded_coverage` | `lost_input` |
    `no_picks`; `lost_table` only as an admin cause), pick and base counts and means (oriented, net
    of the document's cost), exclusions, deciles, `unit` (`excess_return` | `return` | `cushion` |
@@ -37,18 +38,23 @@ counts, not their ids, ranks, scores, exclusion reasons, gross values, dips or l
    `NO_IMPLIED_VOL`, `MISSING_DRAWDOWN`); eligible non-picks are never listed. Columns: entry and
    exit sessions, `rank`, `score` ("score at D": the value stored for D now, screens read with
    `as_of = None`), `value` (oriented, net), `gross_value` (return outcomes only), `hit`,
-   `status` (`won` | `lost` | `excluded`), `delisted`, `in_sample`, `max_drawdown` (the
+   `status` (`won` | `lost` | `excluded`), `delisted`, `before_split`, `max_drawdown` (the
    within-window dip), `adv_usd_20d` at D (null = not stored, never 0), `reference`, `touch`,
-   `licence`. **Retention 45 days** (`TableSpec.retention_days`, the maintenance purge), sparing a
-   partition that holds the latest committed run of its job `edge-eval:<edge>:<user>` or a run
-   cited by any edge's `[evidence] run_id`; a pruned run's ledger reads `Unknown(PRUNED)`.
+   `licence`. **Retention 45 days** (`TableSpec.retention_days`), applied by the ingestion
+   maintenance `purge` task with a keep-list function owned by the run reader's owner: it spares
+   the partitions of the canonical run (the latest non-exploratory official run of each edge), the
+   latest run per edge and user, and every run cited by an edge's `[evidence] run_id`. The run
+   record states the ledger row count it wrote: rows absent under a nonzero count read
+   `Unknown(PRUNED)` ("re-run the backtest"), a run with no count (older) `Unknown(NOT_STORED)`.
 3. **One writer, one reader.** Both tables are framed only in
    `services/evaluation/cross_section/detail/` and written by the `edge-eval` job through
    `ResultWriter` (the job, not an ingestion task: ADR 0063 amendment 5), inside the run's one
    `writer.publishing` block with its `edge_eval` rows, legs and run record (ADR 0022): a crash
    leaves no series or ledger without its run. They are read only through
-   `services/read/evaluation/runs.py` (`load_run_series`, `load_run_trades`), which applies
-   `oos_hidden` from the stored `in_sample` flag exactly as `load_run_rows` does (fitness test).
+   `services/read/evaluation/runs.py` (`load_run_series`, `load_run_trades`); for a hidden copy
+   (`oos_hidden`) they keep only `before_split` rows (fitness test, one test per surface).
+   `load_run_rows` changes too: today it drops every slice kind but the in-sample ones for a
+   hidden run; it keeps the `cost` rows whose `slice_value` starts `in_sample:` as well.
    Storage gains `TableReader.read_run(table, session_date, run_id)` on every backend
    (contract-tested): one committed run's rows of a partition without reading the others'.
 4. **Leg v2 (amends 0063; `LEG_VERSION` 2).** A leg adds, aligned to `pick_ids`, `pick_ranks`,
@@ -58,8 +64,9 @@ counts, not their ids, ranks, scores, exclusion reasons, gross values, dips or l
    invalidates the leg. The cost grid joins the leg key, like `draws`. The key seeds the random
    draws (0063 decision 6), so the bump redraws every random-pick backtest once ("beats N% of
    random picks" moves slightly; the verdict reads only the latest run). One detached full re-run
-   of every site edge follows, with the nightly `edge-eval` step paused that night (concurrent
-   runs of one edge race on tombstones).
+   of every site edge follows; the re-run script takes the existing `claim_edge_eval` lock, so it
+   and the nightly `edge-eval` step serialise per edge (no pause; concurrent runs of one edge
+   would race on tombstones).
 5. **Cost and capacity on `edge_eval`.** Cost rows `slice_kind = cost`, `slice_value =
    "<period>:<bp>"` (period all / in_sample / frozen) over the document's `cost_bps` plus the site
    grid `[edge_costs] levels_bps = [0, 15, 30, 50]` (`config/site/verdict.toml`); not written when
@@ -73,31 +80,38 @@ counts, not their ids, ranks, scores, exclusion reasons, gross values, dips or l
    published, in-sample, out-of-sample and live; a statistic not measurable live is
    `Unknown(NOT_MEASURED_LIVE)`, a horizon mismatch `Unknown(NOT_COMPARABLE)`.
 7. **Projected date.** Computed at run time by the harness, which owns schedule arithmetic: for a
-   calendar schedule it writes `projected_exits` on the run's `slice_kind = all` rows: the exit
-   sessions of the schedule's next N decision sessions per (variant, horizon), count-based, not a
-   calendar window (`vrp_short_premium`'s 40th out-of-sample exit is about 2029 at 21 sessions and
-   2031 at 31), with N = the largest trade count a verdict threshold can ask for, read at run time
-   (the max of `VerdictSettings` `min_oos_trades`, `works_oos_trades`, `works_trades`). The read
-   model's outlook, for count criteria only (`trades`, `works_trades`), takes the sessions still
-   needed at the measured trades per session of the last two complete years and reads that
-   session's exit from the list; thresholds stay in `verdict.toml`, so a changed threshold never
-   stales a stored value. A threshold raised above what the run stored reads as the projection
-   state `BEYOND_PROJECTION` (with its Guide term) until the next run; an event schedule
-   (`on_event:`) cannot be projected: `Unknown(UNPROJECTABLE)`; a hidden copy
-   `Unknown(OOS_HIDDEN)`; a non-count criterion has none. Labelled an estimate; never an input to
-   a verdict.
+   calendar schedule it writes, per (variant, horizon) on the run's `slice_kind = all` rows,
+   `projected_exits` (the exit sessions of the schedule's next N decision sessions, count-based,
+   not a calendar window: `vrp_short_premium`'s 40th out-of-sample exit is about 2029 at 21
+   sessions and 2031 at 31) and the scheduled and measured decision-session counts over the run's
+   out-of-sample side. N = ceil(max threshold / 0.25), the max threshold being the largest of
+   `VerdictSettings` `min_oos_trades`, `works_oos_trades`, `works_trades` at run time. The read
+   model's outlook, for count criteria only (`trades`, `works_trades`), scales by the observed fill
+   ratio (measured / scheduled on the out-of-sample side, the whole run's when there is no
+   out-of-sample history, floored at 0.25): the expected exit is the ceil(remaining / ratio)-th
+   stored exit. Thresholds stay in `verdict.toml`, so a changed threshold never stales a stored
+   value; one past the stored list reads the projection state `BEYOND_PROJECTION` until the next
+   run. An event schedule (`on_event:`) cannot be projected: the honest state `UNPROJECTABLE`
+   (owner-delegated decision); a hidden copy `Unknown(OOS_HIDDEN)`; a non-count criterion has
+   none. Each state has its Guide term. Labelled an estimate; never an input to a verdict.
 8. **Haircut Sharpe.** Robustness shows the Harvey-Liu haircut (Holm, M = the trial log's trials;
    the Bonferroni bound when the peers' t-statistics are not stored) beside the trial count, from
    stored `sharpe`, `sessions`, `trials`; the deflated Sharpe stays the verdict criterion.
 9. **Live state.** `EdgeDesk.liveStates` reads `results/edge_paper` (latest row per key with
    `knowledge_ts` at or before the resolved session's cutoff, ADR 0062; settled trades only) for
    the list badge, the header, an Ideas banner and one line in the nightly `edge-signals` run
-   record when the live record falls below the backtest's usual range. No push, no email.
+   record when the live record falls below the backtest's usual range. No push, no email. The
+   evidence curve's live stroke reads the same stored paper rows through `data/paper` (read-only,
+   never re-derived from today's document) under the same out-of-sample rules as the backtest.
 10. **Licence of a trial.** The harness writes the most restrictive licence of the IV field, the
     screen's features and the universe's features on `edge_eval`, `edge_series` and
-    `edge_trades`. Per-name values derived from a personal-licence feature (`score`) are
-    `Unknown(LICENCE)` to anyone but the licence holder, in the ledger and the CSV; aggregate
-    statistics are shown to all.
+    `edge_trades`, and records each ledger column's licence. The licence holder is a user whose
+    entry in `config/site/users.toml` lists it (`licences = ["personal"]` on `UsersSettings`; the
+    owner only today). To anyone else, in the ledger and the CSV, every per-name column whose
+    recorded licence is personal is `Unknown(LICENCE)`, decided by that recorded licence, never by
+    column name: the oriented outcome value and IV / strike when the outcome's `iv_field` is
+    personal, the score and inputs when the screen reads a personal feature. Counts, dates, names
+    and won / lost stay; aggregate statistics are shown to all.
 11. **CSV route (amends 0037).** `GET /files/edges/{edge_id}/trades.csv?variant&horizon&period`,
     a file, not a page read: same loader as `Query.edgeTrades` (same redaction, licence and
     `oos_hidden`), streamed. `architecture/rest_allowlist.toml` entry with `keep = true`;
@@ -120,5 +134,6 @@ counts, not their ids, ranks, scores, exclusion reasons, gross values, dips or l
   responsibilities (`edge-evaluation-detail`, `edge-evidence-read`).
 - Older runs have no series, ledger, cost or capacity rows: `Unknown(NOT_STORED)` until re-run.
 - Leg v2 costs one full re-run (about 3-4 h for the site edges) and one redraw of random picks.
-- The ledger of a run older than 45 days is gone unless it is the latest or cited.
+- The ledger of a run older than 45 days is gone unless it is canonical, the latest for its edge
+  and user, or cited.
 - REST gains one GET (shrink-only list raised by this amendment only).
