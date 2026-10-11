@@ -58,7 +58,7 @@ RESULT_COLUMNS = (
 
 def is_return(edge: Edge) -> bool:
     """Whether the outcome's value is the net excess return (``apply_outcome``'s own test)."""
-    return edge.outcome.kind == "excess_return" or edge.outcome.measure == "excess_return"
+    return edge.outcome.is_return
 
 
 def needs_implied_vol(edge: Edge) -> bool:
@@ -195,7 +195,7 @@ def apply_outcome(
         with np.errstate(invalid="ignore"):
             hit = hit & (drawdown <= o.max_drawdown)
     hit = hit & counted
-    sign = -1.0 if o.direction == "below" else 1.0
+    sign = o.sign
     return pd.DataFrame(
         {
             "instrument_id": outcomes["instrument_id"].to_numpy(),

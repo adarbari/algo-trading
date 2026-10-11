@@ -166,6 +166,16 @@ class Outcome:
     otm_pct: float | None = None
     iv_field: str | None = None
 
+    @property
+    def is_return(self) -> bool:
+        """The value is the net excess return (a round-trip cost applies to it)."""
+        return self.kind == "excess_return" or self.measure == "excess_return"
+
+    @property
+    def sign(self) -> float:
+        """The orientation of the value: higher is better, so ``-1`` for direction ``below``."""
+        return -1.0 if self.direction == "below" else 1.0
+
 
 @dataclass(frozen=True)
 class EdgeVariant:

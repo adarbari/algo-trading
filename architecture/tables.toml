@@ -354,7 +354,7 @@ note = "every rule screen's per-criterion values (ADR 0029), published with resu
 name = "results/edge_eval"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py"
+note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py; slice_kind cost rows (a return outcome, ADR 0064) and the pick_adv_* capacity columns"
 
 [[table]]
 name = "results/edge_series"

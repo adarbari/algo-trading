@@ -37,7 +37,7 @@ MEASURE_COLUMNS = (
     "decile_sessions", "effect_size", "sharpe", "deflated_sharpe", "trials", "pbo",
     "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
     "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
-    "pre_snapshot_sessions",
+    "pre_snapshot_sessions", "pick_adv_median", "pick_adv_known", "pick_adv_low",
 )  # fmt: skip
 
 
@@ -104,7 +104,7 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
     """The ``results/edge_eval`` rows of ``evaluation``, stamped."""
     rows = []
     for r in evaluation.results:
-        for m in r.measures:
+        for m in (*r.measures, *r.costs):
             rows.append(_row(evaluation, m, r.edge_variant, r.variant, r.role, r.horizon, r))
     for random in evaluation.random_picks:
         for m in random.draws:

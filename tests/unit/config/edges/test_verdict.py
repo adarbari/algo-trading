@@ -19,6 +19,16 @@ def test_defaults_are_the_owners_thresholds() -> None:
     assert d.cost_levels_bps == (0.0, 15.0, 30.0, 50.0)  # ADR 0064 (owner 2026-10-10)
 
 
+def test_the_capacity_floor_defaults_reads_and_rejects_a_bad_value() -> None:
+    assert VerdictSettings.from_document(None).capacity_adv_floor_usd == 5_000_000.0
+    assert (
+        VerdictSettings.from_document({"capacity_adv_floor_usd": 1e6}).capacity_adv_floor_usd == 1e6
+    )
+    for bad in (0, -1, "5e6", True):
+        with pytest.raises(ConfigurationError, match="capacity_adv_floor_usd"):
+            VerdictSettings.from_document({"capacity_adv_floor_usd": bad})
+
+
 @pytest.mark.parametrize("levels", [[15, 0], [0, 0], [-5], ["10"], [True], 10])
 def test_the_cost_grid_is_distinct_non_negative_and_ascending(levels: object) -> None:
     with pytest.raises(ConfigurationError, match="levels_bps"):

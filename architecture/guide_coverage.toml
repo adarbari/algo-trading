@@ -163,6 +163,29 @@ names = { IN_SAMPLE = "in-sample", OUT_OF_SAMPLE = "out-of-sample", LIVE = "live
 [[enum]]
 source = "graphql:TradeSort"
 exempt = "the column a page of trades sorts by: a control, named by the column header"
+[[enum]]
+source = "graphql:EdgeCosts.state"
+values_from = "python:algotrade.services.read.edge_evidence.costs:COST_STATES"
+values = { measured = "term:cost_state", not_stored = "term:cost_state", not_a_cost_outcome = "term:cost_state", oos_hidden = "term:cost_state" }
+names = { oos_hidden = "hidden", not_a_cost_outcome = "not a cost outcome" }
+
+[[enum]]
+source = "graphql:CostPeriod.state"
+values_from = "python:algotrade.services.read.edge_evidence.costs:COST_STATES"
+values = { measured = "term:cost_state", not_stored = "term:cost_state", not_a_cost_outcome = "term:cost_state", oos_hidden = "term:cost_state" }
+names = { oos_hidden = "hidden", not_a_cost_outcome = "not a cost outcome" }
+
+[[enum]]
+source = "graphql:EdgeCapacity.state"
+values_from = "python:algotrade.services.read.edge_evidence.capacity:CAPACITY_STATES"
+values = { measured = "term:cost_state", not_stored = "term:cost_state", oos_hidden = "term:cost_state" }
+names = { oos_hidden = "hidden" }
+
+[[enum]]
+source = "graphql:CapacityPeriod.state"
+values_from = "python:algotrade.services.read.edge_evidence.capacity:CAPACITY_STATES"
+values = { measured = "term:cost_state", not_stored = "term:cost_state", oos_hidden = "term:cost_state" }
+names = { oos_hidden = "hidden" }
 
 [[enum]]
 source = "graphql:VerdictYear.label"
