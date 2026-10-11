@@ -12,7 +12,8 @@ read as ``paper.load_trades`` reads them (the rows as the session's cutoff knew 
 pushed or sent: ``below_range`` only lists what the nightly's run record says in one line."""
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime
 
 from algotrade.config.edges.loading import RECORDING
 from algotrade.config.site.settings import load_verdict
@@ -29,7 +30,8 @@ from algotrade.services.read.edge_desk.live import (
 from algotrade.services.read.edge_desk.paper import PaperTrade, load_trades, record_owner
 from algotrade.services.read.evaluation.edges import Edge, load_edges
 
-LIVE_STATES = (ON_TRACK, BELOW, ABOVE, TOO_EARLY, NO_BACKTEST, NO_TRADES)
+NOT_SETTLED = "not_settled"  # the session's nightly has not completed: nothing is judged
+LIVE_STATES = (ON_TRACK, BELOW, ABOVE, TOO_EARLY, NO_BACKTEST, NO_TRADES, NOT_SETTLED)
 TERM = "live_state"  # the Guide glossary entry that explains every state
 
 
@@ -71,6 +73,15 @@ def load_live_states(
     settings = load_verdict(ctx.configs)
     states = []
     for edge in edges.values():
+        if ctx.session.cutoff is None:
+            states.append(
+                LiveState(
+                    edge.id, edge.name, NOT_SETTLED, 0, 0, None, None, None,
+                    "The session's nightly has not completed: its paper results are not settled.",
+                    TERM, edge.paper_traded,
+                )
+            )  # fmt: skip
+            continue
         record = live_record(ctx, edge, [t for t in trades if t.edge_id == edge.id], settings)
         states.append(
             LiveState(
@@ -81,10 +92,14 @@ def load_live_states(
     return tuple(sorted(states, key=lambda s: (s.name, s.edge_id)))
 
 
-def below_range(ctx: ReadContext) -> tuple[LiveState, ...]:
+def below_range(ctx: ReadContext, cutoff: datetime | None = None) -> tuple[LiveState, ...]:
     """The edges below their usual range whose paper record ``ctx.user`` owns (a site edge for
     ``site``, else the user's own): what the nightly's run record names, one line each, so a site
-    edge is said once, by the site's job, and never again by each follower's."""
+    edge is said once, by the site's job, and never again by each follower's. ``cutoff``: the
+    moment to read as (the nightly's own step runs before its session completes, so it passes
+    now)."""
+    if cutoff is not None:
+        ctx = replace(ctx, session=replace(ctx.session, cutoff=cutoff))
     edges = {e.id: e for e in load_edges(ctx)}
     mine = {
         i: e

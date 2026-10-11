@@ -5,7 +5,7 @@
 [[term]]
 id = "live_state"
 term = "Live state"
-short = "How an edge's settled paper trades compare with its backtest: on track, below or above range, too few trades, or no record."
+short = "How an edge's settled paper trades compare with its backtest: on track, below or above range, too few trades, no record or not settled."
 body = """
 The live state is one word for how an edge is doing on paper against what its backtest led you
 to expect. It reads only settled paper trades, as the session knew them. A trade still open, or
@@ -21,6 +21,8 @@ Too few settled trades: fewer signal sessions have closed than the site's minimu
 swings too widely to judge yet.
 No live record: the edge has no paper trades yet, since a site edge is recorded only once it is
 evidenced or live. The sentence also says when there is no backtest to compare with.
+Not yet settled: the session's nightly has not completed, so no settlement is read and nothing
+is judged until it has.
 The Ideas page shows a banner when an edge you follow, or a site edge, is below range. The
 nightly run record says so in one line. Nothing is pushed or sent: the state is for you to read.
 """

@@ -30,9 +30,10 @@ that week yet). It needs ``outcomes`` and ``screens`` and is not critical: a job
 COMPLETE fails the step, a warning naming the edge, never a hold on the session or a later one.
 """
 
+import logging
 from collections.abc import Callable
 from contextlib import nullcontext
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,8 @@ from algotrade.services.read.edge_desk.states import below_range
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.interfaces import Backend
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
+
+LOG = logging.getLogger(__name__)
 
 type ScreenStep = Callable[[date], Outcome]
 
@@ -102,22 +105,24 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
 
 def _below_range(
     reader: StoreReader, configs: ConfigStore, owner: UserContext, session: date
-) -> list[dict[str, str]]:
-    """The edges ``owner`` records that are below their usual range on ``session``, by the read
-    model's live state (empty when the session cannot be read: the line is a courtesy, never a
-    reason to fail the step)."""
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    """The edges ``owner`` records that are below their usual range on ``session`` (the read
+    model's live state) and the WARN checks of a state that could not be read: logged and
+    recorded on the run record, never swallowed and never a reason to fail the step."""
     try:
-        found = below_range(open_context(reader, configs, owner, session))
-    except AlgoTradeError:
-        return []
-    return [{"user": owner.user_id, "edge": s.edge_id, "headline": s.headline} for s in found]
+        found = below_range(open_context(reader, configs, owner, session), datetime.now(UTC))
+    except AlgoTradeError as error:
+        LOG.warning("live state of %s on %s not read: %s", owner.user_id, session, error)
+        detail = f"live state of {owner.user_id} not read: {error}"
+        return [], [{"name": "edge_live_state", "status": "WARN", "detail": detail}]
+    return [{"user": owner.user_id, "edge": s.edge_id, "headline": s.headline} for s in found], []
 
 
 def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> ScreenStep:
     """The edge-signals step (a job per record owner), submitting through ``jobs``."""
 
     def run(session: date) -> Outcome:
-        summaries, short, below = [], [], []
+        summaries, short, below, warnings = [], [], [], []
         for user in paper_owners(reader, configs, session):
             job = jobs.run("edge-signals", {"session": session.isoformat()}, user, force=True)
             summaries.append(
@@ -128,9 +133,10 @@ def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> S
             if job.status is not JobStatus.COMPLETE:
                 short.append(f"{user.user_id} {job.status.value}")
             elif reader is not None:
-                below += _below_range(reader, configs, user, session)
+                lines, failed = _below_range(reader, configs, user, session)
+                below += lines
+                warnings += failed
         result: dict[str, Any] = {"signals": summaries}
-        warnings = []
         if below:
             result["below_range"] = below
             named = ", ".join(sorted({b["edge"] for b in below}))

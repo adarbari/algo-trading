@@ -27,7 +27,7 @@ function show(edgeId: string, states: ReturnType<typeof state>[]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <EdgeLiveBadge edgeId={edgeId} />
+      <EdgeLiveBadge edgeId={edgeId} help={<span>help live_state</span>} />
     </QueryClientProvider>,
   );
   return client;
@@ -41,6 +41,7 @@ describe('EdgeLiveBadge', () => {
   it('shows the badge when the edge is below its usual range', async () => {
     show('drift', [state('drift', 'below')]);
     expect(await screen.findByText('Below range')).toBeVisible();
+    expect(screen.getByText('help live_state')).toBeVisible();
   });
 
   it('shows nothing for an edge on track, above range or without a live state', async () => {
@@ -50,5 +51,6 @@ describe('EdgeLiveBadge', () => {
     });
     expect(screen.queryByText('Below range')).not.toBeInTheDocument();
     expect(screen.queryByText('On track')).not.toBeInTheDocument();
+    expect(screen.queryByText('help live_state')).not.toBeInTheDocument();
   });
 });

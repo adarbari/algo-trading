@@ -11,6 +11,7 @@ import pytest
 from algotrade.config.edges.document import job_name
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.jobs import JobRecord, JobStatus
+from algotrade.services.read.context import NotFoundError
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
@@ -136,7 +137,9 @@ def test_an_edge_below_its_usual_range_is_one_warning_line_never_a_failure(
     monkeypatch.setattr(
         screens_module,
         "below_range",
-        lambda user: tuple(SimpleNamespace(edge_id=e, headline=h) for e, h in live[user.user_id]),
+        lambda user, cutoff: tuple(
+            SimpleNamespace(edge_id=e, headline=h) for e, h in live[user.user_id]
+        ),
     )
     step = screens_module.signal_jobs(SignalJobs(), MemoryConfigStore({}), object())(D)  # type: ignore[arg-type]
     assert step.status is StepStatus.SUCCEEDED
@@ -148,12 +151,36 @@ def test_an_edge_below_its_usual_range_is_one_warning_line_never_a_failure(
     ]
 
 
+def test_a_live_state_that_cannot_be_read_is_logged_and_a_warning_never_a_failure(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(
+        screens_module, "paper_owners", lambda reader, store, session: [UserContext("site")]
+    )
+
+    def broken(reader: Any, configs: Any, user: Any, day: Any) -> Any:
+        raise NotFoundError("nothing stored")
+
+    monkeypatch.setattr(screens_module, "open_context", broken)
+    with caplog.at_level("WARNING"):
+        step = screens_module.signal_jobs(SignalJobs(), MemoryConfigStore({}), object())(D)  # type: ignore[arg-type]
+    assert step.status is StepStatus.SUCCEEDED
+    assert step.checks == [
+        {
+            "name": "edge_live_state",
+            "status": "WARN",
+            "detail": "live state of site not read: nothing stored",
+        }
+    ]
+    assert "live state of site" in caplog.text
+
+
 def test_no_edge_below_its_range_adds_no_line(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         screens_module, "paper_owners", lambda reader, store, session: [UserContext("site")]
     )
     monkeypatch.setattr(screens_module, "open_context", lambda reader, c, user, day: user)
-    monkeypatch.setattr(screens_module, "below_range", lambda user: ())
+    monkeypatch.setattr(screens_module, "below_range", lambda user, cutoff: ())
     step = screens_module.signal_jobs(SignalJobs(), MemoryConfigStore({}), object())(D)  # type: ignore[arg-type]
     assert step.checks == [] and "below_range" not in step.result
 

@@ -141,14 +141,14 @@ names = { oos_hidden = "hidden", not_given = "not given" }
 [[enum]]
 source = "graphql:LiveRecord.state"
 values_from = "python:algotrade.services.read.edge_desk.states:LIVE_STATES"
-values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state" }
-names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record" }
+values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state", not_settled = "term:live_state" }
+names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record", not_settled = "not yet settled" }
 
 [[enum]]
 source = "graphql:EdgeLiveState.state"
 values_from = "python:algotrade.services.read.edge_desk.states:LIVE_STATES"
-values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state" }
-names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record" }
+values = { on_track = "term:live_state", below = "term:live_state", above = "term:live_state", too_early = "term:live_state", no_backtest = "term:live_state", no_trades = "term:live_state", not_settled = "term:live_state" }
+names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record", not_settled = "not yet settled" }
 
 [[enum]]
 source = "graphql:VerdictYear.label"

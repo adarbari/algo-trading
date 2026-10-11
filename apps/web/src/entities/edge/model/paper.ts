@@ -38,6 +38,7 @@ export interface Desk {
   buys: DeskTrade[];
   sells: DeskTrade[];
   followed: FollowedEdge[];
+  liveStates: LiveState[];
 }
 
 export interface PaperRecord {
@@ -102,6 +103,7 @@ const RECORD_LABELS: Record<string, string> = {
   too_early: 'Too few settled trades',
   no_backtest: 'No backtest to compare',
   no_trades: 'No live record',
+  not_settled: 'Not yet settled',
 };
 
 const RECORD_TONES: Record<string, StatusTone> = {
@@ -111,6 +113,7 @@ const RECORD_TONES: Record<string, StatusTone> = {
   too_early: 'neutral',
   no_backtest: 'neutral',
   no_trades: 'neutral',
+  not_settled: 'neutral',
 };
 
 export const recordLabel = (state: string): string => RECORD_LABELS[state] ?? state;

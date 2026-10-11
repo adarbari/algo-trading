@@ -17,7 +17,8 @@ const DESK_TRADE = 'edgeId edgeName instrumentId instrument { symbol } rank buyS
 const EdgeDesk = new TypedDocumentString<{ edgeDesk: Desk | null }, Record<string, never>>(
   `query EdgeDesk { edgeDesk { session sellSession buys { ${DESK_TRADE} } sells { ${DESK_TRADE} }
     followed { edgeId name state tonight tonightReason missed
-      record { state closed open winRate } } } }`,
+      record { state closed open winRate } }
+    liveStates { edgeId name state closed winRate headline followed } } }`,
 );
 
 const SIDE = 'closed wins winRate';
@@ -29,14 +30,6 @@ const EdgePaper = new TypedDocumentString<{ edgePaper: EdgePaper | null }, { id:
       reason excessReturn }
     forward { replaces replacesName since sessions needed headline this { ${SIDE} }
       replaced { ${SIDE} } } } }`,
-);
-
-const EdgeLiveStates = new TypedDocumentString<
-  { edgeDesk: { liveStates: LiveState[] } | null },
-  Record<string, never>
->(
-  `query EdgeLiveStates { edgeDesk { liveStates { edgeId name state closed winRate headline
-    followed } } }`,
 );
 
 /** The signals of the edges the user follows (null: nothing stored for the session). */
@@ -57,11 +50,11 @@ export function useEdgePaper(id: string) {
   });
 }
 
-/** The live state of every edge with a record, the followed ones and the site's (empty: nothing stored for the session). */
+/** The live state of every edge with a record, the followed ones and the site's (the desk's own read: one load per page; empty when nothing is stored). */
 export function useEdgeLiveStates() {
   return useQuery({
-    queryKey: queryKeys.gql('EdgeLiveStates', {}),
-    queryFn: () => gql(EdgeLiveStates, {}),
+    queryKey: queryKeys.gql('EdgeDesk', {}),
+    queryFn: () => gql(EdgeDesk, {}),
     select: (data): LiveState[] => data.edgeDesk?.liveStates ?? [],
   });
 }

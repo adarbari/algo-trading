@@ -65,7 +65,7 @@ describe('useTrackRecords', () => {
 });
 
 describe('useEdgeLiveStates', () => {
-  it('asks EdgeLiveStates once and serves the states, none when nothing is stored', async () => {
+  it('reads the desk document once and serves the states, none when nothing is stored', async () => {
     const live = {
       edgeId: 'drift',
       name: 'Drift',
@@ -80,7 +80,7 @@ describe('useEdgeLiveStates', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgeLiveStates');
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('liveStates {');
     expect(result.current.data).toEqual([live]);
     GQL.mockResolvedValueOnce({ edgeDesk: null });
     const empty = renderHook(() => useEdgeLiveStates(), { wrapper });

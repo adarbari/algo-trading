@@ -18,6 +18,7 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.unit.services.read.edge_desk.conftest import (
+    CUTOFF,
     FOLLOW,
     FOLLOWED,
     KNOWN,
@@ -146,7 +147,7 @@ def _as(backend: MemoryBackend, user: str, own: dict | None = None) -> ReadConte
     """The read context of ``user``, who follows the site edge ``drift`` (and has ``own`` docs)."""
     docs = {**DOCS, (user, "edges", "drift"): {"follow": FOLLOW}, **(own or {})}
     stores = open_stores(StoreReader(backend), MemoryConfigStore(docs), UserContext(user))
-    session = Session(SESSION, None, True, None, None, False, (), ())
+    session = Session(SESSION, None, True, None, None, False, (), (), cutoff=CUTOFF)
     return ReadContext(
         stores.reader, stores.configs, stores.user, session, stores.features, stores.cache
     )

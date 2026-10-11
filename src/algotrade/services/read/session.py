@@ -27,7 +27,7 @@ from algotrade.data.funds.holdings import TABLE as HOLDINGS_TABLE
 from algotrade.data.reference import IBKR_CONTRACTS, UNIVERSE_TABLE, snapshot
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
-from algotrade.storage.runs import RunRecord, RunStatus, done_sessions
+from algotrade.storage.runs import RunRecord, RunStatus, done_sessions, published
 from algotrade.storage.tables.schemas import SCHEMA_VERSION
 
 BARS = "bars/1d"
@@ -134,7 +134,10 @@ class Session:
     and without a partition for ``date``; ``unavailable``: what the ``missing`` ones leave out,
     in public words (ADR 0056). ``complete``: the nightly workflow of ``date`` is complete (False
     for an explicit date that is not, and for the fallback of a store with no complete session);
-    ``newer``: the incomplete session after ``date`` a default read leaves out (ADR 0062)."""
+    ``newer``: the incomplete session after ``date`` a default read leaves out (ADR 0062).
+    ``cutoff``: when the nightly of ``date`` FIRST completed (the finish time of its first
+    published record, the test ``done_sessions`` uses; ADR 0064 decision 9 amendment): rows with a
+    later ``knowledge_ts`` are not what the session knew. None: it has not completed."""
 
     date: dt.date
     requested: dt.date | None
@@ -147,6 +150,17 @@ class Session:
     unavailable: tuple[Unavailable, ...] = ()
     complete: bool = False
     newer: NewerSession | None = None
+    cutoff: dt.datetime | None = None
+
+
+def session_cutoff(records: Sequence[RunRecord], day: dt.date) -> dt.datetime | None:
+    """The finish time of the first published ``nightly`` record of ``day`` (None: none)."""
+    done = [
+        r.finished_at
+        for r in records
+        if r.session_date == day and published(r) and r.finished_at is not None
+    ]
+    return min(done) if done else None
 
 
 def latest_session(reader: StoreReader) -> dt.date | None:
@@ -255,4 +269,5 @@ def resolve_session(
         unavailable=unavailable_tables(missing, day),
         complete=day in found.complete,
         newer=newer,
+        cutoff=session_cutoff(reader.runs(NIGHTLY), day),
     )
