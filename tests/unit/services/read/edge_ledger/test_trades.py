@@ -7,6 +7,7 @@ the session's cutoff knew them."""
 from datetime import date, datetime, timedelta
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
@@ -22,8 +23,10 @@ from tests.helpers.rollup_store import write_rows
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.edge_desk.conftest import CUTOFF, KNOWN, store, trade
 from tests.unit.services.read.edge_ledger.conftest import LEDGER, context, pick
-from tests.unit.services.read.evaluation.conftest import END, FROZEN, write_run
+from tests.unit.services.read.evaluation.conftest import EDGE, END, FROZEN, write_run
 from tests.unit.services.read.evaluation.test_versions import MOVED, write_own_run
+
+EVIDENCED = {("site", "edges", "drift"): {**EDGE, "status": "evidenced"}}  # it records paper trades
 
 
 @pytest.fixture
@@ -157,7 +160,7 @@ def test_the_live_period_reads_the_paper_record_as_the_cutoff_knew_it(
                     trade("EQ:S", FROZEN.replace(month=9, day=1), "skipped", sell=sell, rank=2),
                     trade("EQ:O", FROZEN.replace(month=9, day=1), "won", sell=sell, rank=3,
                           screener="other")])  # fmt: skip
-    ctx = context(backend, "me", cutoff=CUTOFF)
+    ctx = context(backend, "me", EVIDENCED, cutoff=CUTOFF)
     page = load_edge_trades(ctx, edge_of(ctx), Period.LIVE)
     assert [r.instrument_id for r in page.rows] == ["EQ:L", "EQ:S"]  # the basis's screen only
     won, skipped = page.rows
@@ -185,12 +188,24 @@ def test_a_page_below_the_first_is_the_first(backend: MemoryBackend) -> None:
     assert page.page == 1 and [r.instrument_id for r in page.rows] == ["EQ:A", "EQ:B"]
 
 
+def test_a_candidate_has_no_live_period_and_says_so_never_an_empty_list(
+    backend: MemoryBackend,
+) -> None:
+    """The test that would have caught the Live filter showing "0 trades" for an edge that does
+    not record paper trades."""
+    ctx = context(backend, "me", cutoff=CUTOFF)  # drift is a candidate: nothing is recorded
+    page = load_edge_trades(ctx, edge_of(ctx), Period.LIVE)
+    assert page.unknown is not None and page.unknown.code is UnknownCode.NOT_RECORDING
+    assert page.rows == () and page.basis == "momo, 20 trading days"
+    assert load_edge_trades(ctx, edge_of(ctx), Period.ALL).unknown is None
+
+
 def test_the_live_total_counts_every_settled_row_beyond_the_lookback(
     backend: MemoryBackend,
 ) -> None:
     old = date(2024, 1, 2)  # well over 400 days before the session
     store(backend, [trade("EQ:OLD", old, "won", sell=date(2024, 2, 1))])
-    ctx = context(backend, "me", cutoff=CUTOFF)
+    ctx = context(backend, "me", EVIDENCED, cutoff=CUTOFF)
     page = load_edge_trades(ctx, edge_of(ctx), Period.LIVE)
     assert [r.instrument_id for r in page.rows] == ["EQ:OLD"] and page.total == 1
 
@@ -200,7 +215,7 @@ def test_a_hidden_copys_live_trades_are_served() -> None:
     write_own_run(backend)
     store(backend, [trade("EQ:F", date(2026, 9, 1), "won", sell=date(2026, 9, 30), edge="mine",
                           user="me")])  # fmt: skip
-    docs = {("me", "edges", "mine"): {"extends": "drift", "screeners": ["momo"]}}
+    docs = {("me", "edges", "mine"): {"extends": "drift", "screeners": ["momo"], "status": "live"}}
     ctx = context(backend, "me", docs, cutoff=CUTOFF)
     edge = load_edge(ctx, "mine")
     assert edge is not None and edge.oos_hidden
@@ -309,3 +324,36 @@ def test_a_ledger_of_many_decision_days_reads_each_snapshot_once(
     reads.clear()
     load_edge_trades(ctx, edge_of(ctx), Period.ALL, sort="symbol", limit=None)
     assert reads == []  # warm: the per-publish cache holds both snapshots
+
+
+def test_a_delisted_name_no_snapshot_held_has_its_listing_history_ticker(
+    backend: MemoryBackend,
+) -> None:
+    """The test that would have caught "Unknown" for the 1,754 delisted picks of momentum: their
+    ``EQ:TIINGO:<perma>`` ids are in no reference snapshot, only in the listing history."""
+    gone = [
+        pick(date(2026, 7, 2), "EQ:TIINGO:GONE", 1, False, delisted=True),
+        pick(date(2026, 2, 2), "EQ:TIINGO:LATER", 1, True, delisted=True),  # listed after that day
+    ]
+    write_run(backend, "site1", FROZEN, 0.6, trades=gone)
+    now = pd.Timestamp("2026-10-05", tz="UTC")
+    listings = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:TIINGO:GONE", "EQ:TIINGO:LATER"],
+            "ticker": ["GONE", "LATE"],
+            "start_date": [date(2005, 1, 3), date(2026, 3, 1)],
+            "end_date": [date(2026, 8, 3), None],
+            "exchange": "NYSE", "asset_type": "Stock", "price_currency": "USD",
+            "perma_ticker": "", "ts": now, "knowledge_ts": now,
+            "session_date": date(2026, 10, 5), "source": "tiingo", "run_id": "l",
+        }
+    )  # fmt: skip
+    StoreWriter(backend).write_table(
+        "instruments/listing_history", date(2026, 10, 5), "l", listings
+    )
+    ctx = context(named(backend), "owner", reference=OCT)
+    page = load_edge_trades(ctx, edge_of(ctx), Period.ALL)
+    later, gone_row = page.rows  # in key order: the February decision first
+    assert (gone_row.symbol.value, gone_row.symbol_as_of) == ("GONE", date(2026, 7, 2))
+    assert gone_row.company.value is None and gone_row.company.unknown is not None
+    assert later.symbol.value is None  # listed after its decision session: never a later ticker

@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.core.time.calendar import is_session
 from algotrade.services.read.edge_evidence.drawdown import load_drawdown
-from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.services.read.values import Unknown
 from algotrade.storage.backends.memory import MemoryBackend
 from tests.unit.services.read.edge_evidence.stored_result import (
     DAYS,
@@ -94,7 +94,8 @@ def test_an_outcome_with_no_return_has_no_drawdown(backend: MemoryBackend) -> No
     stored_run(backend, [series_row(d, FROZEN, **kw) for d in DAYS])
     d = load_drawdown(series_of(read(backend)))
     assert d.points == () and d.unit == "ratio"
-    assert d.unknown is not None and d.unknown.code is UnknownCode.NOT_APPLICABLE
+    # a state with a Guide term, never an Unknown whose cause chain an admin reads as a gap
+    assert (d.state, d.unknown) == ("not_a_return", None)
     assert (d.vol_in_sample, d.max_in_sample) == (None, None)
 
 

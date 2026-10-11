@@ -7,11 +7,12 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { EdgeTrades } from './EdgeTrades';
 
-const hooks = vi.hoisted(() => ({ useEdgeTrades: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useEdgeTrades: vi.fn(), useEdgeLiveStates: vi.fn() }));
 
 vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEdgeTrades: hooks.useEdgeTrades,
+  useEdgeLiveStates: hooks.useEdgeLiveStates,
 }));
 vi.mock('@/entities/availability', async () => {
   const { Text } = await import('@algotrade/ui');
@@ -42,6 +43,7 @@ const last = () => hooks.useEdgeTrades.mock.calls.at(-1)?.[0] as Record<string, 
 beforeEach(() => {
   hooks.useEdgeTrades.mockReset();
   hooks.useEdgeTrades.mockReturnValue(fakeQuery(TRADES_FIXTURE));
+  hooks.useEdgeLiveStates.mockReturnValue(fakeQuery([]));
 });
 
 describe('EdgeTrades', () => {
@@ -73,6 +75,17 @@ describe('EdgeTrades', () => {
     expect(last()).toMatchObject({ sort: 'RANK', page: 1 });
     await userEvent.click(within(screen.getByRole('grid')).getByRole('button', { name: /^Name/ }));
     expect(last()).toMatchObject({ sort: 'SYMBOL', page: 1 }); // by ticker, not by instrument id
+  });
+
+  it('turns Live off for an edge that records no paper trades, saying why', () => {
+    hooks.useEdgeLiveStates.mockReturnValue(
+      fakeQuery([{ edgeId: 'drift', state: 'not_recording', headline: '', followed: false }]),
+    );
+    render(<EdgeTrades edgeId="drift" />);
+    expect(screen.getByRole('radio', { name: 'Live' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'In-sample' })).toBeEnabled();
+    expect(screen.getByText('Live: not recording')).toBeInTheDocument();
+    expect(screen.getByText('help live_state')).toBeInTheDocument();
   });
 
   it('hands the period shown to the CSV button', async () => {

@@ -6,17 +6,22 @@ run's ledger (``runs.load_run_trades``, the one reader: hidden copies keep their
 a personal-licence per-name value is ``Unknown(LICENCE)`` to anyone but the licence holder,
 a pruned ledger ``Unknown(PRUNED)``, one never written ``Unknown(NOT_STORED)``), and ``live`` from
 the edge's paper record (``edge_desk.paper.load_trades``: the rows as the session's cutoff knew
-them, never re-derived). The GraphQL page and the CSV file both call it, so they cannot differ;
-an excluded pick keeps its public reason, the causes stay in the ``Unknown`` for admins."""
+them, never re-derived); an edge that records no paper trades has no live period
+(``Unknown(NOT_RECORDING)``, said, not an empty list). The GraphQL page and the CSV file both
+call it, so they cannot differ; an excluded pick keeps its public reason, the causes stay in the
+``Unknown`` for admins."""
 
 from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
 
+from algotrade.core.model.errors import MissingDataError
+from algotrade.data.listings.tickers import ListingTickers, listing_tickers
 from algotrade.data.reference import companies, instruments
-from algotrade.services.read.availability.cause import table_cause
+from algotrade.services.read.availability.cause import Cause, CauseLevel, CauseLink, table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk import paper
+from algotrade.services.read.edge_desk.states import is_recording
 from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edge
@@ -135,6 +140,7 @@ def _live(
     return present + missing
 
 
+PAPER_STEP = "edge-paper"  # the nightly step that records paper trades
 REFERENCE = "instruments/reference"
 SYMBOL = "symbol"  # the sort by ticker: the tickers are read after the rows, so it sorts here
 
@@ -170,6 +176,26 @@ def _snapshot_names(ctx: ReadContext, snap: date) -> Names:
     return ctx.cache.get_or_compute(("ledger-names", ctx.reader.visible_seq(), snap), read)  # type: ignore[no-any-return]
 
 
+def _listing_tickers(ctx: ReadContext) -> ListingTickers:
+    """The listing history's tickers, read once per publish (like the snapshot maps)."""
+    return ctx.cache.get_or_compute(  # type: ignore[no-any-return]
+        ("ledger-listing-tickers", ctx.reader.visible_seq()), lambda: listing_tickers(ctx.reader)
+    )
+
+
+def _listed(ctx: ReadContext, missing: list[TradeRow]) -> dict[tuple[str, date], str]:
+    """The ticker each of ``missing`` (rows no reference snapshot names) carried at its decision
+    session, from the listing history (a delisted name no snapshot ever held); a store with no
+    listing history names none."""
+    try:
+        listings = _listing_tickers(ctx)
+    except MissingDataError:
+        return {}
+    found = {(r.instrument_id, r.decision_session): listings.on(r.instrument_id, r.decision_session)
+             for r in missing}  # fmt: skip
+    return {k: v for k, v in found.items() if v is not None}
+
+
 def _last_known(ctx: ReadContext, ids: set[str]) -> dict[str, tuple[str, TradeText, date]]:
     """For each of ``ids`` the ticker of the LAST reference snapshot that held it (newest first,
     stopping once every id is found): a delisted pick's last known ticker."""
@@ -187,17 +213,23 @@ def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
     """``page`` with each row's ticker and company name as the reference snapshot in force at the
     row's DECISION session had them (never today's: a name changes ticker). Each row's day maps to
     its snapshot and each snapshot is read once, however many days or rows. A delisted pick its
-    day's snapshot lacks gets the last snapshot that held it, its last known ticker; any other
-    name no snapshot names is ``Unknown`` (never its id, ADR 0018)."""
+    day's snapshot lacks gets its ticker from the listing history as of that session (a delisted
+    name no snapshot ever held), else the last snapshot that held it, its last known ticker; any
+    other name no snapshot names is ``Unknown`` (never its id, ADR 0018)."""
     stamp = {
         d: reference_snapshot_on(ctx.reader, d) for d in {r.decision_session for r in page.rows}
     }
     names = {s: _snapshot_names(ctx, s) for s in {s for s in stamp.values() if s is not None}}
+    unnamed = [
+        r
+        for r in page.rows
+        if (snap := stamp[r.decision_session]) is None or r.instrument_id not in names[snap]
+    ]
+    listed = _listed(ctx, unnamed) if unnamed else {}
     missing = {
         r.instrument_id
-        for r in page.rows
-        if r.delisted
-        and ((snap := stamp[r.decision_session]) is None or r.instrument_id not in names[snap])
+        for r in unnamed
+        if r.delisted and (r.instrument_id, r.decision_session) not in listed
     }
     last = _last_known(ctx, missing) if missing else {}
     rows = []
@@ -207,6 +239,10 @@ def _named(ctx: ReadContext, page: EdgeTradePage) -> EdgeTradePage:
         as_of = snap
         if hit is not None:
             symbol, company = TradeText(hit[0]), hit[1]
+        elif (r.instrument_id, r.decision_session) in listed:
+            symbol = TradeText(listed[(r.instrument_id, r.decision_session)])
+            company = TradeText(None, _gap("the listing history names no company"))
+            as_of = r.decision_session
         elif r.instrument_id in last:
             ticker, company, as_of = last[r.instrument_id]
             symbol = TradeText(ticker)
@@ -256,6 +292,11 @@ def _unnamed(
         return EdgeTradePage(period, page, basis.unknown)
     words = f"{basis.key[0]}, {basis.key[1]} trading days"
     offset = 0 if limit is None else (page - 1) * limit
+    if period is Period.LIVE and not is_recording(edge):
+        why = "paper trades are recorded once the edge is evidenced or followed"
+        link = CauseLink(CauseLevel.STEP, PAPER_STEP, UnknownCode.NOT_RECORDING.value, why)
+        gap = Unknown(UnknownCode.NOT_RECORDING, Cause((link,)))
+        return EdgeTradePage(period, page, gap, words)
     if period is Period.LIVE:
         rows = _live(ctx, edge, basis, sort, descending)
         part = tuple(rows[offset : None if limit is None else offset + limit])

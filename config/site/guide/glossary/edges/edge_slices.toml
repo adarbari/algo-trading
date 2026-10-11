@@ -27,7 +27,7 @@ id = "slice_state"
 term = "Slice state"
 short = "Why a regime or holding-period figure is missing: not stored or hidden; a measured one has its value."
 body = """
-Measured: the figure is stored and shown. Not stored: the run behind the page is older than the figure, or the period does not exist (an edge with no frozen period has no out-of-sample). It also reads not stored where the harness keeps no such split, as with a regime's two sides. The figure is blank, never zero. Hidden: the out-of-sample result of a copy is withheld until you show it, and the whole-history figures hold it too. Only the in-sample figure is shown. Thin is separate: the figure is shown, with fewer trades than the verdict needs out of sample, so it can look good or bad by chance. A blank is not a poor result.
+Measured: the figure is stored and shown. Not stored: the run behind the page is older than the figure, or the period does not exist (an edge with no frozen period has no out-of-sample). It also reads not stored for the two sides of a regime or a year in a run from before the harness kept them. The figure is blank, never zero. Hidden: the out-of-sample result of a copy is withheld until you show it, and the whole-history figures hold it too. Only the in-sample figure is shown. Thin is separate: the figure is shown, with fewer trades than the verdict needs out of sample, so it can look good or bad by chance. A blank is not a poor result.
 """
 next = "Re-run the backtest to fill a not stored figure; show the out-of-sample result to fill a hidden one."
 see_also = ["by_regime", "by_holding_period", "out_of_sample", "in_sample", "trades"]

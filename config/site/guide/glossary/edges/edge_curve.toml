@@ -37,9 +37,24 @@ id = "drawdown"
 term = "Drawdown and volatility"
 short = "How far the curve fell below its previous high, the deepest drops with their dates, and how much the windows move."
 body = """
-The underwater line is the curve's distance below its running high, so it is zero at a new high. An episode runs from a high down to its low and back to that high, or is still open. The page lists the three deepest. The drop of each side of the split is measured on its own curve, so an out-of-sample drop is never a fall from an in-sample peak. The curve adds each window at the weight the evidence curve gives it, so overlapping windows are not counted again. It is built from whole windows, so it understates a dip inside a window. Volatility is the spread of the windows, scaled to a year by the independent windows a year holds. Windows of an every-session schedule overlap, and counting each as independent would overstate it. An outcome that is not a return has neither.
+The underwater line is the curve's distance below its running high, so it is zero at a new high. An episode runs from a high down to its low and back to that high, or is still open. The page lists the three deepest. The drop of each side of the split is measured on its own curve, so an out-of-sample drop is never a fall from an in-sample peak. The curve adds each window at the weight the evidence curve gives it, so overlapping windows are not counted again. It is built from whole windows, so it understates a dip inside a window. Volatility is the spread of the windows, scaled to a year by the independent windows a year holds. Windows of an every-session schedule overlap, and counting each as independent would overstate it. An outcome that is not a return has neither (see Not a return).
 """
-see_also = ["evidence_curve", "in_sample", "out_of_sample", "sharpe_ratio"]
+see_also = ["evidence_curve", "in_sample", "out_of_sample", "sharpe_ratio", "not_a_return"]
+
+[[term]]
+id = "not_a_return"
+term = "Not a return"
+short = "Why an edge has no drawdown or volatility: its outcome is a hit or a count, not a return, so there is no money to fall."
+body = """
+Some edges are judged on a yes or no: a put stays out of the money, a price touches a level, a
+cushion holds. Their curve counts wins above what the base rate predicts, not profit and loss.
+A drawdown is a fall in returns and a volatility is their spread, so neither exists for such an
+edge, and the page says so instead of drawing a line. Nothing is missing or failed: the question
+does not apply to this outcome. The same holds for a cost grid and a Sharpe ratio. Read the
+win rate, the lift and the excess-wins curve instead.
+"""
+next = "Read the excess-wins curve and the lift, which are measured for this edge."
+see_also = ["drawdown", "evidence_curve", "cost_state", "lift"]
 
 [[term]]
 id = "rolling_starts"

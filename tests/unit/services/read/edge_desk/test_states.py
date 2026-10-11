@@ -58,7 +58,9 @@ def test_a_site_edge_nobody_follows_is_judged_but_a_candidate_is_not_recorded(
     assert [(s.edge_id, s.state, s.followed) for s in unfollowed.live_states] == [
         ("drift", "below", False)
     ]
-    assert load_edge_desk(context(backend, follow=None)).live_states == ()  # a candidate
+    (candidate,) = load_edge_desk(context(backend, follow=None)).live_states  # a candidate
+    assert (candidate.state, candidate.closed, candidate.followed) == ("not_recording", 0, False)
+    assert "evidenced" in candidate.headline and candidate.state in LIVE_STATES
 
 
 def test_a_settlement_a_later_night_recorded_is_not_in_a_finished_sessions_state(

@@ -108,6 +108,7 @@ const RECORD_LABELS: Record<string, string> = {
   no_backtest: 'No backtest to compare',
   no_trades: 'No live record',
   not_settled: 'Not yet settled',
+  not_recording: 'Not recording',
 };
 
 const RECORD_TONES: Record<string, StatusTone> = {
@@ -118,6 +119,7 @@ const RECORD_TONES: Record<string, StatusTone> = {
   no_backtest: 'neutral',
   no_trades: 'neutral',
   not_settled: 'neutral',
+  not_recording: 'neutral',
 };
 
 export const recordLabel = (state: string): string => RECORD_LABELS[state] ?? state;
