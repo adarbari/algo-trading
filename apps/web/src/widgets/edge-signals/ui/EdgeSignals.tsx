@@ -2,13 +2,15 @@
  * "Edge signals" at the top of Ideas: what the edges the user follows say to buy tonight, what to
  * sell next session and how each followed edge is doing (its live record). Each list is the
  * server's paper record for the session; a row opens its ticker in Explore (through the edge's
- * name) or its edge. With no followed edge it is one line pointing to Edges. This widget loads on
+ * name) or its edge. With no followed edge it is one line pointing to Edges. Above them, one
+ * warning for each edge, followed or the site's, whose live record is below its usual range (the
+ * server's state and sentence). This widget loads on
  * demand, so the Ideas page's first paint does not carry it.
  */
-import { Button, DataTable, Heading, Panel, Stack } from '@algotrade/ui';
+import { Banner, Button, DataTable, Heading, Panel, Stack } from '@algotrade/ui';
 
-import { useEdgeDesk, type DeskTrade } from '@/entities/edge';
-import { GuideHelp } from '@/features/guide-help';
+import { recordLabel, useEdgeDesk, useEdgeLiveStates, type DeskTrade } from '@/entities/edge';
+import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { buyColumns, followedColumns, sellColumns } from '../model/columns';
 
@@ -23,7 +25,49 @@ export interface EdgeSignalsProps {
 
 const tradeId = (t: DeskTrade) => `${t.edgeId}:${t.instrumentId}`;
 
-export function EdgeSignals({ onOpen, onOpenEdge, onOpenEdges }: EdgeSignalsProps) {
+/** One warning per edge, followed or the site's, whose live record is below its usual range. */
+function BelowRange({ onOpenEdge }: Pick<EdgeSignalsProps, 'onOpenEdge'>) {
+  const states = useEdgeLiveStates();
+  const below = (states.data ?? []).filter((s) => s.state === 'below');
+  return (
+    <>
+      {below.map((s) => (
+        <Banner
+          key={s.edgeId}
+          tone="warning"
+          title={`${s.name}: ${recordLabel(s.state).toLowerCase()}`}
+          actions={
+            <Stack direction="row" gap={1} align="center">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  onOpenEdge(s.edgeId);
+                }}
+              >
+                Open edge
+              </Button>
+              {termHelp('live_state')}
+            </Stack>
+          }
+        >
+          {s.headline}
+        </Banner>
+      ))}
+    </>
+  );
+}
+
+export function EdgeSignals(props: EdgeSignalsProps) {
+  return (
+    <>
+      <BelowRange onOpenEdge={props.onOpenEdge} />
+      <Signals {...props} />
+    </>
+  );
+}
+
+function Signals({ onOpen, onOpenEdge, onOpenEdges }: EdgeSignalsProps) {
   const desk = useEdgeDesk();
   if (desk.isPending) {
     return <Panel title="Edge signals" state="loading" loadingLabel="Loading edge signals…" />;

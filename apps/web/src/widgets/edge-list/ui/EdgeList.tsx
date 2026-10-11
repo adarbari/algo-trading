@@ -11,6 +11,7 @@ import { useMemo } from 'react';
 import {
   EDGE_VIEWS,
   inView,
+  useEdgeLiveStates,
   useEdgeProblems,
   useEdges,
   verdictLabel,
@@ -39,7 +40,11 @@ const GROUPS: DataTableGroupBy<Edge> = {
 export function EdgeList({ onSelect, view = 'all', onViewChange }: EdgeListProps) {
   const edges = useEdges();
   const problems = useEdgeProblems();
-  const columns = useMemo(() => edgeColumns(), []);
+  const live = useEdgeLiveStates();
+  const columns = useMemo(
+    () => edgeColumns(new Map((live.data ?? []).map((s) => [s.edgeId, s]))),
+    [live.data],
+  );
   const all = useMemo(() => edges.data ?? [], [edges.data]);
   const rows = useMemo(() => all.filter((e) => inView(e, view)), [all, view]);
   const state =

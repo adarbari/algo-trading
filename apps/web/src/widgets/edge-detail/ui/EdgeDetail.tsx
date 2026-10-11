@@ -21,6 +21,7 @@ import {
 import { lazy, Suspense } from 'react';
 
 import {
+  EdgeLiveBadge,
   labelText,
   stateLabel,
   stateTone,
@@ -94,6 +95,7 @@ export function EdgeDetail({ id, onBack, onEdit }: EdgeDetailProps) {
               {termHelp('edge_status')}
               <StatusBadge tone={stateTone(edge.state)}>{stateLabel(edge.state)}</StatusBadge>
               {termHelp('edge_state')}
+              <EdgeLiveBadge edgeId={edge.id} help={termHelp('live_state')} />
               {edge.canonicalRun && (
                 <>
                   <Text size="sm" tone="secondary">

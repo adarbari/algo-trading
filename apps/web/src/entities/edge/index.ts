@@ -16,7 +16,7 @@ export {
   useEdgeResultBasis,
   useEdgeRollingStarts,
 } from './api/edge-result';
-export { useEdgeDesk, useEdgePaper } from './api/paper';
+export { useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
 export { useTrackRecords } from './api/track-records';
 export {
   EDGE_VIEWS,
@@ -64,6 +64,7 @@ export {
   type EdgePaper,
   type FollowedEdge,
   type ForwardTest,
+  type LiveState,
   type PaperRecord,
   type PaperTrade,
 } from './model/paper';
@@ -74,5 +75,6 @@ export {
   type RecordFigures,
   type TrackEntry,
 } from './model/track-records';
+export { EdgeLiveBadge } from './ui/EdgeLiveBadge';
 export { ScreenerEdgeName, ScreenerRecord, type ScreenerRecordProps } from './ui/ScreenerRecord';
 export { EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from './model/fixtures';

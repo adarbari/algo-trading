@@ -1,18 +1,21 @@
 /**
  * The edges list's columns: the edge (its screens beneath), its verdict (with its Guide button),
  * the out-of-sample result (the server's sentence), the trades behind it and where the user stands
- * (their own state, else the site's status). The
+ * (their own state, else the site's status) and the live state (the badge of a recorded edge). The
  * rows are edge documents, not instruments; every figure and sentence is served.
  */
 import { StatusBadge, Stack, Text, type DataTableColumn } from '@algotrade/ui';
 
 import {
+  recordLabel,
+  recordTone,
   stateOrStatus,
   stateTone,
   statusTone,
   verdictLabel,
   verdictTone,
   type Edge,
+  type LiveState,
 } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
 
@@ -24,7 +27,8 @@ const screensOf = (e: Edge): string => {
   return `${screens} · ${e.mine ? 'your edge' : 'site edge'}`;
 };
 
-export function edgeColumns(): DataTableColumn<Edge>[] {
+/** `live`: each recorded edge's live state by edge id (an edge without one shows nothing). */
+export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColumn<Edge>[] {
   return [
     {
       id: 'name',
@@ -71,6 +75,21 @@ export function edgeColumns(): DataTableColumn<Edge>[] {
       value: (e) => e.verdict.trades ?? null,
       format: { kind: 'number' },
       align: 'end',
+    },
+    {
+      id: 'live',
+      header: 'Live',
+      headerAction: termHelp('live_state'),
+      value: (e) => {
+        const state = live.get(e.id)?.state;
+        return state ? recordLabel(state) : '';
+      },
+      cell: ({ row }) => {
+        const state = live.get(row.id)?.state;
+        return state ? (
+          <StatusBadge tone={recordTone(state)}>{recordLabel(state)}</StatusBadge>
+        ) : null;
+      },
     },
     {
       id: 'status',
