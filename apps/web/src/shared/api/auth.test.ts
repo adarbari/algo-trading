@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const auth = {
+  initialize: vi.fn(),
   getSession: vi.fn(),
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
@@ -27,6 +28,7 @@ async function load(config: { url?: string; key?: string }) {
 const CONFIGURED = { url: 'https://p.supabase.co', key: 'anon' };
 
 beforeEach(() => {
+  auth.initialize.mockResolvedValue({ error: null });
   auth.getSession.mockResolvedValue({
     data: { session: { access_token: 'tok-1', user: { email: 'a@b.co' } } },
   });
@@ -40,6 +42,39 @@ afterEach(() => {
 });
 
 describe('with Supabase configured', () => {
+  it('reads the session only after the client finished its own start-up (no second refresh)', async () => {
+    const order: string[] = [];
+    let finish: (value: unknown) => void = () => undefined;
+    auth.initialize.mockImplementation(() => {
+      order.push('initialize');
+      return new Promise((resolve) => (finish = resolve));
+    });
+    auth.getSession.mockImplementation(() => {
+      order.push('getSession');
+      return Promise.resolve({ data: { session: null } });
+    });
+    const { accessToken } = await load(CONFIGURED);
+    const read = accessToken();
+    await Promise.resolve();
+    expect(order).toEqual(['initialize']);
+    finish({ error: null });
+    await read;
+    expect(order).toEqual(['initialize', 'getSession']);
+  });
+
+  it('shares one session read between concurrent callers (one refresh, not one each)', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    auth.getSession.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const { accessToken, currentSession } = await load(CONFIGURED);
+    const reads = Promise.all([accessToken(), accessToken(), currentSession()]);
+    release({ data: { session: { access_token: 'tok-2', user: { email: 'a@b.co' } } } });
+    expect(await reads).toEqual(['tok-2', 'tok-2', { email: 'a@b.co' }]);
+    expect(auth.getSession).toHaveBeenCalledTimes(1);
+    auth.getSession.mockResolvedValue({ data: { session: null } });
+    expect(await accessToken()).toBeNull();
+    expect(auth.getSession).toHaveBeenCalledTimes(2);
+  });
+
   it('creates the client once, with exactly the options supabase-js used', async () => {
     const { accessToken } = await load({ url: 'https://abcd.supabase.co/', key: 'anon' });
     await accessToken();

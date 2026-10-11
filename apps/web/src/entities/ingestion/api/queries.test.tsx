@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import { useCellDetail, useCompleteness, useFocusCell } from './queries';
+import { useCellDetail, useChainCoverage, useCompleteness, useFocusCell } from './queries';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -85,5 +85,15 @@ describe('ingestion queries', () => {
     await waitFor(() => {
       expect(result.current).toEqual({ dataset: 'bars/1d', session: '2026-10-02' });
     });
+  });
+
+  it('reads the chain coverage of the served session', async () => {
+    GQL.mockResolvedValue({ chainCoverage: { session: '2026-10-02', share: 0.8 } });
+    const { result } = renderHook(() => useChainCoverage(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('chainCoverage');
+    expect(result.current.data).toEqual({ session: '2026-10-02', share: 0.8 });
   });
 });

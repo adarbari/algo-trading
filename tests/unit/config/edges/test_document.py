@@ -381,6 +381,18 @@ def test_a_promoted_screener_must_be_one_the_edge_lists() -> None:
         edge(implementation={})
 
 
+def test_a_declared_basis_horizon_is_one_of_the_outcomes_horizons() -> None:
+    assert edge().basis_horizon is None
+    e = edge(implementation={"horizon": 2})  # a horizon alone: no promoted screener needed
+    assert (e.basis_horizon, e.promoted) == (2, None)
+    both = edge(screeners=["momo", "mod"], implementation={"promoted": "mod", "horizon": 2})
+    assert (both.basis_horizon, both.promoted) == (2, "mod")
+    with pytest.raises(ConfigurationError, match="not one of the outcome's horizon_sessions"):
+        edge(implementation={"horizon": 7})
+    with pytest.raises(ConfigurationError, match="promoted"):
+        edge(implementation={"horizon": 2, "compared": []})  # compared needs the promotion
+
+
 def test_the_numbers_a_promotion_rests_on_are_parsed_and_checked() -> None:
     row = {
         "horizon": 2, "screener": "mod", "lift": 1.3, "decile_spread": 0.02,
