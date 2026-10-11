@@ -5,7 +5,9 @@ import { Surface } from '../../primitives/Surface';
 import { Text } from '../../primitives/Text';
 import { Button } from '../Button';
 import { Chip } from '../Chip';
+import { InfoButton } from '../InfoButton';
 import { StatusBadge } from '../StatusBadge';
+import { FormulaPreview } from '../FormulaPreview';
 import { Panel } from './Panel';
 
 const meta = {
@@ -111,6 +113,40 @@ export const Dense: Story = {
           ),
         )}
       </Stack>
+    ),
+  },
+};
+
+/** A draft review group: a status tag and the Guide button in the header, the formula preview inside. */
+export const DraftReviewGroup: Story = {
+  args: {
+    title: 'Formula to review',
+    headingLevel: 3,
+    actions: (
+      <>
+        <StatusBadge tone="accent">formula to review</StatusBadge>
+        <InfoButton label="What is a formula to review?" />
+      </>
+    ),
+    children: (
+      <FormulaPreview
+        name="draft_near_52w_high"
+        formula="close / price_stats.high_52w - 1"
+        inputs="Inputs: close, price_stats.high_52w · a ratio, 0 is at the high"
+        statsLabel="Dry run"
+        stats={[
+          { label: 'Rows checked', value: 13334, format: { kind: 'number', digits: 0 } },
+          { label: 'No value', value: 0.062, format: { kind: 'percent', digits: 1 } },
+          { label: 'Range', value: '-0.97 to 0' },
+          { label: 'Passing', value: 612, format: { kind: 'number', digits: 0 } },
+        ]}
+        actions={
+          <>
+            <Button variant="primary">Review and add</Button>
+            <Button variant="ghost">Skip</Button>
+          </>
+        }
+      />
     ),
   },
 };

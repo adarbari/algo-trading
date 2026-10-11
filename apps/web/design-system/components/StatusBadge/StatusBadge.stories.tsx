@@ -65,3 +65,21 @@ export const Dense: Story = {
     </Stack>
   ),
 };
+
+/** The Describe it review statuses: the word says the state, the tone only reinforces it. */
+export const DraftReview: Story = {
+  render: () => (
+    <Stack direction="row" gap={2} wrap>
+      <StatusBadge tone="positive" icon="check">
+        applied
+      </StatusBadge>
+      <StatusBadge tone="accent">formula to review</StatusBadge>
+      <StatusBadge tone="warning" icon="alert">
+        needs your call
+      </StatusBadge>
+      <StatusBadge tone="neutral">not available yet</StatusBadge>
+      <StatusBadge tone="neutral">requested, not applied</StatusBadge>
+      <StatusBadge tone="info">waiting on formula</StatusBadge>
+    </Stack>
+  ),
+};
