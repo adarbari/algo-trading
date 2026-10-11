@@ -17,6 +17,9 @@ the store's ``data_url`` is given, and held to ``[budget]``, its counters seeded
 at startup; so even a single provider is wrapped in the chain."""
 
 import logging
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
+from typing import Any
 
 from algotrade.config.env import (
     LLM_API_KEY,
@@ -32,7 +35,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.ledger import UsageLedger
 from algotrade.services.text_model.model import TextModel
-from algotrade.services.text_model.usage import open_recorder, store_seed
+from algotrade.services.text_model.usage import UsageSink, open_recorder, store_seed
 from algotrade_sources.framework.registry import build_claude_cli, build_text_model
 
 log = logging.getLogger(__name__)
@@ -42,12 +45,18 @@ FORCED_OFF = f"the text model is forced off by ${LLM_SWITCH}=off (tests, smoke, 
 
 
 def open_text_model(
-    configs: SiteDocuments, data_url: str | None = None
+    configs: SiteDocuments,
+    data_url: str | None = None,
+    *,
+    only: Sequence[str] | None = None,
+    tee: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[TextModel | None, str]:
     """-> (the model ``llm.toml`` names with the keys from the environment, why there is none).
     ``None`` when off or when the file is wrong; the reason is what the route answers 503 with.
     ``data_url``: the store the usage is recorded to and the budget counters are seeded from
-    (``None``: counted in memory only, as tests do)."""
+    (``None``: counted in memory only, as tests do). ``only``: the chain restricted to these
+    provider ids (the golden evaluation asks one provider at a time, ``ops/golden.py``);
+    ``tee``: sees every usage row the ledger records, before it is written."""
     if llm_off():  # before anything is read: no file, key or login can turn it on
         return None, FORCED_OFF
     try:
@@ -55,7 +64,9 @@ def open_text_model(
         if not settings.enabled:
             return None, OFF
         _known_users(settings, configs)
-        return _chain(settings, _ledger(settings, data_url)), OFF
+        if only is not None:
+            settings = _restricted(settings, only)
+        return _chain(settings, _ledger(settings, data_url, tee)), OFF
     except ConfigurationError as exc:
         log.error("the text model is off, llm.toml is not usable: %s", exc)
         return None, f"the text model is off: {exc}"
@@ -73,10 +84,42 @@ def _known_users(settings: LlmSettings, configs: SiteDocuments) -> None:
             )
 
 
-def _ledger(settings: LlmSettings, data_url: str | None) -> UsageLedger:
-    if data_url is None:
-        return UsageLedger(settings)
-    return UsageLedger(settings, open_recorder(data_url), store_seed(data_url))
+def _restricted(settings: LlmSettings, only: Sequence[str]) -> LlmSettings:
+    """``settings`` with only the providers named (in the file's order); an unknown id is a
+    ``ConfigurationError``."""
+    known = [p.id for p in settings.providers]
+    unknown = sorted(set(only) - set(known))
+    if unknown:
+        raise ConfigurationError(f"llm.toml has no provider {unknown}: it has {known}")
+    return replace(settings, providers=tuple(p for p in settings.providers if p.id in only))
+
+
+class _Tee:
+    """A usage sink that shows each row to ``tee``, then hands it to the real sink (if any)."""
+
+    def __init__(self, tee: Callable[[Mapping[str, Any]], None], inner: UsageSink | None) -> None:
+        self._tee, self._inner = tee, inner
+
+    def submit(self, row: Mapping[str, Any]) -> bool:
+        self._tee(row)
+        return self._inner.submit(row) if self._inner is not None else True
+
+    def close(self) -> None:
+        close = getattr(self._inner, "close", None)
+        if close is not None:
+            close()
+
+
+def _ledger(
+    settings: LlmSettings,
+    data_url: str | None,
+    tee: Callable[[Mapping[str, Any]], None] | None = None,
+) -> UsageLedger:
+    sink = open_recorder(data_url) if data_url is not None else None
+    seed = store_seed(data_url) if data_url is not None else None
+    if tee is not None:
+        return UsageLedger(settings, _Tee(tee, sink), seed)
+    return UsageLedger(settings) if sink is None else UsageLedger(settings, sink, seed)
 
 
 def _chain(settings: LlmSettings, ledger: UsageLedger) -> TextModel:
