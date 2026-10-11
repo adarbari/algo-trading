@@ -1,0 +1,18 @@
+{
+  "id": "fcf-yield-beats-treasury",
+  "sentence": "companies where free cash flow yield beats the 10y treasury yield",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "free cash flow yield beats the 10y treasury yield",
+        "bucket": "C",
+        "fields": []
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

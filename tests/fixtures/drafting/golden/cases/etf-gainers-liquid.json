@@ -1,0 +1,39 @@
+{
+  "id": "etf-gainers-liquid",
+  "sentence": "ETFs up more than 10% in the last 60 days that trade at least $20M a day",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "ETFs",
+        "bucket": "A",
+        "fields": [
+          "instrument.is_etf"
+        ],
+        "op": "eq",
+        "value": true,
+        "tolerance": 0
+      },
+      {
+        "span": "up more than 10% in the last 60 days",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.ret_60d"
+        ],
+        "op": "gt",
+        "value": 0.1,
+        "tolerance": 0.0
+      },
+      {
+        "span": "at least $20M a day",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.adv_usd_20d"
+        ],
+        "op": "gte",
+        "value": 20000000,
+        "tolerance": 0.1
+      }
+    ]
+  }
+}
