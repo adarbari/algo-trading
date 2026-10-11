@@ -254,7 +254,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 **Status:** blocked. **Thesis:** Stocks moving between the Russell 1000 and 2000 at the annual reconstitution feel predictable pressure from the funds that track them.
 
-**Why blocked:** Alive, but one event a year gives at most two in the stored bars, under the 40 independent events the bar asks, and we hold no Russell membership (events/index_change is the S&P 500 only); ED6 (listing history from 2010) unblocks it.
+**Why blocked:** Alive, but too few events: one a year to 2025 and two a year from 2026 give about 16 events from 2010 and 2 more a year, under the 40 independent events the bar asks until the mid-2030s, even with full membership history. We also hold no Russell membership (events/index_change is the S&P 500 only), and the universe (ADR 0013) lacks the small caps needed to rebuild the rank-day cut-off, so membership needs FTSE Russell's lists.
 
 - **Outcome:** excess return, over 20 sessions, vs SPY, starting +1 sessions from the event
 - **Schedule:** on each `index_change` (an S&P 500 membership change (events/index_change); anchor: the session it is first stored)
@@ -263,7 +263,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Screeners:** none yet
 - **Baselines:** none yet
 - **Published:** mean excess 5.00% over 20 sessions (Chang, Y.-C., Hong, H. and Liskovich, I., Regression Discontinuity and the Price Effects of Stock Market Indexing, Review of Financial Studies, 2015, 17 years)
-- **Notes:** The schedule is a placeholder: index_change is the S&P 500 only; ED6 adds a Russell membership source and its event class.
+- **Notes:** The schedule is a placeholder: index_change is the S&P 500 only, and the harness has no field to read it from (a fitness test keeps an open edge off such a class). The thesis needs its own event class, russell_reconstitution (ADR 0050 market structure), read from FTSE Russell's add / delete lists: anchor the session after the preliminary list, known_from its publication after the close, so a 20-session window runs from the list to the effective date (Madhavan's window). Calendar (FTSE Russell, checked 2026-10-10): rank day the last business day of April (May before 2023); preliminary lists after the close on the 4th Friday of May, updated weekly; effective after the close on the 4th Friday of June (2023-06-23, 2024-06-28, 2025-06-27, 2026-06-26). Semi-annual from 2026: rank day 2026-10-30, preliminary lists 2026-11-13, effective after the close on 2026-12-11 (first announced as the 2nd Friday of November; no standing rule for later Decembers, so the dates come from the lists, never a calendar rule). Plan: ADR 0050 amendment and the source and licence decision (owner), the source and ingestion task, the feature group and event field, then this schedule.
 
 **Quality bar**
 
@@ -274,7 +274,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 5. **Faithful replication:** Madhavan's additions and deletions around the rank day and reconstitution date.
 6. **Expected size and sample:** Measurable but shrinking in the published studies (Madhavan 2003; Chang et al. 2015); one event a year.
 7. **Capacity and costs:** Small caps at the 1000 / 2000 boundary; a crowded trade on one day.
-8. **Failure modes and retirement:** Front-running moves the pressure earlier each year; a semiannual schedule changes the dates.
+8. **Failure modes and retirement:** Front-running moves the pressure earlier each year; the semi-annual schedule from 2026 (a December reconstitution) splits the demand across two dates and may shrink each.
 9. **Decoys:** Size and past returns decide membership: the size and momentum baselines.
 
 **Sources**
