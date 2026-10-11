@@ -53,6 +53,7 @@ class ScreenDraft:
     document: dict[str, Any]
     dropped: tuple[DroppedCriterion, ...]
     notes: tuple[str, ...]
+    call_id: str | None = None  # the text-model call that made it (usage/llm_calls, ADR 0066)
 
 
 def draft_screen(
@@ -100,7 +101,7 @@ def _draft(
     if rank:
         document["rank"] = rank
     document, dropped = validated(ctx, screener_id, document, dropped)
-    return ScreenDraft(screener_id, document, dropped, notes_of(proposal))
+    return ScreenDraft(screener_id, document, dropped, notes_of(proposal), completion.call_id)
 
 
 def parse_answer(answer: str) -> Mapping[str, Any]:

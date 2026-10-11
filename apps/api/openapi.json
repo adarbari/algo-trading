@@ -307,6 +307,19 @@
             "description": "the screen's TOML keys as JSON (the version is managed)",
             "title": "Document",
             "type": "object"
+          },
+          "draft_session_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the id a draft-from-text answer returned, when this screen came from it (ADR 0066); a hand-built screen sends none",
+            "title": "Draft Session Id"
           }
         },
         "required": [
@@ -651,6 +664,25 @@
           "sample"
         ],
         "title": "ExpressionCheck",
+        "type": "object"
+      },
+      "FinaliseBody": {
+        "properties": {
+          "draft_session_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the id a draft-from-text answer returned, when this screen came from it (ADR 0066); a hand-built screen sends none",
+            "title": "Draft Session Id"
+          }
+        },
+        "title": "FinaliseBody",
         "type": "object"
       },
       "Finalised": {
@@ -1773,6 +1805,18 @@
             "description": "the draft for the Builder (never saved here)",
             "title": "Document",
             "type": "object"
+          },
+          "draft_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ties this draft to the screen later saved from it (ADR 0066); send it back with the save; null when feedback is not recorded",
+            "title": "Draft Session Id"
           },
           "dropped": {
             "description": "proposed criteria the draft does not keep",
@@ -3611,6 +3655,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/FinaliseBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

@@ -137,6 +137,11 @@ path = "src/algotrade/data"
 purpose = "the domain read API: the only way consumers read market data (R1); feature inputs by table name (feature_inputs.py)"
 
 [[dir]]
+path = "src/algotrade/data/feedback"
+purpose = "reads of the feedback grain (feedback/, ADR 0066): the Describe-it events the API recorded, over a date range, unfiltered; importable only by the read model's viewer-scoped loader"
+contracts = ["Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"]
+
+[[dir]]
 path = "src/algotrade/data/funds"
 purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge"
 
@@ -273,14 +278,14 @@ purpose = "use cases (the backend's interface for apps); shared helpers: configs
 path = "src/algotrade/services/authoring"
 purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features; the only config writer the API calls"
 contracts = [
-    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)",
     "Config writes go only through services.authoring (ADR 0029)",
 ]
 
 [[dir]]
 path = "src/algotrade/services/backtests"
 purpose = "use case: run a configured backtest, record its run and results"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)"]
 
 [[dir]]
 path = "src/algotrade/services/drafting"
@@ -328,7 +333,7 @@ path = "src/algotrade/services/events"
 purpose = "use case: which names the event-sensitivity study covers (ADR 0050): the tier A / B short-put names, the site scope list and the stocks the scoped leveraged funds track, each with its reason; symbols resolved through SymbolResolver of the session's reference snapshot, the unknown ones reported; and the usefulness order of the universe for a budgeted history backfill (fill.py); read-only"
 contracts = [
     "Event scope is read-only: no writers, no jobs, no vendors (ADR 0050)",
-    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)",
 ]
 
 [[dir]]
@@ -336,7 +341,15 @@ path = "src/algotrade/services/explaining"
 purpose = "use case: the market regime explained in plain words on request (ADR 0041, amended): the prompt of facts and allowed links, the answer cleaned and number-checked, the TextCache protocol and key, the per-user rate limit; the only write is the explanation cache"
 contracts = [
     "Explaining reads the regime and writes only its cache: no writers, no jobs, no vendors (ADR 0041)",
-    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)",
+]
+
+[[dir]]
+path = "src/algotrade/services/feedback"
+purpose = "use case: the feedback of Describe it (ADR 0066): the events of a drafting session as rows (clipped, hashed, never failing a request), the diff of a save against the returned draft, and the background recorder of feedback/drafting_events; no market-data writer, no jobs"
+contracts = [
+    "Drafting feedback writes only feedback/* tables: no market-data writer, no jobs (ADR 0066)",
+    "Only the drafting-feedback recorder imports the feedback writer (ADR 0066)",
 ]
 
 [[dir]]
@@ -439,7 +452,7 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 [[dir]]
 path = "src/algotrade/services/screening"
 purpose = "use case: run a screener over the universe, record the run, export its rows"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)"]
 
 [[dir]]
 path = "src/algotrade/services/text_model"

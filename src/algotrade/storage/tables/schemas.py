@@ -326,6 +326,38 @@ USAGE_LLM_CALLS = fixed(
     runs="merge",
     key=("ts", "provider", "use_case", "user", "outcome"),
 )
+# The Describe-it feedback events (ADR 0066, the API's sixth write): one row per event of a
+# drafting session (``draft_requested``, ``draft_returned``, ``choice_made``,
+# ``formula_accepted``, ``formula_skipped``, ``draft_saved``, ``screen_finalised``,
+# ``edge_revised``), one partition per exchange calendar date of the event. Runs merge (each is
+# a batch of events; all kept). ``draft_session_id`` ties the events of one draft to the screen
+# saved from it; ``call_ids`` is a comma-delimited list of ``usage/llm_calls.call_id``;
+# ``draft_hash`` / ``saved_hash`` are content hashes (the draft the model returned, the document
+# saved); ``sentence`` is the trader's text (<= 1,000 characters, personal data: ADR 0066 has the
+# retention) and ``payload`` a small JSON object (the server-side diff of a save, the choices).
+# Only the columns that are not the event's identity are nullable. Written only through
+# ``FeedbackWriter`` (``feedback/*``); read across a date range by ``data.feedback``.
+FEEDBACK_DRAFTING_EVENTS = fixed(
+    "feedback/drafting_events",
+    "feedback",
+    ("event_id", "ts", "event"),
+    "event_id string!",
+    "draft_session_id string!",
+    "ts timestamp_utc!",
+    "user string!",
+    "doc_kind string!",
+    "doc_id string!",
+    "event string!",
+    "call_ids string",
+    "catalogue_version string",
+    "prompt_version string",
+    "draft_hash string",
+    "saved_hash string",
+    "sentence string",
+    "payload string",
+    runs="merge",
+    key=("draft_session_id", "event_id", "event"),
+)
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
 TREASURY_RATES = fixed(
@@ -575,6 +607,7 @@ KNOWN: dict[str, TableSpec] = {
         EDGE_TRADES,
         LIVE_OPTION_QUOTES,
         USAGE_LLM_CALLS,
+        FEEDBACK_DRAFTING_EVENTS,
         ETF_HOLDINGS,
         MACRO_SERIES,
         EARNINGS_EVENTS,

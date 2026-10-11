@@ -23,6 +23,21 @@ class DraftBody(BaseModel):
     document: dict[str, Any] = Field(
         description="the screen's TOML keys as JSON (the version is managed)"
     )
+    draft_session_id: str | None = Field(
+        None,
+        max_length=64,
+        description="the id a draft-from-text answer returned, when this screen came from it "
+        "(ADR 0066); a hand-built screen sends none",
+    )
+
+
+class FinaliseBody(BaseModel):
+    draft_session_id: str | None = Field(
+        None,
+        max_length=64,
+        description="the id a draft-from-text answer returned, when this screen came from it "
+        "(ADR 0066); a hand-built screen sends none",
+    )
 
 
 class CopyBody(BaseModel):
