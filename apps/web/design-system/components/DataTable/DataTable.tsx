@@ -132,8 +132,8 @@ export interface DataTableProps<TRow> {
   emptyMessage?: ReactNode;
   /** Height of the scrolling body in rows (default 12); fewer rows shrink the table. */
   visibleRows?: number;
-  /** Lines of text per row: 1 (default) or 2 (a symbol with its name underneath). */
-  rowLines?: 1 | 2;
+  /** Lines of text per row: 1 (default), 2 (a symbol with its name underneath) or 3 (a cell that wraps a short list of links). */
+  rowLines?: 1 | 2 | 3;
   /** Toolbar content before the column picker (a count, filters). */
   toolbar?: ReactNode;
   /**

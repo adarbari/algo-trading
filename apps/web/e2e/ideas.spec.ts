@@ -39,8 +39,15 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('list', { name: 'Screener priority' })).toHaveCount(0);
     const aapl = grid(page).getByRole('row', { name: /AAPL/ });
     await expect(aapl).toContainText('Apple Inc. · XLK');
-    await expect(aapl).toContainText('VRP scanner');
-    await expect(aapl).toContainText('+1 more');
+    await expect(aapl.getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
+      'href',
+      '/screeners/vrp-scanner',
+    );
+    await expect(aapl.getByRole('link', { name: 'Short premium liquidity' })).toHaveAttribute(
+      'href',
+      /^\/screeners\/[\w-]+$/,
+    );
+    await expect(aapl).not.toContainText('more');
     await expect(aapl).toContainText('226.80');
     await expect(aapl.getByRole('img', { name: /^Criteria: / })).toHaveAccessibleName(
       /Trend up: Passed, Iv rank: Near miss/,
