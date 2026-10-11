@@ -21,7 +21,7 @@ detect = [{ call = "not_applicable" }]
 
 [[responsibility]]
 id = "feature-expressions"
-description = "The expression language for features: lexing, parsing, type checking and vectorised evaluation of a formula over feature columns (null semantics, Kleene logic); never Python eval"
+description = "The expression language for features: lexing, parsing, type checking and vectorised evaluation of a formula over feature columns (null semantics, Kleene logic); the formula fingerprint (fingerprint.py: params bound, constants folded, commutative operands sorted, hashed, so a duplicate feature is found, ADR 0023); never Python eval"
 owner = ["src/algotrade/features/expressions/*"]
 section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
 detect = [
