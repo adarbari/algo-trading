@@ -2,22 +2,25 @@
   "bundle": {
     "entry_gzip_bytes": 24800,
     "entry_closure_gzip_bytes": 195700,
-    "lazy_only": ["design-system/components/Chart/engine.ts"],
+    "lazy_only": [
+      "design-system/components/Chart/engine.ts"
+    ],
     "routes": {
       "src/pages/admin-harness-runs/index.ts": 32005,
       "src/pages/admin-ingestion/index.ts": 48613,
-      "src/pages/admin-llm-usage/index.ts": 49407,
+      "src/pages/admin-llm-usage/index.ts": 47300,
+      "src/pages/admin-llm-usage/ui/CallsSection.tsx": 52200,
       "src/pages/guide/index.ts": 57599,
-      "src/pages/login/index.ts": 1839,
+      "src/pages/login/index.ts": 1800,
       "src/pages/screener-results/index.ts": 70560,
       "src/pages/trader-calendar/index.ts": 12934,
       "src/pages/trader-edges/index.ts": 45370,
+      "src/pages/trader-edges/ui/EdgeSections.tsx": 76111,
       "src/pages/trader-explore/index.ts": 62440,
       "src/pages/trader-explore/ui/OtherTabs.tsx": 93540,
       "src/pages/trader-ideas/index.ts": 41929,
       "src/pages/trader-regime/index.ts": 59260,
-      "src/pages/trader-screeners/index.ts": 17586,
-      "src/pages/trader-edges/ui/EdgeSections.tsx": 76111
+      "src/pages/trader-screeners/index.ts": 17586
     }
   },
   "e2e": {
