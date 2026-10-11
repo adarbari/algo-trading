@@ -44,6 +44,27 @@ describe('EdgeFigures', () => {
     expect(pbo).not.toHaveTextContent('0.00');
   });
 
+  it('adds the risk-neutral and touch rates only when the run stored them, never as zero', () => {
+    const rates = {
+      ...verdict,
+      columns: verdict.columns.map((c) =>
+        c.period === 'out_of_sample' ? { ...c, referenceRate: 0.609, touchRate: 0.417 } : c,
+      ),
+    };
+    render(<EdgeFigures verdict={rates} />);
+    const touch = screen.getByRole('row', { name: /Touch rate/ });
+    expect(touch).toHaveTextContent('41.7%');
+    expect(touch).toHaveTextContent('—'); // the sides that stored none
+    expect(screen.getByRole('row', { name: /Risk-neutral rate/ })).toHaveTextContent('60.9%');
+    expect(screen.getByText('help touch_rate')).toBeInTheDocument();
+  });
+
+  it('has no rate rows for an outcome that has none', () => {
+    render(<EdgeFigures verdict={verdict} />);
+    expect(screen.queryByRole('row', { name: /Touch rate/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Risk-neutral rate/ })).not.toBeInTheDocument();
+  });
+
   it('says there are no figures without an official result', () => {
     render(<EdgeFigures verdict={{ ...verdict, columns: [] }} />);
     expect(screen.getByText('No figures yet: the edge has no official result')).toBeInTheDocument();

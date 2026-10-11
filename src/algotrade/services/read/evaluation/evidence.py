@@ -7,7 +7,10 @@ projection (ADR 0064 decision 7: the harness writes the exit sessions of the sch
 decision sessions and the scheduled and measured counts on its ``all`` row): the missing trades
 are scaled by how often the out-of-sample side filled (measured over scheduled, floored at
 ``FILL_FLOOR``) and read off the stored exits. Otherwise the outlook says which state the
-projection is in, never a made-up date. An estimate: never an input to a verdict."""
+projection is in, never a made-up date. Both count criteria are projected (the page shows when
+Promising's count and Works's are expected) and the next close is the first stored exit after the
+run. ``AtTarget`` is the verdict as it would stand with the count gate met, on today's figures
+(computed by the verdict, which owns the rule). An estimate: never an input to a verdict."""
 
 import math
 from collections.abc import Sequence
@@ -16,6 +19,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Final
 
 from algotrade.config.edges.verdict import VerdictSettings
+from algotrade.core.time.calendar import sessions_to
 
 if TYPE_CHECKING:
     from algotrade.services.read.evaluation.verdict import VerdictCriterion
@@ -30,6 +34,13 @@ PROJECTED, NOT_STORED, BEYOND_PROJECTION, UNPROJECTABLE, OOS_HIDDEN = (
     "oos_hidden",
 )
 PROJECTION_STATES: Final = (PROJECTED, NOT_STORED, BEYOND_PROJECTION, UNPROJECTABLE, OOS_HIDDEN)
+LEVEL_WORDS: Final = {
+    "works": "Works",
+    "promising": "Promising",
+    "not_working": "Not working",
+    "not_enough_data": "Not enough data",
+    "waiting_on_data": "Waiting on data",
+}
 FILL_FLOOR: Final = 0.25  # the lowest share of decision sessions a projection counts on measuring
 
 
@@ -44,6 +55,36 @@ class Projection:
     measured: int | None = None
     scheduled_oos: int | None = None
     measured_oos: int | None = None
+
+
+@dataclass(frozen=True)
+class CountProjection:
+    """One count criterion still short: ``have`` of ``needed`` (``oos``: out-of-sample trades,
+    else the whole history's), ``remaining`` to come, the ``state`` of its projection and
+    ``expected_by`` the exit of the trade that completes it, at ``fill_ratio`` of the decision
+    sessions measured and one trade every ``cadence_sessions`` sessions."""
+
+    criterion: str
+    oos: bool
+    have: int
+    needed: int
+    remaining: int
+    state: str
+    expected_by: date | None = None
+    fill_ratio: float | None = None
+    cadence_sessions: int | None = None
+
+
+@dataclass(frozen=True)
+class AtTarget:
+    """The verdict with the count gate of the outlook's criterion met (``needed`` trades), on
+    today's figures: its ``level``, the ``reasons`` it is not better (the failing tests, in
+    words) and the server's ``sentence``."""
+
+    needed: int
+    level: str
+    reasons: tuple[str, ...]
+    sentence: str
 
 
 @dataclass(frozen=True)
@@ -67,6 +108,10 @@ class EdgeOutlook:
     projection_state: str | None = None
     expected_by: date | None = None
     fill_ratio: float | None = None
+    cadence_sessions: int | None = None
+    projections: tuple[CountProjection, ...] = ()  # every count criterion still short
+    next_close: date | None = None  # the first stored exit after the run: the next trade to close
+    at_target: AtTarget | None = None
 
 
 @dataclass(frozen=True)
@@ -86,13 +131,16 @@ class EvidenceProgress:
     outlook: EdgeOutlook | None = None
 
 
-def _count(gap: "VerdictCriterion", oos: int, whole: int, t: VerdictSettings) -> tuple[int, int]:
-    """``(have, needed)`` of a count criterion: its out-of-sample count, or for ``works_trades``
-    whichever of the whole history's and the out-of-sample count is further from its bound."""
-    if gap.id == "trades":
-        return oos, t.min_oos_trades
+def count_of(cid: str, oos: int, whole: int, t: VerdictSettings) -> tuple[int, int, bool]:
+    """``(have, needed, out_of_sample)`` of a count criterion: its out-of-sample count, or for
+    ``works_trades`` whichever of the whole history's and the out-of-sample count is further
+    from its bound."""
+    if cid == "trades":
+        return oos, t.min_oos_trades, True
     short_oos, short_whole = t.works_oos_trades - oos, t.works_trades - whole
-    return (oos, t.works_oos_trades) if short_oos >= short_whole else (whole, t.works_trades)
+    if short_oos >= short_whole:
+        return oos, t.works_oos_trades, True
+    return whole, t.works_trades, False
 
 
 def _fill_ratio(p: Projection) -> float | None:
@@ -118,6 +166,60 @@ def project(remaining: int, p: Projection | None) -> tuple[str, date | None, flo
     return PROJECTED, p.exits[nth - 1], ratio
 
 
+def _cadence(p: Projection | None, ratio: float | None) -> int | None:
+    """Sessions between two trades closing: the median gap between the stored exits, over the
+    share of decision sessions that fill (None: fewer than two exits or no ratio)."""
+    if p is None or ratio is None or len(p.exits) < 2:
+        return None
+    gaps = sorted(sessions_to(a, b) for a, b in zip(p.exits, p.exits[1:], strict=False))
+    return max(round(gaps[len(gaps) // 2] / ratio), 1)
+
+
+def _projection(
+    cid: str,
+    oos_trades: int,
+    whole_trades: int,
+    t: VerdictSettings,
+    schedule: str | None,
+    hidden: bool,
+    p: Projection | None,
+) -> CountProjection:
+    have, needed, oos = count_of(cid, oos_trades, whole_trades, t)
+    remaining = max(needed - have, 0)
+    if hidden:
+        return CountProjection(cid, oos, have, needed, remaining, OOS_HIDDEN)
+    if schedule is not None and schedule.startswith("on_event:"):
+        return CountProjection(cid, oos, have, needed, remaining, UNPROJECTABLE)
+    state, by, ratio = project(remaining, p)
+    return CountProjection(cid, oos, have, needed, remaining, state, by, ratio, _cadence(p, ratio))
+
+
+def _count_sentence(level: str, c: CountProjection) -> str:
+    """ "Promising needs 40 out-of-sample trades: 8 so far, 32 to go, about Sep 2028 at one trade
+    every 15 sessions." (the date and cadence only when projected)."""
+    kind = "out-of-sample trades" if c.oos else "trades"
+    words = f"{LEVEL_WORDS.get(level, level)} needs {c.needed} {kind}: {c.have} so far"
+    if c.remaining:
+        words += f", {c.remaining} to go"
+    if c.state == PROJECTED and c.expected_by is not None:
+        words += f", about {c.expected_by:%b %Y}"
+        if c.cadence_sessions:
+            every = (
+                "every session"
+                if c.cadence_sessions == 1
+                else f"every {c.cadence_sessions} sessions"
+            )
+            words += f" at one trade {every}"
+    return words + "."
+
+
+def _next_close(p: Projection | None, after: date | None) -> date | None:
+    """The first stored exit after ``after`` (the run's last session): the next trade to close."""
+    if p is None:
+        return None
+    return next((d for d in p.exits if after is None or d > after), None)
+
+
 def outlook_of(
     gap: "VerdictCriterion | None",
     sentence: str,
@@ -127,23 +229,31 @@ def outlook_of(
     schedule: str | None,
     hidden: bool,
     projection: Projection | None = None,
+    after: date | None = None,
+    at_target: AtTarget | None = None,
 ) -> EdgeOutlook | None:
     """The outlook for ``gap``, the first test the verdict has not passed (None: it passed
-    every test), worded ``sentence``; ``schedule``: the edge's (None: not known);
-    ``projection``: what the basis's ``all`` row stores (None: nothing)."""
+    every test), worded ``sentence`` (a count: the server's own, with the date); ``schedule``:
+    the edge's (None: not known); ``projection``: what the basis's ``all`` row stores (None:
+    nothing); ``after``: the run's last session; ``at_target``: the verdict with the count met
+    (from the verdict, only for a count)."""
     if gap is None:
         return None
+    oos, whole = oos_trades or 0, whole_trades or 0
+    every = tuple(
+        c
+        for cid in COUNT_CRITERIA
+        if (c := _projection(cid, oos, whole, t, schedule, hidden, projection)).remaining > 0
+    )
+    close = None if hidden else _next_close(projection, after)
     if gap.id not in COUNT_CRITERIA:
-        return EdgeOutlook(gap.id, gap.level, sentence)
-    have, needed = _count(gap, oos_trades or 0, whole_trades or 0, t)
-    remaining = max(needed - have, 0)
-    if hidden:
-        state, by, ratio = OOS_HIDDEN, None, None
-    elif schedule is not None and schedule.startswith("on_event:"):
-        state, by, ratio = UNPROJECTABLE, None, None
-    else:
-        state, by, ratio = project(remaining, projection)
-    return EdgeOutlook(gap.id, gap.level, sentence, have, needed, remaining, state, by, ratio)
+        return EdgeOutlook(gap.id, gap.level, sentence, projections=every, next_close=close)
+    mine = _projection(gap.id, oos, whole, t, schedule, hidden, projection)
+    return EdgeOutlook(
+        gap.id, gap.level, _count_sentence(gap.level, mine), mine.have, mine.needed,
+        mine.remaining, mine.state, mine.expected_by, mine.fill_ratio, mine.cadence_sessions,
+        every, close, at_target,
+    )  # fmt: skip
 
 
 def evidence_of(

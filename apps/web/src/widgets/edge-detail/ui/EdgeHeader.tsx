@@ -102,6 +102,11 @@ export function EdgeHeader({ edge, onBack, onEdit }: EdgeHeaderProps) {
           </Stack>
         </Stack>
         <Text size="base">{v.headline}</Text>
+        {v.basisWhy && (
+          <Text size="sm" tone="muted">
+            {v.basisWhy}
+          </Text>
+        )}
         {edge.rejectionReason && (
           <Text size="sm" tone="muted">
             {edge.rejectionReason}

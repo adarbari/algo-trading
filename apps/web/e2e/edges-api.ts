@@ -76,6 +76,7 @@ const CURVE = {
     trades: 1,
   })),
   gaps: [{ from: '2026-02-10', to: '2026-02-20', kind: 'no_picks', unknown: null }],
+  baselines: [],
   live: null,
   unknown: null,
 };
@@ -184,6 +185,9 @@ const CAPACITY = {
   variant: 'main',
   horizon: 20,
   floorUsd: 5000000,
+  positionUsd: 100000,
+  universeFloorUsd: null,
+  floorBinds: true,
   periods: ['in_sample', 'out_of_sample', 'all'].map((period) => ({
     period,
     state: 'measured',
@@ -191,6 +195,7 @@ const CAPACITY = {
     advMedian: 4e8,
     advKnown: 30,
     advLow: 2,
+    positionShare: 0.00025,
   })),
 };
 const ROLLING = {

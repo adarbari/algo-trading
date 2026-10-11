@@ -82,7 +82,8 @@ class EdgeCosts:
 @strawberry.type(
     description="One period of the capacity: the `advMedian` (dollars) of the 20-day average "
     "dollar volume of the `advKnown` counted picks that have one (of `picks`), `advLow` of them "
-    "below the site's floor; its `state` (measured, not_stored, oos_hidden)"
+    "below the site's floor; `positionShare` what a position of `EdgeCapacity.positionUsd` is "
+    "of the median pick's volume (0 to 1); its `state` (measured, not_stored, oos_hidden)"
 )
 class CapacityPeriod:
     period: str
@@ -91,19 +92,23 @@ class CapacityPeriod:
     adv_median: float | None
     adv_known: int | None
     adv_low: int | None
+    position_share: float | None
 
     @classmethod
     def of(cls, d: capacity.CapacityPeriod) -> Self:
         return cls(
             period=d.period, state=d.state, picks=d.picks, adv_median=d.adv_median,
-            adv_known=d.adv_known, adv_low=d.adv_low,
+            adv_known=d.adv_known, adv_low=d.adv_low, position_share=d.position_share,
         )  # fmt: skip
 
 
 @strawberry.type(
     description="How much money the picks of an edge's official result (the verdict's basis: "
     "`variant`, `horizon` sessions) can take: `floorUsd` is the site's low-liquidity floor today "
-    "and `periods` one row per period; `state` is measured when any period is, else not_stored"
+    "and `periods` one row per period; `positionUsd` the position the site sizes against the "
+    "median pick's volume; `universeFloorUsd` the floor the edge's own universe already requires "
+    "(null: none known) and `floorBinds`: the site floor is above it, so the low-liquidity row "
+    "says something; `state` is measured when any period is, else not_stored"
 )
 class EdgeCapacity:
     state: str
@@ -111,10 +116,14 @@ class EdgeCapacity:
     horizon: int | None
     floor_usd: float
     periods: list[CapacityPeriod]
+    position_usd: float
+    universe_floor_usd: float | None
+    floor_binds: bool
 
     @classmethod
     def of(cls, d: capacity.EdgeCapacity) -> Self:
         return cls(
             state=d.state, variant=d.variant, horizon=d.horizon, floor_usd=d.floor_usd,
-            periods=[CapacityPeriod.of(p) for p in d.periods],
+            periods=[CapacityPeriod.of(p) for p in d.periods], position_usd=d.position_usd,
+            universe_floor_usd=d.universe_floor_usd, floor_binds=d.floor_binds,
         )  # fmt: skip

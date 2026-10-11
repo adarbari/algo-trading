@@ -81,8 +81,9 @@ class EdgeDefinition:
 
 @strawberry.type(
     description="One test of the verdict: the `value` measured, the `threshold` it must reach "
-    "and its `status` (pass, fail, not_measured); `level`: the verdict it gates (promising, "
-    "works)"
+    "and its `status` (pass, fail, not_measured, not_applicable: nothing to test, as decoys "
+    "that are not declared; it counts neither for nor against the level); `level`: the "
+    "verdict it gates (promising, works)"
 )
 class VerdictCriterion:
     id: str
@@ -144,7 +145,9 @@ class VerdictYear:
 @strawberry.type(
     description="The basis's figures over one `period` (in_sample, out_of_sample or all); "
     "`liftPts`: win rate minus base rate, in points; `thin`: the out-of-sample column has "
-    "fewer trades than the verdict needs. A figure not stored is null"
+    "fewer trades than the verdict needs; `referenceRate` (the risk-neutral rate of a win) and "
+    "`touchRate` (picks whose strike was touched) only an expires-out-of-the-money outcome has. "
+    "A figure not stored is null"
 )
 class VerdictColumn:
     period: str
@@ -158,6 +161,8 @@ class VerdictColumn:
     deflated_sharpe: float | None
     pbo: float | None
     thin: bool
+    reference_rate: float | None
+    touch_rate: float | None
 
     @classmethod
     def of(cls, d: read.VerdictColumn) -> Self:
@@ -173,13 +178,61 @@ class VerdictColumn:
             deflated_sharpe=d.deflated_sharpe,
             pbo=d.pbo,
             thin=d.thin,
+            reference_rate=d.reference_rate,
+            touch_rate=d.touch_rate,
         )
 
 
 @strawberry.type(
+    description="One count of trades still short: `have` of `needed` (`oos`: out-of-sample "
+    "trades, else the whole history's), `remaining` to come, `state` of its projection "
+    "(projected, beyond_projection, not_stored, unprojectable, oos_hidden), `expectedBy` the "
+    "exit of the trade that completes it at `fillRatio` of the decision sessions measured and "
+    "one trade every `cadenceSessions` sessions"
+)
+class CountProjection:
+    criterion: str
+    oos: bool
+    have: int
+    needed: int
+    remaining: int
+    state: str
+    expected_by: date | None
+    fill_ratio: float | None
+    cadence_sessions: int | None
+
+    @classmethod
+    def of(cls, d: evidence.CountProjection) -> Self:
+        return cls(
+            criterion=d.criterion, oos=d.oos, have=d.have, needed=d.needed,
+            remaining=d.remaining, state=d.state, expected_by=d.expected_by,
+            fill_ratio=d.fill_ratio, cadence_sessions=d.cadence_sessions,
+        )  # fmt: skip
+
+
+@strawberry.type(
+    description="The verdict with the count of the outlook's test met (`needed` trades), on "
+    "today's figures: its `level`, `reasons` it is not better (the failing tests, in words) and "
+    "the server's `sentence`. An estimate, never an input to the verdict"
+)
+class AtTarget:
+    needed: int
+    level: str
+    reasons: list[str]
+    sentence: str
+
+    @classmethod
+    def of(cls, d: evidence.AtTarget) -> Self:
+        return cls(needed=d.needed, level=d.level, reasons=list(d.reasons), sentence=d.sentence)
+
+
+@strawberry.type(
     description="What would change the verdict: `criterion` (the first test not passed; "
-    "`level`: the verdict it gates) in `sentence`. For a count of trades (`trades`, "
-    "`works_trades`) `have` of `needed` and `remaining` to come, and `projectionState`: "
+    "`level`: the verdict it gates) in `sentence`. `projections` every count of trades still "
+    "short (Promising's and Works's), `nextClose` the exit of the next trade to close (the first "
+    "stored exit after the run) and, for a count, `atTarget` the verdict once it is met. For a "
+    "count of trades (`trades`, `works_trades`) `have` of `needed` and `remaining` to come, and "
+    "`projectionState`: "
     "projected (`expectedBy`: the exit of the trade that completes the count, at `fillRatio` of "
     "the decision sessions measured), beyond_projection (the count needs more sessions than the "
     "run stored), not_stored (an older run), unprojectable (an event schedule), oos_hidden. An "
@@ -196,6 +249,10 @@ class EdgeOutlook:
     projection_state: str | None
     expected_by: date | None
     fill_ratio: float | None
+    cadence_sessions: int | None
+    projections: list[CountProjection]
+    next_close: date | None
+    at_target: AtTarget | None
 
     @classmethod
     def of(cls, d: evidence.EdgeOutlook) -> Self:
@@ -209,6 +266,10 @@ class EdgeOutlook:
             projection_state=d.projection_state,
             expected_by=d.expected_by,
             fill_ratio=d.fill_ratio,
+            cadence_sessions=d.cadence_sessions,
+            projections=[CountProjection.of(p) for p in d.projections],
+            next_close=d.next_close,
+            at_target=AtTarget.of(d.at_target) if d.at_target else None,
         )
 
 
@@ -380,7 +441,8 @@ class EdgeDecay:
     description="An edge's verdict, judged on its official result (the canonical run): "
     "`verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` "
     "the first failing criterion in words; `headline` the page's sentence and `result` the "
-    "list's one-liner; `basis` the screen and holding period it rests on. The figures are the "
+    "list's one-liner; `basis` the screen and holding period it rests on (`basisWhy`: for a "
+    "basis chosen among several, the in-sample lifts it was chosen on). The figures are the "
     "basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus "
     "base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; "
     "`trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth "
@@ -396,6 +458,7 @@ class EdgeVerdict:
     headline: str
     result: str
     basis: str | None
+    basis_why: str
     trades: int | None
     oos_trades: int | None
     win_rate: float | None
@@ -425,6 +488,7 @@ class EdgeVerdict:
             headline=d.headline,
             result=d.result,
             basis=d.basis,
+            basis_why=d.basis_why,
             trades=d.trades,
             oos_trades=d.oos_trades,
             win_rate=d.win_rate,

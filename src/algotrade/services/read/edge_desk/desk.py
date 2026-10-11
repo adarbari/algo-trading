@@ -104,9 +104,9 @@ def load_edge_desk(ctx: ReadContext) -> EdgeDesk:
     nxt = next_session(day)
     judged = live_edges(edges)
     if not judged:
-        return EdgeDesk(day, nxt, (), (), ())
+        return EdgeDesk(day, nxt, (), (), (), load_live_states(ctx, edges, ()))
     all_trades = load_trades(ctx, judged)
-    states = load_live_states(ctx, judged, all_trades)
+    states = load_live_states(ctx, edges, all_trades)
     if not followed:
         return EdgeDesk(day, nxt, (), (), (), states)
     on_desk = {e.id for e in followed}

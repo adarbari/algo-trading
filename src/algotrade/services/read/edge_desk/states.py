@@ -5,8 +5,10 @@ The state is the live record's own (``live.live_record``: the settled paper trad
 the backtest's usual range by ``VerdictSettings`` ``live_min_sessions`` / ``live_low`` /
 ``live_high``), never judged again here: ``on_track``, ``below`` or ``above`` the range,
 ``too_early`` (too few settled signal sessions), ``no_backtest`` or ``no_trades`` (no live
-record). The edges are those with a paper record to speak of: the ones on the user's desk
-(followed, or their own evidenced or live) and every site edge the site records. Each state
+record), or ``not_recording`` (the edge records no paper trades: a candidate, never judged, never
+read). Every edge has a state; the ones with a paper record to speak of (``is_recording``) are the
+ones on the user's desk (followed, or their own evidenced or live) and every site edge the site
+records. Each state
 carries its Guide term (``TERMS``) so a page shows it only through ``InfoButton``; the trades are
 read as ``paper.load_trades`` reads them (the rows as the session's cutoff knew them). Nothing is
 pushed or sent: ``below_range`` only lists what the nightly's run record says in one line."""
@@ -31,7 +33,10 @@ from algotrade.services.read.edge_desk.paper import PaperTrade, load_trades, rec
 from algotrade.services.read.evaluation.edges import Edge, load_edges
 
 NOT_SETTLED = "not_settled"  # the session's nightly has not completed: nothing is judged
-LIVE_STATES = (ON_TRACK, BELOW, ABOVE, TOO_EARLY, NO_BACKTEST, NO_TRADES, NOT_SETTLED)
+NOT_RECORDING = "not_recording"  # a candidate: paper trades start once it is evidenced
+LIVE_STATES = (
+    ON_TRACK, BELOW, ABOVE, TOO_EARLY, NO_BACKTEST, NO_TRADES, NOT_SETTLED, NOT_RECORDING
+)  # fmt: skip
 TERM = "live_state"  # the Guide glossary entry that explains every state
 
 
@@ -55,24 +60,36 @@ class LiveState:
     followed: bool
 
 
-def _recorded(edge: Edge) -> bool:
-    """The edge has a paper record to judge: on the desk, or a site edge the site records."""
-    return edge.paper_traded or (not edge.mine and edge.status in RECORDING)
+def is_recording(edge: Edge) -> bool:
+    """The edge records paper trades: the nightly records only evidenced or live edges (a
+    follow records nothing)."""
+    return edge.status in RECORDING
 
 
 def live_edges(edges: Mapping[str, Edge]) -> dict[str, Edge]:
-    """The edges whose live state is served (see ``_recorded``), by id."""
-    return {i: e for i, e in edges.items() if _recorded(e)}
+    """The edges with a paper record to read (see ``is_recording``), by id."""
+    return {i: e for i, e in edges.items() if is_recording(e)}
+
+
+def _not_recording(edge: Edge) -> LiveState:
+    when = "you set it live" if edge.mine else "it is evidenced"
+    return LiveState(
+        edge.id, edge.name, NOT_RECORDING, 0, 0, None, None, None,
+        f"No paper trades are recorded: they start when {when}.", TERM, False,
+    )  # fmt: skip
 
 
 def load_live_states(
     ctx: ReadContext, edges: Mapping[str, Edge], trades: Sequence[PaperTrade]
 ) -> tuple[LiveState, ...]:
-    """The live state of each of ``edges`` (from ``live_edges``) over ``trades`` (``load_trades``
-    of at least those edges), sorted by edge name."""
+    """The live state of each of ``edges`` over ``trades`` (``load_trades`` of the recording ones),
+    sorted by edge name: an edge that records no paper trades is ``not_recording``."""
     settings = load_verdict(ctx.configs)
     states = []
     for edge in edges.values():
+        if not is_recording(edge):
+            states.append(_not_recording(edge))
+            continue
         if ctx.session.cutoff is None:
             states.append(
                 LiveState(

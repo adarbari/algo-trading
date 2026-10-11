@@ -24,12 +24,13 @@ from tests.unit.services.read.edge_desk.conftest import (
     KNOWN,
     NEXT,
     SESSION,
+    SITE_DRIFT,
     closed_trades,
     context,
     store,
     trade,
 )
-from tests.unit.services.read.evaluation.conftest import DOCS
+from tests.unit.services.read.evaluation.conftest import DOCS, EDGE
 
 
 def test_the_desk_lists_tonights_buys_and_tomorrows_sells_best_first(
@@ -145,7 +146,12 @@ OWN_LIVE = {
 
 def _as(backend: MemoryBackend, user: str, own: dict | None = None) -> ReadContext:  # type: ignore[type-arg]
     """The read context of ``user``, who follows the site edge ``drift`` (and has ``own`` docs)."""
-    docs = {**DOCS, (user, "edges", "drift"): {"follow": FOLLOW}, **(own or {})}
+    docs = {
+        **DOCS,
+        SITE_DRIFT: {**EDGE, "status": "evidenced"},
+        (user, "edges", "drift"): {"follow": FOLLOW},
+        **(own or {}),
+    }
     stores = open_stores(StoreReader(backend), MemoryConfigStore(docs), UserContext(user))
     session = Session(SESSION, None, True, None, None, False, (), (), cutoff=CUTOFF)
     return ReadContext(

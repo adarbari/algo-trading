@@ -105,12 +105,12 @@ describe('EdgePage', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('leaves the live record out until the edge has one, and the comparison out of a site edge', async () => {
-    hooks.useEdgeLiveStates.mockReturnValue(fakeQuery([live('no_trades')]));
+  it('keeps the live record section for an edge that records nothing, and the comparison out of a site edge', async () => {
+    hooks.useEdgeLiveStates.mockReturnValue(fakeQuery([live('not_recording')]));
     page();
     await screen.findByText('details momentum_12_1');
-    expect(screen.queryByRole('link', { name: 'Live record' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/^live /)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Live record' })).toBeInTheDocument();
+    expect(await screen.findByText('live momentum_12_1')).toBeInTheDocument();
     expect(screen.queryByText(/^compare /)).not.toBeInTheDocument();
   });
 
