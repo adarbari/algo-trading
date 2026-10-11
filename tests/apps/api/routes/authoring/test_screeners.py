@@ -244,7 +244,7 @@ def test_a_failing_sink_does_not_fail_the_save(writer_client: TestClient) -> Non
     assert ok.status_code == 200
 
 
-def test_a_whole_iteration_reads_back_from_the_rows_and_a_save_closes_the_session(
+def test_a_whole_iteration_reads_back_from_the_rows_and_finalising_closes_the_session(
     writer_client: TestClient,
 ) -> None:
     c = writer_client
@@ -265,8 +265,16 @@ def test_a_whole_iteration_reads_back_from_the_rows_and_a_save_closes_the_sessio
     assert sent["criteria"]["price"]["value"] == 12
     saved = json.loads(rows[-1]["payload"])["saved_criteria"]["criteria"]
     assert rows[-1]["event"] == "draft_saved" and saved["price"]["value"] == 15
+    third = c.post(
+        "/screeners/mine/draft-from-text",
+        json={"text": "and large cap", "draft_session_id": session},
+    ).json()["draft_session_id"]
+    assert third == session  # describe, save, describe: still one session
+    c.post("/screeners/mine/finalise", json={"draft_session_id": session})
+    assert sink.rows[-1]["event"] == "screen_finalised"
+    assert sink.rows[-1]["draft_session_id"] == session and sink.rows[-1]["seq"] == 3
     later = c.post(
         "/screeners/mine/draft-from-text",
         json={"text": "another", "draft_session_id": session},
     ).json()["draft_session_id"]
-    assert later != session  # saved: a later description is a new session
+    assert later != session  # finalised: a later description is a new session

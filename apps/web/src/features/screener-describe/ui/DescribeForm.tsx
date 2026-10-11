@@ -22,8 +22,8 @@ export interface DescribeFormProps {
   onDraft: (document: Readonly<Record<string, unknown>>) => void;
   /**
    * The feedback session of this screen (ADR 0066): the id of the last answer, sent with the
-   * next sentence; the owner (the Builder) clears it on save and when another screen opens, and
-   * the same id goes with the save.
+   * next sentence; the owner (the Builder) keeps it across saves (the same id goes with
+   * each save) and clears it on finalise, on discard and when another screen opens.
    */
   draftSessionId?: string | null;
   /** The answer's session id, to keep for the next sentence and the save. */

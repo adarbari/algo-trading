@@ -223,6 +223,15 @@ describe('ScreenerBuilderProvider', () => {
     expect(await screen.findByText('session none')).toBeInTheDocument();
   });
 
+  it('drops the Describe-it session when the draft is discarded', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    await userEvent.click(screen.getByRole('button', { name: 'describe' }));
+    expect(screen.getByText('session sess-1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'discard' }));
+    expect(await screen.findByText('session none')).toBeInTheDocument();
+  });
+
   it('switches an inherited criterion off instead of deleting it', async () => {
     setup();
     await screen.findByText('criteria iv30=0.5,close=5');

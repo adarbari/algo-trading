@@ -89,11 +89,11 @@ request body. Written only after the config write succeeded; a dropped event nev
 see only their own rows. Raw sentences are kept 12 months, then nulled unless curated.
 
 A session is one screen's iteration (ADR 0066, amendment 2026-10-12): successive descriptions of the
-same screen share a `draft_session_id` until it is saved, each draft request has its `seq`, and the
+same screen share a `draft_session_id` until it is finalised or discarded, each draft request has its `seq`, and the
 events carry the criteria in force (`current_criteria` on a request: the trader's edits between
 descriptions; `draft_criteria` on a return; `saved_criteria` on a save). A **golden case** is
 `(all sentences of one session in order, with the criteria in force at each, the final saved
-criteria)`; a session with no save is abandoned and unlabelled; `source_event` of a curated case is
+criteria)`; a session with no save (or discarded) is abandoned and unlabelled; `source_event` of a curated case is
 the session's final event id; the public-repo paraphrase rule applies to every sentence of the chain.
 
 Golden pipeline: an owner-run `golden candidates` builds cases (sentence, catalogue version, final saved

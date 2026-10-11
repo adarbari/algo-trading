@@ -28,6 +28,7 @@ EVENTS = (
 DOC_KINDS = ("screen", "edge")
 MAX_SENTENCE = 1000  # characters of the trader's sentence kept
 MAX_VALUE = 8000  # characters of one criteria snapshot's JSON kept (``bounded``)
+MAX_PART = 4000  # characters of a diff, the dropped list or the notes kept (before the payload)
 MAX_PAYLOAD = 32000  # characters of the whole payload's JSON kept: room for three snapshots
 CALL_IDS_SEP = ","
 

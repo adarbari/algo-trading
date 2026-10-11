@@ -64,12 +64,13 @@ that shows these rows comes with the golden pipeline.
 
 ### Retention
 The raw sentence and the payload are kept 12 months and then nulled unless the row was curated into
-the golden set (`tests/fixtures/drafting/golden/`, reviewed by the owner); a curated case is the owner's
-own text, kept in git. The nulling and an owner-run erase command for one user are a later change (an
+the golden set (`tests/fixtures/drafting/golden/`). The repository is public, so a curated case is
+never the trader's text: the owner rewrites it (every sentence of the chain paraphrased) and checks
+its criteria for personal specifics (holdings, named positions) before it enters the repository. The nulling and an owner-run erase command for one user are a later change (an
 owner-run command in the ingestion CLI, as every rewrite of stored data is); until then the rows are
 append-only and `docs/hosting.md`'s store backups apply.
 
-## Amendment (2026-10-12): the whole iteration of a screen
+## Amendment (2026-10-11): the whole iteration of a screen
 
 The first cut recorded a diff per draft, so the final criteria and the chain of descriptions could
 not be read back. Owner requirement (2026-10-12): for an original sentence, the golden case is the
@@ -78,22 +79,34 @@ several times, all of the descriptions are stored.
 
 - **A session is one screen's iteration.** `POST .../draft-from-text` takes an optional
   `draft_session_id`: the previous answer's. The API continues that session when the id is the same
-  user's, for the same screener, and the screen was not saved since (`DraftMemory`); an unknown,
-  foreign, other-screen or already saved id starts a new session. `seq` (a new nullable `int64`
+  user's, for the same screener, and the screen was not finalised since (`DraftMemory`); an unknown,
+  foreign, other-screen or finalised id starts a new session. A save does not end the session
+  (describe, save, describe, finalise is one session); finalising does, and so does discarding the
+  draft (owner decision to confirm: a discarded screen is abandoned, so the browser drops its id and
+  the next description starts a new session). `seq` comes from stored state (the last draft
+  returned plus one), so a request that failed does not advance it. `seq` (a new nullable `int64`
   column) is the 1-based ordinal of the draft request in its session; save events carry the `seq`
   of the draft they saved. The browser keeps the last id per screener in the Builder and sends it
   with the next sentence, the save and the finalise (the save never carried it before); it clears
-  it when the version is written or another screener opens.
+  it when the version is written, on discard, or when another screener opens.
 - **The criteria in force are stored, not only a diff.** `draft_requested.payload.current_criteria`
   is the Builder's criteria table (with its tie-break / rank) sent with the request: the trader's
   edits between descriptions. `draft_returned.payload.draft_criteria` is the model's criteria after
   validation, with `dropped` (id, field, reason) and `notes`. `draft_saved` and `screen_finalised`
   carry `saved_criteria`, the stored document's criteria table with its tie-break / rank. Each
   snapshot is cut at 8,000 characters of JSON into `{"truncated": true, "chars": n, "head": ...}`
-  and the whole payload at 32,000: never a failed request.
+  and the whole payload at 32,000: never a failed request. A diff, the dropped list and the notes
+  are each cut at 4,000 characters first, so the `*_criteria` snapshot always survives the cap.
+- **A restart does not orphan the chain.** The draft memory is per process and the API restarts on
+  every deploy. After one, a request continuing an unknown id starts a new session and a save of an
+  unknown id is filed under session `""` (never under an id that is not the user's); both record
+  the id the client claimed as `payload.claimed_session_id`. `services/feedback/chains.py` links a
+  row to the claimed session only when that session's rows have the same `user` and `doc_id`.
+- **Two tabs on one screen** share its session and the last writer wins; each save is diffed and
+  hashed against that session's own last draft.
 - **A golden case** is `(all sentences of one session in order, with the criteria in force at each
   (`current_criteria` of its request), the final saved criteria (`saved_criteria` of the session's
-  last `draft_saved` / `screen_finalised`))`. A session with no save is abandoned and unlabelled.
+  last `draft_saved` / `screen_finalised`))`. A session with no save, or one discarded, is abandoned and unlabelled.
   For a curated case `source_event` is the session's final event id. The public-repo paraphrase
   rule applies to every sentence of the chain: the repository is public, so a curated case holds
   paraphrased sentences, never the trader's own words.

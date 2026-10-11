@@ -45,7 +45,7 @@ class Remembered:
     prompt_version: str | None
     last_saved: str | None = None  # the content hash of the last save recorded: autosave is quiet
     seq: int = 1  # the ordinal of the latest draft request of the session
-    closed: bool = False  # saved or finalised: a later description starts a new session
+    closed: bool = False  # finalised: a later description starts a new session
 
 
 class DraftMemory:
@@ -75,18 +75,18 @@ class DraftMemory:
 
     def continue_session(self, session_id: str, user: str, doc_id: str) -> int | None:
         """The ``seq`` of the next draft request of an open session that is ``user``'s and
-        ``doc_id``'s, noted; ``None`` (a new session starts) for one that is unknown, someone
-        else's, another screen's, or already saved."""
+        ``doc_id``'s (the last draft *returned* plus one: a request that failed does not count);
+        ``None`` (a new session starts) for one that is unknown, someone else's, another
+        screen's, or already finalised."""
         with self._lock:
             item = self._items.get(session_id)
             if item is None or item.user != user or item.doc_id != doc_id or item.closed:
                 return None
-            self._items[session_id] = replace(item, seq=item.seq + 1)
             self._items.move_to_end(session_id)
             return item.seq + 1
 
     def close(self, session_id: str, user: str, doc_id: str) -> None:
-        """Note that the session was saved: the next description starts a new one."""
+        """Note that the screen was finalised: the next description starts a new session."""
         with self._lock:
             item = self._items.get(session_id)
             if item is not None and item.user == user and item.doc_id == doc_id:
@@ -129,17 +129,24 @@ def record_requested(
     session when it is open and ``user``'s for ``screener_id``, else a new one starts.
     ``document`` is the Builder's, whose criteria (the trader's edits since the last
     description) go in the payload as ``current_criteria``."""
-    seq = memory.continue_session(session_id, user, screener_id) if session_id else None
-    if seq is None:
-        session_id, seq = events.new_session_id(), 1
-    payload: dict[str, Any] = {}
-    if document is not None:
-        payload["current_criteria"] = events.bounded(criteria_snapshot(document))
-    events.emit(
-        sink, events.DRAFT_REQUESTED, str(session_id), user, KIND, screener_id,
-        sentence=sentence, seq=seq, payload=payload,
-    )  # fmt: skip
-    return str(session_id), seq
+    claimed = session_id
+    try:
+        seq = memory.continue_session(session_id, user, screener_id) if session_id else None
+        if seq is None:
+            session_id, seq = events.new_session_id(), 1
+        payload: dict[str, Any] = {}
+        if document is not None:
+            payload["current_criteria"] = events.bounded(criteria_snapshot(document))
+        if claimed and claimed != session_id:
+            payload["claimed_session_id"] = claimed  # a restart lost it: chains.py relinks
+        events.emit(
+            sink, events.DRAFT_REQUESTED, str(session_id), user, KIND, screener_id,
+            sentence=sentence, seq=seq, payload=payload,
+        )  # fmt: skip
+        return str(session_id), seq
+    except Exception:
+        log.exception("draft_requested not recorded")
+        return events.new_session_id(), 1
 
 
 def record_returned(
@@ -172,8 +179,11 @@ def record_returned(
         raw = document.get("criteria")
         payload = {
             "criteria": len(raw) if isinstance(raw, Mapping) else 0,
-            "dropped": [{k: d[k] for k in ("id", "field", "reason") if k in d} for d in dropped],
-            "notes": list(notes),
+            "dropped": events.bounded(
+                [{k: d[k] for k in ("id", "field", "reason") if k in d} for d in dropped],
+                events.MAX_PART,
+            ),
+            "notes": events.bounded(list(notes), events.MAX_PART),
             "draft_criteria": events.bounded(criteria_snapshot(document)),
         }
         events.emit(
@@ -195,12 +205,16 @@ def _saved(
     document: Mapping[str, Any],
     saved_hash: str | None,
 ) -> None:
-    """The save events share one shape: the diff against the remembered draft, its hashes."""
+    """The save events share one shape: the diff against the remembered draft, its hashes. A
+    save does not end the session (the trader may describe again); finalising does. Two tabs on
+    one screen share its session, last writer wins; each save is diffed against that session's own
+    last draft."""
     if not session_id:
         return  # a hand-built screen: nothing to learn from
     try:
         content = events.document_hash(document)
         draft = memory.get(session_id, user, screener_id)
+        claimed = session_id
         if (
             event == events.DRAFT_SAVED
             and draft is not None
@@ -213,9 +227,12 @@ def _saved(
         }
         if draft is None:
             payload["draft_unknown"] = True  # not remembered here, or not this user's: no diff
+            payload["claimed_session_id"] = claimed  # chains.py links it if it is theirs
             session_id = ""  # never under a session id that is not theirs
         else:
-            payload["diff"] = criteria_diff(draft.document, document)
+            payload["diff"] = events.bounded(
+                criteria_diff(draft.document, document), events.MAX_PART
+            )
         events.emit(
             sink, event, session_id, user, KIND, screener_id,
             call_ids=draft.call_ids if draft else (),
@@ -227,7 +244,7 @@ def _saved(
             seq=draft.seq if draft else None,
             payload=payload,
         )  # fmt: skip
-        if draft is not None:
+        if draft is not None and event == events.SCREEN_FINALISED:
             memory.close(session_id, user, screener_id)  # a later description is a new session
     except Exception:
         log.exception("%s not recorded", event)

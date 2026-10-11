@@ -72,7 +72,7 @@ export interface ScreenerBuilder {
   /**
    * The Describe-it feedback session of this screen (ADR 0066): the id of the last draft the
    * model returned, sent with the next sentence and with the save; null for a hand-built screen,
-   * and after the screen was finalised or another screener opened.
+   * and after the screen was finalised or discarded, or another screener opened.
    */
   draftSessionId: string | null;
   setDraftSessionId: (draftSessionId: string | null) => void;
@@ -206,6 +206,7 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       copying.current = null;
       copy.reset();
       setEdited(null);
+      setSession(null); // a discarded screen is abandoned: a later description is a new session
     },
     saving: save.isPending,
     discarding: discard.isPending,

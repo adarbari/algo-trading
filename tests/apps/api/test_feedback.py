@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.services.feedback.chains import linked_sessions
 from algotrade_api import feedback
 from algotrade_api.feedback import DraftMemory, Remembered
 
@@ -170,14 +171,67 @@ def test_a_foreign_unknown_or_other_screen_id_starts_a_new_session() -> None:
     assert memory.get(mine, "alice", "mine").seq == 1  # type: ignore[union-attr]  # untouched
 
 
-def test_after_a_save_the_next_description_starts_a_new_session() -> None:
+def test_a_save_keeps_the_session_open_and_finalising_ends_it() -> None:
     sink, memory = Keep(), DraftMemory()
     session, _ = request(sink, memory, "over $5", DOC)
     feedback.record_draft_saved(sink, memory, session, "abhi", "mine", DOC)
-    again = request(sink, memory, "and liquid", DOC, given=session)
+    assert request(sink, memory, "and liquid", DOC, given=session) == (session, 2)
+    feedback.record_finalised(sink, memory, session, "abhi", "mine", DOC, "h")
+    assert sink.rows[-1]["draft_session_id"] == session and sink.rows[-1]["seq"] == 2
+    again = request(sink, memory, "next screen", DOC, given=session)
     assert again[0] != session and again[1] == 1
-    feedback.record_finalised(sink, memory, session, "abhi", "mine", DOC, "h")  # still linked
-    assert sink.rows[-1]["draft_session_id"] == session
+
+
+def test_a_failed_request_does_not_advance_seq() -> None:
+    sink, memory = Keep(), DraftMemory()
+    session, _ = request(sink, memory, "over $5", DOC)
+    failed = feedback.record_requested(sink, memory, "abhi", "mine", "x", DOC, session)
+    assert failed == (session, 2)  # the model then failed: nothing returned
+    assert feedback.record_requested(sink, memory, "abhi", "mine", "x", DOC, session)[1] == 2
+    feedback.record_draft_saved(sink, memory, session, "abhi", "mine", DOC)
+    assert sink.rows[-1]["seq"] == 1  # the draft saved is the one returned
+
+
+def test_after_a_restart_a_claimed_session_is_recorded_and_relinked_only_when_theirs() -> None:
+    sink, memory = Keep(), DraftMemory()
+    old = request(sink, memory, "over $5", DOC)[0]
+    memory = DraftMemory()  # a restart: nothing remembered
+    new, seq = request(sink, memory, "and liquid", DOC, given=old)
+    assert new != old and seq == 1
+    feedback.record_draft_saved(sink, memory, "gone", "abhi", "mine", DOC)  # claims an unknown id
+    save = sink.rows[-1]
+    assert (
+        save["draft_session_id"] == ""
+        and json.loads(save["payload"])["claimed_session_id"] == "gone"
+    )
+    feedback.record_draft_saved(sink, DraftMemory(), new, "abhi", "mine", DOC)
+    chain = {r["event_id"]: r["chain_id"] for r in linked_sessions(sink.rows)}
+    mine = [r for r in sink.rows if r["draft_session_id"] in (old, new)]
+    assert {chain[r["event_id"]] for r in mine} == {old}  # both halves are one chain
+    assert chain[sink.rows[-1]["event_id"]] == old  # the save claimed ``new``: same chain
+    other = [dict(r) for r in sink.rows]  # the same rows read for a claim by someone else
+    other[-1]["user"] = "mallory"
+    assert linked_sessions(other)[-1]["chain_id"] == ""  # not linked: not their session
+
+
+def test_a_huge_diff_notes_or_dropped_never_push_the_final_criteria_out() -> None:
+    sink, memory = Keep(), DraftMemory()
+    wide = {
+        "id": "mine",
+        "criteria": {f"c{i}": {**P, "field": "f" * 40, "value": i} for i in range(60)},
+    }
+    session = "s9"
+    feedback.record_returned(
+        sink, memory, session, "abhi", "mine", "x", {"id": "mine", "criteria": {}},
+        [{"id": f"d{i}", "field": "f" * 50, "reason": "r" * 100} for i in range(200)], (),
+        FEATURES, "1", 1, ["n" * 100] * 200,
+    )  # fmt: skip
+    feedback.record_draft_saved(sink, memory, session, "abhi", "mine", wide)
+    returned_payload = json.loads(sink.rows[0]["payload"])
+    assert returned_payload["dropped"]["truncated"] and returned_payload["notes"]["truncated"]
+    saved = json.loads(sink.rows[-1]["payload"])
+    assert saved["diff"]["truncated"] is True
+    assert len(saved["saved_criteria"]["criteria"]) == 60  # the final criteria survive
 
 
 def test_the_events_carry_the_criteria_in_force() -> None:
