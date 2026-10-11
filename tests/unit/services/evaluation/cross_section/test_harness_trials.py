@@ -70,3 +70,23 @@ def test_a_cushion_or_ratio_result_reads_the_excess_wins_and_a_return_its_mean()
     assert all_.sharpe == pytest.approx(sharpe([s.excess_wins for s in stats]))
     (plain, *_), _ = _slice_rows(stats, None, False, False, None, None, 0.0)
     assert plain.sharpe is None  # every session's mean is 2.0: no spread, no Sharpe ratio
+
+
+def test_a_logged_baseline_is_not_a_trial_and_a_record_without_roles_still_counts() -> None:
+    class Record:
+        def __init__(self, trials: list[dict[str, object]]) -> None:
+            self.stats = {"trials": trials}
+            self.finished_at = self.started_at = datetime(2026, 10, 11, tzinfo=UTC)
+
+    logged = [
+        {"variant": "momo", "role": "screener", "config_hash": "a", "horizon": 2},
+        {"variant": "spy", "role": "baseline", "config_hash": "b", "horizon": 2},
+        {"variant": "old", "config_hash": "c", "horizon": 2},  # before roles were logged
+    ]
+
+    class Writer:
+        def runs_for(self, job: str) -> list[Record]:
+            return [Record(logged)] if job == "edge-eval:drift:alice" else []
+
+    seen = _prior_trials(Writer(), "drift", "alice")  # type: ignore[arg-type]
+    assert seen == {("main", "momo", "a", 2), ("main", "old", "c", 2)}

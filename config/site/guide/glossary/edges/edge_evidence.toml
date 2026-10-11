@@ -282,12 +282,15 @@ see_also = ["verdict", "official_result", "edge_backtests", "run_backtest"]
 [[term]]
 id = "verdict_criteria"
 term = "What the verdict tests"
-short = "The table of every test behind the verdict: its value, what it needs, and pass, fail or not measured."
+short = "The table of every test behind the verdict: its value, what it needs, and pass, fail, not measured or does not apply."
 body = """
 Open Details to see it. The tests come in two groups: the seven Promising tests, then the six
 Works tests. Each row shows the test, its Value for this edge, what is Needed and the Result. Not
 measured means the run did not store the figure, which is different from a fail; it keeps the
-verdict at Not enough data. All Promising tests passing means at least Promising, and all Works
+verdict at Not enough data. Does not apply means the test has nothing to test: the two decoy tests
+read it when the edge document declares no decoys, because nothing was compared. The two
+overfitting tests read it when only one variant was tried at the holding period. It counts neither
+for nor against the verdict and is not a pass. All Promising tests passing means at least Promising, and all Works
 tests as well means Works. Example: vrp_short_premium fails three tests: trades (3 against at
 least 40), the decile t (-1.66 against 2) and the deflated Sharpe (0.00 against 0.8). It passes
 the win rate, baselines and keeps-its-size tests, and does not measure the overfitting
@@ -335,9 +338,10 @@ body = """
 The harness splits history into pieces, picks the best variant on some of them and checks how
 that variant ranks on the pieces left out. The overfitting probability is the share of splits
 where it ranks at or below the middle. Promising needs 0.5 or less, Works 0.2 or less, and above
-0.5 the edge is Not working. It needs several variants to compare, so an edge with a single
-variant has none. The page shows not stored, the test is not measured, and the verdict stays at
-Not enough data. Example: vrp_short_premium has no value stored yet.
+0.5 the edge is Not working. It compares the edge's own variants at the same holding period and
+in the same unit, never its baselines. With a single variant there is nothing to compare: the
+page shows none and both overfitting tests do not apply. Example: vrp_short_premium compares its
+cushion variants, not the ratio one.
 """
 see_also = ["variants_tried", "deflated_sharpe", "verdict_criteria", "verdict_not_enough_data"]
 

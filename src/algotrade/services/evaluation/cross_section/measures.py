@@ -513,6 +513,7 @@ def _since(day: date, stat: SessionStat) -> bool:
 
 
 SCREENER = "screener"  # the role of a trial; a baseline is a comparison, never a trial
+BASELINE = "baseline"
 
 
 class Scored(Protocol):
@@ -539,21 +540,28 @@ def deflate[R: Scored](results: list[R], trials: int) -> list[R]:
     whose Sharpe variance and PBO they read are the screeners at the same horizon whose values
     are in the same unit (ADR 0064 amendment 2026-10-11): a window of another length, a value in
     another unit or a baseline (a comparison, not a trial of the hypothesis) is not the same kind
-    of trial. A baseline is deflated against the screeners of its horizon and unit."""
+    of trial. A baseline is deflated against the screeners of its horizon and unit. With fewer
+    than two peer Sharpe ratios the variance is ``1 / (T - 1)``, the Sharpe estimator's variance
+    under the null over the series' ``T`` sessions, so the trial log's count still deflates; PBO
+    of a lone trial is None (nothing to compare, never a baseline)."""
     groups: dict[tuple[int, str | None], list[R]] = {}
     for r in results:
         groups.setdefault((r.horizon, r.unit), []).append(r)
-    variance, overfit = {}, {}
+    variance: dict[tuple[int, str | None], float | None] = {}
+    overfit = {}
     for key, members in groups.items():
         peers = [p for p in members if p.role == SCREENER]
         sharpes = [p.measures[0].sharpe for p in peers if p.measures[0].sharpe is not None]
-        variance[key] = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
+        variance[key] = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None
         overfit[key] = pbo(peers)
     out = []
     for r in results:
         key = (r.horizon, r.unit)
         values = [v for v in (trial_value(s, r.wins) for s in r.stats) if v is not None]
-        dsr = deflated_sharpe(values, trials, variance[key]) if values else None
+        v = variance[key]
+        if v is None and len(values) > 1:
+            v = 1.0 / (len(values) - 1)  # the null's variance of one trial's Sharpe estimate
+        dsr = deflated_sharpe(values, trials, v) if values and v is not None else None
         deflated = replace(r.measures[0], deflated_sharpe=dsr, trials=trials, pbo=overfit[key])
         out.append(replace(r, measures=(deflated, *r.measures[1:])))  # type: ignore[type-var]
     return out

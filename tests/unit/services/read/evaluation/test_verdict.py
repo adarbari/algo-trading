@@ -503,3 +503,21 @@ def test_the_haircut_of_a_stored_run_counts_the_series_sessions_with_picks(
     assert edge is not None
     h = load_edge_verdict(ctx, edge).haircut
     assert h is not None and (h.sessions, h.trials) == (3, 5)
+
+
+def test_a_lone_trial_has_no_overfitting_test_and_can_still_reach_promising() -> None:
+    """ADR 0064 amendment 2026-10-11: PBO needs alternatives of the edge, never baselines, so a
+    lone screener's PBO is None and the two PBO criteria do not apply (not a pass, not a gap)."""
+    no_pbo = {"oos": {"pbo": None}, "whole": {"pbo": None}}
+    lone = verdict(result(**no_pbo))  # type: ignore[arg-type]
+    assert lone.verdict == PROMISING
+    pbo = {c.id: c.status for c in lone.criteria if c.id in ("pbo", "works_pbo")}
+    assert pbo == {"pbo": "not_applicable", "works_pbo": "not_applicable"}
+    assert "overfitting" not in lone.rationale
+    # a second screener at the holding period: PBO None means not stored, which blocks
+    peer = row(variant="scr2", kind="all", pbo=None)
+    two = verdict([*result(**no_pbo), peer])  # type: ignore[arg-type]
+    assert next(c for c in two.criteria if c.id == "pbo").status == "not_measured"
+    assert two.verdict != PROMISING
+    # the hard fail still fires when PBO exists
+    assert verdict(result(whole={"pbo": 0.51})).verdict == NOT_WORKING

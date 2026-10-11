@@ -444,8 +444,20 @@ def test_a_baseline_is_deflated_against_the_screeners_and_a_lone_screener_has_no
     base = trial("decoy", _cushions(2), role="baseline")
     one = _by_name(deflate([trial("a", _cushions()), base], 10))
     assert one["a"].pbo is None and one["decoy"].pbo is None  # one trial: nothing to compare
-    want = deflated_sharpe([s.excess_wins for s in _cushions(2)], 10, 0.0)
+    want = deflated_sharpe([s.excess_wins for s in _cushions(2)], 10, 1 / (len(DAYS) - 1))
     assert one["decoy"].deflated_sharpe == pytest.approx(want)
+
+
+def test_a_lone_trial_is_deflated_by_the_trial_count_against_the_nulls_sharpe_variance() -> None:
+    """Fewer than two peers: V = 1 / (T - 1), so SR0 > 0 and 126 trials still deflate (with
+    V = 0 the deflated Sharpe would be the undeflated probabilistic Sharpe ratio)."""
+    values = [s.excess_wins for s in _cushions()]
+    (got,) = deflate([trial("a", _cushions())], 126)
+    want = deflated_sharpe(values, 126, 1 / (len(values) - 1))
+    assert got.measures[0].deflated_sharpe == pytest.approx(want)
+    undeflated = deflated_sharpe(values, 126, 0.0)
+    assert want is not None and undeflated is not None and want < undeflated
+    assert got.measures[0].pbo is None  # a lone trial has no PBO, never one against a baseline
 
 
 def replace_horizon(t: Trial, horizon: int) -> Trial:

@@ -97,6 +97,8 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
 )
 from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.measures import (
+    BASELINE,
+    SCREENER,
     CostGrid,
     SessionStat,
     SliceMeasure,
@@ -292,8 +294,8 @@ def run_hash(
 
 def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Variant]:
     found = [
-        *(Variant(s, "screener", resolve_config(configs, s, user)) for s in edge.screeners),
-        *(Variant(s, "baseline", resolve_config(configs, s, user)) for s in edge.baselines),
+        *(Variant(s, SCREENER, resolve_config(configs, s, user)) for s in edge.screeners),
+        *(Variant(s, BASELINE, resolve_config(configs, s, user)) for s in edge.baselines),
     ]
     if not found:
         raise ConfigurationError(f"edge {edge.id}: no screeners or baselines to evaluate")
@@ -324,7 +326,8 @@ def _prior_trials(
 ) -> set[tuple[str, str, str, int]]:
     """(edge variant, variant, config hash, horizon) of earlier runs; a trial logged before
     edge variants existed is the edge's own ("main"). The site's log includes the runs recorded
-    under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them."""
+    under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them. A logged
+    baseline is not a trial."""
     found: set[tuple[str, str, str, int]] = set()
     records = list(writer.runs_for(job_name(edge_id, user_id)))
     if user_id == SITE_USER:  # the legacy owners' records from before the cutoff only
@@ -336,6 +339,8 @@ def _prior_trials(
             ]
     for record in records:
         for t in record.stats.get("trials", []):
+            if t.get("role") == BASELINE:  # a comparison, not a trial; no role: counted
+                continue
             found.add(
                 (t.get("edge_variant") or MAIN, t["variant"], t["config_hash"], int(t["horizon"]))
             )
@@ -516,7 +521,10 @@ def evaluate_edge(
     for events in schedules.values():
         for reason, n in events.unknown_total().items():
             unknown[reason] = unknown.get(reason, 0) + n
-    tried = {(r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results}
+    # a trial is a screener: a baseline is a comparison (ADR 0064 amendment 2026-10-11)
+    tried = {
+        (r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results if r.role == SCREENER
+    }
     trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(

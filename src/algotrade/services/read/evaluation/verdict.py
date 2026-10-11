@@ -52,11 +52,12 @@ NOT_WORKING: Final = "not_working"
 NOT_ENOUGH: Final = "not_enough_data"
 WAITING: Final = "waiting_on_data"
 ORDER: Final = (WAITING, NOT_ENOUGH, NOT_WORKING, PROMISING, WORKS)  # worst to best
-PASS, FAIL, NOT_MEASURED = "pass", "fail", "not_measured"
+PASS, FAIL, NOT_MEASURED, NOT_APPLICABLE = "pass", "fail", "not_measured", "not_applicable"
 CRITERION_STATUSES: Final = (
     PASS,
     FAIL,
     NOT_MEASURED,
+    NOT_APPLICABLE,
 )  # a criterion's status, each explained in the Guide
 IN_SAMPLE, OUT_OF_SAMPLE, BOTH, ALL = "in_sample", "out_of_sample", "both", "all"
 EN_DASH = "\u2013"  # between the months of a partial year's label
@@ -165,6 +166,12 @@ def _crit(
     return VerdictCriterion(id, label, value, threshold, status, level)
 
 
+def _not_applicable(
+    id: str, label: str, value: str, threshold: str, level: str
+) -> VerdictCriterion:
+    return VerdictCriterion(id, label, value, threshold, NOT_APPLICABLE, level)
+
+
 def _at_least(x: float | None, bound: float) -> bool | None:
     return None if x is None else x >= bound
 
@@ -183,6 +190,7 @@ class _Candidate:
     baselines: tuple[EdgeRow, ...]
     years: tuple[EdgeRow, ...]
     year_parts: tuple[EdgeRow, ...] = ()  # a year cut by the split, as ``<year>:<side>`` rows
+    lone: bool = False  # the only screener of the run at its holding period: no PBO peers
 
 
 def _by_year(row: EdgeRow) -> str:
@@ -208,6 +216,14 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
         )
         years = tuple(sorted((r for r in mine if r.slice_kind == "year"), key=_by_year))
         parts = tuple(sorted((r for r in mine if r.slice_kind == "year_part"), key=_by_year))
+        trials = {
+            (r.edge_variant, r.variant)
+            for r in rows
+            if r.role not in (runs.BASELINE, runs.RANDOM)
+            and r.slice_kind == "all"
+            and r.horizon_sessions == horizon
+            and not r.exploratory
+        }
         found.append(
             _Candidate(
                 variant,
@@ -218,13 +234,16 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
                 base,
                 years,
                 parts,
+                len(trials) == 1,
             )
         )
     return found
 
 
 def _first(crit: Sequence[VerdictCriterion], level: str) -> VerdictCriterion | None:
-    return next((x for x in crit if x.level == level and x.status != PASS), None)
+    return next(
+        (x for x in crit if x.level == level and x.status not in (PASS, NOT_APPLICABLE)), None
+    )
 
 
 def _words(x: VerdictCriterion) -> str:
@@ -242,6 +261,18 @@ def _random(c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow]) -> tupl
     return f"beats {_pct(share)} of {n} random picks", share >= t.random_beat_share
 
 
+ONE_TRIAL = "one variant tried"  # the value of a PBO criterion that does not apply
+
+
+def _overfit(id: str, pbo: float | None, bound: float, level: str, alone: bool) -> VerdictCriterion:
+    """A PBO criterion: not applicable for a lone trial (ADR 0064 amendment 2026-10-11: PBO
+    compares the edge's alternatives, never its baselines), else at most ``bound``."""
+    label, threshold = "Chance the result is overfitting", f"at most {bound:g}"
+    if alone:
+        return _not_applicable(id, label, ONE_TRIAL, threshold, level)
+    return _crit(id, label, _num(pbo), threshold, _at_most(pbo, bound), level)
+
+
 def _criteria(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
@@ -250,6 +281,7 @@ def _criteria(
     oos_pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     in_pts = runs.lift_points(c.insample.hit_rate, c.insample.base_rate) if c.insample else None
     pbo = whole.pbo if whole.pbo is not None else oos.pbo
+    alone = c.lone and pbo is None  # a lone trial has nothing to overfit among: not applicable
     dsr = whole.deflated_sharpe if whole.deflated_sharpe is not None else oos.deflated_sharpe
     lifts = [b.lift for b in c.baselines if b.lift is not None]
     spreads = [b.decile_spread for b in c.baselines if b.decile_spread is not None]
@@ -286,8 +318,7 @@ def _criteria(
               "above the base rate", win_ok, PROMISING),
         _crit("decile_t", "Top vs bottom decile t", _num(oos.decile_t),
               f"at least {t.promising_t:g}", _at_least(oos.decile_t, t.promising_t), PROMISING),
-        _crit("pbo", "Chance the result is overfitting", _num(pbo),
-              f"at most {t.max_pbo:g}", _at_most(pbo, t.max_pbo), PROMISING),
+        _overfit("pbo", pbo, t.max_pbo, PROMISING, alone),
         _crit("dsr", "Deflated Sharpe", _num(dsr), f"at least {t.promising_dsr:g}",
               _at_least(dsr, t.promising_dsr), PROMISING),
         _crit("baselines", "Lift against every baseline", best,
@@ -301,8 +332,7 @@ def _criteria(
               f"at least {t.works_t:g}", _at_least(oos.decile_t, t.works_t), WORKS),
         _crit("works_dsr", "Deflated Sharpe", _num(dsr), f"at least {t.works_dsr:g}",
               _at_least(dsr, t.works_dsr), WORKS),
-        _crit("works_pbo", "Chance the result is overfitting", _num(pbo),
-              f"at most {t.works_max_pbo:g}", _at_most(pbo, t.works_max_pbo), WORKS),
+        _overfit("works_pbo", pbo, t.works_max_pbo, WORKS, alone),
         _crit("works_spread", "Decile spread against every baseline",
               _num(oos.decile_spread, 3),
               "no decoys declared" if not decoys else "beats every baseline",

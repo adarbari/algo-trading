@@ -142,8 +142,19 @@ than the names they were picked from, and the excess wins is that claim per sess
 series already values these windows the same way). The peers of the deflated Sharpe's variance
 and of PBO are the screeners at the same horizon whose values are in the same unit
 (`deflate`): a baseline is a comparison, not a trial of the hypothesis, and a variant in another
-unit is a different scale; a baseline is still deflated against those screeners. The verdict's
-thresholds are unchanged: the deflated Sharpe and PBO are probabilities, free of the series'
+unit is a different scale; a baseline is still deflated against those screeners. With fewer than
+two peer Sharpe ratios the variance is `1 / (T - 1)`, the Sharpe estimator's variance under the
+null over the trial's `T` sessions, so `SR0 > 0` and the trial log's count still deflates (a
+variance of 0 would leave the undeflated probabilistic Sharpe ratio whatever the count). PBO of a
+lone trial is undefined: it is None, never computed against baselines (they are not alternatives
+of the edge), and the verdict's `pbo` / `works_pbo` criteria are `not_applicable` (counted neither
+for nor against the level) when the run has one screener at the basis's holding period and no
+PBO; with PBO stored the hard fail above `max_pbo` still applies. The trial count counts
+screeners only: the harness's own trials and the logged `_prior_trials` both skip
+`role = "baseline"` (a logged trial without a role, from before roles were logged, still counts).
+These peer, variance and count rules change RETURN outcomes too: an edge with baselines had them
+in its Sharpe variance, PBO and trial count, so its stored deflated Sharpe, PBO and haircut move
+at its next run (pinned in `test_harness.py`). The verdict's thresholds are unchanged: the deflated Sharpe and PBO are probabilities, free of the series'
 scale. The Sharpe ratio is per decision session, not per trade and not annualised. Legs already
 hold every session's hits and base hits, so `LEG_VERSION` is unchanged; stored `edge_eval`
 values change only when an edge is re-run (`edge_eval` stores no unit: the read model takes it
