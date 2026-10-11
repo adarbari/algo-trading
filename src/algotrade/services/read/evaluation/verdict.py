@@ -32,8 +32,12 @@ from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.decay import EdgeDecay, decay_of
 from algotrade.services.read.evaluation.edges import Edge, EdgePublished
 from algotrade.services.read.evaluation.evidence import (
+    COUNT_CRITERIA,
+    LEVEL_WORDS,
+    AtTarget,
     EvidenceProgress,
     Projection,
+    count_of,
     evidence_of,
     outlook_of,
 )
@@ -52,20 +56,24 @@ NOT_WORKING: Final = "not_working"
 NOT_ENOUGH: Final = "not_enough_data"
 WAITING: Final = "waiting_on_data"
 ORDER: Final = (WAITING, NOT_ENOUGH, NOT_WORKING, PROMISING, WORKS)  # worst to best
-PASS, FAIL, NOT_MEASURED = "pass", "fail", "not_measured"
+PASS, FAIL, NOT_MEASURED, NOT_APPLICABLE = "pass", "fail", "not_measured", "not_applicable"
 CRITERION_STATUSES: Final = (
     PASS,
     FAIL,
     NOT_MEASURED,
+    NOT_APPLICABLE,
 )  # a criterion's status, each explained in the Guide
 IN_SAMPLE, OUT_OF_SAMPLE, BOTH, ALL = "in_sample", "out_of_sample", "both", "all"
+NO_DECOYS = "no decoys declared"  # the value of a decoy criterion that does not apply
 EN_DASH = "\u2013"  # between the months of a partial year's label
 
 
 @dataclass(frozen=True)
 class VerdictCriterion:
     """One test of the verdict: what was measured, what it must reach and whether it did
-    (``status``: ``pass``, ``fail`` or ``not_measured``); ``level``: the verdict it gates."""
+    (``status``: ``pass``, ``fail``, ``not_measured`` or ``not_applicable``: the test has nothing to
+    test, as a decoy comparison with no decoys declared; it counts neither for nor against the
+    level); ``level``: the verdict it gates."""
 
     id: str
     label: str
@@ -92,6 +100,8 @@ class VerdictColumn:
     deflated_sharpe: float | None
     pbo: float | None
     thin: bool
+    reference_rate: float | None = None  # expires_otm only: the risk-neutral rate of the win
+    touch_rate: float | None = None  # expires_otm only: picks whose strike was touched
 
 
 @dataclass(frozen=True)
@@ -148,6 +158,7 @@ class EdgeVerdict:
     evidence: EvidenceProgress | None = None  # the trades against what the verdict needs
     haircut: EdgeHaircut | None = None  # the basis's Sharpe ratio after the variants tried
     decay: EdgeDecay | None = None  # the paper's figure against the in- and out-of-sample ones
+    basis_why: str = ""  # a basis chosen among several: the in-sample lifts it was chosen on
 
 
 def _pct(x: float | None) -> str:
@@ -163,6 +174,12 @@ def _crit(
 ) -> VerdictCriterion:
     status = NOT_MEASURED if ok is None else PASS if ok else FAIL
     return VerdictCriterion(id, label, value, threshold, status, level)
+
+
+def _not_applicable(
+    id: str, label: str, value: str, threshold: str, level: str
+) -> VerdictCriterion:
+    return VerdictCriterion(id, label, value, threshold, NOT_APPLICABLE, level)
 
 
 def _at_least(x: float | None, bound: float) -> bool | None:
@@ -224,7 +241,9 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
 
 
 def _first(crit: Sequence[VerdictCriterion], level: str) -> VerdictCriterion | None:
-    return next((x for x in crit if x.level == level and x.status != PASS), None)
+    return next(
+        (x for x in crit if x.level == level and x.status not in (PASS, NOT_APPLICABLE)), None
+    )
 
 
 def _words(x: VerdictCriterion) -> str:
@@ -253,15 +272,9 @@ def _criteria(
     dsr = whole.deflated_sharpe if whole.deflated_sharpe is not None else oos.deflated_sharpe
     lifts = [b.lift for b in c.baselines if b.lift is not None]
     spreads = [b.decile_spread for b in c.baselines if b.decile_spread is not None]
-    beats_all = (
-        True if not decoys else None if oos.lift is None or not lifts else oos.lift > max(lifts)
-    )
+    beats_all = None if oos.lift is None or not lifts else oos.lift > max(lifts)
     beats_spread = (
-        True
-        if not decoys
-        else None
-        if oos.decile_spread is None or not spreads
-        else oos.decile_spread > max(spreads)
+        None if oos.decile_spread is None or not spreads else oos.decile_spread > max(spreads)
     )
     keeps = None if oos_pts is None or in_pts is None else oos_pts >= t.oos_lift_share * in_pts
     win_ok = None if oos_pts is None else oos_pts > 0
@@ -272,12 +285,39 @@ def _criteria(
     )
     versus = f"{_pct(oos.hit_rate)} against {_pct(oos.base_rate)}"
     random_value, random_beaten = _random(c, t, draws)
-    best = (
-        "no decoys declared"
-        if not decoys
-        else f"{_num(oos.lift)} vs best {_num(max(lifts))}"
-        if lifts
-        else "not stored"
+    best = f"{_num(oos.lift)} vs best {_num(max(lifts))}" if lifts else "not stored"
+    # no decoys declared: nothing was tested, so the two decoy criteria do not apply (not a pass)
+    against_all = (
+        _crit(
+            "baselines",
+            "Lift against every baseline",
+            best,
+            "beats every baseline",
+            beats_all,
+            PROMISING,
+        )
+        if decoys
+        else _not_applicable(
+            "baselines", "Lift against every baseline", NO_DECOYS, "beats every baseline", PROMISING
+        )
+    )
+    spread_all = (
+        _crit(
+            "works_spread",
+            "Decile spread against every baseline",
+            _num(oos.decile_spread, 3),
+            "beats every baseline",
+            beats_spread,
+            WORKS,
+        )
+        if decoys
+        else _not_applicable(
+            "works_spread",
+            "Decile spread against every baseline",
+            NO_DECOYS,
+            "beats every baseline",
+            WORKS,
+        )
     )
     return (
         _crit("trades", "Out-of-sample trades", str(oos.sessions), f"at least {t.min_oos_trades}",
@@ -290,8 +330,7 @@ def _criteria(
               f"at most {t.max_pbo:g}", _at_most(pbo, t.max_pbo), PROMISING),
         _crit("dsr", "Deflated Sharpe", _num(dsr), f"at least {t.promising_dsr:g}",
               _at_least(dsr, t.promising_dsr), PROMISING),
-        _crit("baselines", "Lift against every baseline", best,
-              "beats every baseline", beats_all, PROMISING),
+        against_all,
         _crit("oos_lift", "Out-of-sample lift keeps its size",
               f"{_num(oos_pts, 1)} pts vs {_num(in_pts, 1)} pts in-sample",
               f"at least {t.oos_lift_share:g} of the in-sample lift", keeps, PROMISING),
@@ -303,10 +342,7 @@ def _criteria(
               _at_least(dsr, t.works_dsr), WORKS),
         _crit("works_pbo", "Chance the result is overfitting", _num(pbo),
               f"at most {t.works_max_pbo:g}", _at_most(pbo, t.works_max_pbo), WORKS),
-        _crit("works_spread", "Decile spread against every baseline",
-              _num(oos.decile_spread, 3),
-              "no decoys declared" if not decoys else "beats every baseline",
-              beats_spread, WORKS),
+        spread_all,
         _crit("random", "Beats random picks", random_value,
               f"beats at least {_pct(t.random_beat_share)} of them", random_beaten, WORKS),
     )  # fmt: skip
@@ -353,7 +389,7 @@ def _column(
         return VerdictColumn(period, None, None, None, None, None, None, None, None, None, thin)
     return VerdictColumn(
         period, r.hit_rate, r.base_rate, runs.lift_points(r.hit_rate, r.base_rate), r.sessions,
-        r.decile_spread, r.decile_t, r.sharpe, deflated, pbo, thin,
+        r.decile_spread, r.decile_t, r.sharpe, deflated, pbo, thin, r.reference_rate, r.touch_rate,
     )  # fmt: skip
 
 
@@ -383,13 +419,15 @@ def _next_gap(crit: Sequence[VerdictCriterion]) -> VerdictCriterion | None:
 class EdgeFacts:
     """What the verdict knows about the edge beyond its rows: its ``published`` figure, its
     ``schedule`` (an event schedule's count date cannot be projected), whether the
-    out-of-sample result is ``hidden`` and ``measured``: the sessions each (screen, holding
+    out-of-sample result is ``hidden``, ``after`` the last session of the run (the next close is
+    the first stored exit after it) and ``measured``: the sessions each (screen, holding
     period) measured with picks, read from the run's series only when called (None: no series
     is stored, as in an older run: the haircut keeps the stored count)."""
 
     published: EdgePublished | None = None
     schedule: str | None = None
     hidden: bool = False
+    after: date | None = None
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
 
 
@@ -415,6 +453,39 @@ def _haircut(c: _Candidate, facts: EdgeFacts) -> EdgeHaircut | None:
     return load_haircut(whole.sharpe, n, whole.trials)
 
 
+def _at_target(
+    c: _Candidate,
+    t: VerdictSettings,
+    draws: Sequence[EdgeRow],
+    decoys: bool,
+    gap: VerdictCriterion | None,
+    facts: EdgeFacts,
+) -> AtTarget | None:
+    """The verdict as it would stand once ``gap``'s count is reached, on today's stored figures
+    (the count gates met, nothing else changed); None: the gap is not a count, or a copy's
+    out-of-sample result is withheld."""
+    if gap is None or gap.id not in COUNT_CRITERIA or facts.hidden:
+        return None
+    oos, whole = c.oos, c.whole
+    _, needed, _ = count_of(gap.id, oos.sessions or 0, whole.sessions or 0, t)
+    if gap.id == "trades":
+        met = replace(oos, sessions=max(oos.sessions or 0, t.min_oos_trades))
+        there = replace(c, oos=met)
+    else:
+        met = replace(oos, sessions=max(oos.sessions or 0, t.works_oos_trades))
+        there = replace(
+            c, oos=met, whole=replace(whole, sessions=max(whole.sessions or 0, t.works_trades))
+        )
+    crit = _criteria(there, t, draws, decoys)
+    level, _ = _level(there, crit, t)
+    failing = [_words(x) for x in crit if x.level == PROMISING and x.status == FAIL]
+    next_gap = _next_gap(crit)
+    reasons = tuple(failing or ([_words(next_gap)] if next_gap and level != WORKS else []))
+    sentence = f"At {needed}, on today's figures: {LEVEL_WORDS[level]}"
+    sentence += f". {' · '.join(reasons)}." if reasons else "."
+    return AtTarget(needed, level, reasons, sentence)
+
+
 def _judge_one(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool, facts: EdgeFacts
 ) -> EdgeVerdict:
@@ -430,6 +501,8 @@ def _judge_one(
         facts.schedule,
         facts.hidden,
         projection_of(c.whole),
+        facts.after,
+        _at_target(c, t, draws, decoys, gap, facts),
     )
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
@@ -545,10 +618,24 @@ UNDECLARED: Final = Declared()
 @dataclass(frozen=True)
 class BasisChoice:
     """The basis ``(screen, holding period)`` the verdict rests on, or None with the ``reason``
-    no basis can be fixed (the verdict is then Waiting on data)."""
+    no basis can be fixed (the verdict is then Waiting on data); ``why``: for a basis chosen
+    among several, the in-sample lifts it was chosen on, in words (empty: it was the only
+    candidate or the document declared it)."""
 
     key: tuple[str, int] | None
     reason: str = ""
+    why: str = ""
+
+
+def _why(ranked: Sequence[tuple[tuple[str, int], tuple[int, float]]]) -> str:
+    """The candidates' in-sample lifts, best ranked first: "chosen on in-sample lift: 15 d +3.1
+    pts, 31 d +2.7 pts" (a candidate with no lift is left out)."""
+    parts = [
+        f"{k[1]} d {lift:+.1f} pts"
+        for k, (_, lift) in sorted(ranked, key=lambda p: p[1], reverse=True)
+        if lift != float("-inf")
+    ]
+    return f"chosen on in-sample lift: {', '.join(parts)}" if parts else ""
 
 
 def _in_sample_rank(
@@ -617,7 +704,7 @@ def choose_basis(
             "it needs a new run",
         )
     best = max(ranked, key=lambda p: p[1])  # max keeps the first of equals: keys are sorted
-    return BasisChoice(best[0])
+    return BasisChoice(best[0], why=_why(ranked))
 
 
 def _judge_candidate(
@@ -671,7 +758,7 @@ def judge(
         reason = f"The official result has no out-of-sample figures for {on}{lost}"
         return replace(_waiting(edge_id, reason), basis=on)
     judged = _judge_candidate(c, t, draws, decoys, lost_inputs, facts or EdgeFacts())
-    return replace(judged, edge_id=edge_id, years=_years(c, split, range_to))
+    return replace(judged, edge_id=edge_id, years=_years(c, split, range_to), basis_why=choice.why)
 
 
 def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
@@ -694,6 +781,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
         facts=EdgeFacts(
             edge.published,
             edge.schedule,
+            after=run.range_to,
             measured=lambda: runs.load_measured_sessions(ctx, run),
         ),
         range_to=run.range_to,

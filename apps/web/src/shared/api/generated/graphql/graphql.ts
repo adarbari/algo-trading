@@ -157,7 +157,7 @@ export type EdgeResultCurveQueryVariables = Exact<{
 }>;
 
 
-export type EdgeResultCurveQuery = { edgeResult: { curve: { kind: string | null, unit: string | null, splitFrom: string | null, hidden: boolean, points: Array<{ decision: string, exit: string, period: string, value: number, cumulative: number, baseValue: number | null, baseCumulative: number | null, trades: number, weight: number }>, gaps: Array<{ from: string, to: string, kind: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }>, live: { state: string, since: string | null, anchor: number | null, closed: number, sessions: number, points: Array<{ sell: string, value: number, cumulative: number, trades: number }> } | null, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
+export type EdgeResultCurveQuery = { edgeResult: { curve: { kind: string | null, unit: string | null, splitFrom: string | null, hidden: boolean, points: Array<{ decision: string, exit: string, period: string, value: number, cumulative: number, baseValue: number | null, baseCumulative: number | null, trades: number, weight: number }>, gaps: Array<{ from: string, to: string, kind: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }>, baselines: Array<{ baseline: string, points: Array<{ exit: string, period: string, cumulative: number }> }>, live: { state: string, since: string | null, anchor: number | null, closed: number, sessions: number, points: Array<{ sell: string, value: number, cumulative: number, trades: number }> } | null, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } } | null };
 
 export type EdgeResultDrawdownQueryVariables = Exact<{
   id: string;
@@ -200,7 +200,7 @@ export type EdgeResultCapacityQueryVariables = Exact<{
 }>;
 
 
-export type EdgeResultCapacityQuery = { edgeResult: { capacity: { state: string, variant: string | null, horizon: number | null, floorUsd: number, periods: Array<{ period: string, state: string, picks: number | null, advMedian: number | null, advKnown: number | null, advLow: number | null }> } } | null };
+export type EdgeResultCapacityQuery = { edgeResult: { capacity: { state: string, variant: string | null, horizon: number | null, floorUsd: number, positionUsd: number, universeFloorUsd: number | null, floorBinds: boolean, periods: Array<{ period: string, state: string, picks: number | null, advMedian: number | null, advKnown: number | null, advLow: number | null, positionShare: number | null }> } } | null };
 
 export type EdgeResultRegimesQueryVariables = Exact<{
   id: string;
@@ -226,7 +226,7 @@ export type EdgeVariantGridQuery = { edgeVariants: { basis: string | null, trial
 export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
+export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, basisWhy: string, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean, referenceRate: number | null, touchRate: number | null }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null, nextClose: string | null, projections: Array<{ criterion: string, oos: boolean, have: number, needed: number, remaining: number, state: string, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null }>, atTarget: { needed: number, level: string, reasons: Array<string>, sentence: string } | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
 export type EdgeTradesQueryVariables = Exact<{
   edgeId: string;
@@ -756,6 +756,14 @@ export const EdgeResultCurveDocument = new TypedDocumentString(`
           }
         }
       }
+      baselines {
+        baseline
+        points {
+          exit
+          period
+          cumulative
+        }
+      }
       live {
         state
         since
@@ -955,6 +963,9 @@ export const EdgeResultCapacityDocument = new TypedDocumentString(`
       variant
       horizon
       floorUsd
+      positionUsd
+      universeFloorUsd
+      floorBinds
       periods {
         period
         state
@@ -962,6 +973,7 @@ export const EdgeResultCapacityDocument = new TypedDocumentString(`
         advMedian
         advKnown
         advLow
+        positionShare
       }
     }
   }
@@ -1104,6 +1116,7 @@ export const EdgesPageDocument = new TypedDocumentString(`
       headline
       result
       basis
+      basisWhy
       trades
       oosTrades
       winRate
@@ -1161,6 +1174,8 @@ export const EdgesPageDocument = new TypedDocumentString(`
         deflatedSharpe
         pbo
         thin
+        referenceRate
+        touchRate
       }
       evidence {
         oosTrades
@@ -1187,6 +1202,25 @@ export const EdgesPageDocument = new TypedDocumentString(`
           projectionState
           expectedBy
           fillRatio
+          cadenceSessions
+          nextClose
+          projections {
+            criterion
+            oos
+            have
+            needed
+            remaining
+            state
+            expectedBy
+            fillRatio
+            cadenceSessions
+          }
+          atTarget {
+            needed
+            level
+            reasons
+            sentence
+          }
         }
       }
       haircut {

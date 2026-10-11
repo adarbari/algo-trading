@@ -83,6 +83,14 @@ const ResultCurve = graphql(`
             }
           }
         }
+        baselines {
+          baseline
+          points {
+            exit
+            period
+            cumulative
+          }
+        }
         live {
           state
           since
@@ -288,6 +296,9 @@ const ResultCapacity = graphql(`
         variant
         horizon
         floorUsd
+        positionUsd
+        universeFloorUsd
+        floorBinds
         periods {
           period
           state
@@ -295,6 +306,7 @@ const ResultCapacity = graphql(`
           advMedian
           advKnown
           advLow
+          positionShare
         }
       }
     }

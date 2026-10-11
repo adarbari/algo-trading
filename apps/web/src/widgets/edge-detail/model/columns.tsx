@@ -20,6 +20,7 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
   pass: { label: 'Pass', tone: 'positive' },
   fail: { label: 'Fail', tone: 'negative' },
   not_measured: { label: 'Not measured yet', tone: 'neutral' },
+  not_applicable: { label: 'Does not apply', tone: 'neutral' },
 };
 
 export const criterionColumns: DataTableColumn<VerdictCriterion>[] = [

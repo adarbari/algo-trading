@@ -42,8 +42,12 @@ body = """
 A pick that trades little cannot take much money before it moves the price. Capacity shows the
 median 20-day average dollar volume of the counted picks, read on the decision session. It also
 shows how many fall below the floor the site sets (5 million dollars by default). Picks with no
-stored volume are counted apart, never as zero. Example: a median of 8 million with 4 of 30 picks
-below the floor means a position of 80,000 dollars is 1% of the median pick's daily volume.
+stored volume are counted apart, never as zero. The page also sizes a position against that median. The size is set in the site settings (100,000
+dollars by default), and it reads like "a 100,000 dollar position is 1.25% of the median pick's
+volume". The floor row appears only when the site floor is above the floor the edge's own universe
+already requires. A universe that needs 50 million of volume can never breach a 5 million floor,
+so that row would say nothing. Example: a median of 8 million means a
+position of 80,000 dollars is 1% of the median pick's daily volume.
 A position above a few percent of daily volume usually costs more than the cost grid assumes. The
 figure is for the picks of the period, not a promise about the next ones. Don't scale a position
 from the median alone: the smallest picks set the limit.

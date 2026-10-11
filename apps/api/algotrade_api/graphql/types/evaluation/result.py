@@ -140,12 +140,26 @@ class EdgeLive:
 
 
 @strawberry.type(
+    description="One decoy's own curve: the `baseline` (a screener preset the edge declares) and "
+    "its `points` by exit, added up the way the basis's own are"
+)
+class CurveBaseline:
+    baseline: str
+    points: list[CurvePoint]
+
+    @classmethod
+    def of(cls, d: curve.CurveBaseline) -> Self:
+        return cls(baseline=d.baseline, points=[CurvePoint.of(p) for p in d.points])
+
+
+@strawberry.type(
     description="The evidence curve of the verdict's basis: what its picks earned, window by "
     "window, added up (`kind` cumulative_excess in a return `unit`; excess_wins for an outcome "
     "with no return: wins above what the base rate predicts), against what the field earned. "
     "`splitFrom` where the out-of-sample side starts, `hidden` a copy's withheld out-of-sample "
     "result (the points are in-sample only), `gaps` the spans that hold no number and `live` the "
-    "settled paper trades. `unknown`: why there is no curve (then the rest is empty)"
+    "settled paper trades; `baselines` the decoys' own curves over the same windows (empty: none "
+    "declared or stored). `unknown`: why there is no curve (then the rest is empty)"
 )
 class EdgeCurve:
     kind: str | None
@@ -156,6 +170,7 @@ class EdgeCurve:
     gaps: list[CurveGap]
     live: EdgeLive | None
     unknown: Unknown | None
+    baselines: list[CurveBaseline]
 
     @classmethod
     def of(cls, d: curve.EdgeCurve) -> Self:
@@ -168,6 +183,7 @@ class EdgeCurve:
             gaps=[CurveGap.of(g) for g in d.gaps],
             live=EdgeLive.of(d.live) if d.live is not None else None,
             unknown=_unknown(d.unknown),
+            baselines=[CurveBaseline.of(b) for b in d.baselines],
         )
 
 

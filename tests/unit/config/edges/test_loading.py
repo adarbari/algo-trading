@@ -362,3 +362,10 @@ def test_load_all_edges_skips_a_users_folder_named_site() -> None:
         ("drift", "site"),
         ("idea", "site"),
     ]
+
+
+def test_momentum_12_1_declares_a_decoy_so_its_baseline_criteria_apply() -> None:
+    """Without decoys the verdict's baseline criteria are "does not apply" (ADR 0053 #9): the
+    12-1 momentum edge is itself the others' decoy, so it carries the size tilt of its winners."""
+    found = {e.id: e for e in load_all_edges(FileConfigStore(REPO_ROOT / "config", local=False))}
+    assert found["momentum_12_1"].baselines == ("size_small",)

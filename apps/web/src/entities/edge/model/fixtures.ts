@@ -30,6 +30,8 @@ const side = (
   deflatedSharpe: 0.8,
   pbo: null,
   thin,
+  referenceRate: null,
+  touchRate: null,
 });
 
 const verdict = (over: Record<string, unknown>) => ({
@@ -38,6 +40,7 @@ const verdict = (over: Record<string, unknown>) => ({
   headline: 'No official result yet',
   result: 'No official result yet',
   basis: null,
+  basisWhy: '',
   trades: null,
   oosTrades: null,
   winRate: null,
@@ -163,6 +166,38 @@ export const EDGES_FIXTURE = {
             projectionState: 'projected',
             expectedBy: '2027-03-15',
             fillRatio: 0.5,
+            cadenceSessions: 5,
+            nextClose: '2026-11-10',
+            projections: [
+              {
+                criterion: 'trades',
+                oos: true,
+                have: 6,
+                needed: 40,
+                remaining: 34,
+                state: 'projected',
+                expectedBy: '2027-03-15',
+                fillRatio: 0.5,
+                cadenceSessions: 5,
+              },
+              {
+                criterion: 'works_trades',
+                oos: false,
+                have: 70,
+                needed: 100,
+                remaining: 30,
+                state: 'projected',
+                expectedBy: '2027-02-01',
+                fillRatio: 0.5,
+                cadenceSessions: 5,
+              },
+            ],
+            atTarget: {
+              needed: 40,
+              level: 'not_working',
+              reasons: ['Deflated Sharpe is 0.00'],
+              sentence: "At 40, on today's figures: Not working.",
+            },
           },
         },
         haircut: {
@@ -391,6 +426,16 @@ export const CURVE_FIXTURE = {
     },
   ],
   gaps: [{ from: '2026-02-10', to: '2026-02-20', kind: 'lost_input', unknown: null }],
+  baselines: [
+    {
+      baseline: 'size_small',
+      points: [
+        { exit: '2026-02-02', period: 'in_sample', cumulative: 0.004 },
+        { exit: '2026-04-02', period: 'in_sample', cumulative: 0.007 },
+        { exit: '2026-06-03', period: 'out_of_sample', cumulative: 0.005 },
+      ],
+    },
+  ],
   live: {
     state: 'recorded',
     since: '2026-08-03',

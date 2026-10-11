@@ -19,6 +19,21 @@ describe('curveChart', () => {
     expect(series[1]?.points.map((p) => p.value)).toEqual([0.002, 0.004, 0.006]);
   });
 
+  it('draws a decoy only when it is switched on, at its exits, beside the picks', () => {
+    expect(curveChart(curve).series.map((s) => s.id)).not.toContain('decoy:size_small');
+    const { series } = curveChart(curve, ['size_small']);
+    const decoy = series.find((s) => s.id === 'decoy:size_small');
+    expect(decoy?.label).toBe('size_small');
+    expect(decoy?.points.map((p) => [p.time, p.value])).toEqual([
+      ['2026-02-02', 0.004],
+      ['2026-04-02', 0.007],
+      ['2026-06-03', 0.005],
+    ]);
+    expect(curveChart(curve, ['not_a_decoy']).series.map((s) => s.id)).toEqual(
+      curveChart(curve).series.map((s) => s.id),
+    );
+  });
+
   it('continues the picks with a dashed paper stroke from the served anchor', () => {
     const live = curveChart(curve).series[2];
     expect(live?.stroke).toBe('dashed');

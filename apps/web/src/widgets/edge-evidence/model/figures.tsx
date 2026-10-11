@@ -84,6 +84,30 @@ export const FIGURES: readonly FigureRow[] = [
   },
 ];
 
+/** The rows only an expires-out-of-the-money outcome has; shown when any side stored one. */
+export const RATE_FIGURES: readonly FigureRow[] = [
+  {
+    id: 'reference',
+    label: 'Risk-neutral rate',
+    help: 'reference_rate',
+    format: { kind: 'percent', digits: 1 },
+    value: (c) => c.referenceRate,
+  },
+  {
+    id: 'touch',
+    label: 'Touch rate',
+    help: 'touch_rate',
+    format: { kind: 'percent', digits: 1 },
+    value: (c) => c.touchRate,
+  },
+];
+
+/** The figure rows of a verdict's columns: the common ones, then the rates when stored. */
+export function figureRows(columns: readonly VerdictColumn[]): readonly FigureRow[] {
+  const stored = RATE_FIGURES.filter((row) => columns.some((c) => row.value(c) != null));
+  return stored.length === 0 ? FIGURES : [...FIGURES, ...stored];
+}
+
 const OUT = 'out_of_sample';
 
 /** The column of one side of the split; its header says "n=" when the sample is thin. */
