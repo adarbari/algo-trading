@@ -80,6 +80,7 @@ export {
   type EventItem,
   type EventKind,
 } from './EventChip';
+export { EvidenceMeter, type EvidenceMeterProps, type EvidenceMilestone } from './EvidenceMeter';
 export { EventTimeline, type EventTimelineProps } from './EventTimeline';
 export { ExpiryLadder, type ExpiryLadderProps, type ExpiryRow } from './ExpiryLadder';
 export { ExternalLink, type ExternalLinkProps } from './ExternalLink';

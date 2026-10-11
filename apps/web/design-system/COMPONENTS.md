@@ -569,6 +569,22 @@ Source: `design-system/components/EventTimeline`
 | `onRetry` | `() => void` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when no event falls in the window. |
 
+### EvidenceMeter
+
+EvidenceMeter: evidence collected against evidence needed ("5 of 40 trades"): a track filled from the left to `value` of `max` (clamped), milestone ticks on the track with their labels under it (a tick at or below the value is drawn as reached), and an optional one-line caption (the page passes the projected date). A milestone's reached state is also in its text for screen readers. Exposed as a meter (`role="meter"`) with a "5 of 40" reading; an unknown value draws a hatched empty track with the reason as text, never a zero.
+
+Source: `design-system/components/EvidenceMeter`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | Name of the evidence ("Closed trades"): shown above the track, names the meter. |
+| `value` | `number` | yes | Evidence collected so far; clamped to 0-`max` for the fill. Ignored while `state` is `unknown`. |
+| `max` | `number` | yes | Evidence needed (the end of the track). |
+| `milestones` | `readonly EvidenceMilestone[]` | no | Ticks on the track; one at or below `value` is reached. |
+| `caption` | `ReactNode` | no | One line under the track (the projected date). |
+| `state` | `'known' \| 'unknown'` | no | `known` (default) or `unknown`: no fill, a hatched track, the reason as text. |
+| `unknownLabel` | `string` | no | Why the evidence is not known ("No trades recorded yet"); shown instead of the reading. |
+
 ### ExpandableRow
 
 ExpandableRow: one row of a list that opens its detail in place (a screener with its criteria, hits and actions). The summary is a button with `aria-expanded` controlling the detail region; it shows a title, an optional badge, a figure that stays on a phone (`essential`) and further cells (`secondary`) that drop out in a narrow container. Controlled by the caller, so a list keeps one row open at a time. For a labelled count with hidden detail use Disclosure.

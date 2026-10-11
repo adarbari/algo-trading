@@ -33,6 +33,8 @@ const verdict = (over: Record<string, unknown>) => ({
   robustness: null,
   criteria: [],
   years: [],
+  columns: [],
+  evidence: null,
   ...over,
 });
 
@@ -122,6 +124,10 @@ export const EDGES_FIXTURE = {
           {
             year: '2025',
             period: 'in_sample',
+            label: '2025',
+            fromDate: '2025-01-01',
+            toDate: '2025-12-31',
+            partial: false,
             winRate: 0.6,
             baseRate: 0.5,
             liftPts: 10,
@@ -131,6 +137,10 @@ export const EDGES_FIXTURE = {
           {
             year: '2026',
             period: 'both',
+            label: '2026',
+            fromDate: '2026-01-01',
+            toDate: '2026-12-31',
+            partial: false,
             winRate: 0.57,
             baseRate: 0.52,
             liftPts: 5,

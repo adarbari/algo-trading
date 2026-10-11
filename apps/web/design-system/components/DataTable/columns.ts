@@ -64,6 +64,12 @@ export interface DataTableColumn<TRow> {
   mono?: boolean;
   /** Text colour of plain cells: `default`, `secondary` or `muted`. */
   tone?: 'default' | 'secondary' | 'muted';
+  /**
+   * Tints the whole column, header and cells, with the soft accent (the column the reader should
+   * look at: "this edge" among its peers). Independent of `tone` and `fill`: a per-cell `fill` wins
+   * on its own cell, text colour is unchanged, and the header text stays the same.
+   */
+  emphasis?: boolean;
   /** Tints a cell from its row (a criterion's near miss or miss); no tint when `undefined`. */
   fill?: (row: TRow) => DataTableFill | undefined;
 }

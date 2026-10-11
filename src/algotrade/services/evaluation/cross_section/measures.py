@@ -119,7 +119,8 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
 
 @dataclass(frozen=True)
 class Slice:
-    """A set of sessions reported on its own: ``kind`` ("all", "year", "regime", "in_sample",
+    """A set of sessions reported on its own: ``kind`` ("all", "year", "year_part" (a year cut
+    by the split: value ``<year>:in_sample`` / ``<year>:out_of_sample``), "regime", "in_sample",
     "frozen")."""
 
     kind: str
@@ -255,11 +256,20 @@ def slice_measures(
 
 
 def edge_slices(stats: Sequence[SessionStat], split: date | None, exploratory: bool) -> list[Slice]:
-    """The slices of a variant's sessions: all, each year and regime label, and with a split the
-    in-sample and frozen (or exploratory) sides."""
+    """The slices of a variant's sessions: all, each year (a year the split falls in also as its
+    two ``year_part`` sides) and regime label, and with a split the in-sample and frozen (or
+    exploratory) sides."""
     slices = [Slice("all", "all", _always)]
     for year in sorted({s.session.year for s in stats}):
         slices.append(Slice("year", str(year), partial(_in_year, year)))
+        if split is not None and date(year, 1, 1) < split <= date(year, 12, 31):
+            # a trade sits on the side of its decision session, as in_sample / frozen do
+            slices.append(
+                Slice("year_part", f"{year}:in_sample", partial(_year_before, year, split))
+            )
+            slices.append(
+                Slice("year_part", f"{year}:out_of_sample", partial(_year_since, year, split))
+            )
     for label in sorted({s.regime for s in stats}):
         slices.append(Slice("regime", label, partial(_in_regime, label)))
     if split is not None:  # the edge's frozen_from (fixed, never rolling) or an exploratory split
@@ -275,6 +285,14 @@ def _always(stat: SessionStat) -> bool:
 
 def _in_year(year: int, stat: SessionStat) -> bool:
     return stat.session.year == year
+
+
+def _year_before(year: int, day: date, stat: SessionStat) -> bool:
+    return _in_year(year, stat) and _before(day, stat)
+
+
+def _year_since(year: int, day: date, stat: SessionStat) -> bool:
+    return _in_year(year, stat) and _since(day, stat)
 
 
 def _in_regime(label: str, stat: SessionStat) -> bool:

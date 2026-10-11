@@ -13,6 +13,8 @@ export type EdgeVerdict = Edge['verdict'];
 export type VerdictCriterion = EdgeVerdict['criteria'][number];
 export type EdgeProblem = EdgesResponse['edgeProblems'][number];
 export type VerdictYear = EdgeVerdict['years'][number];
+export type VerdictColumn = EdgeVerdict['columns'][number];
+export type EvidenceProgress = NonNullable<EdgeVerdict['evidence']>;
 
 /** The verdicts, best first: the list's groups in this order. */
 export const VERDICT_ORDER = [

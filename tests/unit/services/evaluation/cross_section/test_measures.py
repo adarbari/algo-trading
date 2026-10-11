@@ -11,6 +11,7 @@ from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     Slice,
     decile_means,
+    edge_slices,
     slice_measures,
 )
 
@@ -143,3 +144,31 @@ def test_pooled_running_moments_equal_the_raw_pooled_values() -> None:
     pooled = ((nx - 1) * picks.var(ddof=1) + (ny - 1) * rest.var(ddof=1)) / (nx + ny - 2)
     g = (picks.mean() - rest.mean()) / np.sqrt(pooled) * (1 - 3 / (4 * (nx + ny) - 9))
     assert m.effect_size == pytest.approx(g, rel=1e-9)
+
+
+def _stats() -> list[SessionStat]:
+    days = [date(2025, 12, 30), date(2026, 3, 31), date(2026, 4, 1), date(2026, 4, 30)]
+    return [stat(d, (0.01,), (0.0, 0.01), 1) for d in days]
+
+
+def _year_parts(split: date | None) -> dict[str, list[date]]:
+    stats = _stats()
+    return {
+        s.value: [x.session for x in stats if s.keep(x)]
+        for s in edge_slices(stats, split, exploratory=False)
+        if s.kind == "year_part"
+    }
+
+
+def test_a_split_inside_a_year_cuts_it_into_two_year_part_slices() -> None:
+    parts = _year_parts(date(2026, 4, 1))
+    assert list(parts) == ["2026:in_sample", "2026:out_of_sample"]
+    assert parts["2026:in_sample"] == [date(2026, 3, 31)]
+    assert parts["2026:out_of_sample"] == [date(2026, 4, 1), date(2026, 4, 30)]
+    year = next(s for s in edge_slices(_stats(), date(2026, 4, 1), False) if s.value == "2026")
+    assert sum(len(v) for v in parts.values()) == sum(year.keep(x) for x in _stats())
+
+
+def test_a_split_on_a_year_start_or_none_makes_no_year_part() -> None:
+    assert _year_parts(date(2026, 1, 1)) == {}
+    assert _year_parts(None) == {}
