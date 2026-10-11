@@ -64,11 +64,11 @@ def test_a_long_description_is_cut() -> None:
     assert line.endswith("…") and len(line) < 200
 
 
-def test_system_prompt_keeps_catalogue_order_and_is_stable() -> None:
+def test_system_prompt_sorts_the_catalogue_and_is_stable() -> None:
     infos = [info("rollup.b@v1.x"), info("instrument.a", "str")]
     first = system_prompt(infos)
-    assert first == system_prompt(infos)
-    assert first.index("rollup.b@v1.x") < first.index("instrument.a")
+    assert first == system_prompt(infos) == system_prompt(infos[::-1])
+    assert first.index("instrument.a") < first.index("rollup.b@v1.x")
     assert "ONE JSON object" in first and "tie_break" in first
     assert "Example 1" in first and "Example 2" in first and "Phrasebook" not in first
     assert "Field guide (" not in first and "Field guide (" not in system_prompt(
@@ -174,3 +174,26 @@ def test_guide_lines_keep_only_this_catalogues_fields_and_no_sources() -> None:
     assert text == system_prompt([info("rollup.b@v1.x")], (), guide)
     only_fields = system_prompt([info("rollup.b@v1.x")], (), FieldGuideSettings((RSI,), (NOWHERE,)))
     assert "Field guide (" in only_fields and "Situations that fool" not in only_fields
+
+
+def test_users_share_the_site_prefix_and_own_features_come_last() -> None:
+    site = [info("rollup.b@v1.x"), info("instrument.a", "str")]
+    mine = info("feature.mine", scope="user", owner="u1")
+    other = info("feature.zeta", scope="user", owner="u2")
+    momentum = Phrase(("mine",), ("feature.mine", "rollup.b@v1.x"), "x gt 0")
+    first = system_prompt([site[0], mine, site[1]], [momentum])
+    second = system_prompt([other, *site], [momentum])
+    marker = "\nYour own features ("
+    shared = first.split(marker)[0]
+    # The phrasebook entry naming the user's feature is the only difference before the marker.
+    assert "feature.zeta" not in second.split(marker)[0]
+    plain = system_prompt(site)
+    assert plain.split("\nPhrasebook")[0] == shared.split("\nPhrasebook")[0]
+    assert (
+        system_prompt([*site, mine, other]).split(marker)[0] == system_prompt(site).split(marker)[0]
+    )
+    assert marker not in plain
+    assert first.endswith(catalogue_line(mine) + "\n")
+    # every catalogue field appears exactly once as a catalogue line
+    for i in (*site, mine):
+        assert first.count("\n" + catalogue_line(i) + "\n") == 1
