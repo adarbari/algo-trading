@@ -579,3 +579,36 @@ def test_a_repair_runs_when_time_allows_and_the_last_member_repairs_with_no_rese
         "s", "u", tag=TAG, accept=only_good
     )
     assert done.text == "good" and [s for _, s, _ in last.seen] == ["first", "repair"]
+
+
+class AdmitFirst(Ledger):
+    """Admits (and reserves 0.5 USD for) the first request only: the budget runs out after it."""
+
+    def admit(self, provider: str, prompt_chars: int) -> float | None:
+        if self.reserved and provider == "cheap":
+            return None
+        return super().admit(provider, prompt_chars)
+
+
+def test_a_repair_refused_by_the_budget_keeps_the_fallback_trail_and_settles_each_attempt() -> None:
+    cheap, free = Scripted("cheap", "bad"), Scripted("free", "good")
+    ledger = AdmitFirst()
+    done = with_ledger(ledger, cheap, free).complete("s", "u", tag=TAG, accept=only_good)
+    assert len(cheap.seen) == 1  # the repair was never asked
+    assert (done.provider, done.fell_back_from) == ("free", "cheap")
+    assert [(a.provider, a.outcome, a.call_stage) for a in ledger.attempts] == [
+        ("cheap", "ok", "first"),
+        ("cheap", "rejected", "first"),
+        ("cheap", "skipped_budget", "repair"),
+        ("free", "fell_back", "escalate"),
+    ]
+    assert ledger.reserved == [0.5, 0.0, 0.0, 0.0]  # the first attempt's reserve settled once
+
+
+def test_a_refused_answer_whose_repair_misses_the_deadline_still_falls_back_from_it() -> None:
+    clock = Clock()
+    slow = Timed(clock, 100, "slow", "bad")
+    chained = FallbackTextModel([("slow", slow), ("b", Scripted("b", "good"))], 150.0, clock)
+    chained = reserving(clock, slow, Scripted("b", "good"), worst={"slow": 80.0, "b": 1.0})
+    done = chained.complete("s", "u", tag=TAG, accept=only_good)  # 100 + 80 > 100: no repair
+    assert (done.provider, done.fell_back_from) == ("b", "slow")

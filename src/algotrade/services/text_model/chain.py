@@ -180,11 +180,14 @@ class FallbackTextModel:
                 if attempt and (left := self._short(call, provider)) is not None:
                     call.failures.append(f"{provider}: not repaired, {left}")
                     call.escalating = True
+                    call.first_failed = call.first_failed or provider  # its answer was refused
                     break
                 called = tag if tag is None else replace(tag, stage=REPAIR if attempt else stage)
                 completion = self._ask(call, provider, model, asked, called)
                 if completion is None:  # failed or skipped: the next provider
-                    call.escalating = call.escalating or attempt == 1
+                    if attempt == 1:  # the repair never happened: the first answer was refused
+                        call.escalating = True
+                        call.first_failed = call.first_failed or provider
                     break
                 refusal = _refusal(accept, completion.text)
                 if refusal is None:

@@ -25,7 +25,7 @@ from algotrade.core.model.errors import (
 )
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA, check_answer
+from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA, check_answer, check_criterion
 from algotrade.services.drafting.prompt import PROMPT_VERSION, system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
@@ -151,6 +151,8 @@ def criteria_of(
         cid = _criterion_id(item.get("id"), field_name, n, kept)
         why = f" ({item['why']})" if isinstance(item.get("why"), str) and item["why"] else ""
         try:
+            if (shape := check_criterion(item)) is not None:
+                raise ConfigurationError(f"not the criterion shape ({shape})")
             kept[cid] = _criterion(item, field_name, catalogue)
         except ConfigurationError as exc:
             dropped.append(DroppedCriterion(cid, field_name, f"{exc}{why}"))

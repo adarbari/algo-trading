@@ -56,7 +56,7 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # id = "gemini"
 # base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 # model = "gemini-2.5-flash"
-# structured = "json_schema"
+# # structured = "json_schema"     # (verify with a recorded answer before enabling)
 #
 # [[provider]]                       # strong on failure
 # id = "claude"

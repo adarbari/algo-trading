@@ -7,10 +7,11 @@ providers accept (every property listed in ``required``, an optional one nullabl
 reads a missing nullable property as absent, so an answer that leaves out ``mode`` or ``why`` is
 as valid as one with ``null``. It types the shape only: whether an op, mode or field is known
 stays with ``criteria_of`` (a wrong one is dropped with a reason, not a rejected answer). A
-later contract (several drafts, PR 5) extends this module's schema; the check is a small
-subset of JSON Schema (``type``, ``properties``, ``required``, ``items``, ``anyOf``), enough for
-these shapes and no dependency; a key the schema does not list is tolerated (``additionalProperties
-= false`` is for the provider, strict mode needs it)."""
+later contract (several drafts, PR 5) extends this module's schema: a new answer key must be
+nullable or optional (``["string", "null"]``), so answers recorded before it still pass. The
+check is a small subset of JSON Schema (``type``, ``properties``, ``required``, ``items``,
+``anyOf``), enough for these shapes and no dependency; a key the schema does not list is
+tolerated (``additionalProperties = false`` is for the provider, strict mode needs it)."""
 
 from collections.abc import Mapping
 from typing import Any
@@ -79,6 +80,15 @@ ANSWER_SCHEMA: Mapping[str, Any] = {
     "additionalProperties": False,
 }
 
+# What refuses a whole answer: a JSON object with a criteria list. Each criterion is checked
+# on its own (``check_criterion``), so one malformed criterion is dropped with its reason, as
+# before; tie_break and notes are read leniently.
+ANSWER_SHAPE: Mapping[str, Any] = {
+    "type": "object",
+    "properties": {"criteria": {"type": "array"}},
+    "required": ["criteria"],
+}
+
 _TYPES: Mapping[str, Any] = {
     "object": lambda v: isinstance(v, Mapping),
     "array": lambda v: isinstance(v, list),
@@ -89,10 +99,16 @@ _TYPES: Mapping[str, Any] = {
 }
 
 
-def check_answer(value: Any, schema: Mapping[str, Any] = ANSWER_SCHEMA) -> str | None:
+def check_answer(value: Any, schema: Mapping[str, Any] = ANSWER_SHAPE) -> str | None:
     """Why ``value`` does not fit ``schema`` (the first violation, with its path), else
-    ``None``."""
+    ``None``. By default the top-level shape only, which is what refuses an answer."""
     return _violation(value, schema, "answer")
+
+
+def check_criterion(value: Any) -> str | None:
+    """Why one proposed criterion does not fit ``CRITERION`` (it is dropped with this reason,
+    the rest of the answer kept), else ``None``."""
+    return _violation(value, CRITERION, "criterion")
 
 
 def _violation(value: Any, schema: Mapping[str, Any], path: str) -> str | None:

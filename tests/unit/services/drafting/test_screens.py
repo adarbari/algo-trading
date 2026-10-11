@@ -384,7 +384,7 @@ class Ledger:
 
 GOOD = json.dumps(proposal(PRICE_GT))
 NOT_JSON = "Sure! Here is the screen."
-WRONG_SHAPE = json.dumps({"criteria": [{"field": PRICE, "op": "gt", "value": {"n": 1}}]})
+WRONG_SHAPE = json.dumps({"criteria": {"field": PRICE}})
 
 
 def chained(ledger: Ledger, *members: Scripted) -> FallbackTextModel:
@@ -418,7 +418,7 @@ def test_invalid_twice_escalates_and_a_schema_breach_counts_as_invalid(ctx: Read
     assert list(draft.document["criteria"]) == ["price"]
     assert [s for _, s, _ in cheap.calls] == ["first", "repair"]
     assert [s for _, s, _ in strong.calls] == ["escalate"]
-    assert "does not fit the schema" in cheap.calls[1][0]
+    assert "has no criteria list" in cheap.calls[1][0]
     rejected = [a for a in ledger.attempts if a.outcome == "rejected"]
     assert [a.answer for a in rejected] == [WRONG_SHAPE, NOT_JSON]
     assert (
@@ -432,7 +432,7 @@ def test_every_provider_failing_validation_lists_the_causes_after_two_calls_each
     a, b = Scripted("a", NOT_JSON, NOT_JSON), Scripted("b", WRONG_SHAPE, WRONG_SHAPE)
     with pytest.raises(ModelUnavailableError) as raised:
         draft_screen(ctx, chained(Ledger(), a, b), "s", "over $50")
-    assert "not JSON" in str(raised.value) and "does not fit the schema" in str(raised.value)
+    assert "not JSON" in str(raised.value) and "no criteria list" in str(raised.value)
     assert len(a.calls) == len(b.calls) == 2
 
 
@@ -452,3 +452,19 @@ def test_a_draft_the_validator_refuses_is_repaired_too(
     assert list(draft.document["criteria"]) == ["price"]
     assert [s for _, s, _ in cheap.calls] == ["first", "repair"]
     assert "Your answer was rejected: s.rank: unknown tie_break." in cheap.calls[1][0]
+
+
+def test_a_criterion_that_breaks_the_schema_is_dropped_with_its_reason_not_the_answer(
+    ctx: ReadContext,
+) -> None:
+    answer = proposal(
+        PRICE_GT,
+        {"id": "tol", "field": PRICE, "op": "lt", "value": 9, "mode": "soft", "tolerance": "wide"},
+        {"id": "obj", "field": OI, "op": "gte", "value": {"n": 1}},
+    )
+    only = Scripted("only", json.dumps(answer))
+    draft = draft_screen(ctx, chained(Ledger(), only), "s", "over $50")
+    assert list(draft.document["criteria"]) == ["price"] and len(only.calls) == 1  # no repair
+    assert [(d.id, "not the criterion shape" in d.reason) for d in draft.dropped] == [
+        ("tol", True), ("obj", True)]  # fmt: skip
+    assert "tolerance" in draft.dropped[0].reason and "value" in draft.dropped[1].reason

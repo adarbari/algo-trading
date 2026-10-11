@@ -17,10 +17,11 @@ import pytest
 from algotrade.config.env import claude_cli_env
 from algotrade.config.site.llm import ProviderSettings
 from algotrade.core.model.errors import InvalidAnswerError, ModelUnavailableError
+from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade_sources.framework.registry import build_claude_cli
 from algotrade_sources.llm import claude_cli
 from algotrade_sources.llm.claude_cli import LOCKDOWN, ClaudeCli, run_process
-from tests.helpers.payloads.llm import claude_cli_structured
+from tests.helpers.payloads.llm import RECORDED_STRUCTURED, claude_cli_structured
 
 OK = {
     "type": "result",
@@ -320,7 +321,7 @@ def test_the_answer_is_the_structured_output_when_present_else_the_result() -> N
     done = ClaudeCli("/c", "haiku", {}, runner=runner, structured="json_schema").complete(
         "s", "u", schema=SCHEMA
     )
-    assert json.loads(done.text) == structured and done.cost_usd == 0.0042
+    assert json.loads(done.text) == structured and done.cost_usd == 0.0003257
     plain = Runner(claude_cli_structured(None, result='{"criteria": []}'))
     assert client(plain).complete("s", "u").text == '{"criteria": []}'
 
@@ -338,3 +339,47 @@ def test_the_registry_builds_it_with_the_structured_mode() -> None:
         "/bin/claude", "sonnet", 90, 0, {"HOME": "/h"}, "claude", "json_schema"
     )
     assert built.structured == "json_schema"
+
+
+def test_the_recorded_structured_result_gives_the_object_and_its_usage() -> None:
+    done = ClaudeCli(
+        "/c", "haiku", {}, runner=Runner(RECORDED_STRUCTURED), structured="json_schema"
+    ).complete("s", "u", schema=SCHEMA)
+    assert json.loads(done.text) == {"n": 1, "a": None, "b": False}
+    assert (done.input_tokens, done.cache_write_tokens, done.cost_usd) == (2, 1395, 0.0003257)
+
+
+def test_two_threads_repairing_through_the_chain_share_the_one_lock() -> None:
+    inside, peak, runs = [0], [0], [0]
+    guard = threading.Lock()
+
+    def runner(
+        argv: Sequence[str], stdin: str, cwd: Path, env: Mapping[str, str], timeout: float
+    ) -> "subprocess.CompletedProcess[str]":
+        with guard:
+            inside[0] += 1
+            runs[0] += 1
+            peak[0] = max(peak[0], inside[0])
+        threading.Event().wait(0.03)
+        with guard:
+            inside[0] -= 1
+        answer = "good" if "was rejected" in stdin else "bad"
+        return subprocess.CompletedProcess(argv, 0, json.dumps(OK | {"result": answer}), "")
+
+    def accept(text: str) -> None:
+        if text != "good":
+            raise InvalidAnswerError("not good")
+
+    chain = FallbackTextModel(
+        [("claude", ClaudeCli("/c", "haiku", {}, timeout_s=5, runner=runner))]
+    )
+    done: list[str] = []
+    threads = [
+        threading.Thread(target=lambda: done.append(chain.complete("s", "u", accept=accept).text))
+        for _ in range(2)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert done == ["good", "good"] and runs[0] == 4 and peak[0] == 1

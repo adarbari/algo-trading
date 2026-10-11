@@ -54,17 +54,33 @@ def gemini_answer(text: str, prompt_tokens: int = 398, completion_tokens: int = 
 
 
 def claude_cli_structured(structured: object, result: str = "") -> str:
-    """``claude -p --output-format json --json-schema ...`` stdout, BUILT FROM THE CLI'S RESULT
-    SHAPE (``structured_output`` holds the object that fits the schema; ``result`` is empty or
-    prose), not recorded: replace with stdout recorded on the first real structured call."""
+    """``claude -p --output-format json --json-schema ...`` stdout, RECORDED 2026-10-11 (claude
+    2.1.295, model haiku, the lockdown flags incl. ``--tools ""``, schema ``{n, a (string or
+    null), b}``): the CLI answers in ``structured_output`` and also repeats it as a string in
+    ``result``. Ids, durations and paths are removed; ``structured`` and ``result`` are the
+    only parts a test varies."""
     return json.dumps(
         {
             "type": "result",
             "subtype": "success",
             "is_error": False,
+            "stop_reason": "tool_use",
+            "num_turns": 2,
             "result": result,
             "structured_output": structured,
-            "usage": {"input_tokens": 120, "output_tokens": 30},
-            "total_cost_usd": 0.0042,
+            "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 1395,
+                "cache_read_input_tokens": 0,
+                "output_tokens": 93,
+            },
+            "total_cost_usd": 0.0003257,
+            "permission_denials": [],
+            "terminal_reason": "completed",
         }
     )
+
+
+RECORDED_STRUCTURED = claude_cli_structured(
+    {"n": 1, "a": None, "b": False}, '{"n":1,"a":null,"b":false}'
+)
