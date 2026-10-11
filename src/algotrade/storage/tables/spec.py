@@ -9,11 +9,12 @@ from dataclasses import dataclass
 SCHEMA_VERSION = 1
 COMMON = ("session_date", "knowledge_ts", "source", "run_id")
 # Abstract column types; storage backends map them to physical types (Arrow, DuckDB later).
-# ``<scalar>[]`` is a list column of that scalar (ADR 0063's per-session arrays); null or empty.
+# ``<scalar>[]`` is a list column of that scalar (ADR 0063's per-session arrays, ADR 0064's
+# per-pick ones); the list null or empty, an element null (never 0).
 COLUMN_TYPES = frozenset(
     {
         "string", "float64", "float32", "int64", "bool", "date", "timestamp_utc",
-        "float64[]", "float32[]", "string[]", "date[]",
+        "float64[]", "float32[]", "int64[]", "string[]", "date[]",
     }
 )  # fmt: skip
 # How a partition's runs combine on read: "snapshot" (each run is the whole partition; the

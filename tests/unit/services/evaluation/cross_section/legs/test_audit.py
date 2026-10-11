@@ -17,7 +17,7 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
     encode_leg,
     encode_tombstone,
 )
-from algotrade.services.evaluation.cross_section.measures import SessionStat
+from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
 
 AS_OF = datetime(2026, 10, 5, tzinfo=UTC)
 
@@ -26,7 +26,9 @@ def leg(day: date, key: str = "k", **stat: Any) -> LegRecord:
     base = SessionStat(
         session=day, regime="CALM", pick_values=(0.1, float("nan")), pick_hits=1,
         rest=(5, 0.01, 0.2), base_hits=2, top_decile=None, spread=None, deciles=(0.1,) * 10,
-        ranked=7, unscored=0,
+        ranked=7, unscored=0, base_hits_at=(2, 1), pick_hits_at=(1, 1),
+        picks=(Pick("EQ:A", 1, "", 0.1, True, adv=None), Pick("EQ:B", 2, "", float("nan")),
+               Pick("EQ:C", 3, "no_entry_bar", score=None, adv=2e6)),
     )  # fmt: skip
     return LegRecord(
         key=key, trial_hash="t", edge_variant="main", variant="momo", horizon=1,
@@ -63,6 +65,16 @@ def test_only_the_changed_legs_are_found_with_their_columns() -> None:
     found = differing_legs(rows_of(*fresh), stored_of(*old), "site", "e")
     assert [(d.key[4], d.columns) for d in found] == [(DAYS[1], ("pick_hits", "ranked"))]
     assert "momo h1 2026-09-02" in found[0].describe()
+
+
+def test_a_changed_pick_is_found_through_its_list_with_nulls_and_strings() -> None:
+    """Leg v2 (ADR 0064): pick lists hold strings and null elements; a changed ADV is a change."""
+    old = [leg(d) for d in DAYS]
+    base = old[1].stat
+    picks = (base.picks[0], base.picks[1], replace(base.picks[2], adv=3e6))
+    fresh = [old[0], replace(old[1], stat=replace(base, picks=picks)), old[2]]
+    found = differing_legs(rows_of(*fresh), stored_of(*old), "site", "e")
+    assert [(d.key[4], d.columns) for d in found] == [(DAYS[1], ("pick_adv",))]
 
 
 def test_a_leg_not_stored_is_absent_and_a_stored_leg_the_run_lacks_is_ignored() -> None:

@@ -7,8 +7,9 @@ store readers it is handed (``data.outcomes``), as the harness does."""
 
 import hashlib
 import json
+import math
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from typing import Any
 
@@ -36,6 +37,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     NO_IMPLIED_VOL,
     UNMEASURED,
     apply_outcome,
+    is_return,
     needs_implied_vol,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
@@ -55,6 +57,7 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
     encode_leg,
 )
 from algotrade.services.evaluation.cross_section.measures import (
+    Pick,
     SessionStat,
     decile_means,
 )
@@ -84,6 +87,7 @@ MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 
 CHUNK_SESSIONS = 20  # decision sessions screened and measured before the frames are dropped
 OUTCOME_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS)  # kept per entry session
+NO_ENTRY_BAR = "no_entry_bar"  # a pick's reason when its name has no outcome row at S
 
 
 @dataclass(frozen=True)
@@ -161,11 +165,13 @@ def _stat(
     horizon: int,
     rows: pd.DataFrame,
     event_names: frozenset[str] | None,
+    costs: Sequence[float],
 ) -> SessionStat:
     """One variant at one decision session: ``rows`` are the stored outcomes at the entry
-    session. The eligible names, the screen and the implied vol are read at D. ``event_names``
-    (an event schedule): the picks are the qualified names within them, and the base is them
-    (``base = "event"``) or every eligible name."""
+    session. The eligible names, the screen, the implied vol and the picks' ADV are read at D.
+    ``event_names`` (an event schedule): the picks are the qualified names within them, and the
+    base is them (``base = "event"``) or every eligible name. ``costs``: the site's cost grid
+    (bp), whose hits a return outcome's leg also counts."""
     edge, day = scope.edge, leg.decision
     run, eligible = session.run(variant, day), session.eligible(scope.universe, day)
     if (
@@ -200,6 +206,7 @@ def _stat(
         else sorted((i for i in scored if i in counted.index), key=lambda i: (-scored[i], i))
     )
     deciles = decile_means(counted.loc[ranked, "oriented"].to_list()) if ranked else ()
+    levels = _hits_at(scope, session, leg, horizon, rows, ids, costs)
     return SessionStat(
         session=day,
         regime=session.label(day),
@@ -226,7 +233,80 @@ def _stat(
         pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
         no_implied_vol=sum(1 for i in picks if i in no_iv),
         implied_stored=any(v is not None for v in implied.values()),
+        picks=_picks(scope.edge, picks, run.scores, res, rows, session.adv(eligible, day)),
+        base_hits_at=tuple(int(hits.sum()) for hits in levels),
+        pick_hits_at=tuple(int(hits.loc[got].sum()) for hits in levels),
     )
+
+
+def _picks(
+    edge: Edge,
+    picks: Sequence[str],
+    scores: Mapping[str, float],
+    res: pd.DataFrame,
+    rows: pd.DataFrame,
+    adv: Mapping[str, float | None],
+) -> tuple[Pick, ...]:
+    """Every pick of a session in rank order (leg v2, ADR 0064): counted or with its reason.
+    ``res`` is the scored outcomes of the base names, ``rows`` the stored ones at S."""
+    stored = rows[rows["instrument_id"].isin(set(picks))].set_index("instrument_id")
+    gross = is_return(edge)
+    out = []
+    for rank, i in enumerate(picks, start=1):
+        if i not in res.index:
+            out.append(Pick(i, rank, NO_ENTRY_BAR, score=scores.get(i), adv=adv.get(i)))
+            continue
+        r = res.loc[i]
+        counted = r["excluded"] == ""
+        out.append(
+            Pick(
+                instrument_id=i,
+                rank=rank,
+                reason=str(r["excluded"]),
+                value=_finite(r["oriented"]) if counted else None,
+                hit=bool(r["hit"]),
+                delisted=bool(r["delisted"]),
+                score=scores.get(i),
+                gross=_finite(stored.at[i, "fwd_excess_return"]) if gross and counted else None,
+                drawdown=_finite(stored.at[i, "fwd_max_drawdown"]),
+                adv=adv.get(i),
+                reference=_finite(r["reference"]),
+                touch=None if _finite(r["reference"]) is None else bool(r["touch"]),
+            )
+        )
+    return tuple(out)
+
+
+def _finite(value: object) -> float | None:
+    number = None if value is None else float(value)  # type: ignore[arg-type]
+    return number if number is not None and math.isfinite(number) else None
+
+
+def _hits_at(
+    scope: _Scope,
+    session: SessionReads,
+    leg: Leg,
+    horizon: int,
+    rows: pd.DataFrame,
+    ids: frozenset[str],
+    costs: Sequence[float],
+) -> list[pd.Series]:
+    """Per level of the cost grid, the ``hit`` of each base name were the round trip to cost
+    that many bp instead of the document's ``cost_bps`` (``apply_outcome``'s own rule; ADR 0064
+    decision 5); none for an outcome that is not a return. Exclusions do not depend on the cost,
+    so the counted names are the session's own."""
+    if not is_return(scope.edge):
+        return []
+    found = []
+    for level in costs:
+        costed = replace(scope.edge, outcome=replace(scope.edge.outcome, cost_bps=level))
+
+        def score(edge: Edge = costed) -> pd.DataFrame:
+            inside = rows[rows["instrument_id"].isin(ids)]
+            return apply_outcome(edge, inside).set_index("instrument_id")
+
+        found.append(session.outcomes(f"{scope.key}@{level:g}bp", horizon, leg.decision, score))
+    return [frame["hit"] for frame in found]
 
 
 def _drawing(spec: "_RandomSpec", variant: Variant, block: Sequence[Leg]) -> bool:
@@ -289,13 +369,15 @@ class _RandomSpec:
     """What a leg is keyed and drawn by: the first out-of-sample session (None: no draws), the
     draws per session and the hash of the user's expression-feature definitions, which with the
     trial seed the draws through the leg key (``legs/key.py``); the run's range and ``as_of`` do
-    not. ``user_id`` and ``edge_id`` name the rows the legs are stored as."""
+    not. ``user_id`` and ``edge_id`` name the rows the legs are stored as; ``costs`` is the site's
+    cost grid in bp (each leg counts its hits at every level, so it is in the key too)."""
 
     split: date | None
     draws: int
     expr_hash: str
     user_id: str
     edge_id: str
+    costs: tuple[float, ...]
     keys: dict[tuple[str, str], str] = field(default_factory=dict)  # (scope, variant) -> leg key
 
     def key_for(self, scope: "_Scope", variant: "Variant") -> str:
@@ -313,6 +395,7 @@ class _RandomSpec:
                 scope.edge.top_k,
                 scope.edge.base,
                 scope.edge.picks,
+                self.costs,
             )
         return found
 
@@ -428,7 +511,7 @@ def _measure_plan(
             rows = closed[p.horizon][leg.entry]
             drawing = _drawing(spec, variant, block)
             with session.attribute(leg.decision):
-                stat = _stat(p.scope, session, variant, leg, p.horizon, rows, names)
+                stat = _stat(p.scope, session, variant, leg, p.horizon, rows, names, spec.costs)
                 drawn = (
                     _measure_random(p, variant, leg, stat, session, names, rows, spec)
                     if drawing

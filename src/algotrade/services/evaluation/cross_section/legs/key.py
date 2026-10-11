@@ -3,8 +3,9 @@ leg) is a function of besides the session itself, so a leg computed by one run i
 with the same key would compute, and the random draws of a session can be seeded by it.
 
 A key is a sha256 of a canonical JSON of the trial, the universe, the implied-vol field, the event
-class and offset, the draws per session, the definitions of every expression feature the user's
-catalogue resolves, and the three scheme versions. A change to a screener's or the harness's
+class and offset, the draws per session, the site's cost grid (leg v2 counts hits at each level,
+ADR 0064), the definitions of every expression feature the user's catalogue resolves, and the
+three scheme versions. A change to a screener's or the harness's
 Python that changes a leg bumps ``LEG_VERSION`` (ADR 0063 amendment 9)."""
 
 import hashlib
@@ -16,7 +17,9 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.cross_section.random_picks import SEED_VERSION
 
-LEG_VERSION = 1  # bump when a change to code (not config) changes what a leg holds
+LEG_VERSION = 2  # bump when a change to code (not config) changes what a leg holds
+# 2 (ADR 0064 decision 4): every pick with its rank, score, reason, gross value, dip, ADV at D;
+# hits at each cost level
 HARNESS_VERSION = 2  # 2: the run hash is an allowlist of ``RUN_INPUTS``, not the whole Edge
 
 
@@ -51,10 +54,11 @@ def leg_key(
     top_k: int | None,
     base: str,
     picks: str,
+    cost_levels: tuple[float, ...],
 ) -> str:
     """The key of a leg (``top_k``, ``base`` and ``picks`` of the scope's edge cut its picks and
     names and are not in the trial hash for ``main``): ``universe`` is ``universe_hash``,
-    ``expr_defs_hash`` is ``expression_hash``."""
+    ``expr_defs_hash`` is ``expression_hash``, ``cost_levels`` the site's cost grid in bp."""
     return _digest(
         {
             "trial": trial_hash,
@@ -63,6 +67,7 @@ def leg_key(
             "event_class": event_class,
             "offset": offset,
             "draws": draws,
+            "cost_levels": [float(c) for c in cost_levels],
             "top_k": top_k,
             "base": base,
             "picks": picks,

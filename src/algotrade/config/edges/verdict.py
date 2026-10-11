@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from algotrade.config.site.fields import Table
+from algotrade.core.model.errors import ConfigurationError
 
 KEYS = (
     "min_oos_trades",
@@ -27,7 +28,9 @@ KEYS = (
     "live_min_sessions",
     "live_low",
     "live_high",
+    "edge_costs",
 )
+COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,10 @@ class VerdictSettings:
     live_min_sessions: int = 10
     live_low: float = 0.10
     live_high: float = 0.90
+    # ``[edge_costs] levels_bps``: the round-trip costs (bp) every return edge is also measured
+    # at, beside its document's own ``cost_bps`` (ADR 0064 decision 5). The harness counts hits
+    # at each level in every leg, so the grid is in the leg key: a changed grid recomputes legs.
+    cost_levels_bps: tuple[float, ...] = COST_LEVELS
 
     @classmethod
     def from_document(
@@ -85,4 +92,20 @@ class VerdictSettings:
             live_min_sessions=t.integer("live_min_sessions", d.live_min_sessions, 1),
             live_low=t.fraction("live_low", d.live_low),
             live_high=t.fraction("live_high", d.live_high),
+            cost_levels_bps=_cost_levels(t.table("edge_costs", ("levels_bps",)), d),
         )
+
+
+def _cost_levels(t: Table, d: VerdictSettings) -> tuple[float, ...]:
+    """``levels_bps``: distinct non-negative numbers, ascending (missing: the default grid)."""
+    raw = t.raw("levels_bps")
+    if raw is None:
+        return d.cost_levels_bps
+    ok = isinstance(raw, list) and all(
+        isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0 for v in raw
+    )
+    if not ok or len(set(raw)) != len(raw) or list(raw) != sorted(raw):
+        raise ConfigurationError(
+            f"{t.where} levels_bps: expected distinct non-negative numbers ascending, got {raw!r}"
+        )
+    return tuple(float(v) for v in raw)

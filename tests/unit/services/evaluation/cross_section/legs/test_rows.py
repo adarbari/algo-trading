@@ -1,6 +1,7 @@
 """Legs, reads logs and outcome reads as rows (ADR 0063): each encodes to a dict of declared
 columns and decodes back exactly (the random draws as float32), also after a round trip through a
-store, where lists come back as arrays and nulls as None or NaN."""
+store, where lists come back as arrays and nulls as None or NaN. A v2 leg's picks (ADR 0064) keep
+their unknowns as None, never 0; a v1 row has none."""
 
 from dataclasses import replace
 from datetime import UTC, date, datetime
@@ -32,7 +33,7 @@ from algotrade.services.evaluation.cross_section.legs.store import (
     read_legs,
     write_legs,
 )
-from algotrade.services.evaluation.cross_section.measures import SessionStat
+from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
 from algotrade.services.evaluation.cross_section.random_picks import RandomStat
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -46,6 +47,17 @@ AS_OF = datetime(2026, 10, 5, tzinfo=UTC)
 NOW = datetime(2026, 10, 6, 12, tzinfo=UTC)
 
 
+# Every kind of pick: counted ones (in order, the stat's pick_values) and excluded ones, with
+# unknown scores, gross values, dips, ADVs and references as None.
+PICKS = (
+    Pick("EQ:A", 1, "", 0.1, True, False, 3.5, 0.11, 0.02, 2.5e7, 0.31, True),
+    Pick("EQ:B", 2, "no_entry_bar", score=3.1, adv=None),
+    Pick("EQ:C", 3, "", -0.2, False, True, None, None, None, 1e6, 0.29, False),
+    Pick("EQ:D", 4, "unmeasured", score=2.0, drawdown=None, adv=4e6),
+    Pick("EQ:E", 5, "", 0.35, True, False, 1.0, 0.36, 0.0, None, None, None),
+)
+
+
 def stat(**changes: Any) -> SessionStat:
     base = SessionStat(
         session=D, regime="CALM", pick_values=(0.1, -0.2, 0.35), pick_hits=2,
@@ -53,7 +65,8 @@ def stat(**changes: Any) -> SessionStat:
         deciles=(0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3, -0.35, -0.3), ranked=20, unscored=1,
         excluded_missing=1, excluded_unmeasured=2, unmeasured_base=3, delisted=1,
         pre_snapshot=True, outside_universe=4, no_entry_bar=2, pick_reference=(0.31, 0.29),
-        pick_touches=1, no_implied_vol=1, implied_stored=True,
+        pick_touches=1, no_implied_vol=1, implied_stored=True, picks=PICKS,
+        base_hits_at=(9, 8, 8, 6), pick_hits_at=(2, 2, 1, 1),
     )  # fmt: skip
     return replace(base, **changes)
 
@@ -109,13 +122,35 @@ def test_a_leg_round_trips_exactly_but_for_the_draws_as_float32() -> None:
         {"event_ids": None},
         {"event_ids": ()},
         {"lost_table": "rollups/instrument/x@v1", "snapshot": None},
-        {"stat": stat(top_decile=None, spread=None, deciles=(), pick_values=(), pick_reference=())},
+        {
+            "stat": stat(
+                top_decile=None,
+                spread=None,
+                deciles=(),
+                pick_values=(),
+                pick_reference=(),
+                picks=(),
+                base_hits_at=(),
+                pick_hits_at=(),
+            )
+        },
         {"stat": SessionStat(session=D, regime="UNKNOWN", excluded_coverage=1)},
     ],
 )
 def test_nulls_empty_lists_and_absent_draws_survive(changes: dict[str, Any]) -> None:
     original = leg(**changes)
     assert_same(decode_leg(encode_leg(original, "site", "drift")), _float32(original))
+
+
+def test_a_v1_row_has_no_picks_and_a_corrupt_v2_row_fails() -> None:
+    row = encode_leg(leg(), "site", "drift")
+    v1 = {k: v for k, v in row.items() if not k.startswith("pick_") or k == "pick_values"}
+    v1 |= {"pick_hits": row["pick_hits"], "pick_touches": row["pick_touches"]}
+    v1 |= {"pick_reference": row["pick_reference"]}
+    old = decode_leg({**v1, "base_hits_at": None, "pick_hits_at": None})
+    assert (old.stat.picks, old.stat.base_hits_at, old.stat.pick_hits_at) == ((), (), ())
+    with pytest.raises(ValueError, match="counted picks"):
+        decode_leg({**row, "pick_values": [0.1]})
 
 
 def _float32(record: LegRecord) -> LegRecord:

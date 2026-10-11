@@ -341,6 +341,7 @@ def evaluate_edge(
         expression_hash(catalogue(configs, user.user_id)),
         user.user_id,
         edge.id,
+        load_verdict(configs).cost_levels_bps,  # every leg counts hits at the site's cost grid
     )
     stored = read_legs(reader, user.user_id, edge.id, start, end)
     earnings = any(p.scope.edge.event_class == "earnings_expected" for p in plans)  # a diagnostic

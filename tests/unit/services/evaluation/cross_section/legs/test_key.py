@@ -21,6 +21,7 @@ BASE = {
     "top_k": 5,
     "base": "event",
     "picks": "event",
+    "cost_levels": (0.0, 15.0, 30.0, 50.0),
 }
 
 
@@ -37,6 +38,7 @@ BASE = {
         ("top_k", 6),
         ("base", "universe"),
         ("picks", "universe"),
+        ("cost_levels", (0.0, 15.0, 30.0)),  # leg v2 counts hits at each level (ADR 0064)
     ],
 )
 def test_the_leg_key_changes_with_each_input(name: str, value: object) -> None:
@@ -50,6 +52,11 @@ def test_the_leg_key_is_stable_and_follows_each_version(monkeypatch: pytest.Monk
         monkeypatch.setattr(key, version, getattr(key, version) + 1)
         assert leg_key(**BASE) != base  # type: ignore[arg-type]
         monkeypatch.undo()
+
+
+def test_leg_v2_is_a_new_key_scheme() -> None:
+    """ADR 0064 decision 4: a v1 leg (no picks, no hits per cost level) is never reused."""
+    assert key.LEG_VERSION == 2
 
 
 def test_the_universe_hash_follows_the_selection() -> None:

@@ -8,10 +8,12 @@ import pytest
 
 from algotrade.quant.edges.statistics import moments
 from algotrade.services.evaluation.cross_section.measures import (
+    Pick,
     SessionStat,
     Slice,
     decile_means,
     edge_slices,
+    pool_stats,
     slice_measures,
 )
 
@@ -172,3 +174,18 @@ def test_a_split_inside_a_year_cuts_it_into_two_year_part_slices() -> None:
 def test_a_split_on_a_year_start_or_none_makes_no_year_part() -> None:
     assert _year_parts(date(2026, 1, 1)) == {}
     assert _year_parts(None) == {}
+
+
+def test_a_block_pools_its_days_picks_in_order_and_sums_hits_per_cost_level() -> None:
+    """Leg v2 (ADR 0064): an event block keeps every day's picks, the first day's first, and adds
+    the hits at each cost level; a day without levels (not a return) leaves the block without."""
+    a, b = Pick("EQ:A", 1, "", 0.1, True), Pick("EQ:B", 1, "no_entry_bar")
+    day1 = SessionStat(date(2026, 9, 1), "CALM", (0.1,), 1, picks=(a,), base_hits_at=(4, 3),
+                       pick_hits_at=(1, 1))  # fmt: skip
+    day2 = SessionStat(date(2026, 9, 2), "CALM", (), 0, picks=(b,), base_hits_at=(2, 1),
+                       pick_hits_at=(0, 0))  # fmt: skip
+    pooled = pool_stats([day1, day2])
+    assert pooled.picks == (a, b)
+    assert (pooled.base_hits_at, pooled.pick_hits_at) == ((6, 4), (1, 1))
+    bare = SessionStat(date(2026, 9, 3), "CALM")
+    assert pool_stats([day1, bare]).base_hits_at == ()

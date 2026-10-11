@@ -34,6 +34,31 @@ PBO_SPLITS = 16
 
 
 @dataclass(frozen=True)
+class Pick:
+    """One pick of a screener at a decision session (leg v2, ADR 0064 decision 4): every pick,
+    counted or excluded. ``reason`` is ``""`` when counted, else why it is not (``hit``'s
+    exclusion reasons, or ``no_entry_bar``: no outcome row at S); ``value`` (oriented, net of the
+    document's cost) and ``hit`` only when counted. ``rank``: its place among the session's picks,
+    best first, from 1; ``score``: the screen's score at D (read with ``as_of = None``, ADR 0063);
+    ``gross``: the stored excess return before cost (a return outcome, counted); ``drawdown``:
+    the window's ``fwd_max_drawdown``; ``adv``: ``adv_usd_20d`` at D; ``reference`` / ``touch``:
+    an ``expires_otm`` pick's. A value not known is None, never 0."""
+
+    instrument_id: str
+    rank: int
+    reason: str = ""
+    value: float | None = None
+    hit: bool = False
+    delisted: bool = False
+    score: float | None = None
+    gross: float | None = None
+    drawdown: float | None = None
+    adv: float | None = None
+    reference: float | None = None
+    touch: bool | None = None
+
+
+@dataclass(frozen=True)
 class SessionStat:
     """One variant at one session and horizon. Counts are over names with a counted outcome;
     ``excluded_*`` and ``delisted`` are over the picks; ``unscored`` counts measured (ranked)
@@ -67,6 +92,12 @@ class SessionStat:
     pick_touches: int = 0  # expires_otm: counted picks whose strike was touched intraday
     no_implied_vol: int = 0  # picks excluded for a missing or invalid implied vol at D
     implied_stored: bool = False  # the outcome's iv_field has a value for some eligible name at D
+    picks: tuple[Pick, ...] = ()  # every pick, counted ones aligned with ``pick_values`` (v2)
+    # Hits at each level of the site's cost grid (``VerdictSettings.cost_levels_bps``, in the leg
+    # key) instead of the document's cost: over every counted eligible name and over the picks;
+    # () when the outcome is not a return (cost does not apply) or the session is not measured.
+    base_hits_at: tuple[int, ...] = ()
+    pick_hits_at: tuple[int, ...] = ()
 
     @property
     def eligible(self) -> int:
@@ -114,7 +145,17 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         pick_touches=sum(leg.pick_touches for leg in legs),
         no_implied_vol=sum(leg.no_implied_vol for leg in legs),
         implied_stored=any(leg.implied_stored for leg in legs),
+        picks=tuple(p for leg in legs for p in leg.picks),
+        base_hits_at=_sum_levels([leg.base_hits_at for leg in legs]),
+        pick_hits_at=_sum_levels([leg.pick_hits_at for leg in legs]),
     )
+
+
+def _sum_levels(counts: Sequence[tuple[int, ...]]) -> tuple[int, ...]:
+    """Per cost level the sum over the days; () when a day has none (not a return outcome)."""
+    if not counts or any(len(c) != len(counts[0]) or not c for c in counts):
+        return ()
+    return tuple(int(sum(level)) for level in zip(*counts, strict=True))
 
 
 @dataclass(frozen=True)
