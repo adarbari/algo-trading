@@ -9,6 +9,10 @@ are (login) is the API's concern (ADR 0040); the email a sign-in maps to is not 
 site file but in the user's own git-ignored ``config/users/<id>/identity.toml`` (``email``, and
 optionally ``subject``: the Supabase user id a token's ``sub`` must then equal), attached by
 ``with_identities``. ``settings.load_users`` reads the files, this module does no I/O.
+
+``licences`` lists the data licences a user holds beyond the open one (ADR 0064 decision 10,
+ADR 0028): ``personal`` is the owner's alone today. Only a holder is served per-name values
+derived from a personal-licence feature; everyone else sees them as ``LICENCE``.
 """
 
 import uuid
@@ -18,11 +22,12 @@ from enum import StrEnum
 from typing import Any
 
 from algotrade.config.site.fields import Table
+from algotrade.config.site.macro import LICENCES
 from algotrade.config.user import DEFAULT_USER, SITE_USER, validate_id
 from algotrade.core.model.errors import ConfigurationError
 
 WHERE = "users.toml"
-USER_KEYS = ("id", "role", "name")
+USER_KEYS = ("id", "role", "name", "licences")
 IDENTITY = "identity"  # config/users/<id>/identity.toml: the user's sign-in identity
 IDENTITY_KEYS = ("email", "subject")
 
@@ -46,9 +51,13 @@ class UserRecord:
     name: str = ""
     email: str | None = None  # lowercased; from identity.toml (never committed: ADR 0040)
     subject: str | None = None  # the pinned Supabase user id (a UUID), when set
+    licences: tuple[str, ...] = ()  # data licences held beyond "open" (ADR 0064): "personal"
 
     def __post_init__(self) -> None:
         validate_id("user", self.user_id)
+        unknown = sorted(set(self.licences) - set(LICENCES))
+        if unknown:
+            raise ConfigurationError(f"user '{self.user_id}' licences: unknown {unknown}")
         if self.subject is not None:
             object.__setattr__(self, "subject", _subject(self.subject, f"user '{self.user_id}'"))
         if self.email is None and self.subject is None:
@@ -64,7 +73,7 @@ class UserRecord:
 
 
 DEFAULT_USERS: tuple[UserRecord, ...] = (
-    UserRecord(DEFAULT_USER, Role.ADMIN, "Local user"),
+    UserRecord(DEFAULT_USER, Role.ADMIN, "Local user", licences=("personal",)),  # the owner
     UserRecord(SITE_USER, Role.ADMIN, "Scheduled site screens"),
 )
 
@@ -111,6 +120,14 @@ class UsersSettings:
             raise ConfigurationError(f"{WHERE}: unknown user '{user_id}'")
         return user.role
 
+    def holds(self, user_id: str, licence: str) -> bool:
+        """Whether ``user_id`` may see values under ``licence`` (``open``: everyone; any other
+        only a user who lists it; unknown users hold nothing but ``open``)."""
+        if licence == "open":
+            return True
+        user = self.get(user_id)
+        return user is not None and licence in user.licences
+
     def may_enter(self, user_id: str, workspace: str) -> bool:
         """Whether ``user_id`` may enter ``workspace`` (unknown users enter nothing)."""
         user = self.get(user_id)
@@ -142,7 +159,8 @@ def _user(doc: Mapping[str, Any], index: int) -> UserRecord:
     name = table.raw("name")
     if name is not None and not isinstance(name, str):
         raise ConfigurationError(f"{where} name: expected a string")
-    return UserRecord(user_id, Role(role), name or "")
+    licences = table.strings("licences", ())
+    return UserRecord(user_id, Role(role), name or "", licences=licences)
 
 
 @dataclass(frozen=True)

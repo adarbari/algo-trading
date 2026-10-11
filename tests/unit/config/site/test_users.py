@@ -1,5 +1,8 @@
 """The user registry (ADR 0040): roles, defaults and validation of users.toml."""
 
+import tomllib
+from pathlib import Path
+
 import pytest
 
 from algotrade.config.site.settings import load_users
@@ -135,3 +138,31 @@ def test_invalid_identity_is_refused_without_echoing_it(
     with pytest.raises(ConfigurationError, match=message) as raised:
         identity(doc, "ana")
     assert "not-an-address" not in str(raised.value)
+
+
+def test_licences_are_held_only_by_the_users_who_list_them() -> None:
+    """ADR 0064 decision 10: personal-licence per-name values only to the licence holder."""
+    users = UsersSettings.from_document(
+        {"user": [{"id": "owner", "role": "admin", "licences": ["personal"]},
+                  {"id": "guest", "role": "trader"}]}
+    )  # fmt: skip
+    assert users.holds("owner", "personal") and not users.holds("guest", "personal")
+    assert users.holds("guest", "open") and not users.holds("nobody", "personal")
+    with pytest.raises(ConfigurationError, match="licences"):
+        UsersSettings.from_document({"user": [{"id": "a", "role": "admin", "licences": ["x"]}]})
+    with pytest.raises(ConfigurationError, match="licences"):
+        UsersSettings.from_document(
+            {"user": [{"id": "a", "role": "admin", "licences": "personal"}]}
+        )
+
+
+def test_the_single_user_install_holds_the_personal_licence() -> None:
+    """Without users.toml, ``local`` is the owner: their own personal-licence values show."""
+    users = UsersSettings.from_document(None)
+    assert users.holds("local", "personal") and not users.holds("site", "personal")
+
+
+def test_the_committed_registry_gives_the_personal_licence_to_the_owner_only() -> None:
+    doc = tomllib.loads(Path("config/site/users.toml").read_text())
+    users = UsersSettings.from_document(doc)
+    assert [u.user_id for u in users.users if "personal" in u.licences] == ["local"]

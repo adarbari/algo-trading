@@ -29,16 +29,16 @@ detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pb
 
 [[responsibility]]
 id = "edge-evaluation-detail"
-description = "What an edge evaluation publishes beside its measures (ADR 0064): the per-session series of the main edge variant (results/edge_series: per screener, baseline and horizon, one row per measured block of decision sessions, framed from the run's pooled legs with its entry and exit sessions from the calendar, before_split decided by the run's split, a status for every block that holds no number, the unit and licence of its values), written inside the run's one publish block with its edge_eval rows; and the projected exits of a calendar schedule (the exit sessions of its next N decision sessions, N = ceil(largest verdict count threshold / 0.25), with the scheduled and measured decision-session counts), written on the variant's all row; an event schedule writes none"
+description = "What an edge evaluation publishes beside its measures (ADR 0064): the per-session series of the main edge variant (results/edge_series: per screener, baseline and horizon, one row per measured block of decision sessions, framed from the run's pooled legs with its entry and exit sessions from the calendar, before_split decided by the run's split, a status for every block that holds no number, the unit and licence of its values), written inside the run's one publish block with its edge_eval rows; the projected exits of a calendar schedule (the exit sessions of its next N decision sessions, N = ceil(largest verdict count threshold / 0.25), with the scheduled and measured decision-session counts), written on the variant's all row, an event schedule writes none; the trade ledger results/edge_trades (decisions 2, 3: one row per pick of the main edge variant's implementation screeners at every horizon, framed from the run's v2 legs, never recomputed: won / lost by the edge's own hit or excluded with a public kind, exit session S + h from the calendar, the side of the run's split the leg's block is on, ordered by key) written in the same publish with its count on the run record; and the licence of a trial and of each per-name ledger column (decision 10: the strictest catalogue licence of its implied-vol field, screen and universe features), recorded so a reader redacts by it"
 owner = ["src/algotrade/services/evaluation/cross_section/detail/*"]
 allowed = [
-    "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_series's one schema
-    "src/algotrade/services/evaluation/cross_section/results.py",  # the caller: writes the frame in the run's publish block
-    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: the facts come from its plan's blocks
-    "src/algotrade/services/read/evaluation/runs.py",  # the one reader of a run's stored series
+    "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_series's and results/edge_trades's schemas
+    "src/algotrade/services/evaluation/cross_section/results.py",  # the caller: writes the frames in the run's publish block
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: the facts come from its plan's blocks; each trial's licences ride its result
+    "src/algotrade/services/read/evaluation/runs.py",  # the one reader of a run's stored series and ledger
 ]
 section = "docs/adr/0064-edge-evidence-series-and-trade-ledger.md#decision"
-detect = [{ call = "edge_series_frame" }, { call = "next_exits" }, { string = "results/edge_series" }, { string = "edge_series" }]
+detect = [{ call = "edge_series_frame" }, { call = "next_exits" }, { string = "results/edge_series" }, { string = "edge_series" }, { string = "results/edge_trades" }, { call = "trades_frame" }, { call = "trial_licences" }]
 
 [[responsibility]]
 id = "edge-leg-reuse"

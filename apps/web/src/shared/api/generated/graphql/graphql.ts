@@ -98,10 +98,12 @@ export type UnknownCode =
   | 'NOT_APPLICABLE'
   | 'NOT_IN_CATALOGUE'
   | 'NOT_RUN'
+  | 'NOT_STORED'
   | 'NO_PARTITION'
   | 'NO_ROW'
   | 'NULL'
-  | 'PRE_SNAPSHOT';
+  | 'PRE_SNAPSHOT'
+  | 'PRUNED';
 
 export type OptionChainQueryVariables = Exact<{
   key: string;

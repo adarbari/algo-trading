@@ -115,11 +115,12 @@ def test_edge_variants_are_rows_of_their_own_and_the_edge_itself_has_a_null_key(
     ]
 
 
-def test_the_iv_source_licence_and_rate_columns_are_null_until_something_fills_them(
+def test_the_iv_source_and_rate_columns_are_null_until_something_fills_them(
     world: World,
 ) -> None:
     row = edge_eval_frame(evaluate(world), "r1", NOW).iloc[0]
-    assert pd.isna(row["edge_variant"]) and pd.isna(row["iv_source"]) and pd.isna(row["licence"])
+    assert pd.isna(row["edge_variant"]) and pd.isna(row["iv_source"])
+    assert row["licence"] == "open"  # the trial's: its screen's and universe's features (ADR 0064)
     assert pd.isna(row["reference_rate"]) and pd.isna(row["touch_rate"])
 
 

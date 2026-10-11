@@ -361,6 +361,16 @@ def test_purge_before_deletes_only_older_partitions_of_a_table_with_retention(
     assert reader.dates("catalog/demo") == [D1, D2]
 
 
+def test_a_purge_spares_the_partitions_it_is_told_to_keep(backend: Backend) -> None:
+    """The edge ledger's retention (ADR 0064): the partitions of kept runs survive the cutoff."""
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    for day in (D1, D2):
+        writer.write_table(LIVE, day, "r1", stamped(live_rows(day), day, "r1"))
+    later = D2 + timedelta(days=1)
+    assert writer.purge_table_before(LIVE, later, keep={D1}) == 1
+    assert reader.dates(LIVE) == [D1]
+
+
 def test_purging_a_table_without_retention_raises(backend: Backend) -> None:
     writer, reader = StoreWriter(backend), StoreReader(backend)
     writer.write_table(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1"))

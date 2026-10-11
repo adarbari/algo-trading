@@ -6,7 +6,8 @@ taken over), the run hash, the split and whether the run was
 exploratory, how much was excluded, and who ran it: ``owner``, ``trigger`` (nightly, ui or cli)
 and the ``job_id`` of the job that wrote it (ADR 0059 amendment 2026-10-10); its ``mode``
 (``full`` | ``incremental``) and how many legs it reused, computed and recomputed, by reason
-(ADR 0063)."""
+(ADR 0063); and how many trade-ledger rows it wrote (``ledger_rows``, ADR 0064: a run whose
+ledger has gone under a nonzero count was pruned, one with no count is older than the ledger)."""
 
 from dataclasses import asdict
 from datetime import datetime
@@ -16,7 +17,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN, job_name
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.evaluation.cross_section.detail import series
+from algotrade.services.evaluation.cross_section.detail import series, trades
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
@@ -247,16 +248,17 @@ def write_edge_eval(
     trigger: str = "cli",
     job_id: str | None = None,
 ) -> RunRecord:
-    """Save ``evaluation``: its rows, its per-session series (``results/edge_series``, ADR 0064) and
-    its legs (``results/edge_legs``, ADR 0063; all visible or none) and its run record, whose
-    stats hold the trial log and who ran it (``owner``: the
-    edge's, default the rows' user; ``trigger``: ``nightly`` | ``ui`` | ``cli``; ``job_id``: the
-    job that wrote it, none for a direct call).
+    """Save ``evaluation``: its rows, its per-session series (``results/edge_series``), its trade
+    ledger (``results/edge_trades``, ADR 0064) and its legs (``results/edge_legs``, ADR 0063), all
+    visible or none, and its run record, whose stats hold the trial log and who ran it
+    (``owner``: the edge's, default the rows' user; ``trigger``: ``nightly`` | ``ui`` | ``cli``;
+    ``job_id``: the job that wrote it, none for a direct call).
     Returns the finished record."""
     if trigger not in TRIGGERS:
         raise ConfigurationError(f"unknown run trigger {trigger!r}; known: {list(TRIGGERS)}")
     record = start_run(job_name(evaluation.edge_id, evaluation.user_id), evaluation.end, now)
     frame = edge_eval_frame(evaluation, record.run_id, now)
+    ledger = trades.trades_frame(evaluation, record.run_id, now)
     stats = {
         "edge": evaluation.edge_id,
         "owner": evaluation.user_id if owner is None else owner,
@@ -278,6 +280,7 @@ def write_edge_eval(
         "legs_reused": evaluation.legs_reused,
         "legs_computed": evaluation.legs_computed,
         "legs_invalidated": dict(evaluation.legs_invalidated),  # stored legs recomputed, by reason
+        "ledger_rows": len(ledger),  # results/edge_trades rows written (ADR 0064)
     }
     # The record goes in before the commit: a crash between the two leaves a trial counted
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
@@ -288,5 +291,7 @@ def write_edge_eval(
             writer.write_result(series.RESULT, evaluation.end, record.run_id, rows, pending=True)
         if evaluation.leg_rows:
             write_legs(writer, record.run_id, legs_frame(evaluation.leg_rows, record.run_id, now))
+        if not ledger.empty:
+            writer.write_result(trades.RESULT, evaluation.end, record.run_id, ledger, pending=True)
         writer.save_run(record.finish(now, complete=True, stats=stats))
     return record

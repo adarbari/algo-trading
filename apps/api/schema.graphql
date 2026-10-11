@@ -2684,6 +2684,8 @@ enum UnknownCode {
   NOT_APPLICABLE
   ILLIQUID
   EXPLAINED
+  PRUNED
+  NOT_STORED
 }
 
 """

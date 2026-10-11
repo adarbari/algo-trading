@@ -292,7 +292,7 @@ purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (s
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/detail"
-purpose = "the framing of what an edge evaluation publishes beside its measures (ADR 0064): the per-session series and the trade-ledger rows of each leg, from the stored legs, never recomputed"
+purpose = "the framing of what an edge evaluation publishes beside its measures (ADR 0064): the per-session series and the trade-ledger rows of each leg, from the stored legs, never recomputed, and the licence of a trial and of each per-name ledger column (licences.py)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/legs"
