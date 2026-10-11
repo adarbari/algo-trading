@@ -11,6 +11,11 @@ import {
   aaplEvents,
   aaplVolume,
   aaplWithGap,
+  edgeBands,
+  edgeBase,
+  edgeBacktest,
+  edgeDrawdown,
+  edgeLive,
   eventMarkers,
   hatchedBand,
   msft,
@@ -136,6 +141,36 @@ export const WithLanesAndBands: Story = {
     height: 'lg',
   },
 };
+
+/**
+ * The edge evidence curve: the picks' cumulative excess against the universe base line, the
+ * in-sample and out-of-sample periods shaded, the live paper record continuing in a dashed
+ * stroke. Sample data.
+ */
+export const EvidenceCurve: Story = {
+  args: {
+    label: 'Cumulative excess of the picks',
+    series: [edgeBacktest, edgeLive, edgeBase],
+    bands: edgeBands,
+    format: { kind: 'number', digits: 1 },
+    range: 'All',
+    height: 'lg',
+  },
+};
+
+/** A drawdown as an underwater fill between the line and the 0 baseline (values at or below 0). Sample data. */
+export const Underwater: Story = {
+  args: {
+    label: 'Drawdown of the picks',
+    series: [edgeDrawdown],
+    format: { kind: 'number', digits: 1 },
+    range: 'All',
+    bands: edgeBands,
+  },
+};
+
+/** The same two on a phone. */
+export const EvidenceCurveNarrow: Story = { ...EvidenceCurve, decorators: [narrow] };
 
 /** A missing stretch (null values): the line breaks instead of drawing a zero or joining. */
 export const WithGap: Story = { args: { series: [aaplWithGap], range: '1Y' } };

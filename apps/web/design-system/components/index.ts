@@ -180,6 +180,7 @@ export {
 export { SectionNav, type SectionNavItem, type SectionNavProps } from './SectionNav';
 export { Select, type SelectOption, type SelectProps } from './Select';
 export { ShareBar, type ShareBarProps } from './ShareBar';
+export { LazySection, type LazySectionProps, type LazySectionSize } from './LazySection';
 export { Skeleton, type SkeletonProps } from './Skeleton';
 export { SourceLine, type SourceLineItem, type SourceLineProps } from './SourceLine';
 export { SortableList, type SortableItemState, type SortableListProps } from './SortableList';

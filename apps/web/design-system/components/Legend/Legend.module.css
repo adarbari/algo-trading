@@ -44,6 +44,12 @@
   border-radius: 0;
 }
 
+.swatch[data-swatch='line'][data-dashed] {
+  height: 0;
+  border-top: var(--border-width-thick) dashed var(--tone-fill);
+  background: transparent;
+}
+
 .swatch[data-swatch='cell'] {
   border-color: var(--tone-border);
   background: var(--tone-tint);
