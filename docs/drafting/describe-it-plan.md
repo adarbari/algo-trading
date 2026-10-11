@@ -57,6 +57,10 @@ non-valid answer falls through to the next provider (today only "unavailable" do
 in code (phrasebook, field guide) before the model; thresholds come from the field guide, never from the
 model's memory; code verifies fields, types, dry-runs and fingerprints. Cache by normalised sentence,
 current criteria, catalogue version, prompt version and model. Model versions are pinned.
+Measured live, by the owner only (CI never calls a model): `algotrade-api golden run [--cases ID,...]
+[--split train|held_out|all] [--provider ID ...] [--repeat 3] [--record] [--json] --yes` runs the real
+`draft_screen` over the golden cases per provider and reports pass rate, consistency, invalid rate, tokens,
+cache, latency and cost, under `--max-calls` / `--budget-usd` caps (`src/algotrade/services/drafting/golden_run.py`).
 
 ## Token and latency budget
 
