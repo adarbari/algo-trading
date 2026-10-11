@@ -500,7 +500,8 @@ def choose_basis(
     candidates are named by their ``in_sample`` and ``all`` rows, whose figures are not read):
     the declared screen and horizon narrow the candidates; one left is the basis; of several,
     the best in-sample (ties: the first by screen, then horizon). A run from before the
-    in-sample slice cannot rank several: no basis, Waiting on data."""
+    in-sample slice cannot rank several: no basis, Waiting on data. A model screener's in-sample
+    row is its training fit and is never ranked."""
     main = [r for r in rows if r.edge_variant == runs.MAIN and not r.exploratory]
     named = {
         (r.variant, r.horizon_sessions)
@@ -524,8 +525,15 @@ def choose_basis(
         for r in main
         if r.role != "baseline" and r.slice_kind == runs.IN_SAMPLE
     }
-    ranked = [(k, _in_sample_rank(k, ins[k], main, t, decoys)) for k in keys if k in ins]
+    # a model screener's in-sample row is its training fit (``in_sample``): never ranked, so a
+    # model is the basis only when it is the one candidate left (``promoted``)
+    fair = {k: r for k, r in ins.items() if not r.in_sample}
+    ranked = [(k, _in_sample_rank(k, fair[k], main, t, decoys)) for k in keys if k in fair]
     if not ranked:
+        if any(k in ins for k in keys):
+            return BasisChoice(
+                None, "Only a model screener's training fit is in-sample; it needs promoting"
+            )
         return BasisChoice(
             None,
             "The official result predates the in-sample figures its basis is chosen on; "

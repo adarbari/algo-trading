@@ -1,6 +1,6 @@
 """The edge verdict rule: one test per verdict and per boundary (ED8)."""
 
-from dataclasses import replace
+from dataclasses import fields, replace
 from datetime import date
 
 from algotrade.config.edges.verdict import VerdictSettings
@@ -365,7 +365,8 @@ def test_columns_of_an_older_run_have_no_in_sample_figures_and_waiting_has_none(
 
 # --- the basis is fixed before the frozen period is read (ADR 0065) ------------------------
 
-OOS_KINDS = ("frozen", "split", "year", "year_part")  # every slice that reads the frozen period
+# every slice whose figures cover the frozen period
+OOS_KINDS = ("frozen", "split", "year", "year_part", "regime", "all")
 
 
 def grid(insample: dict[int, float], oos: dict[int, float], variant: str = "vrp") -> list[EdgeRow]:
@@ -396,20 +397,53 @@ def test_vrp_rests_on_the_horizon_best_in_sample_not_the_best_out_of_sample() ->
     assert {c.win_rate for c in v.columns if c.period == IN_SAMPLE} == {0.512}
 
 
+def _scrambled(r: EdgeRow, k: int) -> EdgeRow:
+    """``r`` with every figure changed (numbers scaled and shifted, None to a number, a number
+    to None every other ``k``): only the row's identity is kept."""
+    keep = {"edge_variant", "variant", "role", "horizon_sessions", "slice_kind", "slice_value"}
+    changes: dict[str, object] = {}
+    for f in fields(r):
+        value = getattr(r, f.name)
+        if f.name in keep or isinstance(value, (bool, str)):
+            continue
+        if isinstance(value, tuple):
+            changes[f.name] = tuple(-3.0 * k for _ in value) or (float(k),)
+        elif value is None:
+            changes[f.name] = 0.5 * k
+        else:
+            changes[f.name] = None if k % 2 else value * -5 + k
+    return replace(r, **changes)  # type: ignore[arg-type]
+
+
 def test_the_basis_is_invariant_to_any_change_of_the_out_of_sample_rows() -> None:
     rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
+    rows += [
+        row("vrp", kind="regime", horizon_sessions=h, slice_value="calm") for h in (15, 21, 31)
+    ]
     chosen = choose_basis(rows, T)
-    for rate in (0.0, 0.3, 0.99, None):
-        changed = [
-            replace(r, hit_rate=rate, lift=rate, decile_t=rate, sessions=1)
-            if r.slice_kind in OOS_KINDS
-            else r
-            for r in rows
-        ]
+    assert chosen == BasisChoice(("vrp", 21))
+    for k in range(1, 5):  # every figure of every row that reads the frozen period, pbo and DSR too
+        changed = [_scrambled(r, k) if r.slice_kind in OOS_KINDS else r for r in rows]
+        assert changed != rows
         assert choose_basis(changed, T) == chosen
-    dropped = [r for r in rows if r.slice_kind not in OOS_KINDS]
+    dropped = [r for r in rows if r.slice_kind not in OOS_KINDS or r.slice_kind == "all"]
     assert choose_basis(dropped, T) == chosen
-    assert verdict(dropped).basis == "vrp, 21 trading days"  # waiting, but on the same basis
+    named_by_in_sample = [r for r in rows if r.slice_kind == "in_sample" or r.role == "baseline"]
+    assert choose_basis(named_by_in_sample, T) == chosen
+    assert verdict(named_by_in_sample).basis == "vrp, 21 trading days"  # waiting, same basis
+
+
+def test_a_model_screener_in_sample_fit_never_ranks_it_only_promoted_makes_it_the_basis() -> None:
+    rules = grid({21: 0.512}, {21: 0.52})
+    fitted = [  # the model's in-sample row is its training fit (in_sample=True): a huge lift
+        replace(r, in_sample=r.slice_kind == "in_sample")
+        for r in grid({21: 0.95}, {21: 0.90}, variant="model")
+        if r.role != "baseline"
+    ]
+    assert choose_basis([*rules, *fitted], T).key == ("vrp", 21)
+    assert choose_basis([*rules, *fitted], T, Declared(screener="model")).key == ("model", 21)
+    alone = choose_basis(fitted + [r for r in rules if r.role == "baseline"], T)
+    assert alone.key == ("model", 21)  # the only candidate: nothing is ranked
 
 
 def test_a_declared_horizon_and_screener_fix_the_basis_whatever_the_figures() -> None:
