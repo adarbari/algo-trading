@@ -60,10 +60,10 @@ function BelowRange({ onOpenEdge }: Pick<EdgeSignalsProps, 'onOpenEdge'>) {
 
 export function EdgeSignals(props: EdgeSignalsProps) {
   return (
-    <Stack gap={2}>
+    <>
       <BelowRange onOpenEdge={props.onOpenEdge} />
       <Signals {...props} />
-    </Stack>
+    </>
   );
 }
 

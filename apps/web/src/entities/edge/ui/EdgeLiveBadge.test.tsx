@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Text } from '@algotrade/ui';
+
 import { gql } from '@/shared/api';
 
 import { EdgeLiveBadge } from './EdgeLiveBadge';
@@ -27,7 +29,7 @@ function show(edgeId: string, states: ReturnType<typeof state>[]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <EdgeLiveBadge edgeId={edgeId} help={<span>help live_state</span>} />
+      <EdgeLiveBadge edgeId={edgeId} help={<Text>help live_state</Text>} />
     </QueryClientProvider>,
   );
   return client;
