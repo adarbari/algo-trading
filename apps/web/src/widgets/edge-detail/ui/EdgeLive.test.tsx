@@ -129,7 +129,7 @@ describe('EdgeLive', () => {
       ),
     );
     const { container, rerender } = render(<EdgeLive edgeId="drift" />);
-    expect(screen.getByText('Too early to judge')).toBeVisible();
+    expect(screen.getByText('Too few settled trades')).toBeVisible();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     hooks.useEdgePaper.mockReturnValue(
       fakeQuery(paper({ record: { ...RECORD, state: 'no_trades' }, trades: [] })),

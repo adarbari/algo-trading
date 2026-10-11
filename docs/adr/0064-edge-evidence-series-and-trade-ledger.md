@@ -117,6 +117,17 @@ counts, not their ids, ranks, scores, exclusion reasons, gross values, dips or l
     `oos_hidden`), streamed. `architecture/rest_allowlist.toml` entry with `keep = true`;
     `max_get_routes` goes from 4 to 5. Precedent: ADR 0044's file GET.
 
+### Amendment (2026-10-11): the session's cutoff
+`Session.cutoff` (`services/read/session.py`, resolved once in `resolve_session`) is the finish
+time of the session's FIRST completed nightly: the first `nightly` run record of the session that
+`published()` accepts (the test `done_sessions` uses), by `finished_at`. A session with no completed
+nightly has no cutoff. `data/paper` reads `edge_paper` as of the cutoff (latest row per key with
+`knowledge_ts` at or before it), so a settlement a later night recorded never changes an earlier
+session's state; it bounds every paper read, the desk's buys and sells too (an intended behaviour
+change). With no cutoff the live state is not judged: `EdgeLiveState.state = not_settled`
+("not yet settled for this session", Guide term `live_state`), and no later settlement is read for
+it. The nightly `edge-signals` step runs before its session completes, so it reads as of now.
+
 ## Alternatives rejected
 - **Series as `edge_eval` row kinds** (`slice_kind = session`): every verdict and list read
   would load the whole run's rows (about 150k for `vrp_short_premium` on every page).

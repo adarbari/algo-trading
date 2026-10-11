@@ -12,11 +12,15 @@ const hooks = vi.hoisted(() => ({
   useEdgeCompare: vi.fn(),
   useEdgePaper: vi.fn(),
 }));
-vi.mock('@/entities/edge', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useEdges: hooks.useEdges,
-  useEdgePaper: hooks.useEdgePaper,
-}));
+vi.mock('@/entities/edge', async (importOriginal) => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    ...(await importOriginal<Record<string, unknown>>()),
+    useEdges: hooks.useEdges,
+    useEdgePaper: hooks.useEdgePaper,
+    EdgeLiveBadge: ({ edgeId }: { edgeId: string }) => <Text>{`live badge ${edgeId}`}</Text>,
+  };
+});
 vi.mock('@/features/edge-evaluation', async () => {
   const { Text } = await import('@algotrade/ui');
   return { RunEvaluation: ({ edgeId }: { edgeId: string }) => <Text>{`run ${edgeId}`}</Text> };
@@ -69,6 +73,7 @@ describe('EdgeDetail', () => {
       <EdgeDetail id="momentum_12_1" onBack={vi.fn()} onEdit={vi.fn()} />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeInTheDocument();
+    expect(screen.getByText('live badge momentum_12_1')).toBeInTheDocument(); // the header's state
     expect(screen.getAllByText('Promising').length).toBeGreaterThan(0);
     expect(screen.getByText(/Out-of-sample, momentum_12_1, 20 trading days/)).toBeInTheDocument();
     expect(screen.getByText('run momentum_12_1')).toBeInTheDocument();

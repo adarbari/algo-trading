@@ -346,7 +346,7 @@ type EdgeDefinition {
 }
 
 """
-The Ideas signals of the edges the user follows for the session: `buys` the paper trades signalled on it, `sells` the open ones whose window closes at `sellSession` (the next session), `followed` every followed edge with its record. Empty lists with no followed edge
+The Ideas signals of the edges the user follows for the session: `buys` the paper trades signalled on it, `sells` the open ones whose window closes at `sellSession` (the next session), `followed` every followed edge with its record, `liveStates` the live state of every edge with a record (the followed ones and the site's). Empty lists with no followed edge; `liveStates` still names the site's edges
 """
 type EdgeDesk {
   session: Date!
@@ -354,6 +354,7 @@ type EdgeDesk {
   buys: [PaperTrade!]!
   sells: [PaperTrade!]!
   followed: [FollowedEdge!]!
+  liveStates: [EdgeLiveState!]!
 }
 
 """
@@ -375,6 +376,23 @@ type EdgeHaircut {
   sessions: Int!
   method: String!
   summary: String!
+}
+
+"""
+One edge's live state for the session, the word a list, a header and the Ideas banner show. `state` is the live record's: on_track, below or above the backtest's usual range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or no_trades (no live record yet) or not_settled (the session's nightly has not completed: nothing is judged); `closed` settled trades, `wins`, `winRate`; `headline` the sentence; `term` the Guide entry that explains the state; `followed` the edge is on the user's desk (else a site edge the site records). Settled trades only, as the session's cutoff knew them
+"""
+type EdgeLiveState {
+  edgeId: String!
+  name: String!
+  state: String!
+  closed: Int!
+  wins: Int!
+  winRate: Float
+  low: Float
+  high: Float
+  headline: String!
+  term: String!
+  followed: Boolean!
 }
 
 """

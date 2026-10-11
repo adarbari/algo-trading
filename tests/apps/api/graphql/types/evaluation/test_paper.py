@@ -7,6 +7,7 @@ from datetime import date
 from algotrade.services.read.edge_desk import desk as desk_read
 from algotrade.services.read.edge_desk import live as live_read
 from algotrade.services.read.edge_desk import paper as paper_read
+from algotrade.services.read.edge_desk import states as states_read
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
 from tests.apps.api.graphql.conftest import Graph
 
@@ -19,6 +20,7 @@ DESK = """query Desk($date: Date) {
       edgeId name state since tonight tonightReason missed
       record { state closed headline }
     }
+    liveStates { edgeId name state closed wins winRate low high headline term followed }
   }
 }"""
 PAPER = """query Paper($id: String!) {
@@ -32,6 +34,7 @@ def test_a_user_who_follows_nothing_gets_an_empty_desk(graph: Graph) -> None:
     desk = body["data"]["edgeDesk"]
     assert desk["session"] == "2022-11-23" and desk["sellSession"] > desk["session"]
     assert desk["buys"] == desk["sells"] == desk["followed"] == []
+    assert desk["liveStates"] == []
 
 
 def test_an_unknown_edge_has_no_paper_record(graph: Graph) -> None:
@@ -77,3 +80,17 @@ def test_the_served_types_carry_the_read_models_figures_unchanged() -> None:
         "no features for the session",
     )
     assert desk.followed[0].missed == [date(2026, 10, 2)]
+
+
+def test_the_live_states_are_served_with_their_guide_term() -> None:
+    live = states_read.LiveState(
+        "drift", "Drift", "below", 20, 4, 0.2, 0.4, 0.8, "4 of 20 closed trades won.",
+        states_read.TERM, False,
+    )  # fmt: skip
+    desk = EdgeDesk.of(
+        desk_read.EdgeDesk(date(2026, 10, 5), date(2026, 10, 6), (), (), (), (live,)),
+        None,  # type: ignore[arg-type]
+    )
+    (served,) = desk.live_states
+    assert (served.edge_id, served.state, served.term) == ("drift", "below", "live_state")
+    assert (served.closed, served.win_rate, served.low, served.followed) == (20, 0.2, 0.4, False)
