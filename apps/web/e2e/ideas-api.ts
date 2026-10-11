@@ -24,6 +24,10 @@ export async function mockIdeasApi(page: Page, edgeDesk: unknown = NO_EDGE_DESK)
       await route.fulfill({ json: edgeDesk });
       return;
     }
+    if (/query\s+EdgeLiveStates\b/.test(body?.query ?? '')) {
+      await route.fulfill({ json: NO_EDGE_DESK }); // no live state: no badge, no banner
+      return;
+    }
     if (!/query\s+IdeasPage\b/.test(body?.query ?? '')) {
       await route.fallback();
       return;

@@ -12,6 +12,7 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk import desk as desk_read
 from algotrade.services.read.edge_desk import live as live_read
 from algotrade.services.read.edge_desk import paper as paper_read
+from algotrade.services.read.edge_desk import states as states_read
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 
 
@@ -193,10 +194,50 @@ class FollowedEdge:
 
 
 @strawberry.type(
+    description="One edge's live state for the session, the word a list, a header and the Ideas "
+    "banner show. `state` is the live record's: on_track, below or above the backtest's usual "
+    "range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or "
+    "no_trades (no live record yet); `closed` settled trades, `wins`, `winRate`; `headline` the "
+    "sentence; `term` the Guide entry that explains the state; `followed` the edge is on the "
+    "user's desk (else a site edge the site records). Settled trades only, as the session's "
+    "cutoff knew them"
+)
+class EdgeLiveState:
+    edge_id: str
+    name: str
+    state: str
+    closed: int
+    wins: int
+    win_rate: float | None
+    low: float | None
+    high: float | None
+    headline: str
+    term: str
+    followed: bool
+
+    @classmethod
+    def of(cls, d: states_read.LiveState) -> Self:
+        return cls(
+            edge_id=d.edge_id,
+            name=d.name,
+            state=d.state,
+            closed=d.closed,
+            wins=d.wins,
+            win_rate=d.win_rate,
+            low=d.low,
+            high=d.high,
+            headline=d.headline,
+            term=d.term,
+            followed=d.followed,
+        )
+
+
+@strawberry.type(
     description="The Ideas signals of the edges the user follows for the session: `buys` the "
     "paper trades signalled on it, `sells` the open ones whose window closes at `sellSession` "
-    "(the next session), `followed` every followed edge with its record. Empty lists with no "
-    "followed edge"
+    "(the next session), `followed` every followed edge with its record, `liveStates` "
+    "the live state of every edge with a record (the followed ones and the site's). Empty lists "
+    "with no followed edge; `liveStates` still names the site's edges"
 )
 class EdgeDesk:
     session: dt.date
@@ -204,6 +245,7 @@ class EdgeDesk:
     buys: list[PaperTrade]
     sells: list[PaperTrade]
     followed: list[FollowedEdge]
+    live_states: list[EdgeLiveState]
 
     @classmethod
     def of(cls, d: desk_read.EdgeDesk, ctx: ReadContext) -> Self:
@@ -213,4 +255,5 @@ class EdgeDesk:
             buys=[PaperTrade.of(t, ctx) for t in d.buys],
             sells=[PaperTrade.of(t, ctx) for t in d.sells],
             followed=[FollowedEdge.of(f) for f in d.followed],
+            live_states=[EdgeLiveState.of(s) for s in d.live_states],
         )

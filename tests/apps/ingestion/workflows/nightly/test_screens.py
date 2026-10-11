@@ -126,6 +126,38 @@ def test_a_failed_edge_signals_job_fails_the_step_naming_the_user(
     )
 
 
+def test_an_edge_below_its_usual_range_is_one_warning_line_never_a_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owners = [UserContext("site"), UserContext("alice")]
+    monkeypatch.setattr(screens_module, "paper_owners", lambda reader, store, session: owners)
+    monkeypatch.setattr(screens_module, "open_context", lambda reader, c, user, day: user)
+    live = {"site": [("drift", "4 of 20 closed trades won.")], "alice": []}
+    monkeypatch.setattr(
+        screens_module,
+        "below_range",
+        lambda user: tuple(SimpleNamespace(edge_id=e, headline=h) for e, h in live[user.user_id]),
+    )
+    step = screens_module.signal_jobs(SignalJobs(), MemoryConfigStore({}), object())(D)  # type: ignore[arg-type]
+    assert step.status is StepStatus.SUCCEEDED
+    assert step.result["below_range"] == [
+        {"user": "site", "edge": "drift", "headline": "4 of 20 closed trades won."}
+    ]
+    assert step.checks == [
+        {"name": "edge_below_range", "status": "WARN", "detail": "below the usual range: drift"}
+    ]
+
+
+def test_no_edge_below_its_range_adds_no_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        screens_module, "paper_owners", lambda reader, store, session: [UserContext("site")]
+    )
+    monkeypatch.setattr(screens_module, "open_context", lambda reader, c, user, day: user)
+    monkeypatch.setattr(screens_module, "below_range", lambda user: ())
+    step = screens_module.signal_jobs(SignalJobs(), MemoryConfigStore({}), object())(D)  # type: ignore[arg-type]
+    assert step.checks == [] and "below_range" not in step.result
+
+
 def test_the_edge_signals_step_is_optional_and_waits_for_screens_only() -> None:
     step = next(s for s in NIGHTLY if s.name == EDGE_SIGNALS)
     assert not step.critical and step.needs == ("screens",) and step.latest_only

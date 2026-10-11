@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { gql, queryKeys, TypedDocumentString } from '@/shared/api';
 
-import type { Desk, EdgePaper } from '../model/paper';
+import type { Desk, EdgePaper, LiveState } from '../model/paper';
 
 // Compact documents as TypedDocumentString (not `graphql()`): the generated operation map is in
 // the entry chunk, and these two reads load with their pages.
@@ -31,6 +31,14 @@ const EdgePaper = new TypedDocumentString<{ edgePaper: EdgePaper | null }, { id:
       replaced { ${SIDE} } } } }`,
 );
 
+const EdgeLiveStates = new TypedDocumentString<
+  { edgeDesk: { liveStates: LiveState[] } | null },
+  Record<string, never>
+>(
+  `query EdgeLiveStates { edgeDesk { liveStates { edgeId name state closed winRate headline
+    followed } } }`,
+);
+
 /** The signals of the edges the user follows (null: nothing stored for the session). */
 export function useEdgeDesk() {
   return useQuery({
@@ -46,5 +54,14 @@ export function useEdgePaper(id: string) {
     queryKey: queryKeys.gql('EdgePaper', { id }),
     queryFn: () => gql(EdgePaper, { id }),
     select: (data) => data.edgePaper,
+  });
+}
+
+/** The live state of every edge with a record, the followed ones and the site's (empty: nothing stored for the session). */
+export function useEdgeLiveStates() {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeLiveStates', {}),
+    queryFn: () => gql(EdgeLiveStates, {}),
+    select: (data): LiveState[] => data.edgeDesk?.liveStates ?? [],
   });
 }

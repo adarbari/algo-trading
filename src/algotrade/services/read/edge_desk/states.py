@@ -1,0 +1,97 @@
+"""Every edge's live state for the session: the one word a list, a header and the Ideas banner
+show (ADR 0064 decision 9).
+
+The state is the live record's own (``live.live_record``: the settled paper trades judged against
+the backtest's usual range by ``VerdictSettings`` ``live_min_sessions`` / ``live_low`` /
+``live_high``), never judged again here: ``on_track``, ``below`` or ``above`` the range,
+``too_early`` (too few settled signal sessions), ``no_backtest`` or ``no_trades`` (no live
+record). The edges are those with a paper record to speak of: the ones on the user's desk
+(followed, or their own evidenced or live) and every site edge the site records. Each state
+carries its Guide term (``TERMS``) so a page shows it only through ``InfoButton``; the trades are
+read as ``paper.load_trades`` reads them (the rows as the session's cutoff knew them). Nothing is
+pushed or sent: ``below_range`` only lists what the nightly's run record says in one line."""
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+
+from algotrade.config.edges.loading import RECORDING
+from algotrade.config.site.settings import load_verdict
+from algotrade.services.read.context import ReadContext
+from algotrade.services.read.edge_desk.live import (
+    ABOVE,
+    BELOW,
+    NO_BACKTEST,
+    NO_TRADES,
+    ON_TRACK,
+    TOO_EARLY,
+    live_record,
+)
+from algotrade.services.read.edge_desk.paper import PaperTrade, load_trades, record_owner
+from algotrade.services.read.evaluation.edges import Edge, load_edges
+
+LIVE_STATES = (ON_TRACK, BELOW, ABOVE, TOO_EARLY, NO_BACKTEST, NO_TRADES)
+TERM = "live_state"  # the Guide glossary entry that explains every state
+
+
+@dataclass(frozen=True)
+class LiveState:
+    """One edge's live state: ``state`` (one of ``LIVE_STATES``), the settled trades behind it
+    (``closed``, ``wins``, ``win_rate``), the usual range (``low`` / ``high``, None until it is
+    judged), the server's ``headline`` and the Guide ``term`` that explains the state;
+    ``followed``: the edge is on the user's desk (else a site edge the user does not follow)."""
+
+    edge_id: str
+    name: str
+    state: str
+    closed: int
+    wins: int
+    win_rate: float | None
+    low: float | None
+    high: float | None
+    headline: str
+    term: str
+    followed: bool
+
+
+def _recorded(edge: Edge) -> bool:
+    """The edge has a paper record to judge: on the desk, or a site edge the site records."""
+    return edge.paper_traded or (not edge.mine and edge.status in RECORDING)
+
+
+def live_edges(edges: Mapping[str, Edge]) -> dict[str, Edge]:
+    """The edges whose live state is served (see ``_recorded``), by id."""
+    return {i: e for i, e in edges.items() if _recorded(e)}
+
+
+def load_live_states(
+    ctx: ReadContext, edges: Mapping[str, Edge], trades: Sequence[PaperTrade]
+) -> tuple[LiveState, ...]:
+    """The live state of each of ``edges`` (from ``live_edges``) over ``trades`` (``load_trades``
+    of at least those edges), sorted by edge name."""
+    settings = load_verdict(ctx.configs)
+    states = []
+    for edge in edges.values():
+        record = live_record(ctx, edge, [t for t in trades if t.edge_id == edge.id], settings)
+        states.append(
+            LiveState(
+                edge.id, edge.name, record.state, record.closed, record.wins, record.win_rate,
+                record.low, record.high, record.headline, TERM, edge.paper_traded,
+            )
+        )  # fmt: skip
+    return tuple(sorted(states, key=lambda s: (s.name, s.edge_id)))
+
+
+def below_range(ctx: ReadContext) -> tuple[LiveState, ...]:
+    """The edges below their usual range whose paper record ``ctx.user`` owns (a site edge for
+    ``site``, else the user's own): what the nightly's run record names, one line each, so a site
+    edge is said once, by the site's job, and never again by each follower's."""
+    edges = {e.id: e for e in load_edges(ctx)}
+    mine = {
+        i: e
+        for i, e in live_edges(edges).items()
+        if record_owner(e, ctx.user.user_id) == ctx.user.user_id
+    }
+    if not mine:
+        return ()
+    states = load_live_states(ctx, mine, load_trades(ctx, mine))
+    return tuple(s for s in states if s.state == BELOW)

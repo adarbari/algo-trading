@@ -84,13 +84,24 @@ export interface EdgePaper {
   forward: ForwardTest | null;
 }
 
+/** One edge's live state for the session (`EdgeDesk.liveStates`): the live record's state, its settled trades and the server's sentence. */
+export interface LiveState {
+  edgeId: string;
+  name: string;
+  state: string;
+  closed: number;
+  winRate: number | null;
+  headline: string;
+  followed: boolean;
+}
+
 const RECORD_LABELS: Record<string, string> = {
   on_track: 'On track',
-  below: 'Below the usual range',
-  above: 'Above the usual range',
-  too_early: 'Too early to judge',
+  below: 'Below range',
+  above: 'Above range',
+  too_early: 'Too few settled trades',
   no_backtest: 'No backtest to compare',
-  no_trades: 'No trades yet',
+  no_trades: 'No live record',
 };
 
 const RECORD_TONES: Record<string, StatusTone> = {

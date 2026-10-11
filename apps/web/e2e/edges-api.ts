@@ -1,5 +1,5 @@
 /**
- * Playwright route mock for the edges: the `EdgesPage`, `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record) GraphQL
+ * Playwright route mock for the edges: the `EdgesPage`, `ScreenerTrackRecords`, `EdgeDesk`, `EdgeLiveStates` and `EdgePaper` (nothing followed, no paper record) GraphQL
  * operations (POST /api/graphql). The golden store holds no edge runs, so the answers are
  * synthetic with the real API's shapes (`Query.edges`, `Screener.trackRecords`): one candidate
  * edge with an official result and an exploratory run beside it, one rejected edge with no
@@ -133,7 +133,7 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
       });
     } else if (/query\s+EdgeBuilder\b/.test(query)) {
       await route.fulfill({ json: { data: { edge: BUILDER } } });
-    } else if (/query\s+EdgeDesk\b/.test(query)) {
+    } else if (/query\s+EdgeDesk\b|query\s+EdgeLiveStates\b/.test(query)) {
       await route.fulfill({ json: { data: { edgeDesk: null } } });
     } else if (/query\s+EdgePaper\b/.test(query)) {
       await route.fulfill({ json: { data: { edgePaper: null } } });

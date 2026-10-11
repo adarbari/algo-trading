@@ -1,0 +1,28 @@
+# L3 site setting: the Guide glossary, edges: the live state badge on the list, the header and the Ideas banner (ADR 0051, ADR 0064). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "live_state"
+term = "Live state"
+short = "How an edge's settled paper trades compare with its backtest: on track, below or above range, too few trades, or no record."
+body = """
+The live state is one word for how an edge is doing on paper against what its backtest led you
+to expect. It reads only settled paper trades, as the session knew them. A trade still open, or
+skipped, is never counted as a loss. A result a later night recorded does not change an earlier
+session's state. The judging is the live record's, with the same usual range, so the state and
+the Live record panel always agree.
+On track: the live win rate is inside the usual range.
+Below range: it is under the start of the range. If the backtest were right, that happens about
+one time in ten by chance alone. It is worth a look and proves nothing alone.
+Above range: it is over the end of the range. That is good news that deserves the same doubt,
+because a lucky start fades.
+Too few settled trades: fewer signal sessions have closed than the site's minimum. The rate
+swings too widely to judge yet.
+No live record: the edge has no paper trades yet, since a site edge is recorded only once it is
+evidenced or live. The sentence also says when there is no backtest to compare with.
+The Ideas page shows a banner when an edge you follow, or a site edge, is below range. The
+nightly run record says so in one line. Nothing is pushed or sent: the state is for you to read.
+"""
+next = "Open the edge's Live record: the picture shows the usual range, the live win rate and the paper trades behind it."
+see_also = ["live_record", "usual_range", "paper_trading", "win_rate"]

@@ -7,6 +7,7 @@ import { gql } from '@/shared/api';
 
 import { EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from '../model/fixtures';
 import { useEdgeProblems, useEdges } from './edges';
+import { useEdgeLiveStates } from './paper';
 import { useTrackRecords } from './track-records';
 
 vi.mock('@/shared/api', async (importOriginal) => {
@@ -60,5 +61,32 @@ describe('useTrackRecords', () => {
       ['momentum_12_1', 'candidate'],
       ['earnings_drift', 'evidenced'],
     ]);
+  });
+});
+
+describe('useEdgeLiveStates', () => {
+  it('asks EdgeLiveStates once and serves the states, none when nothing is stored', async () => {
+    const live = {
+      edgeId: 'drift',
+      name: 'Drift',
+      state: 'below',
+      closed: 20,
+      winRate: 0.2,
+      headline: '4 of 20 closed trades won.',
+      followed: false,
+    };
+    GQL.mockResolvedValueOnce({ edgeDesk: { liveStates: [live] } });
+    const { result } = renderHook(() => useEdgeLiveStates(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgeLiveStates');
+    expect(result.current.data).toEqual([live]);
+    GQL.mockResolvedValueOnce({ edgeDesk: null });
+    const empty = renderHook(() => useEdgeLiveStates(), { wrapper });
+    await waitFor(() => {
+      expect(empty.result.current.isSuccess).toBe(true);
+    });
+    expect(empty.result.current.data).toEqual([]);
   });
 });
