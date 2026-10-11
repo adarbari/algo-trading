@@ -129,6 +129,7 @@ const ResultDrawdown = graphql(`
   query EdgeResultDrawdown($id: String!) {
     edgeResult(id: $id) {
       drawdown {
+        state
         unit
         points {
           exit

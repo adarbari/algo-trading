@@ -68,4 +68,4 @@ the whole-history figures hold it too. Only the in-sample period is shown. A bla
 result.
 """
 next = "Re-run the backtest to fill a not stored figure; show the out-of-sample result to fill a hidden one."
-see_also = ["cost_sensitivity", "capacity", "out_of_sample", "in_sample"]
+see_also = ["cost_sensitivity", "capacity", "out_of_sample", "in_sample", "not_a_return"]

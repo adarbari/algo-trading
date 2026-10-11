@@ -219,10 +219,12 @@ class DrawdownEpisode:
     "deepest `episodes`, the deepest drop of each side of the split (`maxInSample`, "
     "`maxOutOfSample`: positive; the out-of-sample side from its own first window) and the "
     "annualised volatility of the windows of each side (null: fewer than two windows). Measured "
-    "on the per-window curve, so it understates a dip inside a window. `unknown`: none for an "
-    "outcome with no return (not applicable), or no series"
+    "on the per-window curve, so it understates a dip inside a window. `state`: measured, "
+    "not_a_return (the outcome has no return to fall) or not_stored (no series: `unknown` says "
+    "why)"
 )
 class EdgeDrawdown:
+    state: str
     unit: str | None
     points: list[UnderwaterPoint]
     episodes: list[DrawdownEpisode]
@@ -235,6 +237,7 @@ class EdgeDrawdown:
     @classmethod
     def of(cls, d: drawdown.EdgeDrawdown) -> Self:
         return cls(
+            state=d.state,
             unit=d.unit,
             points=[UnderwaterPoint.of(p) for p in d.points],
             episodes=[DrawdownEpisode.of(e) for e in d.episodes],

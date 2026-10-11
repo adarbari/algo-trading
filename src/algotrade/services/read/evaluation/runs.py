@@ -49,6 +49,9 @@ COST = (
 )
 
 
+SIDE_PARTS = ("year_part", "regime_part")  # a slice on one side of the split: ``<value>:<side>``
+
+
 @dataclass(frozen=True)
 class EdgeRun:
     """One committed evaluation run. ``owner``: whose run (the user's id, or ``site``);
@@ -418,10 +421,14 @@ def _without_oos_counts(row: EdgeRow) -> EdgeRow:
 
 
 def _in_sample_only(row: EdgeRow) -> bool:
-    """Whether a row holds in-sample sessions only: the ``in_sample`` slice or its cost rows."""
-    return row.slice_kind == IN_SAMPLE or (
-        row.slice_kind == COST and row.slice_value.startswith(f"{IN_SAMPLE}:")
-    )
+    """Whether a row holds in-sample sessions only: the ``in_sample`` slice, its cost rows
+    (``in_sample:<bp>``) and the in-sample side of a split year or regime (``year_part`` /
+    ``regime_part``, ``<value>:in_sample``)."""
+    if row.slice_kind == IN_SAMPLE:
+        return True
+    if row.slice_kind == COST:
+        return row.slice_value.startswith(f"{IN_SAMPLE}:")
+    return row.slice_kind in SIDE_PARTS and row.slice_value.endswith(f":{IN_SAMPLE}")
 
 
 def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:

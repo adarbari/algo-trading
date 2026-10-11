@@ -24,7 +24,7 @@ from tests.helpers.api_store import StubAuthenticator, store_over
 from tests.helpers.rollup_store import write_bars
 from tests.unit.services.read.edge_desk.conftest import store, trade
 from tests.unit.services.read.edge_ledger.conftest import LEDGER, SESSION, USERS
-from tests.unit.services.read.evaluation.conftest import DOCS, FROZEN, write_run
+from tests.unit.services.read.evaluation.conftest import DOCS, EDGE, FROZEN, write_run
 
 Make = Callable[..., TestClient]
 GRAPH = """query T($id: String!, $period: TradePeriod!, $sort: TradeSort!, $desc: Boolean!) {
@@ -47,8 +47,11 @@ def backend_with_run(trades: list[dict[str, Any]] | None = LEDGER) -> MemoryBack
 
 @pytest.fixture
 def make() -> Callable[..., TestClient]:
-    def build(user: str, role: Role, backend: MemoryBackend | None = None) -> TestClient:
-        configs = MemoryConfigStore({**DOCS, ("site", "settings", "users"): USERS})
+    def build(
+        user: str, role: Role, backend: MemoryBackend | None = None, status: str = "candidate"
+    ) -> TestClient:
+        site = {("site", "edges", "drift"): {**EDGE, "status": status}}
+        configs = MemoryConfigStore({**DOCS, **site, ("site", "settings", "users"): USERS})
         app = create_app(
             ApiSettings("memory://", "config"),
             store_over(backend or backend_with_run(), configs, UserContext(user)),
@@ -179,7 +182,7 @@ def test_the_file_takes_the_pages_session_for_live_rows(make: Make) -> None:
 
     backend = backend_with_run()
     store(backend, [trade("EQ:L", date(2026, 9, 1), "won", sell=date(2026, 9, 30))])
-    client = make("me", Role.TRADER, backend)
+    client = make("me", Role.TRADER, backend, "evidenced")
     asked = {"period": "live", "date": SESSION.isoformat()}
     rows = list(
         csv.DictReader(io.StringIO(client.get("/files/edges/drift/trades.csv", params=asked).text))

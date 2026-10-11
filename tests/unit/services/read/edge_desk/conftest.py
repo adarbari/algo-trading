@@ -16,7 +16,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
-from tests.unit.services.read.evaluation.conftest import DOCS, FROZEN, write_run
+from tests.unit.services.read.evaluation.conftest import DOCS, EDGE, FROZEN, write_run
 
 FOLLOWED = date(2026, 9, 1)
 SESSION = date(2026, 10, 5)  # a Monday; the next session is Oct 6
@@ -69,6 +69,10 @@ def closed_trades(
     ]
 
 
+SITE_DRIFT = ("site", "edges", "drift")  # evidenced by default: only those record paper trades
+CANDIDATE = {SITE_DRIFT: EDGE}
+
+
 def context(
     backend: MemoryBackend,
     day: date = SESSION,
@@ -76,7 +80,7 @@ def context(
     extra: dict[tuple[str, str, str], dict[str, Any]] | None = None,
     cutoff: datetime | None = CUTOFF,
 ) -> ReadContext:
-    docs = dict(DOCS) | (extra or {})
+    docs = dict(DOCS) | {SITE_DRIFT: {**EDGE, "status": "evidenced"}} | (extra or {})
     if follow is not None:
         docs[("me", "edges", "drift")] = {"follow": follow}
     stores = open_stores(StoreReader(backend), MemoryConfigStore(docs), UserContext("me"))

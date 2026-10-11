@@ -114,6 +114,18 @@ describe('EdgePerformance', () => {
     expect(hooks.chart).not.toHaveBeenCalled();
   });
 
+  it('says an outcome that is not a return is not a return, with its Guide term and no gap', async () => {
+    hooks.useEdgeDrawdown.mockReturnValue(
+      fakeQuery({ ...DRAWDOWN_FIXTURE, state: 'not_a_return', points: [], episodes: [] }),
+    );
+    render(<EdgePerformance edgeId="momentum_12_1" verdict={verdict} />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Drawdown' }));
+    expect(screen.getByText('Not a return')).toBeInTheDocument();
+    expect(screen.getByText('help not_a_return')).toBeInTheDocument();
+    expect(screen.queryByText(/NOT_A_RETURN|unit:/)).not.toBeInTheDocument();
+    expect(hooks.chart).not.toHaveBeenCalled();
+  });
+
   it('shows the drawdown loading and failed with a retry', async () => {
     hooks.useEdgeDrawdown.mockReturnValue(fakeQuery(undefined));
     const { rerender } = render(<EdgePerformance edgeId="momentum_12_1" verdict={verdict} />);
@@ -137,6 +149,21 @@ describe('EdgePerformance', () => {
     await userEvent.click(periodRadio('In-sample'));
     expect(within(table).getAllByText('Not stored')).toHaveLength(3); // crisis has no in-sample side
     expect(screen.getByText('help by_regime')).toBeInTheDocument();
+  });
+
+  it('names the regime no scale covers Unclassified, with its Guide term', async () => {
+    hooks.useEdgeRegimes.mockReturnValue(
+      fakeQuery({
+        ...REGIMES_FIXTURE,
+        rows: [{ ...REGIMES_FIXTURE.rows[0], regime: 'UNKNOWN' }],
+      }),
+    );
+    render(<EdgePerformance edgeId="momentum_12_1" verdict={verdict} />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Regime' }));
+    const table = screen.getByRole('grid', { name: 'By regime' });
+    expect(within(table).getByText('Unclassified')).toBeInTheDocument();
+    expect(within(table).queryByText('UNKNOWN')).not.toBeInTheDocument();
+    expect(within(table).getByText('help regime')).toBeInTheDocument();
   });
 
   it('opens the holding-period view: the basis marked, the others not the pre-chosen test, and the count date', async () => {

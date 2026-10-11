@@ -352,6 +352,19 @@ def test_a_year_the_split_cuts_is_two_rows_not_a_both_row() -> None:
     assert (years[0].from_date, years[0].to_date) == (date(2025, 1, 1), date(2025, 12, 31))
 
 
+def test_years_before_the_screens_first_session_are_not_rows_and_the_split_ends_at_the_run() -> (
+    None
+):
+    empty = [row(kind="year", slice_value=str(y), sessions=0) for y in range(2010, 2024)]
+    rows = [*result(), *empty, row(kind="year", slice_value="2025"), *parts()]
+    years = judge("e", rows, SPLIT, T, range_to=date(2026, 10, 9)).years
+    assert [y.label for y in years] == ["2025", "2026 Jan\u2013Mar", "2026 Apr\u2013Oct"]
+    assert years[-1].to_date == date(2026, 10, 9)
+    # a year after the last with sessions goes too
+    tail = [*rows, row(kind="year", slice_value="2027", sessions=0)]
+    assert [y.year for y in judge("e", tail, SPLIT, T).years][-1] == "2026"
+
+
 def test_a_moved_split_cuts_its_own_year_and_never_inverts_the_dates() -> None:
     rows = [*result(), *parts("2025")]
     moved = judge("e", rows, date(2025, 7, 1), T).years  # a copy's run split on 2025-07-01

@@ -505,9 +505,10 @@ type EdgeDesk {
 }
 
 """
-How far the curve fell and how much it moves: the `points` below its high, its deepest `episodes`, the deepest drop of each side of the split (`maxInSample`, `maxOutOfSample`: positive; the out-of-sample side from its own first window) and the annualised volatility of the windows of each side (null: fewer than two windows). Measured on the per-window curve, so it understates a dip inside a window. `unknown`: none for an outcome with no return (not applicable), or no series
+How far the curve fell and how much it moves: the `points` below its high, its deepest `episodes`, the deepest drop of each side of the split (`maxInSample`, `maxOutOfSample`: positive; the out-of-sample side from its own first window) and the annualised volatility of the windows of each side (null: fewer than two windows). Measured on the per-window curve, so it understates a dip inside a window. `state`: measured, not_a_return (the outcome has no return to fall) or not_stored (no series: `unknown` says why)
 """
 type EdgeDrawdown {
+  state: String!
   unit: String
   points: [UnderwaterPoint!]!
   episodes: [DrawdownEpisode!]!
@@ -562,7 +563,7 @@ type EdgeLive {
 }
 
 """
-One edge's live state for the session, the word a list, a header and the Ideas banner show. `state` is the live record's: on_track, below or above the backtest's usual range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or no_trades (no live record yet) or not_settled (the session's nightly has not completed: nothing is judged); `closed` settled trades, `wins`, `winRate`; `headline` the sentence; `term` the Guide entry that explains the state; `followed` the edge is on the user's desk (else a site edge the site records). Settled trades only, as the session's cutoff knew them
+One edge's live state for the session, the word a list, a header and the Ideas banner show. `state` is the live record's: on_track, below or above the backtest's usual range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or no_trades (no live record yet), not_settled (the session's nightly has not completed: nothing is judged) or not_recording (the edge records no paper trades: a candidate); `closed` settled trades, `wins`, `winRate`; `headline` the sentence; `term` the Guide entry that explains the state; `followed` the edge is on the user's desk (else a site edge the site records). Settled trades only, as the session's cutoff knew them
 """
 type EdgeLiveState {
   edgeId: String!
@@ -3122,6 +3123,7 @@ enum UnknownCode {
   EXPLAINED
   PRUNED
   NOT_STORED
+  NOT_RECORDING
 }
 
 """
