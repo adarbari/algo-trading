@@ -315,6 +315,25 @@ describe('DataTable', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('emphasises a whole column, header and cells, beside a per-cell fill', async () => {
+    const emphasised = columns.map((c) =>
+      c.id === 'iv30'
+        ? {
+            ...c,
+            emphasis: true,
+            fill: (r: TickerRow) =>
+              r.symbol === rows[0]?.symbol ? ('warning' as const) : undefined,
+          }
+        : c,
+    );
+    const { container } = render(<Table columns={emphasised} />);
+    expect(container.querySelectorAll('[role="columnheader"][data-emphasis]')).toHaveLength(1);
+    const cells = container.querySelectorAll('[role="gridcell"][data-emphasis]');
+    expect(cells.length).toBeGreaterThan(1);
+    expect(container.querySelector('[data-emphasis][data-fill="warning"]')).not.toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
   it('moves the active row with j / k and arrows, reporting each change', async () => {
     const onActiveRowChange = vi.fn();
     render(<Table onActiveRowChange={onActiveRowChange} />);

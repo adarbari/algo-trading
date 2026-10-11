@@ -184,6 +184,12 @@
   border-inline-end-color: var(--color-border);
 }
 
+/* An emphasised column: the soft accent behind header and cells; a cell's own fill (below) wins. */
+.headerCell[data-emphasis],
+.cell[data-emphasis] {
+  background: var(--color-accent-soft);
+}
+
 .cell[data-fill='warning'] {
   background: var(--color-warning-bg);
 }

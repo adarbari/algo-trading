@@ -404,7 +404,7 @@ type EdgeSource {
 }
 
 """
-An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests
+An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on. The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests; `columns` the basis's figures in-sample, out-of-sample and over all (empty: no result yet); `evidence` the trades against what the verdict needs
 """
 type EdgeVerdict {
   verdict: String!
@@ -428,6 +428,8 @@ type EdgeVerdict {
   trials: Int
   deciles: [Float]!
   robustness: Robustness
+  columns: [VerdictColumn!]!
+  evidence: EvidenceProgress
 }
 
 """
@@ -502,6 +504,19 @@ type EventGap {
   instrumentId: String
   part: String!
   unknown: Unknown!
+}
+
+"""
+How much evidence the verdict has: `oosTrades` out-of-sample against `needed` (from there it can say Promising or Not working; `reached`: it has them), `worksOosNeeded` the out-of-sample count Works asks, `wholeTrades` against `wholeNeeded` the whole history's, and `checks` the criteria that say whether the result is real
+"""
+type EvidenceProgress {
+  oosTrades: Int!
+  needed: Int!
+  worksOosNeeded: Int!
+  wholeTrades: Int!
+  wholeNeeded: Int!
+  reached: Boolean!
+  checks: [VerdictCriterion!]!
 }
 
 """
@@ -2594,6 +2609,23 @@ type UsePass {
 }
 
 """
+The basis's figures over one `period` (in_sample, out_of_sample or all); `liftPts`: win rate minus base rate, in points; `thin`: the out-of-sample column has fewer trades than the verdict needs. A figure not stored is null
+"""
+type VerdictColumn {
+  period: String!
+  winRate: Float
+  baseRate: Float
+  liftPts: Float
+  trades: Int
+  decileSpread: Float
+  decileT: Float
+  sharpe: Float
+  deflatedSharpe: Float
+  pbo: Float
+  thin: Boolean!
+}
+
+"""
 One test of the verdict: the `value` measured, the `threshold` it must reach and its `status` (pass, fail, not_measured); `level`: the verdict it gates (promising, works)
 """
 type VerdictCriterion {
@@ -2606,11 +2638,15 @@ type VerdictCriterion {
 }
 
 """
-One calendar year of the verdict's basis; `period`: in_sample, out_of_sample or both (the split falls inside the year); `liftPts`: win rate minus base rate, in points
+One calendar year of the verdict's basis, or the part of it on one side of the split (`partial`: a year the split falls in is two rows, in-sample then out-of-sample); `label` names the row ("2026 Jan-Mar") and it spans `fromDate` to `toDate`; `period`: in_sample, out_of_sample or both (an older run's year the split falls inside); `liftPts`: win rate minus base rate, in points
 """
 type VerdictYear {
   year: String!
   period: String!
+  label: String!
+  fromDate: Date!
+  toDate: Date!
+  partial: Boolean!
   winRate: Float
   baseRate: Float
   liftPts: Float

@@ -112,7 +112,7 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
     found = verdict.judge(
         edge.id,
         rows,
-        edge.frozen_from,
+        run.split_from or edge.frozen_from,  # a copy's run may have moved its split
         settings,
         run.lost_inputs,
         decoys=bool(edge.baselines),

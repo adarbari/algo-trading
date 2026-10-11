@@ -18,7 +18,7 @@ the stored rows' (``quant/edge_statistics.py``), never recomputed; the threshold
 import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Final
 
 from algotrade.config.edges.verdict import VerdictSettings
@@ -26,6 +26,7 @@ from algotrade.config.site.settings import load_verdict
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge
+from algotrade.services.read.evaluation.evidence import EvidenceProgress, evidence_of
 from algotrade.services.read.evaluation.robustness import Robustness, beat_share, load_robustness
 from algotrade.services.read.evaluation.runs import EdgeRow
 
@@ -41,7 +42,8 @@ CRITERION_STATUSES: Final = (
     FAIL,
     NOT_MEASURED,
 )  # a criterion's status, each explained in the Guide
-IN_SAMPLE, OUT_OF_SAMPLE, BOTH = "in_sample", "out_of_sample", "both"
+IN_SAMPLE, OUT_OF_SAMPLE, BOTH, ALL = "in_sample", "out_of_sample", "both", "all"
+EN_DASH = "\u2013"  # between the months of a partial year's label
 
 
 @dataclass(frozen=True)
@@ -58,12 +60,38 @@ class VerdictCriterion:
 
 
 @dataclass(frozen=True)
+class VerdictColumn:
+    """The basis's figures over one ``period`` (``in_sample``, ``out_of_sample`` or ``all``);
+    ``thin``: the out-of-sample column has fewer trades than the verdict needs. A figure not
+    stored (older runs) is None."""
+
+    period: str
+    win_rate: float | None
+    base_rate: float | None
+    lift_pts: float | None
+    trades: int | None
+    decile_spread: float | None
+    decile_t: float | None
+    sharpe: float | None
+    deflated_sharpe: float | None
+    pbo: float | None
+    thin: bool
+
+
+@dataclass(frozen=True)
 class YearRow:
-    """One calendar year of the basis (screen, holding period); ``period``: ``in_sample``,
-    ``out_of_sample`` or ``both`` (the split falls inside the year)."""
+    """One calendar year of the basis (screen, holding period), or the part of it on one side
+    of the split (``partial``: a year the split falls in is two rows, in-sample then
+    out-of-sample); ``period``: ``in_sample``, ``out_of_sample`` or ``both`` (a run from before
+    the parts); ``label``: the row's name ("2026 Jan-Mar", en dash), from ``from_date``
+    to ``to_date``."""
 
     year: str
     period: str
+    label: str
+    from_date: date
+    to_date: date
+    partial: bool
     win_rate: float | None
     base_rate: float | None
     lift_pts: float | None
@@ -100,6 +128,8 @@ class EdgeVerdict:
     trials: int | None = None  # the variants tried on the edge (the whole result's count)
     deciles: tuple[float | None, ...] = ()  # in-sample mean outcome per tenth, best-ranked first
     robustness: Robustness | None = None  # the lift among the random-pick backtests
+    columns: tuple[VerdictColumn, ...] = ()  # in-sample, out-of-sample, all (empty: waiting)
+    evidence: EvidenceProgress | None = None  # the trades against what the verdict needs
 
 
 def _pct(x: float | None) -> str:
@@ -134,6 +164,7 @@ class _Candidate:
     insample: EdgeRow | None
     baselines: tuple[EdgeRow, ...]
     years: tuple[EdgeRow, ...]
+    year_parts: tuple[EdgeRow, ...] = ()  # a year cut by the split, as ``<year>:<side>`` rows
 
 
 def _by_year(row: EdgeRow) -> str:
@@ -158,6 +189,7 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
             if r.role == "baseline" and r.horizon_sessions == horizon and r.slice_kind == "frozen"
         )
         years = tuple(sorted((r for r in mine if r.slice_kind == "year"), key=_by_year))
+        parts = tuple(sorted((r for r in mine if r.slice_kind == "year_part"), key=_by_year))
         found.append(
             _Candidate(
                 variant,
@@ -167,6 +199,7 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
                 before[0] if len(before) == 1 else None,
                 base,
                 years,
+                parts,
             )
         )
     return found
@@ -295,6 +328,30 @@ def _level(c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings) 
     return (WORKS, "") if gap is None else (PROMISING, _words(gap))
 
 
+def _column(
+    period: str, r: EdgeRow | None, deflated: float | None, pbo: float | None, thin: bool = False
+) -> VerdictColumn:
+    if r is None:  # an older run has no in-sample row
+        return VerdictColumn(period, None, None, None, None, None, None, None, None, None, thin)
+    return VerdictColumn(
+        period, r.hit_rate, r.base_rate, runs.lift_points(r.hit_rate, r.base_rate), r.sessions,
+        r.decile_spread, r.decile_t, r.sharpe, deflated, pbo, thin,
+    )  # fmt: skip
+
+
+def _columns(c: _Candidate, t: VerdictSettings) -> tuple[VerdictColumn, ...]:
+    """The in-sample, out-of-sample and all columns, each with its own row's deflated Sharpe and
+    overfitting probability (stored on ``all`` only; a side's is normally not: missing, never
+    another column's)."""
+    ins, oos = c.insample, c.oos
+    thin = oos.sessions is None or oos.sessions < t.min_oos_trades
+    return (
+        _column(IN_SAMPLE, ins, ins.deflated_sharpe if ins else None, ins.pbo if ins else None),
+        _column(OUT_OF_SAMPLE, oos, oos.deflated_sharpe, oos.pbo, thin),
+        _column(ALL, c.whole, c.whole.deflated_sharpe, c.whole.pbo),
+    )
+
+
 def _judge_one(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> EdgeVerdict:
@@ -308,6 +365,8 @@ def _judge_one(
         f"{_pct(oos.base_rate)} ({_num(pts, 0)} pts)."
     )
     shown = level in (WORKS, PROMISING, NOT_WORKING)
+    deflated = whole.deflated_sharpe if whole.deflated_sharpe is not None else oos.deflated_sharpe
+    pbo = whole.pbo if whole.pbo is not None else oos.pbo
     return EdgeVerdict(
         edge_id="",
         verdict=level,
@@ -327,13 +386,13 @@ def _judge_one(
         decile_spread=oos.decile_spread,
         decile_t=oos.decile_t,
         sharpe=whole.sharpe,
-        deflated_sharpe=whole.deflated_sharpe
-        if whole.deflated_sharpe is not None
-        else oos.deflated_sharpe,
-        pbo=whole.pbo if whole.pbo is not None else oos.pbo,
+        deflated_sharpe=deflated,
+        pbo=pbo,
         trials=whole.trials,
         deciles=c.insample.decile_means if c.insample else (),
         robustness=load_robustness(oos.lift, draws, c.horizon, c.variant, whole.trials),
+        columns=_columns(c, t),
+        evidence=evidence_of(oos.sessions, whole.sessions, crit, t),
     )
 
 
@@ -344,14 +403,38 @@ def _period(year: str, split: date | None) -> str:
     return IN_SAMPLE if last < split else OUT_OF_SAMPLE if first >= split else BOTH
 
 
-def _years(c: _Candidate, split: date | None) -> tuple[YearRow, ...]:
-    return tuple(
-        YearRow(
-            r.slice_value, _period(r.slice_value, split), r.hit_rate, r.base_rate,
-            runs.lift_points(r.hit_rate, r.base_rate), r.decile_spread, r.sessions,
-        )
-        for r in c.years
+def _row_of(r: EdgeRow, year: str, period: str, first: date, last: date, part: bool) -> YearRow:
+    label = f"{year} {first:%b}{EN_DASH}{last:%b}" if part else year
+    return YearRow(
+        year, period, label, first, last, part, r.hit_rate, r.base_rate,
+        runs.lift_points(r.hit_rate, r.base_rate), r.decile_spread, r.sessions,
     )  # fmt: skip
+
+
+def _years(c: _Candidate, split: date | None) -> tuple[YearRow, ...]:
+    """The year rows; a year the split falls in is its in-sample then its out-of-sample part
+    (a run from before the parts keeps the one ``both`` row)."""
+    parts = {r.slice_value: r for r in c.year_parts}
+    out: list[YearRow] = []
+    for r in c.years:
+        year = r.slice_value
+        mine = [(side, parts.get(f"{year}:{side}")) for side in (IN_SAMPLE, OUT_OF_SAMPLE)]
+        cut = split is not None and year.isdigit() and split.year == int(year)
+        if cut and split is not None and all(p for _, p in mine):
+            first, last = date(int(year), 1, 1), date(int(year), 12, 31)
+            bounds = {
+                IN_SAMPLE: (first, split - timedelta(days=1)),
+                OUT_OF_SAMPLE: (split, last),
+            }
+            out += [
+                _row_of(p, year, side, *bounds[side], True) for side, p in mine if p is not None
+            ]
+        else:
+            first = date(int(year), 1, 1) if year.isdigit() else date.min
+            last = date(int(year), 12, 31) if year.isdigit() else date.min
+            period = BOTH if any(p for _, p in mine) and not cut else _period(year, split)
+            out.append(_row_of(r, year, period, first, last, False))
+    return tuple(out)
 
 
 def _waiting(edge_id: str, reason: str) -> EdgeVerdict:
@@ -412,7 +495,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
     return judge(
         edge.id,
         rows,
-        edge.frozen_from,
+        found.run.split_from or edge.frozen_from,  # the split its year parts were cut at
         settings,
         found.run.lost_inputs,
         draws=runs.load_run_draws(ctx, found.run),
