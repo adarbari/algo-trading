@@ -84,6 +84,7 @@ owner = [
     "src/algotrade/config/site/regime/*",
     "src/algotrade/config/site/guide/*",
     "src/algotrade/config/site/events/*",
+    "src/algotrade/config/site/drafting/*",
     "src/algotrade/config/site/features/*",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",

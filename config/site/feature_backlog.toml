@@ -1,0 +1,32 @@
+# Missing features traders ask for, curated by PR (the Describe it drafting offers the OPEN
+# ones as keys to request, never as fields). Loaded by FeatureBacklogSettings
+# (src/algotrade/config/site/drafting/backlog.py); plan: docs/drafting/describe-it-plan.md.
+#
+# key          slug (a-z, 0-9, _), unique across keys and aliases
+# description  one line: what it would measure
+# feasibility  ROLLUP_FROM_STORED (computable from stored tables) | NEEDS_SOURCE (a source we
+#              do not ingest) | UNCLEAR
+# aliases      other slugs that mean the same item
+# status       OPEN | PROMOTED (built: set promoted_to) | WONT_DO
+# promoted_to  the catalogue feature name; required when PROMOTED, otherwise absent
+# closest      catalogue features that come nearest today
+
+[[item]]
+key = "free_cash_flow_yield"
+description = "Free cash flow per share over the price; the cash-flow statement fields are not ingested"
+feasibility = "NEEDS_SOURCE"
+status = "OPEN"
+aliases = ["fcf_yield"]
+
+[[item]]
+key = "support_level_history"
+description = "Per-session support level and the share of days inside its band over the last 504 sessions"
+feasibility = "ROLLUP_FROM_STORED"
+status = "OPEN"
+closest = ["dist_to_support", "support_touches", "swing_low"]
+
+[[item]]
+key = "treasury_10y_level"
+description = "The nominal 10-year Treasury yield itself; stored only in rates/treasury, not exposed as a feature"
+feasibility = "NEEDS_SOURCE"
+status = "OPEN"
