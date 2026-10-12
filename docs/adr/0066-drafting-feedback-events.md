@@ -76,7 +76,9 @@ cut of this section had named the ingestion CLI). Both are a dry run unless
 `--yes`, idempotent, and refuse while any run has pending writes or another retention command runs.
 - *retain* nulls the personal text of every table in `retention.PERSONAL` (the registry: a test fails
   when a `feedback/*` or `usage/*` table is added unregistered): `sentence` and `payload` of
-  `feedback/drafting_events`; `sentence`, `answer`, `error` of `usage/llm_calls`; `span` of
+  `feedback/drafting_events` (for `edge_revised` events the payload holds the edge document's free
+  text, thesis, persistence reason and outcome, and its diff; edge events are never curated, the
+  curation skips `doc_kind == "edge"`); `sentence`, `answer`, `error` of `usage/llm_calls`; `span` of
   `feedback/feature_requests` (its `ref` key never holds personal text). It does so for partitions
   older than the window (exchange `session_date`), except every event of a curated golden case (the
   union of the case's `source_events` and `source_event`) and the usage rows those events' `call_ids`
@@ -88,11 +90,9 @@ cut of this section had named the ingestion CLI). Both are a dry run unless
   (its text is nulled all the same); it replaces `user`, `doc_id`, `draft_session_id`, `call_ids`,
   `call_id` and the draft and saved hashes by **a fresh random token per row**, so erased rows join
   neither to a person nor to each other (and a table key that holds the user, as
-  `feedback/feature_requests`'s, never collides); it truncates `ts` to the day. **What stays**: the
+  `feedback/feature_requests`'s, never collides); it truncates `ts` and `knowledge_ts` to the day (the point-in-time purity of an erased row is not needed). **What stays**: the
   event type, outcome, versions, token counts, costs, the exchange date and the day, so counts and
-  the budget seed still add up. **What remains manual**: `knowledge_ts` (the time of day, kept for
-  run ordering: the stored time can still be joined to a log that names the user), the API and
-  nightly logs, `config/users/<id>/` (the user's own configs, ADR 0029), the audit log's counts,
+  the budget seed still add up. **What remains manual**: the API and nightly logs, `config/users/<id>/` (the user's own configs, ADR 0029), the audit log's counts,
   and backups.
 - *Mechanism*: a new run, not restating, holds the merged view with the text nulled for every changed
   partition (same keys, a run id that sorts after the recorders', committed together, ADR 0022); then
@@ -101,7 +101,8 @@ cut of this section had named the ingestion CLI). Both are a dry run unless
   commit that lands meanwhile is never lost; a run that was restating would hide a later commit with
   an older `ts`, which is why it is not. A crash between the commit and the purge leaves the old and the rewritten rows
   both readable until the next run, which first deletes the runs committed before the last retention
-  run (a dry run reports them), then plans on the clean view: no row is duplicated. After the purge the command checks that no planned run is on disk and no row
+  run (a dry run reports them), then plans on the clean view: no row is duplicated. That scan covers every partition of the
+  registered tables whichever command runs, so a later `retain` finishes an `erase` that crashed. After the purge the command checks that no planned run is on disk and no row
   still holds text, else it exits non-zero.
 - *Concurrency*: the command holds `feedback-writers` (`storage.locks`) from plan to purge and both
   recorders take it for each flush, so none commits in between; their queues absorb the wait and a

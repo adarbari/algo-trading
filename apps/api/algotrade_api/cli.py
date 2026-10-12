@@ -261,13 +261,17 @@ def feedback_run(args: argparse.Namespace, now: datetime | None = None) -> int:
         return 2
     at = now or datetime.now(UTC)
     backend = retention.open_backend(data_url())
+    params: dict[str, object] = {}
+
+    def audit(done: retention.Outcome) -> None:  # also for a run that failed half way
+        retention.append_audit(retention.AUDIT_LOG, retention.audit_record(done, at, params))
+
     try:
         if args.feedback_command == "retain":
-            done = retention.retain(backend, at, args.older_than_days, apply=args.yes)
-            params: dict[str, object] = {"older_than_days": args.older_than_days}
+            params = {"older_than_days": args.older_than_days}
+            done = retention.retain(backend, at, args.older_than_days, apply=args.yes, audit=audit)
         else:
-            done = retention.erase(backend, args.user, at, apply=args.yes)
-            params = {}
+            done = retention.erase(backend, args.user, at, apply=args.yes, audit=audit)
     except ConfigurationError as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
@@ -276,7 +280,6 @@ def feedback_run(args: argparse.Namespace, now: datetime | None = None) -> int:
         return 1
     print("\n".join(done.lines()))
     if done.applied:
-        retention.append_audit(retention.AUDIT_LOG, retention.audit_record(done, at, params))
         print(f"audit line: {retention.AUDIT_LOG}")
         print(f"reminder: {retention.BACKUP_REMINDER}")
     return 0

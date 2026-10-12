@@ -422,3 +422,60 @@ def test_an_erase_that_crashed_before_its_purge_is_finished_without_duplicating_
     assert done.rows() == 0 and done.superseded_runs >= 2
     assert len(events(backend)) == 4 and len(calls(backend)) == 4
     assert not events(backend)["user"].eq("abhi").any()
+
+
+def test_a_retain_finishes_the_purge_an_erase_crash_left_in_a_recent_partition(
+    backend: Backend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed(backend)  # the young partitions are not retain's to rewrite
+    real = backend.tables.purge_runs
+    monkeypatch.setattr(backend.tables, "purge_runs", lambda *a: (_ for _ in ()).throw(OSError()))
+    with pytest.raises(OSError):
+        retention.erase(backend, "abhi", NOW, apply=True)
+    monkeypatch.setattr(backend.tables, "purge_runs", real)
+    assert len(calls(backend)) == 6  # old and erased copies both read: cost counted twice
+    assert retention.retain(backend, NOW).to_purge > 0  # a dry run says so
+    retention.retain(backend, NOW, apply=True)
+    assert len(events(backend)) == 4 and len(calls(backend)) == 4
+    assert (
+        not events(backend)["user"].eq("abhi").any()
+        and (calls(backend)["sentence"] == SECRET).sum() == 1
+    )
+    assert retention.retain(backend, NOW).to_purge == 0
+
+
+def test_no_erased_row_keeps_a_time_of_day_in_any_column(backend: Backend) -> None:
+    seed(backend)
+    retention.erase(backend, "abhi", NOW, apply=True)
+    for frame in (events(backend), calls(backend)):
+        erased = frame[frame["user"].str.startswith("erased-")]
+        assert len(erased) == 2
+        for column in ("ts", "knowledge_ts"):
+            assert (erased[column] == erased[column].dt.floor("D")).all()
+        kept = frame[~frame["user"].str.startswith("erased-")]
+        assert (kept["knowledge_ts"] != kept["knowledge_ts"].dt.floor("D")).all()
+
+
+def test_a_run_that_fails_its_verification_is_still_audited(
+    backend: Backend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed(backend)
+    monkeypatch.setattr(backend.tables, "purge_runs", lambda *a: 0)
+    seen: list[retention.Outcome] = []
+    with pytest.raises(RuntimeError):
+        retention.retain(backend, NOW, apply=True, audit=seen.append)
+    assert len(seen) == 1 and seen[0].error == "RuntimeError" and seen[0].run_id
+    assert retention.audit_record(seen[0], NOW, {})["error"] == "RuntimeError"
+
+
+def test_close_does_not_wait_forever_on_a_full_queue(backend: Backend) -> None:
+    lock = backend.lock(retention.FEEDBACK_WRITERS)
+    assert lock.acquire()  # the writer thread is stuck behind a retention run
+    rec = FeedbackRecorder(FeedbackWriter(backend), maxsize=1, clock=lambda: OLD)
+    rec.submit(feedback_row(OLD, "abhi"))
+    rec.submit(feedback_row(OLD, "abhi"))  # taken by the thread, then queued
+    rec.submit(feedback_row(OLD, "abhi"))
+    started = datetime.now(UTC)
+    rec.close(timeout_s=0.3)
+    assert (datetime.now(UTC) - started).total_seconds() < 3
+    lock.release()

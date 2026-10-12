@@ -4,8 +4,10 @@ Two owner-run commands (``algotrade-api feedback retain | erase``) over the tabl
 ``PERSONAL`` (the registry: each table's personal-text columns and user column; a test fails
 when a ``feedback/*`` or ``usage/*`` table is added without an entry): today
 ``feedback/drafting_events`` (``sentence``, and the ``payload`` that holds the criteria
-snapshots), the failure rows of ``usage/llm_calls`` (``sentence``, ``answer``, ``error``) and
-``feedback/feature_requests`` (``span``; its ``ref`` key must never hold personal text).
+snapshots and, for ``edge_revised`` events, the edge document's free text: thesis, persistence
+reason, outcome, and its diff; edge events are never curated), the failure rows of
+``usage/llm_calls`` (``sentence``, ``answer``, ``error``) and ``feedback/feature_requests``
+(``span``; its ``ref`` key must never hold personal text).
 
 - **retain**: every row of a partition older than the window (by ``session_date``) loses that
   text, unless it was curated into the golden set: its ``event_id`` is a ``source_events`` (or
@@ -15,8 +17,8 @@ snapshots), the failure rows of ``usage/llm_calls`` (``sentence``, ``answer``, `
 - **erase**: every row of one user, any date, loses its text; its criteria (``payload``) go too
   unless the event is curated; ``user``, ``doc_id``, session and call ids and hashes become a
   fresh random token per row (erased rows join neither to a person nor to each other, and a key
-  holding the user never collides); ``ts`` is cut to the day. Event type, outcome, versions,
-  tokens and cost stay, so counts and the budget seed add up. ``knowledge_ts``, logs,
+  holding the user never collides); ``ts`` and ``knowledge_ts`` are cut to the day. Event
+  type, outcome, versions, tokens and cost stay, so counts and the budget seed add up. Logs,
   ``config/users/<id>/`` and backups stay: ADR 0066 lists what is manual.
 
 **Mechanism.** A rewrite is a new run, *not restating*, holding the merged view with the personal
@@ -84,7 +86,7 @@ class PersonalTable:
     criteria: tuple[str, ...] = ()  # the user's strategy: nulled, curated rows spared by both
     user: str = "user"  # the user column (erase matches it)
     tokenized: tuple[str, ...] = ()  # erase: a fresh random token per row (where not null)
-    rounded: tuple[str, ...] = ("ts",)  # erase: truncated to the day
+    rounded: tuple[str, ...] = ("ts", "knowledge_ts")  # erase: cut to the day
     safe: tuple[str, ...] = ()  # the other string columns: keys, enums, versions
     curated_by: str | None = None  # the column compared with the curated ids ...
     curated_kind: str = "events"  # ... "events" (event ids) or "calls" (call ids)
@@ -138,6 +140,7 @@ class Outcome:
     superseded_runs: int = 0  # old runs (files) deleted after the rewrite
     to_purge: int = 0  # old runs still on disk (a dry run: what --yes would delete)
     run_id: str | None = None
+    error: str | None = None  # the exception class of a run that failed after it started
 
     def rows(self, table: str | None = None) -> int:
         return sum(c.rows for c in self.changes if table in (None, c.table))
@@ -279,15 +282,23 @@ class _Part:
     runs: list[str]  # the committed runs now, oldest commit first
     frame: pd.DataFrame | None  # the rewritten view; None: nothing to change
 
-    def stale(self) -> list[str]:
-        """Runs a retention run already superseded and a crash left on disk: those committed
-        before the last retention run (by commit order, never by ``ts``)."""
-        last = max((i for i, r in enumerate(self.runs) if r.startswith(JOB)), default=-1)
-        return self.runs[:last]
-
     def doomed(self) -> list[str]:
         """What to delete once the rewrite committed: every run seen at plan time."""
-        return self.runs if self.frame is not None else self.stale()
+        return self.runs if self.frame is not None else []
+
+
+def _stale(backend: Backend) -> list[tuple[str, date, list[str]]]:
+    """Per partition of EVERY personal table, whatever the command, the runs a crashed retention
+    run left: those committed before its last run, which holds their rows already rewritten (an
+    erase changes keys, so until they go a read sees both versions)."""
+    found = []
+    for t in PERSONAL:
+        for day in backend.tables.dates(t.table):
+            runs = backend.tables.partition_runs(t.table, day)
+            last = max((i for i, r in enumerate(runs) if r.startswith(JOB)), default=-1)
+            if runs[:last]:
+                found.append((t.table, day, runs[:last]))
+    return found
 
 
 def _plan(backend: Backend, redactions: list[Redaction], outcome: Outcome) -> list[_Part]:
@@ -306,18 +317,25 @@ def _plan(backend: Backend, redactions: list[Redaction], outcome: Outcome) -> li
                 if rows:
                     outcome.changes.append(Change(redaction.table, day, rows))
                     rewritten = changed
-            part = _Part(redaction, day, runs, rewritten)
-            outcome.to_purge += len(part.stale())
-            parts.append(part)
+            parts.append(_Part(redaction, day, runs, rewritten))
     return parts
 
 
+Audit = Callable[[Outcome], None]
+
+
 def _run(
-    backend: Backend, command: str, redactions: list[Redaction], now: datetime, apply: bool
+    backend: Backend,
+    command: str,
+    redactions: list[Redaction],
+    now: datetime,
+    apply: bool,
+    audit: Audit | None = None,
 ) -> Outcome:
     outcome = Outcome(command, apply)
     if not apply:
         _plan(backend, redactions, outcome)
+        outcome.to_purge = sum(len(runs) for _, _, runs in _stale(backend))
         return outcome
     with held(backend.lock(LOCK), wait=False) as alone:
         if not alone:
@@ -328,33 +346,32 @@ def _run(
                     "a run has pending writes (a crashed run the store drops after its "
                     "retention): try again in a moment"
                 )
-            _finish_crashed(backend, redactions, outcome)
-            parts = _plan(backend, redactions, outcome)
-            outcome.to_purge = 0
-            changed = [p for p in parts if p.frame is not None]
-            if changed:
-                outcome.run_id = _rewrite(backend, changed, now)
-            for part in parts:
-                if part.doomed():
-                    outcome.superseded_runs += backend.tables.purge_runs(
-                        part.redaction.table, part.day, part.doomed()
-                    )
-            _verify(backend, parts, outcome.run_id)
+            try:  # a run that got this far is audited even when it fails
+                _finish_crashed(backend, outcome)
+                parts = _plan(backend, redactions, outcome)
+                changed = [p for p in parts if p.frame is not None]
+                if changed:
+                    outcome.run_id = _rewrite(backend, changed, now)
+                for part in parts:
+                    if part.doomed():
+                        outcome.superseded_runs += backend.tables.purge_runs(
+                            part.redaction.table, part.day, part.doomed()
+                        )
+                _verify(backend, parts, outcome.run_id)
+            except BaseException as exc:
+                outcome.error = type(exc).__name__
+                raise
+            finally:
+                if audit:
+                    audit(outcome)
     return outcome
 
 
-def _finish_crashed(backend: Backend, redactions: list[Redaction], outcome: Outcome) -> None:
-    """Before planning: delete the runs a crashed retention run left (committed before its last
-    run, which already holds their rows nulled), so the plan reads one clean view."""
-    for redaction in redactions:
-        for day in backend.tables.dates(redaction.table):
-            if redaction.wanted(day):
-                runs = backend.tables.partition_runs(redaction.table, day)
-                stale = _Part(redaction, day, runs, None).stale()
-                if stale:
-                    outcome.superseded_runs += backend.tables.purge_runs(
-                        redaction.table, day, stale
-                    )
+def _finish_crashed(backend: Backend, outcome: Outcome) -> None:
+    """Before planning: delete the runs a crashed retention run left, in every personal
+    partition, so the plan reads one clean view."""
+    for table, day, runs in _stale(backend):
+        outcome.superseded_runs += backend.tables.purge_runs(table, day, runs)
 
 
 def _rewrite(backend: Backend, changed: list[_Part], now: datetime) -> str:
@@ -394,11 +411,12 @@ def retain(
     older_than_days: int = RETAIN_DAYS,
     golden_cases: Path = GOLDEN_CASES,
     apply: bool = False,
+    audit: Audit | None = None,
 ) -> Outcome:
     """Null the text of rows older than ``older_than_days`` (exchange dates) but the curated."""
     cutoff = exchange_date(now) - timedelta(days=older_than_days)
     redactions = retain_redactions(cutoff, _curated(backend, golden_cases))
-    return _run(backend, "retain", redactions, now, apply)
+    return _run(backend, "retain", redactions, now, apply, audit)
 
 
 def _curated(backend: Backend, golden_cases: Path) -> dict[str, frozenset[str]]:
@@ -413,12 +431,13 @@ def erase(
     golden_cases: Path = GOLDEN_CASES,
     token: Callable[[], str] = _fresh,
     apply: bool = False,
+    audit: Audit | None = None,
 ) -> Outcome:
     """Remove ``user``'s personal data from every personal table (the skeleton stays)."""
     if not user or user.startswith(TOKEN):
         raise ConfigurationError("name the user to erase")
     redactions = erase_redactions(user, _curated(backend, golden_cases), token=token)
-    return _run(backend, "erase", redactions, now, apply)
+    return _run(backend, "erase", redactions, now, apply, audit)
 
 
 def audit_record(outcome: Outcome, now: datetime, params: Mapping[str, Any]) -> dict[str, Any]:
@@ -429,6 +448,7 @@ def audit_record(outcome: Outcome, now: datetime, params: Mapping[str, Any]) -> 
         "applied": outcome.applied,
         "params": dict(params),
         "run_id": outcome.run_id,
+        "error": outcome.error,
         "scanned": outcome.scanned,
         "partitions": len(outcome.changes),
         "rows": {t.table: outcome.rows(t.table) for t in PERSONAL},
