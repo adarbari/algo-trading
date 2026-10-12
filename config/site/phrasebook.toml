@@ -90,12 +90,16 @@ value = "DOWNTREND"
 
 [[phrase]]
 say = ["pullback", "dip in an uptrend", "buy the dip"]
-fields = ["feature.pullback_to_sma20"]
-hint = "pullback_to_sma20 eq true (an uptrend with the close within one ATR of SMA20)"
+fields = ["feature.pullback_to_sma20", "feature.trend_state"]
+hint = "pullback_to_sma20 eq true and trend_state eq UPTREND (a pullback is a dip inside an uptrend: the close within one ATR of SMA20)"
 [[phrase.criterion]]
 field = "feature.pullback_to_sma20"
 op = "eq"
 value = true
+[[phrase.criterion]]
+field = "feature.trend_state"
+op = "eq"
+value = "UPTREND"
 
 [[phrase]]
 say = ["breakout", "breaking out", "new 20-day high on volume"]

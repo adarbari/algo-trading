@@ -215,12 +215,14 @@ def record_returned(
     terms: Sequence[str] = (),
     formulas: Sequence[str] = (),
     parts: Sequence[Mapping[str, Any]] = (),
+    stage: str = "model",
 ) -> None:
     """``draft_returned`` (the model's criteria after validation, what it dropped and its
     notes) and the draft remembered for the save that follows, with the answer's unresolved
     ``terms`` and proposed ``formulas`` (the only subjects a later choice may name). ``parts``
     (``parts_payload``) go in the payload, clipped: the trader's words and the model's readings
-    of them are personal text, kept and nulled with the payload (ADR 0066)."""
+    of them are personal text, kept and nulled with the payload (ADR 0066). A draft the phrasebook
+    made with no model call (``stage`` ``phrasebook``) says so in the payload; it has no call id."""
     try:
         version = events.catalogue_version(list(feature_infos(features)))  # the caller's fields
         draft_hash = events.document_hash(document)
@@ -244,6 +246,8 @@ def record_returned(
         }
         if parts:
             payload["parts"] = events.bounded(list(parts), events.MAX_PART)
+        if stage != "model":
+            payload["stage"] = stage
         events.emit(
             sink, events.DRAFT_RETURNED, session_id, user, KIND, screener_id,
             call_ids=call_ids, catalogue_version=version, prompt_version=prompt_version,
