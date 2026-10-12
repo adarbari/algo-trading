@@ -229,3 +229,84 @@ def test_a_description_with_the_previous_session_id_stays_in_the_session(
     ]
     assert [r["seq"] for r in asked] == [1, 2]
     assert json.loads(asked[1]["payload"])["current_criteria"]["criteria"]["price"]["value"] == 9
+
+
+def _item(slug: str, span: str, feasibility: str) -> dict[str, Any]:
+    return {
+        "key": None, "new_key_slug": slug, "span": span, "description": f"{slug} described",
+        "why_needed": "no stored field holds it", "closest": [], "feasibility": feasibility,
+    }  # fmt: skip
+
+
+MISSING = [
+    _item("held_two_years_score", "held for two years", "ROLLUP_FROM_STORED"),
+    _item("short_squeeze_score", "a squeeze", "NEEDS_SOURCE"),
+]
+ASKED = "over $5, held for two years and a squeeze"
+
+
+def _asked(client: TestClient) -> Any:
+    return client.post("/screeners/my_screen/draft-from-text", json={"text": ASKED})
+
+
+def _with_requests(store: ReadStore, answer: Any, sink: Any, user: str = "u1") -> TestClient:
+    return TestClient(
+        create_app(
+            ApiSettings("memory://", "config"), store, text_model=Canned(answer),
+            authenticator=as_user(user), requests=sink,
+        )
+    )  # fmt: skip
+
+
+def test_a_draft_with_two_missing_items_writes_two_request_rows(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    body = _asked(_with_requests(api_golden[0], ANSWER | {"missing": MISSING}, sink)).json()
+    assert [r["ref"] for r in sink.rows] == ["held_two_years_score", "short_squeeze_score"]
+    assert {r["draft_session_id"] for r in sink.rows} == {body["draft_session_id"]}
+    assert sink.rows[0]["span"] == "held for two years" and sink.rows[0]["key"] is None
+    assert sink.rows[1]["new_slug"] == "short_squeeze_score"
+    assert len(body["missing"]) == 2
+
+
+def test_a_request_is_recorded_for_the_trader_whose_sentence_it_was(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    _asked(_with_requests(api_golden[0], ANSWER | {"missing": MISSING}, sink, user="trader_7"))
+    assert {r["user"] for r in sink.rows} == {"trader_7"}
+
+
+def test_a_draft_with_nothing_missing_records_no_request(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    assert _asked(_with_requests(api_golden[0], ANSWER, sink)).status_code == 200
+    assert sink.rows == []
+
+
+def test_a_raising_request_sink_still_returns_the_draft(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    class Raises:
+        def submit(self, row: Any) -> bool:
+            raise RuntimeError("full")
+
+    response = _asked(_with_requests(api_golden[0], ANSWER | {"missing": MISSING}, Raises()))
+    assert response.status_code == 200 and response.json()["draft_session_id"]
+
+
+def test_the_request_recorder_is_closed_at_shutdown(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    class Closing(Keep):
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    sink = Closing()
+    with _with_requests(api_golden[0], ANSWER, sink):
+        assert not sink.closed
+    assert sink.closed

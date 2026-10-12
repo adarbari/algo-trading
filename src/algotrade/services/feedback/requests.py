@@ -33,11 +33,16 @@ log = logging.getLogger(__name__)
 class MissingLike(Protocol):
     """What ``record_missing`` reads of an item (``drafting.gaps.MissingFeature`` has them)."""
 
-    key: str | None
-    new_key_slug: str | None
-    span: str
-    closest: tuple[str, ...]
-    feasibility: str
+    @property
+    def key(self) -> str | None: ...
+    @property
+    def new_key_slug(self) -> str | None: ...
+    @property
+    def span(self) -> str: ...
+    @property
+    def closest(self) -> tuple[str, ...]: ...
+    @property
+    def feasibility(self) -> str: ...
 
 
 def _fold(text: str) -> str:

@@ -60,7 +60,7 @@ from algotrade_api.auth.local import LocalAuthenticator
 from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
-from algotrade_api.feedback import DraftMemory, feedback_sink
+from algotrade_api.feedback import DraftMemory, feedback_sink, request_sink
 from algotrade_api.graphql.offload import OverloadedError
 from algotrade_api.graphql.response_cache import CountWrites, WriteEpoch, served_token
 from algotrade_api.graphql.schema import graphql_router, sdl
@@ -156,6 +156,7 @@ def create_app(
     authenticator: Authenticator | None = None,
     text_model: TextModel | None = None,
     feedback: FeedbackSink | None = None,
+    requests: FeedbackSink | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
@@ -166,7 +167,8 @@ def create_app(
     registry; ADR 0040). ``text_model``: the text model behind screener drafts (default: the
     one ``config/site/llm.toml`` enables when ``settings.live``, else off: a request answers
     503; ADR 0041). ``feedback``: where the Describe-it events go (default: the recorder of
-    ``feedback/drafting_events`` when ``settings.live``, else none; ADR 0066)."""
+    ``feedback/drafting_events`` when ``settings.live``, else none; ADR 0066). ``requests``: the
+    same for the missing-feature request log (``feedback/feature_requests``)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -176,7 +178,9 @@ def create_app(
         if warming is not None:
             await _stop(warming)
         app.state.live.close()
-        _flush(app.state.text_model, app.state.feedback)  # the queued usage rows, feedback events
+        _flush(  # the queued usage rows, feedback events, feature requests
+            app.state.text_model, app.state.feedback, app.state.requests
+        )
         for runner in (app.state.ondemand, app.state.ondemand_edges):
             if runner is not None:
                 runner.close()
@@ -218,7 +222,10 @@ def create_app(
     if text_model is None and settings.live:
         text_model, text_model_off = open_text_model(app.state.store.configs, settings.data_url)
     app.state.text_model, app.state.text_model_off = text_model, text_model_off
-    app.state.feedback = feedback_sink(feedback, settings.live, settings.data_url)  # ADR 0066
+    app.state.feedback, app.state.requests = (  # ADR 0066: the events, the feature requests
+        feedback_sink(feedback, settings.live, settings.data_url),
+        request_sink(requests, settings.live, settings.data_url),
+    )
     app.state.drafts = DraftMemory()
     app.state.explain_cache = open_text_cache(settings.data_url)  # ADR 0041 (amended): derived
     app.state.explain_limiter = RateLimiter()
