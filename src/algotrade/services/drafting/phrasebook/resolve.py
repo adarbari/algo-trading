@@ -3,8 +3,12 @@ what it means without the model. ``structured_matches`` returns every structured
 sentence says (``retrieval.phrase_matches``); ``resolves_fully`` returns the criteria only when
 the structured entries claim every content word of the sentence (a number, an unknown word or a
 free-text entry's word leaves a gap), no matched entry is ambiguous (alternatives) and no two
-criteria disagree; else ``None`` and the model answers. Longest wording first, so "breaking out
-to highs" is not also "breaking out". Not wired into ``draft_screen`` yet."""
+criteria disagree (the same field read twice, or two that can never both hold:
+``consistency.compatible``); else ``None`` and the model answers. A word that flips or splits a
+meaning (negation, a comparative, "or") is never filler: it is a gap unless a structured wording
+covers that very word, so "uptrend stocks without earnings this week" goes to the model.
+Longest wording first, so "breaking out to highs" is not also "breaking out".
+Not wired into ``draft_screen`` yet."""
 
 import re
 from collections.abc import Sequence
@@ -12,9 +16,20 @@ from dataclasses import dataclass
 from typing import Any
 
 from algotrade.config.site.llm import Phrase
+from algotrade.services.drafting.phrasebook.consistency import compatible
 from algotrade.services.drafting.retrieval import STOP_WORDS, phrase_matches, stem
 
 _WORD = re.compile(r"[a-z0-9]+")
+# Words that change what a sentence asks: retrieval skips them as filler, resolving must not.
+MEANING_WORDS = frozenset(
+    [
+        *("without", "no", "not", "never", "except", "excluding", "exclude", "non", "but", "nor"),
+        *("less", "more", "least", "most", "fewer", "higher", "lower", "than", "or", "over"),
+        *("under", "above", "below", "neither", "either", "versus", "vs"),
+    ]
+)
+_MEANING = frozenset(stem(w) for w in MEANING_WORDS) | MEANING_WORDS
+FILLER = frozenset(w for w in STOP_WORDS if w not in _MEANING)
 
 
 def is_structured(phrase: Phrase) -> bool:
@@ -54,7 +69,8 @@ def _cover(tokens: list[str], phrasebook: Sequence[Phrase]) -> tuple[list[bool],
 
 
 def _merged(phrases: Sequence[Phrase]) -> tuple[dict[str, Any], ...] | None:
-    """The entries' criteria once each, ``None`` when two read one field and op differently."""
+    """The entries' criteria once each, ``None`` when two read one field and op differently or
+    no value can satisfy them all."""
     out: list[dict[str, Any]] = []
     seen: dict[tuple[str, str], dict[str, Any]] = {}
     for phrase in phrases:
@@ -66,7 +82,7 @@ def _merged(phrases: Sequence[Phrase]) -> tuple[dict[str, Any], ...] | None:
                 out.append(answer)
             elif seen[key] != answer:
                 return None
-    return tuple(out)
+    return tuple(out) if compatible(out) else None
 
 
 def resolves_fully(
@@ -76,7 +92,7 @@ def resolves_fully(
     structured entries with exact thresholds cover every content word of it, else ``None``."""
     tokens = [stem(w) for w in _WORD.findall(sentence.lower())]
     taken, chosen = _cover(tokens, phrasebook)
-    gap = any(not t and w not in STOP_WORDS for t, w in zip(taken, tokens, strict=True))
+    gap = any(not t and w not in FILLER for t, w in zip(taken, tokens, strict=True))
     if not chosen or gap or any(p.alternatives for p in chosen):  # alternatives: ask
         return None
     return _merged(chosen)

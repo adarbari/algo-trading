@@ -2,8 +2,11 @@
 loader cannot do (``config/site/drafting/criteria.py`` has no catalogue). A criterion's field
 must be a catalogue field, its op must fit the field's type (a number op on a number, ``eq`` /
 ``in`` on text or a category with its values among the field's categories, ``eq`` / ``ne`` on a
-boolean with a boolean), and it must pass the answer's own criterion check
-(``answer_schema.check_criterion``), the one definition of a criterion the model's answers use."""
+boolean with a boolean), a number's magnitude must fit the field's unit (a fraction field, unit
+``decimal``, takes no value over 1.5; a percentage-points field takes no value of 1 or less
+when the entry's text says a percent) and its declared range, and it must pass the answer's
+own criterion check (``answer_schema.check_criterion``), the one definition of a criterion the
+model's answers use."""
 
 from collections.abc import Collection, Mapping
 
@@ -20,8 +23,14 @@ def phrase_criteria(phrase: Phrase) -> tuple[PhraseCriterion, ...]:
     return phrase.criteria or tuple(a.criterion for a in phrase.alternatives)
 
 
-def criterion_problem(criterion: PhraseCriterion, infos: Mapping[str, FeatureInfo]) -> str | None:
-    """Why ``criterion`` cannot be used over this catalogue, else ``None``."""
+FRACTION_MAX = 1.5  # a fraction above this is a percentage written as a number (25, not 0.25)
+
+
+def criterion_problem(
+    criterion: PhraseCriterion, infos: Mapping[str, FeatureInfo], text: str = ""
+) -> str | None:
+    """Why ``criterion`` cannot be used over this catalogue, else ``None``. ``text`` is the
+    entry's hint, read only for a percent sign (a percentage-points field with a small value)."""
     info = infos.get(criterion.field)
     if info is None:
         return f"{criterion.field}: not in the catalogue"
@@ -29,7 +38,25 @@ def criterion_problem(criterion: PhraseCriterion, infos: Mapping[str, FeatureInf
         return f"{criterion.field}: {shape}"
     if criterion.op in NO_VALUE_OPS:
         return None
-    return _type_problem(criterion, info)
+    return _type_problem(criterion, info) or _magnitude_problem(criterion, info, text)
+
+
+def _magnitude_problem(criterion: PhraseCriterion, info: FeatureInfo, text: str) -> str | None:
+    """A number the field's unit or range makes impossible; ``None`` for a non-number."""
+    if info.dtype not in NUMERIC_TYPES:
+        return None
+    value, name = criterion.value, criterion.field
+    raw = value if isinstance(value, tuple) else (value,)
+    members = [float(m) for m in raw if isinstance(m, int | float) and not isinstance(m, bool)]
+    low, high = info.range or (None, None)
+    for m in members:
+        if (low is not None and m < low) or (high is not None and m > high):
+            return f"{name}: {m!r} is outside the field's range {info.range}"
+        if info.unit == "decimal" and abs(m) > FRACTION_MAX:
+            return f"{name}: {m!r} is not a fraction (0.25 reads 25%)"
+        if info.unit == "pct_points" and 0 < abs(m) <= 1 and "%" in text:
+            return f"{name}: {m!r} is a fraction, but the field is in percentage points"
+    return None
 
 
 def _type_problem(criterion: PhraseCriterion, info: FeatureInfo) -> str | None:
@@ -60,6 +87,6 @@ def problems(phrases: Collection[Phrase], infos: Mapping[str, FeatureInfo]) -> l
     found: list[str] = []
     for phrase in phrases:
         for criterion in phrase_criteria(phrase):
-            if (why := criterion_problem(criterion, infos)) is not None:
+            if (why := criterion_problem(criterion, infos, phrase.hint)) is not None:
                 found.append(f"{phrase.say[0]}: {why}")
     return found
