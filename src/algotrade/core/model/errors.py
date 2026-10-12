@@ -52,6 +52,17 @@ class RateLimitedError(AlgoTradeError):
         super().__init__(f"{what}: too many requests, try again in {retry_after_s} s")
 
 
+class DailyLimitError(AlgoTradeError):
+    """A user used up what they may ask of a model in one day (the per-user daily cap, ADR 0041
+    amended 2026-10-12: part re-drafts). Unlike ``RateLimitedError`` (slow down, try in a
+    minute) it will not clear until the exchange day turns: the API answers 429 with ``code``
+    (what the web keys its "limit reached" state on), the ``limit`` and ``retry_after_s``."""
+
+    def __init__(self, what: str, code: str, limit: int, retry_after_s: int) -> None:
+        self.code, self.limit, self.retry_after_s = code, limit, retry_after_s
+        super().__init__(f"{what}: the daily limit of {limit} is reached, try again tomorrow")
+
+
 class PermissionDeniedError(AlgoTradeError):
     """The caller may not do this (ADR 0040): an ops read for a trader, or another user's job.
     The API answers 403 (REST) or ``FORBIDDEN`` (GraphQL)."""

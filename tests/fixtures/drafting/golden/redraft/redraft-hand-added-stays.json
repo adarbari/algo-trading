@@ -1,0 +1,177 @@
+{
+  "id": "redraft-hand-added-stays",
+  "about": "a criterion the trader added by hand belongs to no part: it stays, in the kept part, whichever part is retyped",
+  "sentence": "stocks over $10 and IV rank above 60%",
+  "prior": {
+    "criteria": [
+      {
+        "id": "active",
+        "field": "instrument.status",
+        "op": "eq",
+        "value": "ACTIVE",
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "stocks",
+        "field": "instrument.security_type",
+        "op": "in",
+        "value": [
+          "COMMON_STOCK",
+          "ADR"
+        ],
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "price",
+        "field": "rollup.price_stats@v2.close",
+        "op": "gt",
+        "value": 10,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p2"
+      },
+      {
+        "id": "iv_rank",
+        "field": "feature.iv_rank",
+        "op": "gte",
+        "value": 0.6,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p3"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": null,
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "stocks",
+        "reading": "Active stocks and ADRs"
+      },
+      {
+        "id": "p2",
+        "words": "over $10",
+        "reading": "Price above $10"
+      },
+      {
+        "id": "p3",
+        "words": "IV rank above 60%",
+        "reading": "IV rank of 60% or more"
+      }
+    ]
+  },
+  "hand_added": {
+    "optionable": {
+      "field": "instrument.optionable",
+      "op": "eq",
+      "value": true
+    }
+  },
+  "retype": {
+    "part_id": "p3",
+    "new_words": "IV rank above 70%"
+  },
+  "answer": {
+    "criteria": [
+      {
+        "id": "iv_rank",
+        "field": "feature.iv_rank",
+        "op": "gte",
+        "value": 0.7,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": null,
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "IV rank above 70%",
+        "reading": "IV rank of 70% or more"
+      }
+    ]
+  },
+  "expect": {
+    "sentence": "stocks over $10 and IV rank above 70%",
+    "criteria": [
+      [
+        "instrument.status",
+        "eq",
+        "ACTIVE"
+      ],
+      [
+        "instrument.security_type",
+        "in",
+        [
+          "COMMON_STOCK",
+          "ADR"
+        ]
+      ],
+      [
+        "rollup.price_stats@v2.close",
+        "gt",
+        10
+      ],
+      [
+        "feature.iv_rank",
+        "gte",
+        0.7
+      ],
+      [
+        "instrument.optionable",
+        "eq",
+        true
+      ]
+    ],
+    "parts": [
+      {
+        "id": "p1",
+        "kind": "applied"
+      },
+      {
+        "id": "p2",
+        "kind": "applied"
+      },
+      {
+        "id": "p3",
+        "kind": "applied",
+        "reading": "model"
+      },
+      {
+        "id": "kept",
+        "kind": "applied",
+        "origin": "kept",
+        "words": ""
+      }
+    ],
+    "dropped": [],
+    "unchanged": [
+      "p1",
+      "p2"
+    ]
+  }
+}

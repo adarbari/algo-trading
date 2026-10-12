@@ -1,0 +1,177 @@
+{
+  "id": "redraft-number-changed",
+  "about": "one number in one part changes: the part's row is replaced, every other part is as it was",
+  "sentence": "optionable stocks with IV rank above 50% and price over $20",
+  "prior": {
+    "criteria": [
+      {
+        "id": "active",
+        "field": "instrument.status",
+        "op": "eq",
+        "value": "ACTIVE",
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "stocks",
+        "field": "instrument.security_type",
+        "op": "in",
+        "value": [
+          "COMMON_STOCK",
+          "ADR"
+        ],
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "optionable",
+        "field": "instrument.optionable",
+        "op": "eq",
+        "value": true,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "iv_rank",
+        "field": "feature.iv_rank",
+        "op": "gte",
+        "value": 0.5,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p2"
+      },
+      {
+        "id": "price",
+        "field": "rollup.price_stats@v2.close",
+        "op": "gt",
+        "value": 20,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p3"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": null,
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "optionable stocks",
+        "reading": "Active optionable stocks"
+      },
+      {
+        "id": "p2",
+        "words": "IV rank above 50%",
+        "reading": "IV rank of 50% or more"
+      },
+      {
+        "id": "p3",
+        "words": "price over $20",
+        "reading": "Price above $20"
+      }
+    ]
+  },
+  "retype": {
+    "part_id": "p3",
+    "new_words": "price over $35"
+  },
+  "answer": {
+    "criteria": [
+      {
+        "id": "price",
+        "field": "rollup.price_stats@v2.close",
+        "op": "gt",
+        "value": 35,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": null,
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "price over $35",
+        "reading": "Price above $35"
+      }
+    ]
+  },
+  "expect": {
+    "sentence": "optionable stocks with IV rank above 50% and price over $35",
+    "criteria": [
+      [
+        "instrument.status",
+        "eq",
+        "ACTIVE"
+      ],
+      [
+        "instrument.security_type",
+        "in",
+        [
+          "COMMON_STOCK",
+          "ADR"
+        ]
+      ],
+      [
+        "instrument.optionable",
+        "eq",
+        true
+      ],
+      [
+        "feature.iv_rank",
+        "gte",
+        0.5
+      ],
+      [
+        "rollup.price_stats@v2.close",
+        "gt",
+        35
+      ]
+    ],
+    "parts": [
+      {
+        "id": "p1",
+        "kind": "applied"
+      },
+      {
+        "id": "p2",
+        "kind": "applied"
+      },
+      {
+        "id": "p3",
+        "words": "price over $35",
+        "kind": "applied",
+        "origin": "words",
+        "reading": "model"
+      }
+    ],
+    "dropped": [],
+    "unchanged": [
+      "p1",
+      "p2"
+    ]
+  }
+}

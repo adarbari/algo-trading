@@ -4,15 +4,37 @@ over the caller's catalogue (the document, what was dropped and why, the model's
 previous one, so the descriptions of one screen are one session). An empty or over-long
 sentence: 400; the model off or not answering: 503. The feedback events of the draft are recorded
 in the background (ADR 0066), and so are its missing-feature requests (the span, never the
-sentence); neither ever fails the request."""
+sentence); neither ever fails the request.
+
+``POST /screeners/{screener_id}/draft-part`` (ADR 0041, amended 2026-10-12): the trader retypes the
+words of one explained part; one scoped model call re-drafts that part and the answer is merged
+into the draft the browser sent (all of it re-validated; nothing is saved). The same two feedback
+events are recorded with ``scope`` ``part`` in the payload, and the request log gets only the
+re-drafted part's missing items. A request that fails a check: 400; at the user's daily limit
+(``[limits] part_redrafts_per_day``, counted from the usage log): 429, ``LimitReached``."""
 
 from fastapi import APIRouter
 
 from algotrade.services.drafting import screens
 from algotrade.services.drafting.prompt import PROMPT_VERSION
+from algotrade.services.drafting.redraft.request import check_request
+from algotrade.services.drafting.redraft.run import redraft_part
 from algotrade_api import feedback
-from algotrade_api.deps import Context, Drafts, Feedback, Requests, TextModelDep
-from algotrade_api.schemas.drafting.screeners import DraftFromTextBody, ScreenDraft
+from algotrade_api.deps import (
+    Context,
+    Drafts,
+    Feedback,
+    PartCap,
+    Requests,
+    TextModelDep,
+)
+from algotrade_api.schemas.drafting.screeners import (
+    DraftFromTextBody,
+    DraftPartBody,
+    DraftPartResult,
+    LimitReached,
+    ScreenDraft,
+)
 
 router = APIRouter(prefix="/screeners", tags=["screeners"])
 
@@ -44,3 +66,38 @@ def draft_from_text(
         requests, user, result.missing, body.text, result.call_id, session_id
     )  # what the sentence asks and no field answers
     return ScreenDraft.model_validate(result).model_copy(update={"draft_session_id": session_id})
+
+
+@router.post("/{screener_id}/draft-part", responses={429: {"model": LimitReached}})
+def draft_part(
+    ctx: Context,
+    model: TextModelDep,
+    sink: Feedback,
+    requests: Requests,
+    drafts: Drafts,
+    cap: PartCap,
+    screener_id: str,
+    body: DraftPartBody,
+) -> DraftPartResult:
+    user = ctx.user.user_id
+    request = check_request(screener_id, body.model_dump())  # 400 before anything is counted
+    note = feedback.part_note(request.part.id, request.old_words, request.new_words)
+    with cap.slot(user) as slot:  # 429 at the daily limit, before the model is asked
+        session_id, seq = feedback.record_requested(
+            sink, drafts, user, screener_id, request.merged, body.document,
+            body.draft_session_id, note,
+        )  # fmt: skip
+        done = redraft_part(ctx, model, request, slot.note)
+    draft = done.draft
+    feedback.record_returned(
+        sink, drafts, session_id, user, screener_id, draft.sentence, draft.document,
+        [{"id": d.id, "field": d.field, "reason": d.reason} for d in draft.dropped],
+        (draft.call_id,) if draft.call_id else (), ctx.features, PROMPT_VERSION, seq, draft.notes,
+        [u.term for u in draft.unresolved], [f.name for f in draft.formulas],
+        feedback.parts_payload(draft.parts), note,
+    )  # fmt: skip
+    feedback.record_requests(
+        requests, user, done.missing, draft.sentence, draft.call_id, session_id
+    )  # only the re-drafted part's: the others' were recorded when they were asked
+    served = ScreenDraft.model_validate(draft).model_copy(update={"draft_session_id": session_id})
+    return DraftPartResult(draft=served, replaced_part_id=done.replaced_part_id)

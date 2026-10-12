@@ -496,10 +496,12 @@ def slice_for(
     phrasebook: Iterable[Phrase] = (),
     guide: FieldGuideSettings | None = None,
     open_keys: Iterable[tuple[str, str]] = (),
+    slice_tokens: int | None = None,
 ) -> Slice:
     """The slice ``sliced_system_prompt`` renders for ``sentence``: ``select_slice`` under the
     token budget left once everything else in the prompt (task, examples, index, open keys, the
-    matched phrasebook entries, the caller's own features) is counted. The plan is checked against
+    matched phrasebook entries, the caller's own features) is counted, and under ``slice_tokens``
+    when given (the small slice of one part's re-draft). The plan is checked against
     the rendered prompt and tightened until the whole fits ``PROMPT_BUDGET_TOKENS`` (or only the
     phrasebook and core fields remain)."""
     infos, book, keys = list(catalogue), tuple(phrasebook), tuple(open_keys)
@@ -508,6 +510,8 @@ def slice_for(
     bare = Slice((), frozenset(), matched)
     room = PROMPT_BUDGET_TOKENS - SECTION_TOKENS
     room -= _tokens(_render(infos, sentence, bare, guide, keys))
+    if slice_tokens is not None:
+        room = min(room, slice_tokens)
     chosen = select_slice(sentence, infos, book, guide, room, weigh)
     if _tokens(_render(infos, sentence, chosen, guide, keys)) > PROMPT_BUDGET_TOKENS:
         # the weigher counts a field's own lines, not the situations it brings: find by halving
@@ -533,14 +537,16 @@ def sliced_system_prompt(
     phrasebook: Iterable[Phrase] = (),
     guide: FieldGuideSettings | None = None,
     open_keys: Iterable[tuple[str, str]] = (),
+    slice_tokens: int | None = None,
 ) -> str:
     """The prompt for one sentence (ADR 0041, plan "Token and latency budget"): ``prefix_text``
     (byte-identical across sentences), then the slice ``slice_for`` picks (catalogue lines,
     trimmed guide entries, the phrasebook entries the sentence says, the situations over the
     slice), then the caller's own features in full (``scope != "site"``, sorted; most users have
-    none). The sentence itself is in the user prompt."""
+    none). The sentence itself is in the user prompt. ``slice_tokens`` caps the slice (a part's
+    re-draft sends the same prefix and a small one, ``services/drafting/redraft``)."""
     infos, keys = list(catalogue), tuple(open_keys)
-    chosen = slice_for(infos, sentence, phrasebook, guide, keys)
+    chosen = slice_for(infos, sentence, phrasebook, guide, keys, slice_tokens)
     return _render(infos, sentence, chosen, guide, keys)
 
 

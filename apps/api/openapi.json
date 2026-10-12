@@ -513,6 +513,170 @@
         "title": "DraftFromTextBody",
         "type": "object"
       },
+      "DraftPartBody": {
+        "description": "The draft the browser holds, and which part's words to retype. Nothing in it is trusted:\nthe server re-checks every part's words against the sentence and every id against the items\n(``services.drafting.redraft.request``); a failed check is a 400.",
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "description": "the Builder's current document: the trader's edits included",
+            "title": "Document",
+            "type": "object"
+          },
+          "draft_session_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the id of the draft being worked on (ADR 0066), so the re-draft is an event of the same session; an unknown or foreign id starts a new one",
+            "title": "Draft Session Id"
+          },
+          "dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedCriterion"
+            },
+            "maxItems": 40,
+            "title": "Dropped",
+            "type": "array"
+          },
+          "formulas": {
+            "items": {
+              "$ref": "#/components/schemas/DraftFormula"
+            },
+            "maxItems": 40,
+            "title": "Formulas",
+            "type": "array"
+          },
+          "formulas_dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedFormula"
+            },
+            "maxItems": 40,
+            "title": "Formulas Dropped",
+            "type": "array"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/MissingFeature"
+            },
+            "maxItems": 40,
+            "title": "Missing",
+            "type": "array"
+          },
+          "new_words": {
+            "description": "what the part's words become",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "New Words",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Notes",
+            "type": "array"
+          },
+          "part_id": {
+            "description": "the part whose words are retyped",
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Part Id",
+            "type": "string"
+          },
+          "parts": {
+            "description": "the draft's `parts`",
+            "items": {
+              "$ref": "#/components/schemas/Part"
+            },
+            "maxItems": 14,
+            "title": "Parts",
+            "type": "array"
+          },
+          "sentence": {
+            "description": "the draft's `sentence`, as served",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Sentence",
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            },
+            "maxItems": 40,
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "suggestions_dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedSuggestion"
+            },
+            "maxItems": 40,
+            "title": "Suggestions Dropped",
+            "type": "array"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/Unresolved"
+            },
+            "maxItems": 40,
+            "title": "Unresolved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sentence",
+          "document",
+          "parts",
+          "part_id",
+          "new_words"
+        ],
+        "title": "DraftPartBody",
+        "type": "object"
+      },
+      "DraftPartResult": {
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ScreenDraft",
+            "description": "the whole draft with the part re-drafted and every other part as it was; the browser replaces its draft with it (`sentence` has the new words in place)"
+          },
+          "replaced_part_id": {
+            "description": "the part that was re-drafted",
+            "title": "Replaced Part Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft",
+          "replaced_part_id"
+        ],
+        "title": "DraftPartResult",
+        "type": "object"
+      },
+      "DraftSampleValue": {
+        "properties": {
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "value"
+        ],
+        "title": "DraftSampleValue",
+        "type": "object"
+      },
       "DroppedCriterion": {
         "properties": {
           "field": {
@@ -824,7 +988,7 @@
           },
           "sample": {
             "items": {
-              "$ref": "#/components/schemas/algotrade_api__schemas__preview__features__SampleValue"
+              "$ref": "#/components/schemas/SampleValue"
             },
             "title": "Sample",
             "type": "array"
@@ -975,7 +1139,7 @@
           },
           "sample": {
             "items": {
-              "$ref": "#/components/schemas/algotrade_api__schemas__drafting__screeners__SampleValue"
+              "$ref": "#/components/schemas/DraftSampleValue"
             },
             "title": "Sample",
             "type": "array"
@@ -1243,6 +1407,38 @@
           "error"
         ],
         "title": "JobStatus",
+        "type": "object"
+      },
+      "LimitReached": {
+        "description": "The 429 of a user at their daily limit of part re-drafts (not a rate limit: it clears\nwhen the exchange day turns).",
+        "properties": {
+          "code": {
+            "const": "part_redraft_limit",
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "limit": {
+            "description": "part re-drafts a user may ask per exchange day",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "retry_after_s": {
+            "description": "seconds until the exchange day turns",
+            "title": "Retry After S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "detail",
+          "code",
+          "limit",
+          "retry_after_s"
+        ],
+        "title": "LimitReached",
         "type": "object"
       },
       "LiveOptionChain": {
@@ -2207,6 +2403,40 @@
         "title": "RunRequest",
         "type": "object"
       },
+      "SampleValue": {
+        "properties": {
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "value"
+        ],
+        "title": "SampleValue",
+        "type": "object"
+      },
       "SaveEdgeBody": {
         "properties": {
           "document": {
@@ -2969,57 +3199,6 @@
           "names"
         ],
         "title": "ViewNames",
-        "type": "object"
-      },
-      "algotrade_api__schemas__drafting__screeners__SampleValue": {
-        "properties": {
-          "instrument_id": {
-            "title": "Instrument Id",
-            "type": "string"
-          },
-          "value": {
-            "title": "Value"
-          }
-        },
-        "required": [
-          "instrument_id",
-          "value"
-        ],
-        "title": "SampleValue",
-        "type": "object"
-      },
-      "algotrade_api__schemas__preview__features__SampleValue": {
-        "properties": {
-          "instrument_id": {
-            "title": "Instrument Id",
-            "type": "string"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          }
-        },
-        "required": [
-          "instrument_id",
-          "value"
-        ],
-        "title": "SampleValue",
         "type": "object"
       }
     }
@@ -4283,6 +4462,68 @@
           }
         },
         "summary": "Draft From Text",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/draft-part": {
+      "post": {
+        "operationId": "draft_part_screeners__screener_id__draft_part_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftPartBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftPartResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitReached"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "summary": "Draft Part",
         "tags": [
           "screeners"
         ]

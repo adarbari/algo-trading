@@ -372,6 +372,67 @@ derives nothing (ADR 0038) and a model's copy of the trader's words is not the t
   the parts not understood; the live run reports the share of items the model placed itself, of its
   parts located, the parts not understood and the share of readings that kept their numbers.
 
+## Amended 2026-10-12: re-draft one part (scoped call, merge, daily cap)
+
+Owner decisions 2026-10-11 (`docs/decisions/log.md`, "Fixing one part", "Cost control type", "Daily cap number"):
+a trader fixes one explained part by picking another reading or editing its rows (no model call), or by
+retyping just that part's words, which re-drafts only that part. This is the second.
+
+- **Route.** `POST /screeners/{id}/draft-part`: a preview-style POST that writes no config (ADR 0037 decision 4;
+  no GET, so the allow-list is unchanged). The body is the draft the browser holds (`sentence`, `parts`, `document`
+  the Builder's current one with the trader's edits, and the items the parts point at: `dropped`, `notes`,
+  `formulas`, `formulas_dropped`, `missing`, `unresolved`, `suggestions`, `suggestions_dropped`), the `part_id` and
+  `new_words` (at most 200 characters), and the optional `draft_session_id`. The answer is `{draft, replaced_part_id}`:
+  the whole merged `ScreenDraft`, which the browser swaps in. The body carries the whole draft (not only the
+  parts) because the answer must carry the other parts' pending formulas, readings to choose, requests and
+  checks, which the server keeps nowhere (the draft memory is per process and the API restarts at every deploy).
+- **Nothing sent is trusted** (`services/drafting/redraft/request.py`, a 400 before anything is asked or
+  counted): the sentence is normalised as a description is; each part's `words` is the sentence's own slice at its
+  UTF-16 offsets (in order, not overlapping; an offset inside a character is refused); ids are unique; every id a part
+  names is an item the draft holds (a criterion the trader deleted from the document since is only dropped from the
+  part) and belongs to one part (a missing request may be named by two); the part retyped has words of its own (not
+  the `kept` / `unplaced` catch-alls; a `not_understood` gap may be retyped); the sentence with the new words in
+  place is at most 1,000 characters. `kind` is decided again, never read.
+- **Scoped prompt** (`redraft/prompt.py`): the same system prefix as the whole draft's (task, examples, field index,
+  byte for byte, so the provider's cache hits), a slice retrieved for the new words alone and capped at 1,200 tokens,
+  the matched phrasebook entries and open keys; the user prompt asks for the same JSON with one part and lists the
+  other parts' criteria as at most 24 fixed rows of at most 110 characters. Everything after the prefix is under 4,000
+  tokens for every golden sentence as the new words, with a trader's own features and padded keys (a test); the answer
+  is the draft's shape for one part, short (a line of reading, no notes unless a word could not be mapped). The call
+  is tagged use case `screener-draft-part` with the shared `PROMPT_VERSION`, so the usage log, the cost and the budget
+  count it as they count a draft. It goes through the same asking path (`screens.ask_for_draft`: answer schema,
+  validation as `accept`, one repair, next provider).
+- **Merge** (`redraft/merge.py`): the part's own criteria (the ids it names) are replaced as a whole, with its dropped
+  criteria, formulas, readings to choose, requests, suggestions and tie-break. The other parts win: a new criterion on
+  the same field and operator as a criterion of another part (or one the trader added by hand) is dropped with the
+  reason "set by another part" (kind `other_part`); a suggestion that repeats or rewrites one of those thresholds is
+  not offered; a formula or term another part offers is not offered twice; the document's tie-break stays when another
+  part owns it. What the document holds that no part names (added by hand) is the `kept` part. Ids stay unique (a new
+  criterion, dropped criterion or suggestion that takes a held id is renamed). The document is validated as finalise
+  does: a new criterion the validator refuses is dropped with its message; one of the trader's own that it refuses is a
+  400 (the merge never drops what the trader has). The new part's reading is the model's only when nothing it described
+  was dropped by the merge. The other parts keep their ids, words and readings; the offsets of the words after the new
+  ones move (UTF-16 units, tested with an accent and an emoji). Hand edits of the retyped part are replaced; the web
+  asks first (the owner's decision).
+- **Daily cap** (`redraft/cap.py`, `llm.toml` `[limits] part_redrafts_per_day`, default 30, 0 turns it off): per user
+  per exchange calendar day, **counted from the usage log**, not from a counter a restart resets: the calls of use case
+  `screener-draft-part` of that user on that day (`data.usage.calls_of`, one per call id, a failed call counts, a
+  budget-skipped attempt does not). The recorder writes in the background, so this process also remembers the calls it
+  made and is making and counts the union (a call is counted once when it reaches the log); admission is under a lock,
+  so requests that arrive together cannot all pass the last place. One API process is assumed, as the usage ledger
+  does (ADR 0058). A count that cannot be read fails closed (503). At the limit: `DailyLimitError`, HTTP 429 with
+  `{detail, code: "part_redraft_limit", limit, retry_after_s}` and `Retry-After` (seconds to the exchange day turning),
+  which the web shows its "limit reached" state on; the model is not asked and no feedback event is recorded. The
+  limit is read for each request. It is a count of calls, not of dollars: `[budget]` still caps the spend.
+- **Feedback** (ADR 0066, amended 2026-10-12): `draft_requested` / `draft_returned` with `scope` `part`, `part_id`,
+  `old_words`, `new_words` in the payload; the request log gets only the re-drafted part's missing items.
+- **Golden**: four recorded cases (`tests/fixtures/drafting/golden/redraft/`: a number changed, the other part
+  wins, a hand-added row stays, a vague word made exact), replayed through the real `draft_screen` and
+  `redraft_part`; never the text of a reading.
+- **Not decided here**: the web states (limit reached, confirmation before replacing hand-edited rows) are the web PR's.
+  Notes and the dropped formulas / suggestions of the replaced words stay in the merged draft (they have no part to go
+  with).
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.
