@@ -43,4 +43,9 @@ describe('Input', () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  it('limits the text to maxLength characters', () => {
+    render(<Input aria-label="Words" maxLength={200} />);
+    expect(screen.getByLabelText('Words')).toHaveAttribute('maxlength', '200');
+  });
 });

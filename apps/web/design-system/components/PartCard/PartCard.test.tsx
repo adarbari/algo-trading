@@ -246,4 +246,35 @@ describe('PartCard', () => {
     expect(screen.getAllByText('Redrafting this part')).toHaveLength(2);
     expect(screen.getAllByRole('status')).toHaveLength(1);
   });
+
+  it('names the card by its heading, not a second copy of the text', () => {
+    render(<PartCard {...props} />);
+    const card = screen.getByRole('article');
+    expect(card).not.toHaveAttribute('aria-label');
+    expect(card).toHaveAccessibleName('stocks over $5');
+    expect(card.getAttribute('aria-labelledby')).toBe(
+      screen.getByRole('heading').getAttribute('id'),
+    );
+  });
+
+  it('keeps focus in the card when retype closes or a redraft starts', () => {
+    const retype = {
+      value: 'x',
+      onValueChange: vi.fn(),
+      onApply: vi.fn(),
+      onCancel: vi.fn(),
+      inputLabel: 'Retype',
+      applyLabel: 'Apply',
+      cancelLabel: 'Cancel',
+    };
+    const { rerender } = render(<PartCard {...props} retype={retype} />);
+    expect(screen.getByLabelText('Retype')).toHaveFocus();
+    // The caller removes the input (jsdom drops focus to body) and gives no onExitFocus.
+    rerender(<PartCard {...props} />);
+    const words = screen.getByRole('heading').parentElement;
+    expect(words).toHaveFocus();
+    (words as HTMLElement).blur();
+    rerender(<PartCard {...props} state="redrafting" />);
+    expect(words).toHaveFocus();
+  });
 });

@@ -11,7 +11,7 @@
  * `title` names it). It holds callbacks and slots only: every label and sentence arrives as a
  * prop, the rows component is composed by the caller, and nothing here calls an API.
  */
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
 
 import { Heading, type HeadingLevel } from '../../primitives/Heading';
 
@@ -139,6 +139,22 @@ export function PartCard({
   const name = quoted ?? title ?? words;
   const retypeRef = useRef<HTMLDivElement>(null);
   const retyping = Boolean(retype);
+  const headingId = useId();
+  const wordsRef = useRef<HTMLDivElement>(null);
+  const hadRetype = useRef(false);
+  const wasRedrafting = useRef(false);
+
+  // Focus must not fall to <body>: when the retype block goes away or the card turns inert for a
+  // redraft, and focus is lost, it lands on the card's words (the caller's `onExitFocus` wins).
+  useEffect(() => {
+    const leftRetype = hadRetype.current && !retyping;
+    const startedRedraft = !wasRedrafting.current && redrafting;
+    hadRetype.current = retyping;
+    wasRedrafting.current = redrafting;
+    if (!leftRetype && !startedRedraft) return;
+    const active = document.activeElement;
+    if (!active || active === document.body) wordsRef.current?.focus();
+  }, [retyping, redrafting]);
 
   useEffect(() => {
     if (retyping) retypeRef.current?.querySelector('input')?.focus();
@@ -163,12 +179,12 @@ export function PartCard({
       data-kind={kind}
       data-origin={origin}
       data-state={state}
-      aria-label={name}
+      aria-labelledby={headingId}
       aria-busy={redrafting || undefined}
     >
       <header className={styles.head}>
-        <div className={styles.words}>
-          <Heading level={headingLevel} size="base">
+        <div className={styles.words} ref={wordsRef} tabIndex={-1}>
+          <Heading level={headingLevel} size="base" id={headingId}>
             {quoted ? <mark className={styles.quote}>{quoted}</mark> : name}
           </Heading>
         </div>
