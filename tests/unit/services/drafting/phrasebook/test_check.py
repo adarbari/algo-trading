@@ -12,6 +12,7 @@ from algotrade.services.drafting.phrasebook.check import (
     criterion_problem,
     phrase_criteria,
     problems,
+    shared_wordings,
 )
 from algotrade.services.drafting.phrasebook.resolve import is_structured
 from algotrade.services.read.context import open_context
@@ -84,3 +85,13 @@ def test_an_impossible_magnitude_is_refused(site, criterion, text, message) -> N
 def test_a_small_percentage_points_value_passes_without_a_percent_in_the_text(site) -> None:
     infos, _ = site
     assert criterion_problem(PhraseCriterion("rollup.momentum@v1.rsi_14", "lt", 0.3), infos) is None
+
+
+def test_no_two_shipped_entries_share_a_stemmed_wording(site) -> None:
+    _, book = site
+    assert shared_wordings(book) == []
+
+
+def test_a_plural_of_another_entrys_wording_is_a_shared_wording() -> None:
+    a, b = Phrase(("covered call",), ("f",), "x"), Phrase(("Covered  calls",), ("f",), "y")
+    assert len(shared_wordings([a, b])) == 1

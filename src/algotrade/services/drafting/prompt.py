@@ -84,7 +84,8 @@ Rules:
   read a field, the usual criterion per intent (op, value, mode, tolerance) and when the reading
   lies. Take thresholds from them, never from memory (say in "notes" when you had to choose one).
   A phrasebook entry's last column, "exact default" (`field op value`), is the meaning to use as
-  given; for a word with several readings it lists them and the first is the default.
+  given unless the sentence gives its own value;
+  for a word with several readings it lists them and the first is the default.
   When a caveat or situation names a field to check, add that criterion (soft or score, so it
   lists rather than rejects) and say why in "notes".
 

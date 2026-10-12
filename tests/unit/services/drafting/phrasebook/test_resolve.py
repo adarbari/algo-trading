@@ -114,3 +114,11 @@ def test_criteria_that_cannot_both_hold_are_not_resolved(sentence: str) -> None:
 def test_a_flipping_word_a_wording_covers_does_not_block() -> None:
     got = fields("stocks with no earnings coming")  # "no" is part of the entry's own wording
     assert ("rollup.earnings@v1.days_to_earnings", "gt", 10) in got
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    ["oversold then breakout", "oversold followed by a breakout", "oversold after a breakout"],
+)
+def test_a_sequence_is_not_two_simultaneous_gates(sentence: str) -> None:
+    assert resolves_fully(sentence, BOOK) is None

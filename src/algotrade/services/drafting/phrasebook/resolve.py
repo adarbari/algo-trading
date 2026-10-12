@@ -25,7 +25,20 @@ MEANING_WORDS = frozenset(
     [
         *("without", "no", "not", "never", "except", "excluding", "exclude", "non", "but", "nor"),
         *("less", "more", "least", "most", "fewer", "higher", "lower", "than", "or", "over"),
-        *("under", "above", "below", "neither", "either", "versus", "vs"),
+        *(
+            "under",
+            "above",
+            "below",
+            "neither",
+            "either",
+            "versus",
+            "vs",
+            "then",
+            "after",
+            "before",
+            "followed",
+            "by",
+        ),
     ]
 )
 _MEANING = frozenset(stem(w) for w in MEANING_WORDS) | MEANING_WORDS

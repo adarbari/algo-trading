@@ -8,13 +8,15 @@ when the entry's text says a percent) and its declared range, and it must pass t
 own criterion check (``answer_schema.check_criterion``), the one definition of a criterion the
 model's answers use."""
 
-from collections.abc import Collection, Mapping
+import re
+from collections.abc import Collection, Mapping, Sequence
 
 from algotrade.config.site.drafting.criteria import PhraseCriterion
 from algotrade.config.site.llm import Phrase
 from algotrade.core.model.fields import NUMERIC_TYPES
 from algotrade.core.model.predicates import NO_VALUE_OPS, NUMERIC_OPS
 from algotrade.services.drafting.answer_schema import check_criterion
+from algotrade.services.drafting.retrieval import stem
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
 
@@ -80,6 +82,22 @@ def _type_problem(criterion: PhraseCriterion, info: FeatureInfo) -> str | None:
 
 def _number(v: object) -> bool:
     return isinstance(v, int | float) and not isinstance(v, bool)
+
+
+def shared_wordings(phrases: Sequence[Phrase]) -> list[str]:
+    """Wordings two entries both say, compared as matching compares them (whole stemmed words:
+    "covered call" and "covered calls" are one); the loader refuses only the exact repeat
+    (``config`` cannot import the stemmer)."""
+    seen: dict[tuple[str, ...], int] = {}
+    found: list[str] = []
+    for i, phrase in enumerate(phrases):
+        for say in phrase.say:
+            key = tuple(stem(w) for w in re.findall(r"[a-z0-9]+", say.lower()))
+            if seen.setdefault(key, i) != i:
+                found.append(
+                    f"{say!r} is in entries {phrases[seen[key]].say[0]!r} and {phrase.say[0]!r}"
+                )
+    return found
 
 
 def problems(phrases: Collection[Phrase], infos: Mapping[str, FeatureInfo]) -> list[str]:
