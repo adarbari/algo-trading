@@ -94,12 +94,19 @@ def test_phrasebook_keeps_only_this_catalogues_fields() -> None:
     names = {"rollup.b@v1.x"}
     assert phrase_line(momentum, names) == "momentum / trending up | rollup.b@v1.x | x gt 0"
     assert phrase_line(elsewhere, names) is None
+
     text = sliced_system_prompt([info("rollup.b@v1.x")], "momentum", [momentum, elsewhere])
     assert text.index("Detail (") < text.index("Phrasebook (")
     assert text.endswith("momentum / trending up | rollup.b@v1.x | x gt 0\n")
     assert "yield" not in text
     assert "Phrasebook (what the trader says | fields | how to use them | exact default):" in text
     assert '"exact default"' in TASK  # the column is explained where the model reads the rules
+
+
+def test_a_phrasebook_line_lists_at_most_four_wordings() -> None:
+    many = Phrase(tuple(f"word{n}" for n in range(7)), ("rollup.b@v1.x",), "x gt 0")
+    line = phrase_line(many, {"rollup.b@v1.x"})
+    assert line == "word0 / word1 / word2 / word3 | rollup.b@v1.x | x gt 0"
 
 
 def test_shipped_phrasebook_and_examples_name_catalogue_fields() -> None:
