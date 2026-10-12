@@ -92,3 +92,19 @@ def test_a_chain_that_began_before_the_window_is_dropped_and_a_seqless_one_is_fl
              saved_criteria=FINAL)]  # fmt: skip
     got = {c["chain_id"]: c["partial"] for c in golden_candidates(late_start + old_rows + whole)}
     assert got == {"B": True, "C": False}
+
+
+def test_an_edge_claim_never_joins_a_screen_chain_and_edge_rows_are_never_cases() -> None:
+    def row(event: str, session: str, kind: str, payload: str = "{}") -> dict[str, Any]:
+        return {"event_id": f"{event}{session}{kind}", "draft_session_id": session, "user": "u",
+                "doc_kind": kind, "doc_id": "x", "event": event, "ts": 1, "seq": 1,
+                "sentence": "s", "payload": payload}  # fmt: skip
+
+    rows = [
+        row("draft_requested", "s1", "screen"),
+        row("edge_revised", "e1", "edge", '{"claimed_session_id": "s1"}'),
+    ]
+    chains = {r["draft_session_id"]: r["chain_id"] for r in linked_sessions(rows)}
+    assert chains == {"s1": "s1", "e1": "e1"}
+    edge_done = [row("draft_requested", "e2", "edge"), row("screen_finalised", "e2", "edge")]
+    assert golden_candidates(edge_done) == []

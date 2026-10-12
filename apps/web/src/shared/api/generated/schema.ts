@@ -33,7 +33,8 @@ export interface paths {
         /**
          * Save
          * @description Replace (or create) the user's own edge; validated as the harness reads it, nothing is
-         *     written on an error (400). A site edge's id is 409: copy it.
+         *     written on an error (400). A site edge's id is 409: copy it. A revision is recorded as an
+         *     ``edge_revised`` feedback event after the write (ADR 0066), never failing the save.
          */
         put: operations["save_edges__edge_id__put"];
         post?: never;
@@ -1295,6 +1296,11 @@ export interface components {
             document: {
                 [key: string]: unknown;
             };
+            /**
+             * Draft Session Id
+             * @description the id of the Describe-it session this edit continues, when it has one (ADR 0066); recorded with the revision, never required
+             */
+            draft_session_id?: string | null;
         };
         /** ScreenDraft */
         ScreenDraft: {
