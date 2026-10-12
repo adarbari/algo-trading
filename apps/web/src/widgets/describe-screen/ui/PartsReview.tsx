@@ -9,7 +9,7 @@
  * reference; a card is marked edited when the trader changed its rows (ADR 0038). Zero applied
  * criteria is not an error: the Builder's document stays.
  */
-import { PartCard, PartList, Stack, Text } from '@algotrade/ui';
+import { Mono, PartCard, PartList, Stack, Text } from '@algotrade/ui';
 import { useState, type ReactNode } from 'react';
 
 import { GuideHelp, termHelp } from '@/features/guide-help';
@@ -34,18 +34,17 @@ import { CriteriaRows, Readings, Suggested, type SuggestionState } from './PartR
 import { FormulaCard } from './ProposedFormulas';
 import type { DraftReviewProps } from './props';
 
-/** The criteria the draft left out of a part, as the answer lists them (by id or as the entry). */
+/** The criteria the draft left out of a part, as the answer lists them. */
 function leftOut(part: DraftPart, answer: ScreenDraft): ScreenDraft['dropped'] {
-  return part.dropped.flatMap((entry) => {
-    const id =
-      typeof entry === 'string'
-        ? entry
-        : typeof entry === 'object' && entry !== null && 'id' in entry
-          ? String(entry.id)
-          : null;
-    const found = answer.dropped.find((d) => d.id === id);
-    return found ? [found] : [];
-  });
+  return answer.dropped.filter((d) => part.dropped.includes(d.id));
+}
+
+/** The field the screen ranks by, when it has one. */
+function tieBreakOf(document: Readonly<Record<string, unknown>>): string | null {
+  const rank = document['rank'];
+  const field =
+    typeof rank === 'object' && rank !== null && 'tie_break' in rank ? rank.tie_break : null;
+  return typeof field === 'string' && field !== '' ? field : null;
 }
 
 export function PartsReview({
@@ -99,12 +98,26 @@ export function PartsReview({
     const own = formulas.filter((f) => part.formulas.includes(f.name));
     const gaps = missing.filter((item) => part.missing.includes(missingKey(item)));
     const offered = suggestedIn(part.suggestions);
-    if (criteria.length + dropped.length + own.length + gaps.length + offered.length === 0)
+    const rankField = part.rank ? tieBreakOf(document) : null;
+    if (
+      criteria.length + dropped.length + own.length + gaps.length + offered.length === 0 &&
+      !rankField
+    )
       return null;
     return (
       <Stack gap={3}>
         {(criteria.length > 0 || dropped.length > 0) && (
           <CriteriaRows rows={criteria} dropped={dropped} renderFieldHelp={renderFieldHelp} />
+        )}
+        {rankField && (
+          <Stack direction="row" gap={1} align="center" wrap>
+            <Text size="sm" tone="muted">
+              {PART_TEXT.rankedBy}
+            </Text>
+            <Mono size="sm">{rankField}</Mono>
+            {renderFieldHelp?.(rankField)}
+            {termHelp(PART_TEXT.rankHelp.id)}
+          </Stack>
         )}
         {own.map((formula) => (
           <FormulaCard
@@ -160,7 +173,7 @@ export function PartsReview({
     const common = {
       kind: part.kind,
       kindLabel: kind.label,
-      origin: part.origin,
+      origin: part.origin === 'gap' ? 'words' : part.origin,
       keptLabel: PART_TEXT.keptMark,
       readingLabel: PART_TEXT.reading,
       reading: part.reading,
@@ -174,13 +187,13 @@ export function PartsReview({
     const helps = (
       <Stack direction="row" gap={1} align="center">
         <GuideHelp entry={kind.help} />
-        {part.reading_source !== 'model' && part.origin === 'words' && (
+        {part.reading_source !== 'model' && part.words !== '' && (
           <GuideHelp entry={PART_TEXT.readingHelp} />
         )}
         {edited && <GuideHelp entry={PART_TEXT.editedHelp} />}
       </Stack>
     );
-    return part.origin === 'words' ? (
+    return part.origin === 'words' || part.origin === 'gap' ? (
       <PartCard
         key={part.id}
         {...common}

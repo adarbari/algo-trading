@@ -140,6 +140,16 @@ see_also = ["describe_part_reading", "describe_needs_your_call"]
 next = "Read the rows under the card, and save the screen when they say what you mean."
 
 [[term]]
+id = "describe_part_rank"
+term = "Describe it: Ranked by"
+short = "The field your screen orders its results by, set by the words of this part."
+body = """
+When your sentence says how to order the results ("rank by momentum"), the draft sets the screen's tie-break to that field and shows it in the card for those words. The ranking decides the order of the instruments that pass, not which ones pass.
+Without a card, a ranking sentence would show as not understood.
+"""
+see_also = ["describe_part_reading", "describe_applied"]
+
+[[term]]
 id = "describe_suggested"
 term = "Describe it: Suggested"
 short = "A protective check the draft offers beside your own criteria, never added until you say so."

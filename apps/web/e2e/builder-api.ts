@@ -438,6 +438,7 @@ const SUGGESTION = {
 const PART = {
   start: 0,
   end: 0,
+  rank: false,
   reading_source: 'model',
   origin: 'words',
   dropped: [],

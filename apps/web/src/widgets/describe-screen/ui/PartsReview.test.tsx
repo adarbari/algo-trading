@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ScreenDocument } from '@/entities/screen';
 import type { ScreenDraft } from '@/features/screener-describe';
+import type { components } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import DraftReview, { type DraftReviewProps } from './DraftReview';
@@ -20,12 +21,15 @@ vi.mock('@/features/screener-describe', async (importOriginal) => ({
   useMyFeatureRequests: () => ({ data: history.data }),
 }));
 
+type Part = components['schemas']['Part'];
+
 const FIFTY = { field: 'f.dollar_volume', op: 'gte', value: 50_000_000, mode: 'hard' };
 const TEN = { field: 'f.dollar_volume', op: 'gte', value: 10_000_000, mode: 'hard' };
 const OPTIONABLE = { field: 'f.optionable', op: 'eq', value: true, mode: 'hard' };
 const PRICE = { field: 'f.price', op: 'gte', value: 5, mode: 'hard' };
 const DOCUMENT: ScreenDocument = {
   id: 'mine',
+  rank: { tie_break: 'f.volume' },
   criteria: { dollar_volume: { ...FIFTY }, optionable: { ...OPTIONABLE }, price: { ...PRICE } },
 };
 
@@ -68,9 +72,10 @@ const SUGGESTIONS = [
   },
 ];
 
-const PART = {
+const PART: Omit<Part, 'id' | 'kind' | 'words'> = {
   start: 0,
   end: 0,
+  rank: false,
   reading: null,
   reading_source: 'model',
   origin: 'words',
@@ -81,7 +86,7 @@ const PART = {
   missing: [],
   suggestions: [],
 };
-const PARTS = [
+const PARTS: Part[] = [
   {
     ...PART,
     id: 'p1',
@@ -99,7 +104,7 @@ const PARTS = [
     kind: 'applied',
     reading: 'stocks with listed options',
     criteria: ['optionable'],
-    dropped: [{ id: 'iv' }],
+    dropped: ['iv'],
   },
   {
     ...PART,
@@ -118,7 +123,15 @@ const PARTS = [
     reading: 'close to the 52-week high',
     formulas: ['draft_near_high'],
   },
-  { ...PART, id: 'p5', words: 'blue skies', kind: 'not_understood', reading: null },
+  { ...PART, id: 'g1', words: 'blue skies', kind: 'not_understood', origin: 'gap' },
+  {
+    ...PART,
+    id: 'p7',
+    words: 'rank by volume',
+    kind: 'applied',
+    reading: 'highest volume first',
+    rank: true,
+  },
   {
     ...PART,
     id: 'p6',
@@ -160,8 +173,9 @@ const ANSWER = {
     },
   ],
   suggestions: SUGGESTIONS,
+  sentence: 'liquid optionable stocks',
   parts: PARTS,
-} as unknown as ScreenDraft;
+} satisfies ScreenDraft;
 
 function setup(over: Partial<DraftReviewProps> = {}) {
   const props: DraftReviewProps = {
@@ -200,6 +214,7 @@ describe('DraftReview with parts', () => {
       'rising moat score',
       'near its high',
       'blue skies',
+      'rank by volume',
       'Kept from your screen',
     ]);
     expect(screen.queryByRole('heading', { name: 'Applied' })).not.toBeInTheDocument();
@@ -231,6 +246,20 @@ describe('DraftReview with parts', () => {
     expect(within(none).getByText('Not understood')).toBeInTheDocument();
     expect(within(none).getByText('guide describe_part_not_understood')).toBeInTheDocument();
     expect(within(none).queryByText(/over|stocks/)).not.toBeInTheDocument();
+  });
+
+  it('a gap card quotes the uncovered words as not understood', () => {
+    setup();
+    expect(within(card('blue skies')).getByText('Not understood')).toBeInTheDocument();
+  });
+
+  it('the part holding the tie-break shows what the screen ranks by', () => {
+    setup();
+    const rank = card('rank by volume');
+    expect(within(rank).getByText('Ranked by')).toBeInTheDocument();
+    expect(within(rank).getByText('field help f.volume')).toBeInTheDocument();
+    expect(within(rank).getByText('help describe_part_rank')).toBeInTheDocument();
+    expect(within(card('liquid')).queryByText('Ranked by')).not.toBeInTheDocument();
   });
 
   it('criteria kept from the screen are a card with a title, not quoted words', () => {
@@ -366,7 +395,7 @@ describe('DraftReview with parts', () => {
 
   it('renders the grouped panel when parts are absent, null or empty', () => {
     for (const parts of [undefined, null, []]) {
-      const { unmount } = setup({ answer: { ...ANSWER, parts } as unknown as ScreenDraft });
+      const { unmount } = setup({ answer: { ...ANSWER, parts } as ScreenDraft });
       expect(screen.getByRole('heading', { name: 'Applied' })).toBeInTheDocument();
       expect(screen.queryByRole('list', { name: 'Parts of your sentence' })).toBeNull();
       unmount();
