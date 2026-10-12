@@ -256,8 +256,12 @@ an answer of the old shape still passes): `formulas` (B1), `missing` (B2 / C) an
   `ROLLUP_FROM_STORED`. The prompt says so, and the server enforces it by checking the formula as a
   user feature (`FeatureSet.with_user`).
 - **The server decides, the model proposes**: a formula needs the `draft_` name, no shadowed feature, an
-  `inputs` list equal to the names it reads, and passes a dry run on the request's session (no-value rate,
-  range, criterion pass count, samples). Anything else is returned in `formulas_dropped` with its reason.
+  `inputs` list equal to the names it reads, and is dry-run once, on the accepted draft, on the request's session (no-value rate,
+  range, criterion pass count, samples; a formula whose inputs are missing for the session is kept
+  unsampled, and a dry run that fails never fails the draft). A formula that is a stored column or
+  repeats a saved one is a repeat (below). At most 3 formulas, 3 unresolved terms with 3
+  alternatives each and 5 missing items are read; the rest are cut with a note. The prompt shows the
+  8 open backlog keys most relevant to the sentence. Anything else is returned in `formulas_dropped` with its reason.
   `missing` keys are matched to the backlog (`feature_backlog.toml`, by key or alias), else become new
   slugs; `closest` keeps catalogue names only; each `unresolved` alternative carries a criterion
   validated like any other.

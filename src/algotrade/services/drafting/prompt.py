@@ -10,7 +10,7 @@ prompt cache hits and a recorded test stays valid). The prompt carries no market
 or credentials.
 
 The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 3: the A / B / C answer contract and
-the open backlog keys, which every sentence shares, so they sit in the prefix): the task, the
+the open backlog keys most relevant to the sentence): the task, the
 examples and an index of every field (name, type, unit) as a prefix no sentence changes, then in
 detail only the fields ``retrieval.select_slice`` picks for the sentence (~11-15k tokens, was ~110k
 for the whole catalogue, phrasebook and guide), then the caller's own features."""
@@ -20,6 +20,7 @@ import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from algotrade.config.site.drafting.backlog import PROMPT_LIMIT
 from algotrade.config.site.field_guide import (
     FieldGuideEntry,
     FieldGuideSettings,
@@ -178,32 +179,24 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "field": "instrument.status",
                     "op": "eq",
                     "value": "ACTIVE",
-                    "mode": "hard",
-                    "why": "stocks (listed)",
                 },
                 {
                     "id": "stocks",
                     "field": "instrument.security_type",
                     "op": "in",
                     "value": ["COMMON_STOCK", "ADR"],
-                    "mode": "hard",
-                    "why": "stocks",
                 },
                 {
                     "id": "optionable",
                     "field": "instrument.optionable",
                     "op": "eq",
                     "value": True,
-                    "mode": "hard",
-                    "why": "optionable",
                 },
                 {
                     "id": "price",
                     "field": "rollup.price_stats@v2.close",
                     "op": "gt",
                     "value": 10,
-                    "mode": "hard",
-                    "why": "over $10",
                 },
                 {
                     "id": "liquid",
@@ -250,7 +243,7 @@ def examples_text() -> str:
     return "\n\n".join(parts) + "\n"
 
 
-DESCRIPTION_CHARS = 120
+DESCRIPTION_CHARS = 160
 
 
 def catalogue_line(info: FeatureInfo) -> str:
@@ -356,21 +349,31 @@ def slice_guide_line(
     return " | ".join(parts)
 
 
-KEY_CHARS = 90  # of an open key's description (the cap of 60 keys must stay inside the budget)
+KEY_CHARS = 60  # of an open key's description (PROMPT_LIMIT keys must stay inside the budget)
+_WORD = re.compile(r"[a-z0-9]{3,}")
 OPEN_HEADER = "Open requests (key | what it is); reuse one as a missing item's key when it fits:"
 
 
-def prefix_text(catalogue: Iterable[FeatureInfo], open_keys: Iterable[tuple[str, str]] = ()) -> str:
-    """The part of the sliced prompt that no sentence changes: the task, the examples, the
-    index of every SITE field (sorted by name) and the open backlog keys (as given: sorted and
-    capped by ``open_keys``)."""
+def prefix_text(catalogue: Iterable[FeatureInfo]) -> str:
+    """The part of the sliced prompt that no sentence changes: the task, the examples and the
+    index of every SITE field (sorted by name)."""
     site = sorted((i for i in catalogue if i.scope == "site"), key=lambda i: i.name)
     index = "\n".join(index_line(i) for i in site)
     out = f"{TASK}\n{examples_text()}\n{INDEX_HEADER}\n{index}\n"
-    keys = [f"{key} | {description[:KEY_CHARS]}" for key, description in open_keys]
-    if keys:
-        out += f"\n{OPEN_HEADER}\n" + "\n".join(keys) + "\n"
     return out
+
+
+def relevant_keys(
+    sentence: str, open_keys: Iterable[tuple[str, str]], limit: int = PROMPT_LIMIT
+) -> list[tuple[str, str]]:
+    """At most ``limit`` of the open (key, description) pairs: those whose key or description
+    share the most words with the sentence first, then by key (deterministic)."""
+    said = set(_WORD.findall(sentence.lower()))
+
+    def score(pair: tuple[str, str]) -> int:
+        return len(said & set(_WORD.findall(f"{pair[0].replace('_', ' ')} {pair[1]}".lower())))
+
+    return sorted(open_keys, key=lambda p: (-score(p), p[0]))[:limit]
 
 
 def sliced_system_prompt(
@@ -392,7 +395,13 @@ def sliced_system_prompt(
     detail = [i for i in sorted(infos, key=lambda i: i.name) if i.name in picked]
     detail = [i for i in detail if i.scope == "site"]
     own = sorted((i for i in infos if i.scope != "site"), key=lambda i: i.name)
-    out = prefix_text(infos, open_keys)
+    out = prefix_text(infos)
+    keys = [
+        f"{key} | {' '.join(description.split())[:KEY_CHARS]}"
+        for key, description in relevant_keys(sentence, open_keys)
+    ]
+    if keys:
+        out += f"\n{OPEN_HEADER}\n" + "\n".join(keys) + "\n"
     out += "\nDetail (name | type | unit | description | values):\n"
     out += "\n".join(catalogue_line(i) for i in detail) + "\n"
     phrases = [line for p in chosen.phrases if (line := phrase_line(p, names)) is not None]

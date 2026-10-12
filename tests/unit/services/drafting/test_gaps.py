@@ -16,6 +16,7 @@ BACKLOG = FeatureBacklogSettings(
         BacklogItem("support_history", "time in the support band", "ROLLUP_FROM_STORED",
                     aliases=("support_share",)),
         BacklogItem("fcf_yield", "free cash flow over price", "NEEDS_SOURCE"),
+        BacklogItem("built_one", "built", "NEEDS_SOURCE", status="PROMOTED", promoted_to="x"),
     )
 )  # fmt: skip
 CATALOGUE = {"feature.dist_to_support", "feature.pct_from_high_52w", "instrument.status"}
@@ -107,7 +108,7 @@ def test_each_alternative_carries_its_validated_criterion_and_the_default() -> N
         term(alt("a", value=1), alt("b", value=2), alt("c", value=3), default=1)
     )
     assert notes == () and got.default_index == 1 and got.term == "liquid"
-    assert [a.label for a in got.alternatives] == ["a", "b", "c"]
+    assert [a.text for a in got.alternatives] == ["a", "b", "c"]
     assert got.alternatives[1].criterion == {
         "field": "feature.pct_from_high_52w", "op": "gt", "value": 2,
     }  # fmt: skip
@@ -117,13 +118,13 @@ def test_an_alternative_that_does_not_validate_is_dropped_and_the_default_follow
     (got,), notes = unresolved(
         term(alt("a", "instrument.nope"), alt("b", value=2), alt("c", value=3), default=2)
     )
-    assert [a.label for a in got.alternatives] == ["b", "c"] and got.default_index == 1
+    assert [a.text for a in got.alternatives] == ["b", "c"] and got.default_index == 1
     assert "alternative a dropped" in notes[0]
 
 
 def test_a_dropped_default_falls_back_to_the_first() -> None:
     (got,), notes = unresolved(term(alt("a", "instrument.nope"), alt("b"), alt("c"), default=0))
-    assert got.default_index == 0 and got.alternatives[0].label == "b"
+    assert got.default_index == 0 and got.alternatives[0].text == "b"
     assert "alternative a dropped" in notes[0] and "default alternative was dropped" in notes[1]
 
 
@@ -150,3 +151,28 @@ def test_an_unresolved_item_of_the_wrong_shape_is_noted() -> None:
 def test_no_unresolved_is_nothing() -> None:
     for proposal in ({"criteria": []}, {"unresolved": None}):
         assert unresolved_of(proposal, CATALOGUE, norm) == ((), ())
+
+
+def test_a_curated_key_sent_as_a_new_slug_is_still_the_curated_one() -> None:
+    (by_slug, by_alias), _ = missing(
+        item(key=None, new_key_slug="support_history"), item(key=None, new_key_slug="support_share")
+    )
+    assert (by_slug.key, by_slug.new_key_slug) == ("support_history", None)
+    assert by_alias.key == "support_history"
+
+
+def test_a_closed_backlog_key_is_not_requested_again() -> None:
+    got, notes = missing(item(key="built_one"), item(key=None, new_key_slug="built_one"))
+    assert got == () and notes == ("built_one is PROMOTED in the backlog; request not kept",) * 2
+
+
+def test_the_lists_are_capped_and_the_cut_is_said() -> None:
+    many = [item(key=None, new_key_slug=f"s{n}", closest=["dist_to_support"] * 9) for n in range(8)]
+    got, notes = missing(*many)
+    assert len(got) == 5 and notes == ("3 missing features beyond the first 5 were cut",)
+    assert all(len(m.closest) == 5 for m in got)
+    terms = [term(alt("a"), alt("b"), alt("c"), alt("d"), term=f"t{n}") for n in range(5)]
+    kept, said = unresolved(*terms)
+    assert len(kept) == 3 and all(len(t.alternatives) == 3 for t in kept)
+    assert "2 ambiguous terms beyond the first 3 were cut" in said
+    assert any("1 t0 alternatives beyond the first 3 were cut" in n for n in said)

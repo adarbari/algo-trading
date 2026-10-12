@@ -39,8 +39,7 @@ class SampleValue(Schema):
 
 
 class FormulaDryRun(Schema):
-    session: date | None = Field(description="the session read (null: not read, see missing)")
-    missing: list[str] = Field(description="the inputs' tables with no data for the session")
+    session: date | None = Field(description="the session read (null: not read: no data for it)")
     rows: int
     no_value_rate: float | None
     minimum: float | None
@@ -80,7 +79,7 @@ class MissingFeature(Schema):
 
 
 class Alternative(Schema):
-    label: str
+    text: str
     criterion: dict[str, Any]
 
 

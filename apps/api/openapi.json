@@ -8,13 +8,13 @@
             "title": "Criterion",
             "type": "object"
           },
-          "label": {
-            "title": "Label",
+          "text": {
+            "title": "Text",
             "type": "string"
           }
         },
         "required": [
-          "label",
+          "text",
           "criterion"
         ],
         "title": "Alternative",
@@ -882,14 +882,6 @@
             ],
             "title": "Minimum"
           },
-          "missing": {
-            "description": "the inputs' tables with no data for the session",
-            "items": {
-              "type": "string"
-            },
-            "title": "Missing",
-            "type": "array"
-          },
           "no_value_rate": {
             "anyOf": [
               {
@@ -922,13 +914,12 @@
                 "type": "null"
               }
             ],
-            "description": "the session read (null: not read, see missing)",
+            "description": "the session read (null: not read: no data for it)",
             "title": "Session"
           }
         },
         "required": [
           "session",
-          "missing",
           "rows",
           "no_value_rate",
           "minimum",

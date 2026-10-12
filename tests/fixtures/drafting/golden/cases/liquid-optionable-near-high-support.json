@@ -48,7 +48,10 @@
         "span": "within 5% of their 52-week high",
         "bucket": "B",
         "fields": [],
-        "expr": "if(price_stats.high_52w > 0, price_stats.close / price_stats.high_52w, null)"
+        "expr": "if(price_stats.high_52w > 0, price_stats.close / price_stats.high_52w, null)",
+        "op": "gte",
+        "value": 0.95,
+        "tolerance": 0.02
       },
       {
         "span": "held within support lines for two years",

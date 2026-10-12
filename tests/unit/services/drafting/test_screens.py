@@ -12,6 +12,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.completion import Attempt, CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.configs import resolve_rule_draft
+from algotrade.services.drafting import formulas as formulas_module
 from algotrade.services.drafting import screens
 from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA
 from algotrade.services.drafting.prompt import PROMPT_VERSION
@@ -559,4 +560,63 @@ def test_an_alternative_the_validator_would_reject_is_not_offered(ctx: ReadConte
     }
     draft = draft_screen(ctx, Canned(proposal(ACTIVE, unresolved=[reading])), "s", "x")
     (term,) = draft.unresolved
-    assert [a.label for a in term.alternatives] == ["50", "1000"] and term.default_index == 1
+    assert [a.text for a in term.alternatives] == ["50", "1000"] and term.default_index == 1
+
+
+class Retrying(Canned):
+    """A model whose chain checks the answer twice (a repair, then a fallback) before returning."""
+
+    def complete(
+        self,
+        system: str,
+        user: str,
+        *,
+        tag: object = None,
+        schema: object = None,
+        accept: Any = None,
+    ) -> Completion:
+        for _ in range(2):
+            accept(self.answer)
+        return super().complete(system, user, tag=tag, schema=schema, accept=accept)
+
+
+def test_the_dry_runs_are_made_once_on_the_accepted_draft_and_capped(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runs: list[str] = []
+    real = formulas_module.dry_run
+
+    def counted(c: Any, definition: Any, criterion: Any = None) -> Any:
+        runs.append(definition.name)
+        return real(c, definition, criterion)
+
+    monkeypatch.setattr(formulas_module, "dry_run", counted)
+    many = [
+        {**FORMULA, "name": f"draft_f{n}", "expr": f"option_liquidity.chain_oi * {n + 1}",
+         "inputs": ["option_liquidity.chain_oi"]}
+        for n in range(10)
+    ]  # fmt: skip
+    draft = draft_screen(ctx, Retrying(proposal(ACTIVE, formulas=many)), "s", "x")
+    assert runs == ["draft_f0", "draft_f1", "draft_f2"]  # not once per attempt, not ten
+    assert all(f.dry_run.session == DAY for f in draft.formulas)
+    assert any("7 formulas beyond the first 3 were cut" in n for n in draft.notes)
+
+
+def test_a_default_the_model_also_listed_is_not_added_twice(ctx: ReadContext) -> None:
+    listed = {"id": "deep_oi", "field": OI, "op": "gte", "value": 1000}
+    draft = draft_screen(ctx, Canned(proposal(ACTIVE, listed, unresolved=[READINGS])), "s", "x")
+    assert set(draft.document["criteria"]) == {"active", "deep_oi"}
+    assert draft.unresolved[0].default_index == 1
+
+
+def test_a_default_the_validator_dropped_is_not_still_the_default(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def drops_deep(c: Any, sid: str, document: dict[str, Any], dropped: Any) -> Any:
+        kept = {k: v for k, v in document["criteria"].items() if k != "deep"}
+        return {**document, "criteria": kept}, dropped
+
+    monkeypatch.setattr(screens, "validated", drops_deep)
+    draft = draft_screen(ctx, Canned(proposal(ACTIVE, unresolved=[READINGS])), "s", "x")
+    assert draft.unresolved[0].default_index == 0
+    assert "the validator dropped its default reading" in draft.notes[-1]

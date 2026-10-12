@@ -85,8 +85,8 @@ def test_a_contract_answer_through_the_whole_draft_meets_the_case(
         case,
         draft.document["criteria"],
         [d.field for d in draft.dropped],
-        [f.expr for f in draft.formulas],
-        [m.key or m.new_key_slug or "" for m in draft.missing],
+        [(f.expr, f.criterion) for f in draft.formulas],
+        [m.key or f"new:{m.new_key_slug}" for m in draft.missing],
         [u.term for u in draft.unresolved],
     )
     assert result.passed, f"{slug}/{case.id}: {result}"

@@ -293,8 +293,8 @@ def _call(
         case,
         made.document["criteria"],
         [d.field for d in made.dropped],
-        [f.expr for f in made.formulas],
-        [m.key or m.new_key_slug or "" for m in made.missing],
+        [(f.expr, f.criterion) for f in made.formulas],
+        [m.key or f"new:{m.new_key_slug}" for m in made.missing],
         [u.term for u in made.unresolved],
     )
     fields = frozenset(c["field"] for c in made.document["criteria"].values())

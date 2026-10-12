@@ -14,7 +14,8 @@ amendment): ``formulas`` (B1,
 accepts), ``missing`` and ``unresolved`` (``gaps.py``). The document holds only A criteria (the
 existing-field rewrite of a duplicate formula and the default reading of each unresolved term
 among them); a pending formula and its criterion travel beside it and are never auto-applied.
-Reads only the catalogue and the configs; writes nothing."""
+Reads the catalogue, the configs and, for the dry run of a formula, the request's session;
+writes nothing."""
 
 import json
 import logging
@@ -38,7 +39,12 @@ from algotrade.core.model.errors import (
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
 from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA, check_answer, check_criterion
-from algotrade.services.drafting.formulas import DraftFormula, DroppedFormula, check_formulas
+from algotrade.services.drafting.formulas import (
+    DraftFormula,
+    DroppedFormula,
+    check_formulas,
+    dry_run_all,
+)
 from algotrade.services.drafting.gaps import MissingFeature, Unresolved, missing_of, unresolved_of
 from algotrade.services.drafting.prompt import PROMPT_VERSION, sliced_system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
@@ -102,7 +108,9 @@ def draft_screen(
     phrasebook = load_phrasebook(ctx.configs).phrases
     guide = load_field_guide(ctx.configs)
     backlog = load_feature_backlog(ctx.configs)
-    system = sliced_system_prompt(infos.values(), sentence, phrasebook, guide, open_keys(backlog))
+    system = sliced_system_prompt(
+        infos.values(), sentence, phrasebook, guide, open_keys(backlog, limit=len(backlog.items))
+    )
     user = user_prompt(screener_id, sentence, current)
     tag = CallTag("screener-draft", ctx.user.user_id, PROMPT_VERSION)
     drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
@@ -124,7 +132,11 @@ def draft_screen(
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
-    return replace(drafted[-1][1], call_id=completion.call_id)  # one id: every attempt of the call
+    final = drafted[-1][1]
+    formulas, dry_notes = dry_run_all(ctx, final.formulas)  # once, on the draft we keep
+    return replace(
+        final, formulas=formulas, notes=(*final.notes, *dry_notes), call_id=completion.call_id
+    )  # one id: every attempt of the call
 
 
 def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, Any]) -> ScreenDraft:
@@ -140,10 +152,16 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
     missing, missing_notes = missing_of(proposal, load_feature_backlog(ctx.configs), catalogue)
     for criterion in formulas.rewritten.values():  # a duplicate formula: the existing field
         criteria[_criterion_id(None, criterion["field"], len(criteria) + 1, criteria)] = criterion
+    placed: dict[str, str] = {}  # unresolved term -> the id of its default in the criteria
     for term in unresolved:  # the reading the draft starts with
         default = term.alternatives[term.default_index].criterion
+        same = [k for k, c in criteria.items() if _reading(c) == _reading(default)]
+        if same:  # the model also listed it in criteria: not twice
+            placed[term.term] = same[0]
+            continue
         key = _criterion_id(term.term.lower().replace(" ", "_"), default["field"], 0, criteria)
         criteria[key] = default
+        placed[term.term] = key
     document: dict[str, Any] = {
         "id": screener_id,
         "kind": "screener",
@@ -154,12 +172,41 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
     if rank:
         document["rank"] = rank
     document, dropped = validated(ctx, screener_id, document, dropped)
-    notes = (*notes_of(proposal), *formulas.notes, *unresolved_notes, *missing_notes)
+    unresolved, reset_notes = _defaults_kept(unresolved, placed, document["criteria"])
+    notes = (
+        *notes_of(proposal), *formulas.notes, *unresolved_notes, *missing_notes, *reset_notes
+    )  # fmt: skip
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
         missing=missing, unresolved=unresolved,
     )  # fmt: skip
+
+
+def _reading(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:
+    value = criterion.get("value")
+    return criterion["field"], criterion["op"], tuple(value) if isinstance(value, list) else value
+
+
+def _defaults_kept(
+    unresolved: tuple[Unresolved, ...], placed: Mapping[str, str], criteria: Mapping[str, Any]
+) -> tuple[tuple[Unresolved, ...], tuple[str, ...]]:
+    """``unresolved`` with ``default_index`` pointing at a reading the document still has: when
+    the validator dropped the default, the first alternative the document holds, else the first
+    (and a note)."""
+    out: list[Unresolved] = []
+    notes: list[str] = []
+    for term in unresolved:
+        if placed.get(term.term) in criteria:
+            out.append(term)
+            continue
+        held = {_reading(c) for c in criteria.values()}
+        index = next(
+            (n for n, a in enumerate(term.alternatives) if _reading(a.criterion) in held), 0
+        )
+        notes.append(f"{term.term}: the validator dropped its default reading")
+        out.append(replace(term, default_index=index))
+    return tuple(out), tuple(notes)
 
 
 def _alternative(

@@ -13,9 +13,12 @@ Layout (``root`` = ``tests/fixtures/drafting/golden``):
   of its own, so any criterion that matches no ``A`` part is extra. The A / B / C contract
   (ADR 0041, amended 2026-10-11) adds expectations a part may carry: a ``B`` part with ``expr``
   wants a kept formula with that fingerprint (``features.expressions.fingerprint``, so a
-  rewriting of it passes; any other kept formula is extra), a ``C`` part with ``key`` wants a
-  missing item of that backlog key or slug, an ``ask`` part with ``term`` wants that term
-  unresolved. A part without these keys expects nothing of the new buckets, and a score given no
+  rewriting of it passes; any other kept formula is extra) and, with ``op`` / ``value``, that
+  criterion on it, a ``C`` part with ``key`` wants a
+  missing item of that curated backlog key (a new slug never matches; a missing item no part
+  names is extra unless a ``C`` part has no key), an ``ask`` part with ``term`` wants that term
+  unresolved (any other unresolved term is extra). A part without these keys expects nothing of
+  the new buckets, and a score given no
   ``formulas`` / ``missing`` / ``unresolved`` leaves them unchecked (an answer of the old shape).
   ``scope_fields`` are tolerated scaffolding (status, security type). ``"contract": true`` in
   ``expect`` marks a case written for the contract: CI replays its answer through the whole
@@ -100,13 +103,14 @@ def score(
     case: GoldenCase,
     kept: Mapping[str, Mapping[str, Any]],
     dropped_fields: Sequence[str] = (),
-    formulas: Sequence[str] | None = None,
+    formulas: Sequence[tuple[str, Mapping[str, Any] | None]] | None = None,
     missing_keys: Sequence[str] | None = None,
     terms: Sequence[str] | None = None,
 ) -> GoldenScore:
     """Score the kept criteria (``criteria_of``'s table) and the fields it dropped as invented.
-    ``formulas``: the kept formulas' ``expr``; ``missing_keys``: each missing item's key or new
-    slug; ``terms``: the unresolved terms (``None``: that bucket is not scored)."""
+    ``formulas``: the kept formulas' ``(expr, criterion)``; ``missing_keys``: each missing
+    item's curated key (``new:<slug>`` for a new one); ``terms``: the unresolved terms (``None``:
+    that bucket is not scored)."""
     missing: list[str] = []
     wrong: list[str] = []
     used: set[str] = set()
@@ -130,34 +134,48 @@ def score(
         for cid, crit in kept.items()
         if cid not in used and crit["field"] not in case.scope_fields
     ]
-    extra += _bucket_scores(case, formulas, missing_keys, terms, missing)
+    extra += _bucket_scores(case, formulas, missing_keys, terms, missing, wrong)
     return GoldenScore(tuple(missing), tuple(wrong), tuple(extra) + tuple(dropped_fields))
 
 
 def _bucket_scores(
     case: GoldenCase,
-    formulas: Sequence[str] | None,
+    formulas: Sequence[tuple[str, Mapping[str, Any] | None]] | None,
     missing_keys: Sequence[str] | None,
     terms: Sequence[str] | None,
     missing: list[str],
+    wrong: list[str],
 ) -> list[str]:
-    """Score the B, C and unresolved buckets; spans not found are added to ``missing``, the
-    kept formulas nothing asked for returned."""
+    """Score the B, C and unresolved buckets: spans not found go to ``missing``, a formula whose
+    criterion is not the expected one to ``wrong``; what was kept and nothing asked for is
+    returned (a missing item is tolerated when a ``C`` part names no key)."""
     extra: list[str] = []
     if formulas is not None:
-        wanted = {_print(p["expr"]): p for p in case.parts if p["bucket"] == "B" and "expr" in p}
-        got = {_print(e): e for e in formulas}
-        missing += [str(p["span"]) for h, p in wanted.items() if h not in got]
-        extra += [f"formula {e}" for h, e in got.items() if h not in wanted]
+        got = [(_print(e), e, crit) for e, crit in formulas]
+        for part in (p for p in case.parts if p["bucket"] == "B" and "expr" in p):
+            found = next((g for g in got if g[0] == _print(part["expr"])), None)
+            if found is None:
+                missing.append(str(part["span"]))
+                continue
+            got.remove(found)  # a second part with the same formula needs its own
+            if "op" in part and (found[2] is None or not _fits(part, found[2])):
+                wrong.append(str(part["span"]))
+        extra += [f"formula {e}" for _, e, _ in got]
     if missing_keys is not None:
+        wanted = {p["key"] for p in case.parts if "key" in p}
         missing += [
             str(p["span"]) for p in case.parts if "key" in p and p["key"] not in missing_keys
         ]
+        open_ended = any(p["bucket"] == "C" and "key" not in p for p in case.parts)
+        if not open_ended:
+            extra += [f"missing {k}" for k in missing_keys if k not in wanted]
     if terms is not None:
         said = {t.lower() for t in terms}
+        wanted_terms = {p["term"].lower() for p in case.parts if "term" in p}
         missing += [
             str(p["span"]) for p in case.parts if "term" in p and p["term"].lower() not in said
         ]
+        extra += [f"unresolved {t}" for t in terms if t.lower() not in wanted_terms]
     return extra
 
 

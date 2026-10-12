@@ -11,7 +11,14 @@ import pytest
 
 from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.formulas import FormulaOutcome, check_formulas
+from algotrade.services.drafting import formulas as formulas_module
+from algotrade.services.drafting.formulas import (
+    MAX_FORMULAS,
+    UNSAMPLED,
+    FormulaOutcome,
+    check_formulas,
+    dry_run_all,
+)
 from algotrade.services.read.context import ReadContext, at_session, open_context
 from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.api_store import END, api_store
@@ -50,6 +57,12 @@ def check(ctx: ReadContext, *formulas: Any) -> FormulaOutcome:
     return check_formulas(ctx, {"criteria": [], "formulas": list(formulas)}, normalise)
 
 
+def sampled(ctx: ReadContext, out: FormulaOutcome) -> tuple[Any, ...]:
+    kept, notes = dry_run_all(ctx, out.formulas)
+    assert notes == ()
+    return kept
+
+
 def only_reason(out: FormulaOutcome) -> str:
     assert out.formulas == () and len(out.dropped) == 1
     return out.dropped[0].reason
@@ -57,7 +70,8 @@ def only_reason(out: FormulaOutcome) -> str:
 
 def test_a_good_formula_is_kept_pending_with_its_dry_run(ctx: ReadContext) -> None:
     out = check(ctx, formula())
-    (kept,) = out.formulas
+    assert out.formulas[0].dry_run is UNSAMPLED  # checking does not run it
+    (kept,) = sampled(ctx, out)
     assert out.dropped == () and out.rewritten == {} and out.notes == ()
     assert kept.pending and kept.name == "draft_near_high"
     assert kept.inputs == ("price_stats.close", "price_stats.high_52w")
@@ -69,7 +83,7 @@ def test_a_good_formula_is_kept_pending_with_its_dry_run(ctx: ReadContext) -> No
 
 
 def test_a_formula_without_a_criterion_is_kept_and_counts_nothing(ctx: ReadContext) -> None:
-    (kept,) = check(ctx, formula(criterion=None)).formulas
+    (kept,) = sampled(ctx, check(ctx, formula(criterion=None)))
     assert kept.criterion is None and kept.dry_run.criterion_pass is None
 
 
@@ -84,13 +98,13 @@ def test_a_formula_without_a_criterion_is_kept_and_counts_nothing(ctx: ReadConte
 def test_only_a_numeric_comparison_is_counted_in_the_dry_run(
     ctx: ReadContext, criterion: dict[str, Any]
 ) -> None:
-    (kept,) = check(ctx, formula(criterion=criterion)).formulas
+    (kept,) = sampled(ctx, check(ctx, formula(criterion=criterion)))
     assert kept.dry_run.criterion_pass is None and kept.criterion is not None
 
 
 def test_a_formula_on_a_session_without_its_inputs_is_kept_unsampled(ctx: ReadContext) -> None:
     later = at_session(ctx, END + timedelta(days=1))
-    (kept,) = check(later, formula()).formulas
+    (kept,) = sampled(later, check(later, formula()))
     assert kept.dry_run.session is None and kept.dry_run.sample == []
     assert kept.dry_run.missing
 
@@ -142,6 +156,7 @@ def test_a_repeat_of_a_site_feature_is_dropped_and_its_criterion_uses_the_field(
     repeat = formula(
         name="draft_below_high",
         expr="price_stats.close / price_stats.high_52w - 1",
+        unit="decimal",
         criterion={"op": "gte", "value": -0.04, "mode": None, "tolerance": None},
     )
     out = check(ctx, repeat)
@@ -184,3 +199,79 @@ def test_a_repeat_of_the_traders_own_feature_is_dropped(ctx: ReadContext) -> Non
 def test_a_name_the_trader_already_has_is_not_shadowed(ctx: ReadContext) -> None:
     out = check(own(ctx), formula(name="draft_mine"))
     assert "already a feature" in only_reason(out)
+
+
+def test_a_saved_formula_proposed_again_is_a_repeat_not_a_name_clash(ctx: ReadContext) -> None:
+    again = formula(
+        name="draft_mine",
+        expr="price_stats.close * 2",
+        inputs=["price_stats.close"],
+        criterion={"op": "gt", "value": 10, "mode": None, "tolerance": None},
+    )
+    out = check(own(ctx), again)
+    assert out.dropped[0].existing == "draft_mine"
+    assert out.rewritten["draft_mine"]["field"] == "feature.draft_mine"  # the criterion survives
+
+
+def test_a_bare_stored_column_is_that_field_not_a_formula(ctx: ReadContext) -> None:
+    bare = formula(
+        name="draft_close",
+        expr="price_stats.close",
+        inputs=["price_stats.close"],
+        unit="usd_per_share",
+        criterion={"op": "gt", "value": 5, "mode": None, "tolerance": None},
+    )
+    out = check(ctx, bare)
+    assert out.formulas == () and out.dropped[0].existing == "price_stats.close"
+    assert out.rewritten["draft_close"] == {
+        "field": "rollup.price_stats@v2.close", "op": "gt", "value": 5,
+    }  # fmt: skip
+    assert out.notes == ("draft_close is price_stats.close: its criterion uses that field",)
+
+
+def test_a_bare_feature_reference_is_that_feature(ctx: ReadContext) -> None:
+    bare = formula(
+        name="draft_again", expr="pct_from_high_52w", inputs=["pct_from_high_52w"], unit="decimal"
+    )
+    out = check(ctx, bare)
+    assert out.dropped[0].existing == "pct_from_high_52w"
+    assert out.rewritten["draft_again"]["field"] == "feature.pct_from_high_52w"
+
+
+def repeat_with(unit: str) -> dict[str, Any]:
+    return formula(
+        name="draft_below_high",
+        expr="price_stats.close / price_stats.high_52w - 1",
+        unit=unit,
+        criterion={"op": "gte", "value": -0.04, "mode": None, "tolerance": None},
+    )
+
+
+def test_a_repeat_in_another_unit_is_noted_and_a_percent_for_a_fraction_loses_its_criterion(
+    ctx: ReadContext,
+) -> None:
+    noted = check(ctx, repeat_with("ratio"))
+    assert "draft_below_high" in noted.rewritten and "check it" in noted.notes[-1]
+    dropped = check(ctx, repeat_with("pct_points"))
+    assert dropped.rewritten == {} and "percent against a fraction" in dropped.notes[-1]
+
+
+def test_only_the_first_formulas_are_checked_and_the_cut_is_said(ctx: ReadContext) -> None:
+    many = [formula(name=f"draft_f{n}") for n in range(10)]
+    many[1]["expr"], many[1]["inputs"] = "price_stats.close * 3", ["price_stats.close"]
+    many[2]["expr"], many[2]["inputs"] = "price_stats.close * 4", ["price_stats.close"]
+    out = check(ctx, *many)
+    assert len(out.formulas) + len(out.dropped) == MAX_FORMULAS
+    assert out.notes == (f"7 formulas beyond the first {MAX_FORMULAS} were cut",)
+
+
+def test_a_dry_run_that_breaks_leaves_the_formula_unsampled_with_a_note(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_: object) -> None:
+        raise OSError("the store went away")
+
+    monkeypatch.setattr(formulas_module, "dry_run", broken)
+    kept, notes = dry_run_all(ctx, check(ctx, formula()).formulas)
+    assert kept[0].dry_run is UNSAMPLED and kept[0].pending
+    assert notes == ("draft_near_high: the dry run could not be made (OSError)",)

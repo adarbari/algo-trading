@@ -428,8 +428,8 @@ export interface components {
             criterion: {
                 [key: string]: unknown;
             };
-            /** Label */
-            label: string;
+            /** Text */
+            text: string;
         };
         /** Build */
         Build: {
@@ -757,11 +757,6 @@ export interface components {
             maximum: number | null;
             /** Minimum */
             minimum: number | null;
-            /**
-             * Missing
-             * @description the inputs' tables with no data for the session
-             */
-            missing: string[];
             /** No Value Rate */
             no_value_rate: number | null;
             /** Rows */
@@ -770,7 +765,7 @@ export interface components {
             sample: components["schemas"]["algotrade_api__schemas__drafting__screeners__SampleValue"][];
             /**
              * Session
-             * @description the session read (null: not read, see missing)
+             * @description the session read (null: not read: no data for it)
              */
             session: string | null;
         };

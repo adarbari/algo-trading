@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.site.drafting.backlog import FeatureBacklogSettings, open_keys
+from algotrade.config.site.drafting.backlog import PROMPT_LIMIT, FeatureBacklogSettings, open_keys
 from algotrade.config.site.settings import load_feature_backlog
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.site import site_features
@@ -82,5 +82,7 @@ def test_open_keys_are_open_only_sorted_and_capped() -> None:
         item(key="b_built", status="PROMOTED", promoted_to="x"),
     ]
     pairs = open_keys(parse(*reversed(many)))
-    assert len(pairs) == 60 and pairs[0] == ("k000", "d0") and pairs == tuple(sorted(pairs))
+    assert (
+        len(pairs) == PROMPT_LIMIT and pairs[0] == ("k000", "d0") and pairs == tuple(sorted(pairs))
+    )
     assert open_keys(parse(*many), limit=2) == (("k000", "d0"), ("k001", "d1"))

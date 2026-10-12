@@ -6,7 +6,7 @@ features, joined tokens and numbers."""
 
 import pytest
 
-from algotrade.config.site.drafting.backlog import open_keys
+from algotrade.config.site.drafting.backlog import PROMPT_LIMIT, open_keys
 from algotrade.config.site.field_guide import FieldGuideEntry, FieldGuideSettings
 from algotrade.config.site.llm import Phrase
 from algotrade.config.site.settings import (
@@ -71,10 +71,13 @@ def test_the_golden_set_has_the_new_train_cases() -> None:
 @pytest.mark.parametrize("case", CASES, ids=ids)
 def test_the_sliced_prompt_is_within_the_token_budget(case: GoldenCase, site) -> None:
     infos, book, guide = site
-    keys = open_keys(load_feature_backlog(open_config_store(REPO_ROOT / "config")))
-    prompt = sliced_system_prompt(infos, case.sentence, book, guide, keys)
+    real = open_keys(load_feature_backlog(open_config_store(REPO_ROOT / "config")))
+    # the backlog may grow: the budget holds with more keys than the prompt shows, at full length
+    padding = tuple((f"zz_pad_{n:03}", "x" * 200) for n in range(2 * PROMPT_LIMIT))
+    prompt = sliced_system_prompt(infos, case.sentence, book, guide, (*real, *padding))
     assert len(prompt) // 4 <= BUDGET_TOKENS, f"{case.id}: {len(prompt) // 4} tokens"
-    assert prompt.startswith(prefix_text(infos, keys))
+    assert prompt.count("zz_pad_") + len(real) >= min(PROMPT_LIMIT, len(real) + len(padding))
+    assert prompt.startswith(prefix_text(infos))
 
 
 def test_the_prefix_is_identical_across_sentences_and_the_slice_is_smaller(site) -> None:

@@ -6,6 +6,7 @@ has; the worked examples; stable bytes for the same inputs; the sentence with th
 criteria. Fitness: every field the shipped phrasebook and the examples name is in the site
 catalogue."""
 
+from algotrade.config.site.drafting.backlog import PROMPT_LIMIT
 from algotrade.config.site.field_guide import (
     FieldGuideEntry,
     FieldGuideSettings,
@@ -23,6 +24,7 @@ from algotrade.services.drafting.prompt import (
     index_line,
     phrase_line,
     prefix_text,
+    relevant_keys,
     situation_line,
     slice_guide_line,
     sliced_system_prompt,
@@ -257,11 +259,23 @@ def test_the_task_states_the_contract_and_what_a_formula_can_express() -> None:
 
 def test_the_open_backlog_keys_are_in_the_prefix_every_sentence_shares() -> None:
     site = [info("rollup.b@v1.x")]
-    keys = (("a_key", "what a is"), ("b_key", "what b is"))
+    keys = (("a_key", "what a is"), ("b_key", "what\nb   is"))
     first = sliced_system_prompt(site, "b", open_keys=keys)
     second = sliced_system_prompt(site, "something else", open_keys=keys)
-    prefix = prefix_text(site, keys)
-    assert first.startswith(prefix) and second.startswith(prefix)
-    assert prefix.endswith("a_key | what a is\nb_key | what b is\n")
-    assert prefix.index("Field index (every") < prefix.index("Open requests (")
-    assert "Open requests (" not in prefix_text(site)  # no keys, no section
+    prefix = prefix_text(site)
+    assert first.startswith(prefix) and second.startswith(prefix)  # the prefix has no keys
+    assert "Open requests (" not in prefix
+    assert "a_key | what a is\nb_key | what b is\n" in first  # equal relevance: by key
+    assert "Open requests (" not in sliced_system_prompt(site, "b")  # no keys, no section
+
+
+def test_open_keys_shown_are_the_most_relevant_then_by_key_and_capped() -> None:
+    keys = [(f"k{n:02}", "plain") for n in range(30)] + [
+        ("zz_support_history", "time near support")
+    ]
+    got = relevant_keys("held near support for years", keys)
+    assert got[0][0] == "zz_support_history"  # the sentence's words first
+    assert [k for k, _ in got[1:]] == [f"k{n:02}" for n in range(PROMPT_LIMIT - 1)]
+    assert len(got) == PROMPT_LIMIT
+    assert relevant_keys("x", keys, limit=2) == [("k00", "plain"), ("k01", "plain")]
+    assert relevant_keys("x", reversed(keys)) == relevant_keys("x", keys)  # deterministic
