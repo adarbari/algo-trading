@@ -134,17 +134,31 @@ def draft_screen(
         if named:  # a bare entry name: the repair asks again with the full names
             raise InvalidAnswerError("; ".join(f"{d.field}: {d.reason}" for d in named))
 
-    completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
+    try:
+        completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
+    except ModelUnavailableError:
+        # every attempt refused for a bare entry name only: keep the good criteria, show the
+        # bare ones dropped with their candidates (no completion, so no call id)
+        if (
+            drafted
+            and drafted[-1][1].dropped
+            and all("; did you mean " in d.reason for d in drafted[-1][1].dropped)
+        ):
+            return _finished(ctx, drafted[-1][1], None)
+        raise
     try:
         if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
             check(completion.text)
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
-    final = drafted[-1][1]
+    return _finished(ctx, drafted[-1][1], completion.call_id)
+
+
+def _finished(ctx: ReadContext, final: ScreenDraft, call_id: str | None) -> ScreenDraft:
     formulas, dry_notes = dry_run_all(ctx, final.formulas)  # once, on the draft we keep
     return replace(
-        final, formulas=formulas, notes=(*final.notes, *dry_notes), call_id=completion.call_id
+        final, formulas=formulas, notes=(*final.notes, *dry_notes), call_id=call_id
     )  # one id: every attempt of the call
 
 

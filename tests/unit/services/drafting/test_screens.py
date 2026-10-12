@@ -651,3 +651,20 @@ def test_a_bare_entry_name_is_repaired_with_the_full_name_in_the_ask(ctx: ReadCo
     assert [s for _, s, _ in cheap.calls] == ["first", "repair"]
     assert f"`{PRICE}`" in cheap.calls[1][0]  # the repair names the full field
     assert draft.document["criteria"]["price"]["field"] == PRICE and not draft.dropped
+
+
+def test_bare_names_in_every_attempt_keep_the_good_criteria_and_other_problems_still_fail(
+    ctx: ReadContext,
+) -> None:
+    bare = {"id": "bare", "field": BARE, "op": "gt", "value": 50}
+    answer = json.dumps(proposal(PRICE_GT, bare))
+    only = Scripted("only", answer, answer)  # the first answer and the repair
+    draft = draft_screen(ctx, chained(Ledger(), only), "s", "over $50")
+    assert [s for _, s, _ in only.calls] == ["first", "repair"]
+    assert list(draft.document["criteria"]) == ["price"]
+    assert [(d.id, d.field) for d in draft.dropped] == [("bare", BARE)]
+    assert f"did you mean `{PRICE}`" in draft.dropped[0].reason
+    other = {"id": "made", "field": "rollup.made_up@v9.x", "op": "gt", "value": 1}
+    mixed = json.dumps(proposal(PRICE_GT, bare, other))
+    with pytest.raises(ModelUnavailableError):
+        draft_screen(ctx, chained(Ledger(), Scripted("m", mixed, mixed)), "s", "over $50")
