@@ -121,24 +121,27 @@ pending formulas, not on missing features (the gap is saved in the screen's note
 trader-facing message with Try again; a visible waiting phase with Cancel. Every new term (buckets,
 statuses, pending formula, needs your call) ships its Guide entry in the same PR.
 
-## PR order
+## PR order (state 2026-10-12)
 
-0. Done: #514 failure log (rejected rows, error / stage / sentence / answer on the admin usage page).
-1. Meter fix: cache read / write tokens, `call_id`, `prompt_version`, `stage` on `usage/llm_calls`
-   (ADR 0058 amendment; the CLI adapter drops cache tokens today, so input is under-reported ~10^5).
-2. Prompt reorder for a stable prefix; the guide trimmed to its criterion lines.
-3. Done: #529 retrieval slice (field index + per-sentence slice, `PROMPT_VERSION` 2) and the golden replay
-   harness (#526). Not done: the phrasebook skip-the-model short-cut (lever 3): phrasebook hints are free text,
-   so wiring it needs structured thresholds in the phrasebook first (a later PR).
-4. Cheap-model-first tiering, the repair retry, fall-through on invalid output, schema-constrained JSON.
-5. The A / B / C contract: parsing, validation, dry run, fingerprint, `feature_backlog.toml` (ADR 0041
-   amendment).
-6. New ADR and `feedback/drafting_events` recorder; `usage/feature_requests`.
-7. Builder panel, formula flow and Guide entries; choices carried in the save body; server-side diff.
-8. Admin: feature requests and accepted formulas; `golden candidates` / `curate`; the leak test;
-   `promote-feature` skill. Later: "Notify me when available".
+Done: #514 failure log; #521 usage meter (cache tokens, call ids); #522 stable prefix; #526 golden replay
+harness; #528 answer schema, repair, fall-through; #529 retrieval slice; #530 + #533 feedback events (one
+session per screen, the iteration chain); #531 live golden run command; #535 A / B / C contract; #523
+fingerprint and dry-run; #524 design-system components; #525 backlog config; #537 golden candidates and
+curate; #539 request log and ranking; #538 review-and-release; #536 promote-feature skill.
 
-PRs 1 and 6 touch `usage.py` and the ledger that #514 changed: start after #514 merges.
+In flight: #540 feedback retention / erase.
+
+Not started (owner in brackets):
+- Request-log route wiring, after #535 (implementer, API).
+- Builder panel wiring, PR 7 (implementer, web), then the admin accepted-formula list.
+- Admin feature-requests page, PR 8 (implementer, web).
+- Prompt headroom: a token-budgeted slice and a compact index; the largest golden prompt margin is about 77
+  tokens (architect decides, implementer builds).
+- `services/drafting` folder split (`contract/`, `golden/`) (implementer).
+- Structured phrasebook thresholds, then the skip-the-model short-cut (architect, then implementer).
+- Enum values for index-only fields: measure after the live golden run (owner question).
+- The live golden run: approved by the owner, Gemini first, $3 cap, `--yes` (owner runs it).
+- "Notify me when available" (lowest priority); `edge_revised` event (reserved, only if a save route exists).
 
 Follow-up (owner question, not built): should index-only fields show their enum values? The model otherwise
 guesses a value and the validator drops a wrong guess; adding them to the prefix would exceed the 15k budget at
