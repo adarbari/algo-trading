@@ -86,6 +86,11 @@ export const ADMIN: Workspace = {
         'Every edge evaluation run, newest first: whose, which split, what it measured and left out, and its stored rows.',
     },
     {
+      path: '/admin/feature-requests',
+      label: 'Feature requests',
+      summary: 'Missing features traders asked for, ranked.',
+    },
+    {
       path: '/admin/screener-runs',
       label: 'Screener runs',
       summary: 'Per-user scheduled screens, run history and publishing (sharing) results.',

@@ -17,11 +17,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
-from algotrade.config.site.drafting.backlog import BacklogItem, FeatureBacklogSettings
+from algotrade.config.site.drafting.backlog import STATUS, BacklogItem, FeatureBacklogSettings
 
 HALF_LIFE_DAYS = 60.0  # the decay constant of exp(-age / 60)
 WEIGHTS = {"ROLLUP_FROM_STORED": 1.0, "NEEDS_SOURCE": 0.5, "UNCLEAR": 0.25}
 UNMAPPED = "UNMAPPED"  # the status of a slug the backlog does not know
+STATUSES = (*STATUS, UNMAPPED)  # every status a ranked row can carry
 
 
 @dataclass(frozen=True)

@@ -299,7 +299,9 @@ exempt = "free text: the run's name"
 
 [[enum]]
 source = "graphql:FeatureRequestRow.status"
-exempt = "admin-only Feature requests page: the backlog status of a requested feature (OPEN, PROMOTED, WONT_DO, UNMAPPED); the Guide entry ships with the web page (ADR 0066)"
+values_from = "python:algotrade.services.feedback.ranking:STATUSES"
+values = { OPEN = "term:feature_request_status", PROMOTED = "term:feature_request_status", WONT_DO = "term:feature_request_status", UNMAPPED = "term:feature_request_status" }
+names = { WONT_DO = "won't do" }
 
 # ------------------------------------------------------------------ sections
 
@@ -318,6 +320,10 @@ start = "start:read_an_edge_page"
 [[section]]
 path = "/regime"
 start = "start:read_the_regime_page"
+
+[[section]]
+path = "/admin/feature-requests"
+start = "start:read_feature_requests"
 
 [[section]]
 path = "/backtests"

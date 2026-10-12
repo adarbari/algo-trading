@@ -267,6 +267,11 @@ export type ComparePricesQueryVariables = Exact<{
 
 export type ComparePricesQuery = { table: { instruments: Array<{ instrumentId: string, symbol: string, prices: { bars: Array<{ session: string, close: number }> } }> } | null };
 
+export type FeatureRequestsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type FeatureRequestsQuery = { featureRequests: { today: string, days: number, rows: Array<{ rank: number, ref: string, description: string, feasibility: string, score: number, users: number, timesAsked: number, firstSeen: string | null, lastSeen: string, status: string, promotedTo: string, unmapped: boolean }> } | null };
+
 export type FeatureCatalogueQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -1577,6 +1582,28 @@ export const ComparePricesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ComparePricesQuery, ComparePricesQueryVariables>;
+export const FeatureRequestsDocument = new TypedDocumentString(`
+    query FeatureRequests {
+  featureRequests {
+    today
+    days
+    rows {
+      rank
+      ref
+      description
+      feasibility
+      score
+      users
+      timesAsked
+      firstSeen
+      lastSeen
+      status
+      promotedTo
+      unmapped
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<FeatureRequestsQuery, FeatureRequestsQueryVariables>;
 export const FeatureCatalogueDocument = new TypedDocumentString(`
     query FeatureCatalogue {
   catalogue {

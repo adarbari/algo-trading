@@ -12,6 +12,7 @@ import { WORKSPACES } from '../src/app/workspaces/workspaces';
 import { expectAccessible, settled } from './a11y';
 import { mockAdminApi } from './admin-api';
 import { mockViewer } from './auth-api';
+import REQUESTS from './fixtures/feature-requests.json' with { type: 'json' };
 import { mockApi } from './mock-api';
 
 /** Every section, and the Guide (its own layout, outside the workspaces) with its regime pages. */
@@ -337,6 +338,19 @@ test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) =>
   // A phone shows 3 of the columns (edge, started, status): the run id is in the sheet
   await page.getByRole('row', { name: /momentum_12_1/ }).tap();
   await expect(page.getByRole('dialog', { name: 'run-b' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()?.width ?? 0,
+  );
+});
+
+test('Feature requests: the ranked list fits a phone and a status filter narrows it', async ({
+  page,
+}) => {
+  await mockAdminApi(page, { featureRequests: REQUESTS });
+  await page.goto('/admin/feature-requests');
+  await expect(page.getByRole('row', { name: /realised_vol_20d/ })).toBeVisible();
+  await page.getByRole('radio', { name: 'Promoted' }).tap();
+  await expect(page).toHaveURL(/status=PROMOTED/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );
