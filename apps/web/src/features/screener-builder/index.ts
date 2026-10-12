@@ -3,6 +3,8 @@ export {
   useScreenerBuilder,
   ScreenerBuilderProvider,
   PREVIEW_DEBOUNCE_MS,
+  type DraftChoice,
+  type FormulaState,
   type ScreenerBuilder,
 } from './model/builder';
 export { previewPanelState, type PreviewPanelState } from './model/preview-state';

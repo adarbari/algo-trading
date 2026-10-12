@@ -59,4 +59,10 @@ describe('plainEnglish', () => {
       ),
     ).toContain('IV30');
   });
+
+  it('ends with what the screen does not cover', () => {
+    expect(plainEnglish([criterion({ id: 'iv' })], catalogue, ['support lines', 'a trend'])).toBe(
+      'Find instruments where IV30 ≥ 50%. Not covered: support lines; a trend.',
+    );
+  });
 });

@@ -2,6 +2,7 @@
 back through GraphQL (``screenDetail``, ``screenVersions``, ``myScreens``: the API's user)."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -200,7 +201,18 @@ def _describe_it(c: TestClient) -> tuple[Keep, str]:
     c.app.state.feedback, c.app.state.text_model = sink, Answer()  # type: ignore[attr-defined]
     drafted = c.post("/screeners/mine/draft-from-text", json={"text": "price over $5"})
     assert drafted.status_code == 200, drafted.text
-    return sink, drafted.json()["draft_session_id"]
+    session = drafted.json()["draft_session_id"]
+    drafts = c.app.state.drafts  # type: ignore[attr-defined]
+    kept = drafts.get(session, "local", "mine")  # the canned answer offers no choices: say it did
+    drafts.put(
+        session,
+        replace(
+            kept,
+            terms=frozenset({"liquid"}),
+            formulas=frozenset({"draft_near_high", "draft_other"}),
+        ),
+    )
+    return sink, session
 
 
 def test_describe_it_events_follow_the_draft_to_the_saved_screen(writer_client: TestClient) -> None:
@@ -238,6 +250,98 @@ def test_a_hand_built_screen_and_a_failed_write_record_nothing(writer_client: Te
     c.delete("/screeners/mine")  # the screen goes: a later save of its id is a conflict, 409
     refused = c.put("/screeners/mine/draft", json={"document": OWN, "draft_session_id": session})
     assert refused.status_code == 409 and len(sink.rows) == after_save
+
+
+CHOICES = [
+    {"event": "choice_made", "subject": "liquid", "picked": 1},
+    {"event": "formula_accepted", "subject": "draft_near_high"},
+    {"event": "formula_skipped", "subject": "draft_other"},
+]
+
+
+def test_choices_become_one_event_each_after_the_write_and_a_resend_is_the_same_row(
+    writer_client: TestClient,
+) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    body = {"document": OWN, "draft_session_id": session, "choices": CHOICES}
+    assert c.put("/screeners/mine/draft", json=body).status_code == 200
+    made = [r for r in sink.rows if r["event"] in {x["event"] for x in CHOICES}]
+    assert [r["event"] for r in made] == [x["event"] for x in CHOICES]
+    assert json.loads(made[0]["payload"]) == {"subject": "liquid", "picked": 1}
+    assert json.loads(made[1]["payload"]) == {"subject": "draft_near_high", "picked": None}
+    assert {r["draft_session_id"] for r in made} == {session} and made[0]["sentence"]
+    c.put("/screeners/mine/draft", json=body)  # the web re-sends them with the next save
+    c.post("/screeners/mine/finalise", json={"draft_session_id": session, "choices": CHOICES})
+    ids = [r["event_id"] for r in sink.rows if r["event"] in {x["event"] for x in CHOICES}]
+    assert len(ids) == 9 and len(set(ids)) == 3  # the same three keys: the table keeps one each
+
+
+def test_a_choice_whose_subject_the_answer_never_offered_records_nothing(
+    writer_client: TestClient,
+) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    stray = [
+        {"event": "choice_made", "subject": "invented", "picked": 0},
+        {"event": "formula_accepted", "subject": "liquid"},  # a term is not a formula
+        {"event": "formula_skipped", "subject": "draft_other"},
+    ]
+    c.put(
+        "/screeners/mine/draft",
+        json={"document": OWN, "draft_session_id": session, "choices": stray},
+    )
+    made = [r for r in sink.rows if r["event"] in {x["event"] for x in stray}]
+    assert [r["event"] for r in made] == ["formula_skipped"]
+
+
+def test_choices_of_a_session_that_is_not_theirs_or_of_a_refused_write_record_nothing(
+    writer_client: TestClient,
+) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    before = len(sink.rows)
+    c.put("/screeners/mine/draft", json={"document": OWN, "choices": CHOICES})  # no session id
+    c.put(
+        "/screeners/other/draft",
+        json={"document": OWN, "draft_session_id": session, "choices": CHOICES},
+    )  # another screen's id
+    c.put(
+        "/screeners/mine/draft",
+        json={"document": OWN, "draft_session_id": "unknown", "choices": CHOICES},
+    )
+    assert not [r for r in sink.rows[before:] if r["event"] in {x["event"] for x in CHOICES}]
+    c.delete("/screeners/mine")
+    refused = c.put(
+        "/screeners/mine/draft",
+        json={"document": OWN, "draft_session_id": session, "choices": CHOICES},
+    )
+    assert refused.status_code == 409
+    assert not [r for r in sink.rows[before:] if r["event"] in {x["event"] for x in CHOICES}]
+
+
+def test_bad_choices_are_refused_and_a_failing_sink_does_not_fail_the_save(
+    writer_client: TestClient,
+) -> None:
+    c = writer_client
+    wrong = {"event": "draft_saved", "subject": "x"}
+    assert (
+        c.put("/screeners/mine/draft", json={"document": OWN, "choices": [wrong]}).status_code
+        == 422
+    )
+    many = [CHOICES[0]] * 51
+    assert (
+        c.put("/screeners/mine/draft", json={"document": OWN, "choices": many}).status_code == 422
+    )
+    _sink, session = _describe_it(c)
+
+    class Down:
+        def submit(self, row: Any) -> bool:
+            raise RuntimeError("down")
+
+    c.app.state.feedback = Down()  # type: ignore[attr-defined]
+    body = {"document": OWN, "draft_session_id": session, "choices": CHOICES}
+    assert c.put("/screeners/mine/draft", json=body).status_code == 200
 
 
 def test_a_failing_sink_does_not_fail_the_save(writer_client: TestClient) -> None:

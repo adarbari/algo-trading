@@ -70,7 +70,7 @@ export default defineConfig({
             },
             {
               name: 'tables',
-              test: /(feature-table[\\/]model[\\/]rows|features[\\/]guide-help[\\/]ui[\\/]helped)/,
+              test: /(feature-table[\\/]model[\\/]rows|features[\\/]guide-help[\\/]ui[\\/]helped|components[\\/]PendingRow[\\/])/,
               priority: 10,
             },
             {

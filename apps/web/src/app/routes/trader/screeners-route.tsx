@@ -11,8 +11,10 @@ import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
 import { lazyPage } from '@/shared/lib/lazy';
 
-const NewScreener = lazyPage(() => import('./screener-builder-routes'), 'NewScreener');
-const EditScreener = lazyPage(() => import('./screener-builder-routes'), 'EditScreener');
+// One import call for both: the entry then carries one preload file list, not two.
+const builderRoutes = () => import('./screener-builder-routes');
+const NewScreener = lazyPage(builderRoutes, 'NewScreener');
+const EditScreener = lazyPage(builderRoutes, 'EditScreener');
 const ScreenerResultsPage = lazyPage(
   () => import('@/pages/screener-results'),
   'ScreenerResultsPage',

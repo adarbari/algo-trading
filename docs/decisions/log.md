@@ -191,3 +191,19 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: they were taken by the orchestrator, which may not decide policy; the owner confirmed them in the session.
+
+## 2026-10-11 | PR 7 Builder draft review | Screen notes key
+- Question: where is the gap of a missing feature saved, and does it change the config hash?
+- Options: a new optional `notes` list on the rule-screen spec (in the hash) / out of the hash / a separate store.
+- Decision: an optional `notes` list (10 items, 200 characters each) on the rule-screen spec; absent it, the canonical form and hash are unchanged; present it, an edit makes a new hash.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the plan says the gap is saved in the screen's notes; a run should record what the screen did not cover.
+
+## 2026-10-11 | PR 7 Builder draft review | Sentence tags
+- Question: the server sends spans only for unresolved terms and missing features; how is the rest of the sentence tagged?
+- Options: tag only what the server spans / match criteria to words in the browser / add spans to the answer contract.
+- Decision: tag only the server's spans in this PR (needs your call, not available yet); applied and formula spans wait for a contract change.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the browser derives nothing (ADR 0038); a contract change is a separate PR.

@@ -19,20 +19,22 @@ import { rootRoute } from '../root';
 import { lazyPage } from '@/shared/lib/lazy';
 
 // One chunk for the Guide's pages (they share widgets), loaded when the first Guide page opens.
-const GuideEpisodePage = lazyPage(() => import('@/pages/guide'), 'GuideEpisodePage');
-const GuideFieldPage = lazyPage(() => import('@/pages/guide'), 'GuideFieldPage');
-const GuideFieldsPage = lazyPage(() => import('@/pages/guide'), 'GuideFieldsPage');
-const GuideGlossaryPage = lazyPage(() => import('@/pages/guide'), 'GuideGlossaryPage');
-const GuideHomePage = lazyPage(() => import('@/pages/guide'), 'GuideHomePage');
-const GuideIndicatorPage = lazyPage(() => import('@/pages/guide'), 'GuideIndicatorPage');
-const GuidePlaybookPage = lazyPage(() => import('@/pages/guide'), 'GuidePlaybookPage');
-const GuidePlaybooksPage = lazyPage(() => import('@/pages/guide'), 'GuidePlaybooksPage');
-const GuideRegimePage = lazyPage(() => import('@/pages/guide'), 'GuideRegimePage');
-const GuideSituationPage = lazyPage(() => import('@/pages/guide'), 'GuideSituationPage');
-const GuideSituationsPage = lazyPage(() => import('@/pages/guide'), 'GuideSituationsPage');
-const GuideStartIndexPage = lazyPage(() => import('@/pages/guide'), 'GuideStartIndexPage');
-const GuideStartPage = lazyPage(() => import('@/pages/guide'), 'GuideStartPage');
-const GuideTermPage = lazyPage(() => import('@/pages/guide'), 'GuideTermPage');
+// One import call for every Guide page: the entry carries one preload file list, not fourteen.
+const guidePages = () => import('@/pages/guide');
+const GuideEpisodePage = lazyPage(guidePages, 'GuideEpisodePage');
+const GuideFieldPage = lazyPage(guidePages, 'GuideFieldPage');
+const GuideFieldsPage = lazyPage(guidePages, 'GuideFieldsPage');
+const GuideGlossaryPage = lazyPage(guidePages, 'GuideGlossaryPage');
+const GuideHomePage = lazyPage(guidePages, 'GuideHomePage');
+const GuideIndicatorPage = lazyPage(guidePages, 'GuideIndicatorPage');
+const GuidePlaybookPage = lazyPage(guidePages, 'GuidePlaybookPage');
+const GuidePlaybooksPage = lazyPage(guidePages, 'GuidePlaybooksPage');
+const GuideRegimePage = lazyPage(guidePages, 'GuideRegimePage');
+const GuideSituationPage = lazyPage(guidePages, 'GuideSituationPage');
+const GuideSituationsPage = lazyPage(guidePages, 'GuideSituationsPage');
+const GuideStartIndexPage = lazyPage(guidePages, 'GuideStartIndexPage');
+const GuideStartPage = lazyPage(guidePages, 'GuideStartPage');
+const GuideTermPage = lazyPage(guidePages, 'GuideTermPage');
 
 export const guideRoute = createRoute({
   getParentRoute: () => rootRoute,

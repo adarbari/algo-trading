@@ -21,6 +21,7 @@ from algotrade.services.drafting.prompt import (
     PROMPT_VERSION,
     TASK,
     catalogue_line,
+    index_group,
     index_line,
     phrase_line,
     prefix_text,
@@ -78,7 +79,7 @@ def test_sliced_prompt_sorts_the_index_and_is_stable() -> None:
         == sliced_system_prompt(infos, "b things")
         == sliced_system_prompt(infos[::-1], "b things")
     )
-    assert first.index("instrument.a") < first.index("rollup.b@v1.x")
+    assert first.index("instrument.*") < first.index("rollup.b@v1.*")
     assert "ONE JSON object" in first and "tie_break" in first
     assert "Example 1" in first and "Example 2" in first and "Phrasebook" not in first
     assert "Field guide (" not in first and "Field guide (" not in sliced_system_prompt(
@@ -188,11 +189,11 @@ def test_users_share_the_site_prefix_and_own_features_come_last() -> None:
 
 
 def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
-    assert PROMPT_VERSION == "4"
+    assert PROMPT_VERSION == "5"
     names = {"rollup.b@v1.x"}
-    assert (
-        index_line(info("instrument.a", "str", unit="category")) == "instrument.a | str | category"
-    )
+    assert index_line(info("instrument.a", "str", unit="category")) == "a|str|category"
+    assert index_group("rollup.price_stats@v2.close") == ("rollup.price_stats@v2.", "close")
+    assert index_group("feature.iv_rank") == ("feature.", "iv_rank")
     assert slice_guide_line(RSI, names) == (
         "rollup.b@v1.x | use: oversold: lt 30 soft tolerance 5.0 (with a trend); "
         'liquid: gte 50000000.0 soft tolerance {"relative": 0.2} on_miss LIQUIDITY_RISK; '
@@ -221,7 +222,8 @@ def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
     text = sliced_system_prompt(infos, "oversold b names", (), guide)
     assert text.index("Field index") < text.index("Detail (") < text.index("Field guide (")
     index = text.split("Detail (")[0]
-    assert all(f"{i.name} | float | -" in index for i in infos)  # every field is indexed
+    assert "rollup.b@v1.*\nx|float|-" in index
+    assert "feature.*\nc|float|-\nother|float|-" in index  # one heading per prefix
     assert "feature.other | float | - | x" not in text  # but only the slice has detail
     assert "pending takeover" in text and "Phrasebook (" not in text
 

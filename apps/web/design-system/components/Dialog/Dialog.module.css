@@ -3,6 +3,7 @@
  * never shadows. The backdrop is the canvas colour at partial opacity (no raw colours).
  */
 .overlay {
+  container-type: inline-size;
   z-index: var(--z-modal);
   display: grid;
   place-items: center;
@@ -70,6 +71,18 @@
 .panel[data-kind='drawer'][data-side='start'] {
   border-inline-start: 0;
   animation-name: slide-from-start;
+}
+
+/* A long form fills a narrow screen (the overlay is the viewport, so its width is the screen's). */
+@container (width < 480px) {
+  .panel[data-kind='dialog'][data-phone='full'] {
+    position: fixed;
+    inset: 0;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
 }
 
 .panel:focus-visible {

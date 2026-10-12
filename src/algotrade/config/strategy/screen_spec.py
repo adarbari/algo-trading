@@ -21,6 +21,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.core.model.predicates import NUMERIC_OPS, Group, Rule
 from algotrade.core.model.screen_spec import (
+    MAX_NOTE_LENGTH,
+    MAX_NOTES,
     NEAR_MISS_DECISIONS,
     Criterion,
     Mode,
@@ -134,6 +136,19 @@ def _rank(raw: Any, path: str) -> tuple[str | None, bool]:
     return tie_break, order == "desc"
 
 
+def _notes(raw: Any, path: str) -> tuple[str, ...]:
+    if not isinstance(raw, list):
+        raise _fail(path, "expected a list of short strings")
+    if len(raw) > MAX_NOTES:
+        raise _fail(path, f"at most {MAX_NOTES} notes")
+    for i, note in enumerate(raw):
+        if not isinstance(note, str) or not note.strip():
+            raise _fail(f"{path}[{i}]", "expected a non-empty string")
+        if len(note) > MAX_NOTE_LENGTH:
+            raise _fail(f"{path}[{i}]", f"at most {MAX_NOTE_LENGTH} characters")
+    return tuple(raw)
+
+
 def _score_criterion(score: Any, path: str) -> Criterion:
     """A model screen's last gate: its score exists. A probit lies in [0, 1], so ``>= 0`` is
     "has a value" and a missing score never passes (ADR 0030); the rank is the score itself."""
@@ -181,6 +196,7 @@ def parse_screen_spec(config_id: str, raw: Mapping[str, Any], path: str) -> Scre
         columns=columns,
         tie_break=tie_break,
         tie_break_descending=descending,
+        notes=_notes(raw.get("notes", []), f"{path}.notes"),
     )
 
 

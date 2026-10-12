@@ -31,6 +31,7 @@ const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unk
   discarding: false,
   nextVersion: 2,
   criteria: [{ id: 'a' }],
+  pendingFormulas: [],
   save,
   discard,
   detail: {
@@ -211,5 +212,20 @@ describe('DraftBar', () => {
     );
     setup();
     expect(screen.getByText('This draft would not finalize')).toBeInTheDocument();
+  });
+
+  it('blocks Finalize while a proposed formula is pending, says why, and lets Save draft through', () => {
+    state.builder = builder({ dirty: true, pendingFormulas: [{ name: 'draft_x' }] });
+    setup();
+    expect(screen.getByRole('button', { name: 'Finalize v2' })).toBeDisabled();
+    expect(screen.getByText('Formula pending')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+  });
+
+  it('does not say a formula is pending when none is', () => {
+    state.builder = builder({ dirty: true });
+    setup();
+    expect(screen.getByRole('button', { name: 'Finalize v2' })).toBeEnabled();
+    expect(screen.queryByText('Formula pending')).toBeNull();
   });
 });

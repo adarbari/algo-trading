@@ -6,13 +6,13 @@ says (always all of them), (b) a word match of the sentence against field names,
 descriptions (word boundaries, simple stemming, stop words, rarer words count more), (c) the
 fields a selected field's guide caveats name, (d) a few core fields every screen touches. A
 missed field must never turn into a false "missing", so the match is generous; the cap
-(``MAX_FIELDS``) bounds only the non-phrasebook picks of (b) and (c). Pure: reads nothing,
-calls no model."""
+(``MAX_FIELDS``) bounds only the non-phrasebook picks of (b) and (c), and the prompt's token
+budget caps the whole slice (``select_slice(budget=...)``). Pure: reads nothing, calls no model."""
 
 import math
 import re
 from collections import Counter
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from algotrade.config.site.field_guide import FieldGuideSettings
@@ -208,9 +208,18 @@ def select_slice(
     infos: Sequence[FeatureInfo],
     phrasebook: Iterable[Phrase] = (),
     guide: FieldGuideSettings | None = None,
+    budget: int | None = None,
+    weigh: Callable[[str, bool], int] | None = None,
 ) -> Slice:
     """The slice of ``sentence`` over the catalogue ``infos``. Deterministic: the same inputs
-    give the same slice whatever the order of ``infos``."""
+    give the same slice whatever the order of ``infos``.
+
+    With a token ``budget`` and ``weigh(name, brief)`` (the tokens of that field's detail line and
+    guide entry, caveats left out when brief) the slice is capped by tokens, not only by counts:
+    the phrasebook fields and the core fields are always in (briefly); then, by relevance, the
+    word picks, cross references and weaker matches get their detail line while the budget
+    holds; then, by relevance, those that earn caveats are upgraded to the full entry while it
+    holds. So text added to the prompt around the slice shrinks the slice, never the margin."""
     names = {i.name for i in infos}
     matched = tuple(p for p in phrasebook if phrase_matches(sentence, p))
     phrase_fields = {f for p in matched for f in p.fields if f in names}
@@ -222,9 +231,40 @@ def select_slice(
     tail = [n for n in ranked[FIRST_WORD_PICKS:] if n not in full]
     brief = tail[: max(0, MAX_FIELDS - len(full))]
     core = {n for n in CORE_FIELDS if n in names}
+    if budget is not None and weigh is not None:
+        return _within_budget(
+            matched, sorted(phrase_fields), list(full), brief, core, budget, weigh
+        )
     keep = phrase_fields | full.keys()
     weak = frozenset((set(brief) | core) - keep)
     return Slice(tuple(sorted(keep | weak)), weak, matched)
+
+
+def _within_budget(
+    matched: tuple[Phrase, ...],
+    phrase_fields: list[str],
+    picks: list[str],
+    tail: list[str],
+    core: set[str],
+    budget: int,
+    weigh: Callable[[str, bool], int],
+) -> Slice:
+    """The budgeted slice (see ``select_slice``): ``phrase_fields`` and ``core`` first (never
+    dropped), then ``picks`` and ``tail`` (relevance order) while their detail fits, then the
+    ``phrase_fields`` and ``picks`` upgraded to full entries while the caveats fit."""
+    chosen = dict.fromkeys(sorted(set(phrase_fields) | core))
+    spent = sum(weigh(n, True) for n in chosen)
+    for name in (*picks, *tail):
+        if name not in chosen and spent + weigh(name, True) <= budget:
+            chosen[name] = None
+            spent += weigh(name, True)
+    upgraded: set[str] = set()
+    for name in (*phrase_fields, *picks):
+        extra = weigh(name, False) - weigh(name, True)
+        if name in chosen and name not in upgraded and spent + extra <= budget:
+            upgraded.add(name)
+            spent += extra
+    return Slice(tuple(sorted(chosen)), frozenset(set(chosen) - upgraded), matched)
 
 
 def _ranked(
