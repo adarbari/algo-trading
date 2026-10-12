@@ -2,6 +2,7 @@
 own history, never a count or trace of another user, and gets an authorization error for the ranked
 list; an admin reads the ranked list across users, and their own "my requests" is theirs only."""
 
+import dataclasses
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
@@ -12,7 +13,13 @@ from algotrade.core.model.errors import PermissionDeniedError
 from algotrade.services.feedback.request_recorder import FeatureRequestRecorder
 from algotrade.services.feedback.requests import request_row
 from algotrade.services.read.context import StoreContext, open_stores
-from algotrade.services.read.ops.feature_requests import load_my_requests, load_ranked_requests
+from algotrade.services.read.ops.feature_requests import (
+    FeatureRequestList,
+    FeatureRequestRow,
+    load_feature_requests,
+    load_my_requests,
+    load_ranked_requests,
+)
 from algotrade.services.read.users.viewer import Viewer
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -156,3 +163,45 @@ def test_an_older_partition_without_optional_columns_reads() -> None:
     # the reads need only user, ref, feasibility and the day: a partition lacking the rest is fine
     ctx = stores([ask("alice", "fcf_yield", 1) | {"feasibility": None}])
     assert load_ranked_requests(ctx, ADMIN, TODAY)[0].feasibility == "NEEDS_SOURCE"
+
+
+def test_the_admin_list_is_ranked_with_counts_and_unmapped_flagged() -> None:
+    ctx = stores(ledger())
+    listed = load_feature_requests(ctx, ADMIN, TODAY)
+    assert (listed.today, listed.days) == (TODAY, 365)
+    assert [r.rank for r in listed.rows] == [1, 2, 3]
+    top = listed.rows[0]
+    assert (top.ref, top.users, top.times_asked, top.status) == ("fcf_yield", 2, 3, "OPEN")
+    assert (top.first_seen, top.last_seen) == (date(2026, 9, 18), TODAY)
+    assert top.description == "FCF over price" and top.feasibility == "NEEDS_SOURCE"
+    slugs = {r.ref: r for r in listed.rows}
+    assert slugs["gamma_squeeze"].unmapped and slugs["gamma_squeeze"].status == "UNMAPPED"
+    assert slugs["gamma_squeeze"].description == ""
+
+
+def test_a_closed_backlog_item_is_listed_after_open_and_unmapped_ones() -> None:
+    backlog = {
+        ("site", "settings", "feature_backlog"): {
+            "item": [
+                {"key": "done", "description": "d", "feasibility": "ROLLUP_FROM_STORED",
+                 "status": "PROMOTED", "promoted_to": "rollup.x@v1.y"},
+            ]
+        }
+    }  # fmt: skip
+    ctx = stores([ask("a", "done", 0), ask("b", "done", 0), ask("c", "fresh", 3)])
+    ctx = open_stores(ctx.reader, MemoryConfigStore(backlog), UserContext("local"))
+    rows = load_feature_requests(ctx, ADMIN, TODAY).rows
+    assert [(r.rank, r.ref, r.status) for r in rows] == [
+        (1, "fresh", "UNMAPPED"),
+        (2, "done", "PROMOTED"),
+    ]
+    assert rows[1].promoted_to == "rollup.x@v1.y"
+
+
+def test_the_admin_list_refuses_a_trader_and_has_no_user_or_span_field() -> None:
+    with pytest.raises(PermissionDeniedError):
+        load_feature_requests(stores(ledger()), ALICE, TODAY)
+    names = {f.name for f in dataclasses.fields(FeatureRequestRow)}
+    assert not names & {"user", "users_list", "user_id", "span", "spans", "who"}
+    assert {f.name for f in dataclasses.fields(FeatureRequestList)} == {"today", "days", "rows"}
+    assert load_feature_requests(stores([], documents=False), ADMIN, TODAY).rows == ()

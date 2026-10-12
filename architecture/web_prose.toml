@@ -20,7 +20,6 @@ min_words = 12
 max_sentence_words = 25
 
 [baseline]
-"src/app/workspaces/workspaces.ts" = 3
 "src/entities/feature/model/columns.tsx" = 1
 "src/entities/regime/ui/RegimeHeadline.tsx" = 1
 "src/features/indicator-history/ui/IndicatorHistory.tsx" = 1

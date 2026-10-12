@@ -502,3 +502,33 @@ so the same idea is not filed again; the Rejected view lists these edges. Reopen
 your own edge back to researching. Blocked: worth testing but missing the data it needs; only
 the site sets and clears it. Blocked describes the edge, while Waiting on data describes a result.
 """
+
+# --------------------------------------------------------------------------------------- 9
+[[page]]
+id = "read_feature_requests"
+order = 9
+title = "Read the Feature requests page"
+summary = "Admins: the features traders asked Describe it for that the catalogue lacks, ranked so the next feature to build is clear."
+links = [
+  { kind = "term", id = "feature_request_score" },
+  { kind = "term", id = "feature_request_status" },
+  { kind = "term", id = "feature_request_feasibility" },
+]
+
+[[page.section]]
+title = "What the page lists"
+body = """
+Each row is one feature a trader asked Describe it for that the catalogue did not have. The page shows counts only: how many distinct users asked, how many times, and when. It never shows who. Rows come in the server's order, best first, and the rank column is that order.
+"""
+
+[[page.section]]
+title = "How the ranking works"
+body = """
+The score adds up the users who asked, each fading with the age of their latest request, and multiplies by the feasibility weight. A feature buildable from stored data ranks above a harder one with the same asks. Open and unmapped requests come before promoted and won't do ones.
+"""
+
+[[page.section]]
+title = "What to do with a row"
+body = """
+Filter by status to see what is waiting. An open row is a candidate to promote to a site feature; a promoted row links to its field page. An unmapped row needs its name merged into a backlog item. All of these are changes to the backlog, reviewed like any other.
+"""
