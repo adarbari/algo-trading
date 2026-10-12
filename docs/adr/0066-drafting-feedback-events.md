@@ -206,6 +206,12 @@ Owner policy decided 2026-10-11.
   answer (`services/drafting` imports nothing of `services/feedback`); GraphQL and the web come
   later.
 
+**Note (2026-10-11): the route records requests.** `draft-from-text` now calls `record_missing` for the
+draft's post-validation `missing` (never the model's raw list) after the feedback events, for the user
+the caller whose sentence it was (as the drafting events), through a second sink (`app.state.requests`, the
+`feature_requests` recorder started with the app and flushed at shutdown with the others); a raising
+or full sink never fails the draft, and a draft with no missing items writes nothing.
+
 ## Consequences
 - The golden set grows from real sentences, with the model's answer and what the trader kept.
 - Personal data is stored: one more reason the read is viewer-scoped and the sentence short.
