@@ -12,6 +12,7 @@ nothing for the diff, and a hand-built screen records nothing at all. Every func
 swallows its own failure: a request never fails on its feedback."""
 
 import copy
+import hashlib
 import logging
 import threading
 from collections import OrderedDict
@@ -23,6 +24,8 @@ from algotrade.services.feedback import events
 from algotrade.services.feedback.diff import criteria_diff, criteria_snapshot
 from algotrade.services.feedback.events import FeedbackSink, NoFeedback
 from algotrade.services.feedback.recorder import open_recorder
+from algotrade.services.feedback.request_recorder import open_request_recorder
+from algotrade.services.feedback.requests import MissingLike, record_missing
 from algotrade.services.read.instruments.catalogue import feature_infos
 
 log = logging.getLogger(__name__)
@@ -113,6 +116,29 @@ def feedback_sink(given: FeedbackSink | None, live: bool, data_url: str) -> Feed
     if given is not None:
         return given
     return open_recorder(data_url) if live else NoFeedback()
+
+
+def request_sink(given: FeedbackSink | None, live: bool, data_url: str) -> FeedbackSink:
+    """``feedback_sink`` for the missing-feature requests (``feedback/feature_requests``)."""
+    if given is not None:
+        return given
+    return open_request_recorder(data_url) if live else NoFeedback()
+
+
+def record_missing_requests(
+    sink: FeedbackSink,
+    user: str,
+    items: Sequence[MissingLike],
+    sentence: str,
+    call_id: str | None,
+    session_id: str,
+) -> None:
+    """Queue a draft's ``missing`` items as the user's requests (the span only, never the
+    sentence); never raises."""
+    try:
+        record_missing(sink, user, items, sentence, call_id=call_id, draft_session_id=session_id)
+    except Exception:
+        log.exception("missing-feature requests not recorded")
 
 
 def record_requested(
@@ -248,6 +274,44 @@ def _saved(
             memory.close(session_id, user, screener_id)  # a later description is a new session
     except Exception:
         log.exception("%s not recorded", event)
+
+
+def record_choices(
+    sink: FeedbackSink,
+    memory: DraftMemory,
+    session_id: str | None,
+    user: str,
+    screener_id: str,
+    choices: Sequence[Any],
+) -> None:
+    """One ``choice_made`` / ``formula_accepted`` / ``formula_skipped`` row per choice
+    (``subject``, ``picked`` in the payload), for a session that is ``user``'s and
+    ``screener_id``'s only (a session not remembered or not theirs records nothing). The
+    ``event_id`` is a hash of the session, event, subject and pick, so a choice sent again with a
+    later save is the same row. Call after the config write succeeded; never raises."""
+    if not session_id or not choices:
+        return
+    try:
+        draft = memory.get(session_id, user, screener_id)
+        if draft is None:
+            return
+        for choice in choices:
+            try:
+                picked = choice.picked if choice.event == events.CHOICE_MADE else None
+                row = events.row_of(
+                    choice.event, session_id, user, KIND, screener_id,
+                    call_ids=draft.call_ids, catalogue_version=draft.catalogue_version,
+                    prompt_version=draft.prompt_version, draft_hash=draft.draft_hash,
+                    sentence=draft.sentence, seq=draft.seq,
+                    payload={"subject": choice.subject, "picked": picked},
+                )  # fmt: skip
+                key = f"{session_id}|{choice.event}|{choice.subject}|{picked}"
+                row["event_id"] = hashlib.sha256(key.encode()).hexdigest()[:32]
+                sink.submit(row)
+            except Exception:
+                log.exception("%s not recorded", choice.event)
+    except Exception:
+        log.exception("choices not recorded")
 
 
 def record_draft_saved(

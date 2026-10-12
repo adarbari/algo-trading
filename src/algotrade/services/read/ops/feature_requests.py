@@ -27,7 +27,7 @@ from algotrade.services.read.users.viewer import Viewer
 from algotrade.services.read.values import to_scalar
 
 WINDOW_DAYS = 365  # the history read: a request older than this has decayed to under 3%
-COLUMNS = ("user", "ref", "feasibility", "session_date")
+COLUMNS = ("user", "ref", "feasibility", "session_date", "ts", "span")
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,8 @@ class MyRequest:
     last_asked: date
     times_asked: int
     promoted_to: str = ""
+    feasibility: str = "UNCLEAR"  # of the latest ask (the backlog item's when it has one)
+    span: str | None = None  # the piece of the viewer's own sentence of the latest ask
 
 
 def _stored(ctx: Stores, since: date, today: date) -> pd.DataFrame:
@@ -71,17 +73,28 @@ def load_my_requests(
     first. The filter is on ``viewer.user_id`` for every role: nobody's history but their own."""
     today = today or exchange_date(datetime.now(UTC))
     frame = _stored(ctx, today - timedelta(days=days), today)
-    mine = _rows(frame[frame["user"] == viewer.user_id])
+    own = frame[frame["user"] == viewer.user_id].sort_values("ts", kind="stable")
+    mine = _rows(own)
+    latest = {  # the newest ask per row's ref: its feasibility and span
+        str(r["ref"]): (
+            str(to_scalar(r["feasibility"]) or "UNCLEAR"),
+            str(span) if (span := to_scalar(r["span"])) else None,
+        )
+        for r in own.to_dict("records")
+    }
     backlog = load_feature_backlog(ctx.configs)
     by_name: dict[str, BacklogItem] = {i.key: i for i in backlog.items}
     by_name |= {a: i for i in backlog.items for a in i.aliases}
     days_by_ref: dict[str, set[date]] = {}
+    last_of: dict[str, tuple[str, str | None]] = {}
     for row in mine:
         ref = by_name[row.ref].key if row.ref in by_name else row.ref
         days_by_ref.setdefault(ref, set()).add(row.day)
+        last_of[ref] = latest[row.ref]  # mine is in time order: the newest ask wins
     out = []
     for ref, asked in days_by_ref.items():
         item = by_name.get(ref)
+        feasibility, span = last_of[ref]
         out.append(
             MyRequest(
                 ref=ref,
@@ -92,6 +105,8 @@ def load_my_requests(
                 last_asked=max(asked),
                 times_asked=len(asked),
                 promoted_to=item.promoted_to if item else "",
+                feasibility=item.feasibility if item else feasibility,
+                span=span,
             )
         )
     return tuple(sorted(out, key=lambda r: (-r.last_asked.toordinal(), r.ref)))

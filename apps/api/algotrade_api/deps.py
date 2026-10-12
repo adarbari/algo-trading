@@ -312,7 +312,13 @@ def get_drafts(request: Request) -> DraftMemory:
     return cast(DraftMemory, request.app.state.drafts)
 
 
+def get_requests(request: Request) -> FeedbackSink:
+    """Where the missing-feature requests of a draft go (``feedback/feature_requests``)."""
+    return cast(FeedbackSink, request.app.state.requests)
+
+
 Feedback = Annotated[FeedbackSink, Depends(get_feedback)]
+Requests = Annotated[FeedbackSink, Depends(get_requests)]
 Drafts = Annotated[DraftMemory, Depends(get_drafts)]
 
 

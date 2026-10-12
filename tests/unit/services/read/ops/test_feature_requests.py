@@ -86,6 +86,18 @@ def test_a_trader_reads_only_their_own_history() -> None:
     assert not hasattr(mine[0], "users") and not hasattr(mine[0], "score")
 
 
+def test_my_history_carries_the_latest_span_and_feasibility() -> None:
+    ctx = stores(
+        [ask("alice", "gamma_squeeze", 4, "NEEDS_SOURCE"), ask("alice", "gamma_squeeze", 1)]
+    )
+    (mine,) = load_my_requests(ctx, ALICE, TODAY)
+    assert (mine.span, mine.feasibility) == ("my span", "UNCLEAR")  # the newest ask's
+    backlog = {
+        r.ref: r for r in load_my_requests(stores([ask("alice", "fcf_yield")]), ALICE, TODAY)
+    }
+    assert backlog["fcf_yield"].feasibility == "NEEDS_SOURCE"  # the backlog item's
+
+
 def test_an_admin_own_history_is_their_own_too() -> None:
     ctx = stores([*ledger(), ask("abhi", "treasury_level", 3)])
     assert [r.ref for r in load_my_requests(ctx, ADMIN, TODAY)] == ["treasury_level"]

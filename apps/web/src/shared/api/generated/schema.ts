@@ -550,6 +550,11 @@ export interface components {
         /** DraftBody */
         DraftBody: {
             /**
+             * Choices
+             * @description the decisions the trader made on the draft's options, recorded with the save (ADR 0066); a re-sent one is the same event
+             */
+            choices?: components["schemas"]["DraftChoice"][];
+            /**
              * Document
              * @description the screen's TOML keys as JSON (the version is managed)
              */
@@ -561,6 +566,29 @@ export interface components {
              * @description the id a draft-from-text answer returned, when this screen came from it (ADR 0066); a hand-built screen sends none
              */
             draft_session_id?: string | null;
+        };
+        /**
+         * DraftChoice
+         * @description What the trader decided about one thing Describe it offered (ADR 0066): an unresolved
+         *     term's reading (``choice_made``, ``picked`` the alternative's index) or a proposed formula
+         *     (``formula_accepted`` / ``formula_skipped``, ``subject`` its name).
+         */
+        DraftChoice: {
+            /**
+             * Event
+             * @enum {string}
+             */
+            event: "choice_made" | "formula_accepted" | "formula_skipped";
+            /**
+             * Picked
+             * @description the alternative's index (choice_made only)
+             */
+            picked?: number | null;
+            /**
+             * Subject
+             * @description the unresolved term, or the formula name
+             */
+            subject: string;
         };
         /** DraftFormula */
         DraftFormula: {
@@ -731,6 +759,11 @@ export interface components {
         };
         /** FinaliseBody */
         FinaliseBody: {
+            /**
+             * Choices
+             * @description the decisions the trader made on the draft's options, recorded with the save (ADR 0066); a re-sent one is the same event
+             */
+            choices?: components["schemas"]["DraftChoice"][];
             /**
              * Draft Session Id
              * @description the id a draft-from-text answer returned, when this screen came from it (ADR 0066); a hand-built screen sends none

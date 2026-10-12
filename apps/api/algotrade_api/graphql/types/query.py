@@ -38,6 +38,7 @@ from algotrade.services.read.market import market
 from algotrade.services.read.ops import (
     backtests,
     configs,
+    feature_requests,
     harness_runs,
     ingestion,
     quality,
@@ -89,6 +90,7 @@ from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
 from algotrade_api.graphql.types.screens.view import TableView
 from algotrade_api.graphql.types.session import Session
+from algotrade_api.graphql.types.users.feature_requests import MyFeatureRequest
 from algotrade_api.graphql.types.users.viewer import Viewer
 
 Day = Annotated[
@@ -532,6 +534,21 @@ class Query:
         ctx = info.context.stores()
         found = documents.load_screen_listings(ctx) if ctx is not None else ()
         return [ScreenListing.of(s) for s in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The features the viewer's own Describe-it drafts listed as missing over the "
+        "last year, one per feature, most recently asked first: their own history only, for every "
+        "role (never another user's asks, counts or spans). A date range, not one session"
+    )
+    async def my_feature_requests(self, info: Ctx) -> list[MyFeatureRequest]:
+        ctx = await info.context.astores()
+        viewer = load_viewer(info.context.viewer)
+        found = (
+            await off_loop(feature_requests.load_my_requests, ctx, viewer)
+            if ctx is not None
+            else ()
+        )
+        return [MyFeatureRequest.of(r) for r in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's screen `screenerId` (or the site preset of that id they have "

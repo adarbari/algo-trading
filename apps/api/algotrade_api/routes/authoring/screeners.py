@@ -36,6 +36,7 @@ def save_draft(
 ) -> Draft:
     stored = screens.save_draft(writer, user, screener_id, body.document)
     # after the write succeeded; a draft that came from Describe it is recorded (ADR 0066)
+    feedback.record_choices(sink, drafts, body.draft_session_id, user, screener_id, body.choices)
     feedback.record_draft_saved(sink, drafts, body.draft_session_id, user, screener_id, stored)
     return Draft(screener_id=screener_id, document=stored)
 
@@ -57,6 +58,9 @@ def finalise(
     session_id = body.draft_session_id if body else None
     draft = _draft_of(writer, user, screener_id) if session_id else None
     done = screens.finalise(writer, user, screener_id)
+    feedback.record_choices(
+        sink, drafts, session_id, user, screener_id, body.choices if body else []
+    )
     feedback.record_finalised(sink, drafts, session_id, user, screener_id, draft, done.hash)
     return Finalised.model_validate(done)
 

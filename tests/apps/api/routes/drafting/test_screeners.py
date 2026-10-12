@@ -84,7 +84,7 @@ class Keep:
         return True
 
 
-def app_with(store: ReadStore, model: Any, sink: Any = None) -> TestClient:
+def app_with(store: ReadStore, model: Any, sink: Any = None, requests: Any = None) -> TestClient:
     return TestClient(
         create_app(
             ApiSettings("memory://", "config"),
@@ -92,6 +92,7 @@ def app_with(store: ReadStore, model: Any, sink: Any = None) -> TestClient:
             text_model=model,
             authenticator=as_user(),
             feedback=sink,
+            request_feedback=requests,
         )
     )
 
@@ -229,3 +230,38 @@ def test_a_description_with_the_previous_session_id_stays_in_the_session(
     ]
     assert [r["seq"] for r in asked] == [1, 2]
     assert json.loads(asked[1]["payload"])["current_criteria"]["criteria"]["price"]["value"] == 9
+
+
+class Raising:
+    def submit(self, row: Any) -> bool:
+        raise RuntimeError("down")
+
+
+def contract_answer() -> Any:
+    recorded = REPO_ROOT / "tests/fixtures/drafting/golden/answers/seed-handwritten"
+    return Canned(json.loads((recorded / CONTRACT_CASE).read_text()))
+
+
+def test_a_draft_queues_its_missing_features_as_the_users_requests(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    events, requests = Keep(), Keep()
+    client = app_with(api_golden[0], contract_answer(), events, requests)
+    body = client.post(
+        "/screeners/my_screen/draft-from-text", json={"text": "liquid near support"}
+    ).json()
+    (row,) = requests.rows
+    assert row["user"]
+    assert row["ref"] == "support_level_history" == body["missing"][0]["key"]
+    assert row["draft_session_id"] == body["draft_session_id"]
+    assert "liquid near support" not in json.dumps(row, default=str)  # a span, never the sentence
+    assert "feature_requests" not in [r["event"] for r in events.rows]
+
+
+def test_a_raising_request_sink_still_returns_the_draft(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    client = app_with(api_golden[0], contract_answer(), Keep(), Raising())
+    response = client.post("/screeners/my_screen/draft-from-text", json={"text": "liquid"})
+    assert response.status_code == 200, response.text
+    assert response.json()["missing"][0]["key"] == "support_level_history"
