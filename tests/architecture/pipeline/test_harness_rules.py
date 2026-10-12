@@ -54,11 +54,27 @@ def test_agent_briefs_demand_foreground_checks_and_a_last_action_hand_back() -> 
         assert "no command may still be running" in text, name
 
 
-def test_only_the_label_setter_removes_the_label() -> None:
-    for parts in (("CLAUDE.md",), (".claude", "agents", "implementer.md")):
-        text = _flat(*parts)
-        assert "Only the session that set `no-automerge` or `needs-owner` removes it" in text
-        assert "an agent never removes a label it did not set" in text, parts
+def test_only_the_orchestrator_releases_no_automerge() -> None:
+    claude = _flat("CLAUDE.md")
+    assert "Only the session that set `no-automerge` removes it" in claude
+    assert "`needs-owner` is never removed by an agent" in claude
+    implementer = _flat(".claude", "agents", "implementer.md")
+    assert "Only the orchestrating session removes `no-automerge`" in implementer
+    assert "never removes `needs-owner`" in implementer
+
+
+def test_decision_log_entries_have_date_status_and_decider() -> None:
+    text = REPO.joinpath("docs", "decisions", "log.md").read_text()
+    entries = text.split("\n## ")[1:]
+    assert entries
+    for entry in entries:
+        assert re.match(r"\d{4}-\d{2}-\d{2} \| ", entry), entry[:60]
+        assert re.search(r"^- decided by: (owner|Fable on the owner's behalf)$", entry, re.M), (
+            entry[:60]
+        )
+        assert re.search(
+            r"^- status: (final|pending owner confirmation|overruled)$", entry, re.M
+        ), entry[:60]
 
 
 def test_claude_md_names_the_four_model_tiers() -> None:
