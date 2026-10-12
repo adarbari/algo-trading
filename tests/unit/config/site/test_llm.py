@@ -8,7 +8,14 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.site.llm import BudgetSettings, LlmSettings, Phrase, PhrasebookSettings, Rate
+from algotrade.config.site.llm import (
+    BudgetSettings,
+    LimitsSettings,
+    LlmSettings,
+    Phrase,
+    PhrasebookSettings,
+    Rate,
+)
 from algotrade.config.site.settings import load_llm, load_phrasebook
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
@@ -377,6 +384,28 @@ def test_the_budget_is_optional_typed_and_daily_cannot_exceed_monthly() -> None:
     ]:
         with pytest.raises(ConfigurationError, match=message):
             LlmSettings.from_document({"budget": doc})
+
+
+def test_the_part_redraft_cap_defaults_to_30_a_day_and_is_typed() -> None:
+    assert LlmSettings.from_document({}).limits.part_redrafts_per_day == 30
+    assert LlmSettings().limits.part_redrafts_per_day == 30
+    limits = LlmSettings.from_document({"limits": {"part_redrafts_per_day": 5}}).limits
+    assert limits.part_redrafts_per_day == 5
+    assert LlmSettings.from_document({"limits": {"part_redrafts_per_day": 0}}).limits == (
+        LimitsSettings(0)  # 0 turns part re-drafts off
+    )
+    for doc, message in [
+        ({"part_redrafts_per_day": -1}, "part_redrafts_per_day: expected an integer >= 0"),
+        ({"part_redrafts_per_day": 2.5}, "part_redrafts_per_day: expected an integer"),
+        ({"part_redrafts_per_day": True}, "part_redrafts_per_day: expected an integer"),
+        ({"per_hour": 3}, "unknown keys"),
+    ]:
+        with pytest.raises(ConfigurationError, match=message):
+            LlmSettings.from_document({"limits": doc})
+
+
+def test_the_shipped_llm_toml_sets_the_part_redraft_cap() -> None:
+    assert LlmSettings.from_document(site("llm")).limits.part_redrafts_per_day == 30
 
 
 def test_structured_is_none_by_default_and_a_top_level_default_of_every_provider() -> None:

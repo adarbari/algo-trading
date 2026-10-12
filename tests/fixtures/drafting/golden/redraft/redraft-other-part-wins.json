@@ -1,0 +1,175 @@
+{
+  "id": "redraft-other-part-wins",
+  "about": "the new words bring a criterion another part already sets on the same field and operator: it is dropped with a reason, the other part keeps its own",
+  "sentence": "stocks with RSI under 30 and liquid names",
+  "prior": {
+    "criteria": [
+      {
+        "id": "active",
+        "field": "instrument.status",
+        "op": "eq",
+        "value": "ACTIVE",
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "stocks",
+        "field": "instrument.security_type",
+        "op": "in",
+        "value": [
+          "COMMON_STOCK",
+          "ADR"
+        ],
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "rsi",
+        "field": "rollup.momentum@v1.rsi_14",
+        "op": "lt",
+        "value": 30,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p2"
+      },
+      {
+        "id": "liquid",
+        "field": "rollup.price_stats@v2.adv_usd_20d",
+        "op": "gte",
+        "value": 50000000,
+        "mode": "soft",
+        "tolerance": {
+          "relative": 0.2
+        },
+        "on_miss": "LIQUIDITY_RISK",
+        "why": null,
+        "part": "p3"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": null,
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "stocks",
+        "reading": "Active stocks and ADRs"
+      },
+      {
+        "id": "p2",
+        "words": "RSI under 30",
+        "reading": "RSI 14 below 30"
+      },
+      {
+        "id": "p3",
+        "words": "liquid names",
+        "reading": "About $50M a day traded"
+      }
+    ]
+  },
+  "retype": {
+    "part_id": "p2",
+    "new_words": "RSI under 30 and at least $50M a day traded"
+  },
+  "answer": {
+    "criteria": [
+      {
+        "id": "rsi",
+        "field": "rollup.momentum@v1.rsi_14",
+        "op": "lt",
+        "value": 30,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "traded",
+        "field": "rollup.price_stats@v2.adv_usd_20d",
+        "op": "gte",
+        "value": 50000000,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": null,
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "RSI under 30 and at least $50M a day traded",
+        "reading": "RSI 14 below 30 and $50M a day traded"
+      }
+    ]
+  },
+  "expect": {
+    "sentence": "stocks with RSI under 30 and at least $50M a day traded and liquid names",
+    "criteria": [
+      [
+        "instrument.status",
+        "eq",
+        "ACTIVE"
+      ],
+      [
+        "instrument.security_type",
+        "in",
+        [
+          "COMMON_STOCK",
+          "ADR"
+        ]
+      ],
+      [
+        "rollup.momentum@v1.rsi_14",
+        "lt",
+        30
+      ],
+      [
+        "rollup.price_stats@v2.adv_usd_20d",
+        "gte",
+        50000000
+      ]
+    ],
+    "parts": [
+      {
+        "id": "p1",
+        "kind": "applied"
+      },
+      {
+        "id": "p2",
+        "kind": "not_available",
+        "reading": "server"
+      },
+      {
+        "id": "p3",
+        "kind": "applied"
+      }
+    ],
+    "dropped": [
+      "set by another part"
+    ],
+    "unchanged": [
+      "p1",
+      "p3"
+    ],
+    "soft_kept": "liquid"
+  }
+}

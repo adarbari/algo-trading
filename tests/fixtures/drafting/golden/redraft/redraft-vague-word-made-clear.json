@@ -1,0 +1,154 @@
+{
+  "id": "redraft-vague-word-made-clear",
+  "about": "a part that needed the trader's call (a vague word with readings to choose) is retyped as something exact: the term goes, the part is applied",
+  "sentence": "stocks with heavy volume",
+  "prior": {
+    "criteria": [
+      {
+        "id": "active",
+        "field": "instrument.status",
+        "op": "eq",
+        "value": "ACTIVE",
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      },
+      {
+        "id": "stocks",
+        "field": "instrument.security_type",
+        "op": "in",
+        "value": [
+          "COMMON_STOCK",
+          "ADR"
+        ],
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": [
+      {
+        "term": "heavy",
+        "span": "heavy volume",
+        "default_index": 0,
+        "part": "p2",
+        "alternatives": [
+          {
+            "label": "1.5x",
+            "criterion": {
+              "id": null,
+              "field": "rollup.volume@v1.volume_ratio_5d_20d",
+              "op": "gte",
+              "value": 1.5
+            }
+          },
+          {
+            "label": "2x",
+            "criterion": {
+              "id": null,
+              "field": "rollup.volume@v1.volume_ratio_5d_20d",
+              "op": "gte",
+              "value": 2
+            }
+          }
+        ]
+      }
+    ],
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "stocks",
+        "reading": "Active stocks and ADRs"
+      },
+      {
+        "id": "p2",
+        "words": "heavy volume",
+        "reading": null
+      }
+    ]
+  },
+  "retype": {
+    "part_id": "p2",
+    "new_words": "volume ratio above 2"
+  },
+  "answer": {
+    "criteria": [
+      {
+        "id": "volume",
+        "field": "rollup.volume@v1.volume_ratio_5d_20d",
+        "op": "gt",
+        "value": 2,
+        "mode": "hard",
+        "tolerance": null,
+        "on_miss": null,
+        "why": null,
+        "part": "p1"
+      }
+    ],
+    "tie_break": null,
+    "notes": [],
+    "formulas": null,
+    "missing": null,
+    "unresolved": null,
+    "suggestions": null,
+    "parts": [
+      {
+        "id": "p1",
+        "words": "volume ratio above 2",
+        "reading": "Volume 2 times its 20-day average or more"
+      }
+    ]
+  },
+  "expect": {
+    "sentence": "stocks with volume ratio above 2",
+    "criteria": [
+      [
+        "instrument.status",
+        "eq",
+        "ACTIVE"
+      ],
+      [
+        "instrument.security_type",
+        "in",
+        [
+          "COMMON_STOCK",
+          "ADR"
+        ]
+      ],
+      [
+        "rollup.volume@v1.volume_ratio_5d_20d",
+        "gt",
+        2
+      ]
+    ],
+    "parts": [
+      {
+        "id": "p1",
+        "kind": "applied"
+      },
+      {
+        "id": "p2",
+        "words": "volume ratio above 2",
+        "kind": "applied",
+        "origin": "words"
+      }
+    ],
+    "dropped": [],
+    "unchanged": [
+      "p1"
+    ],
+    "unresolved_before": [
+      "heavy"
+    ],
+    "unresolved_after": []
+  }
+}

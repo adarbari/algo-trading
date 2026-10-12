@@ -218,6 +218,25 @@ the caller whose sentence it was (as the drafting events), through a second sink
 `feature_requests` recorder started with the app and flushed at shutdown with the others); a raising
 or full sink never fails the draft, and a draft with no missing items writes nothing.
 
+## Amendment (2026-10-12): a part's re-draft
+
+`POST /screeners/{id}/draft-part` (ADR 0041, amended 2026-10-12) reuses the two events of a description, in the
+same session (the body may carry the `draft_session_id`; `seq` continues). Each carries in `payload`:
+`scope` = `part`, `part_id`, `old_words` (the words replaced) and `new_words` (what the trader typed), each clipped to
+200 characters (the route's bound). The row's `sentence` is the whole sentence with the new words in place, so a
+curated chain still reads as the descriptions in order; `draft_requested.payload.current_criteria` is the Builder's
+rows at the retype. `draft_returned.payload.parts` is the merged draft's parts, as for a description. The call's id is in
+`call_ids` (use case `screener-draft-part` in the usage log). A request refused at the daily limit records nothing
+(nothing happened); a request that fails a check, nothing; one the model could not answer leaves its `draft_requested`,
+as a description does. The memory of the session is updated with the merged draft, so the save that follows is diffed
+against it. Only the re-drafted part's missing items go to the request log.
+
+**The retyped words are personal text** (they are the trader's own words, like the sentence), kept under the same
+12-month rule (owner decision 2026-10-11, "Retention of retyped part words"): they sit in `payload` only, which both
+retention and erase already null (`PERSONAL`'s `criteria` column of `feedback/drafting_events`), so the registry needs no
+new column; `test_the_retyped_words_of_a_part_redraft_go_with_the_payload_under_both_commands` is the fitness test.
+The usage log's failure rows (`sentence`, `answer`, `error`) already cover the call's own text.
+
 ## Consequences
 - The golden set grows from real sentences, with the model's answer and what the trader kept.
 - Personal data is stored: one more reason the read is viewer-scoped and the sentence short.

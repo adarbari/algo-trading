@@ -158,12 +158,14 @@ def record_requested(
     sentence: str,
     document: Mapping[str, Any] | None,
     session_id: str | None = None,
+    part: Mapping[str, Any] | None = None,
 ) -> tuple[str, int]:
     """``draft_requested``, before the model is asked (a draft that fails leaves its trace):
     the ``draft_session_id`` and the ``seq`` of this request. ``session_id`` continues that
     session when it is open and ``user``'s for ``screener_id``, else a new one starts.
     ``document`` is the Builder's, whose criteria (the trader's edits since the last
-    description) go in the payload as ``current_criteria``."""
+    description) go in the payload as ``current_criteria``. ``part`` (``part_note``): the
+    request re-drafts one part, so it goes in the payload too (ADR 0066, amended 2026-10-12)."""
     claimed = session_id
     try:
         seq = memory.continue_session(session_id, user, screener_id) if session_id else None
@@ -174,6 +176,8 @@ def record_requested(
             payload["current_criteria"] = events.bounded(criteria_snapshot(document))
         if claimed and claimed != session_id:
             payload["claimed_session_id"] = claimed  # a restart lost it: chains.py relinks
+        if part:
+            payload.update(part)
         events.emit(
             sink, events.DRAFT_REQUESTED, str(session_id), user, KIND, screener_id,
             sentence=sentence, seq=seq, payload=payload,
@@ -184,15 +188,31 @@ def record_requested(
         return events.new_session_id(), 1
 
 
-def parts_payload(parts: Sequence[Any] | None) -> list[dict[str, Any]]:
+PART_WORDS = 200  # characters of the old and the new words of a part kept in a payload
+
+
+def part_note(part_id: str, old_words: str, new_words: str) -> dict[str, Any]:
+    """The payload of an event of a part's re-draft (ADR 0066, amended 2026-10-12):
+    ``scope`` ``part``, the part's id and the words before and after, each clipped. The words
+    are the trader's own text: personal, in the payload, nulled with it by retention and erase."""
+    return {
+        "scope": "part", "part_id": part_id[:16],
+        "old_words": old_words[:PART_WORDS], "new_words": new_words[:PART_WORDS],
+    }  # fmt: skip
+
+
+def parts_payload(parts: Sequence[Any] | None, replaced: str | None = None) -> list[dict[str, Any]]:
     """The explained parts of a draft as the ``draft_returned`` payload keeps them: id, words,
     the model's reading (null when the server dropped it), kind and origin, and how many items
-    each holds; never the sentence again."""
+    each holds; never the sentence again. ``replaced``: the id of the part a re-draft replaced:
+    the other parts came back from the browser, so their readings are the client's word, not the
+    model's, and each says ``prior`` ``client``."""
     return [
         {
             "id": p.id, "words": p.words, "reading": p.reading, "kind": p.kind, "origin": p.origin,
             "items": len(p.criteria) + len(p.dropped) + len(p.formulas) + len(p.unresolved)
             + len(p.missing) + len(p.suggestions) + int(p.rank),
+            **({"prior": "client"} if replaced is not None and p.id != replaced else {}),
         }
         for p in parts or ()
     ]  # fmt: skip
@@ -216,12 +236,14 @@ def record_returned(
     formulas: Sequence[str] = (),
     parts: Sequence[Mapping[str, Any]] = (),
     stage: str = "model",
+    part: Mapping[str, Any] | None = None,
 ) -> None:
     """``draft_returned`` (the model's criteria after validation, what it dropped and its
     notes) and the draft remembered for the save that follows, with the answer's unresolved
     ``terms`` and proposed ``formulas`` (the only subjects a later choice may name). ``parts``
     (``parts_payload``) go in the payload, clipped: the trader's words and the model's readings
-    of them are personal text, kept and nulled with the payload (ADR 0066). A draft the phrasebook
+    of them are personal text, kept and nulled with the payload (ADR 0066). ``part``
+    (``part_note``): the draft is a part's re-draft, noted in the payload. A draft the phrasebook
     made with no model call (``stage`` ``phrasebook``) says so in the payload; it has no call id."""
     try:
         version = events.catalogue_version(list(feature_infos(features)))  # the caller's fields
@@ -248,6 +270,8 @@ def record_returned(
             payload["parts"] = events.bounded(list(parts), events.MAX_PART)
         if stage != "model":
             payload["stage"] = stage
+        if part:
+            payload.update(part)
         events.emit(
             sink, events.DRAFT_RETURNED, session_id, user, KIND, screener_id,
             call_ids=call_ids, catalogue_version=version, prompt_version=prompt_version,

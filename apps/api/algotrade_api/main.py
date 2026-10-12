@@ -21,17 +21,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from algotrade.config.site.settings import load_users
+from algotrade.config.site.settings import load_llm, load_users
 from algotrade.config.site.users import Role, UserRecord
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import (
     ConfigurationError,
+    DailyLimitError,
     MissingDataError,
     ModelUnavailableError,
     PermissionDeniedError,
     RateLimitedError,
 )
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
+from algotrade.services.drafting.redraft.cap import PartRedraftCap
 from algotrade.services.explaining.cache import open_text_cache
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.feedback.events import FeedbackSink
@@ -120,6 +122,20 @@ def _rate_limited(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+def _limit_reached(request: Request, exc: Exception) -> JSONResponse:
+    """A user at their daily limit (``DailyLimitError``): 429 with the code the web shows the
+    "limit reached" state on, the limit and the seconds until the exchange day turns."""
+    assert isinstance(exc, DailyLimitError)
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": str(exc), "code": exc.code, "limit": exc.limit,
+            "retry_after_s": exc.retry_after_s,
+        },
+        headers={"Retry-After": str(exc.retry_after_s)},
+    )  # fmt: skip
+
+
 def _overloaded(request: Request, exc: Exception) -> JSONResponse:
     """The read pool and its queue are full (``graphql.offload.Admission``): ask the caller to
     come back rather than queue without bound."""
@@ -157,6 +173,7 @@ def create_app(
     text_model: TextModel | None = None,
     feedback: FeedbackSink | None = None,
     requests: FeedbackSink | None = None,
+    part_cap: PartRedraftCap | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
@@ -168,7 +185,9 @@ def create_app(
     one ``config/site/llm.toml`` enables when ``settings.live``, else off: a request answers
     503; ADR 0041). ``feedback``: where the Describe-it events go (default: the recorder of
     ``feedback/drafting_events`` when ``settings.live``, else none; ADR 0066). ``requests``: the
-    same for the missing-feature request log (``feedback/feature_requests``)."""
+    same for the missing-feature request log (``feedback/feature_requests``). ``part_cap``: the
+    per-user daily cap on part re-drafts (default: ``[limits]`` of ``llm.toml`` over the usage
+    log in ``store``; ADR 0041, amended 2026-10-12)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -226,7 +245,14 @@ def create_app(
         feedback_sink(feedback, settings.live, settings.data_url),
         request_sink(requests, settings.live, settings.data_url),
     )
-    app.state.drafts = DraftMemory()
+    app.state.drafts, app.state.part_cap = (
+        DraftMemory(),
+        part_cap
+        or PartRedraftCap(
+            app.state.store.reader,
+            lambda: load_llm(app.state.store.configs).limits.part_redrafts_per_day,
+        ),
+    )  # ADR 0066: the drafts for the save; ADR 0041: the daily cap of part re-drafts
     app.state.explain_cache = open_text_cache(settings.data_url)  # ADR 0041 (amended): derived
     app.state.explain_limiter = RateLimiter()
     # Compress what is big (the bundle, GraphQL answers): the app is served over a remote link.
@@ -248,6 +274,7 @@ def create_app(
         (PermissionDeniedError, _forbidden),
         (ModelUnavailableError, _unavailable),
         (RateLimitedError, _rate_limited),
+        (DailyLimitError, _limit_reached),
         (OverloadedError, _overloaded),
     ):
         app.add_exception_handler(error, handler)

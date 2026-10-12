@@ -88,7 +88,7 @@ holds = "data"
 
 [[test_dir]]
 path = "tests/fixtures/drafting/golden/*"
-purpose = "cases/ (one JSON per case) or answers/ (one folder per model slug)"
+purpose = "cases/ (one JSON per case), answers/ (one folder per model slug) or redraft/ (one JSON per part re-draft: the whole answer, the part retyped, the scoped answer, what the merge must be)"
 holds = "data"
 
 [[test_dir]]
@@ -119,6 +119,10 @@ holds = "data"
 [[test_dir]]
 path = "tests/helpers"
 purpose = "test builders and fakes shared across suites, one module per thing built (stored frames, ingest fakes, rollup stores, domain objects)"
+
+[[test_dir]]
+path = "tests/helpers/drafting"
+purpose = "builders of the drafting tests shared across suites (a held draft, the request of a part's re-draft, the scoped model answer)"
 
 [[test_dir]]
 path = "tests/helpers/payloads"

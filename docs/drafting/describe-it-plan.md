@@ -147,9 +147,15 @@ fixed locally (another reading, edit rows) or by retyping its words (one scoped 
   padding), `why` and `notes` kept (the Builder shows both), six golden cases with hand-written answers
   (`parts-*`; scored structurally, never the reading's text) and the golden run's four parts measures. The
   web reads it in C1.
-- PR B, per-part re-draft: `POST /screeners/{id}/draft-part`, scoped prompt under 4k tokens, server-side merge,
-  ledger kind `screener-draft-part`, feedback through `draft_requested` / `draft_returned` with payload
-  `scope=part`, ADR 0066 amendment, daily cap per user (30 by default, `config/site/llm.toml`).
+- PR B, per-part re-draft (built, `services/drafting/redraft/`, ADR 0041 amended 2026-10-12): `POST /screeners/{id}/draft-part`,
+  scoped prompt under 4k uncached tokens (the same prefix, a 1,200-token slice for the new words, the other parts'
+  criteria as fixed rows), server-side merge (the other parts win; hand-added rows stay in `kept`), ledger kind
+  `screener-draft-part`, feedback through `draft_requested` / `draft_returned` with payload `scope=part` (ADR 0066
+  amended; the retyped words go with the payload under the 12-month rule), daily cap per user (30 by default,
+  `[limits] part_redrafts_per_day` in `config/site/llm.toml`, counted from the usage log, only a call that
+  returned a draft counts, a 429 with code `part_redraft_limit`), four golden cases, one shared `PROMPT_VERSION` (9) pinned to the hashes of both prompts. Built as decided, with: the body carries the whole draft the browser
+  holds (the answer must carry the other parts' pending items, which the server keeps nowhere) and the answer is
+  `{draft, replaced_part_id}`.
 - PR C1, web: `PartCard` and the local fixes (after A).
 - PR C2, web: retype a part (after B); asks before replacing hand-edited rows.
 
