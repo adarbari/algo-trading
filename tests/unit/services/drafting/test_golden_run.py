@@ -4,6 +4,7 @@ the guard rails (refusal, ``--yes``, the caps) and the ``--record`` file layout.
 
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -380,3 +381,21 @@ def test_a_curated_case_is_drafted_with_the_criteria_in_force_and_record_clears_
     case_file.write_text(json.dumps({"id": "c1", "recorded": False}))
     write_recordings(recordings(result, tmp_path), force=False, say=lambda _: None)
     assert "recorded" not in json.loads(case_file.read_text())
+
+
+def test_suggestions_are_counted_per_call_and_never_change_the_score() -> None:
+    answers = [json.dumps({"criteria": [], "suggestions": [1, 2]}), "not json"]
+
+    def drafting(model: TextModel, sentence: str, current: Mapping[str, Any] | None = None) -> Any:
+        text = model.complete("system", sentence).text
+        offered = json.loads(text)["suggestions"]  # a bare list: only its length is reported
+        made = draft(Scripted([GOOD], CostTap()), sentence)
+        return replace(made, suggestions=tuple(offered))
+
+    costs = CostTap()
+    plan = plan_of([case()], repeat=1)
+    result = evaluate(plan, {"paid": Scripted(answers[:1], costs)}, drafting, costs,
+                      budget_usd=1.0, max_calls=5)  # fmt: skip
+    (call,) = result.results
+    assert call.suggestions == 2 and call.passed
+    assert measure(result.results)["suggestions"] == 2

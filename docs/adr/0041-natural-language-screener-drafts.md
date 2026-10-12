@@ -287,6 +287,28 @@ cap, a user with three expression features): the prefix 7,380 -> 5,184 tokens, t
 (`heavy-put-call`) 14,930 -> 12,892; no case lost an expected field. A bare entry name (`iv30`, several headings share some) is never
 resolved silently: the draft is refused with the full candidate names, so the repair retry fixes it.
 
+## Amended 2026-10-11: protective checks are suggestions, never applied silently
+
+Owner decision (2026-10-11, final; `docs/decisions/log.md`). The live Haiku golden run passed about
+40%: roughly 20% of the failures were scorer artefacts (`gt` vs `gte` at a boundary; `is_etf` vs
+`security_type in [ETF]`), 55% over-scaffolding (unrequested `atr_pct`, `trend_state`,
+`rel_volume`, `adv_usd`, ... that the task text asked for as "add that criterion"), 25% real model
+errors. The checks a caveat names are worth keeping but never applied silently, as with a formula
+or a missing feature. The answer gains `suggestions` (nullable; `services/drafting/suggestions.py`):
+`{field, op, value, mode, tolerance, on_miss, why, source}` with `mode` soft or score only. The
+server checks one like a criterion (catalogue field, op, value, tolerance, the rule validator) plus
+the mode; a hard or modeless one, an invalid one, or one past 5 goes to `suggestions_dropped`
+with a reason, a repeat of a criterion of the draft (or of another suggestion) is dropped
+quietly, and a suggestion is never placed in `document.criteria`. `ScreenDraft` and the REST draft
+response carry `suggestions` and `suggestions_dropped`; the Builder shows a "Suggested" group the
+trader accepts or skips (a later web PR). Prompt version 6: `criteria` holds only what the
+sentence asks for, a caveat's check goes to `suggestions`, and a vague word (`heavy`, `volatile`)
+with no threshold in the phrasebook or field guide is left out with a note (the three guide
+notes that said "add" now say "suggest"). Largest golden prompt: 12,735 -> 12,827 tokens (cap
+15,000). Golden scorer: a part may carry `equivalent_ops` (the same value, an immaterial boundary),
+`EQUIVALENT_READINGS` names readings that select the same instruments (`is_etf eq true` /
+`security_type in [ETF]`), only `criteria` are scored, and the run reports the suggestions count.
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

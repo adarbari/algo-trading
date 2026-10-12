@@ -180,3 +180,11 @@ telling the session, which updates the entry (an overrule means a follow-up PR).
 - decided by: orchestrator (owner present)
 - status: pending owner confirmation
 - Reasoning: the browser derives nothing (ADR 0038); a contract change is a separate PR.
+
+## 2026-10-11 | Describe it | Extra protective checks
+- Question: the model adds checks the sentence did not ask for (trend, earnings, liquidity); what do we do with them?
+- Options: only what they said (drop the extras) / soft or score suggestions the trader accepts or skips / apply silently.
+- Decision: extra protective checks are added as soft/score SUGGESTIONS, flagged in the review panel, never applied silently.
+- decided by: owner
+- status: final
+- Reasoning: the protective checks stay, but nothing from the model is applied silently (formulas, missing features); the golden score reads `criteria` only.

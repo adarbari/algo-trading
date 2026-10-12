@@ -664,6 +664,13 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** DroppedSuggestion */
+        DroppedSuggestion: {
+            /** Field */
+            field: string;
+            /** Reason */
+            reason: string;
+        };
         /** EdgeDocument */
         EdgeDocument: {
             /** Document */
@@ -1371,6 +1378,13 @@ export interface components {
             /** Screener Id */
             screener_id: string;
             /**
+             * Suggestions
+             * @description protective checks offered (soft or score), never in the document: the trader accepts or skips each
+             */
+            suggestions?: components["schemas"]["Suggestion"][];
+            /** Suggestions Dropped */
+            suggestions_dropped?: components["schemas"]["DroppedSuggestion"][];
+            /**
              * Unresolved
              * @description ambiguous terms; the document has each default
              */
@@ -1450,6 +1464,26 @@ export interface components {
              * @description the user's own edge: researching | candidate | live | retired | rejected; none keeps it
              */
             status?: string | null;
+        };
+        /** Suggestion */
+        Suggestion: {
+            /**
+             * Criterion
+             * @description a soft or score criterion, never in the document
+             */
+            criterion: {
+                [key: string]: unknown;
+            };
+            /**
+             * Source
+             * @description the field guide entry or field that raised it
+             */
+            source: string | null;
+            /**
+             * Why
+             * @description the short reason, from the caveat or situation
+             */
+            why: string;
         };
         /** TableView */
         TableView: {

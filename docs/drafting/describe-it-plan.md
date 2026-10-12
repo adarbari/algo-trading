@@ -121,6 +121,10 @@ for C showing only the trader's own history, and choices that swap criteria loca
 pending formulas, not on missing features (the gap is saved in the screen's notes). Failure states: a
 trader-facing message with Try again; a visible waiting phase with Cancel. Every new term (buckets,
 statuses, pending formula, needs your call) ships its Guide entry in the same PR.
+A "Suggested" group in the review panel (owner decision 2026-10-11): the protective checks the
+model offers (`suggestions`, soft or score, each with its why), each accepted into the criteria or
+skipped, never applied on their own; built after #550 (the server contract is in; the web does not
+read it yet).
 
 ## PR order (state 2026-10-12)
 

@@ -135,3 +135,30 @@ def test_a_curated_case_loads_the_criteria_in_force_and_its_recording_state(
 def test_an_old_case_has_one_sentence_and_nothing_in_force() -> None:
     old = case(A)
     assert old.sentences == () and old.current is None and old.recorded
+
+
+def test_an_equivalent_op_passes_at_the_same_value_only() -> None:
+    part = {**A, "op": "gt", "value": 100, "tolerance": 0, "equivalent_ops": ["gte"]}
+    assert score(case(part), {"a": crit("f.x", "gte", 100)}).passed
+    assert score(case(part), {"a": crit("f.x", "gte", 101)}).wrong == ("p",)  # not the value
+    assert score(case(part), {"a": crit("f.x", "lt", 100)}).wrong == ("p",)  # not an equivalent
+    assert score(case({**part, "equivalent_ops": []}), {"a": crit("f.x", "gte")}).wrong == ("p",)
+
+
+ETF_FLAG = {"span": "ETFs", "bucket": "A", "fields": ["instrument.is_etf"], "op": "eq",
+            "value": True}  # fmt: skip
+ETF_TYPE = {"span": "ETFs", "bucket": "A", "fields": ["instrument.security_type"], "op": "in",
+            "value": ["ETF"]}  # fmt: skip
+
+
+def test_an_etf_flag_and_the_etf_security_type_read_the_same_either_way() -> None:
+    as_type = {"a": crit("instrument.security_type", "in", ["ETF"])}
+    as_flag = {"a": crit("instrument.is_etf", "eq", True)}
+    assert score(case(ETF_FLAG), as_type).passed and score(case(ETF_FLAG), as_flag).passed
+    assert score(case(ETF_TYPE), as_flag).passed and score(case(ETF_TYPE), as_type).passed
+
+
+def test_the_equivalence_is_only_for_the_named_readings() -> None:
+    stock = {"a": crit("instrument.security_type", "in", ["COMMON_STOCK"])}
+    assert score(case(ETF_FLAG), stock).missing == ("ETFs",)
+    assert score(case(ETF_FLAG), {"a": crit("instrument.is_etf", "eq", False)}).wrong == ("ETFs",)

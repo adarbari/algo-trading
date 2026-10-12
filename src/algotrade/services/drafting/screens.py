@@ -13,7 +13,9 @@ amendment): ``formulas`` (B1,
 ``formulas.py``: checked, deduplicated by fingerprint and dry-run, pending until the trader
 accepts), ``missing`` and ``unresolved`` (``gaps.py``). The document holds only A criteria (the
 existing-field rewrite of a duplicate formula and the default reading of each unresolved term
-among them); a pending formula and its criterion travel beside it and are never auto-applied.
+among them); a pending formula and its criterion travel beside it and are never auto-applied,
+nor are the ``suggestions`` (protective soft / score checks the sentence did not ask for,
+``suggestions.py``).
 Reads the catalogue, the configs and, for the dry run of a formula, the request's session;
 writes nothing."""
 
@@ -51,6 +53,11 @@ from algotrade.services.drafting.prompt import (
     index_group,
     sliced_system_prompt,
     user_prompt,
+)
+from algotrade.services.drafting.suggestions import (
+    DroppedSuggestion,
+    Suggestion,
+    suggestions_of,
 )
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
@@ -92,6 +99,8 @@ class ScreenDraft:
     formulas_dropped: tuple[DroppedFormula, ...] = ()
     missing: tuple[MissingFeature, ...] = ()  # B2 / C: asked for, not buildable here
     unresolved: tuple[Unresolved, ...] = ()  # ambiguous terms; the document has the default
+    suggestions: tuple[Suggestion, ...] = ()  # soft / score checks offered, never in the document
+    suggestions_dropped: tuple[DroppedSuggestion, ...] = ()
 
 
 def draft_screen(
@@ -196,6 +205,11 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
         document["rank"] = rank
     document, dropped = validated(ctx, screener_id, document, dropped)
     unresolved, reset_notes = _defaults_kept(unresolved, placed, document["criteria"])
+    suggestions, suggestions_dropped = suggestions_of(
+        proposal,
+        lambda raw, name: _alternative(ctx, screener_id, raw, name, catalogue),
+        list(document["criteria"].values()),
+    )
     notes = (
         *notes_of(proposal), *formulas.notes, *unresolved_notes, *missing_notes, *reset_notes
     )  # fmt: skip
@@ -203,6 +217,7 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
         missing=missing, unresolved=unresolved,
+        suggestions=suggestions, suggestions_dropped=suggestions_dropped,
     )  # fmt: skip
 
 

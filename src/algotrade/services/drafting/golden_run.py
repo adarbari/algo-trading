@@ -276,6 +276,7 @@ class CallResult:
     dropped: tuple[Drop, ...] = ()
     answer_chars: int | None = None
     rate_limit_retries: int = 0
+    suggestions: int = 0  # checks the draft offered (never scored: counted and reported)
 
 
 @dataclass
@@ -366,7 +367,15 @@ def _call(
     fields = frozenset(c["field"] for c in made.document["criteria"].values())
     drops = tuple(Drop(d.id, d.field, d.reason, drop_kind(d.reason)) for d in made.dropped)
     return _result(
-        provider, case.id, "ok", got, costs, passed=graded.passed, fields=fields, dropped=drops
+        provider,
+        case.id,
+        "ok",
+        got,
+        costs,
+        passed=graded.passed,
+        fields=fields,
+        dropped=drops,
+        suggestions=len(made.suggestions),
     )
 
 
@@ -381,13 +390,14 @@ def _result(
     fields: frozenset[str] = frozenset(),
     error: str | None = None,
     dropped: tuple[Drop, ...] = (),
+    suggestions: int = 0,
 ) -> CallResult:
     if got is None:
         return CallResult(provider, case_id, status, error=error)
     return CallResult(
         provider, case_id, status, passed, fields, got.model, got.input_tokens,
         got.output_tokens, got.cache_read_tokens, got.cache_write_tokens, got.latency_s,
-        costs.cost_of(got.call_id), got.text, error, dropped, len(got.text),
+        costs.cost_of(got.call_id), got.text, error, dropped, len(got.text), 0, suggestions,
     )  # fmt: skip
 
 
@@ -440,6 +450,7 @@ def measure(results: Sequence[CallResult]) -> dict[str, Any]:
         "latency_p50_s": percentile(latencies, 0.5),
         "latency_p90_s": percentile(latencies, 0.9),
         "cost_usd": sum(costs) if costs else None,
+        "suggestions": sum(r.suggestions for r in results),
         **drop_metrics(results),
     }
 

@@ -2,7 +2,8 @@
 whose criteria the model keeps unless the sentence changes them) in; the draft document, the
 criteria dropped with their reasons and the model's notes out, plus the A / B / C contract
 (ADR 0041, amended 2026-10-11): pending formulas with their dry run, the formulas dropped, the
-missing features and the unresolved terms. Pending formulas are never in ``document``."""
+missing features and the unresolved terms, and the suggested checks (soft or score, offered
+not applied) with those dropped. Pending formulas and suggestions are never in ``document``."""
 
 from datetime import date
 from typing import Any
@@ -90,6 +91,19 @@ class Unresolved(Schema):
     alternatives: list[Alternative]
 
 
+class Suggestion(Schema):
+    criterion: dict[str, Any] = Field(
+        description="a soft or score criterion, never in the document"
+    )
+    why: str = Field(description="the short reason, from the caveat or situation")
+    source: str | None = Field(description="the field guide entry or field that raised it")
+
+
+class DroppedSuggestion(Schema):
+    field: str
+    reason: str
+
+
 class ScreenDraft(Schema):
     screener_id: str
     document: dict[str, Any] = Field(description="the draft for the Builder (never saved here)")
@@ -103,6 +117,12 @@ class ScreenDraft(Schema):
     unresolved: list[Unresolved] = Field(
         default_factory=list, description="ambiguous terms; the document has each default"
     )
+    suggestions: list[Suggestion] = Field(
+        default_factory=list,
+        description="protective checks offered (soft or score), never in the document: the "
+        "trader accepts or skips each",
+    )
+    suggestions_dropped: list[DroppedSuggestion] = Field(default_factory=list)
     draft_session_id: str | None = Field(
         None,
         description="ties this draft to the screen later saved from it (ADR 0066); send it back "
