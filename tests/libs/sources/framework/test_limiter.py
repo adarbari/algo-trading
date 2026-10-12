@@ -206,3 +206,11 @@ def test_two_processes_share_one_pace(tmp_path: Path) -> None:
     assert len(stamps) == 6
     gaps = [b - a for a, b in pairwise(stamps)]
     assert min(gaps) >= 0.2  # six requests, never closer than the interval (minus jitter)
+
+
+def test_pause_holds_the_key_and_waits_the_seconds(tmp_path: Path) -> None:
+    slept: list[float] = []
+    now = [100.0]
+    limiter = Limiter("p", 0.0, tmp_path, slept.append, lambda: now[0])
+    limiter.pause(5.0)
+    assert slept == [5.0]

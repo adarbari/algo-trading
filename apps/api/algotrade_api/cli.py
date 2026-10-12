@@ -21,7 +21,6 @@ import os
 import resource
 import subprocess
 import sys
-import time
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
@@ -84,6 +83,7 @@ from algotrade_api.ops.schedule import (
     deploy_plist,
 )
 from algotrade_api.text_model import open_text_model
+from algotrade_sources.framework.registry import build_pauser
 
 APP = "algotrade_api.app:app"
 OWNER = Viewer("owner", "owner", Role.ADMIN.value, ())  # the owner's own terminal reads as admin
@@ -277,7 +277,7 @@ def golden_run(args: argparse.Namespace) -> int:
     try:
         return run_golden(
             run_args, load_llm(store.configs), llm_off(), Path.cwd() / GOLDEN_ROOT, open_models,
-            draft, print, to_stderr if args.as_json else print, time.sleep,
+            draft, print, to_stderr if args.as_json else print, build_pauser("golden-run"),
         )  # fmt: skip
     finally:
         for model in models:

@@ -31,10 +31,7 @@ detect = [{ string = "series/observations" }, { string = "realtime_start" }]
 id = "rate-limiting"
 description = "Pace requests to a vendor: one limiter per key, shared across threads and processes (file lock under var/run/limits)"
 owner = ["libs/sources/algotrade_sources/framework/limiter.py"]
-allowed = [
-    "libs/sources/algotrade_sources/framework/http.py",  # retry backoff waits (Retry-After), not pacing
-    "apps/api/algotrade_api/cli.py",  # the owner-run golden evaluation waits between its own model calls (--pace, 429), not vendor pacing
-]
+allowed = ["libs/sources/algotrade_sources/framework/http.py"]  # retry backoff waits (Retry-After), not pacing
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 
