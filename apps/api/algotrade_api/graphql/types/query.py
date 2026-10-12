@@ -38,6 +38,7 @@ from algotrade.services.read.market import market
 from algotrade.services.read.ops import (
     backtests,
     configs,
+    feature_requests,
     harness_runs,
     ingestion,
     quality,
@@ -78,6 +79,7 @@ from algotrade_api.graphql.types.market.market import Market
 from algotrade_api.graphql.types.market.regime import MarketRegime
 from algotrade_api.graphql.types.ops.backtest import Backtest, BacktestDetail
 from algotrade_api.graphql.types.ops.config import Config
+from algotrade_api.graphql.types.ops.feature_requests import FeatureRequestList
 from algotrade_api.graphql.types.ops.harness import HarnessRun
 from algotrade_api.graphql.types.ops.ingestion import CellDetail, ChainCoverage, Completeness
 from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
@@ -89,6 +91,7 @@ from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
 from algotrade_api.graphql.types.screens.view import TableView
 from algotrade_api.graphql.types.session import Session
+from algotrade_api.graphql.types.users.feature_requests import MyFeatureRequest
 from algotrade_api.graphql.types.users.viewer import Viewer
 
 Day = Annotated[
@@ -534,6 +537,21 @@ class Query:
         return [ScreenListing.of(s) for s in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The features the viewer's own Describe-it drafts listed as missing over the "
+        "last year, one per feature, most recently asked first: their own history only, for every "
+        "role (never another user's asks, counts or spans). A date range, not one session"
+    )
+    async def my_feature_requests(self, info: Ctx) -> list[MyFeatureRequest]:
+        ctx = await info.context.astores()
+        viewer = load_viewer(info.context.viewer)
+        found = (
+            await off_loop(feature_requests.load_my_requests, ctx, viewer)
+            if ctx is not None
+            else ()
+        )
+        return [MyFeatureRequest.of(r) for r in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's screen `screenerId` (or the site preset of that id they have "
         "not copied yet): draft, versions, preset pin, working copy. Null: no such screen"
     )
@@ -670,6 +688,22 @@ class Query:
         ctx = await info.context.astores()
         found = await off_loop(usage.load_llm_usage, ctx, None, recent) if ctx is not None else None
         return LlmUsage.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The features traders asked for that the catalogue lacks, ranked (decayed "
+        "distinct users x feasibility), over the last year up to today: a date range, not one "
+        "session. Counts only, never a user or a span (ADR 0066)",
+        extensions=[AdminOnly()],
+    )
+    async def feature_requests(self, info: Ctx) -> FeatureRequestList | None:
+        ctx = await info.context.astores()
+        viewer = load_viewer(info.context.viewer)
+        found = (
+            await off_loop(feature_requests.load_feature_requests, ctx, viewer)
+            if ctx is not None
+            else None
+        )
+        return FeatureRequestList.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The `limit` most recent edge evaluation runs of any status, newest first: "

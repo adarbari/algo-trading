@@ -3,14 +3,15 @@
  * (mode, feature with its help drawer, operator, threshold, tolerance, distribution), add a criterion or a formula
  * feature, the tie-break column, and the universe it runs over.
  */
-import { Button, Divider, EmptyState, Legend, Panel, Stack, Text } from '@algotrade/ui';
+import { Button, Divider, EmptyState, Legend, Panel, PendingRow, Stack, Text } from '@algotrade/ui';
 import { useState } from 'react';
 
 import { useFeatureCatalogue } from '@/entities/feature';
 import { CriterionRow, TieBreakField, useScreenerBuilder } from '@/features/screener-builder';
 import { FormulaFeatureDialog } from '@/features/formula-feature';
-import { GuideHelp } from '@/features/guide-help';
+import { GuideHelp, termHelp } from '@/features/guide-help';
 
+import { pendingLine } from '../model/pending';
 import { plainEnglish } from '../model/plain-english';
 
 const LEGEND = [
@@ -24,7 +25,11 @@ export function CriteriaTable() {
   const catalogue = useFeatureCatalogue();
   const [formula, setFormula] = useState(false);
   const features = catalogue.data ?? [];
-  const sentence = plainEnglish(builder.criteria, features);
+  const sentence = plainEnglish(builder.criteria, features, builder.notes);
+  const waiting = builder.pendingFormulas.flatMap((formula) => {
+    const line = pendingLine(formula);
+    return line ? [{ formula, line }] : [];
+  });
   const state =
     builder.status === 'loading' ? 'loading' : builder.status === 'error' ? 'error' : 'ready';
 
@@ -47,7 +52,7 @@ export function CriteriaTable() {
         footer="Fields come from the feature catalogue; formulas are saved as your own features."
       >
         <Stack gap={3}>
-          {builder.criteria.length === 0 && (
+          {builder.criteria.length === 0 && waiting.length === 0 && (
             <EmptyState
               compact
               title="No criteria yet"
@@ -71,6 +76,37 @@ export function CriteriaTable() {
                 error={builder.errorCriterion === criterion.id ? builder.preview.error : null}
               />
             </Stack>
+          ))}
+          {waiting.map(({ formula, line }) => (
+            <PendingRow
+              key={formula.name}
+              label="Waiting on formula"
+              help={termHelp('describe_waiting_on_formula')}
+              name={line.name}
+              summary={line.summary}
+              actions={
+                <>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      builder.reviewFormula(formula);
+                    }}
+                  >
+                    Review and add
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      builder.skipFormula(formula.name);
+                    }}
+                  >
+                    Skip
+                  </Button>
+                </>
+              }
+            />
           ))}
           <Stack direction="row" gap={2} align="center" wrap>
             <Button

@@ -9,15 +9,19 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 3: the A / B / C answer contract and
-the open backlog keys most relevant to the sentence): the task, the
-examples and an index of every field (name, type, unit) as a prefix no sentence changes, then in
-detail only the fields ``retrieval.select_slice`` picks for the sentence (~11-15k tokens, was ~110k
-for the whole catalogue, phrasebook and guide), then the caller's own features."""
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 5: the A / B / C answer contract, the
+open backlog keys most relevant to the sentence, the index grouped by prefix): the task, the
+examples and an index of every field (grouped under one heading per prefix: type, unit) as a prefix
+no sentence changes, then in detail only the fields ``retrieval.select_slice`` picks for the
+sentence, capped by a token budget (``PROMPT_BUDGET_TOKENS``: text added to the prompt shrinks the
+slice, never the margin to the 15k cap; was ~110k for the whole catalogue, phrasebook and guide),
+then the caller's own features."""
 
 import json
+import logging
 import re
-from collections.abc import Iterable, Mapping
+from collections import defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
 from algotrade.config.site.drafting.backlog import PROMPT_LIMIT
@@ -28,13 +32,18 @@ from algotrade.config.site.field_guide import (
     Situation,
 )
 from algotrade.config.site.llm import Phrase
-from algotrade.services.drafting.retrieval import FIELD_REF, select_slice
+from algotrade.services.drafting.retrieval import FIELD_REF, Slice, select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
 # Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice;
 # 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
-# entry shows its structured thresholds; 5: that column is headed "exact default".
-PROMPT_VERSION = "5"
+# entry shows its structured thresholds; 5: the index grouped by prefix and the slice capped by a
+# token budget; 6: the phrasebook's last column is headed "exact default".
+PROMPT_VERSION = "6"
+PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
+SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
+
+log = logging.getLogger(__name__)
 
 TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored
@@ -319,14 +328,37 @@ def situation_line(situation: Situation, catalogue: set[str]) -> str | None:
 
 
 INDEX_HEADER = (
-    "Field index (every field you may use: name | type | unit). Detail for the fields most "
-    "likely to matter follows it; a field with no detail is still valid:"
+    "Field index (every field you may use). A heading ends in .*: a field's name is the heading "
+    "without the * followed by the entry's name, e.g. rollup.price_stats@v2.* with close is "
+    "rollup.price_stats@v2.close. An entry is name|type|unit. Detail for the fields most likely "
+    "to matter follows it; a field with no detail is still valid:"
 )
 
 
+def index_group(name: str) -> tuple[str, str]:
+    """``(heading, local name)`` of a field: ``rollup.price_stats@v2.`` + ``close``;
+    ``feature.`` + ``iv_rank``; a name with no dot has the empty heading."""
+    if "@" in name:  # rollup.<group>@vN.<column>
+        head, _, tail = name.rpartition(".")
+    elif "." in name:
+        head, _, tail = name.partition(".")
+    else:
+        return "", name
+    return f"{head}.", tail
+
+
 def index_line(info: FeatureInfo) -> str:
-    """One field of the index: ``name | type | unit``."""
-    return f"{info.name} | {info.dtype} | {info.unit or '-'}"
+    """One field of the index under its heading: ``local name|type|unit``."""
+    return f"{index_group(info.name)[1]}|{info.dtype}|{info.unit or '-'}"
+
+
+def index_text(site: Iterable[FeatureInfo]) -> str:
+    """The index of ``site`` fields: one ``<heading>*`` line per prefix, then its entries (names
+    sorted, so a heading is not repeated)."""
+    groups: dict[str, list[str]] = defaultdict(list)
+    for info in sorted(site, key=lambda i: i.name):
+        groups[index_group(info.name)[0]].append(index_line(info))
+    return "\n".join(f"{head}*\n" + "\n".join(lines) for head, lines in groups.items())
 
 
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
@@ -383,9 +415,7 @@ def prefix_text(catalogue: Iterable[FeatureInfo]) -> str:
     """The part of the sliced prompt that no sentence changes: the task, the examples and the
     index of every SITE field (sorted by name)."""
     site = sorted((i for i in catalogue if i.scope == "site"), key=lambda i: i.name)
-    index = "\n".join(index_line(i) for i in site)
-    out = f"{TASK}\n{examples_text()}\n{INDEX_HEADER}\n{index}\n"
-    return out
+    return f"{TASK}\n{examples_text()}\n{INDEX_HEADER}\n{index_text(site)}\n"
 
 
 def relevant_keys(
@@ -401,6 +431,60 @@ def relevant_keys(
     return sorted(open_keys, key=lambda p: (-score(p), p[0]))[:limit]
 
 
+def _tokens(text: str) -> int:
+    return len(text) // 4
+
+
+def _weigher(
+    infos: Sequence[FeatureInfo], guide: FieldGuideSettings | None
+) -> Callable[[str, bool], int]:
+    """``weigh(name, brief)`` for ``select_slice``: the tokens of the field's detail line and guide
+    entry as the prompt renders them (a brief field's entry has no caveats)."""
+    names = {i.name for i in infos}
+    lines = {i.name: catalogue_line(i) for i in infos if i.scope == "site"}
+    entries = {e.name: e for e in guide.fields} if guide is not None else {}
+
+    def weigh(name: str, brief: bool) -> int:
+        text = lines.get(name, "")
+        entry = entries.get(name)
+        if entry is not None and (line := slice_guide_line(entry, names, not brief)) is not None:
+            text += "\n" + line
+        return _tokens(text) + 1
+
+    return weigh
+
+
+def slice_for(
+    catalogue: Iterable[FeatureInfo],
+    sentence: str,
+    phrasebook: Iterable[Phrase] = (),
+    guide: FieldGuideSettings | None = None,
+    open_keys: Iterable[tuple[str, str]] = (),
+) -> Slice:
+    """The slice ``sliced_system_prompt`` renders for ``sentence``: ``select_slice`` under the
+    token budget left once everything else in the prompt (task, examples, index, open keys, the
+    matched phrasebook entries, the caller's own features) is counted. The plan is checked against
+    the rendered prompt and tightened until the whole fits ``PROMPT_BUDGET_TOKENS`` (or only the
+    phrasebook and core fields remain)."""
+    infos, book, keys = list(catalogue), tuple(phrasebook), tuple(open_keys)
+    weigh = _weigher(infos, guide)
+    matched = select_slice(sentence, infos, book, guide, 0, weigh).phrases
+    bare = Slice((), frozenset(), matched)
+    room = PROMPT_BUDGET_TOKENS - SECTION_TOKENS
+    room -= _tokens(_render(infos, sentence, bare, guide, keys))
+    chosen = select_slice(sentence, infos, book, guide, room, weigh)
+    for _ in range(8):
+        over = _tokens(_render(infos, sentence, chosen, guide, keys)) - PROMPT_BUDGET_TOKENS
+        if over <= 0 or room <= 0:
+            break
+        room -= over
+        chosen = select_slice(sentence, infos, book, guide, room, weigh)
+    total = _tokens(_render(infos, sentence, chosen, guide, keys))
+    if total > PROMPT_BUDGET_TOKENS:  # the phrasebook, core fields and own features alone
+        log.warning("drafting prompt over budget: %d > %d tokens", total, PROMPT_BUDGET_TOKENS)
+    return chosen
+
+
 def sliced_system_prompt(
     catalogue: Iterable[FeatureInfo],
     sentence: str,
@@ -409,13 +493,24 @@ def sliced_system_prompt(
     open_keys: Iterable[tuple[str, str]] = (),
 ) -> str:
     """The prompt for one sentence (ADR 0041, plan "Token and latency budget"): ``prefix_text``
-    (byte-identical across sentences), then the slice ``select_slice`` picks (catalogue lines,
+    (byte-identical across sentences), then the slice ``slice_for`` picks (catalogue lines,
     trimmed guide entries, the phrasebook entries the sentence says, the situations over the
     slice), then the caller's own features in full (``scope != "site"``, sorted; most users have
     none). The sentence itself is in the user prompt."""
-    infos = list(catalogue)
+    infos, keys = list(catalogue), tuple(open_keys)
+    chosen = slice_for(infos, sentence, phrasebook, guide, keys)
+    return _render(infos, sentence, chosen, guide, keys)
+
+
+def _render(
+    infos: Sequence[FeatureInfo],
+    sentence: str,
+    chosen: Slice,
+    guide: FieldGuideSettings | None,
+    open_keys: Iterable[tuple[str, str]],
+) -> str:
+    """The prompt text for a chosen slice."""
     names = {info.name for info in infos}
-    chosen = select_slice(sentence, infos, phrasebook, guide)
     picked = set(chosen.fields)
     detail = [i for i in sorted(infos, key=lambda i: i.name) if i.name in picked]
     detail = [i for i in detail if i.scope == "site"]

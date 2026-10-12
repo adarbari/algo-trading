@@ -1055,6 +1055,33 @@ A catalogue field: instrument.<column>, rollup.<group>@v<N>.<column> or feature.
 """
 scalar FeatureName
 
+"""
+The ranked feature requests of the last `days` days up to `today` (exchange date): a date range, not one session. Admin only; counts, never a user or a span
+"""
+type FeatureRequestList {
+  today: Date!
+  days: Int!
+  rows: [FeatureRequestRow!]!
+}
+
+"""
+One requested feature in the ranking, best first (`rank` is 1-based; promoted and won't-do ones come after every open one). `ref` is the backlog key, or the slug of a request not yet mapped (`unmapped`, status UNMAPPED); `users` the distinct askers and `timesAsked` the distinct (user, day) asks, never who. `status` is OPEN, PROMOTED, WONT_DO or UNMAPPED; `promotedTo` the site feature a promoted one became
+"""
+type FeatureRequestRow {
+  rank: Int!
+  ref: String!
+  description: String!
+  feasibility: String!
+  score: Float!
+  users: Int!
+  timesAsked: Int!
+  firstSeen: Date
+  lastSeen: Date!
+  status: String!
+  promotedTo: String!
+  unmapped: Boolean!
+}
+
 """Catalogue features per stored session of `start..end`"""
 type FeatureSeries {
   instrumentId: String!
@@ -1921,6 +1948,23 @@ type MarketRegime {
 }
 
 """
+A feature the viewer asked for: `ref` the backlog key (an alias counts under its key) or the slug of a request not yet mapped (`unmapped`); `status` the backlog's; `firstAsked` / `lastAsked` the days it was asked and `timesAsked` how many distinct days; `span` the piece of the viewer's own sentence of the latest ask (null: not stored); `feasibility` the backlog item's, else the latest ask's; `askedBeforeToday` whether an ask falls on an earlier exchange date than today
+"""
+type MyFeatureRequest {
+  ref: String!
+  description: String!
+  status: String!
+  unmapped: Boolean!
+  firstAsked: Date!
+  lastAsked: Date!
+  timesAsked: Int!
+  promotedTo: String!
+  feasibility: String!
+  span: String
+  askedBeforeToday: Boolean!
+}
+
+"""
 The newest session after the one served whose nightly workflow is not complete (ADR 0062): its `date`, its `state`, and for a failure the public `kind` only (never the step or its cause: ADR 0056)
 """
 type NewerSession {
@@ -2400,6 +2444,11 @@ type Query {
   myScreens: [ScreenListing!]!
 
   """
+  The features the viewer's own Describe-it drafts listed as missing over the last year, one per feature, most recently asked first: their own history only, for every role (never another user's asks, counts or spans). A date range, not one session
+  """
+  myFeatureRequests: [MyFeatureRequest!]!
+
+  """
   The user's screen `screenerId` (or the site preset of that id they have not copied yet): draft, versions, preset pin, working copy. Null: no such screen
   """
   screenDetail(screenerId: String!): ScreenDetail
@@ -2491,6 +2540,11 @@ type Query {
   What the text model spent: tokens and cost against the budget, by model, use case and user, a 30-day series and the `recent` latest calls (newest first). A date range ending today, not one session (ADR 0058)
   """
   llmUsage(recent: Int! = 50): LlmUsage
+
+  """
+  The features traders asked for that the catalogue lacks, ranked (decayed distinct users x feasibility), over the last year up to today: a date range, not one session. Counts only, never a user or a span (ADR 0066)
+  """
+  featureRequests: FeatureRequestList
 
   """
   The `limit` most recent edge evaluation runs of any status, newest first: every edge the user sees, for the site and every declared user

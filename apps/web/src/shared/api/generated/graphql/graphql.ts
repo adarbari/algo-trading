@@ -267,6 +267,11 @@ export type ComparePricesQueryVariables = Exact<{
 
 export type ComparePricesQuery = { table: { instruments: Array<{ instrumentId: string, symbol: string, prices: { bars: Array<{ session: string, close: number }> } }> } | null };
 
+export type FeatureRequestsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type FeatureRequestsQuery = { featureRequests: { today: string, days: number, rows: Array<{ rank: number, ref: string, description: string, feasibility: string, score: number, users: number, timesAsked: number, firstSeen: string | null, lastSeen: string, status: string, promotedTo: string, unmapped: boolean }> } | null };
+
 export type FeatureCatalogueQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -591,6 +596,11 @@ export type GuideSearchQueryVariables = Exact<{
 
 
 export type GuideSearchQuery = { guideSearch: { query: string, groups: Array<{ kind: string, hits: Array<{ kind: string, id: string, title: string, snippet: string }> }> } | null };
+
+export type MyFeatureRequestsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyFeatureRequestsQuery = { myFeatureRequests: Array<{ ref: string, description: string, status: string, unmapped: boolean, firstAsked: string, lastAsked: string, timesAsked: number, promotedTo: string, feasibility: string, span: string | null, askedBeforeToday: boolean }> };
 
 export type TableViewQueryVariables = Exact<{
   scope: string;
@@ -1577,6 +1587,28 @@ export const ComparePricesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ComparePricesQuery, ComparePricesQueryVariables>;
+export const FeatureRequestsDocument = new TypedDocumentString(`
+    query FeatureRequests {
+  featureRequests {
+    today
+    days
+    rows {
+      rank
+      ref
+      description
+      feasibility
+      score
+      users
+      timesAsked
+      firstSeen
+      lastSeen
+      status
+      promotedTo
+      unmapped
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<FeatureRequestsQuery, FeatureRequestsQueryVariables>;
 export const FeatureCatalogueDocument = new TypedDocumentString(`
     query FeatureCatalogue {
   catalogue {
@@ -3492,6 +3524,23 @@ export const GuideSearchDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideSearchQuery, GuideSearchQueryVariables>;
+export const MyFeatureRequestsDocument = new TypedDocumentString(`
+    query MyFeatureRequests {
+  myFeatureRequests {
+    ref
+    description
+    status
+    unmapped
+    firstAsked
+    lastAsked
+    timesAsked
+    promotedTo
+    feasibility
+    span
+    askedBeforeToday
+  }
+}
+    `) as unknown as TypedDocumentString<MyFeatureRequestsQuery, MyFeatureRequestsQueryVariables>;
 export const TableViewDocument = new TypedDocumentString(`
     query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) {

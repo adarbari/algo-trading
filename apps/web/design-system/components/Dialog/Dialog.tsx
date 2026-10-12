@@ -5,6 +5,8 @@
  * dialog (the first focusable element, or `initialFocus`), Tab stays inside, and focus returns to
  * the opener on close; Escape, the close button and a click on the backdrop close it
  * (`dismissible={false}` for a step that must be answered). Page scroll is locked behind it.
+ * `fullOnPhone` makes a long form fill the whole screen when the screen is narrow (a phone), with
+ * the title and the footer still in place.
  */
 import type { ReactNode, RefObject } from 'react';
 
@@ -25,6 +27,8 @@ export interface DialogProps {
   size?: 'sm' | 'md' | 'lg';
   /** Escape and backdrop clicks close it (default true). */
   dismissible?: boolean;
+  /** On a narrow screen the dialog fills it (a long form); a short one keeps its card. */
+  fullOnPhone?: boolean;
   /** The element focused on open; default the first focusable element. */
   initialFocus?: RefObject<HTMLElement | null>;
   children?: ReactNode;

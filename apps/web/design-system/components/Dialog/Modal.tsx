@@ -43,6 +43,8 @@ export interface ModalProps {
   /** Before the close button in the header (previous / next). */
   headerActions?: ReactNode;
   dismissible: boolean;
+  /** A dialog fills a narrow screen (see Dialog). */
+  fullOnPhone?: boolean;
   initialFocus?: RefObject<HTMLElement | null>;
   /** Extra class for the panel (the Drawer's own widths). */
   panelClassName?: string | undefined;
@@ -63,6 +65,7 @@ export function Modal({
   headerStart,
   headerActions,
   dismissible,
+  fullOnPhone = false,
   initialFocus,
   panelClassName,
   children,
@@ -104,6 +107,7 @@ export function Modal({
             data-kind={kind}
             data-side={side}
             data-size={size}
+            data-phone={fullOnPhone ? 'full' : undefined}
             tabIndex={-1}
             {...getFloatingProps()}
           >

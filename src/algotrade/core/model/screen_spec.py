@@ -18,6 +18,9 @@ class Mode(StrEnum):
         return self is not Mode.SCORE
 
 
+MAX_NOTES = 10
+MAX_NOTE_LENGTH = 200
+
 # Decisions a near miss may give (most severe first); WATCH is the default.
 NEAR_MISS_DECISIONS = ("EVENT_RISK", "LIQUIDITY_RISK", "WATCH")
 
@@ -58,6 +61,7 @@ class ScreenSpec:
     columns: tuple[tuple[str, str], ...] = ()  # display name -> field
     tie_break: str | None = None  # field sorting rows with equal scores
     tie_break_descending: bool = True
+    notes: tuple[str, ...] = ()  # what the screen does not cover (data, shown as "Not covered")
 
     def fields(self) -> tuple[str, ...]:
         """Every field the screen reads, sorted (what the view must hold)."""

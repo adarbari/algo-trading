@@ -297,6 +297,12 @@ exempt = "free text: the regime label in plain words, the Guide's regime term ex
 source = "graphql:TrackRecord.runLabel"
 exempt = "free text: the run's name"
 
+[[enum]]
+source = "graphql:FeatureRequestRow.status"
+values_from = "python:algotrade.services.feedback.ranking:STATUSES"
+values = { OPEN = "term:feature_request_status", PROMOTED = "term:feature_request_status", WONT_DO = "term:feature_request_status", UNMAPPED = "term:feature_request_status" }
+names = { WONT_DO = "won't do" }
+
 # ------------------------------------------------------------------ sections
 
 [[section]]
@@ -316,6 +322,10 @@ path = "/regime"
 start = "start:read_the_regime_page"
 
 [[section]]
+path = "/admin/feature-requests"
+start = "start:read_feature_requests"
+
+[[section]]
 path = "/backtests"
 exempt = "placeholder page, not built yet"
 
@@ -326,6 +336,11 @@ exempt = "placeholder page, not built yet"
 [[section]]
 path = "/admin/users"
 exempt = "placeholder page, not built yet"
+
+[[enum]]
+source = "graphql:MyFeatureRequest.status"
+values_from = "python:algotrade.config.site.drafting.backlog:STATUS"
+values = { OPEN = "term:describe_status_open", PROMOTED = "term:describe_status_promoted", WONT_DO = "term:describe_status_wont_do" }
 
 # ------------------------------------------------------------------ dynamic references
 

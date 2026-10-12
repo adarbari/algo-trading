@@ -1,0 +1,44 @@
+# L3 site setting: the Guide glossary, the missing-feature requests (ADR 0066, amendment 2026-10-11). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "feature_request_status"
+term = "Feature request status"
+short = "Where a requested feature stands in the backlog: open, promoted, won't do, or unmapped."
+body = """
+Every feature a trader asked Describe it for, and the catalogue did not have, is matched to the curated backlog. Open: it is in the backlog and nobody has decided yet. Promoted: it became a site feature, and its row names that feature. Won't do: the site decided not to build it, with the reason in the backlog. Unmapped: the backlog does not know the name the request was filed under yet.
+Promoted and won't do requests keep their history and their score, but they are listed after every open and unmapped one: what still needs a decision comes first.
+"""
+next = "An admin merges an unmapped name into a backlog item, or promotes or declines an open one, by a reviewed change to the backlog."
+see_also = ["feature_request_unmapped", "feature_request_score"]
+
+[[term]]
+id = "feature_request_feasibility"
+term = "Feature request feasibility"
+short = "How hard a requested feature is to build: from stored data, from a new source, or unclear."
+body = """
+The backlog rates each requested feature. Rollup from stored: a window or ratio over data the app already stores, so it can ship quickly. Needs source: it requires data the app does not have yet, so a vendor or a new table comes first. Unclear: the request is too vague to build, or nobody has judged it.
+The rating sets a weight in the score: 1.0 for rollup from stored, 0.5 for needs source and 0.25 for unclear. A rating is a judgement made when the item was written. Check the item in the backlog before you plan work from it.
+"""
+see_also = ["feature_request_score"]
+
+[[term]]
+id = "feature_request_score"
+term = "Feature request score"
+short = "The ranking of a requested feature: its distinct askers, each fading with age, times its feasibility weight."
+body = """
+Each user who asked counts once, however often they asked. Their count fades with the age of their latest request. It is multiplied by exp(-age in days / 60), so a request from 60 days ago counts about a third of one made today. The faded counts are added up, then multiplied by the feasibility weight.
+Worked example: two users asked, one today and one 60 days ago, for a feature rated rollup from stored. The score is (1.00 + 0.37) x 1.0 = 1.37. The same asks for a needs-source feature score 0.68.
+A score over one or two users is noise. Read the users and times asked columns beside it, and never read a score as a vote: it ranks what to look at, not what to build.
+"""
+see_also = ["feature_request_feasibility", "feature_request_status"]
+
+[[term]]
+id = "feature_request_unmapped"
+term = "Unmapped request"
+short = "A requested feature whose name the curated backlog does not know yet."
+body = """
+Describe it files each missing feature under a short name. When that name is neither a backlog key nor one of its aliases, the row is unmapped and its name is shown as it was filed. Two names for the same feature stay two rows until someone merges them: the app never merges by guessing.
+"""
+see_also = ["feature_request_status"]

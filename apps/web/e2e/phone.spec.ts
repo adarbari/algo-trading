@@ -12,6 +12,8 @@ import { WORKSPACES } from '../src/app/workspaces/workspaces';
 import { expectAccessible, settled } from './a11y';
 import { mockAdminApi } from './admin-api';
 import { mockViewer } from './auth-api';
+import REQUESTS from './fixtures/feature-requests.json' with { type: 'json' };
+import { mockBuilderApi, mockDescribeApi } from './builder-api';
 import { mockApi } from './mock-api';
 
 /** Every section, and the Guide (its own layout, outside the workspaces) with its regime pages. */
@@ -305,6 +307,37 @@ test('Edge builder: the six steps fit a phone, the steps scroll sideways and a s
   expect(errors).toEqual([]);
 });
 
+test('Describe it: the review fits the screen and the formula dialog fills it', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockBuilderApi(page);
+  await mockDescribeApi(page);
+  await page.goto('/screeners/my-vrp/edit');
+  await page.getByRole('textbox', { name: 'Describe the screen' }).fill('IV above HV');
+  await page.getByRole('button', { name: 'Draft it' }).tap();
+  await expect(page.getByRole('heading', { level: 3, name: 'Proposed formulas' })).toBeVisible();
+  const width = page.viewportSize()?.width ?? 0;
+  const pageWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+  expect(await pageWidth()).toBeLessThanOrEqual(width);
+  const pending = page.getByRole('group', { name: /Waiting on formula/ });
+  await expect(pending).toBeVisible();
+  const row = await pending.boundingBox();
+  expect((row?.x ?? 0) + (row?.width ?? 0)).toBeLessThanOrEqual(width);
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'Review and add' }).first().tap();
+  const dialog = page.getByRole('dialog', { name: 'Add formula feature' });
+  await expect(dialog).toBeVisible();
+  const box = await dialog.boundingBox();
+  const height = page.viewportSize()?.height ?? 0;
+  expect(box?.x ?? 1).toBeLessThanOrEqual(1);
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(width - 1);
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(height - 1);
+  await expect(dialog.getByRole('button', { name: 'Save feature' })).toBeInViewport();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) => {
   await mockAdminApi(page, {
     harnessRuns: [
@@ -337,6 +370,19 @@ test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) =>
   // A phone shows 3 of the columns (edge, started, status): the run id is in the sheet
   await page.getByRole('row', { name: /momentum_12_1/ }).tap();
   await expect(page.getByRole('dialog', { name: 'run-b' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()?.width ?? 0,
+  );
+});
+
+test('Feature requests: the ranked list fits a phone and a status filter narrows it', async ({
+  page,
+}) => {
+  await mockAdminApi(page, { featureRequests: REQUESTS });
+  await page.goto('/admin/feature-requests');
+  await expect(page.getByRole('row', { name: /realised_vol_20d/ })).toBeVisible();
+  await page.getByRole('radio', { name: 'Promoted' }).tap();
+  await expect(page).toHaveURL(/status=PROMOTED/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );

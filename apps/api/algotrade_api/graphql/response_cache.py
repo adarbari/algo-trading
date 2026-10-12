@@ -9,7 +9,8 @@ configs, the same for every caller of a role: market and regime history, prices,
 ``USER_OPERATIONS`` (published tables and configs that depend on the caller's catalogue or
 configs: user features, the Guide's field entries), ``RUN_OPERATIONS`` (they also read run
 records or jobs: nightly runs, ingestion, screener runs and results, ideas, edges, status) and
-``NEVER_CACHED`` (the text model's usage, which reads the clock, and the caller's identity). The
+``NEVER_CACHED`` (the text model's usage and the Describe-it request ranking, which read the
+clock, and the caller's identity). The
 key (``response_key``) is the published state (``StoreReader.visible_seq()``), the writes the
 API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
 the routes that write: a config save changes the caller's next read without a publish), a hash
@@ -140,10 +141,14 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
 # The run operations whose loader reads the clock (``load_completeness``: the last session the
 # exchange closed): the closed session is in their key too.
 CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", "StatusStrip"})
-# Never kept: the text model's usage (it reads the clock, unkeyed) and the caller's identity
-# (answered inline, no context opened). A new operation is never in this group by default: the
-# classification test fails until it is placed.
-NEVER_CACHED: frozenset[str] = frozenset({"LlmUsage", "Viewer"})
+# Never kept: the text model's usage (it reads the clock, unkeyed), the caller's identity
+# (answered inline, no context opened) and the caller's own missing-feature requests (a draft
+# POST records them, and a draft writes nothing the cache keys on; the window reads the clock).
+# A new operation is never in this group by default: the classification test fails until it is
+# placed.
+NEVER_CACHED: frozenset[str] = frozenset(
+    {"FeatureRequests", "LlmUsage", "Viewer", "MyFeatureRequests"}
+)
 # The route packages whose endpoints write (configs, screen results, evaluations); a preview,
 # a draft or an explain POST writes nothing the cache keys on.
 WRITE_PACKAGES = (

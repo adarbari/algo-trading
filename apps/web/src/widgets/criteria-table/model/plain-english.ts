@@ -47,10 +47,15 @@ const join = (parts: readonly string[]): string =>
     ? (parts[0] ?? '')
     : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
 
-/** "Find instruments where A and B; a near miss on C is tolerated; D only raises the score." */
+/**
+ * "Find instruments where A and B; a near miss on C is tolerated; D only raises the score." The
+ * screen's notes (what it does not cover: data the trader asked for, not authored prose) end it
+ * as "Not covered: ...".
+ */
 export function plainEnglish(
   criteria: readonly Criterion[],
   catalogue: readonly CatalogueFeature[],
+  notes: readonly string[] = [],
 ): string | null {
   const ready = criteria.filter(
     (c) => c.field !== '' && (c.value !== undefined || shapeOf(c.op) === 'none'),
@@ -72,5 +77,6 @@ export function plainEnglish(
   const score = text('score');
   if (score.length > 0)
     sentences.push(`Prefer ${join(score)}; missing these only lowers the score.`);
+  if (notes.length > 0) sentences.push(`Not covered: ${notes.join('; ')}.`);
   return sentences.join(' ');
 }
