@@ -355,6 +355,22 @@ follow-up PR).
 - status: final
 - Reasoning: one rule for everything in a drafting-event payload.
 
+## 2026-10-12 | Describe it wrap-up | Enum values not built, one contradiction accepted
+- Question: are enum values for index-only fields shown to the model; is "volatile squeeze" (ATR >= 3% and a Bollinger squeeze) served without the model?
+- Options: build enum values now / measure first; fall through to the model / serve it.
+- Decision: enum values are not built (the live Haiku run of 2026-10-12 shows no wrong-enum drops: 0 drops of any kind); "volatile squeeze" is served (a squeeze is measured against the name's own history, ATR% is an absolute level, so the pair is a real screen, not a contradiction).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: enum values would cost prompt budget the measurement does not justify; the Opus architect reviewer of #560 agreed on the second.
+
+## 2026-10-12 | Describe it phrasebook shortcut | Stamp on a no-model draft
+- Question: what does a draft made by the phrasebook (no model call) record as its prompt version in the feedback event?
+- Options: the shared prompt version, stage only in the payload / `phrasebook:<hash of the structured entries>` / null.
+- Decision: `phrasebook:<short hash of the structured entries>`.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: no prompt made the draft, so the prompt version would be a false attribution; the payload (where the stage lives) can be nulled while the column survives; the hash is site config, not personal data.
+
 ## 2026-10-12 | PR #566 (Describe it retype) | Stale answer after the screen changed
 - Question: a retype's answer arrives after the trader changed the screen: apply it, or drop it, and does the call still count against the daily limit?
 - Options: apply the merged draft over the later edits / drop it and keep counting the call / block every edit during the wait.
