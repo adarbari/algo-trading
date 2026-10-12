@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.suggestions import MAX_SUGGESTIONS, suggestions_of
+from algotrade.services.drafting.contract.suggestions import MAX_SUGGESTIONS, suggestions_of
 
 
 def build(item: Mapping[str, Any], name: str) -> dict[str, Any]:

@@ -11,8 +11,8 @@ import pytest
 
 from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting import formulas as formulas_module
-from algotrade.services.drafting.formulas import (
+from algotrade.services.drafting.contract import formulas as formulas_module
+from algotrade.services.drafting.contract.formulas import (
     MAX_FORMULAS,
     UNSAMPLED,
     FormulaOutcome,

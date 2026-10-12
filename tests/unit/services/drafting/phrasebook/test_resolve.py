@@ -5,7 +5,7 @@ content word of it."""
 import pytest
 
 from algotrade.config.site.settings import load_phrasebook
-from algotrade.services.drafting.golden import load_cases
+from algotrade.services.drafting.golden.golden import load_cases
 from algotrade.services.drafting.phrasebook.resolve import (
     resolve,
     resolves_fully,

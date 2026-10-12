@@ -5,7 +5,7 @@ import json
 
 from algotrade.config.site.llm import ProviderSettings
 from algotrade.config.site.settings import load_llm
-from algotrade.services.drafting.golden import recorded_answers
+from algotrade.services.drafting.golden.golden import recorded_answers
 from algotrade.services.drafting.parts.model import MAX_READING, MAX_WORDS, Part, PartsStats
 from algotrade.services.drafting.parts.scoring import aggregate, score_parts, share_ok
 from algotrade.storage.factory import open_config_store

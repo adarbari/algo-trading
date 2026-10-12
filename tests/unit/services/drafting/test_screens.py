@@ -12,9 +12,9 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.completion import Attempt, CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.configs import field_catalog, resolve_rule_draft
-from algotrade.services.drafting import formulas as formulas_module
 from algotrade.services.drafting import screens
-from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA
+from algotrade.services.drafting.contract import formulas as formulas_module
+from algotrade.services.drafting.contract.answer_schema import ANSWER_SCHEMA
 from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.screens import (
     MAX_TEXT,

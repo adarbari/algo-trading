@@ -15,7 +15,7 @@ from algotrade.config.site.settings import (
     load_phrasebook,
 )
 from algotrade.config.user import UserContext
-from algotrade.services.drafting.golden import GoldenCase, load_cases, recorded_answers
+from algotrade.services.drafting.golden.golden import GoldenCase, load_cases, recorded_answers
 from algotrade.services.drafting.prompt import (
     PROMPT_BUDGET_TOKENS,
     index_group,

@@ -12,7 +12,7 @@ table's columns). Plan: `docs/drafting/describe-it-plan.md`. Code:
 ## Context
 Describe it turns a sentence into a draft screen. Whether it understood is known only by what the
 trader did next: saved the draft as it came, edited it, or walked away. The golden set (replayed
-in CI to score the prompt, `services/drafting/golden.py`) should come from that real iteration, not
+in CI to score the prompt, `services/drafting/golden/golden.py`) should come from that real iteration, not
 from cases invented at a desk. The usage log (0058) records model calls and cannot say what the
 trader made of the answer, and a sentence is personal data that deserves its own rules.
 

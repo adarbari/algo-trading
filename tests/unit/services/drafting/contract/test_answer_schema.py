@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from algotrade.services.drafting.answer_schema import (
+from algotrade.services.drafting.contract.answer_schema import (
     ANSWER_SCHEMA,
     CRITERION,
     FORMULA,

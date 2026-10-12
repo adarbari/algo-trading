@@ -10,7 +10,8 @@ writes the auto-deploy agent; ``deploy-plan`` and ``deploy-verify`` are what
 open-files soft limit to ``OPEN_FILES`` and caps the connections served at once at
 ``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08).
 ``algotrade-api golden run`` is the owner-run live evaluation of the drafting prompt against
-the golden set (``services/drafting/golden_run.py``: real models and money, only with ``--yes``).
+the golden set (``services/drafting/golden/golden_run.py``: real models and money, only with
+``--yes``).
 ``algotrade-api feedback retain | erase`` are the owner-run retention (12 months) and per-user
 erasure of the personal text of the drafting feedback (``services/feedback/retention.py``, ADR
 0066): a dry run unless ``--yes``.
@@ -47,7 +48,7 @@ from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import exchange_date
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.drafting.golden_run import (
+from algotrade.services.drafting.golden.golden_run import (
     DEFAULT_BUDGET_USD,
     DEFAULT_MAX_CALLS,
     DEFAULT_REPEAT,
