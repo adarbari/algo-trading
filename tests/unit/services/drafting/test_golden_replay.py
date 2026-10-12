@@ -92,3 +92,22 @@ def test_a_contract_answer_through_the_whole_draft_meets_the_case(
     )
     assert result.passed, f"{slug}/{case.id}: {result}"
     assert not any(f.name in json.dumps(draft.document) for f in draft.formulas)
+
+
+def test_the_suggestions_of_a_contract_answer_are_offered_apart(ctx: ReadContext) -> None:
+    """The cases that expect suggestions: the offered ones are beside the document, never in its
+    criteria; the refused ones (hard, invented, duplicate) are not offered; notes say what was
+    left out."""
+    cases = [(c, s, t) for c, s, t in CONTRACT if c.suggested]
+    assert {c.id for c, _, _ in cases} >= {
+        "yield-trap-suggestions", "vague-word-no-threshold", "hard-suggestion-refused",
+    }  # fmt: skip
+    for case, _, text in cases:
+        draft = draft_screen(ctx, Recorded(text), "golden", case.sentence)
+        assert [s.criterion["field"] for s in draft.suggestions] == case.suggested["offered"]
+        held = {(c["field"], c["op"]) for c in draft.document["criteria"].values()}
+        assert not held & {(s.criterion["field"], s.criterion["op"]) for s in draft.suggestions}
+        assert all(s.criterion["mode"] in ("soft", "score") for s in draft.suggestions)
+        assert [d.field for d in draft.suggestions_dropped] == case.suggested["dropped"]
+        for word in case.suggested["notes"]:
+            assert any(word in n for n in draft.notes)

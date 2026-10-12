@@ -1,0 +1,35 @@
+{
+  "id": "hard-suggestion-refused",
+  "sentence": "stocks with an annual dividend yield above 6%",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "dividend yield above 6%",
+        "bucket": "A",
+        "fields": [
+          "feature.div_yield"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.06,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "suggestions": {
+      "offered": [],
+      "dropped": [
+        "feature.trend_state",
+        "feature.no_such_field"
+      ],
+      "notes": []
+    }
+  }
+}

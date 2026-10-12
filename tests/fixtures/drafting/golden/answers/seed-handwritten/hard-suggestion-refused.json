@@ -1,0 +1,84 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "yield",
+      "field": "feature.div_yield",
+      "op": "gt",
+      "value": 0.06,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "dividend yield above 6%"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": [
+    {
+      "field": "feature.trend_state",
+      "op": "ne",
+      "value": "DOWNTREND",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "skip falling names",
+      "source": "feature.div_yield"
+    },
+    {
+      "field": "feature.no_such_field",
+      "op": "gt",
+      "value": 1,
+      "mode": "soft",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "an invented field",
+      "source": null
+    },
+    {
+      "field": "feature.div_yield",
+      "op": "gt",
+      "value": 0.06,
+      "mode": "soft",
+      "tolerance": 0.005,
+      "on_miss": null,
+      "why": "the same check as the criterion",
+      "source": null
+    },
+    {
+      "field": "feature.div_yield",
+      "op": "gt",
+      "value": 0.09,
+      "mode": "score",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "a tighter threshold than asked",
+      "source": null
+    }
+  ]
+}

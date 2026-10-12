@@ -158,7 +158,7 @@ Sources: IV behaviour around earnings: https://optionalpha.com/learn/iv-crush an
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| options expensive for this name (sell premium) | `gte 0.5` | soft | 0.1 | add rollup.earnings@v1.days_to_earnings gt 10 (soft, EVENT_RISK) and feature.iv_hv_spread gte 0.05 |
+| options expensive for this name (sell premium) | `gte 0.5` | soft | 0.1 | suggest rollup.earnings@v1.days_to_earnings gt 10 (soft, EVENT_RISK) and feature.iv_hv_spread gte 0.05 |
 | options cheap for this name (buy premium) | `lte 0.3` | soft | 0.1 | with feature.atr_pct gte 0.01 so pinned names are out |
 
 **When the reading lies**
@@ -308,7 +308,7 @@ Sources: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-whi
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| the premium's denominator is real | `gte 0.1` | hard | - | the floor the VRP ratio lacks by design; add it to any IV/HV screen |
+| the premium's denominator is real | `gte 0.1` | hard | - | the floor the VRP ratio lacks by design; suggest it for any IV/HV screen |
 | a volatile name (realised, a month and a half) | `gte 0.4` | soft | 0.05 | - |
 
 **When the reading lies**

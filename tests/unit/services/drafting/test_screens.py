@@ -678,3 +678,59 @@ def test_bare_names_in_every_attempt_keep_the_good_criteria_and_other_problems_s
     mixed = json.dumps(proposal(PRICE_GT, bare, other))
     with pytest.raises(ModelUnavailableError):
         draft_screen(ctx, chained(Ledger(), Scripted("m", mixed, mixed)), "s", "over $50")
+
+
+def sug(**over: Any) -> dict[str, Any]:
+    base = {
+        "field": OI, "op": "gte", "value": 1000, "mode": "score", "tolerance": None,
+        "on_miss": None, "why": "thin open interest hides the spread", "source": PRICE,
+    }  # fmt: skip
+    return {**base, **over}
+
+
+def test_suggestions_are_offered_beside_the_document_never_in_it(ctx: ReadContext) -> None:
+    answer = proposal(
+        ACTIVE, PRICE_GT,
+        suggestions=[
+            sug(), sug(field=PRICE, op="gt", value=50), sug(mode="hard", value=7),
+            sug(field="nope.x"),
+            sug(field=OI, op="gte", value=500, mode="soft", tolerance=100, on_miss="EVENT_RISK"),
+        ],
+    )  # fmt: skip
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "over $50")
+    assert set(draft.document["criteria"]) == {"active", "price"}
+    assert [(s.criterion["field"], s.criterion["mode"], s.source) for s in draft.suggestions] == [
+        (OI, "score", PRICE),
+        (OI, "soft", PRICE),
+    ]
+    assert draft.suggestions[1].criterion["on_miss"] == "EVENT_RISK"
+    assert [d.field for d in draft.suggestions_dropped] == [OI, "nope.x"]  # hard, then invented
+    resolve_rule_draft(ctx.configs, "my_screen", ctx.user, draft.document)
+
+
+def test_a_soft_suggestion_without_a_tolerance_is_refused_by_the_criterion_validator(
+    ctx: ReadContext,
+) -> None:
+    draft = draft_screen(ctx, Canned(proposal(ACTIVE, suggestions=[sug(mode="soft")])), "s", "x")
+    assert draft.suggestions == () and "tolerance" in draft.suggestions_dropped[0].reason
+
+
+def test_an_answer_without_suggestions_offers_none(ctx: ReadContext) -> None:
+    draft = draft_screen(ctx, Canned(proposal(ACTIVE)), "my_screen", "active")
+    assert (draft.suggestions, draft.suggestions_dropped) == ((), ())
+
+
+def test_a_suggestion_equal_to_a_non_default_alternative_is_not_offered_twice(
+    ctx: ReadContext,
+) -> None:
+    other = {"label": "price", "criterion": {"id": None, "field": PRICE, "op": "gt", "value": 50}}
+    term = {**READINGS, "alternatives": [READINGS["alternatives"][1], other], "default_index": 0}
+    answer = proposal(
+        ACTIVE, unresolved=[term],
+        suggestions=[
+            sug(field=PRICE, op="gt", value=50, mode="score"), sug(field=OI, op="lt", value=9),
+        ],
+    )  # fmt: skip
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "deep")
+    assert [(s.criterion["field"], s.criterion["op"]) for s in draft.suggestions] == [(OI, "lt")]
+    assert draft.suggestions_dropped == ()

@@ -1,0 +1,35 @@
+{
+  "id": "yield-trap-suggestions",
+  "sentence": "stocks with a dividend yield above 5%",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "dividend yield above 5%",
+        "bucket": "A",
+        "fields": [
+          "feature.div_yield"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.05,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "suggestions": {
+      "offered": [
+        "feature.trend_state",
+        "rollup.earnings@v1.days_to_earnings"
+      ],
+      "dropped": [],
+      "notes": []
+    }
+  }
+}

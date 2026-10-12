@@ -29,7 +29,7 @@ for = "earnings this week (an event play)"
 op = "lte"
 value = 5
 mode = "hard"
-note = "add rollup.earnings@v1.date_confirmed eq true when the date must be right"
+note = "suggest rollup.earnings@v1.date_confirmed eq true when the date must be right"
 
 [[field]]
 name = "feature.earnings_before_expiry"

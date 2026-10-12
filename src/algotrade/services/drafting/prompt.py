@@ -9,7 +9,7 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 5: the A / B / C answer contract, the
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 7: the A / B / C answer contract, the
 open backlog keys most relevant to the sentence, the index grouped by prefix): the task, the
 examples and an index of every field (grouped under one heading per prefix: type, unit) as a prefix
 no sentence changes, then in detail only the fields ``retrieval.select_slice`` picks for the
@@ -38,8 +38,9 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice;
 # 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
 # entry shows its structured thresholds; 5: the index grouped by prefix and the slice capped by a
-# token budget; 6: the phrasebook's last column is headed "exact default".
-PROMPT_VERSION = "6"
+# token budget; 6: the phrasebook's last column is headed "exact default"; 7: protective checks
+# are ``suggestions``, never criteria, and no threshold is invented for a vague word.
+PROMPT_VERSION = "7"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -75,7 +76,7 @@ Rules:
   "optionable" means instrument.optionable eq true. Always include instrument.status eq
   "ACTIVE" (id "active") unless the sentence says otherwise.
 - Gates (price, liquidity, kind of instrument) are hard. A threshold where a near miss is
-  worth seeing is soft with a sensible tolerance. "prefer" / "ideally" is score.
+  worth seeing is soft with a tolerance. "prefer" / "ideally" is score.
 - "rank by X" / "sort by X" sets "tie_break" (descending unless the sentence says lowest
   first); otherwise "tie_break" is null.
 - When current criteria are given, keep every one the sentence does not change and answer
@@ -86,13 +87,15 @@ Rules:
   A phrasebook entry's last column, "exact default" (`field op value`), is the meaning to use as
   given unless the sentence gives its own value;
   for a word with several readings it lists them and the first is the default.
-  When a caveat or situation names a field to check, add that criterion (soft or score, so it
-  lists rather than rejects) and say why in "notes".
+- "criteria" holds ONLY what the sentence asks for; a caveat's check goes in "suggestions" (soft
+  or score). A vague word ("heavy") with no phrasebook or guide threshold stays out of "criteria":
+  offer "unresolved" readings when fields fit, else a note.
 
 Answer shape:
 {"criteria": [ ... ], "tie_break": {"field": "...", "descending": true} or null,
  "notes": ["anything you could not map, or assumed"],
- "formulas": [ ... ] or null, "missing": [ ... ] or null, "unresolved": [ ... ] or null}
+ "formulas": [ ... ] or null, "missing": [ ... ] or null, "unresolved": [ ... ] or null,
+ "suggestions": [ ... ] or null}
 
 Each part of the sentence goes in one place. A: a criterion on a catalogue field (preferred). B: a
 formula, only when maths over fields says it and no field does. C: missing, when neither can. Never
@@ -109,6 +112,9 @@ one_of(x, a, ...) exists(group). No lag, window, rolling or history: anything ov
 "missing": [{"key": an open key from "Open requests" below, else null, "new_key_slug" (a-z0-9_) when
 key is null, "span", "description", "why_needed", "closest": [catalogue fields], "feasibility":
 "ROLLUP_FROM_STORED" (a window over stored data) | "NEEDS_SOURCE" (new data) | "UNCLEAR"}].
+
+"suggestions": [{"field", "op", "value", "mode": "soft"|"score", "tolerance" (soft needs it),
+"on_miss", "why": the caveat, "source": field or null}], at most 5, shown to the trader to accept.
 
 "unresolved": [{"term", "span", "default_index", "alternatives": [{"label", "criterion": a complete
 criterion}, 2 or 3]}] for a term with several readings ("liquid"); the server adds the default to
@@ -127,15 +133,13 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "field": "instrument.status",
                     "op": "eq",
                     "value": "ACTIVE",
-                    "mode": "hard",
-                    "why": "stocks (listed)",
+                    "why": "listed",
                 },
                 {
                     "id": "stocks",
                     "field": "instrument.security_type",
                     "op": "in",
                     "value": ["COMMON_STOCK", "ADR"],
-                    "mode": "hard",
                     "why": "stocks",
                 },
                 {
@@ -152,17 +156,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "field": "rollup.price_stats@v2.ret_20d",
                     "op": "gt",
                     "value": 0,
-                    "mode": "hard",
                     "why": "upward momentum",
-                },
-                {
-                    "id": "above_sma20",
-                    "field": "feature.pct_vs_sma_20",
-                    "op": "gt",
-                    "value": 0,
-                    "mode": "soft",
-                    "tolerance": 0.02,
-                    "why": "upward momentum (confirmation)",
                 },
                 {
                     "id": "rsi",
@@ -171,20 +165,16 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "value": 50,
                     "mode": "score",
                     "tolerance": 20,
-                    "why": "upward momentum (strength)",
+                    "why": "upward momentum",
                 },
             ],
             "tie_break": {"field": "rollup.price_stats@v2.ret_20d", "descending": True},
-            "notes": [
-                "momentum read as a positive 20-day return, confirmed above the 20-day average; "
-                "RSI only scores",
-                "near the low read as within 10% of the 52-week low (5% near-miss band)",
-            ],
+            "notes": ["momentum read as a positive 20-day return; RSI only scores"],
         },
     ),
     (
-        "liquid optionable stocks over $10 with IV rank above 50% and no earnings in the next "
-        "10 sessions, rank by IV rank",
+        "liquid stocks with IV rank above 50% and no earnings in the next 10 sessions, "
+        "rank by IV rank",
         {
             "criteria": [
                 {
@@ -198,18 +188,6 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "field": "instrument.security_type",
                     "op": "in",
                     "value": ["COMMON_STOCK", "ADR"],
-                },
-                {
-                    "id": "optionable",
-                    "field": "instrument.optionable",
-                    "op": "eq",
-                    "value": True,
-                },
-                {
-                    "id": "price",
-                    "field": "rollup.price_stats@v2.close",
-                    "op": "gt",
-                    "value": 10,
                 },
                 {
                     "id": "liquid",
@@ -228,7 +206,6 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "value": 0.5,
                     "mode": "soft",
                     "tolerance": 0.1,
-                    "why": "IV rank above 50%",
                 },
                 {
                     "id": "no_earnings",
@@ -238,7 +215,6 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "mode": "soft",
                     "tolerance": 2,
                     "on_miss": "EVENT_RISK",
-                    "why": "no earnings in the next 10 sessions",
                 },
             ],
             "tie_break": {"field": "feature.iv_rank", "descending": True},
@@ -276,7 +252,7 @@ def phrase_line(phrase: Phrase, catalogue: set[str]) -> str | None:
     if not fields:
         return None
     hint = " ".join(phrase.hint.split())
-    line = f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+    line = f"{' / '.join(phrase.say[:SAY_SHOWN])} | {', '.join(fields)} | {hint or '-'}"
     exact = _structured_text(phrase, catalogue)
     return f"{line} | = {exact}" if exact else line
 
@@ -407,6 +383,7 @@ def slice_guide_line(
     return " | ".join(parts)
 
 
+SAY_SHOWN = 4  # wordings of an entry the prompt lists (the slice still matches on all of them)
 KEY_CHARS = 60  # of an open key's description (PROMPT_LIMIT keys must stay inside the budget)
 _WORD = re.compile(r"[a-z0-9]{3,}")
 OPEN_HEADER = "Open requests (key | what it is); reuse one as a missing item's key when it fits:"

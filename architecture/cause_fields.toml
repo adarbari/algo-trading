@@ -141,6 +141,21 @@ surface = "rest"
 reason = "the criterion of one reading of a term in the caller's own sentence"
 
 [[fact]]
+name = "Suggestion.criterion"
+surface = "rest"
+reason = "a protective check the drafting model offers on the caller's own sentence, never applied"
+
+[[fact]]
+name = "Suggestion.why"
+surface = "rest"
+reason = "the model's short reason for a suggested check, from the field guide caveat"
+
+[[fact]]
+name = "DroppedSuggestion.reason"
+surface = "rest"
+reason = "why a check the drafting model suggested for the caller's sentence is not offered"
+
+[[fact]]
 name = "RegimeExplanation.note"
 surface = "rest"
 reason = "the text model's note on the regime explanation"
