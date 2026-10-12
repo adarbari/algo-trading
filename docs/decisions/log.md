@@ -204,6 +204,6 @@ follow-up PR).
 - Question: the server sends spans only for unresolved terms and missing features; how is the rest of the sentence tagged?
 - Options: tag only what the server spans / match criteria to words in the browser / add spans to the answer contract.
 - Decision: tag only the server's spans in this PR (needs your call, not available yet); applied and formula spans wait for a contract change.
-- decided by: orchestrator (design call)
+- decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
 - Reasoning: the browser derives nothing (ADR 0038); a contract change is a separate PR.

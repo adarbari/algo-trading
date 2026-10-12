@@ -38,6 +38,10 @@ session, else decided by a Fable agent on their behalf, and always logged.
   data, security or permission settings, publishing outside the repo, merging with failing CI,
   overriding an ADR. The PR stays `no-automerge` plus `needs-owner`.
 
+Whenever a policy decision is open, the orchestrator ADDS `needs-owner` to the PR (it removes
+only the label it set, once the decision is logged), so `scripts/auto_merge.sh` blocks the merge
+mechanically.
+
 For a policy decision:
 
 - **Owner present**: ask in the session with `AskUserQuestion`: one clear question, options
@@ -55,7 +59,7 @@ PR). Only the owner's word makes an entry `final`; an agent never does.
 ## 3. Release
 
 When the reviewer's last verdict is `Re-review: no`, CI on the head is green, the PR has no
-`needs-owner` label, no policy decision is unanswered, and the PR body lists the decisions taken (owner, or Fable on the
+`needs-owner` label (added for every open policy decision), no policy decision is unanswered, and the PR body lists the decisions taken (owner, or Fable on the
 owner's behalf), the **orchestrating session** removes `no-automerge` from PRs created in its
 own flow (an implementer's label counts as its orchestrator's). The auto-merge workflow then
 merges on green; never `gh pr merge`. Post a short PR comment: reviewer rounds and decisions.

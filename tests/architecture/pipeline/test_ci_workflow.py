@@ -223,3 +223,23 @@ def test_full_history_is_fetched_only_by_the_shard_that_runs_the_architecture_te
                 "rest",
             }
             assert full(shard, python) == runs_architecture, (shard, python)
+
+
+def test_every_other_workflow_running_the_architecture_tests_checks_out_full_history() -> None:
+    """A workflow that runs `make check` or tests/architecture (release.yml: `make check FULL=1`)
+    needs `fetch-depth: 0` too, or the golden commit-date check fails in its shallow clone."""
+    for path in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+        if path == WORKFLOW:  # its own shard rule is tested above
+            continue
+        for name, job in (yaml.safe_load(path.read_text()).get("jobs") or {}).items():
+            steps = job.get("steps") or []
+            if not any(
+                "make check" in str(s.get("run", ""))
+                or "tests/architecture" in str(s.get("run", ""))
+                for s in steps
+            ):
+                continue
+            checkouts = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout")]
+            assert checkouts and all(
+                str(c.get("with", {}).get("fetch-depth")) == "0" for c in checkouts
+            ), f"{path.name}:{name} runs the architecture tests: checkout needs fetch-depth: 0"

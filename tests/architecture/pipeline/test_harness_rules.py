@@ -74,7 +74,8 @@ def test_decision_log_entries_have_date_status_and_decider() -> None:
         assert re.match(r"\d{4}-\d{2}-\d{2} \| ", entry), entry[:60]
         assert re.search(
             r"^- decided by: (owner( \(confirmed \d{4}-\d{2}-\d{2}\))?"
-            r"|Fable on the owner's behalf|orchestrator \(design call\))$",
+            r"|Fable on the owner's behalf|orchestrator \(design call\)"
+            r"|proposed by orchestrator; awaiting owner)$",
             entry,
             re.M,
         ), entry[:60]
