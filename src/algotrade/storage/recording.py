@@ -59,8 +59,13 @@ class BatchRecorder[T]:
         self._queue.join()
 
     def close(self, timeout_s: float = 10.0) -> None:
-        """Write what is queued, then stop the thread."""
-        self._queue.put(_STOP)
+        """Write what is queued, then stop the thread. Waits at most ``timeout_s`` in all, also
+        for room on a full queue (a writer stuck behind a lock must not hold shutdown)."""
+        try:
+            self._queue.put(_STOP, timeout=timeout_s)
+        except queue.Full:
+            log.warning("%s recorder queue full at close: %s left queued", self._job, self._noun)
+            return
         self._thread.join(timeout_s)
 
     def run_id(self, session: date, now: datetime) -> str:

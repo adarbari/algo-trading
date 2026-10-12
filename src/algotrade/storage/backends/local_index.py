@@ -28,6 +28,7 @@ import secrets
 import shutil
 import tempfile
 import threading
+import time
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -38,10 +39,12 @@ import pandas as pd
 
 from algotrade.storage.backends.run_selection import RunEntry, committed
 from algotrade.storage.locks import FileLock, held
+from algotrade.storage.tables.interfaces import PartitionBusyError
 
 INDEX = "_runs.json"
 INDEX_LOCK = ".runs.lock"
 TXN = "_txn"
+ORPHAN_GRACE_S = 60.0  # a loose file younger than this may be a write about to be indexed
 
 
 def atomic_write(path: Path, data: bytes) -> None:
@@ -300,6 +303,68 @@ class Commits:
                 shutil.rmtree(directory, ignore_errors=True)
             if gone:
                 atomic_write(self.base / "seq", str(self.published() + 1).encode())
+            return len(gone)
+
+    def runs_of(self, directory: Path) -> list[str]:
+        """The committed runs of one partition, oldest commit first."""
+        entries = read_index(directory)
+        return sorted(entries, key=lambda r: (entries[r].seq or -1, r))
+
+    def sweep(self, directory: Path) -> int:
+        """Delete the ``run=*.parquet`` files of one partition its index does not name (see
+        ``TableStore.sweep_orphans``), under the commit lock. -> files deleted."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            if directory in busy:
+                raise PartitionBusyError(str(directory))
+            with held(index_lock(directory)):
+                entries = read_index(directory)
+                named = set()
+                for run, entry in entries.items():
+                    for version in (entry, entry.prev):
+                        if version is not None:
+                            named.add(run_file(run, version))
+                found = [p for p in directory.glob("run=*.parquet") if p.name not in named]
+                staged = {  # read after the glob: a run staged since the busy check is spared
+                    item["file"]
+                    for run_id in self.pending_runs()
+                    for item in self.journal(run_id).values()
+                    if self._dir(item["table"], item["date"]) == directory
+                }
+                cutoff = time.time() - ORPHAN_GRACE_S  # a direct write puts its file first
+                orphans = [p for p in found if p.name not in staged and p.stat().st_mtime < cutoff]
+                for path in orphans:
+                    path.unlink(missing_ok=True)
+            return len(orphans)
+
+    def remove_runs(self, directory: Path, runs: Iterable[str]) -> int:
+        """Delete committed runs of one partition (see ``TableStore.purge_runs``), committed like
+        ``purge``: under the commit lock, the index rewritten under its lock before the files go,
+        then the sequence moves on. ``PartitionBusyError`` when a pending run wrote to the
+        partition. -> runs deleted."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            if directory in busy:
+                raise PartitionBusyError(str(directory))
+            with held(index_lock(directory)):
+                entries = read_index(directory)
+                gone = [r for r in dict.fromkeys(runs) if r in entries]
+                if not gone:
+                    return 0
+                write_index(directory, {r: e for r, e in entries.items() if r not in gone})
+            for run in gone:
+                drop_unreferenced(directory, run)  # no longer indexed: every version's file
+            atomic_write(self.base / "seq", str(self.published() + 1).encode())
             return len(gone)
 
     def _forget(self, run_id: str) -> None:

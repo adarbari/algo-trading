@@ -66,9 +66,51 @@ that shows these rows comes with the golden pipeline.
 The raw sentence and the payload are kept 12 months and then nulled unless the row was curated into
 the golden set (`tests/fixtures/drafting/golden/`). The repository is public, so a curated case is
 never the trader's text: the owner rewrites it (every sentence of the chain paraphrased) and checks
-its criteria for personal specifics (holdings, named positions) before it enters the repository. The nulling and an owner-run erase command for one user are a later change (an
-owner-run command in the ingestion CLI, as every rewrite of stored data is); until then the rows are
-append-only and `docs/hosting.md`'s store backups apply.
+its criteria for personal specifics (holdings, named positions) before it enters the repository. The nulling and the erase command for one user came
+later: see the note below.
+
+**Note (2026-10-11): the retain and erase commands exist.** `algotrade-api feedback retain
+[--older-than-days 365]` and `algotrade-api feedback erase --user ID` (`services/feedback/retention.py`;
+the command is on the API's CLI, not ingestion's, because the API is the table's writer; the first
+cut of this section had named the ingestion CLI). Both are a dry run unless
+`--yes`, idempotent, and refuse while any run has pending writes or another retention command runs.
+- *retain* nulls the personal text of every table in `retention.PERSONAL` (the registry: a test fails
+  when a `feedback/*` or `usage/*` table is added unregistered): `sentence` and `payload` of
+  `feedback/drafting_events` (for `edge_revised` events the payload holds the edge document's free
+  text, thesis, persistence reason and outcome, and its diff; edge events are never curated, the
+  curation skips `doc_kind == "edge"`); `sentence`, `answer`, `error` of `usage/llm_calls`; `span` of
+  `feedback/feature_requests` (its `ref` key never holds personal text). It does so for partitions
+  older than the window (exchange `session_date`), except every event of a curated golden case (the
+  union of the case's `source_events` and `source_event`) and the usage rows those events' `call_ids`
+  list. The golden folder is found from the repository root, not the working directory; a missing
+  folder, or a curated case (`chain_id`) naming no event, refuses the command.
+- *erase* (default design; the owner has not yet answered what it should cover) acts on every row of
+  one user on any date, in the registered tables: it nulls the free text (`sentence`, `answer`,
+  `error`, `span`) and the criteria snapshots (`payload`) unless the event belongs to a curated case
+  (its text is nulled all the same); it replaces `user`, `doc_id`, `draft_session_id`, `call_ids`,
+  `call_id` and the draft and saved hashes by **a fresh random token per row**, so erased rows join
+  neither to a person nor to each other (and a table key that holds the user, as
+  `feedback/feature_requests`'s, never collides); it truncates `ts` and `knowledge_ts` to the day (the point-in-time purity of an erased row is not needed). **What stays**: the
+  event type, outcome, versions, token counts, costs, the exchange date and the day, so counts and
+  the budget seed still add up. **What remains manual**: the API and nightly logs, `config/users/<id>/` (the user's own configs, ADR 0029), the audit log's counts,
+  and backups.
+- *Mechanism*: a new run, not restating, holds the merged view with the text nulled for every changed
+  partition (same keys, a run id that sorts after the recorders', committed together, ADR 0022); then
+  `TableStore.purge_runs` deletes the runs seen at plan time, files included: the old Parquet is
+  physically rewritten away, not only hidden by a newer run. Only the planned runs are deleted, so a
+  commit that lands meanwhile is never lost; a run that was restating would hide a later commit with
+  an older `ts`, which is why it is not. A crash between the commit and the purge leaves the old and the rewritten rows
+  both readable until the next run, which first deletes the runs committed before the last retention
+  run (a dry run reports them), then plans on the clean view: no row is duplicated. That scan covers every partition of the
+  registered tables whichever command runs, so a later `retain` finishes an `erase` that crashed. After the purge the command checks that no planned run is on disk and no row
+  still holds text, else it exits non-zero.
+- *Concurrency*: the command holds `feedback-writers` (`storage.locks`) from plan to purge and both
+  recorders take it for each flush, so none commits in between; their queues absorb the wait and a
+  request never waits. It refuses while any run has pending writes or another retention command runs.
+- *Audit*: one JSON line of counts (no sentence, no user id) per applied run in
+  `var/logs/feedback-retention.log` under the repository root.
+- *Backups*: copies of the store taken earlier (`docs/hosting.md`) still hold the text; erasing
+  them is the owner's manual step and the command prints the reminder.
 
 ## Amendment (2026-10-11): the whole iteration of a screen
 

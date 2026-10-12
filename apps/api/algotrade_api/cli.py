@@ -11,6 +11,9 @@ open-files soft limit to ``OPEN_FILES`` and caps the connections served at once 
 ``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08).
 ``algotrade-api golden run`` is the owner-run live evaluation of the drafting prompt against
 the golden set (``services/drafting/golden_run.py``: real models and money, only with ``--yes``).
+``algotrade-api feedback retain | erase`` are the owner-run retention (12 months) and per-user
+erasure of the personal text of the drafting feedback (``services/feedback/retention.py``, ADR
+0066): a dry run unless ``--yes``.
 ``golden candidates`` lists the finalised sessions worth curating (real sentences, to this terminal
 only) and ``golden curate --from curation.json`` writes the owner's paraphrased cases
 (``services/feedback/{candidates,curate}.py``, ADR 0066): the logic is there; this parses."""
@@ -56,7 +59,7 @@ from algotrade.services.drafting.golden_run import (
     run_golden,
 )
 from algotrade.services.drafting.screens import ScreenDraft
-from algotrade.services.feedback import candidates, curate
+from algotrade.services.feedback import candidates, curate, retention
 from algotrade.services.feedback.chains import golden_candidates
 from algotrade.services.read.context import (
     NotFoundError,
@@ -105,6 +108,18 @@ def raise_open_files(wanted: int = OPEN_FILES) -> int:
         resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
         return target
     return soft
+
+
+def _feedback_parser(sub: Any) -> None:
+    fb = sub.add_parser("feedback", help="owner-run retention and erasure of drafting feedback")
+    fsub = fb.add_subparsers(dest="feedback_command", required=True)
+    rt = fsub.add_parser("retain", help="null the text of rows older than the window")
+    rt.add_argument("--older-than-days", type=int, default=retention.RETAIN_DAYS)
+    er = fsub.add_parser("erase", help="remove one user's text and id")
+    er.add_argument("--user", required=True)
+    for sp in (rt, er):
+        sp.add_argument("--dry-run", action="store_true", help="the default: only count")
+        sp.add_argument("--yes", action="store_true", help="apply (without it nothing is written)")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -163,6 +178,7 @@ def _parser() -> argparse.ArgumentParser:
     cu.add_argument("--user", default=None, help="validate as this user (default $ALGOTRADE_USER)")
     cu.add_argument("--dry-run", action="store_true", help="validate and show; write nothing")
     cu.add_argument("--yes", action="store_true", help="write the case files")
+    _feedback_parser(sub)
     return parser
 
 
@@ -238,6 +254,38 @@ def golden_curate_cmd(args: argparse.Namespace) -> int:
         print("nothing written" + ("" if args.dry_run else ": pass --yes to write these files"))
         return 0 if args.dry_run else 2
     print("wrote " + ", ".join(str(p) for p in curate.write_cases(planned)))
+    return 0
+
+
+def feedback_run(args: argparse.Namespace, now: datetime | None = None) -> int:
+    """``feedback retain | erase``: wire the store and the audit log into ``services/feedback``;
+    the exit code (2: refused, nothing written)."""
+    if args.dry_run and args.yes:
+        print("--dry-run and --yes exclude each other", file=sys.stderr)
+        return 2
+    at = now or datetime.now(UTC)
+    backend = retention.open_backend(data_url())
+    params: dict[str, object] = {}
+
+    def audit(done: retention.Outcome) -> None:  # also for a run that failed half way
+        retention.append_audit(retention.AUDIT_LOG, retention.audit_record(done, at, params))
+
+    try:
+        if args.feedback_command == "retain":
+            params = {"older_than_days": args.older_than_days}
+            done = retention.retain(backend, at, args.older_than_days, apply=args.yes, audit=audit)
+        else:
+            done = retention.erase(backend, args.user, at, apply=args.yes, audit=audit)
+    except ConfigurationError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    except (RuntimeError, OSError) as exc:  # a purge that left text behind, a busy partition
+        print(f"FAILED, text may remain on disk: rerun to finish: {exc}", file=sys.stderr)
+        return 1
+    print("\n".join(done.lines()))
+    if done.applied:
+        print(f"audit line: {retention.AUDIT_LOG}")
+        print(f"reminder: {retention.BACKUP_REMINDER}")
     return 0
 
 
@@ -377,6 +425,8 @@ def main(argv: list[str] | None = None) -> None:
             args.golden_command, golden_run
         )
         sys.exit(run(args))
+    if args.command == "feedback":
+        sys.exit(feedback_run(args))
     if args.command == "deploy-plan":
         paths = changed_paths(args.since, args.to)
         if args.locks:

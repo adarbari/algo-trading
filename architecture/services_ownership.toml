@@ -108,6 +108,17 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "load_event_scope" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
 
 [[responsibility]]
+id = "feedback-retention"
+description = "Retain and erase the personal text of the drafting feedback (ADR 0066): the owner-run `algotrade-api feedback retain | erase` null the sentence and payload of feedback/drafting_events and the sentence / answer / error of usage/llm_calls (older than the window but the curated, or one user's rows), as one new run per rewrite (not restating) followed by TableStore.purge_runs of the runs planned, so the old Parquet files are physically gone; holds the feedback-writers lock the recorders take per flush; a registry of personal tables and columns; refuses while a run is pending, dry run unless --yes, an audit line of counts only"
+owner = ["src/algotrade/services/feedback/retention.py"]
+allowed = [
+    "apps/api/algotrade_api/cli.py",  # the thin command wiring
+    "src/algotrade/storage/backends/*",  # purge_runs (the TableStore op the rewrite ends with)
+]
+section = "docs/adr/0066-drafting-feedback-events.md#retention"
+detect = [{ call = "purge_runs" }, { call = "erase_redactions" }, { call = "retain_redactions" }]
+
+[[responsibility]]
 id = "history-fill-order"
 description = "The order a budgeted history backfill takes names as of a session (ADR 0050, services/events/fill.py): every ticker of the session's reference snapshot, optionable names first (an option_liquidity@v1 row), then iv_history@v2.iv30 descending, then price_stats@v2.adv_usd_20d descending, each read through rollup_as_of; tasks call fill_order and never rank the universe themselves"
 owner = ["src/algotrade/services/events/fill.py"]
