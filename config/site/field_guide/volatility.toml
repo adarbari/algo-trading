@@ -131,7 +131,7 @@ op = "gte"
 value = 0.5
 mode = "soft"
 tolerance = 0.1
-note = "add rollup.earnings@v1.days_to_earnings gt 10 (soft, EVENT_RISK) and feature.iv_hv_spread gte 0.05"
+note = "suggest rollup.earnings@v1.days_to_earnings gt 10 (soft, EVENT_RISK) and feature.iv_hv_spread gte 0.05"
 [[field.use]]
 for = "options cheap for this name (buy premium)"
 op = "lte"
@@ -318,7 +318,7 @@ for = "the premium's denominator is real"
 op = "gte"
 value = 0.10
 mode = "hard"
-note = "the floor the VRP ratio lacks by design; add it to any IV/HV screen"
+note = "the floor the VRP ratio lacks by design; suggest it for any IV/HV screen"
 [[field.use]]
 for = "a volatile name (realised, a month and a half)"
 op = "gte"

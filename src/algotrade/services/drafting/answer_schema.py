@@ -8,8 +8,10 @@ reads a missing nullable property as absent, so an answer that leaves out ``mode
 as valid as one with ``null``. It types the shape only: whether an op, mode or field is known
 stays with ``criteria_of`` (a wrong one is dropped with a reason, not a rejected answer). The
 A / B / C contract (PR 5, ADR 0041 amendment 2026-10-11) adds ``formulas`` (B1), ``missing``
-(B2 / C) and ``unresolved`` (an ambiguous term with ready alternatives); every one is nullable
-or optional, so answers recorded before it still pass (a new answer key must be the same). The
+(B2 / C) and ``unresolved`` (an ambiguous term with ready alternatives); ``suggestions``
+(protective soft or score checks the sentence did not ask for, never applied silently,
+``suggestions.py``); every one is nullable or optional, so answers recorded before it still pass
+(a new answer key must be the same). The
 check is a small subset of JSON Schema (``type``, ``properties``, ``required``, ``items``,
 ``anyOf``), enough for these shapes and no dependency; a key the schema does not list is
 tolerated (``additionalProperties = false`` is for the provider, strict mode needs it)."""
@@ -54,6 +56,19 @@ CRITERION: Mapping[str, Any] = {
         "why": NULLABLE_STRING,
     },
     "required": ["id", "field", "op", "value", "mode", "tolerance", "on_miss", "why"],
+    "additionalProperties": False,
+}
+SUGGESTION: Mapping[str, Any] = {
+    "type": "object",
+    "properties": {
+        **{
+            key: CRITERION["properties"][key]
+            for key in ("field", "op", "value", "mode", "tolerance", "on_miss")
+        },
+        "why": {"type": "string"},
+        "source": NULLABLE_STRING,
+    },
+    "required": ["field", "op", "value", "mode", "tolerance", "on_miss", "why", "source"],
     "additionalProperties": False,
 }
 TIE_BREAK: Mapping[str, Any] = {
@@ -145,8 +160,17 @@ ANSWER_SCHEMA: Mapping[str, Any] = {
         "formulas": {"type": ["array", "null"], "items": FORMULA},
         "missing": {"type": ["array", "null"], "items": MISSING},
         "unresolved": {"type": ["array", "null"], "items": UNRESOLVED},
+        "suggestions": {"type": ["array", "null"], "items": SUGGESTION},
     },
-    "required": ["criteria", "tie_break", "notes", "formulas", "missing", "unresolved"],
+    "required": [
+        "criteria",
+        "tie_break",
+        "notes",
+        "formulas",
+        "missing",
+        "unresolved",
+        "suggestions",
+    ],
     "additionalProperties": False,
 }
 

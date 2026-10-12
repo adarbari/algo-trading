@@ -9,6 +9,7 @@ import pytest
 from algotrade.services.drafting.answer_schema import (
     ANSWER_SCHEMA,
     FORMULA,
+    SUGGESTION,
     check_answer,
     check_criterion,
     check_item,
@@ -146,3 +147,20 @@ def test_a_contract_key_of_the_wrong_shape_names_where(answer: dict[str, Any], n
 def test_check_item_types_one_item_with_its_name() -> None:
     assert check_item(NEW["formulas"][0], FORMULA, "formula") is None
     assert check_item({}, FORMULA, "formula") == "formula: missing 'name'"
+
+
+SUGGESTION_ITEM = {
+    "field": "feature.trend_state", "op": "ne", "value": "DOWNTREND", "mode": "score",
+    "tolerance": None, "on_miss": None, "why": "a falling price", "source": None,
+}  # fmt: skip
+
+
+def test_suggestions_are_optional_nullable_and_typed() -> None:
+    assert "suggestions" in ANSWER_SCHEMA["required"]
+    assert check_answer({**GOOD, "suggestions": None}, ANSWER_SCHEMA) is None
+    assert check_answer({"criteria": []}, ANSWER_SCHEMA) is None  # an old answer
+    assert check_answer({**GOOD, "suggestions": [SUGGESTION_ITEM]}, ANSWER_SCHEMA) is None
+    assert check_item(SUGGESTION_ITEM, SUGGESTION, "suggestion") is None
+    assert check_item({**SUGGESTION_ITEM, "why": None}, SUGGESTION, "suggestion") is not None
+    why = check_answer({**GOOD, "suggestions": [{"field": "x"}]}, ANSWER_SCHEMA)
+    assert why is not None and "suggestions[0]: missing" in why

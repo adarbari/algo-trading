@@ -207,6 +207,95 @@ follow-up PR).
 - decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
 - Reasoning: the browser derives nothing (ADR 0038); a contract change is a separate PR.
+- note: superseded by the explained-parts decision (2026-10-11, below); the tagged sentence is not built.
+
+## 2026-10-11 | Describe it review | Explained parts
+- Question: how does the review show what the model understood of the sentence?
+- Options: the tagged sentence only / tags plus part cards / the sentence quoted inside each part
+- Decision: instead of the verbatim tagged sentence, the review shows explained parts: for every part, the trader's quoted words, then "We read this as...", then that part's criteria, formula, readings and suggestions.
+- decided by: owner
+- status: final
+- Reasoning: the trader checks each reading against their own words (answered in the session).
+
+## 2026-10-11 | Describe it review | Fixing one part
+- Question: how does a trader fix one part of a draft?
+- Options: edit only / retype only / both
+- Decision: both ways: pick another reading or edit rows (instant, no model call), or retype just that part's words and re-draft only that part (one scoped model call).
+- decided by: owner
+- status: final
+- Reasoning: cheap local fixes first; a model call only when the words change.
+
+## 2026-10-11 | Describe it review | Quoted words and not understood
+- Question: is there a separate tagged sentence line, and where do unplaced words go?
+- Options: a separate line / the sentence quoted inside each part card
+- Decision: the sentence is quoted inside each part card, with no separate tagged line; words the model could not place appear as a "not understood" part.
+- decided by: owner
+- status: final
+- Reasoning: one place to read, and nothing is silently dropped.
+
+## 2026-10-11 | Describe it review | Retyping a hand-edited part
+- Question: what happens when the trader retypes a part they hand-edited?
+- Options: replace silently / ask first / refuse
+- Decision: ask, then replace the part's rows.
+- decided by: owner
+- status: final
+- Reasoning: hand edits are never lost without a confirmation.
+
+## 2026-10-11 | Describe it review | Kept from your screen
+- Question: where do criteria tied to none of the sentence's words appear?
+- Options: hide them / a separate card
+- Decision: in a "Kept from your screen" card.
+- decided by: owner
+- status: final
+- Reasoning: existing criteria stay visible and are not attributed to words they did not come from.
+
+## 2026-10-11 | Describe it part re-draft | Cost control type
+- Question: how is the cost of part re-drafts controlled?
+- Options: a daily cap per user / a per-session cap / a rate limit
+- Decision: a daily cap per user.
+- decided by: owner
+- status: final
+- Reasoning: the owner chose the type of control.
+
+## 2026-10-11 | Describe it part re-draft | Daily cap number
+- Question: how many part re-drafts per user per day?
+- Options: 10 / 30 / 100
+- Decision: 30 per user per day, a second entry in `config/site/llm.toml` (configurable).
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: the design default; the owner chose only the type.
+
+## 2026-10-11 | Describe it feedback | Retention of retyped part words
+- Question: how long are the words a trader retypes for a part kept?
+- Options: the 12-month sentence rule / a different period
+- Decision: the same 12-month rule as sentences.
+- decided by: owner
+- status: final
+- Reasoning: a consequence of the owner's earlier retention decision (Raw sentence retention), logged under that authority.
+
+## 2026-10-11 | Describe it feedback | Admins read edge text
+- Question: may admins read edge thesis text and revisions?
+- Options: own only / admins see all
+- Decision: admins may read edge thesis text and revisions, the same as sentences.
+- decided by: owner
+- status: final
+- Reasoning: admins tune from real usage; same rule as sentences.
+
+## 2026-10-11 | Describe it feedback (ADR 0066) | Erase behaviour
+- Question: what does erasing a user's feedback do to linked events?
+- Options: delete rows / scrub and unlink
+- Decision: scrub and unlink.
+- decided by: owner
+- status: final
+- Reasoning: the personal text goes while the aggregate record stays intact.
+
+## 2026-10-11 | Describe it drafting | Extra protective checks
+- Question: how are extra protective checks added to a draft?
+- Options: apply silently / suggest only
+- Decision: added as soft or score suggestions, never applied silently.
+- decided by: owner
+- status: final
+- Reasoning: the trader decides what enters the screen.
 
 ## 2026-10-11 | Admin accepted formulas | Web budgets and page placement
 - Question: where do the accepted formulas go on the web, and do the perf budgets move?

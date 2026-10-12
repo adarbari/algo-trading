@@ -580,6 +580,24 @@
         "title": "DroppedFormula",
         "type": "object"
       },
+      "DroppedSuggestion": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "reason"
+        ],
+        "title": "DroppedSuggestion",
+        "type": "object"
+      },
       "EdgeDocument": {
         "properties": {
           "document": {
@@ -2194,6 +2212,21 @@
             "title": "Screener Id",
             "type": "string"
           },
+          "suggestions": {
+            "description": "protective checks offered (soft or score), never in the document: the trader accepts or skips each",
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "suggestions_dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedSuggestion"
+            },
+            "title": "Suggestions Dropped",
+            "type": "array"
+          },
           "unresolved": {
             "description": "ambiguous terms; the document has each default",
             "items": {
@@ -2362,6 +2395,40 @@
           }
         },
         "title": "StateBody",
+        "type": "object"
+      },
+      "Suggestion": {
+        "properties": {
+          "criterion": {
+            "additionalProperties": true,
+            "description": "a soft or score criterion, never in the document",
+            "title": "Criterion",
+            "type": "object"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the field guide entry or field that raised it",
+            "title": "Source"
+          },
+          "why": {
+            "description": "the short reason, from the caveat or situation",
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion",
+          "why",
+          "source"
+        ],
+        "title": "Suggestion",
         "type": "object"
       },
       "TableView": {

@@ -12,7 +12,10 @@
         ],
         "op": "gt",
         "value": 0.04,
-        "tolerance": 0.0
+        "tolerance": 0.0,
+        "equivalent_ops": [
+          "gte"
+        ]
       },
       {
         "span": "ex-date within 2 weeks",

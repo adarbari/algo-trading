@@ -1,0 +1,66 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "yield",
+      "field": "feature.div_yield",
+      "op": "gt",
+      "value": 0.05,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "dividend yield above 5%"
+    }
+  ],
+  "tie_break": null,
+  "notes": [
+    "yield read as a fraction (5% = 0.05)"
+  ],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": [
+    {
+      "field": "feature.trend_state",
+      "op": "ne",
+      "value": "DOWNTREND",
+      "mode": "score",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "a high yield with a falling price is often a yield trap",
+      "source": "feature.div_yield"
+    },
+    {
+      "field": "rollup.earnings@v1.days_to_earnings",
+      "op": "gt",
+      "value": 10,
+      "mode": "soft",
+      "tolerance": 3,
+      "on_miss": "EVENT_RISK",
+      "why": "an earnings date close by can cut the dividend",
+      "source": "feature.div_yield"
+    }
+  ]
+}

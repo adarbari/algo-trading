@@ -22,7 +22,10 @@
         ],
         "op": "gt",
         "value": 0.1,
-        "tolerance": 0.0
+        "tolerance": 0.0,
+        "equivalent_ops": [
+          "gte"
+        ]
       }
     ],
     "scope_fields": [
