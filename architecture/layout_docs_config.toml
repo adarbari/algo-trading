@@ -157,5 +157,10 @@ path = "docs/ui"
 purpose = "the web UI: frontend architecture (layers, rules) and the design system"
 
 [[docs_dir]]
+path = "docs/decisions"
+purpose = "the decision log: product-direction and policy decisions, by the owner or by a Fable agent on their behalf, append-only (.claude/skills/review-and-release)"
+kind = "log"
+
+[[docs_dir]]
 path = "docs/drafting"
 purpose = "the text-model drafting ('Describe it') plans and specs (ADR 0041)"

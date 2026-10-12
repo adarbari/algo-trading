@@ -161,8 +161,9 @@ the skill with the fix.
     the workflow merges, and only on green. The repo is public: CI runs on
     GitHub-hosted runners only, never self-hosted ones (`docs/ci.md`).
     A PR that waits on an owner decision gets `needs-owner` (and `no-automerge` if it must not
-    merge); `/start` lists them. Only the session that set `no-automerge` or `needs-owner`
-    removes it: an agent never removes a label it did not set (#284, #287, #291 auto-merged
+    merge); `/start` lists them. Only the session that set `no-automerge` removes it
+    (an implementer's label is its orchestrator's, who releases it per `.claude/skills/review-and-release`);
+    `needs-owner` is never removed by an agent, nor any label it did not set (#284, #287, #291 auto-merged
     when another session removed it under the shared account).
     **No stacked PRs into a branch that will be deleted**: squash-merge deletes the base and
     GitHub closes the stacked PR (#99, #103). Branch from `main`; if stacking is unavoidable,
@@ -190,6 +191,7 @@ the skill with the fix.
 | New domain read object (and its loader) | `.claude/skills/add-domain-object` |
 | New REST endpoint (writes, jobs, live, files only) | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
+| Review and release a PR (reviewer loop, owner decisions, removing `no-automerge`) | `.claude/skills/review-and-release` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
 | Start of day: what slowed the last sessions down, top 3 fixed before new work | `.claude/skills/review-sessions` (`/review-sessions`, `make friction`) |
 
@@ -227,10 +229,7 @@ Quality is not traded for tokens: the cheaper model never decides design, CI's f
 gates every change whatever wrote it, a change in an `architect` area (new responsibility /
 folder / table / ADR, layer boundaries, point-in-time, `quant/` maths, atomic publish, locks
 and jobs, the IBKR read-only boundary, a bug that survived two fixes) gets an `architect`
-review of the diff before it is finished (the reviewer ends its report with `Re-review: yes | no`;
-on yes the orchestrator sends the fixes and the implementer's per-finding list back to the same
-reviewer with SendMessage before the PR leaves draft / `no-automerge`, and records the outcome in
-the PR description), and an agent that hits ambiguity or fails the same check twice escalates one
+review of the diff before it is finished (`.claude/skills/review-and-release`: review loop, policy gate, release), and an agent that hits ambiguity or fails the same check twice escalates one
 tier instead of retrying.
 
 Shared machine: at most 2 agents at once. Rule 9 keeps full checks off the machine, so nobody

@@ -29,6 +29,11 @@ When reviewing a diff (`git diff main...HEAD`), report only real defects with `p
 the failure scenario and the fix, most severe first. Say plainly when you found none. Do not
 pad a review with style notes the linters already enforce.
 
+Before that line, every review report has an `Owner decisions:` section (or `none`): only
+product-direction or policy items (who sees what; personal data stored or its retention; money
+or budget; what the product does or shows users; a contradiction of an ADR), each with options
+and a recommendation. Design and mechanics are yours to settle, not the owner's.
+
 Every review report ENDS with one line, `Re-review: yes | no`, plus the reason, decided from
 the findings you raised. `yes` when any finding was about behaviour or semantics (cost, ledger
 or budget paths; privacy and who-sees-what; point-in-time or lookahead; concurrency, locks or

@@ -63,11 +63,13 @@ After `architect` review findings: fix them, then hand back a per-finding list (
 commit or `path:line` -> test added) so the reviewer verifies without rereading the PR. Never
 mark the PR ready or drop `no-automerge` yourself; the orchestrator does after the reviewer's
 last `Re-review: no`.
+List every unresolved owner decision (product direction or policy: who sees what, personal
+data, money, what users see, an ADR contradiction) in the hand-back; never decide one.
 
 Foreground rule: every check (`make check`, a gate, a test run) runs in the foreground, never
 as a background command. The hand-back is your last action, exactly one per run, and no
 command may still be running when you hand back.
-Only the session that set `no-automerge` or `needs-owner` removes it; an agent never removes a label it did not set (CLAUDE.md rule 10).
+Only the orchestrating session removes `no-automerge`, after the reviewer's last `Re-review: no`; an agent never removes `needs-owner` or a label it did not set (CLAUDE.md rule 10, `.claude/skills/review-and-release`).
 
 Finish with a hand-back of at most 150 words: the PR link (or files changed), checks run and
 their result, deviations from the brief, and decisions the caller must make. Everything else
