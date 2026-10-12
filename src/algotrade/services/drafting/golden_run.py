@@ -17,8 +17,8 @@ drafted; ``-`` below two answered repeats), invalid-answer rate (the model answe
 could not be parsed or validated), unavailable count (no answer), mean tokens in / out / cache
 read / cache write, latency p50 / p90 and cost (from the usage ledger's rows of the call; the
 rows are written to ``usage/llm_calls`` as usual). ``--json`` prints the same as one object, with
-each repeat's ``dropped`` criteria (id, field, reason, kind: the check's own message, never the
-model's free text) per case.
+each repeat's ``dropped`` criteria (id, field, kind, detail: the check kind and JSON path, never
+model-written values) per case.
 
 Drops: a criterion the server dropped carries the ``kind`` of the check that refused it
 (``not_in_catalogue``: the model named a field the catalogue lacks, e.g. a bare ``iv30``;
@@ -232,7 +232,7 @@ class Recording:
 @dataclass(frozen=True)
 class Drop:
     """One criterion the server dropped from a draft: no sentence and none of the model's
-    free text, only the field, the kind of check and that check's own message."""
+    free text and no quoted value: the field, the kind of check and the JSON path."""
 
     id: str
     field: str
@@ -470,14 +470,14 @@ def drop_metrics(results: Sequence[CallResult]) -> dict[str, Any]:
 
 def repeats_of(results: Sequence[CallResult]) -> list[dict[str, Any]]:
     """The per-repeat record ``--json`` carries: status, answer length and the dropped criteria
-    (the check kind and message, never the model's free text)."""
+    (the check kind and JSON path, never model-written values)."""
     return [
         {
             "status": r.status,
             "answer_chars": r.answer_chars,
             "rate_limit_retries": r.rate_limit_retries,
             "dropped": [
-                {"id": d.id, "field": d.field, "reason": d.detail, "kind": d.kind}
+                {"id": d.id, "field": d.field, "detail": d.detail, "kind": d.kind}
                 for d in r.dropped
             ],
         }

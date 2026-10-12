@@ -56,8 +56,12 @@ This skill decides the class, then hands the building to `add-feature` (and `add
 3. **Field guide**: a `[[field]]` in `config/site/field_guide/<theme>.toml` naming the feature:
    how to read it, `[[field.use]]` per intent, caveats, sources (`add-feature` step 4).
 4. **Phrasebook**, when traders have a word for it: `[[phrase]]` in `config/site/phrasebook.toml`
-   (`say`, `fields`, `hint`). The format has no structured threshold: the threshold goes into
-   the `hint` text. Every field named must exist (a test checks); a held-out golden sentence
+   (`say`, `fields`, `hint`). Add a structured meaning when the word is exact: a
+   `[[phrase.criterion]]` (`field`, `op`, `value`, `mode`, `tolerance`, `on_miss`) when it has
+   one reading, `[[phrase.alternative]]` (a `label` plus the same keys, and a `default`) when
+   it is ambiguous; `services/drafting/phrasebook/resolve.py` (`resolves_fully`, not wired
+   into `draft_screen` yet) reads them. The `hint` text still carries the typical thresholds.
+   Every field named must exist (a test checks); a held-out golden sentence
    must not be pasted in as a `say`.
 5. **Guide entry**: through `add-guide-content` (a field entry comes with the field guide
    entry; a new enum value or status needs its own). `tests/architecture/guide/` fails CI
@@ -102,9 +106,10 @@ maths, or adds a personal-licence source.
 
 ## Known gaps against the plan (2026-10-11)
 
-- `algotrade-api golden curate` and `golden candidates` are not in `apps/api/algotrade_api/cli.py`
-  yet (only `golden run`): write the golden case file by hand.
-- The admin accepted-formula list (grouped by fingerprint) and the `fingerprint` call in the
-  accept path are not wired: `fingerprint.py` is used by nothing else yet, so list users'
-  formulas by script.
+- `algotrade-api golden candidates` and `golden curate --from curation.json` exist (#537,
+  `apps/api/algotrade_api/cli.py`, admin only): use them to turn a real session into a golden
+  case instead of writing the file by hand.
+- The admin accepted-formula list (grouped by fingerprint) is not wired:
+  `features.expressions.fingerprint` is used by `services/drafting/formulas.py` (the dry run's
+  duplicate check) only, so list users' formulas by script.
 - No migration helper for users' copies (section 3).

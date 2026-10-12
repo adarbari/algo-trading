@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "micro",
+      "field": "feature.market_cap",
+      "op": "lt",
+      "value": 300000000.0,
+      "mode": "hard",
+      "why": "micro caps"
+    },
+    {
+      "id": "choppy",
+      "field": "rollup.price_stats@v2.hv20",
+      "op": "gt",
+      "value": 0.5,
+      "mode": "hard",
+      "why": "choppy"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

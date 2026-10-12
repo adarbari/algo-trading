@@ -526,3 +526,20 @@ def test_the_builder_reason_keeps_the_why_while_detail_does_not() -> None:
         {"criteria": [{"field": "iv30", "op": "gt", "value": 1, "why": SENTENCE_WHY}]}, CATALOGUE
     )
     assert d.reason.endswith(f"({SENTENCE_WHY})") and SENTENCE_WHY not in d.detail
+
+
+def test_json_never_carries_a_text_value_or_a_non_string_why(tmp_path: Path) -> None:
+    secret = "buy cheap tech names my own words"
+    bad = json.dumps(
+        {
+            "criteria": [
+                {"field": "f.a", "op": "gt", "value": secret, "tolerance": secret, "why": 5},
+                {"field": "f.b", "op": "gt", "value": [secret], "why": {"x": secret}},
+                {"field": "f.a", "op": "between", "value": [secret], "mode": secret},
+            ]
+        }
+    )
+    h = Harness(tmp_path, [bad])
+    assert h.go(RunArgs(("c1",), "all", (), 1, False, False, True, 60, 1.0, True)) == 0
+    out = "".join(h.out)
+    assert secret not in out and "criteria[" in out

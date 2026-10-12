@@ -96,11 +96,12 @@ jobs:
         python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13"]') }}
         shard: [unit-a, unit-b, unit-c, apps, rest]
     steps:
-      # Full history only where tests/architecture runs (shard `apps`; `rest` on a docs-only change):
-      # tests/architecture/drafting/test_golden_unrecorded.py dates the adding commit of a golden
-      # case and skips that check in a shallow clone. Other shards keep the fast shallow clone.
+      # Full history only on the shard that runs tests/architecture: `apps` on a Python change,
+      # `rest` (architecture tests only) otherwise. tests/architecture/drafting/test_golden_unrecorded.py
+      # dates the adding commit of a golden case and FAILS in a shallow clone in CI. The depth is
+      # a quoted string: a bare 0 is falsy in an expression and would fall through to 1.
       - uses: actions/checkout@v7
-        with: { fetch-depth: "${{ (matrix.shard == 'apps' || matrix.shard == 'rest') && 0 || 1 }}" }
+        with: { fetch-depth: "${{ ((matrix.shard == 'apps' && needs.changes.outputs.python == 'true') || (matrix.shard == 'rest' && needs.changes.outputs.python != 'true')) && '0' || '1' }}" }
       - uses: astral-sh/setup-uv@v7
         with: { python-version: "${{ matrix.python }}", enable-cache: true }
       - uses: actions/cache@v6

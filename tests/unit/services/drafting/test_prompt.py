@@ -98,6 +98,8 @@ def test_phrasebook_keeps_only_this_catalogues_fields() -> None:
     assert text.index("Detail (") < text.index("Phrasebook (")
     assert text.endswith("momentum / trending up | rollup.b@v1.x | x gt 0\n")
     assert "yield" not in text
+    assert "Phrasebook (what the trader says | fields | how to use them | exact default):" in text
+    assert '"exact default"' in TASK  # the column is explained where the model reads the rules
 
 
 def test_shipped_phrasebook_and_examples_name_catalogue_fields() -> None:

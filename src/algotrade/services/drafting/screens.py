@@ -85,7 +85,7 @@ class DroppedCriterion:
     field: str
     reason: str
     kind: str = "other"  # not_in_catalogue / bad_op / bad_mode / bad_shape / bad_value / validator
-    detail: str = ""  # the check's own message, without the model's ``why``
+    detail: str = ""  # the check and the JSON path only, no model-written value
 
 
 class CriterionError(ConfigurationError):
@@ -309,7 +309,9 @@ def criteria_of(
             kept[cid] = _criterion(item, field_name, catalogue)
         except ConfigurationError as exc:
             kind = exc.kind if isinstance(exc, CriterionError) else "other"
-            dropped.append(DroppedCriterion(cid, field_name, f"{exc}{why}", kind, str(exc)))
+            dropped.append(
+                DroppedCriterion(cid, field_name, f"{exc}{why}", kind, f"{kind}: criteria[{n - 1}]")
+            )
     return kept, tuple(dropped)
 
 
@@ -431,7 +433,11 @@ def validated(
                 cid = named.group(1)
                 criterion = out["criteria"].pop(cid)
                 reason = _reason(str(exc))
-                gone.append(DroppedCriterion(cid, criterion["field"], reason, "validator", reason))
+                gone.append(
+                    DroppedCriterion(
+                        cid, criterion["field"], reason, "validator", f"validator: criteria.{cid}"
+                    )
+                )
             elif ".rank" in str(exc) and "rank" in out:
                 del out["rank"]
             else:

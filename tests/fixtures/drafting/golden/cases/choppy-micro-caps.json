@@ -1,0 +1,39 @@
+{
+  "id": "choppy-micro-caps",
+  "sentence": "choppy micro caps",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "micro caps",
+        "bucket": "A",
+        "fields": [
+          "feature.market_cap"
+        ],
+        "op": "lt",
+        "value": 300000000.0,
+        "tolerance": 0.0
+      },
+      {
+        "span": "choppy",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.hv20",
+          "rollup.price_stats@v2.hv20_yz",
+          "rollup.price_stats@v2.hv30",
+          "feature.atr_pct"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.5,
+        "tolerance": 0.5
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

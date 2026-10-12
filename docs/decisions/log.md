@@ -1,9 +1,17 @@
 # Decision log
 
-Append-only, newest last. One entry per product-direction or policy decision, whoever took it
-(`.claude/skills/review-and-release`). `decided by`: owner | Fable on the owner's behalf | orchestrator (owner present) | orchestrator (owner away).
-`status`: final | pending owner confirmation | overruled. The owner confirms or overrules by
-telling the session, which updates the entry (an overrule means a follow-up PR).
+Append-only, newest last: an entry is never edited except its `status` line (and the
+`- confirmed:` line added with it); a reversal is a new entry. A unit test cannot check that a
+diff touched only status lines, so a reviewer does. One entry per policy decision, or design
+call worth a line, whoever took it (`.claude/skills/review-and-release`, section 2).
+`decided by`: owner | Fable on the owner's behalf | orchestrator (design call). The
+orchestrator never decides policy (who sees what, stored personal data, retention, money,
+product behaviour, an ADR contradiction); a heuristic test rejects `orchestrator` on an entry
+about those topics.
+`status`: final | pending owner confirmation | overruled. `final` needs `decided by: owner` or
+a `- confirmed: owner YYYY-MM-DD` line: only the owner's word makes an entry final. The owner
+confirms or overrules by telling the session, which updates the entry (an overrule means a
+follow-up PR).
 
 ## 2026-10-11 | Harness | Release without owner review
 - Question: does a PR with no product or policy change wait for the owner after review?
@@ -112,16 +120,17 @@ telling the session, which updates the entry (an overrule means a follow-up PR).
 ## 2026-10-11 | PR #537 golden curate | Unrecorded curated cases
 - Question: may a curated case with no recorded answer stay in the set?
 - Options: fail CI at once / skip forever / skip for 14 days then fail.
-- Decision: the replay test skips a case with `recorded: false` for 14 days; after that a fitness test fails.
-- decided by: orchestrator (owner present)
-- status: pending owner confirmation
+- Decision: the replay test skips a case with `recorded: false`; `make status` warns after 14 days (no CI failure); a fitness test bounds the state structurally. (Wording corrected 2026-10-11 to the owner-confirmed behaviour: warn only.)
+- decided by: owner (confirmed 2026-10-11)
+- proposed by: orchestrator, applied while the owner was away
+- status: final
 - Reasoning: CI must not go red on the PR that adds a curated case, but cases must not stay unrecorded.
 
 ## 2026-10-11 | PR #535 | Prompt budget
 - Question: how does the drafting prompt stay inside its token budget?
 - Options: shorten field-detail descriptions / cap backlog keys and shorten examples.
 - Decision: field-detail descriptions stay at 160 chars (restored); open backlog keys in the prompt are capped at 8, relevance first; the second worked example is shortened; the budget test pads the keys to the cap. The margin is about 77 tokens, so a retrieval trim PR comes before any further prompt text.
-- decided by: orchestrator (owner away)
+- decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: taken following two Opus reviews.
 
@@ -129,7 +138,7 @@ telling the session, which updates the entry (an overrule means a follow-up PR).
 - Question: when is the full `services/drafting` folder (9 of 10 modules) split?
 - Options: inside #535 / a separate refactor PR after #535 merges.
 - Decision: split into `contract/` and `golden/` subfolders in a separate refactor PR after #535 merges.
-- decided by: orchestrator (owner away)
+- decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: keeps #535 reviewable.
 
@@ -137,16 +146,18 @@ telling the session, which updates the entry (an overrule means a follow-up PR).
 - Question: which events does a curated golden case spare from retention?
 - Options: only its final event / the whole chain.
 - Decision: a curated golden case spares the whole chain (every event id in `source_events`), not only its final event.
-- decided by: orchestrator (owner away)
-- status: pending owner confirmation
+- decided by: owner (confirmed 2026-10-11)
+- proposed by: orchestrator, applied while the owner was away
+- status: final
 - Reasoning: the stored iteration stays whole.
 
 ## 2026-10-11 | PR #535 | API shape of the formula dry run
 - Question: what does REST serve of `FormulaDryRun`, and which type is `Alternative.label`?
 - Options: serve `missing` / withhold it; `label` as enum / text.
 - Decision: `FormulaDryRun.missing` is not served over REST; `Alternative.label` is `text` in the API.
-- decided by: orchestrator (owner away)
-- status: pending owner confirmation
+- decided by: owner (confirmed 2026-10-11)
+- proposed by: orchestrator, applied while the owner was away
+- status: final
 - Reasoning: `missing` listed table names, an admin-only cause under ADR 0056, and label follows ADR 0038.
 
 ## 2026-10-11 | Feature-request ranked list | PROMOTED and WONT_DO keys
@@ -165,11 +176,27 @@ telling the session, which updates the entry (an overrule means a follow-up PR).
 - status: final
 - Reasoning: enough context to judge a request without storing whole sentences.
 
+## 2026-10-11 | Harness | Who decides what
+- Question: what may the orchestrating session decide, and what goes to the owner or Fable?
+- Options: the orchestrator decides everything not marked policy / design calls only.
+- Decision: the orchestrating session decides design and engineering calls only (thresholds, test structure, refactor order). Every policy item (who sees what, stored personal data, retention and erasure, money or budget, product behaviour or scope, ADR contradictions) goes to the owner in the session, else to a Fable agent. Fable may not decide spend above caps, deleting or erasing data, security or permission settings, publishing outside the repo, merging with failing CI, or overriding an ADR: those go to the owner only.
+- decided by: owner
+- status: final
+- Reasoning: policy and money are the owner's; the orchestrator's tier is design.
+
+## 2026-10-11 | Harness | Confirmation of three orchestrator-logged entries
+- Question: do the owner's confirmations stand for "Unrecorded curated cases", "Retention of curated golden cases" and "API shape of the formula dry run"?
+- Options: confirm / overrule.
+- Decision: confirmed: curated cases spare the whole chain from retention; unrecorded curated cases only warn after 14 days; the draft API does not serve the formula dry run's table names. All three are `final`.
+- decided by: owner
+- status: final
+- Reasoning: they were taken by the orchestrator, which may not decide policy; the owner confirmed them in the session.
+
 ## 2026-10-11 | PR 7 Builder draft review | Screen notes key
 - Question: where is the gap of a missing feature saved, and does it change the config hash?
 - Options: a new optional `notes` list on the rule-screen spec (in the hash) / out of the hash / a separate store.
 - Decision: an optional `notes` list (10 items, 200 characters each) on the rule-screen spec; absent it, the canonical form and hash are unchanged; present it, an edit makes a new hash.
-- decided by: orchestrator (owner present)
+- decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the plan says the gap is saved in the screen's notes; a run should record what the screen did not cover.
 
@@ -177,7 +204,7 @@ telling the session, which updates the entry (an overrule means a follow-up PR).
 - Question: the server sends spans only for unresolved terms and missing features; how is the rest of the sentence tagged?
 - Options: tag only what the server spans / match criteria to words in the browser / add spans to the answer contract.
 - Decision: tag only the server's spans in this PR (needs your call, not available yet); applied and formula spans wait for a contract change.
-- decided by: orchestrator (owner present)
+- decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
 - Reasoning: the browser derives nothing (ADR 0038); a contract change is a separate PR.
 
