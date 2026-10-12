@@ -9,15 +9,23 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
 from algotrade.data.feedback import read_feature_requests
 from algotrade.services.feedback.request_recorder import FeatureRequestRecorder
-from algotrade.services.feedback.requests import MAX_SPAN, record_missing, request_row
+from algotrade.services.feedback.requests import (
+    MAX_SPAN,
+    erase_user,
+    null_spans,
+    record_missing,
+    request_row,
+)
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.feedback_writer import FeedbackWriter
 
+SENTENCE = "I want a stock with free cash flow yield above treasuries and a gamma squeeze"
 LATE = datetime(2026, 10, 3, 1, tzinfo=UTC)  # Fri 9pm in New York
 NEXT = datetime(2026, 10, 3, 15, tzinfo=UTC)
 RANGE = (date(2026, 10, 2), date(2026, 10, 3))
@@ -44,8 +52,20 @@ class Collect:
 
 def test_a_known_key_and_a_new_slug_make_rows_with_the_right_columns() -> None:
     sink = Collect()
-    items = [Item(), Item(key=None, new_key_slug="gamma_squeeze", feasibility="odd", closest=())]
-    assert record_missing(sink, "alice", items, call_id="c1", draft_session_id="s1", at=NEXT) == 2
+    items = [
+        Item(),
+        Item(
+            key=None,
+            new_key_slug="gamma_squeeze",
+            span="gamma squeeze",
+            feasibility="odd",
+            closest=(),
+        ),
+    ]
+    assert (
+        record_missing(sink, "alice", items, SENTENCE, call_id="c1", draft_session_id="s1", at=NEXT)
+        == 2
+    )
     known, new = sink.rows
     assert (known["ref"], known["key"], known["new_slug"]) == ("fcf_yield", "fcf_yield", None)
     assert known["closest"] == "fcf_margin" and known["call_id"] == "c1"
@@ -55,7 +75,7 @@ def test_a_known_key_and_a_new_slug_make_rows_with_the_right_columns() -> None:
 
 
 def test_the_span_is_clipped_and_whitespace_folded_never_the_sentence() -> None:
-    row = request_row("alice", Item(span="x " * 400), at=NEXT)
+    row = request_row("alice", Item(span="x " * 400), "x " * 500, at=NEXT)
     assert row is not None and len(row["span"]) == MAX_SPAN and row["span"].endswith("…")
     assert set(row) == {
         "ts", "user", "ref", "key", "new_slug", "feasibility", "span", "closest", "call_id",
@@ -65,9 +85,9 @@ def test_the_span_is_clipped_and_whitespace_folded_never_the_sentence() -> None:
 
 def test_an_item_with_neither_key_nor_slug_is_skipped_and_a_refusing_sink_counts_none() -> None:
     sink = Collect()
-    assert record_missing(sink, "a", [Item(key=None), Item(key="  ")], at=NEXT) == 0
+    assert record_missing(sink, "a", [Item(key=None), Item(key="  ")], SENTENCE, at=NEXT) == 0
     assert sink.rows == []
-    assert record_missing(Collect(accept=False), "a", [Item()], at=NEXT) == 0
+    assert record_missing(Collect(accept=False), "a", [Item()], SENTENCE, at=NEXT) == 0
 
 
 def test_a_failing_sink_or_item_never_raises(caplog: pytest.LogCaptureFixture) -> None:
@@ -76,14 +96,14 @@ def test_a_failing_sink_or_item_never_raises(caplog: pytest.LogCaptureFixture) -
             raise RuntimeError("queue gone")
 
     with caplog.at_level(logging.ERROR):
-        assert record_missing(Boom(), "a", [Item(), Item()], at=NEXT) == 0
-        assert record_missing(Collect(), "a", [object()], at=NEXT) == 0  # type: ignore[list-item]
-        assert record_missing(Collect(), "a", 5, at=NEXT) == 0  # type: ignore[arg-type]
+        assert record_missing(Boom(), "a", [Item(), Item()], SENTENCE, at=NEXT) == 0
+        assert record_missing(Collect(), "a", [object()], SENTENCE, at=NEXT) == 0  # type: ignore[list-item]
+        assert record_missing(Collect(), "a", 5, SENTENCE, at=NEXT) == 0  # type: ignore[arg-type]
     assert "not recorded" in caplog.text
 
 
 def row(at: datetime, user: str = "alice", **over: Any) -> dict[str, Any]:
-    made = request_row(user, Item(), at=at)
+    made = request_row(user, Item(), SENTENCE, at=at)
     assert made is not None
     return made | over
 
@@ -139,3 +159,39 @@ def test_a_full_queue_drops_the_row_and_logs_never_raises(
     gate.set()
     recorder.close()
     assert not all(results) and "queue full" in caplog.text
+
+
+def test_a_span_that_is_not_a_piece_of_the_sentence_is_stored_as_null() -> None:
+    invented = request_row("a", Item(span="I hold 500 shares of ACME"), SENTENCE, at=NEXT)
+    assert invented is not None and invented["span"] is None  # the model made it up
+    paraphrase = request_row("a", Item(span="FCF yield"), SENTENCE, at=NEXT)
+    assert paraphrase is not None and paraphrase["span"] is None
+    folded = request_row("a", Item(span="Free  CASH flow\nyield"), SENTENCE, at=NEXT)
+    assert folded is not None and folded["span"] == "Free CASH flow yield"
+    empty = request_row("a", Item(span="  "), SENTENCE, at=NEXT)
+    assert empty is not None and empty["span"] is None
+    whole = request_row("a", Item(span=SENTENCE), SENTENCE, at=NEXT)
+    assert whole is not None and whole["span"] == SENTENCE  # a substring, within the cap
+
+
+def test_the_ref_never_comes_from_the_span() -> None:
+    assert (
+        request_row("a", Item(key=None, new_key_slug=None, span="gamma"), "gamma", at=NEXT) is None
+    )
+    assert (
+        request_row("a", Item(key=None, new_key_slug="  ", span="gamma"), "gamma", at=NEXT) is None
+    )
+
+
+def test_null_spans_and_erase_user_for_the_retention_commands() -> None:
+    frame = pd.DataFrame(
+        {"user": ["alice", "bob", "alice"], "span": ["s1", "s2", None], "ref": ["a", "b", "c"]}
+    )
+    out, rows = null_spans(frame)
+    assert rows == 2 and out["span"].isna().all() and list(out["user"]) == ["alice", "bob", "alice"]
+    kept, rows = null_spans(frame, frame["user"] == "bob")
+    assert rows == 1 and list(kept["span"].fillna("-")) == ["-", "s2", "-"]
+    erased, rows = erase_user(frame, "alice", "tok")
+    assert rows == 2 and list(erased["user"]) == ["tok", "bob", "tok"]
+    assert list(erased["span"].fillna("-")) == ["-", "s2", "-"]  # only alice's span goes
+    assert list(frame["span"].fillna("-")) == ["s1", "s2", "-"]  # the input is not touched

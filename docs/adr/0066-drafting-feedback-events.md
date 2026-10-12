@@ -140,7 +140,10 @@ Owner policy decided 2026-10-11.
   `draft_session_id`; all but `ts`, `user`, `ref` nullable for evolution. Key: (`user`, `ref`,
   `session_date`): one row per user, feature and exchange day.
 - **Privacy: the span, never the sentence.** The row holds the clipped span (300 characters) the
-  request covers, not the trader's sentence. It is still personal data (a span can name a holding),
+  request covers, not the trader's sentence, and only when the span is a piece of the sentence
+  (ignoring case and whitespace): a span the model invented or paraphrased is stored as null, and
+  `ref` is never derived from free text. `null_spans` and `erase_user` (`services/feedback/requests.py`)
+  are the retention and erase edits the feedback retention command applies to this table. It is still personal data (a span can name a holding),
   so the read is viewer-scoped and the retention of this ADR applies to `span`.
 - **Who sees what.** A trader sees only their own history (`load_my_requests`: per feature, first
   and last asked, times asked) and never a count or trace of another user; this holds for an admin's
@@ -150,7 +153,9 @@ Owner policy decided 2026-10-11.
 - **Ranking** (`services/feedback/ranking.py`, pure): the sum over distinct users of
   `exp(-age_days / 60)`, the age from each user's latest request for the feature, times a
   feasibility weight (`ROLLUP_FROM_STORED` 1.0, `NEEDS_SOURCE` 0.5, `UNCLEAR` 0.25); the raw count
-  of distinct (user, day) asks breaks ties, then the later last-seen, then the name. No embeddings:
+  of distinct (user, day) asks breaks ties, then the later last-seen, then the name; a feature the
+  backlog has since PROMOTED or set WONT_DO keeps its score but is listed after every OPEN and
+  unmapped one. No embeddings:
   a slug is the same feature only when the backlog says so (a key or alias), re-resolved at read
   time, so an alias added by a PR merges the earlier slugs. A slug the backlog does not know is
   shown to admins as unmapped, with the backlog's status (OPEN / PROMOTED / WONT_DO) beside the

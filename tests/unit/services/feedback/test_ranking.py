@@ -3,6 +3,7 @@ request, times the feasibility weight; one count per (user, key, day); ties brea
 count, then recency, then the name; the backlog's keys and aliases decide what is one feature and
 an unknown slug is unmapped (ADR 0066 amendment)."""
 
+import itertools
 import math
 from datetime import date, timedelta
 
@@ -122,3 +123,21 @@ def test_no_rows_no_ranking_and_a_future_date_counts_as_today() -> None:
     assert rank([], BACKLOG, TODAY) == ()
     future = rank([RequestRow("a", "support_history", ago(-3))], BACKLOG, TODAY)[0]
     assert future.score == 1.0
+
+
+def test_closed_items_are_listed_after_open_and_unmapped_ones_with_their_status() -> None:
+    rows = [row("a", "old_idea", 0), row("b", "old_idea", 0), row("a", "gamma", 50)]
+    ranked = rank(rows, BACKLOG, TODAY)
+    assert [(r.ref, r.status) for r in ranked] == [("gamma", UNMAPPED), ("old_idea", "WONT_DO")]
+    assert ranked[1].score > ranked[0].score  # the history keeps its score
+
+
+def test_read_order_never_decides_the_latest_row() -> None:
+    rows = [
+        row("a", "gamma", 3, "NEEDS_SOURCE"),
+        row("b", "gamma", 3, "ROLLUP_FROM_STORED"),
+        row("c", "gamma", 3, "UNCLEAR"),
+        row("c", "gamma", 3, "NEEDS_SOURCE"),
+    ]
+    results = {rank(list(p), BACKLOG, TODAY) for p in itertools.permutations(rows)}
+    assert len(results) == 1

@@ -7,7 +7,10 @@ taken from each user's latest request for it, times a feasibility weight (``ROLL
 each time; one count per (user, feature, day), so the raw ``requests`` count, which breaks ties
 (then the later ``last_seen``, then the name), cannot be inflated within a day. No embeddings: two
 slugs are one feature only when the curated backlog says so (a key or an alias). A slug the backlog
-does not know is ``unmapped``: an admin merges it into a key or alias by a PR."""
+does not know is ``unmapped``: an admin merges it into a key or alias by a PR.
+
+A feature the backlog has since PROMOTED or set WONT_DO keeps its history and its score but is
+listed after every OPEN and unmapped one, with its status: what is still to decide comes first."""
 
 import math
 from collections.abc import Iterable
@@ -73,12 +76,22 @@ def rank(
     for row in rows:
         ref = known[row.ref].key if row.ref in known else row.ref
         asks.setdefault(ref, set()).add((row.user, row.day))
-        if ref not in latest_row or row.day >= latest_row[ref].day:
+        if ref not in latest_row or _recency(row) > _recency(latest_row[ref]):
             latest_row[ref] = row
     out = [_ranked(ref, days, latest_row[ref], known.get(ref), today) for ref, days in asks.items()]
-    return tuple(
-        sorted(out, key=lambda r: (-r.score, -r.requests, -r.last_seen.toordinal(), r.ref))
-    )
+    return tuple(sorted(out, key=_order))
+
+
+def _recency(row: RequestRow) -> tuple[date, str, str]:
+    """Which of two requests is the latest: the day, then (so that read order never decides) the
+    user and the feasibility."""
+    return (row.day, row.user, row.feasibility)
+
+
+def _order(r: RankedRequest) -> tuple[int, float, int, int, str]:
+    """Open and unmapped features first, then by score, raw count, recency and name."""
+    closed = r.status not in ("OPEN", UNMAPPED)
+    return (int(closed), -r.score, -r.requests, -r.last_seen.toordinal(), r.ref)
 
 
 def _ranked(

@@ -45,6 +45,7 @@ def ask(user: str, ref: str, days_ago: int = 0, feasibility: str = "UNCLEAR") ->
     made = request_row(
         user,
         item(ref if known else None, None if known else ref, feasibility),
+        "my span",
         at=NOON - timedelta(days=days_ago),
     )
     assert made is not None
