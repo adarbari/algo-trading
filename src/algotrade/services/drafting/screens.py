@@ -211,7 +211,7 @@ def _draft(
     )
     missing, missing_notes = missing_of(proposal, load_feature_backlog(ctx.configs), catalogue)
     for name, criterion in formulas.rewritten.items():  # a duplicate formula: the existing field
-        key = _criterion_id(None, criterion["field"], len(criteria) + 1, criteria)
+        key = _criterion_id(None, criterion["field"], len(criteria) + 1, _spent(criteria, dropped))
         criteria[key] = criterion
         tags[key] = formulas.rewritten_parts.get(name)
     placed: dict[str, str] = {}  # unresolved term -> the id of its default in the criteria
@@ -222,7 +222,9 @@ def _draft(
         if same:  # the model also listed it in criteria: not twice
             placed[term.term] = same[0]
             continue
-        key = _criterion_id(term.term.lower().replace(" ", "_"), default["field"], 0, criteria)
+        key = _criterion_id(
+            term.term.lower().replace(" ", "_"), default["field"], 0, _spent(criteria, dropped)
+        )
         criteria[key] = default
         tags[key], spans[key] = term.part, term.span
         placed[term.term] = key
@@ -332,8 +334,7 @@ def criteria_of(
         item = raw if isinstance(raw, Mapping) else {}
         raw_field = item.get("field")
         field_name: str = raw_field if isinstance(raw_field, str) else ""
-        taken = {**kept, **dict.fromkeys(d.id for d in dropped)}  # a dropped id is spent too
-        cid = _criterion_id(item.get("id"), field_name, n, taken)
+        cid = _criterion_id(item.get("id"), field_name, n, _spent(kept, dropped))
         if tags is not None:
             tags[cid] = part_tag(item)
         why = f" ({item['why']})" if isinstance(item.get("why"), str) and item["why"] else ""
@@ -347,6 +348,12 @@ def criteria_of(
                 DroppedCriterion(cid, field_name, f"{exc}{why}", kind, f"{kind}: criteria[{n - 1}]")
             )
     return kept, tuple(dropped)
+
+
+def _spent(kept: Mapping[str, Any], dropped: Sequence[DroppedCriterion]) -> dict[str, Any]:
+    """The ids no new criterion may take: the kept ones and the dropped ones (a part's refs and
+    the Builder's rows name a criterion by id)."""
+    return {**kept, **dict.fromkeys(d.id for d in dropped)}
 
 
 def _criterion_id(given: Any, field_name: str, n: int, taken: Mapping[str, Any]) -> str:

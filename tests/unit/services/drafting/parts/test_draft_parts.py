@@ -9,9 +9,12 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.user import UserContext
 from algotrade.services.drafting.screens import draft_screen
 from algotrade.services.feedback.events import document_hash
-from algotrade.services.read.context import ReadContext
+from algotrade.services.read.context import ReadContext, open_context
+from algotrade_sources.framework.base import FixtureSource
+from tests.helpers.api_store import api_store
 from tests.unit.services.drafting.test_screens import (
     ACTIVE,
     FORMULA,
@@ -206,3 +209,41 @@ def test_criterion_ids_are_unique_across_kept_and_dropped_so_tags_never_mix(
     parts = by_id(draft)
     assert (parts["p1"].dropped, parts["p1"].criteria) == (("price",), ())
     assert (parts["p2"].criteria, parts["p2"].dropped) == (("price_2",), ())
+
+
+@pytest.fixture
+def golden_ctx(golden_source: FixtureSource) -> ReadContext:
+    store = api_store(golden_source)[0]
+    return open_context(store.reader, store.configs, UserContext(store.user.user_id))
+
+
+def test_a_rewritten_duplicate_formula_does_not_take_a_dropped_criterions_id(
+    golden_ctx: ReadContext,
+) -> None:
+    """A criterion dropped as ``close`` and a bare-column formula rewritten onto ``...close`` keep
+    distinct ids, so each part's refs name its own item."""
+    bare = {
+        **FORMULA, "name": "draft_close", "expr": "price_stats.close", "unit": "usd_per_share",
+        "inputs": ["price_stats.close"], "part": "p2",
+        "criterion": {"op": "gt", "value": 5, "mode": None, "tolerance": None},
+    }  # fmt: skip
+    invented = {
+        "id": "close",
+        "field": "rollup.nope@v1.close",
+        "op": "gt",
+        "value": 1,
+        "part": "p1",
+    }
+    parts = [
+        {"id": "p1", "words": "close over $1", "reading": None},
+        {"id": "p2", "words": "price above 5", "reading": None},
+    ]
+    draft = draft_screen(
+        golden_ctx, Canned(proposal(invented, formulas=[bare], parts=parts)), "golden",
+        "close over $1 and price above 5",
+    )  # fmt: skip
+    assert [d.id for d in draft.dropped] == ["close"]
+    assert list(draft.document["criteria"]) == ["close_2"]
+    got = by_id(draft)
+    assert (got["p1"].dropped, got["p1"].criteria) == (("close",), ())
+    assert (got["p2"].criteria, got["p2"].dropped) == (("close_2",), ())
