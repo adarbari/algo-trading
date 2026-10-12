@@ -156,22 +156,46 @@ def test_the_old_parquet_files_are_physically_gone_after_the_rewrite(tmp_path: P
         assert SECRET.encode() not in path.read_bytes()
 
 
-def test_erase_touches_only_the_named_user_and_keeps_the_skeleton(backend: Backend) -> None:
+def test_erase_touches_only_the_named_user_and_leaves_a_skeleton_that_joins_to_nothing(
+    backend: Backend,
+) -> None:
     seed(backend)
-    done = retention.erase(backend, "abhi", NOW, token="erased-xyz", apply=True)
+    done = retention.erase(backend, "abhi", NOW, apply=True)
     fb, us = events(backend), calls(backend)
-    assert len(fb) == 4 and len(us) == 4
-    mine, theirs = fb[fb["user"] == "erased-xyz"], fb[fb["user"] == "bea"]
-    assert len(mine) == 2 and len(theirs) == 2
-    assert mine[["sentence", "payload"]].isna().all().all() and (mine["doc_id"] == "erased").all()
-    assert (mine["draft_hash"] == "h").all()
+    assert len(fb) == 4 and len(us) == 4 and done.rows() == 4  # counts still add up
+    theirs = fb[fb["user"] == "bea"]
+    mine = fb[fb["user"].str.startswith("erased-")]
+    assert len(mine) == 2 and len(theirs) == 2 and "abhi" not in set(fb["user"])
+    assert mine[["sentence", "payload"]].isna().all().all()
+    for column in ("user", "doc_id", "draft_session_id", "draft_hash"):
+        assert mine[column].str.startswith("erased-").all() and mine[column].is_unique
+    assert (mine["event"] == "draft_requested").all() and (mine["doc_kind"] == "screen").all()
+    assert (mine["ts"] == mine["ts"].dt.floor("D")).all()  # the day, not the time
     assert (theirs["sentence"] == SECRET).all() and theirs["payload"].notna().all()
-    assert (theirs["doc_id"] == "my-screen").all()
-    gone, kept = us[us["user"] == "erased-xyz"], us[us["user"] == "bea"]
-    assert len(gone) == 2 and gone[["sentence", "answer", "error"]].isna().all().all()
-    assert (kept["error"].notna()).all() and (kept["sentence"] == SECRET).all()
-    assert "abhi" not in set(fb["user"]) | set(us["user"])
-    assert done.rows() == 4
+    assert (theirs["doc_id"] == "my-screen").all() and (theirs["draft_hash"] == "h").all()
+    assert (theirs["ts"] != theirs["ts"].dt.floor("D")).all()
+    gone, kept = us[us["user"].str.startswith("erased-")], us[us["user"] == "bea"]
+    assert len(gone) == 2 and gone["user"].is_unique
+    assert gone[["sentence", "answer", "error"]].isna().all().all()
+    assert (gone["outcome"] == "failed").all() and (gone["input_tokens"] == 10).all()
+    assert (gone["ts"] == gone["ts"].dt.floor("D")).all()
+    assert kept["error"].notna().all() and (kept["sentence"] == SECRET).all()
+
+
+def test_erase_keeps_a_curated_events_criteria_but_never_its_text(
+    backend: Backend, tmp_path: Path
+) -> None:
+    old = [feedback_row(OLD, "abhi"), feedback_row(OLD, "abhi")]
+    record(backend, old, [], OLD)
+    folder = case_folder(tmp_path, {"chain_id": "s", "source_events": [old[0]["event_id"]]})
+    retention.erase(backend, "abhi", NOW, golden_cases=folder, apply=True)
+    fb = events(backend).set_index("event_id")
+    assert fb.loc[old[0]["event_id"], "sentence"] is None or pd.isna(
+        fb.loc[old[0]["event_id"], "sentence"]
+    )
+    assert pd.notna(fb.loc[old[0]["event_id"], "payload"])
+    assert pd.isna(fb.loc[old[1]["event_id"], "payload"])
+    assert not fb["user"].eq("abhi").any()
 
 
 def test_a_dry_run_writes_nothing(backend: Backend) -> None:
@@ -360,6 +384,41 @@ def test_every_personal_table_is_registered_with_its_text_columns() -> None:
         assert name in registered, f"{name} holds text: register it in retention.PERSONAL"
         t, spec = registered[name], KNOWN[name]
         strings = {c.name for c in spec.columns if c.type == "string"}
-        covered = {*t.text, t.user, *t.blanked, *t.safe, "source", "run_id"}
+        covered = {*t.text, *t.criteria, t.user, *t.tokenized, *t.safe, "source", "run_id"}
         assert strings <= covered, f"{name}: classify {sorted(strings - covered)} (text or safe)"
-        assert set(t.text) | {t.user} <= {c.name for c in spec.columns}
+        assert {*t.text, *t.criteria, t.user, *t.tokenized} <= {c.name for c in spec.columns}
+
+
+def test_erased_feature_requests_never_collide_on_their_key() -> None:
+    """The table key is (user, ref, session_date): a fixed placeholder would merge two erased
+    users who asked for the same thing on a day; every row gets a fresh token."""
+    frame = pd.DataFrame({
+        "ts": pd.to_datetime(["2026-10-01T10:00Z", "2026-10-01T11:00Z", "2026-10-01T12:00Z"]),
+        "user": ["abhi", "abhi", "bea"], "ref": ["r1", "r2", "r1"],
+        "span": ["secret a", "secret b", "secret c"], "draft_session_id": ["s1", "s1", "s2"],
+        "call_id": ["c1", None, "c3"],
+    })  # fmt: skip
+    table = next(t for t in retention.PERSONAL if t.table == retention.FEATURE_REQUESTS)
+    redaction = retention.erase_redactions("abhi", {}, [table])[0]
+    out, changed = redaction.redact(frame)
+    assert (
+        changed == 2 and out["span"].tolist()[:2] == [None, None] and out["span"][2] == "secret c"
+    )
+    assert out["user"][2] == "bea" and out["ref"].tolist() == ["r1", "r2", "r1"]
+    assert out["user"][:2].is_unique and pd.isna(out["call_id"][1])
+    assert (out["ts"][:2] == pd.Timestamp("2026-10-01", tz="UTC")).all()
+
+
+def test_an_erase_that_crashed_before_its_purge_is_finished_without_duplicating_rows(
+    backend: Backend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed(backend)
+    real = backend.tables.purge_runs
+    monkeypatch.setattr(backend.tables, "purge_runs", lambda *a: (_ for _ in ()).throw(OSError()))
+    with pytest.raises(OSError):
+        retention.erase(backend, "abhi", NOW, apply=True)
+    monkeypatch.setattr(backend.tables, "purge_runs", real)
+    done = retention.erase(backend, "abhi", NOW, apply=True)
+    assert done.rows() == 0 and done.superseded_runs >= 2
+    assert len(events(backend)) == 4 and len(calls(backend)) == 4
+    assert not events(backend)["user"].eq("abhi").any()

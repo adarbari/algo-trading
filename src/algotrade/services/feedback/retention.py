@@ -12,11 +12,12 @@ snapshots), the failure rows of ``usage/llm_calls`` (``sentence``, ``answer``, `
   ``source_event``) id of a golden case, a usage row's ``call_id`` is listed by such an event.
   The golden cases are read from the repository root, never the working directory; no folder
   or a curated case without ids refuses the command (fail closed).
-- **erase**: every row of one user, any date, a curated row too, loses the same text and the
-  user id (the user column becomes one random token per erase, so per-user keys stay distinct;
-  ``doc_id`` becomes a placeholder). What stays: ``ts``, ids, hashes, call ids, versions, counts,
-  tokens, cost (so counts add up); these can be joined by time to logs that name the user, which
-  is why ADR 0066 states exactly what an erase covers.
+- **erase**: every row of one user, any date, loses its text; its criteria (``payload``) go too
+  unless the event is curated; ``user``, ``doc_id``, session and call ids and hashes become a
+  fresh random token per row (erased rows join neither to a person nor to each other, and a key
+  holding the user never collides); ``ts`` is cut to the day. Event type, outcome, versions,
+  tokens and cost stay, so counts and the budget seed add up. ``knowledge_ts``, logs,
+  ``config/users/<id>/`` and backups stay: ADR 0066 lists what is manual.
 
 **Mechanism.** A rewrite is a new run, *not restating*, holding the merged view with the personal
 fields nulled for every changed partition, all committed together (ADR 0022). Same keys, a run id
@@ -24,9 +25,9 @@ that sorts after the recorders' and the newest ``knowledge_ts``: it wins over ev
 and anything committed later merges beside it (a restating run would hide a later run with an
 older ``ts``). The runs that existed when it was planned are then deleted with their files
 (``TableStore.purge_runs``): the old Parquet is physically gone. A crash between the commit and
-the purge leaves reads clean; the next run (and a dry run, which reports them) finds the runs
-committed before the last retention run and purges them. Only runs seen at plan time are
-deleted, so a commit that lands meanwhile is never lost.
+the purge leaves both versions readable; the next run first deletes the runs committed before the
+last retention run (a dry run reports them), then plans on the clean view.
+Only runs seen at plan time are deleted, so a commit that lands meanwhile is never lost.
 
 **Concurrency.** The command holds ``feedback-writers`` (``storage.locks``) from plan to purge;
 the API's recorders take it for every flush, so none commits in between (their queue absorbs
@@ -63,7 +64,7 @@ __all__ = ["open_backend"]  # the API opens the store through this module
 JOB = "retention_feedback"  # sorts after the recorders' run ids (drafting_feedback, llm_usage)
 LOCK = "feedback-retention"
 RETAIN_DAYS = 365
-PLACEHOLDER = "erased"
+TOKEN = "erased-"  # a token is this prefix and 16 hex digits, fresh per row
 REPO_ROOT = Path(__file__).resolve().parents[4]  # never the working directory
 AUDIT_LOG = REPO_ROOT / "var" / "logs" / "feedback-retention.log"
 GOLDEN_CASES = REPO_ROOT / "tests" / "fixtures" / "drafting" / "golden" / "cases"
@@ -77,29 +78,35 @@ FEATURE_REQUESTS = "feedback/" + "feature_requests"
 
 @dataclass(frozen=True)
 class PersonalTable:
-    """A stored table that holds personal text: what retain nulls and erase removes."""
+    """A stored table that holds personal data: what retain nulls and erase removes."""
 
     table: str
-    text: tuple[str, ...]  # nulled by both commands
-    user: str = "user"  # the user column (erase matches it, then writes a token)
-    blanked: tuple[str, ...] = ()  # non-null columns erase replaces by PLACEHOLDER
-    safe: tuple[str, ...] = ()  # the other string columns: ids, hashes, versions, enums
-    curated_by: str | None = None  # the column retain compares with the curated ids ...
+    text: tuple[str, ...]  # free text: nulled by both commands, curated rows spared by retain
+    criteria: tuple[str, ...] = ()  # the user's strategy: nulled, curated rows spared by both
+    user: str = "user"  # the user column (erase matches it)
+    tokenized: tuple[str, ...] = ()  # erase: a fresh random token per row (where not null)
+    rounded: tuple[str, ...] = ("ts",)  # erase: truncated to the day
+    safe: tuple[str, ...] = ()  # the other string columns: keys, enums, versions
+    curated_by: str | None = None  # the column compared with the curated ids ...
     curated_kind: str = "events"  # ... "events" (event ids) or "calls" (call ids)
 
 
 PERSONAL = (
     PersonalTable(
-        FEEDBACK, ("sentence", "payload"), blanked=("doc_id",), curated_by="event_id",
-        safe=("event_id", "draft_session_id", "doc_kind", "event", "call_ids",
-              "catalogue_version", "prompt_version", "draft_hash", "saved_hash"),
+        FEEDBACK, ("sentence",), criteria=("payload",), curated_by="event_id",
+        tokenized=("user", "doc_id", "draft_session_id", "call_ids", "draft_hash", "saved_hash"),
+        safe=("event_id", "doc_kind", "event", "catalogue_version", "prompt_version"),
     ),
     PersonalTable(
         USAGE, ("sentence", "answer", "error"), curated_by="call_id", curated_kind="calls",
+        tokenized=("user", "call_id"),
         safe=("provider", "model", "use_case", "cost_basis", "outcome", "fell_back_from",
-              "stage", "call_id", "prompt_version", "call_stage"),
+              "stage", "prompt_version", "call_stage"),
     ),
-    PersonalTable(FEATURE_REQUESTS, ("span",), safe=("ref",)),  # `ref` is a key: never text
+    PersonalTable(  # `ref` is a key: never personal text, never changed
+        FEATURE_REQUESTS, ("span",), tokenized=("user", "draft_session_id", "call_id"),
+        safe=("ref", "key", "new_slug", "feasibility", "closest"),
+    ),
 )  # fmt: skip
 
 Redact = Callable[[pd.DataFrame], tuple[pd.DataFrame, int]]  # -> (frame, rows changed)
@@ -173,32 +180,53 @@ def retain_redactions(
 
     def build(t: PersonalTable) -> Redaction:
         spared = curated.get(t.curated_kind, frozenset())
+        columns = (*t.text, *t.criteria)
 
         def redact(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
-            mask = _holds_text(frame, t.text)
+            mask = _holds_text(frame, columns)
             if t.curated_by and t.curated_by in frame.columns:
                 mask &= ~frame[t.curated_by].isin(spared)
-            return _nulled(frame, mask, t.text), int(mask.sum())
+            return _nulled(frame, mask, columns), int(mask.sum())
 
         return Redaction(t.table, lambda day: day < cutoff, redact)
 
     return [build(t) for t in tables]
 
 
+def _fresh(_: object = None) -> str:
+    return TOKEN + token_hex(8)
+
+
 def erase_redactions(
-    user: str, token: str, tables: Iterable[PersonalTable] = PERSONAL
+    user: str,
+    curated: Mapping[str, frozenset[str]],
+    tables: Iterable[PersonalTable] = PERSONAL,
+    token: Callable[[], str] = _fresh,
 ) -> list[Redaction]:
-    """Every row of ``user``, any date, loses its text and its id."""
+    """Every row of ``user``, any date, loses its text, its criteria (but a curated row's), its
+    ids (a fresh random token per row, so erased rows join neither to a person nor to each
+    other) and the time of day; the non-personal skeleton stays."""
 
     def build(t: PersonalTable) -> Redaction:
+        spared = curated.get(t.curated_kind, frozenset())
+
         def redact(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
             if t.user not in frame.columns:
                 return frame, 0
             mask = frame[t.user] == user
             out = _nulled(frame, mask, t.text)
-            out.loc[mask, t.user] = token
-            for column in (c for c in t.blanked if c in out.columns):
-                out.loc[mask, column] = PLACEHOLDER
+            keep = (
+                frame[t.curated_by].isin(spared)
+                if t.curated_by and t.curated_by in frame.columns
+                else pd.Series(False, index=frame.index)
+            )
+            out = _nulled(out, mask & ~keep, t.criteria)
+            for column in (c for c in t.tokenized if c in out.columns):
+                out[column] = out[column].astype("object")
+                rows = mask & out[column].notna()
+                out.loc[rows, column] = [token() for _ in range(int(rows.sum()))]
+            for column in (c for c in t.rounded if c in out.columns):
+                out.loc[mask, column] = out.loc[mask, column].dt.floor("D")
             return out, int(mask.sum())
 
         return Redaction(t.table, lambda _day: True, redact)
@@ -301,17 +329,33 @@ def _run(
                     "a run has pending writes (a crashed run the store drops after its "
                     "retention): try again in a moment"
                 )
+            _finish_crashed(backend, redactions, outcome)
             parts = _plan(backend, redactions, outcome)
             outcome.to_purge = 0
             changed = [p for p in parts if p.frame is not None]
             if changed:
                 outcome.run_id = _rewrite(backend, changed, now)
-            for part in parts:  # also finishes what a crashed run left behind
-                outcome.superseded_runs += backend.tables.purge_runs(
-                    part.redaction.table, part.day, part.doomed()
-                )
+            for part in parts:
+                if part.doomed():
+                    outcome.superseded_runs += backend.tables.purge_runs(
+                        part.redaction.table, part.day, part.doomed()
+                    )
             _verify(backend, parts, outcome.run_id)
     return outcome
+
+
+def _finish_crashed(backend: Backend, redactions: list[Redaction], outcome: Outcome) -> None:
+    """Before planning: delete the runs a crashed retention run left (committed before its last
+    run, which already holds their rows nulled), so the plan reads one clean view."""
+    for redaction in redactions:
+        for day in backend.tables.dates(redaction.table):
+            if redaction.wanted(day):
+                runs = backend.tables.partition_runs(redaction.table, day)
+                stale = _Part(redaction, day, runs, None).stale()
+                if stale:
+                    outcome.superseded_runs += backend.tables.purge_runs(
+                        redaction.table, day, stale
+                    )
 
 
 def _rewrite(backend: Backend, changed: list[_Part], now: datetime) -> str:
@@ -353,23 +397,28 @@ def retain(
     apply: bool = False,
 ) -> Outcome:
     """Null the text of rows older than ``older_than_days`` (exchange dates) but the curated."""
-    events = curated_events(golden_cases)
-    curated = {"events": events, "calls": curated_call_ids(backend, events)}
     cutoff = exchange_date(now) - timedelta(days=older_than_days)
-    return _run(backend, "retain", retain_redactions(cutoff, curated), now, apply)
+    redactions = retain_redactions(cutoff, _curated(backend, golden_cases))
+    return _run(backend, "retain", redactions, now, apply)
+
+
+def _curated(backend: Backend, golden_cases: Path) -> dict[str, frozenset[str]]:
+    events = curated_events(golden_cases)
+    return {"events": events, "calls": curated_call_ids(backend, events)}
 
 
 def erase(
     backend: Backend,
     user: str,
     now: datetime,
-    token: str | None = None,
+    golden_cases: Path = GOLDEN_CASES,
+    token: Callable[[], str] = _fresh,
     apply: bool = False,
 ) -> Outcome:
-    """Remove ``user``'s text and id from every personal table (the skeleton stays)."""
-    if not user or user == PLACEHOLDER:
+    """Remove ``user``'s personal data from every personal table (the skeleton stays)."""
+    if not user or user.startswith(TOKEN):
         raise ConfigurationError("name the user to erase")
-    redactions = erase_redactions(user, token or f"{PLACEHOLDER}-{token_hex(6)}")
+    redactions = erase_redactions(user, _curated(backend, golden_cases), token=token)
     return _run(backend, "erase", redactions, now, apply)
 
 

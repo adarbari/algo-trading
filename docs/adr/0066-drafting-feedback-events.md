@@ -82,22 +82,26 @@ cut of this section had named the ingestion CLI). Both are a dry run unless
   union of the case's `source_events` and `source_event`) and the usage rows those events' `call_ids`
   list. The golden folder is found from the repository root, not the working directory; a missing
   folder, or a curated case (`chain_id`) naming no event, refuses the command.
-- *erase* does the same for every row of one user on any date (a curated row too) and replaces the
-  user column by a random per-erase token (per-user keys stay distinct) and `doc_id` by `erased`.
-  **What erase covers**: the text columns above, the user id and `doc_id`, in those three tables.
-  **What it leaves**: `ts`, `session_date`, `draft_session_id`, `event_id`, `call_ids`, the hashes,
-  versions, token counts and costs (counts add up; they can be joined by time to logs that name the
-  user), the criteria of a *saved* config (user configs are the user's own, ADR 0029), the nightly
-  and API logs, and everything outside the store. Wider erasure is a manual step until the owner
-  decides otherwise.
+- *erase* (default design; the owner has not yet answered what it should cover) acts on every row of
+  one user on any date, in the registered tables: it nulls the free text (`sentence`, `answer`,
+  `error`, `span`) and the criteria snapshots (`payload`) unless the event belongs to a curated case
+  (its text is nulled all the same); it replaces `user`, `doc_id`, `draft_session_id`, `call_ids`,
+  `call_id` and the draft and saved hashes by **a fresh random token per row**, so erased rows join
+  neither to a person nor to each other (and a table key that holds the user, as
+  `feedback/feature_requests`'s, never collides); it truncates `ts` to the day. **What stays**: the
+  event type, outcome, versions, token counts, costs, the exchange date and the day, so counts and
+  the budget seed still add up. **What remains manual**: `knowledge_ts` (the time of day, kept for
+  run ordering: the stored time can still be joined to a log that names the user), the API and
+  nightly logs, `config/users/<id>/` (the user's own configs, ADR 0029), the audit log's counts,
+  and backups.
 - *Mechanism*: a new run, not restating, holds the merged view with the text nulled for every changed
   partition (same keys, a run id that sorts after the recorders', committed together, ADR 0022); then
   `TableStore.purge_runs` deletes the runs seen at plan time, files included: the old Parquet is
   physically rewritten away, not only hidden by a newer run. Only the planned runs are deleted, so a
   commit that lands meanwhile is never lost; a run that was restating would hide a later commit with
-  an older `ts`, which is why it is not. A crash between the commit and the purge leaves reads clean;
-  the next run (or a dry run, which reports them) finds the runs committed before the last retention
-  run and deletes them. After the purge the command checks that no planned run is on disk and no row
+  an older `ts`, which is why it is not. A crash between the commit and the purge leaves the old and the rewritten rows
+  both readable until the next run, which first deletes the runs committed before the last retention
+  run (a dry run reports them), then plans on the clean view: no row is duplicated. After the purge the command checks that no planned run is on disk and no row
   still holds text, else it exits non-zero.
 - *Concurrency*: the command holds `feedback-writers` (`storage.locks`) from plan to purge and both
   recorders take it for each flush, so none commits in between; their queues absorb the wait and a
