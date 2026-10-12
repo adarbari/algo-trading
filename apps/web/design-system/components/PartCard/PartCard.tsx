@@ -11,7 +11,9 @@
  * `title` names it). It holds callbacks and slots only: every label and sentence arrives as a
  * prop, the rows component is composed by the caller, and nothing here calls an API.
  */
-import { useId, type ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+
+import { Heading, type HeadingLevel } from '../../primitives/Heading';
 
 import { Button } from '../Button';
 import { Icon } from '../Icon';
@@ -20,8 +22,11 @@ import { Skeleton } from '../Skeleton';
 import { StatusBadge, type StatusTone } from '../StatusBadge';
 import styles from './PartCard.module.css';
 
-/** How a part was understood; the shared vocabulary of the review (badge and underline kinds). */
-export type PartKind = 'applied' | 'formula' | 'ask' | 'gap' | 'not-understood' | 'kept';
+/** How a part was understood: the kinds the server sends. Sets the badge tone and icon. */
+export type PartKind = 'applied' | 'formula' | 'needs_choice' | 'not_available' | 'not_understood';
+
+/** Where a part comes from: the trader's words, kept from the screen, or words nothing placed. */
+export type PartOrigin = 'words' | 'kept' | 'unplaced';
 
 /** The status tone and icon of each kind: the one place the vocabulary is mapped. */
 export const PART_KIND_BADGE: Readonly<
@@ -29,10 +34,9 @@ export const PART_KIND_BADGE: Readonly<
 > = {
   applied: { tone: 'positive', icon: 'check' },
   formula: { tone: 'accent', icon: 'info' },
-  ask: { tone: 'warning', icon: 'alert' },
-  gap: { tone: 'neutral', icon: 'info' },
-  'not-understood': { tone: 'negative', icon: 'alert' },
-  kept: { tone: 'info', icon: 'info' },
+  needs_choice: { tone: 'warning', icon: 'alert' },
+  not_available: { tone: 'neutral', icon: 'info' },
+  not_understood: { tone: 'negative', icon: 'alert' },
 };
 
 export type PartCardState = 'idle' | 'redrafting' | 'error' | 'disabled';
@@ -41,13 +45,20 @@ export interface PartRetype {
   /** The words being edited (controlled). */
   value: string;
   onValueChange: (value: string) => void;
-  /** Apply the new words to this part only. */
+  /** Apply the new words to this part only (Enter). */
   onApply: () => void;
+  /** Leave without applying (Escape). */
   onCancel: () => void;
+  /** Called after Apply or Cancel: move focus back to the caller's target (the card's retype button). */
+  onExitFocus?: (() => void) | undefined;
   /** Accessible name of the input ("Retype this part"). */
   inputLabel: string;
   applyLabel: string;
   cancelLabel: string;
+  /** The longest text accepted (the 200-character limit). */
+  maxLength?: number | undefined;
+  /** Apply is off: empty or unchanged text, or an apply in flight. */
+  applyDisabled?: boolean | undefined;
 }
 
 export interface PartCardProps {
@@ -55,10 +66,16 @@ export interface PartCardProps {
   kind: PartKind;
   /** The badge text ("applied", "not understood"). */
   kindLabel: string;
-  /** The trader's own words, quoted and highlighted; omit for `kept`. */
+  /** Where the part comes from; `kept` has no quoted words and shows `keptLabel`. */
+  origin?: PartOrigin | undefined;
+  /** The marker for a kept part ("kept from your screen"); shown beside the badge. */
+  keptLabel?: string | undefined;
+  /** The trader's own words, quoted and highlighted; omit for a kept part. */
   words?: string | undefined;
-  /** The card's name when it has no words (the `kept` card: "Kept from your screen"). */
+  /** The card's name when it has no words (the kept card: "Kept from your screen"). */
   title?: string | undefined;
+  /** Outline level of the card's heading (default 3). */
+  headingLevel?: HeadingLevel | undefined;
   /** The lead-in to the reading ("We read this as"). */
   readingLabel?: string | undefined;
   /** The part in plain language. */
@@ -71,10 +88,12 @@ export interface PartCardProps {
   rows?: ReactNode;
   /** Pick another reading, retype this part: buttons or a picker, composed by the caller. */
   actions?: ReactNode;
+  /** A Guide InfoButton for the kind, shown beside the badge. */
+  info?: ReactNode;
   /** `idle`, `redrafting` (this card is being redrafted), `error` (inline retry), `disabled`. */
   state?: PartCardState | undefined;
-  /** Text while redrafting ("Redrafting this part"). */
-  redraftingLabel?: string | undefined;
+  /** What is happening while redrafting ("Redrafting this part"): announced and shown once. */
+  redraftingLabel: string;
   /** What went wrong, shown inline in the `error` state. */
   errorMessage?: string | undefined;
   /** The retry button's label ("Try again"). */
@@ -91,14 +110,18 @@ export interface PartCardProps {
 export function PartCard({
   kind,
   kindLabel,
+  origin = 'words',
+  keptLabel,
   words,
   title,
+  headingLevel = 3,
   readingLabel,
   reading,
   readingSource = 'model',
   checkReadingLabel,
   rows,
   actions,
+  info,
   state = 'idle',
   redraftingLabel,
   errorMessage,
@@ -108,60 +131,103 @@ export function PartCard({
   editedLabel,
   retype,
 }: PartCardProps) {
-  const headingId = useId();
   const badge = PART_KIND_BADGE[kind];
   const redrafting = state === 'redrafting';
   const disabled = state === 'disabled' || redrafting;
   const trusted = readingSource === 'model';
-  const name = words ?? title;
+  const quoted = origin !== 'kept' && words ? words : undefined;
+  const name = quoted ?? title ?? words;
+  const retypeRef = useRef<HTMLDivElement>(null);
+  const retyping = Boolean(retype);
+
+  useEffect(() => {
+    if (retyping) retypeRef.current?.querySelector('input')?.focus();
+  }, [retyping]);
+
+  const onRetypeKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!retype) return;
+    if (event.key === 'Enter' && !retype.applyDisabled) {
+      event.preventDefault();
+      retype.onApply();
+      retype.onExitFocus?.();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      retype.onCancel();
+      retype.onExitFocus?.();
+    }
+  };
 
   return (
     <article
       className={styles.card}
       data-kind={kind}
+      data-origin={origin}
       data-state={state}
-      aria-labelledby={headingId}
+      aria-label={name}
       aria-busy={redrafting || undefined}
     >
       <header className={styles.head}>
-        <div id={headingId} className={styles.words}>
-          {retype ? (
-            <div className={styles.retype}>
-              <Input
-                aria-label={retype.inputLabel}
-                value={retype.value}
-                onValueChange={retype.onValueChange}
-              />
-              <div className={styles.retypeActions}>
-                <Button variant="primary" size="sm" onClick={retype.onApply}>
-                  {retype.applyLabel}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={retype.onCancel}>
-                  {retype.cancelLabel}
-                </Button>
-              </div>
-            </div>
-          ) : words ? (
-            <mark className={styles.quote}>{words}</mark>
-          ) : (
-            <span className={styles.title}>{name}</span>
-          )}
+        <div className={styles.words}>
+          <Heading level={headingLevel} size="base">
+            {quoted ? <mark className={styles.quote}>{quoted}</mark> : name}
+          </Heading>
         </div>
         <div className={styles.marks}>
           {edited && editedLabel && <span className={styles.edited}>{editedLabel}</span>}
+          {origin === 'kept' && keptLabel && <span className={styles.edited}>{keptLabel}</span>}
           <StatusBadge tone={badge.tone} icon={badge.icon}>
             {kindLabel}
           </StatusBadge>
+          {info}
         </div>
       </header>
 
+      {retype && (
+        <div className={styles.retype} ref={retypeRef} inert={disabled}>
+          <Input
+            aria-label={retype.inputLabel}
+            value={retype.value}
+            onValueChange={retype.onValueChange}
+            maxLength={retype.maxLength}
+            onKeyDown={onRetypeKey}
+            disabled={disabled}
+          />
+          <div className={styles.retypeActions}>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={disabled || retype.applyDisabled === true}
+              onClick={() => {
+                retype.onApply();
+                retype.onExitFocus?.();
+              }}
+            >
+              {retype.applyLabel}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={disabled}
+              onClick={() => {
+                retype.onCancel();
+                retype.onExitFocus?.();
+              }}
+            >
+              {retype.cancelLabel}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {redrafting ? (
         <div className={styles.body}>
-          <Skeleton variant="text" lines={2} label={redraftingLabel ?? 'Redrafting…'} />
-          {redraftingLabel && <span className={styles.muted}>{redraftingLabel}</span>}
+          <Skeleton variant="text" lines={2} label={redraftingLabel} />
+          <span className={styles.muted} aria-hidden="true">
+            {redraftingLabel}
+          </span>
         </div>
       ) : (
-        <div className={styles.body} data-disabled={disabled || undefined}>
+        <div className={styles.body} data-disabled={disabled || undefined} inert={disabled}>
           {(reading || !trusted) && (
             <p className={styles.reading}>
               {readingLabel && <span className={styles.lead}>{readingLabel}: </span>}

@@ -17,20 +17,25 @@ const meta = {
         words="optionable stocks"
         readingLabel="We read this as"
         reading="Stocks with listed options."
+        redraftingLabel="Redrafting this part"
       />,
       <PartCard
         key="b"
-        kind="not-understood"
+        kind="not_understood"
         kindLabel="not understood"
         words="that feel strong"
+        redraftingLabel="Redrafting this part"
       />,
       <PartCard
         key="c"
-        kind="kept"
-        kindLabel="kept from your screen"
+        kind="applied"
+        kindLabel="applied"
+        origin="kept"
+        keptLabel="kept from your screen"
         title="Kept from your screen"
         readingLabel="We read this as"
         reading="Price above 5."
+        redraftingLabel="Redrafting this part"
       />,
     ],
   },
@@ -49,7 +54,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** An applied part, a not-understood card and a kept card in order. */
+/** An applied part, a not_understood card and a kept card in order. */
 export const Default: Story = {};
 
 export const Narrow: Story = { decorators: [narrow] };

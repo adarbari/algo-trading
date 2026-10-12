@@ -4,7 +4,7 @@
  * card, sits in the list like any other. A list element, so assistive technology announces
  * "list, N items"; its name arrives as a prop.
  */
-import { Children, type ReactNode } from 'react';
+import { Children, isValidElement, type ReactNode } from 'react';
 
 import styles from './PartList.module.css';
 
@@ -19,7 +19,10 @@ export function PartList({ 'aria-label': ariaLabel, children }: PartListProps) {
   return (
     <ol className={styles.list} aria-label={ariaLabel}>
       {Children.toArray(children).map((child, index) => (
-        <li className={styles.item} key={index}>
+        <li
+          className={styles.item}
+          key={isValidElement(child) && child.key !== null ? child.key : index}
+        >
           {child}
         </li>
       ))}

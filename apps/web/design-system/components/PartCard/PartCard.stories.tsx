@@ -70,10 +70,9 @@ export const Default: Story = {};
 const kinds: [PartKind, string][] = [
   ['applied', 'applied'],
   ['formula', 'formula to review'],
-  ['ask', 'needs your call'],
-  ['gap', 'not available yet'],
-  ['not-understood', 'not understood'],
-  ['kept', 'kept from your screen'],
+  ['needs_choice', 'needs your call'],
+  ['not_available', 'not available yet'],
+  ['not_understood', 'not understood'],
 ];
 
 /** Every kind, in one list. */
@@ -86,12 +85,19 @@ export const Kinds: Story = {
           {...args}
           kind={kind}
           kindLabel={kindLabel}
-          {...(kind === 'kept' ? { words: undefined, title: 'Kept from your screen' } : {})}
-          {...(kind === 'not-understood'
+          {...(kind === 'not_understood'
             ? { rows: undefined, actions: undefined, reading: undefined }
             : {})}
         />
       ))}
+      <PartCard
+        {...args}
+        kindLabel="applied"
+        origin="kept"
+        keptLabel="kept from your screen"
+        words={undefined}
+        title="Kept from your screen"
+      />
     </PartList>
   ),
 };
@@ -99,7 +105,7 @@ export const Kinds: Story = {
 /** Words the model could not place: the words, no reading. */
 export const NotUnderstood: Story = {
   args: {
-    kind: 'not-understood',
+    kind: 'not_understood',
     kindLabel: 'not understood',
     words: 'that feel strong',
     reading: undefined,
@@ -110,8 +116,8 @@ export const NotUnderstood: Story = {
 /** Criteria tied to no words: no quote, a title instead. */
 export const Kept: Story = {
   args: {
-    kind: 'kept',
-    kindLabel: 'kept from your screen',
+    origin: 'kept',
+    keptLabel: 'kept from your screen',
     words: undefined,
     title: 'Kept from your screen',
     reading: undefined,
@@ -134,6 +140,17 @@ export const Error: Story = {
   },
 };
 
+/** A Guide InfoButton beside the badge. */
+export const WithInfo: Story = {
+  args: {
+    info: (
+      <button type="button" aria-label="About this kind">
+        ?
+      </button>
+    ),
+  },
+};
+
 export const Edited: Story = { args: { edited: true } };
 
 export const Disabled: Story = { args: { state: 'disabled' } };
@@ -149,6 +166,8 @@ export const Retype: Story = {
           value,
           onValueChange: setValue,
           onApply: () => undefined,
+          maxLength: 200,
+          applyDisabled: value.trim() === '' || value === 'optionable stocks over $5',
           onCancel: () => undefined,
           inputLabel: 'Retype this part',
           applyLabel: 'Apply',

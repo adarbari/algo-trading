@@ -843,6 +843,7 @@ Source: `design-system/components/Input`
 | `name` | `string` | no |  |
 | `id` | `string` | no |  |
 | `autoComplete` | `string` | no |  |
+| `maxLength` | `number \| undefined` | no | Longest text the box accepts, in characters. |
 | `spellCheck` | `boolean` | no |  |
 | `onKeyDown` | `KeyboardEventHandler<HTMLInputElement> \| undefined` | no |  |
 | `onFocus` | `FocusEventHandler<HTMLInputElement> \| undefined` | no |  |
@@ -1107,16 +1108,20 @@ Source: `design-system/components/PartCard`
 |---|---|---|---|
 | `kind` | `PartKind` | yes | How the part was understood: sets the badge tone and icon. |
 | `kindLabel` | `string` | yes | The badge text ("applied", "not understood"). |
-| `words` | `string \| undefined` | no | The trader's own words, quoted and highlighted; omit for `kept`. |
-| `title` | `string \| undefined` | no | The card's name when it has no words (the `kept` card: "Kept from your screen"). |
+| `origin` | `PartOrigin \| undefined` | no | Where the part comes from; `kept` has no quoted words and shows `keptLabel`. |
+| `keptLabel` | `string \| undefined` | no | The marker for a kept part ("kept from your screen"); shown beside the badge. |
+| `words` | `string \| undefined` | no | The trader's own words, quoted and highlighted; omit for a kept part. |
+| `title` | `string \| undefined` | no | The card's name when it has no words (the kept card: "Kept from your screen"). |
+| `headingLevel` | `HeadingLevel \| undefined` | no | Outline level of the card's heading (default 3). |
 | `readingLabel` | `string \| undefined` | no | The lead-in to the reading ("We read this as"). |
 | `reading` | `ReactNode` | no | The part in plain language. |
 | `readingSource` | `'model' \| 'server' \| null \| undefined` | no | Who wrote the reading: `model` is shown as is; `server` or null shows the muted note. |
 | `checkReadingLabel` | `string \| undefined` | no | The muted note for a reading not written by the model ("check this reading"). |
 | `rows` | `ReactNode` | no | The part's criteria / formula / readings / suggestions, composed by the caller. |
 | `actions` | `ReactNode` | no | Pick another reading, retype this part: buttons or a picker, composed by the caller. |
+| `info` | `ReactNode` | no | A Guide InfoButton for the kind, shown beside the badge. |
 | `state` | `PartCardState \| undefined` | no | `idle`, `redrafting` (this card is being redrafted), `error` (inline retry), `disabled`. |
-| `redraftingLabel` | `string \| undefined` | no | Text while redrafting ("Redrafting this part"). |
+| `redraftingLabel` | `string` | yes | What is happening while redrafting ("Redrafting this part"): announced and shown once. |
 | `errorMessage` | `string \| undefined` | no | What went wrong, shown inline in the `error` state. |
 | `retryLabel` | `string \| undefined` | no | The retry button's label ("Try again"). |
 | `onRetry` | `(() => void) \| undefined` | no |  |
