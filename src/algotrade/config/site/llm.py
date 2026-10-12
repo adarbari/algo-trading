@@ -452,7 +452,24 @@ class PhrasebookSettings:
         raw = root.raw("phrase") or []
         if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
             raise ConfigurationError(f"{where} phrase: expected a list of tables ([[phrase]])")
-        return cls(tuple(_phrase(Table(e, f"{where} [[phrase]][{i}]")) for i, e in enumerate(raw)))
+        phrases = tuple(_phrase(Table(e, f"{where} [[phrase]][{i}]")) for i, e in enumerate(raw))
+        _no_shared_wording(phrases, where)
+        return cls(phrases)
+
+
+def _no_shared_wording(phrases: tuple[Phrase, ...], where: str) -> None:
+    """One wording (case and spacing ignored) says one thing: two entries claiming it would
+    each be matched, and a structured one read as the whole meaning."""
+    seen: dict[str, int] = {}
+    for i, phrase in enumerate(phrases):
+        for say in phrase.say:
+            key = " ".join(say.lower().split())
+            if key in seen and seen[key] != i:
+                raise ConfigurationError(
+                    f"{where} say: {say!r} is in [[phrase]][{seen[key]}] "
+                    f"({phrases[seen[key]].say[0]!r}) and [[phrase]][{i}] ({phrase.say[0]!r})"
+                )
+            seen.setdefault(key, i)
 
 
 def _phrase(t: Table) -> Phrase:

@@ -107,7 +107,7 @@ op = "eq"
 value = true
 
 [[phrase]]
-say = ["liquid", "actively traded", "heavy volume", "enough volume", "tradable"]
+say = ["liquid", "actively traded", "enough volume", "tradable"]
 fields = ["rollup.price_stats@v2.adv_usd_20d", "feature.liquidity_class"]
 hint = "adv_usd_20d gte 50000000 (dollars a day; 'very liquid' 100000000, 'some volume' 5000000), soft with tolerance {relative = 0.2} and on_miss LIQUIDITY_RISK; or liquidity_class in [HIGH, MEDIUM]"
 default = "$50M a day"
@@ -492,7 +492,7 @@ fields = ["feature.dist_to_poc", "feature.in_value_area", "rollup.volume_profile
 hint = "near the point of control: dist_to_poc between -0.03 and 0.03; at a heavy level: volume_near_close_share gte 0.15; in thin air: volume_near_close_share lte 0.05 or in_value_area eq false; the node levels are compared with the close, not thresholded"
 
 [[phrase]]
-say = ["turnover", "actively traded relative to float", "volume building", "volume trend up", "busiest day of the year"]
+say = ["turnover", "actively traded relative to float", "volume trend up", "busiest day of the year"]
 fields = ["feature.turnover_20d", "feature.volume_trend_20_60", "rollup.vol_stats@v1.volume_pctile_252d"]
 hint = "turnover_20d gte 0.01 for 1% of the company a day; volume_trend_20_60 gte 1.2 for a month busier than the quarter; volume_pctile_252d gte 0.95 for one of the year's busiest sessions"
 

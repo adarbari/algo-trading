@@ -110,6 +110,16 @@ def test_the_shipped_phrasebook_loads() -> None:
         ({"phrase": [{"say": "x", "fields": ["a"]}]}, r"a list of strings"),
         ({"phrase": [{"say": ["x"], "fields": ["a"], "mean": "y"}]}, r"unknown keys"),
         ({"phrases": []}, r"unknown keys"),
+        (
+            {
+                "phrase": [
+                    {"say": ["Volume  Building"], "fields": ["a"]},
+                    {"say": ["x", "volume building"], "fields": ["b"]},
+                ]
+            },
+            r"'volume building' is in \[\[phrase\]\]\[0\] \('Volume  Building'\) "
+            r"and \[\[phrase\]\]\[1\] \('x'\)",
+        ),
     ],
 )
 def test_phrasebook_errors_name_the_entry(doc: dict[str, Any], message: str) -> None:
