@@ -51,6 +51,7 @@ import pandas as pd
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import exchange_date
 from algotrade.services.feedback.recorder import TABLE as FEEDBACK
+from algotrade.services.feedback.request_recorder import TABLE as FEATURE_REQUESTS
 from algotrade.services.text_model.usage import TABLE as USAGE
 from algotrade.storage.factory import open_backend
 from algotrade.storage.locks import FEEDBACK_WRITERS, held
@@ -72,8 +73,6 @@ BACKUP_REMINDER = (
     "backups and snapshots of the store taken before this run still hold the text: erasing "
     "them is a manual step (docs/hosting.md)"
 )
-# named by prefix until the table's owner exports a constant (feedback/feature_requests)
-FEATURE_REQUESTS = "feedback/" + "feature_requests"
 
 
 @dataclass(frozen=True)

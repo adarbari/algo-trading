@@ -233,3 +233,7 @@ worktree.env
 
 # this machine's site values over config/site/<name>.toml (ADR 0015; docs/configuration.md)
 config/site/*.local.toml
+
+# real trader sentences: the owner's curation input and the candidates export stay local (ADR 0066)
+curation*.json
+candidates*.json

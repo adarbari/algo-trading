@@ -361,6 +361,28 @@ FEEDBACK_DRAFTING_EVENTS = fixed(
     runs="merge",
     key=("draft_session_id", "event_id", "event"),
 )
+# The missing-feature requests of Describe it (ADR 0066 amendment 2026-10-11): one row per
+# (user, backlog key or new slug, exchange day), the span of the sentence the request covers
+# (never the sentence). ``ref`` is the key or the slug (the identity); ``key`` is set for a backlog
+# item, ``new_slug`` for a request the backlog does not know. Written through ``FeedbackWriter``,
+# read across a date range by ``data.feedback``; the viewer-scoped loader decides who sees what.
+FEEDBACK_FEATURE_REQUESTS = fixed(
+    "feedback/feature_requests",
+    "feedback",
+    ("ts", "user", "ref"),
+    "ts timestamp_utc!",
+    "user string!",
+    "ref string!",
+    "key string",
+    "new_slug string",
+    "feasibility string",
+    "span string",
+    "closest string",
+    "call_id string",
+    "draft_session_id string",
+    runs="merge",
+    key=("user", "ref", "session_date"),
+)
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
 TREASURY_RATES = fixed(
@@ -611,6 +633,7 @@ KNOWN: dict[str, TableSpec] = {
         LIVE_OPTION_QUOTES,
         USAGE_LLM_CALLS,
         FEEDBACK_DRAFTING_EVENTS,
+        FEEDBACK_FEATURE_REQUESTS,
         ETF_HOLDINGS,
         MACRO_SERIES,
         EARNINGS_EVENTS,

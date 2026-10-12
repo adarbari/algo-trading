@@ -164,6 +164,47 @@ several times, all of the descriptions are stored.
   and the screener id when it is a site preset's. Retention, viewer scoping and the owner's
   erase command apply to all the personal columns, the payload included.
 
+## Amendment (2026-10-11): the missing-feature request log
+
+A draft may say what the sentence asks that no stored field answers (`missing`, ADR 0041
+amendment). Those requests are the signal for what to build next, so they are logged and ranked.
+Owner policy decided 2026-10-11.
+
+- **A second table, the same writer**: `feedback/feature_requests`, written only through
+  `FeedbackWriter` by its own `BatchRecorder` (`services/feedback/request_recorder.py`; never raises,
+  drops on a full queue, one atomic run per batch). It is not `usage/*` (the model-call log) and not
+  a drafting event (a request is about a feature, not a draft's life). Columns: the point-in-time
+  ones of ADR 0007 (`session_date` the exchange day of `ts`, `knowledge_ts` = `ts`, `source`
+  `drafting_feedback`, `run_id`) and `ts`, `user`, `ref` (the backlog key, else the new slug: the
+  identity), `key` (set for a backlog item), `new_slug` (set for one the backlog does not know),
+  `feasibility`, `span`, `closest` (comma-delimited catalogue names), `call_id`,
+  `draft_session_id`; all but `ts`, `user`, `ref` nullable for evolution. Key: (`user`, `ref`,
+  `session_date`): one row per user, feature and exchange day.
+- **Privacy: the span, never the sentence.** The row holds the clipped span (300 characters) the
+  request covers, not the trader's sentence, and only when the span is a piece of the sentence
+  (ignoring case and whitespace): a span the model invented or paraphrased is stored as null, and
+  `ref` is never derived from free text. `null_spans` and `erase_user` (`services/feedback/requests.py`)
+  are the retention and erase edits the feedback retention command applies to this table. It is still personal data (a span can name a holding),
+  so the read is viewer-scoped and the retention of this ADR applies to `span`.
+- **Who sees what.** A trader sees only their own history (`load_my_requests`: per feature, first
+  and last asked, times asked) and never a count or trace of another user; this holds for an admin's
+  "my requests" too. An admin sees an ordered ranked list across users (`load_ranked_requests`);
+  a trader asking for it gets `PermissionDeniedError` before anything is read. The role is the
+  registry's (`Viewer.role`).
+- **Ranking** (`services/feedback/ranking.py`, pure): the sum over distinct users of
+  `exp(-age_days / 60)`, the age from each user's latest request for the feature, times a
+  feasibility weight (`ROLLUP_FROM_STORED` 1.0, `NEEDS_SOURCE` 0.5, `UNCLEAR` 0.25); the raw count
+  of distinct (user, day) asks breaks ties, then the later last-seen, then the name; a feature the
+  backlog has since PROMOTED or set WONT_DO keeps its score but is listed after every OPEN and
+  unmapped one. No embeddings:
+  a slug is the same feature only when the backlog says so (a key or alias), re-resolved at read
+  time, so an alias added by a PR merges the earlier slugs. A slug the backlog does not know is
+  shown to admins as unmapped, with the backlog's status (OPEN / PROMOTED / WONT_DO) beside the
+  mapped ones.
+- **Wiring**: the route layer calls `record_missing(sink, user, draft.missing, ...)` after the draft
+  answer (`services/drafting` imports nothing of `services/feedback`); GraphQL and the web come
+  later.
+
 ## Consequences
 - The golden set grows from real sentences, with the model's answer and what the trader kept.
 - Personal data is stored: one more reason the read is viewer-scoped and the sentence short.

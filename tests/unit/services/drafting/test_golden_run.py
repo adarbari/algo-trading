@@ -106,7 +106,7 @@ class Scripted:
         )
 
 
-def draft(model: TextModel, sentence: str) -> ScreenDraft:
+def draft(model: TextModel, sentence: str, current: Mapping[str, Any] | None = None) -> ScreenDraft:
     answer = model.complete("system", sentence)
     kept, dropped = criteria_of(parse_answer(answer.text), CATALOGUE)
     return ScreenDraft("g", {"criteria": kept}, dropped, ())
@@ -185,7 +185,9 @@ def test_a_chain_never_repairs_in_a_run_the_first_answer_is_scored_and_kept() ->
     inner = Scripted(["not json", GOOD], costs)
     chained = FallbackTextModel([("p", inner)])
 
-    def with_accept(model: TextModel, sentence: str) -> ScreenDraft:
+    def with_accept(
+        model: TextModel, sentence: str, current: Mapping[str, Any] | None = None
+    ) -> ScreenDraft:
         def accept(text: str) -> None:
             parse_answer(text)
 
@@ -353,3 +355,28 @@ def test_slug_and_recordings_layout(tmp_path: Path) -> None:
     assert written == 1 and (tmp_path / "a" / "b.json").read_text() == "x\n"
     _, result = run([GOOD, WRONG], repeat=2)
     assert recordings(result, tmp_path) == [(tmp_path / "answers" / "m1" / "c1.json", GOOD)]
+
+
+def test_a_curated_case_is_drafted_with_the_criteria_in_force_and_record_clears_its_flag(
+    tmp_path: Path,
+) -> None:
+    force = {"criteria": {"c1": {"field": "f.b", "op": "gt", "value": 1}}}
+    curated = GoldenCase("c1", "last paraphrase", "train", case().parts, frozenset(),
+                         current=force, recorded=False)  # fmt: skip
+    seen: list[Any] = []
+
+    def spy(
+        model: TextModel, sentence: str, current: Mapping[str, Any] | None = None
+    ) -> ScreenDraft:
+        seen.append((sentence, current))
+        return draft(model, sentence)
+
+    costs = CostTap()
+    result = evaluate(plan_of([curated], repeat=1), {"paid": Scripted([GOOD], costs)}, spy, costs,
+                      budget_usd=1.0, max_calls=5)  # fmt: skip
+    assert seen == [("last paraphrase", force)]
+    (tmp_path / "cases").mkdir()
+    case_file = tmp_path / "cases" / "c1.json"
+    case_file.write_text(json.dumps({"id": "c1", "recorded": False}))
+    write_recordings(recordings(result, tmp_path), force=False, say=lambda _: None)
+    assert "recorded" not in json.loads(case_file.read_text())
