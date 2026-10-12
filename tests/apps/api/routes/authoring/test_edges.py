@@ -237,3 +237,55 @@ def test_a_faulty_copy_file_is_served_as_a_problem_with_its_reason(
     (problem,) = read(client, query)
     assert problem["edgeId"] == "broken" and "extends: no edge 'ghost'" in problem["reason"]
     assert [e["id"] for e in read(client, LIST)] == ["drift"]
+
+
+class _Keep:
+    def __init__(self) -> None:
+        self.rows: list[Any] = []
+
+    def submit(self, row: Any) -> bool:
+        self.rows.append(row)
+        return True
+
+
+def test_a_save_records_edge_revised_after_the_write_and_never_before_a_refusal(
+    client: TestClient,
+) -> None:
+    sink = _Keep()
+    client.app.state.feedback = sink  # type: ignore[attr-defined]
+    assert client.post("/edges/drift/copy", json={"new_id": "mine"}).status_code == 201
+    assert (
+        client.put("/edges/mine", json={"document": {"extends": "drift", "top_k": 2}}).status_code
+        == 200
+    )
+    assert (
+        client.put("/edges/mine", json={"document": {"extends": "drift", "top_k": 2}}).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            "/edges/mine",
+            json={"document": {"extends": "drift", "top_k": 3}, "draft_session_id": "s1"},
+        ).status_code
+        == 200
+    )
+    bad = client.put("/edges/mine", json={"document": {"extends": "drift", "screeners": ["nope"]}})
+    assert (
+        bad.status_code == 400
+        and client.put("/edges/drift", json={"document": {}}).status_code == 409
+    )
+    assert [r["event"] for r in sink.rows] == ["edge_revised", "edge_revised"]  # unchanged: quiet
+    assert "top_k" in sink.rows[1]["payload"] and "s1" in sink.rows[1]["payload"]
+
+
+def test_a_failing_sink_does_not_fail_an_edge_save(client: TestClient) -> None:
+    class Down:
+        def submit(self, row: Any) -> bool:
+            raise RuntimeError("down")
+
+    client.app.state.feedback = Down()  # type: ignore[attr-defined]
+    assert client.post("/edges/drift/copy", json={"new_id": "mine"}).status_code == 201
+    assert (
+        client.put("/edges/mine", json={"document": {"extends": "drift", "top_k": 2}}).status_code
+        == 200
+    )

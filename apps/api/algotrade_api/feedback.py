@@ -1,15 +1,16 @@
 """The Describe-it feedback the API records (ADR 0066), server side only: ``draft_requested`` and
 ``draft_returned`` around the draft route, ``draft_saved`` and ``screen_finalised`` after the
-screen's config write has succeeded, each carrying the ``draft_session_id`` the draft answer
-returned. A session is one screen's whole iteration (ADR 0066): a draft request may carry the id
-of the session it continues (the same user, the same screen, not yet saved: else a new session),
-each request has its ``seq`` in the session, and the events carry what was in force (the criteria
-sent with a request, the draft returned, the criteria saved), so a golden case can be read from
-the rows. ``DraftMemory`` keeps, in this process and bounded, the last draft returned per
-session, so a save is diffed against what the model proposed (``services.feedback.diff``); a save
-with no session id, or one this process no longer remembers (a restart, an evicted entry) records
-nothing for the diff, and a hand-built screen records nothing at all. Every function here
-swallows its own failure: a request never fails on its feedback."""
+screen's config write has succeeded, ``edge_revised`` after an edge document's. The screen events
+each carry the ``draft_session_id`` the draft answer returned. A session is one screen's whole
+iteration: a draft request may carry the id of the session it continues (the same user, the same
+screen, not yet saved: else a new session), each request has its ``seq`` in the session, and the
+events carry what was in force (the criteria sent with a request, the draft returned, the criteria
+saved), so a golden case can be read from the rows. ``DraftMemory`` keeps, in this process and
+bounded, the last draft returned per session, so a save is diffed against what the model proposed
+(``services.feedback.diff``); a save with no session id, or one this process no longer remembers
+(a restart, an evicted entry) records nothing for the diff, and a hand-built screen records
+nothing at all. Every function here swallows its own failure: a request never fails on its
+feedback."""
 
 import copy
 import logging
@@ -20,7 +21,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from algotrade.services.feedback import events
-from algotrade.services.feedback.diff import criteria_diff, criteria_snapshot
+from algotrade.services.feedback.diff import criteria_diff, criteria_snapshot, document_diff
 from algotrade.services.feedback.events import FeedbackSink, NoFeedback
 from algotrade.services.feedback.recorder import open_recorder
 from algotrade.services.read.instruments.catalogue import feature_infos
@@ -28,6 +29,7 @@ from algotrade.services.read.instruments.catalogue import feature_infos
 log = logging.getLogger(__name__)
 MEMORY = 512  # drafts remembered at most (the least recently used goes first)
 KIND = "screen"
+EDGE_KIND = "edge"
 
 
 @dataclass(frozen=True)
@@ -279,3 +281,37 @@ def record_finalised(
         sink, memory, events.SCREEN_FINALISED, session_id, user, screener_id, document,
         finalised_hash,
     )  # fmt: skip
+
+
+def record_edge_revised(
+    sink: FeedbackSink,
+    session_id: str | None,
+    user: str,
+    edge_id: str,
+    before: Mapping[str, Any] | None,
+    after: Mapping[str, Any],
+) -> None:
+    """``edge_revised``: call after the edge document was stored. ``before`` is the user's last
+    stored revision (``None``: the first save) and ``after`` what was stored; nothing is recorded
+    when they are equal (an autosave). An edge has no remembered draft, so a ``session_id`` the
+    client claims goes in the payload (``chains.py`` links it when it is the user's own for this
+    edge) and the row is filed under a fresh session."""
+    try:
+        if before is not None and dict(before) == dict(after):
+            return
+        payload: dict[str, Any] = {
+            "content_hash": events.document_hash(after),
+            "diff": events.bounded(document_diff(before, after), events.MAX_PART),
+            "saved_document": events.bounded(dict(after)),  # the edge as stored, clipped
+        }
+        if before is None:
+            payload["first_revision"] = True
+        if session_id:
+            payload["claimed_session_id"] = session_id
+        events.emit(
+            sink, events.EDGE_REVISED, events.new_session_id(), user, EDGE_KIND, edge_id,
+            draft_hash=events.document_hash(before) if before is not None else None,
+            saved_hash=events.document_hash(after), payload=payload,
+        )  # fmt: skip
+    except Exception:
+        log.exception("edge_revised not recorded")

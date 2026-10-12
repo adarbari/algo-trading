@@ -206,6 +206,12 @@ def save_edge(
     return stored
 
 
+def stored_edge(writer: ConfigWriter, user: str, edge_id: str) -> dict[str, Any] | None:
+    """The document ``user`` has stored for their own edge ``edge_id`` (``None``: they have none);
+    what a save is compared with."""
+    return _own(writer, author(user).user_id, edge_id)
+
+
 def delete_edge(writer: ConfigWriter, user: str, edge_id: str, now: datetime | None = None) -> None:
     """Archive ``user``'s own document ``edge_id`` (their bookmark of a site edge: removed).
     ``EdgeNotFoundError`` if they have none; ``ConflictError`` if another of their

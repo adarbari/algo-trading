@@ -274,3 +274,37 @@ def test_a_whole_iteration_can_be_read_back_from_the_rows() -> None:
     assert asked[1][2]["price"]["value"] == 7  # the edit between the descriptions
     last = json.loads(rows[-1]["payload"])["saved_criteria"]["criteria"]
     assert rows[-1]["event"] == "draft_saved" and last["price"]["value"] == 8
+
+
+def test_an_edge_revision_records_the_diff_against_the_last_stored_one() -> None:
+    sink = Keep()
+    first = {"extends": "drift", "top_k": 2}
+    feedback.record_edge_revised(sink, None, "abhi", "mine", None, first)
+    feedback.record_edge_revised(
+        sink, "s9", "abhi", "mine", first, {"extends": "drift", "top_k": 3}
+    )
+    one, two = sink.rows
+    assert one["event"] == "edge_revised" and one["doc_kind"] == "edge" and one["doc_id"] == "mine"
+    assert json.loads(str(one["payload"]))["first_revision"] is True
+    assert one["draft_session_id"] and one["draft_session_id"] != two["draft_session_id"]
+    payload = json.loads(str(two["payload"]))
+    assert payload["diff"]["changed"] == {"top_k": {"from": 2, "to": 3}}
+    assert payload["claimed_session_id"] == "s9" and two["draft_hash"] != two["saved_hash"]
+
+
+def test_an_unchanged_edge_save_records_nothing_and_a_huge_one_is_clipped() -> None:
+    sink = Keep()
+    doc = {"extends": "drift"}
+    feedback.record_edge_revised(sink, None, "abhi", "mine", doc, dict(doc))
+    assert sink.rows == []
+    feedback.record_edge_revised(
+        sink, None, "abhi", "mine", doc, {"extends": "drift", "t": "x" * 20000}
+    )
+    assert (
+        len(sink.rows) == 1
+        and len(json.loads(str(sink.rows[0]["payload"]))["saved_document"]) < 9000 + 200
+    )
+
+
+def test_a_failing_sink_never_raises_from_an_edge_revision() -> None:
+    feedback.record_edge_revised(Raises(), None, "abhi", "mine", None, {"extends": "drift"})
