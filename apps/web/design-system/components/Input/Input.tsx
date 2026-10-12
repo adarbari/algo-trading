@@ -66,6 +66,8 @@ export interface InputProps extends Pick<
   name?: string;
   id?: string;
   autoComplete?: string;
+  /** Longest text the box accepts, in characters. */
+  maxLength?: number | undefined;
   spellCheck?: boolean;
   onKeyDown?: KeyboardEventHandler<HTMLInputElement> | undefined;
   onFocus?: FocusEventHandler<HTMLInputElement> | undefined;
