@@ -66,9 +66,31 @@ that shows these rows comes with the golden pipeline.
 The raw sentence and the payload are kept 12 months and then nulled unless the row was curated into
 the golden set (`tests/fixtures/drafting/golden/`). The repository is public, so a curated case is
 never the trader's text: the owner rewrites it (every sentence of the chain paraphrased) and checks
-its criteria for personal specifics (holdings, named positions) before it enters the repository. The nulling and an owner-run erase command for one user are a later change (an
-owner-run command in the ingestion CLI, as every rewrite of stored data is); until then the rows are
-append-only and `docs/hosting.md`'s store backups apply.
+its criteria for personal specifics (holdings, named positions) before it enters the repository. The nulling and the erase command for one user came
+later: see the note below.
+
+**Note (2026-10-11): the retain and erase commands exist.** `algotrade-api feedback retain
+[--older-than-days 365]` and `algotrade-api feedback erase --user ID` (`services/feedback/retention.py`;
+the command is on the API's CLI, not ingestion's, because the API is the table's writer; the first
+cut of this section had named the ingestion CLI). Both are a dry run unless
+`--yes`, idempotent, and refuse while any run has pending writes or another retention command runs.
+- *retain* nulls `sentence` and `payload` of `feedback/drafting_events` and `sentence`, `answer`,
+  `error` of `usage/llm_calls` for partitions older than the window (exchange `session_date`), except
+  an event whose `event_id` is a golden case's `source_event` and the usage rows whose `call_id` such
+  an event lists.
+- *erase* does the same for every row of one user on any date (a curated row too) and replaces the
+  user id: feedback `user` and `doc_id` by `erased`, usage `user` by a random token (per-user keys stay
+  distinct). The skeleton (`ts`, `event`, hashes, call ids, tokens, cost) stays, so counts add up.
+- *Mechanism*: one new run that restates each changed partition with the nulled merged view, all
+  partitions committed together (ADR 0022), then `TableStore.purge_superseded` deletes the runs the
+  restating run supersedes, files included: the old Parquet is physically rewritten away, not only
+  hidden by a newer run. A crash between the two leaves reads clean; the next run finishes the purge.
+  The API's recorder takes no lock and is never blocked; a row it adds meanwhile is a later run,
+  merged after the rewrite.
+- *Audit*: one JSON line of counts (no sentence, no user id) per applied run in
+  `var/logs/feedback-retention.log`.
+- *Backups*: copies of the store taken earlier (`docs/hosting.md`) still hold the text; erasing
+  them is the owner's manual step and the command prints the reminder.
 
 ## Amendment (2026-10-11): the whole iteration of a screen
 

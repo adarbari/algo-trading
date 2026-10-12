@@ -241,6 +241,23 @@ class MemoryTables:
                 self._seq += 1  # committed like a run: a read sees all of the purge or none
             return len(keys)
 
+    def purge_superseded(self, table: str, session_date: date) -> int:
+        key = (table, session_date)
+        with self._index_lock:
+            if any(key in writes for writes in self._pending.values()):
+                return 0
+            entries = self._partitions.get(key, {})
+            order = sorted((e.knowledge_ts, run) for run, e in entries.items())
+            restating = [i for i, (_, run) in enumerate(order) if entries[run].restates]
+            gone = {run for _, run in order[: restating[-1]]} if restating else set()
+            for run in gone:
+                del entries[run]
+            for frame_key in [f for f in self._frames if f[0] == key and f[1] in gone]:
+                del self._frames[frame_key]
+            if gone:
+                self._seq += 1  # committed like a run: a read sees all of the purge or none
+            return len(gone)
+
     def dates(self, table: str, own_run: str | None = None) -> list[date]:
         with self._index_lock:
             keys = set(self._partitions) | set(self._pending.get(own_run or "", {}))

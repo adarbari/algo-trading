@@ -151,6 +151,16 @@ class TableStore(Protocol):
         the edge ledger, whose kept runs' partitions are spared); -> partitions deleted."""
         ...
 
+    def purge_superseded(self, table: str, session_date: date) -> int:
+        """Delete the runs of one committed partition that its latest restating run supersedes
+        (every run ordered before it by ``(knowledge_ts, run)``: ``select_runs`` already stops
+        reading them) with their files, so the data they held is physically gone; -> runs
+        deleted (0: nothing superseded, or a pending run is writing to the partition, left for
+        a later pass). Committed like ``purge_before`` (the published sequence moves on; a read
+        pinned to an older one retries). An admin rewrite (``services/feedback/retention.py``),
+        never part of a run."""
+        ...
+
 
 class RawStore(Protocol):
     """Vendor responses exactly as received (ADR 0006), kept for a retention window."""

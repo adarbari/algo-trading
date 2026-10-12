@@ -362,6 +362,9 @@ class LocalTables:
         ]
         return self.commits.purge(days)
 
+    def purge_superseded(self, table: str, session_date: date) -> int:
+        return self.commits.supersede(self._dir(table, session_date))
+
     @staticmethod
     def _remove(days: list[Path]) -> None:
         for day in days:

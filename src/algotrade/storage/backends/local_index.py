@@ -302,6 +302,33 @@ class Commits:
                 atomic_write(self.base / "seq", str(self.published() + 1).encode())
             return len(gone)
 
+    def supersede(self, directory: Path) -> int:
+        """Delete the runs of one partition the latest restating run supersedes (see
+        ``TableStore.purge_superseded``), committed like ``purge``: under the commit lock, the
+        index rewritten under its lock before the files go, then the sequence moves on. A
+        partition a pending run has written to is left for a later pass. -> runs deleted."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            if directory in busy or not (directory / INDEX).exists():
+                return 0
+            with held(index_lock(directory)):
+                entries = read_index(directory)
+                order = sorted((e.knowledge_ts, run) for run, e in entries.items())
+                restating = [i for i, (_, run) in enumerate(order) if entries[run].restates]
+                gone = [run for _, run in order[: restating[-1]]] if restating else []
+                if not gone:
+                    return 0
+                write_index(directory, {r: e for r, e in entries.items() if r not in gone})
+            for run in gone:
+                drop_unreferenced(directory, run)  # no longer indexed: every version's file
+            atomic_write(self.base / "seq", str(self.published() + 1).encode())
+            return len(gone)
+
     def _forget(self, run_id: str) -> None:
         with self._guard:
             self._journals.pop(run_id, None)
