@@ -25,7 +25,8 @@
 }
 
 .card[data-state='disabled'] {
-  opacity: 0.6;
+  border-style: dotted;
+  background: var(--color-row);
 }
 
 .head {
