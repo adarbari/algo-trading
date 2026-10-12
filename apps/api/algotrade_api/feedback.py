@@ -189,6 +189,20 @@ def record_requested(
         return events.new_session_id(), 1
 
 
+def parts_payload(parts: Sequence[Any] | None) -> list[dict[str, Any]]:
+    """The explained parts of a draft as the ``draft_returned`` payload keeps them: id, words,
+    the model's reading (null when the server dropped it), kind and origin, and how many items
+    each holds; never the sentence again."""
+    return [
+        {
+            "id": p.id, "words": p.words, "reading": p.reading, "kind": p.kind, "origin": p.origin,
+            "items": len(p.criteria) + len(p.dropped) + len(p.formulas) + len(p.unresolved)
+            + len(p.missing) + len(p.suggestions) + int(p.rank),
+        }
+        for p in parts or ()
+    ]  # fmt: skip
+
+
 def record_returned(
     sink: FeedbackSink,
     memory: DraftMemory,
@@ -205,10 +219,13 @@ def record_returned(
     notes: Sequence[str] = (),
     terms: Sequence[str] = (),
     formulas: Mapping[str, str] | None = None,
+    parts: Sequence[Mapping[str, Any]] = (),
 ) -> None:
     """``draft_returned`` (the model's criteria after validation, what it dropped and its
     notes) and the draft remembered for the save that follows, with the answer's unresolved
-    ``terms`` and proposed ``formulas`` (the only subjects a later choice may name)."""
+    ``terms`` and proposed ``formulas`` (the only subjects a later choice may name). ``parts``
+    (``parts_payload``) go in the payload, clipped: the trader's words and the model's readings
+    of them are personal text, kept and nulled with the payload (ADR 0066)."""
     try:
         version = events.catalogue_version(list(feature_infos(features)))  # the caller's fields
         draft_hash = events.document_hash(document)
@@ -230,6 +247,8 @@ def record_returned(
             "notes": events.bounded(list(notes), events.MAX_PART),
             "draft_criteria": events.bounded(criteria_snapshot(document)),
         }
+        if parts:
+            payload["parts"] = events.bounded(list(parts), events.MAX_PART)
         events.emit(
             sink, events.DRAFT_RETURNED, session_id, user, KIND, screener_id,
             call_ids=call_ids, catalogue_version=version, prompt_version=prompt_version,

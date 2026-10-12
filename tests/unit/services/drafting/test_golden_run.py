@@ -36,6 +36,7 @@ from algotrade.services.drafting.golden_run import (
     slug,
     write_recordings,
 )
+from algotrade.services.drafting.parts.model import PartsStats
 from algotrade.services.drafting.screens import ScreenDraft, criteria_of, parse_answer
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
@@ -402,6 +403,30 @@ def test_suggestions_are_counted_per_call_and_never_change_the_score() -> None:
     (call,) = result.results
     assert call.suggestions == 2 and call.passed
     assert measure(result.results)["suggestions"] == 2
+
+
+def test_the_explained_parts_measures_are_reported_apart_and_never_score_a_case() -> None:
+    stats = PartsStats(
+        items=4, by_model=3, by_fallback=1, spans=2, located=2, readings=2, readings_kept=1
+    )
+
+    def drafting(model: TextModel, sentence: str, current: Mapping[str, Any] | None = None) -> Any:
+        return replace(draft(model, sentence), parts_stats=stats)
+
+    costs = CostTap()
+    result = evaluate(plan_of([case()], repeat=1), {"paid": Scripted([GOOD], costs)}, drafting,
+                      costs, budget_usd=1.0, max_calls=5)  # fmt: skip
+    (call,) = result.results
+    assert call.passed and call.parts == stats
+    assert measure(result.results)["parts"] == {
+        "with_parts": 1, "model_share": 0.75, "located_share": 1.0, "not_understood": 0,
+        "readings_kept": 0.5,
+    }  # fmt: skip
+    plain = evaluate(plan_of([case()], repeat=1), {"paid": Scripted([GOOD], CostTap())}, draft,
+                     costs, budget_usd=1.0, max_calls=5)  # fmt: skip
+    assert measure(plain.results)["parts"]["with_parts"] == 0
+    rep = report(result, plan_of([case()], repeat=1))
+    assert any("parts: 1 drafts, model placed 75%" in line for line in report_lines(rep))
 
 
 # ------------------------------------------------------------------------ drops, pacing, 429

@@ -10,7 +10,9 @@ stays with ``criteria_of`` (a wrong one is dropped with a reason, not a rejected
 A / B / C contract (PR 5, ADR 0041 amendment 2026-10-11) adds ``formulas`` (B1), ``missing``
 (B2 / C) and ``unresolved`` (an ambiguous term with ready alternatives); ``suggestions``
 (protective soft or score checks the sentence did not ask for, never applied silently,
-``suggestions.py``); every one is nullable or optional, so answers recorded before it still pass
+``suggestions.py``); the explained parts (2026-10-11) add ``parts`` (``{id, words, reading}``: the
+sentence split as the model read it) and a nullable ``part`` on every item, the id of the part it
+comes from; every one is nullable or optional, so answers recorded before it still pass
 (a new answer key must be the same). The
 check is a small subset of JSON Schema (``type``, ``properties``, ``required``, ``items``,
 ``anyOf``), enough for these shapes and no dependency; a key the schema does not list is
@@ -26,7 +28,7 @@ SCALAR: tuple[Mapping[str, Any], ...] = (
 )
 NULLABLE_STRING: Mapping[str, Any] = {"type": ["string", "null"]}
 
-CRITERION: Mapping[str, Any] = {
+CRITERION_BODY: Mapping[str, Any] = {
     "type": "object",
     "properties": {
         "id": NULLABLE_STRING,
@@ -58,6 +60,13 @@ CRITERION: Mapping[str, Any] = {
     "required": ["id", "field", "op", "value", "mode", "tolerance", "on_miss", "why"],
     "additionalProperties": False,
 }
+# the part of the sentence an item comes from (explained parts, PROMPT_VERSION 8): its id, or
+# null for what no words ask for; the alternatives of an unresolved term have none (the term has)
+CRITERION: Mapping[str, Any] = {
+    **CRITERION_BODY,
+    "properties": {**CRITERION_BODY["properties"], "part": NULLABLE_STRING},
+    "required": [*CRITERION_BODY["required"], "part"],
+}
 SUGGESTION: Mapping[str, Any] = {
     "type": "object",
     "properties": {
@@ -67,8 +76,9 @@ SUGGESTION: Mapping[str, Any] = {
         },
         "why": {"type": "string"},
         "source": NULLABLE_STRING,
+        "part": NULLABLE_STRING,
     },
-    "required": ["field", "op", "value", "mode", "tolerance", "on_miss", "why", "source"],
+    "required": ["field", "op", "value", "mode", "tolerance", "on_miss", "why", "source", "part"],
     "additionalProperties": False,
 }
 TIE_BREAK: Mapping[str, Any] = {
@@ -78,8 +88,9 @@ TIE_BREAK: Mapping[str, Any] = {
             "properties": {
                 "field": {"type": "string"},
                 "descending": {"type": ["boolean", "null"]},
+                "part": NULLABLE_STRING,
             },
-            "required": ["field", "descending"],
+            "required": ["field", "descending", "part"],
             "additionalProperties": False,
         },
         {"type": "null"},
@@ -96,6 +107,7 @@ FORMULA: Mapping[str, Any] = {
         "description": {"type": "string"},
         "null_meaning": {"type": "string"},
         "inputs": STRINGS,
+        "part": NULLABLE_STRING,
         "criterion": {
             "anyOf": [
                 {
@@ -113,6 +125,7 @@ FORMULA: Mapping[str, Any] = {
     },
     "required": [
         "name", "expr", "dtype", "unit", "description", "null_meaning", "inputs", "criterion",
+        "part",
     ],
     "additionalProperties": False,
 }  # fmt: skip
@@ -126,9 +139,11 @@ MISSING: Mapping[str, Any] = {
         "why_needed": {"type": "string"},
         "closest": STRINGS,
         "feasibility": {"type": "string"},
+        "part": NULLABLE_STRING,
     },
     "required": [
         "key", "new_key_slug", "span", "description", "why_needed", "closest", "feasibility",
+        "part",
     ],
     "additionalProperties": False,
 }  # fmt: skip
@@ -142,13 +157,24 @@ UNRESOLVED: Mapping[str, Any] = {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"label": {"type": "string"}, "criterion": CRITERION},
+                "properties": {"label": {"type": "string"}, "criterion": CRITERION_BODY},
                 "required": ["label", "criterion"],
                 "additionalProperties": False,
             },
         },
+        "part": NULLABLE_STRING,
     },
-    "required": ["term", "span", "default_index", "alternatives"],
+    "required": ["term", "span", "default_index", "alternatives", "part"],
+    "additionalProperties": False,
+}
+PART: Mapping[str, Any] = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "words": {"type": "string"},
+        "reading": NULLABLE_STRING,
+    },
+    "required": ["id", "words", "reading"],
     "additionalProperties": False,
 }
 ANSWER_SCHEMA: Mapping[str, Any] = {
@@ -161,6 +187,7 @@ ANSWER_SCHEMA: Mapping[str, Any] = {
         "missing": {"type": ["array", "null"], "items": MISSING},
         "unresolved": {"type": ["array", "null"], "items": UNRESOLVED},
         "suggestions": {"type": ["array", "null"], "items": SUGGESTION},
+        "parts": {"type": ["array", "null"], "items": PART},
     },
     "required": [
         "criteria",
@@ -170,6 +197,7 @@ ANSWER_SCHEMA: Mapping[str, Any] = {
         "missing",
         "unresolved",
         "suggestions",
+        "parts",
     ],
     "additionalProperties": False,
 }
@@ -237,6 +265,8 @@ def _object_violation(value: Mapping[str, Any], schema: Mapping[str, Any], path:
         if key not in value and not nullable:
             return f"{path}: missing {key!r}"
     for key, sub in props.items():
+        if key == "part":  # a tag is read leniently (``parts.model.part_tag``): never a reason
+            continue  # to refuse the item it is on
         if key in value and (why := _violation(value[key], sub, f"{path}.{key}")) is not None:
             return why
     return None

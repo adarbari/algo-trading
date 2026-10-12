@@ -297,6 +297,14 @@ follow-up PR).
 - status: final
 - Reasoning: the trader decides what enters the screen.
 
+## 2026-10-11 | Describe it review | Items tied to no words
+- Question: how does the review show criteria the model tied to no words of the sentence (origin `unplaced`)?
+- Options: inside a not-understood card / a separate card
+- Decision: the web shows them as a separate card, "Added without your words"; the backend is as built (a catch-all part with no words, origin `unplaced`, apart from `gap` parts, which carry the words nobody covered).
+- decided by: owner
+- status: final
+- Reasoning: owner decision in the session, 2026-10-11 (source: owner); the rows are not the trader's words and are not "not understood".
+
 ## 2026-10-11 | Admin accepted formulas | Web budgets and page placement
 - Question: where do the accepted formulas go on the web, and do the perf budgets move?
 - Options: a section on the Feature requests page in its own lazy chunk / a new Admin section and route / inline in the page chunk.

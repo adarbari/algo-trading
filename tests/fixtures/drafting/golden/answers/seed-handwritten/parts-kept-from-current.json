@@ -1,0 +1,50 @@
+{
+  "criteria": [
+    {
+      "id": "optionable",
+      "field": "instrument.optionable",
+      "op": "eq",
+      "value": true,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "kept",
+      "part": null
+    },
+    {
+      "id": "iv_rank",
+      "field": "feature.iv_rank",
+      "op": "gte",
+      "value": 0.5,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "kept",
+      "part": null
+    },
+    {
+      "id": "price",
+      "field": "rollup.price_stats@v2.close",
+      "op": "gt",
+      "value": 25,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "price above $25",
+      "part": "p1"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "also require price above $25",
+      "reading": "Price above $25"
+    }
+  ]
+}

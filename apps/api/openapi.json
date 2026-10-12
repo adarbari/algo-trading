@@ -1630,6 +1630,145 @@
         "title": "NarrowMiss",
         "type": "object"
       },
+      "Part": {
+        "properties": {
+          "criteria": {
+            "description": "ids of criteria in the draft document",
+            "items": {
+              "type": "string"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "dropped": {
+            "description": "ids of the criteria dropped",
+            "items": {
+              "type": "string"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "end": {
+            "description": "end offset of words in sentence, in UTF-16 code units",
+            "title": "End",
+            "type": "integer"
+          },
+          "formulas": {
+            "description": "names of pending formulas",
+            "items": {
+              "type": "string"
+            },
+            "title": "Formulas",
+            "type": "array"
+          },
+          "id": {
+            "description": "p1... from the model; g1... a gap; kept / unplaced: catch-alls with no words",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "description": "decided by the server from what the part holds, never by the model",
+            "enum": [
+              "applied",
+              "formula",
+              "needs_choice",
+              "not_available",
+              "not_understood"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "missing": {
+            "description": "keys (or new slugs) of the missing-feature requests",
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "origin": {
+            "description": "words: a part of the model, located in the sentence; gap: words no part covers; kept: criteria carried over from the Builder's document; unplaced: items tied to no words (kept and unplaced have no words)",
+            "enum": [
+              "words",
+              "gap",
+              "kept",
+              "unplaced"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "rank": {
+            "description": "true when the document's tie-break belongs to this part",
+            "title": "Rank",
+            "type": "boolean"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "what the model read the words as; null when it gave none or its numbers disagree with the part's criteria (then reading_source is server)",
+            "title": "Reading"
+          },
+          "reading_source": {
+            "enum": [
+              "model",
+              "server"
+            ],
+            "title": "Reading Source",
+            "type": "string"
+          },
+          "start": {
+            "description": "offset of words in sentence, in UTF-16 code units (JS slice)",
+            "title": "Start",
+            "type": "integer"
+          },
+          "suggestions": {
+            "description": "ids of suggestions",
+            "items": {
+              "type": "string"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "unresolved": {
+            "description": "terms of the unresolved readings",
+            "items": {
+              "type": "string"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          },
+          "words": {
+            "description": "the sentence's own words for this part; empty for a catch-all",
+            "title": "Words",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "words",
+          "start",
+          "end",
+          "reading",
+          "reading_source",
+          "kind",
+          "origin",
+          "criteria",
+          "dropped",
+          "formulas",
+          "unresolved",
+          "missing",
+          "suggestions",
+          "rank"
+        ],
+        "title": "Part",
+        "type": "object"
+      },
       "Period": {
         "description": "Which trades: the backtest's in-sample or out-of-sample side, the live paper record, all.",
         "enum": [
@@ -2208,8 +2347,28 @@
             "title": "Notes",
             "type": "array"
           },
+          "parts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Part"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the explained parts, in sentence order (catch-alls last); null when the model gave none: show the draft without them",
+            "title": "Parts"
+          },
           "screener_id": {
             "title": "Screener Id",
+            "type": "string"
+          },
+          "sentence": {
+            "description": "the whitespace-normalised sentence the parts' offsets count in",
+            "title": "Sentence",
             "type": "string"
           },
           "suggestions": {
@@ -2405,6 +2564,11 @@
             "title": "Criterion",
             "type": "object"
           },
+          "id": {
+            "description": "the server's id (s1, s2...), what a part's suggestions name",
+            "title": "Id",
+            "type": "string"
+          },
           "source": {
             "anyOf": [
               {
@@ -2424,6 +2588,7 @@
           }
         },
         "required": [
+          "id",
           "criterion",
           "why",
           "source"

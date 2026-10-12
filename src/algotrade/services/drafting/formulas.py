@@ -23,7 +23,7 @@ Reads the catalogue and the session; writes nothing."""
 import logging
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from algotrade.config.site.features.definitions import FeatureDefinition
@@ -31,6 +31,7 @@ from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.features.expressions.fingerprint import find_duplicate, fingerprint
 from algotrade.features.expressions.nodes import ExpressionError, Ref
 from algotrade.services.drafting.answer_schema import FORMULA, check_item
+from algotrade.services.drafting.parts.model import part_tag
 from algotrade.services.preview.expressions import DryRun, dry_run
 from algotrade.services.read.context import ReadContext
 
@@ -64,6 +65,7 @@ class DraftFormula:
     fingerprint: str
     dry_run: DryRun = UNSAMPLED
     pending: bool = True  # never saved or in the document until the trader accepts it
+    part: str | None = None  # the part id the model tagged it with (explained parts)
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,7 @@ class FormulaOutcome:
     dropped: tuple[DroppedFormula, ...]
     rewritten: Mapping[str, dict[str, Any]]  # duplicate's name -> its criterion on the field
     notes: tuple[str, ...]
+    rewritten_parts: Mapping[str, str | None] = field(default_factory=dict)  # name -> part tag
 
 
 @dataclass(frozen=True)
@@ -103,6 +106,7 @@ def check_formulas(
     kept: list[DraftFormula] = []
     dropped: list[DroppedFormula] = []
     rewritten: dict[str, dict[str, Any]] = {}
+    rewritten_parts: dict[str, str | None] = {}
     notes: list[str] = []
     if len(items) > MAX_FORMULAS:
         notes.append(
@@ -122,7 +126,7 @@ def check_formulas(
             dropped.append(DroppedFormula(name, getattr(exc, "message", None) or str(exc)))
             continue
         if isinstance(result, DraftFormula):
-            kept.append(result)
+            kept.append(replace(result, part=part_tag(item)))
             continue
         dropped.append(
             DroppedFormula(name, f"the same as the existing feature {result.label}", result.label)
@@ -131,7 +135,8 @@ def check_formulas(
         criterion = _rewrite(item, result, normalise, notes, name)
         if criterion is not None:
             rewritten[name] = criterion
-    return FormulaOutcome(tuple(kept), tuple(dropped), rewritten, tuple(notes))
+            rewritten_parts[name] = part_tag(item)
+    return FormulaOutcome(tuple(kept), tuple(dropped), rewritten, tuple(notes), rewritten_parts)
 
 
 def dry_run_all(

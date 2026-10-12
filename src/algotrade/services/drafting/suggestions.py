@@ -14,11 +14,12 @@ duplicate is dropped quietly: there is nothing to report). ``why`` is the short 
 beside it and ``source`` the field guide entry or field that raised it. Pure; writes nothing."""
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.drafting.answer_schema import SUGGESTION, check_item
+from algotrade.services.drafting.parts.model import part_tag
 
 MAX_SUGGESTIONS = 5
 SUGGESTED_MODES = ("soft", "score")
@@ -37,11 +38,15 @@ class SuggestionError(ConfigurationError):
 
 @dataclass(frozen=True)
 class Suggestion:
-    """A protective check offered, never applied: a soft or score criterion with the reason."""
+    """A protective check offered, never applied: a soft or score criterion with the reason.
+    ``id`` (``s1``, ``s2``...) is the server's, so a part can point at it; ``part`` is the part
+    id the model tagged it with (explained parts)."""
 
     criterion: dict[str, Any]
     why: str
     source: str | None
+    id: str = ""
+    part: str | None = None
 
 
 @dataclass(frozen=True)
@@ -103,7 +108,7 @@ def suggestions_of(
             )
             continue
         seen.add(reading)
-        kept.append(suggestion)
+        kept.append(replace(suggestion, id=f"s{len(kept) + 1}"))
     return tuple(kept), tuple(dropped)
 
 
@@ -121,7 +126,9 @@ def _one(item: Any, field_name: str, build: Build) -> Suggestion:
     if not why:
         raise SuggestionError("missing_why", "a suggestion needs a short reason (why)")
     source = item.get("source")
-    return Suggestion(criterion, why, source if isinstance(source, str) and source else None)
+    return Suggestion(
+        criterion, why, source if isinstance(source, str) and source else None, part=part_tag(item)
+    )
 
 
 _PATH = {

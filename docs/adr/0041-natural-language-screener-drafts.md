@@ -309,6 +309,69 @@ notes that said "add" now say "suggest"). Largest golden prompt: 12,735 -> 12,87
 `EQUIVALENT_READINGS` names readings that select the same instruments (`is_etf eq true` /
 `security_type in [ETF]`), only `criteria` are scored, and the run reports the suggestions count.
 
+## Amended 2026-10-11: explained parts (the answer says which words each item comes from)
+
+Owner decision 2026-10-11 (`docs/decisions/log.md`, "Explained parts"): the review shows one card per
+part of the sentence, the trader's quoted words, then "We read this as...", then that part's rows. The
+words, the part an item belongs to and the kind of part must be the server's, because the browser
+derives nothing (ADR 0038) and a model's copy of the trader's words is not the trader's words.
+
+- **Model side** (additive, nullable, so every answer recorded before it still passes): the answer gains
+  `parts: [{id, words, reading}]` (`p1`... in sentence order, at most 12) and a nullable `part` on each
+  criterion, formula, missing item, unresolved term, suggestion and on `tie_break`. `PROMPT_VERSION` 8.
+  A malformed `part` is never a reason to drop its item. The criteria of an unresolved term's alternatives
+  carry none (the term has it).
+- **Served side** (`ScreenDraft.sentence` the whitespace-normalised text, `ScreenDraft.parts`, new folder
+  `services/drafting/parts/`): each part is `{id, words, start, end, reading, reading_source, kind, origin,
+  criteria, dropped, formulas, unresolved, missing, suggestions, rank}`. The lists only reference items of
+  the same draft (criteria ids, formula names, terms, the key or new slug of a missing request, the
+  server-assigned suggestion ids `s1`...); criteria, formulas, missing, unresolved and suggestions stay
+  the sources of truth. `parts` is null when the model gave none or none could be found, and the web then
+  shows today's panel. The `part` tag is never in `document.criteria`: criteria are rebuilt from the
+  known keys, so it cannot enter the saved spec or its hash (a test compares the document and its hash of
+  one answer with and without tags).
+- **Words** are the server's slice of the sentence. Each part's quoted words are found in order, after the
+  previous part: exact on word boundaries, then ignoring case, then token by token with one edit allowed
+  per token of four or more letters and no digit (a typo; also a swapped pair). A part whose words are not
+  found after the previous one (so also a reordered or overlapping one), are over 200 characters or are
+  malformed is dropped and its items fall back. `start` / `end` are **UTF-16 code units** (what the
+  browser's `slice` counts; Python counts code points, converted on the server, tested with accents and
+  an emoji). Text no part covers that holds a word other than glue (`and with plus also then that which
+  where whose who the a an &`) becomes a `not_understood` part, so nothing is silently dropped; at most 12
+  parts carry words (the last model parts give way).
+- **Attribution** is deterministic, in order: the part the model tagged the item with; else the part
+  whose words contain the item's `span` (unresolved, missing); else the first part whose words say a
+  phrasebook entry for the item's field; else a catch-all part with no words: `kept` for a criterion
+  carried over from the Builder's current document, `unplaced` for the rest. The default reading of an
+  unresolved term and the criterion of a rewritten duplicate formula follow their term or formula.
+- **Kind** is the server's, from the refs only: `needs_choice` (an unresolved term) over `formula` over
+  `not_available` (a missing request or a dropped criterion) over `applied` (a criterion or the
+  tie-break); a part with none of these is `not_understood`. Suggestions never change the kind and
+  never make a part understood. `origin` is `words` (a located part of the model), `gap` (words no part covers, always
+  `not_understood`), `kept` or `unplaced` (the two catch-alls, with no words).
+- **Reading** (the model's one line, clipped to 160 characters) is kept only when every number in it is
+  one of the part's own: a criterion's value or tolerance, a formula's number, a number in the name of
+  a field the part uses (the 20 of `ret_20d`), read with `%` as a fraction and `k` / `M` / `B` as their
+  multiple; a part with no rows of its own may repeat the numbers of its words. Else `reading` is null
+  and `reading_source` is `server` (the web shows the rows alone, which are always shown). A reading of a
+  part nothing points at is dropped.
+- **Rank**: `rank_by X` is a thing the trader says, so `tie_break` carries a `part` and a part holds
+  `rank: true`; without it "rank by ..." would show as not understood.
+- **Cost**: the prompt grows by 413 input tokens (the task text and both worked examples) and the
+  slice shrinks to hold the 13,000-token budget: `slice_for` now searches (halving) for the largest
+  slice whose whole prompt fits, where its eight fixed steps had stalled on a plateau (two golden
+  sentences were over 13,000 with the new text, 13,044 and 13,107). Every golden sentence is now at most
+  12,999 tokens with a trader's three own features and a padded backlog (cap 15,000). Output grows by a
+  line per part (about 40 tokens; the largest recorded answer plus 12 parts at their caps and the thinking allowance stays under 75% of the configured `answer_limit` of 8,000, a test; the 2,000 in `chat.py` is only a dataclass default the registry overrides); `why` and `notes` are kept (the Builder shows both: a dropped
+  criterion's reason ends with its `why`, and the notes are saved with the screen).
+- **Feedback** (ADR 0066): `draft_returned.payload.parts` keeps id, words, reading, kind, origin and
+  the item count of each part, clipped; the words and readings are personal text and go with the
+  payload under the same 12-month retention and the erase command.
+- **Golden scoring** never scores the text of a reading. The case's `expect.explained` names the parts
+  (words, kind, origin, optionally the reading source), the share of items the model placed itself and
+  the parts not understood; the live run reports the share of items the model placed itself, of its
+  parts located, the parts not understood and the share of readings that kept their numbers.
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.
