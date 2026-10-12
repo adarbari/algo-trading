@@ -369,6 +369,11 @@ def _call(
     )
     fields = frozenset(c["field"] for c in made.document["criteria"].values())
     drops = tuple(Drop(d.id, d.field, d.detail, d.kind) for d in made.dropped)
+    if made.stage == "phrasebook":  # no model was asked: nothing was metered or spent
+        return CallResult(
+            provider, case.id, "ok", graded.passed, fields, "phrasebook", cost_usd=0.0,
+            dropped=drops, suggestions=len(made.suggestions), parts=made.parts_stats,
+        )  # fmt: skip
     return _result(
         provider,
         case.id,
@@ -398,12 +403,7 @@ def _result(
     parts: PartsStats | None = None,
 ) -> CallResult:
     if got is None:
-        if status != "ok":
-            return CallResult(provider, case_id, status, error=error)
-        return CallResult(  # a draft the phrasebook made: no model was asked, nothing was spent
-            provider, case_id, status, passed, fields, "phrasebook", cost_usd=0.0,
-            dropped=dropped, suggestions=suggestions, parts=parts,
-        )  # fmt: skip
+        return CallResult(provider, case_id, status, error=error)
     return CallResult(
         provider, case_id, status, passed, fields, got.model, got.input_tokens,
         got.output_tokens, got.cache_read_tokens, got.cache_write_tokens, got.latency_s,

@@ -404,3 +404,4 @@ def test_a_sentence_the_phrasebook_resolves_is_served_and_logged_without_a_model
     returned = sink.rows[1]  # written as for a model draft, with no call id to point at
     assert not returned["call_ids"] and returned["sentence"] == "oversold stocks in an uptrend"
     assert json.loads(returned["payload"])["stage"] == "phrasebook"
+    assert returned["prompt_version"].startswith("phrasebook:")  # survives the payload's erasure

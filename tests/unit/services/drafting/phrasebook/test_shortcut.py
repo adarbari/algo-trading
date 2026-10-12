@@ -6,6 +6,7 @@ criterion the catalogue or the validator refuses) asks the model."""
 
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -18,7 +19,7 @@ from algotrade.core.model.completion import Completion
 from algotrade.services.drafting import screens
 from algotrade.services.drafting.golden import load_cases
 from algotrade.services.drafting.phrasebook.resolve import resolve
-from algotrade.services.drafting.phrasebook.shortcut import shortcut
+from algotrade.services.drafting.phrasebook.shortcut import phrasebook_version, shortcut
 from algotrade.services.drafting.screens import draft_screen
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.storage.factory import open_config_store
@@ -70,27 +71,68 @@ def ctx(golden_source: FixtureSource) -> ReadContext:
     return open_context(store.reader, store.configs, UserContext(store.user.user_id))
 
 
-def fields_of(draft: screens.ScreenDraft) -> list[tuple[str, str, Any]]:
-    return [(c["field"], c["op"], c.get("value")) for c in draft.document["criteria"].values()]
+def criteria_of(draft: screens.ScreenDraft) -> list[str]:
+    """The draft's criteria as sorted JSON, so a wrong extra or a missing one fails a test."""
+    return sorted(json.dumps(c, sort_keys=True) for c in draft.document["criteria"].values())
 
 
-# sentences of structured wordings only: (sentence, the criteria its words ask for, in file order)
+def expect(*criteria: dict[str, Any]) -> list[str]:
+    return sorted(json.dumps(c, sort_keys=True) for c in criteria)
+
+
+STOCKS = {"field": "instrument.security_type", "op": "in", "value": ["COMMON_STOCK", "ADR"]}
+ETFS = {"field": "instrument.security_type", "op": "in", "value": ["ETF"]}
+ACTIVE = {"field": "instrument.status", "op": "eq", "value": "ACTIVE"}
+# sentences of structured wordings only, and exactly the criteria they ask for (nothing else)
 RESOLVED = [
-    ("oversold stocks in an uptrend", [(RSI, "lt", 30), ("feature.trend_state", "eq", "UPTREND")]),
-    ("volatile small caps", [(CAP, "lt", 2_000_000_000), ("feature.atr_pct", "gte", 0.03)]),
-    ("low implied volatility ETFs", [("feature.iv_rank", "lte", 0.3)]),
-    ("large cap stocks near the 52-week high", [(CAP, "gte", 10_000_000_000)]),
-    ("stocks with earnings this week", [("rollup.earnings@v1.days_to_earnings", "lte", 5)]),
-]
+    (
+        "oversold stocks in an uptrend",
+        expect(
+            {"field": RSI, "op": "lt", "value": 30},
+            {"field": "feature.trend_state", "op": "eq", "value": "UPTREND"},
+            STOCKS, ACTIVE,
+        ),
+    ),
+    (
+        "volatile small caps",
+        expect(
+            {"field": CAP, "op": "lt", "value": 2_000_000_000},
+            {"field": "feature.atr_pct", "op": "gte", "value": 0.03},
+            ACTIVE,
+        ),
+    ),
+    (
+        "low implied volatility ETFs",
+        expect({"field": "feature.iv_rank", "op": "lte", "value": 0.3}, ETFS, ACTIVE),
+    ),
+    (
+        "large cap stocks near the 52-week high",
+        expect(
+            {"field": CAP, "op": "gte", "value": 10_000_000_000},
+            {
+                "field": "feature.pct_from_high_52w", "op": "gte", "value": -0.1,
+                "mode": "soft", "tolerance": 0.05,
+            },
+            STOCKS, ACTIVE,
+        ),
+    ),
+    (
+        "stocks with earnings this week",
+        expect(
+            {"field": "rollup.earnings@v1.days_to_earnings", "op": "lte", "value": 5},
+            STOCKS, ACTIVE,
+        ),
+    ),
+]  # fmt: skip
 
 
 @pytest.mark.parametrize(("sentence", "asked"), RESOLVED, ids=[s for s, _ in RESOLVED])
 def test_a_sentence_the_phrasebook_resolves_is_drafted_without_the_model(
-    ctx: ReadContext, sentence: str, asked: list[tuple[str, str, Any]]
+    ctx: ReadContext, sentence: str, asked: list[str]
 ) -> None:
     draft = draft_screen(ctx, Forbidden(), "mine", sentence)
     assert draft.stage == "phrasebook" and draft.call_id is None  # no call, no ledger row to name
-    assert all(a in fields_of(draft) for a in asked)  # what the words ask for, thresholds exact
+    assert criteria_of(draft) == asked  # what the words ask for, thresholds exact, nothing more
     assert not draft.dropped and not draft.formulas and not draft.missing and not draft.unresolved
     assert draft.document["id"] == "mine" and draft.sentence == sentence
     assert draft.parts and draft.parts_stats is None  # no model made them
@@ -107,11 +149,11 @@ def test_the_scaffolding_the_prompt_asks_of_the_model_is_there_without_words(
     ctx: ReadContext,
 ) -> None:
     draft = draft_screen(ctx, Forbidden(), "mine", "oversold")
-    assert ("instrument.status", "eq", "ACTIVE") in fields_of(draft)
+    assert criteria_of(draft) == expect({"field": RSI, "op": "lt", "value": 30}, ACTIVE)
     (active,) = [p for p in draft.parts or () if p.origin == "unplaced"]
     assert active.criteria == ("active",) and active.words == ""
     stocks = draft_screen(ctx, Forbidden(), "mine", "oversold stocks")  # "stocks" says it
-    assert [f for f, _, _ in fields_of(stocks)].count("instrument.status") == 1
+    assert criteria_of(stocks) == expect({"field": RSI, "op": "lt", "value": 30}, STOCKS, ACTIVE)
 
 
 @pytest.mark.parametrize(
@@ -119,7 +161,11 @@ def test_the_scaffolding_the_prompt_asks_of_the_model_is_there_without_words(
     [
         "oversold stocks without earnings this week",  # a negation
         "oversold or overbought stocks",  # "or"
-        "stocks cheaper than their peers that are oversold",  # a comparative
+        "less volatile small caps",  # a comparative: only "less" is not covered
+        "pullback in a downtrend",  # the pullback implies an uptrend: two regimes
+        "volatile to squeeze",  # a range: "to" is never filler
+        "from oversold to uptrend",
+        "around oversold",
         "stocks that are oversold, then breakout",  # a sequence
         "oversold stocks over 5 dollars",  # a number nobody covers
         "oversold stocks with a good story",  # a word nobody covers
@@ -155,6 +201,65 @@ def test_current_criteria_are_kept_and_added_to(ctx: ReadContext) -> None:
     assert next(iter(draft.document["criteria"])) == "cap"
     assert {c for p in draft.parts or () if p.origin == "kept" for c in p.criteria} == {"cap"}
     assert any(p.words == "oversold" and p.criteria == ("rsi_14",) for p in draft.parts or ())
+
+
+PULLBACK = {"criteria": {"pb": {"field": "feature.pullback_to_sma20", "op": "eq", "value": True}}}
+
+
+def test_a_current_pullback_and_a_downtrend_in_the_sentence_are_the_models(
+    ctx: ReadContext,
+) -> None:
+    """The pullback entry implies an uptrend: the Builder's pullback row contradicts the words."""
+    model = Canned()
+    draft = draft_screen(ctx, model, "mine", "downtrend", PULLBACK)
+    assert model.asked == 1 and draft.stage == "model"
+    ok = draft_screen(ctx, Forbidden(), "mine", "oversold", PULLBACK)  # nothing contradicts
+    assert ok.stage == "phrasebook" and "pb" in ok.document["criteria"]
+
+
+def test_the_status_scaffolding_the_builder_already_has_does_not_stop_the_shortcut(
+    ctx: ReadContext,
+) -> None:
+    current = {"criteria": {"active": dict(ACTIVE)}}
+    draft = draft_screen(ctx, Forbidden(), "mine", "oversold ETFs", current)
+    assert draft.stage == "phrasebook"
+    assert criteria_of(draft) == expect({"field": RSI, "op": "lt", "value": 30}, ETFS, ACTIVE)
+    assert all(p.kind == "applied" for p in draft.parts or ())  # the row sits with the words
+
+
+def test_a_no_model_draft_is_stamped_with_the_book_that_made_it(ctx: ReadContext) -> None:
+    draft = draft_screen(ctx, Forbidden(), "mine", "oversold")
+    assert draft.prompt_version == phrasebook_version(BOOK) != screens.PROMPT_VERSION
+    assert draft.prompt_version.startswith("phrasebook:") and len(draft.prompt_version) == 19
+    i = next(n for n, p in enumerate(BOOK) if p.criteria)
+    other = [*BOOK]
+    other[i] = replace(BOOK[i], criteria=())  # an entry's criteria are what the book says
+    assert phrasebook_version(other) != phrasebook_version(BOOK)
+    other[i] = replace(BOOK[i], hint="reworded")  # a hint is not read by the shortcut
+    assert phrasebook_version(other) == phrasebook_version(BOOK)
+
+
+def test_a_model_draft_keeps_the_prompt_version(ctx: ReadContext) -> None:
+    assert draft_screen(ctx, Canned(), "mine", "oversold or overbought").prompt_version == (
+        screens.PROMPT_VERSION
+    )
+
+
+@pytest.mark.parametrize(
+    "current",
+    [
+        {"criteria": [{"field": CAP}]},  # not a table of criteria
+        {"criteria": {"cap": "gte"}},  # not a criterion
+        {"criteria": {"cap": {"field": CAP, "op": "gte", "value": {"x": 1}}}},  # not a value
+    ],
+)
+def test_a_malformed_current_never_fails_the_draft(
+    ctx: ReadContext, current: Mapping[str, Any]
+) -> None:
+    """A Builder document is whatever the client sent: the model answers, no error."""
+    model = Canned()
+    draft_screen(ctx, model, "mine", "oversold", current)
+    assert model.asked == 1
 
 
 @pytest.mark.parametrize(

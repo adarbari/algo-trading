@@ -40,6 +40,7 @@ MEANING_WORDS = frozenset(
             "followed",
             "by",
         ),
+        *("from", "to", "about", "around", "within", "between"),  # ranges and approximations
     ]
 )
 _MEANING = frozenset(stem(w) for w in MEANING_WORDS) | MEANING_WORDS

@@ -383,12 +383,13 @@ validator, attribution, parts). `PROMPT_VERSION` is unchanged (the prompt is). A
 splits a meaning (negation, a comparative, "or", "then"), a number or word no entry covers, an
 entry with alternatives, two entries that disagree or share a criterion, a phrase said twice, a
 criterion the caller's catalogue or the validator refuses, and a phrase on a field the Builder's
-`current` criteria already hold all go to the model; `current` is kept as it was and added to. The
+`current` criteria already hold all go to the model; `current` is kept as it was and added to; a sentence that contradicts what an entry implies of a `current` row (the pullback entry also says `trend_state eq UPTREND`) goes to the model, and so do the range and approximation words (`from`, `to`, `around`, `within`, `between`), which are never filler. The
 `instrument.status` = `ACTIVE` scaffolding the task text asks of the model is added when no entry
 says it. The parts' readings are built from the entries' criteria and served with `reading_source`
 `server` (the web marks them "check this reading"). The draft has `stage` `phrasebook`, no `call_id`
-(there is no ledger row to point at: it cost nothing) and the `draft_returned` payload says
-`"stage": "phrasebook"`; the request and feedback events are written as for any draft. Golden
+(there is no ledger row to point at: it cost nothing), a `prompt_version` of `phrasebook:<hash of the
+structured entries>` on its `draft_returned` row (the version survives the payload's erasure) and the
+payload says `"stage": "phrasebook"`; the request and feedback events are written as for any draft. Golden
 replay and the live run score such a case as any draft (model `phrasebook`, cost 0): it says
 nothing about a provider.
 

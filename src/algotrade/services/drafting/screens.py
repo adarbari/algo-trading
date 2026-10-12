@@ -57,7 +57,11 @@ from algotrade.services.drafting.parts.build import build_parts
 from algotrade.services.drafting.parts.items import items_of
 from algotrade.services.drafting.parts.model import Part, PartsStats, part_tag
 from algotrade.services.drafting.phrasebook.resolve import resolve
-from algotrade.services.drafting.phrasebook.shortcut import served, shortcut
+from algotrade.services.drafting.phrasebook.shortcut import (
+    phrasebook_version,
+    served,
+    shortcut,
+)
 from algotrade.services.drafting.prompt import (
     PROMPT_VERSION,
     index_group,
@@ -118,6 +122,7 @@ class ScreenDraft:
     notes: tuple[str, ...]
     call_id: str | None = None  # the text-model call that made it (usage/llm_calls, ADR 0066)
     stage: str = "model"  # what made it: "model", or "phrasebook" (no call, no call_id, no cost)
+    prompt_version: str = PROMPT_VERSION  # "phrasebook:<hash of the book>" for a no-model draft
     formulas: tuple[DraftFormula, ...] = ()  # B1: pending, not in the document
     formulas_dropped: tuple[DroppedFormula, ...] = ()
     missing: tuple[MissingFeature, ...] = ()  # B2 / C: asked for, not buildable here
@@ -208,7 +213,7 @@ def _from_phrasebook(
     outside this caller's catalogue or a criterion the validator refuses is not served from the
     phrasebook, the model is asked."""
     resolution = resolve(sentence, phrasebook)
-    quick = None if resolution is None else shortcut(resolution, sentence, current)
+    quick = None if resolution is None else shortcut(resolution, sentence, current, phrasebook)
     if quick is None:
         return None
     try:
@@ -221,7 +226,17 @@ def _from_phrasebook(
     parts = None if draft.dropped or not draft.parts else served(draft.parts, quick)
     if parts is None:
         return None
-    return _finished(ctx, replace(draft, parts=parts, parts_stats=None, stage="phrasebook"), None)
+    return _finished(
+        ctx,
+        replace(
+            draft,
+            parts=parts,
+            parts_stats=None,
+            stage="phrasebook",
+            prompt_version=phrasebook_version(phrasebook),
+        ),
+        None,
+    )
 
 
 def _finished(ctx: ReadContext, final: ScreenDraft, call_id: str | None) -> ScreenDraft:

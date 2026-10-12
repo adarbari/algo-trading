@@ -12,16 +12,20 @@ cap; words nothing explains. The ``instrument.status`` = ``ACTIVE`` scaffolding 
 always asks of the model is added when no entry says it (an ``unplaced`` row, as for the model).
 Pure; no model, no storage."""
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
+from algotrade.config.site.llm import Phrase
 from algotrade.core.model.predicates import NO_VALUE_OPS
 from algotrade.services.drafting.answer_schema import check_criterion
 from algotrade.services.drafting.parts.model import MAX_PARTS, MAX_READING, Part
 from algotrade.services.drafting.parts.spans import CONNECTORS
-from algotrade.services.drafting.phrasebook.resolve import FILLER, Resolution
+from algotrade.services.drafting.phrasebook.consistency import compatible
+from algotrade.services.drafting.phrasebook.resolve import FILLER, Resolution, is_structured
 from algotrade.services.drafting.retrieval import stem
 
 STATUS = "instrument.status"
@@ -46,7 +50,10 @@ class Shortcut:
 
 
 def shortcut(
-    resolution: Resolution, sentence: str, current: Mapping[str, Any] | None
+    resolution: Resolution,
+    sentence: str,
+    current: Mapping[str, Any] | None,
+    phrasebook: Sequence[Phrase] = (),
 ) -> Shortcut | None:
     """The answer for ``resolution`` over ``sentence`` and the Builder's ``current`` document, or
     ``None`` when the model should answer (see the module docstring)."""
@@ -56,15 +63,18 @@ def shortcut(
     if kept is None:
         return None
     held_fields = {c["field"] for c in kept if isinstance(c.get("field"), str)}
+    held = {_norm(c) for c in kept}  # what the Builder already has, to the letter
     owner: dict[tuple[str, str], int] = {}
     criteria: list[dict[str, Any]] = []
     parts: list[dict[str, Any]] = []
     readings: dict[str, str] = {}
     for n, claim in enumerate(resolution.claims, 1):
         mine = [c.as_answer() for c in claim.phrase.criteria]
-        if not mine or any(c["field"] in held_fields for c in mine):  # current: the model decides
-            return None
+        if not mine or any(c["field"] in held_fields and _norm(c) not in held for c in mine):
+            return None  # a field current has, read otherwise: the model decides
         for c in mine:
+            if _norm(c) in held:  # the Builder's own row says it (the status scaffolding)
+                continue
             key = (c["field"], c["op"])
             if key in owner:  # two places, or two entries, say one criterion
                 return None
@@ -73,12 +83,58 @@ def shortcut(
         parts.append({"id": f"p{n}", "words": words, "reading": None})
         readings[f"p{n}"] = _reading(mine)
     for c in resolution.criteria:  # file order, as the resolution gives them
+        if _norm(c) in held:
+            continue
         criteria.append({**c, "part": f"p{owner[(c['field'], c['op'])]}"})
+    if _contradicts_current(kept, resolution.criteria, phrasebook):
+        return None
     if STATUS not in held_fields | {c["field"] for c in criteria}:
         criteria.append(dict(ACTIVE))
     return Shortcut(
         {"criteria": [*kept, *criteria], "tie_break": None, "notes": [], "parts": parts}, readings
     )
+
+
+def phrasebook_version(phrasebook: Sequence[Phrase]) -> str:
+    """The version a no-model draft is stamped with in place of a prompt version:
+    ``phrasebook:`` and a short hash of the structured entries (wordings, criteria, alternatives),
+    so a stored draft says which book made it even when its payload is gone."""
+    entries = [
+        asdict(replace(phrase, fields=(), hint=""))  # only what the shortcut reads
+        for phrase in phrasebook
+        if is_structured(phrase)
+    ]
+    text = json.dumps(entries, sort_keys=True, default=str)
+    return "phrasebook:" + hashlib.sha256(text.encode()).hexdigest()[:8]
+
+
+def _norm(criterion: Mapping[str, Any]) -> str:
+    """A criterion as text, a hard mode and an absent one the same."""
+    keys = {k: criterion[k] for k in KEPT_KEYS if criterion.get(k) is not None}
+    return json.dumps({"mode": "hard", **keys}, sort_keys=True, default=str)
+
+
+def _reading_of(c: Mapping[str, Any]) -> tuple[Any, Any, Any]:
+    value = c.get("value")
+    return c.get("field"), c.get("op"), tuple(value) if isinstance(value, list) else value
+
+
+def _contradicts_current(
+    kept: Sequence[Mapping[str, Any]],
+    asked: Sequence[Mapping[str, Any]],
+    phrasebook: Sequence[Phrase],
+) -> bool:
+    """Whether what the sentence asks can never hold with what a Builder criterion implies: a
+    structured entry says a criterion (``pullback_to_sma20 eq true``) together with the others
+    it implies (``trend_state eq UPTREND``), so a ``current`` that holds the one holds the rest
+    too. The status scaffolding implies nothing (it is on every screen). A false implication
+    only sends the sentence to the model."""
+    held = {_reading_of(c) for c in kept if c.get("field") != STATUS}
+    for phrase in phrasebook:
+        entry = [c.as_answer() for c in phrase.criteria]
+        if any(_reading_of(c) in held for c in entry) and not compatible([*entry, *asked]):
+            return True
+    return False
 
 
 def _kept(current: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:

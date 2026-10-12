@@ -571,8 +571,8 @@ def test_json_never_carries_a_text_value_or_a_non_string_why(tmp_path: Path) -> 
 
 
 def test_a_draft_made_without_the_model_is_scored_and_costs_nothing() -> None:
-    """A sentence the phrasebook resolves never reaches the model (``Recording.last`` stays
-    ``None``): the case is still scored, with no tokens and a zero cost, never silently failed."""
+    """A draft the phrasebook made (``stage``, not the absence of a completion, says so) is still
+    scored, with no tokens and a zero cost, never silently failed."""
     costs = CostTap()
     scripted = Scripted([GOOD], costs)
 
