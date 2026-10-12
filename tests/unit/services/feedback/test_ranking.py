@@ -141,3 +141,13 @@ def test_read_order_never_decides_the_latest_row() -> None:
     ]
     results = {rank(list(p), BACKLOG, TODAY) for p in itertools.permutations(rows)}
     assert len(results) == 1
+
+
+def test_first_seen_is_the_earliest_ask_across_users() -> None:
+    rows = [
+        RequestRow("a", "x", date(2026, 10, 1)),
+        RequestRow("b", "x", date(2026, 9, 20)),
+        RequestRow("a", "x", date(2026, 10, 5)),
+    ]
+    [one] = rank(rows, FeatureBacklogSettings(), date(2026, 10, 8))
+    assert (one.first_seen, one.last_seen) == (date(2026, 9, 20), date(2026, 10, 5))

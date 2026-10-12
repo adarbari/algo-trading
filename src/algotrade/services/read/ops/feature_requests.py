@@ -8,7 +8,9 @@ and last asked, times asked), for a trader and an admin alike, and never a count
 another user; ``load_ranked_requests`` is the admin's ordered list across users (score, distinct
 users, last seen, feasibility, status from the backlog, unmapped slugs flagged), and a trader
 asking for it gets ``PermissionDeniedError``. The ranking itself is ``services/feedback/ranking``.
-A column an older partition lacks reads as null."""
+A column an older partition lacks reads as null. ``load_feature_requests`` is the admin page's
+read object (``FeatureRequestList``): the ranking as rows, **counts only** (never a user id or a
+span), over the date range ending today."""
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -43,6 +45,35 @@ class MyRequest:
     last_asked: date
     times_asked: int
     promoted_to: str = ""
+
+
+@dataclass(frozen=True)
+class FeatureRequestRow:
+    """One feature in the admin list, counts only: ``rank`` 1-based in the ranking's order;
+    ``ref`` the backlog key (else the unmapped slug); ``users`` the distinct askers, ``times_asked``
+    the distinct (user, day) asks; ``status`` OPEN / PROMOTED / WONT_DO or UNMAPPED."""
+
+    rank: int
+    ref: str
+    description: str
+    feasibility: str
+    score: float
+    users: int
+    times_asked: int
+    first_seen: date | None
+    last_seen: date
+    status: str
+    promoted_to: str
+    unmapped: bool
+
+
+@dataclass(frozen=True)
+class FeatureRequestList:
+    """The ranked requests of the last ``days`` days up to ``today``, an admin's view."""
+
+    today: date
+    days: int
+    rows: tuple[FeatureRequestRow, ...]
 
 
 def _stored(ctx: Stores, since: date, today: date) -> pd.DataFrame:
@@ -107,3 +138,29 @@ def load_ranked_requests(
     today = today or exchange_date(datetime.now(UTC))
     frame = _stored(ctx, today - timedelta(days=days), today)
     return rank(_rows(frame), load_feature_backlog(ctx.configs), today)
+
+
+def load_feature_requests(
+    ctx: Stores, viewer: Viewer, today: date | None = None, days: int = WINDOW_DAYS
+) -> FeatureRequestList:
+    """The ranked list as rows for the admin page (``PermissionDeniedError`` for anyone else)."""
+    today = today or exchange_date(datetime.now(UTC))
+    ranked = load_ranked_requests(ctx, viewer, today, days)
+    rows = tuple(
+        FeatureRequestRow(
+            rank=i,
+            ref=r.ref,
+            description=r.description,
+            feasibility=r.feasibility,
+            score=r.score,
+            users=r.users,
+            times_asked=r.requests,
+            first_seen=r.first_seen,
+            last_seen=r.last_seen,
+            status=r.status,
+            promoted_to=r.promoted_to,
+            unmapped=r.unmapped,
+        )
+        for i, r in enumerate(ranked, start=1)
+    )
+    return FeatureRequestList(today=today, days=days, rows=rows)

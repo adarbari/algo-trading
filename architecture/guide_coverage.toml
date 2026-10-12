@@ -297,6 +297,10 @@ exempt = "free text: the regime label in plain words, the Guide's regime term ex
 source = "graphql:TrackRecord.runLabel"
 exempt = "free text: the run's name"
 
+[[enum]]
+source = "graphql:FeatureRequestRow.status"
+exempt = "admin-only Feature requests page: the backlog status of a requested feature (OPEN, PROMOTED, WONT_DO, UNMAPPED); the Guide entry ships with the web page (ADR 0066)"
+
 # ------------------------------------------------------------------ sections
 
 [[section]]
