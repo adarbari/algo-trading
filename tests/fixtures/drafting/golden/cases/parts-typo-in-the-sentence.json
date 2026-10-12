@@ -1,0 +1,70 @@
+{
+  "id": "parts-typo-in-the-sentence",
+  "sentence": "optionable stocks with strong momemtum and a price over $8",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "optionable",
+        "bucket": "A",
+        "fields": [
+          "instrument.optionable"
+        ],
+        "op": "eq",
+        "value": true,
+        "tolerance": 0
+      },
+      {
+        "span": "strong momentum",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.ret_20d"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0,
+        "tolerance": 0
+      },
+      {
+        "span": "price over $8",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 8,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "optionable stocks",
+          "kind": "applied",
+          "origin": "words"
+        },
+        {
+          "words": "strong momemtum",
+          "kind": "applied",
+          "origin": "words"
+        },
+        {
+          "words": "price over $8",
+          "kind": "applied",
+          "origin": "words"
+        }
+      ],
+      "model_share": 1.0
+    }
+  }
+}

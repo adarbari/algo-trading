@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.services.drafting.parts.model import Part
 from algotrade.services.feedback.chains import linked_sessions
 from algotrade_api import feedback
 from algotrade_api.feedback import DraftMemory, Remembered
@@ -61,6 +62,32 @@ def test_returned_records_the_draft_and_remembers_it() -> None:
     assert payload["draft_criteria"] == {"criteria": {"price": P}, "rank": None}
     assert payload["notes"] == [] and row["seq"] == 1
     assert memory.get("s1", "abhi", "mine") is not None
+
+
+def test_returned_keeps_the_explained_parts_clipped_in_the_payload() -> None:
+    """The trader's words and the model's readings of them are personal text: they are in the
+    payload (nulled by retention with it), never a column of their own, and clipped."""
+    sink, memory = Keep(), DraftMemory()
+    parts = [Part("p1", "over $5", 0, 7, "Price above $5", "model", "applied", "words", ("price",))]
+    feedback.record_returned(
+        sink, memory, "s1", "abhi", "mine", "over $5", DOC, [], ("c1",), FEATURES, "8",
+        parts=feedback.parts_payload(parts),
+    )  # fmt: skip
+    payload = json.loads(sink.rows[0]["payload"])
+    assert payload["parts"] == [
+        {"id": "p1", "words": "over $5", "reading": "Price above $5", "kind": "applied",
+         "origin": "words", "items": 1}
+    ]  # fmt: skip
+    huge = [
+        Part(f"p{n}", "w" * 200, 0, 200, "r" * 160, "model", "applied", "words") for n in range(12)
+    ]
+    feedback.record_returned(
+        sink, memory, "s2", "abhi", "mine", "over $5", DOC, [], ("c1",), FEATURES, "8",
+        parts=feedback.parts_payload(huge * 3),
+    )  # fmt: skip
+    assert json.loads(sink.rows[1]["payload"])["parts"]["truncated"] is True  # bounded, not failed
+    returned(sink, memory, "s3")
+    assert "parts" not in json.loads(sink.rows[2]["payload"])  # none: nothing recorded
 
 
 def test_a_save_records_the_diff_and_an_unchanged_autosave_records_nothing_more() -> None:

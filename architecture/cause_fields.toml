@@ -146,6 +146,16 @@ surface = "rest"
 reason = "a protective check the drafting model offers on the caller's own sentence, never applied"
 
 [[fact]]
+name = "Part.unresolved"
+surface = "rest"
+reason = "the terms of the caller's own ambiguous words that belong to this part: ids of items in the same response, no cause"
+
+[[fact]]
+name = "Part.missing"
+surface = "rest"
+reason = "the keys of the caller's own missing-feature requests that belong to this part: ids of items in the same response, no cause"
+
+[[fact]]
 name = "Suggestion.why"
 surface = "rest"
 reason = "the model's short reason for a suggested check, from the field guide caveat"

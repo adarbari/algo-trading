@@ -22,11 +22,12 @@ writes nothing."""
 import json
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
 from algotrade.config.site.drafting.backlog import open_keys
+from algotrade.config.site.llm import Phrase
 from algotrade.config.site.settings import (
     load_feature_backlog,
     load_field_guide,
@@ -48,6 +49,9 @@ from algotrade.services.drafting.formulas import (
     dry_run_all,
 )
 from algotrade.services.drafting.gaps import MissingFeature, Unresolved, missing_of, unresolved_of
+from algotrade.services.drafting.parts.build import build_parts
+from algotrade.services.drafting.parts.items import items_of
+from algotrade.services.drafting.parts.model import Part, PartsStats, part_tag
 from algotrade.services.drafting.prompt import (
     PROMPT_VERSION,
     index_group,
@@ -113,6 +117,9 @@ class ScreenDraft:
     unresolved: tuple[Unresolved, ...] = ()  # ambiguous terms; the document has the default
     suggestions: tuple[Suggestion, ...] = ()  # soft / score checks offered, never in the document
     suggestions_dropped: tuple[DroppedSuggestion, ...] = ()
+    sentence: str = ""  # the whitespace-normalised sentence the parts' offsets count in
+    parts: tuple[Part, ...] | None = None  # explained parts; None: the model gave none
+    parts_stats: PartsStats | None = None  # how they were made (golden scoring; never served)
 
 
 def draft_screen(
@@ -143,7 +150,7 @@ def draft_screen(
     drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
 
     def check(text: str) -> None:
-        drafted.append((text, _draft(ctx, screener_id, text, infos)))
+        drafted.append((text, _draft(ctx, screener_id, text, infos, sentence, phrasebook, current)))
 
     def accept(text: str) -> None:
         """The chain's check of an answer: a draft we can use, else ``InvalidAnswerError``."""
@@ -183,10 +190,19 @@ def _finished(ctx: ReadContext, final: ScreenDraft, call_id: str | None) -> Scre
     )  # one id: every attempt of the call
 
 
-def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, Any]) -> ScreenDraft:
+def _draft(
+    ctx: ReadContext,
+    screener_id: str,
+    text: str,
+    infos: Mapping[str, Any],
+    sentence: str = "",
+    phrasebook: Sequence[Phrase] = (),
+    current: Mapping[str, Any] | None = None,
+) -> ScreenDraft:
     proposal = parse_answer(text)
     catalogue = set(infos)
-    criteria, dropped = criteria_of(proposal, catalogue)
+    tags: dict[str, str | None] = {}  # criterion id -> the part the model tagged it with
+    criteria, dropped = criteria_of(proposal, catalogue, tags)
     formulas = check_formulas(
         ctx, proposal, lambda raw, name: _criterion(raw, name, catalogue | {name})
     )
@@ -194,9 +210,12 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
         proposal, catalogue, lambda raw, name: _alternative(ctx, screener_id, raw, name, catalogue)
     )
     missing, missing_notes = missing_of(proposal, load_feature_backlog(ctx.configs), catalogue)
-    for criterion in formulas.rewritten.values():  # a duplicate formula: the existing field
-        criteria[_criterion_id(None, criterion["field"], len(criteria) + 1, criteria)] = criterion
+    for name, criterion in formulas.rewritten.items():  # a duplicate formula: the existing field
+        key = _criterion_id(None, criterion["field"], len(criteria) + 1, criteria)
+        criteria[key] = criterion
+        tags[key] = formulas.rewritten_parts.get(name)
     placed: dict[str, str] = {}  # unresolved term -> the id of its default in the criteria
+    spans: dict[str, str] = {}  # that criterion id -> the words of the term it stands for
     for term in unresolved:  # the reading the draft starts with
         default = term.alternatives[term.default_index].criterion
         same = [k for k, c in criteria.items() if _reading(c) == _reading(default)]
@@ -205,6 +224,7 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
             continue
         key = _criterion_id(term.term.lower().replace(" ", "_"), default["field"], 0, criteria)
         criteria[key] = default
+        tags[key], spans[key] = term.part, term.span
         placed[term.term] = key
     document: dict[str, Any] = {
         "id": screener_id,
@@ -226,11 +246,20 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
     notes = (
         *notes_of(proposal), *formulas.notes, *unresolved_notes, *missing_notes, *reset_notes
     )  # fmt: skip
+    tie = proposal.get("tie_break")
+    items = items_of(
+        document["criteria"], tags, current, [(d.id, d.field) for d in dropped],
+        formulas.formulas, unresolved, missing, suggestions,
+        (part_tag(tie), rank["tie_break"]) if rank else None, spans,
+    )  # fmt: skip
+    explained = build_parts(sentence, proposal.get("parts"), items, phrasebook)
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
         missing=missing, unresolved=unresolved,
         suggestions=suggestions, suggestions_dropped=suggestions_dropped,
+        sentence=sentence, parts=explained[0] if explained else None,
+        parts_stats=explained[1] if explained else None,
     )  # fmt: skip
 
 
@@ -291,10 +320,12 @@ def parse_answer(answer: str) -> Mapping[str, Any]:
 
 
 def criteria_of(
-    proposal: Mapping[str, Any], catalogue: set[str]
+    proposal: Mapping[str, Any], catalogue: set[str], tags: dict[str, str | None] | None = None
 ) -> tuple[dict[str, dict[str, Any]], tuple[DroppedCriterion, ...]]:
     """The proposed criteria as the draft's ``criteria`` table, and the ones dropped (a field
-    outside the catalogue, an unknown op or mode, a value of the wrong shape)."""
+    outside the catalogue, an unknown op or mode, a value of the wrong shape). ``tags``, when
+    given, is filled with the part id the model gave each criterion id (explained parts); the
+    ``part`` never enters the criterion, so never the saved spec or its hash."""
     kept: dict[str, dict[str, Any]] = {}
     dropped: list[DroppedCriterion] = []
     for n, raw in enumerate(proposal["criteria"], 1):
@@ -302,6 +333,8 @@ def criteria_of(
         raw_field = item.get("field")
         field_name: str = raw_field if isinstance(raw_field, str) else ""
         cid = _criterion_id(item.get("id"), field_name, n, kept)
+        if tags is not None:
+            tags[cid] = part_tag(item)
         why = f" ({item['why']})" if isinstance(item.get("why"), str) and item["why"] else ""
         try:
             if (shape := check_criterion(item)) is not None:
