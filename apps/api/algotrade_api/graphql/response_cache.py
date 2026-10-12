@@ -9,7 +9,8 @@ configs, the same for every caller of a role: market and regime history, prices,
 ``USER_OPERATIONS`` (published tables and configs that depend on the caller's catalogue or
 configs: user features, the Guide's field entries), ``RUN_OPERATIONS`` (they also read run
 records or jobs: nightly runs, ingestion, screener runs and results, ideas, edges, status) and
-``NEVER_CACHED`` (the text model's usage, which reads the clock, and the caller's identity). The
+``NEVER_CACHED`` (the text model's usage and the Describe-it request ranking, which read the
+clock, and the caller's identity). The
 key (``response_key``) is the published state (``StoreReader.visible_seq()``), the writes the
 API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
 the routes that write: a config save changes the caller's next read without a publish), a hash
@@ -145,7 +146,9 @@ CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", 
 # POST records them, and a draft writes nothing the cache keys on; the window reads the clock).
 # A new operation is never in this group by default: the classification test fails until it is
 # placed.
-NEVER_CACHED: frozenset[str] = frozenset({"LlmUsage", "Viewer", "MyFeatureRequests"})
+NEVER_CACHED: frozenset[str] = frozenset(
+    {"FeatureRequests", "LlmUsage", "Viewer", "MyFeatureRequests"}
+)
 # The route packages whose endpoints write (configs, screen results, evaluations); a preview,
 # a draft or an explain POST writes nothing the cache keys on.
 WRITE_PACKAGES = (
