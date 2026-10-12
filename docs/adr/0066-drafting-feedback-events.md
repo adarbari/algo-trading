@@ -204,7 +204,8 @@ Owner policy decided 2026-10-11.
   mapped ones.
 - **Wiring**: the route layer calls `record_missing(sink, user, draft.missing, ...)` after the draft
   answer (`services/drafting` imports nothing of `services/feedback`); GraphQL and the web come
-  later.
+  later. *Status (2026-10-11): shipped.* `Query.featureRequests` (AdminOnly, NEVER_CACHED, counts only, plus `first_seen`)
+  and the Admin Feature requests page now exist; no decision changed.
 
 **Note (2026-10-11): the route records requests.** `draft-from-text` now calls `record_missing` for the
 draft's post-validation `missing` (never the model's raw list) after the feedback events, for the user

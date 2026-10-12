@@ -26,8 +26,6 @@ export const TRADER: Workspace = {
     {
       path: '/ideas',
       label: 'Ideas',
-      summary:
-        "Home: screeners ranked in the user's priority order and a combined ranked list of top ideas.",
     },
     {
       path: '/screeners',
