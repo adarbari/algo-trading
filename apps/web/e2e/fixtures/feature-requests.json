@@ -1,0 +1,34 @@
+{
+  "today": "2026-10-11",
+  "days": 365,
+  "rows": [
+    {
+      "rank": 1,
+      "ref": "realised_vol_20d",
+      "description": "Realised volatility over 20 sessions",
+      "feasibility": "ROLLUP_FROM_STORED",
+      "score": 2.31,
+      "users": 3,
+      "timesAsked": 5,
+      "firstSeen": "2026-09-02",
+      "lastSeen": "2026-10-09",
+      "status": "OPEN",
+      "promotedTo": "",
+      "unmapped": false
+    },
+    {
+      "rank": 2,
+      "ref": "rsi_14",
+      "description": "RSI over 14 sessions",
+      "feasibility": "ROLLUP_FROM_STORED",
+      "score": 0.6,
+      "users": 1,
+      "timesAsked": 1,
+      "firstSeen": null,
+      "lastSeen": "2026-10-01",
+      "status": "PROMOTED",
+      "promotedTo": "rollup.momentum@v1.rsi_14",
+      "unmapped": false
+    }
+  ]
+}

@@ -19,6 +19,6 @@ export function placeholderRoute<P extends AnyRoute>(
   return createRoute({
     getParentRoute: () => parent,
     path,
-    component: () => <PlaceholderPage title={label} summary={summary} />,
+    component: () => <PlaceholderPage title={label} summary={summary ?? ''} />,
   });
 }
