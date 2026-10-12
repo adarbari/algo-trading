@@ -51,11 +51,6 @@ type Clock = Callable[[], float]
 type Outcome = Literal["ok", "missing", "error"]
 
 
-def limiter_sleep() -> Sleep:
-    """The real sleep a ``Limiter`` waits with by default."""
-    return time.sleep
-
-
 @dataclass(frozen=True)
 class Pacing:
     """One key's pacing rules (from ``config/site/sources.toml``, built by the registry).

@@ -42,7 +42,7 @@ from algotrade_sources.framework.http import (
     urllib_transport,
     with_query_param,
 )
-from algotrade_sources.framework.limiter import DEFAULT_DIR, Limiter, Pacing, limiter_sleep
+from algotrade_sources.framework.limiter import DEFAULT_DIR, Limiter, Pacing
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.llm.claude_cli import ClaudeCli
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
@@ -602,12 +602,9 @@ def build_claude_cli(
     return ClaudeCli(command, model, env, timeout_s, retries, provider, structured=structured)
 
 
-def build_pauser(
-    key: str, directory: Path | None = None, sleep: Callable[[float], None] | None = None
-) -> Callable[[float], None]:
+def build_pauser(key: str, directory: Path | None = None) -> Callable[[float], None]:
     """A ``pause(seconds)`` for an owner-run tool that waits between its own calls (the golden
     run's ``--pace`` / ``--batch-pause`` / a 429): the ``key`` limiter holds for the seconds and
     waits them out (``Limiter.pause``), so the wait is the framework's, not a ``sleep`` in the
-    tool. ``directory`` and ``sleep`` are for tests."""
-    limiter = Limiter(key, Pacing(0.0), directory or DEFAULT_DIR, sleep or limiter_sleep())
-    return limiter.pause
+    tool. ``directory`` is for tests."""
+    return Limiter(key, Pacing(0.0), directory or DEFAULT_DIR).pause

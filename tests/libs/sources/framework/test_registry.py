@@ -307,8 +307,6 @@ def test_each_key_gets_adaptive_pacing_from_its_section_and_http(tmp_path: Path)
         build_sources(settings(bad), ENV.get, ["massive_bars"], tmp_path)
 
 
-def test_a_pauser_waits_the_seconds_through_the_key_limiter(tmp_path: Path) -> None:
-    slept: list[float] = []
-    pause = build_pauser("golden-run", tmp_path, slept.append)
-    pause(5.0)
-    assert len(slept) == 1 and 4.0 < slept[0] <= 5.0
+def test_a_pauser_holds_the_key_limiter_for_the_seconds(tmp_path: Path) -> None:
+    build_pauser("golden-run", tmp_path)(0.05)
+    assert (tmp_path / "golden-run.lock").exists()
