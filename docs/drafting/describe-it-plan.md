@@ -165,22 +165,43 @@ Phrasebook structured thresholds (`[[phrase.criterion]]`, `resolve` / `shortcut`
 model call (stage `phrasebook`, no call id, zero cost), through the same validation and parts as a model's answer;
 any doubt goes to the model. Lever 3 is done.
 
-In flight: #540 feedback retention / erase.
+Also done (2026-10-12): #540 retention / erase; #541-#543 decision log; #544 `edge_revised`; #545 request log route;
+#546 + #553 phrasebook thresholds; #547 prompt headroom; #548 + #551 golden run reporting; #549 admin feature requests;
+#550 Builder review panel; #552 harness; #554 protective suggestions; #555 explained-parts decisions; #556 `PartCard` /
+`PartList`; #558 refused attempts' call id; #559 parts contract (PR A); #560 phrasebook shortcut.
 
-Not started (owner in brackets):
-- Request-log route wiring, after #535 (implementer, API).
-- Builder panel wiring, PR 7 (implementer, web), then the admin accepted-formula list.
-- Admin feature-requests page, PR 8 (implementer, web).
-- Prompt headroom: a token-budgeted slice and a compact index; the largest golden prompt margin is about 77
-  tokens (architect decides, implementer builds).
-- `services/drafting` folder split (`contract/`, `golden/`) (implementer).
-- Enum values for index-only fields: measure after the live golden run (owner question).
-- The live golden run: approved by the owner, Gemini first, $3 cap, `--yes` (owner runs it).
-- "Notify me when available" (lowest priority); `edge_revised` event (reserved, only if a save route exists).
+In flight: #561 re-draft one part (PR B); #557 admin accepted formulas; the `services/drafting` folder split
+(`contract/`, `golden/`).
 
-Follow-up (owner question, not built): should index-only fields show their enum values? The model otherwise
-guesses a value and the validator drops a wrong guess; adding them to the prefix would exceed the 15k budget at
-the largest case, so measure it in the live golden run first.
+Not started:
+- Builder part cards on the review panel (C1) and retype a part (C2, after #561).
+- "Notify me when available" (lowest priority).
+- A Gemini free-tier rerun of the live golden run, to compare with Haiku.
+- Enum values for index-only fields: not built; the 2026-10-12 run shows no enum drops (below).
+- Weak spots from the live run: the twelve failing cases (below), consistency of 0.31 on repeats.
+
+## Live evaluation (2026-10-12, Claude Haiku via the owner's login)
+
+`golden run --provider claude_haiku --repeat 2` over 34 cases (68 calls, temporary one-provider config, not recorded),
+on the merged parts contract (#559), prompt version 8. Baseline: the #547 comments (Haiku, before the contract).
+
+| Measure | Baseline (#547) | Now |
+|---|---|---|
+| Pass rate, all | 0.35-0.40 | 0.68 |
+| Train (20 cases) | n/a | 0.75 |
+| Held-out (14 cases) | 0.19-0.23 | 0.57 |
+| Consistency (same answer on repeat) | n/a | 0.31 |
+| Invalid-answer rate | n/a | 0.015 (1 of 68; `would_repair` 1) |
+| Invented-field drops / any drop | 0 | 0 / 0 |
+| Suggestions per draft | n/a | 0.75 (51 in 68) |
+| Parts | n/a | 67 of 68 drafts carry parts; 98% model-made; 99% located; 9 "not understood"; 88% of readings kept |
+| Latency p50 / p90 | n/a | 9.0 s / 11.3 s |
+| Tokens per call | n/a | 2 fresh in, 10.0k cache read, 10.4k cache write, 1.8k out |
+| Notional cost | n/a | $0.21 for the run ($0.003 a call) |
+
+Twelve cases fail every or one repeat (for example `heavy-put-call`, `outperforming-spy-3m`, `volatile-small-caps`,
+`choppy-micro-caps`, and three of the adversarial `parts-*` cases). No drop in any run was a wrong enum value, so
+showing enum values for index-only fields is not built: re-measure if a drop of that kind appears.
 
 ## Risks
 
