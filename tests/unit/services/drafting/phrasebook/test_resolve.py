@@ -6,7 +6,11 @@ import pytest
 
 from algotrade.config.site.settings import load_phrasebook
 from algotrade.services.drafting.golden import load_cases
-from algotrade.services.drafting.phrasebook.resolve import resolves_fully, structured_matches
+from algotrade.services.drafting.phrasebook.resolve import (
+    resolve,
+    resolves_fully,
+    structured_matches,
+)
 from algotrade.storage.factory import open_config_store
 from tests.conftest import REPO_ROOT
 
@@ -122,3 +126,19 @@ def test_a_flipping_word_a_wording_covers_does_not_block() -> None:
 )
 def test_a_sequence_is_not_two_simultaneous_gates(sentence: str) -> None:
     assert resolves_fully(sentence, BOOK) is None
+
+
+def test_resolve_says_where_each_wording_is_in_the_sentence() -> None:
+    sentence = "Liquid stocks that are OVERSOLD"
+    got = resolve("oversold stocks in an uptrend", BOOK)
+    assert got is not None and got.criteria == resolves_fully("oversold stocks in an uptrend", BOOK)
+    said = "oversold stocks in an uptrend"
+    assert [said[c.start : c.end] for c in got.claims] == ["oversold", "stocks", "in an uptrend"]
+    assert [c.phrase.say[0] for c in got.claims] == ["oversold", "stocks", "uptrend"]
+    assert resolve(sentence, BOOK) is None  # "liquid" has several readings: ask
+    capital = resolve("Oversold ETFs", BOOK)
+    assert capital is not None and "Oversold ETFs"[capital.claims[1].start :] == "ETFs"
+
+
+def test_resolve_declines_a_sentence_whose_lower_case_is_longer() -> None:
+    assert resolve("İstanbul oversold", BOOK) is None  # offsets would not be its own words

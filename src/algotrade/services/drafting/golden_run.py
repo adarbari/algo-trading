@@ -26,6 +26,10 @@ Drops: a criterion the server dropped carries the ``kind`` of the check that ref
 adds ``drops_total``, ``invented_field_drops`` (count and the top 20 invented names with counts)
 and ``would_repair`` (answers whose first answer was refused: the product's repair path would run).
 
+A case the structured phrasebook resolves in full (ADR 0041, lever 3) is drafted with no model
+call: it is scored as any draft, its model is ``phrasebook`` and its cost 0, so such a case says
+nothing about the provider; train cases may grow the phrasebook, held-out ones never do.
+
 Pacing: ``--pace`` sleeps between calls; ``--batch N`` pauses ``--batch-pause`` seconds every N
 calls. A rate-limited answer (HTTP 429) waits the pause (``DEFAULT_RATE_WAIT_S`` without one) and
 retries the same call up to ``RATE_LIMIT_RETRIES`` times before it counts as unavailable.
@@ -365,6 +369,11 @@ def _call(
     )
     fields = frozenset(c["field"] for c in made.document["criteria"].values())
     drops = tuple(Drop(d.id, d.field, d.detail, d.kind) for d in made.dropped)
+    if made.stage == "phrasebook":  # no model was asked: nothing was metered or spent
+        return CallResult(
+            provider, case.id, "ok", graded.passed, fields, "phrasebook", cost_usd=0.0,
+            dropped=drops, suggestions=len(made.suggestions), parts=made.parts_stats,
+        )  # fmt: skip
     return _result(
         provider,
         case.id,

@@ -305,6 +305,14 @@ follow-up PR).
 - status: final
 - Reasoning: owner decision in the session, 2026-10-11 (source: owner); the rows are not the trader's words and are not "not understood".
 
+## 2026-10-12 | Describe it phrasebook shortcut | What a no-model draft carries
+- Question: a sentence the structured phrasebook resolves in full is drafted without the model; what does that draft carry beyond the entries' criteria?
+- Options: only the entries' criteria / the same `instrument.status` ACTIVE scaffolding a model draft always has; a ledger row for the call / no call id; a reading the server writes / none.
+- Decision: the ACTIVE scaffolding is added when no entry says it (shown in the "Added without your words" card, as for a model draft); no call id and no ledger row (the draft cost nothing; `draft_returned.payload.stage` is `phrasebook`); each part carries a server-written reading from its entry's criteria, `reading_source` `server`; a phrase on a field the Builder's current criteria already hold, or any other doubt, goes to the model.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a no-model draft must match what the same sentence would give from the model (inactive instruments excluded), keep every event written as usual without a call id pointing at nothing, and never guess when the Builder's own criteria are in play.
+
 ## 2026-10-11 | Admin accepted formulas | Web budgets and page placement
 - Question: where do the accepted formulas go on the web, and do the perf budgets move?
 - Options: a section on the Feature requests page in its own lazy chunk / a new Admin section and route / inline in the page chunk.

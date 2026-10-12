@@ -14,13 +14,17 @@ from algotrade.services.drafting.parts.model import Item
 from algotrade.services.drafting.suggestions import Suggestion
 
 
+def _frozen(value: Any) -> Any:
+    """``value`` as something hashable (the Builder's document is whatever the client sent)."""
+    if isinstance(value, list):
+        return tuple(_frozen(v) for v in value)
+    if isinstance(value, Mapping):
+        return tuple(sorted((str(k), _frozen(v)) for k, v in value.items()))
+    return value
+
+
 def _reading(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:
-    value = criterion.get("value")
-    return (
-        criterion.get("field"),
-        criterion.get("op"),
-        tuple(value) if isinstance(value, list) else value,
-    )
+    return (criterion.get("field"), criterion.get("op"), _frozen(criterion.get("value")))
 
 
 def _numbers(criterion: Mapping[str, Any]) -> tuple[float, ...]:
@@ -48,7 +52,11 @@ def items_of(
     criteria dropped, ``rank`` the (tag, field) of the document's tie-break, ``spans`` the words
     a criterion stands for when it is the default reading of an ambiguous term."""
     held = current.get("criteria") if isinstance(current, Mapping) else None
-    carried = {_reading(c) for c in held.values() if isinstance(c, Mapping)} if held else set()
+    carried = (
+        {_reading(c) for c in held.values() if isinstance(c, Mapping)}
+        if isinstance(held, Mapping)
+        else set()
+    )
     out = [
         Item(
             "criteria",
