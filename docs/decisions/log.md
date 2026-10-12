@@ -302,5 +302,5 @@ follow-up PR).
 - Options: inside a not-understood card / a separate card
 - Decision: the web shows them as a separate card, "Added without your words"; the backend is as built (a catch-all part with no words, origin `unplaced`, apart from `gap` parts, which carry the words nobody covered).
 - decided by: owner
-- status: confirmed
+- status: final
 - Reasoning: owner decision in the session, 2026-10-11 (source: owner); the rows are not the trader's words and are not "not understood".
